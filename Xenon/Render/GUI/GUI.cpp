@@ -6,13 +6,18 @@ void Render::GUI::Init(SDL_Window* window, void* context) {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGuiIO& io = ImGui::GetIO();
-  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-  io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
   // We don't want to create a ini because it stores positions.
   // Because we initialize with a 1280x720 window, then resize to whatever,
   // this will break the window positions, causing them to render off screen
   io.IniFilename = NULL;
-
+  // Enable ImGui Keyboard Navigation
+  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+  // Enable ImGui Gamepad Navigation
+  io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+  // Enable Docking
+  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+  // Enable Viewport (Allows for no window background)
+  io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
   SetStyle();
   InitBackend(window, context);
 }
@@ -123,6 +128,7 @@ void Render::GUI::Render() {
   EndSwap();
 }
 void Render::GUI::SetStyle() {
+  ImGuiIO &io = ImGui::GetIO();
   ImGuiStyle &style = ImGui::GetStyle();
   ImVec4 *colors = style.Colors;
   // Colors
@@ -204,5 +210,10 @@ void Render::GUI::SetStyle() {
   style.TabBarOverlineSize = 0.f;
   style.ButtonTextAlign = { 0.5f, 0.5f };
   style.DisplaySafeAreaPadding = { 3.f, 22.f };
-  style.MouseCursorScale = 0.7f;
+  style.MouseCursorScale = 0.7f; 
+  // Change some style vars for Viewports
+  if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+    style.WindowRounding = 0.0f;
+    style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+  }
 }

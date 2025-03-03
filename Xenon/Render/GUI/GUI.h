@@ -48,10 +48,10 @@ public:
 
   void Render();
   void SetStyle();
+
   ImFont* defaultFont13{};
   ImFont* robotRegular14{};
   SDL_Window* mainWindow{};
-private:
   bool styleEditor{};
   bool demoWindow{};
 };

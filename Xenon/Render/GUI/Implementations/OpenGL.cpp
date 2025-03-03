@@ -39,19 +39,13 @@ void Render::OpenGLGUI::OnSwap() {
     TabBar("##main", [this] {
       TabItem("Codeflow", [this] {
         Button("Halt", [this] {
-          std::thread([this] {
-            Xe_Main->getCPU()->Halt();
-          }).detach();
+          Xe_Main->getCPU()->Halt();
         });       
         Button("Step", [this] {
-          std::thread([this] {
-            Xe_Main->getCPU()->Step();
-          }).detach();
+          Xe_Main->getCPU()->Step();
         });       
         Button("Continue", [this] {
-          std::thread([this] {
-            Xe_Main->getCPU()->Continue();
-          }).detach();
+           Xe_Main->getCPU()->Continue();
         });
         Toggle("RGH2 Init Skip", &RGH2, [] {
           if (!storedPreviousInitSkips || !RGH2) {
@@ -81,6 +75,10 @@ void Render::OpenGLGUI::OnSwap() {
               SDL_GL_SetSwapInterval(Xe_Main->renderer->VSYNC ? 1 : 0);
             });
           });
+          TabItem("ImGui", [this] {
+            Toggle("Style Editor", &styleEditor);
+            Toggle("Demo", &demoWindow);
+          });
         });
       });
     });
@@ -88,5 +86,13 @@ void Render::OpenGLGUI::OnSwap() {
 } 
 
 void Render::OpenGLGUI::EndSwap() {
+  ImGuiIO& io = ImGui::GetIO();
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+  if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+    SDL_Window* backupCurrentWindow = SDL_GL_GetCurrentWindow();
+    SDL_GLContext backupCurrentContext = SDL_GL_GetCurrentContext();
+    ImGui::UpdatePlatformWindows();
+    ImGui::RenderPlatformWindowsDefault();
+    SDL_GL_MakeCurrent(backupCurrentWindow, backupCurrentContext);
+  }
 }
