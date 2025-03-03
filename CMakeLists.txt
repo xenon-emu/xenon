@@ -153,15 +153,39 @@ set(XCPU
     Xenon/Core/XCPU/PPU/PowerPC.h
 )
 
+set(IMGUI_DIR third_party/ImGui)
+set(IMGUI
+    ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_opengl3.h
+    ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_sdl3.h
+    ${IMGUI_DIR}/imconfig.h
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/imgui.h
+    ${IMGUI_DIR}/imgui_demo.cpp
+    ${IMGUI_DIR}/imgui_internal.h
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
+    ${IMGUI_DIR}/imstb_rectpack.h
+    ${IMGUI_DIR}/imstb_textedit.h
+    ${IMGUI_DIR}/imstb_truetype.h
+)
+
 set(OPENGL
     third_party/glad/src/glad.c
 )
 
 set(RENDER
     ${OPENGL}
+    ${IMGUI}
     Xenon/Render/Abstractions/Texture.h
     Xenon/Render/Implementations/OGLTexture.cpp
-    Xenon/Render/Implementations/OGLTexture.h
+    Xenon/Render/Implementations/OGLTexture.h 
+    Xenon/Render/GUI/Implementations/OpenGL.cpp
+    Xenon/Render/GUI/Implementations/OpenGL.h
+    Xenon/Render/GUI/GUI.cpp
+    Xenon/Render/GUI/GUI.h
     Xenon/Render/Renderer.cpp
     Xenon/Render/Renderer.h
 )
@@ -204,7 +228,7 @@ endif()
 # Include OPENGL Directory
 include_directories(Xenon third_party/glad/include)
 
-target_include_directories(Xenon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(Xenon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${IMGUI_DIR})
 target_link_libraries(Xenon PRIVATE fmt::fmt SDL3::SDL3 toml11::toml11)
 
 add_definitions(-DNTDDI_VERSION=0x0A000006 -D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00)

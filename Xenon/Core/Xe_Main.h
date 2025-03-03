@@ -52,6 +52,10 @@ public:
   void shutdown() {
     running = false;
   }
+
+  Xenon* getCPU() {
+    return xenonCPU.get();
+  }
 private:
   // Main objects
   //  Thread state

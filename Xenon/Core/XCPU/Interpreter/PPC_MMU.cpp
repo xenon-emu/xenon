@@ -861,7 +861,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *hCoreState,
             /*
                 Conditions for a match to occur:
 
-                * PTE: H = 0 for the primary PTEG, 1 for the secondary PTEG
+                * PTE: H = 0 for the primary PTEG, 1 for the secondary PTEG
                 * PTE: V = 1
                 * PTE: AVPN[0:51] = VA0:51
                 * if p < 28, PTE: AVPN[52:51+q] = VA[52:51+q]
@@ -891,7 +891,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *hCoreState,
             */
 
             // L?
-            if (((pteg0[i].pte0 & PPC_HPTE64_LARGE) >> 2) != L) {
+            if (static_cast<u8>((pteg0[i].pte0 & PPC_HPTE64_LARGE) >> 2) != static_cast<u8>(L)) {
               continue;
             }
 
@@ -947,7 +947,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *hCoreState,
             /*
                 Conditions for a match to occur:
 
-                * PTE: H = 0 for the primary PTEG, 1 for the secondary PTEG
+                * PTE: H = 0 for the primary PTEG, 1 for the secondary PTEG
                 * PTE: V = 1
                 * PTE: AVPN[0:51] = VA0:51
                 * if p < 28, PTE: AVPN[52:51+q] = VA[52:51+q]
@@ -977,12 +977,12 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *hCoreState,
             */
 
             // L?
-            if (((pteg1[i].pte0 & PPC_HPTE64_LARGE) >> 2) != L) {
+            if (static_cast<u8>((pteg1[i].pte0 & PPC_HPTE64_LARGE) >> 2) != static_cast<u8>(L)) {
               continue;
             }
 
             // L & LP?
-            if (L && (((pteg1[i].pte1 & PPC_HPTE64_LP) >> 12) != LP)) {
+            if (L && static_cast<u8>((pteg1[i].pte1 & PPC_HPTE64_LP) >> 12) != LP) {
               continue;
             }
 

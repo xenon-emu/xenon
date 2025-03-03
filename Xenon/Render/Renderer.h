@@ -14,21 +14,24 @@ extern "C" {
 #include <glad/glad.h>
 }
 
+#include <backends/imgui_impl_opengl3.h>
+#include <backends/imgui_impl_sdl3.h>
+
 #include "Base/Types.h"
 #include "Core/RAM/RAM.h"
 #include "Core/RootBus/HostBridge/PCIe.h"
 #include "Render/Abstractions/Texture.h"
+#include "Render/GUI/GUI.h"
    
 // ARGB (Console is BGRA)
 #define COLOR(r, g, b, a) ((a) << 24 | (r) << 16 | (g) << 8  | (b) << 0)
 #define TILE(x) ((x + 31) >> 5) << 5
 
-
 namespace Render {
 
 class Renderer {
 public:
-  Renderer(RAM* ram);
+  Renderer(RAM *ram);
   ~Renderer();
   void Start();
   void Shutdown();
@@ -37,13 +40,22 @@ public:
 
   void Thread();
 
-  RAM* ramPointer{};
+  RAM *ramPointer{};
   u8 *fbPointer{};
 
   // Vali0004: This may need to be in XGPU
   // Initial Internal rendering width/height.
   u32 internalWidth = 1280;
   u32 internalHeight = 720;
+
+  // Window Resolution
+  u32 width = 1280;
+  u32 height = 720;
+
+  // Vertical SYNC
+  bool VSYNC = true;
+  // Is Fullscreen
+  bool fullscreen = false;
 private:
   // Thread handle
   std::thread thread;
@@ -51,12 +63,9 @@ private:
   // Backbuffer texture
   std::unique_ptr<Texture> backbuffer;
 
-  // Resolution
-  u32 width = 1280;
-  u32 height = 720;
-  // Vertical SYNC
-  bool VSYNC = true;
-  bool fullscreen = false;
+  // GUI handle
+  std::unique_ptr<GUI> gui;
+
   // Pixel buffer
   int pitch = 0;
   std::vector<u32> pixels{};

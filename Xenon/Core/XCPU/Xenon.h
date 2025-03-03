@@ -24,6 +24,11 @@ public:
   ~Xenon();
 
   void Start(u64 resetVector = 0x100);
+
+  void Halt();
+  void Continue();
+  void Step(int amount = 1);
+
   Xe::XCPU::IIC::XenonIIC *GetIICPointer() { return &xenonContext.xenonIIC; }
 
 private:

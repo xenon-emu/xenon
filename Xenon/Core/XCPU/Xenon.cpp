@@ -32,15 +32,31 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, eFuses inFuseSet) {
   }
 }
 
-Xenon::~Xenon() {}
+Xenon::~Xenon() {
+  ppu0.reset();
+  ppu1.reset();
+  ppu2.reset();
+}
 
 void Xenon::Start(u64 resetVector) {
   // Start execution on every thread.
   ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(&xenonContext, mainBus, XE_PVR, 0, "PPU0"); // Threads 0-1
   ppu1 = std::make_unique<STRIP_UNIQUE(ppu1)>(&xenonContext, mainBus, XE_PVR, 2, "PPU1"); // Threads 2-3
   ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(&xenonContext, mainBus, XE_PVR, 4, "PPU2"); // Threads 4-5
+}
 
-  while (true) {
-    std::this_thread::sleep_for(std::chrono::seconds(60));
-  }
+void Xenon::Halt() {
+  ppu0->Halt();
+  ppu1->Halt();
+  ppu2->Halt();
+}
+void Xenon::Continue() {
+  ppu0->Continue();
+  ppu1->Continue();
+  ppu2->Continue();
+}
+void Xenon::Step(int amount) {
+  ppu0->Step(amount);
+  ppu1->Step(amount);
+  ppu2->Step(amount);
 }

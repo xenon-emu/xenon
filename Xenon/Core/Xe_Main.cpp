@@ -25,6 +25,9 @@ XeMain::~XeMain() {
   // Save config incase it was modified
   Config::saveConfig(userDirectory / "xenon_config.toml");
 
+  // The CPU needs to be killed first, to ensure execution is finished
+  xenonCPU.reset();
+
   // Delete the GPU first, as we likely would have exited from it.
   xenos.reset();
 
@@ -52,9 +55,6 @@ XeMain::~XeMain() {
   hdd.reset();
 
   renderer.reset();
-
-  // CPU last as we will need to shutdown the threads.
-  xenonCPU.reset();
 }
 
 void XeMain::start() {
