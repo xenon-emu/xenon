@@ -46,6 +46,8 @@ u32 Render::OGLTexture::GetDepthFromFlags(int flags) {
   if ((flags & Render::eTextureDepth::R32U) != 0) {
     return GL_R32UI;
   }
+
+  return 0;
 } 
 u32 Render::OGLTexture::GetOGLTextureFormat(Render::eDataFormat format) {
  switch (format) {

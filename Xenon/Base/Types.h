@@ -2,11 +2,11 @@
 
 #pragma once
 
-#include <format>	
+#include <format>
 #include <type_traits>
 
 // Vali0004: Helper macro to make me sane when doing RAII
-#define STRIP_UNIQUE(x) std::remove_pointer_t<decltype(x.get())>   
+#define STRIP_UNIQUE(x) std::remove_pointer_t<decltype(x.get())>
 
 #ifdef _WIN32
 #define SYSTEM_PAUSE() system("PAUSE")
