@@ -287,6 +287,9 @@ private:
   // SMC Thread object
   std::thread smcThread;
 
+  // Is SMC Thread Running?
+  bool smcThreadRunning = true;
+
 #ifndef _WIN32
   // UART Thread object
   std::thread uartThread;

@@ -46,17 +46,24 @@ void Xenon::Start(u64 resetVector) {
 }
 
 void Xenon::Halt() {
-  ppu0->Halt();
-  ppu1->Halt();
-  ppu2->Halt();
+  if (ppu0.get()) ppu0->Halt();
+  if (ppu1.get()) ppu1->Halt();
+  if (ppu2.get()) ppu2->Halt();
 }
 void Xenon::Continue() {
-  ppu0->Continue();
-  ppu1->Continue();
-  ppu2->Continue();
+  if (ppu0.get()) ppu0->Continue();
+  if (ppu1.get()) ppu1->Continue();
+  if (ppu2.get()) ppu2->Continue();
 }
 void Xenon::Step(int amount) {
-  ppu0->Step(amount);
-  ppu1->Step(amount);
-  ppu2->Step(amount);
+  if (ppu0.get()) ppu0->Step(amount);
+  if (ppu1.get()) ppu1->Step(amount);
+  if (ppu2.get()) ppu2->Step(amount);
+} 
+bool Xenon::IsHalted() {
+  bool halted = false;
+  if (ppu0.get()) halted = ppu0->IsHalted();
+  if (ppu1.get()) halted = ppu1->IsHalted();
+  if (ppu2.get()) halted = ppu2->IsHalted();
+  return halted;
 }

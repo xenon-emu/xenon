@@ -28,6 +28,7 @@ public:
   void Halt();
   void Continue();
   void Step(int amount = 1);
+  bool IsHalted();
 
   Xe::XCPU::IIC::XenonIIC *GetIICPointer() { return &xenonContext.xenonIIC; }
 

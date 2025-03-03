@@ -14,6 +14,7 @@ extern "C" {
 #include <glad/glad.h>
 }
 
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include <backends/imgui_impl_opengl3.h>
 #include <backends/imgui_impl_sdl3.h>
 
@@ -36,7 +37,7 @@ public:
   void Start();
   void Shutdown();
 
-  void Resize(int x, int y);
+  void Resize(int x, int y, bool resizeViewport = true);
 
   void Thread();
 
@@ -56,6 +57,10 @@ public:
   bool VSYNC = true;
   // Is Fullscreen
   bool fullscreen = false;
+  // Render in ImGui
+  bool imguiRender = false;
+
+  int pitch = 0;
 private:
   // Thread handle
   std::thread thread;
@@ -67,15 +72,20 @@ private:
   std::unique_ptr<GUI> gui;
 
   // Pixel buffer
-  int pitch = 0;
   std::vector<u32> pixels{};
   // SDL Window data
   SDL_Window *mainWindow{};
   SDL_GLContext context;
   SDL_Event windowEvent;
-  // GL Handles                                
-  GLuint texture, dummyVAO, shaderProgram, pixelBuffer;
-  GLuint renderShaderProgram;
+  SDL_WindowID windowID;
+public:
+  // OpenGL Handles
+  // XeFB Pixel Buffer                                
+  GLuint pixelBuffer;
+  // Texture handles
+  GLuint texture, dummyVAO;
+  // Shaders
+  GLuint shaderProgram, renderShaderProgram;
 };
 
 // Shaders

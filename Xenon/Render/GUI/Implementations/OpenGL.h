@@ -7,6 +7,7 @@ extern "C" {
 #include <KHR/khrplatform.h>
 #include <glad/glad.h>
 }
+#define IMGUI_DEFINE_MATH_OPERATORS
 #include <backends/imgui_impl_opengl3.h>
 #include <backends/imgui_impl_sdl3.h>
 
@@ -16,11 +17,14 @@ namespace Render {
 
 class OpenGLGUI : public GUI {
 public:
-  void InitBackend(SDL_Window* window, void* context) override;
+  void InitBackend(SDL_Window *window, void *context) override;
   void ShutdownBackend() override;
   void BeginSwap() override;
-  void OnSwap() override;
+  void OnSwap(Texture *texture) override;
   void EndSwap() override;
+  bool ppcDebuggerActive{};
+private:
+  bool ppcDebuggerAttached{ true };
 };
 
 } // namespace Render

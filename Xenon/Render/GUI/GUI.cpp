@@ -16,19 +16,25 @@ void Render::GUI::Init(SDL_Window* window, void* context) {
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
   // Enable Docking
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-  // Enable Viewport (Allows for no window background)
-  io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+  if (viewports) {
+    // Enable Viewport (Allows for no window background)
+    io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+  }
   SetStyle();
   InitBackend(window, context);
 }
 void Render::GUI::Shutdown() {
+  if (!this) {
+    return;
+  }
   ShutdownBackend();
   ImGui::DestroyContext();
 }
 
-void Render::GUI::Window(const std::string& title, std::function<void()> callback, const ImVec2& size, ImGuiWindowFlags flags, bool* conditon, const ImVec2& position) {
-  ImGui::SetNextWindowPos(position, ImGuiCond_Once);
-  ImGui::SetNextWindowSize(size, ImGuiCond_Once);
+//TODO(Vali0004): Make Windows into callbacks, so we can create a window from a different thread.
+void Render::GUI::Window(const std::string& title, std::function<void()> callback, const ImVec2& size, ImGuiWindowFlags flags, bool* conditon, const ImVec2& position, ImGuiCond cond) {
+  ImGui::SetNextWindowPos(position, cond);
+  ImGui::SetNextWindowSize(size, cond);
 
   if (ImGui::Begin(title.c_str(), conditon, flags)) {
     if (callback) {
@@ -36,7 +42,46 @@ void Render::GUI::Window(const std::string& title, std::function<void()> callbac
     }
   }
   ImGui::End();
+} 
+
+void Render::GUI::Child(const std::string& title, std::function<void()> callback, const ImVec2& size, ImGuiChildFlags flags, ImGuiWindowFlags windowFlags) {
+  if (ImGui::BeginChild(title.c_str(), size, flags, windowFlags)) {
+    if (callback) {
+      callback();
+    }
+  }
+  ImGui::EndChild();
 }
+
+void Render::GUI::Text(const std::string& label) {
+  ImGui::TextUnformatted(label.c_str());
+}
+
+void Render::GUI::MenuBar(std::function<void()> callback) {
+  if (ImGui::BeginMenuBar()) {
+    if (callback) {
+      callback();
+    }
+    ImGui::EndMenuBar();  
+  }
+}
+
+void Render::GUI::Menu(const std::string& title, std::function<void()> callback) {
+  if (ImGui::BeginMenu(title.c_str())) {
+    if (callback) {
+      callback();
+    }
+    ImGui::EndMenu();  
+  }
+}
+
+void Render::GUI::MenuItem(const std::string& title, std::function<void()> callback, bool enabled, bool selected, const std::string& shortcut) {
+  if (ImGui::MenuItem(title.c_str(), shortcut.c_str(), selected, enabled)) {
+    if (callback) {
+      callback();
+    }  
+  }
+}  
 
 void Render::GUI::TabBar(const std::string& title, std::function<void()> callback, ImGuiTabBarFlags flags) {
   if (ImGui::BeginTabBar(title.c_str(), flags)) {
@@ -111,7 +156,7 @@ void Render::GUI::Tooltip(const std::string& contents, ImGuiHoveredFlags delay) 
 }
  
 
-void Render::GUI::Render() {
+void Render::GUI::Render(Texture* texture) {
   BeginSwap();
   ImGui::NewFrame();
   if (styleEditor) {
@@ -122,7 +167,7 @@ void Render::GUI::Render() {
   if (demoWindow) {
     ImGui::ShowDemoWindow(&demoWindow);
   }
-  OnSwap();
+  OnSwap(texture);
   ImGui::EndFrame();
   ImGui::Render();
   EndSwap();

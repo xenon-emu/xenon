@@ -2,7 +2,8 @@
 
 #include "HostBridge.h"
 
-#include "Base/Logging/Log.h"
+#include "Base/Logging/Log.h" 
+#include "Core/Xe_Main.h"
 
 HostBridge::HostBridge() {
   xGPU = nullptr;
@@ -62,6 +63,11 @@ bool HostBridge::Read(u64 readAddress, u64 *data, u8 byteCount) {
       *data = 0;
       break;
     }
+    return true;
+  }
+
+  // If we are shutting down threads, ignore
+  if (!xGPU || !Xe_Main->isRunning()) {
     return true;
   }
 

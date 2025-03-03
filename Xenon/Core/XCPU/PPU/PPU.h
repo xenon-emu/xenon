@@ -23,6 +23,7 @@ public:
   // Returns a pointer to a thread.
   PPU_THREAD_REGISTERS *GetPPUThread(u8 thrdID);
 
+  bool IsHalted() { return ppcHalt; }
 private:
   // Thread handle
   std::thread ppuThread;

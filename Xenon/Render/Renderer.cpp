@@ -114,6 +114,8 @@ void Render::Renderer::Start() {
   SDL_GL_SetSwapInterval((int)VSYNC);
   // Set if we are in fullscreen mode or not
   SDL_SetWindowFullscreen(mainWindow, fullscreen);
+  // Get current window ID
+  windowID = SDL_GetWindowID(mainWindow);
 
   // TODO(Vali0004): Pull shaders from a file
   // Init shader handles
@@ -173,12 +175,13 @@ void Render::Renderer::Shutdown() {
   SDL_Quit();
 }
 
-void Render::Renderer::Resize(int x, int y) {
+void Render::Renderer::Resize(int x, int y, bool resizeViewport) {
   // Normalize our x and y for tiling
   width = TILE(x);
   height = TILE(y);
   // Resize viewport
-  glViewport(0, 0, width, height);
+  if (resizeViewport)
+    glViewport(0, 0, width, height);
   // Recreate our texture with the new size
   backbuffer->ResizeTexture(width, height);
   // Set our new pitch
@@ -205,8 +208,10 @@ void Render::Renderer::Thread() {
         ImGui_ImplSDL3_ProcessEvent(&windowEvent);
       switch (windowEvent.type) {
       case SDL_EVENT_WINDOW_RESIZED:
-        LOG_DEBUG(Xenos, "Resizing window...");
-        Resize(windowEvent.window.data1, windowEvent.window.data2);
+        if (windowEvent.window.windowID == windowID) {
+          LOG_DEBUG(Xenos, "Resizing window...");
+          Resize(windowEvent.window.data1, windowEvent.window.data2);
+        }
         break;
       case SDL_EVENT_QUIT:
         Shutdown();
@@ -220,6 +225,10 @@ void Render::Renderer::Thread() {
           SDL_GL_SetSwapInterval((int)!VSYNC);
           LOG_INFO(Xenos, "RenderWindow: Setting Vsync to: {0:#b}", VSYNC);
           VSYNC = !VSYNC;
+        }
+        if (windowEvent.key.key == SDLK_F6) {
+          LOG_INFO(Xenos, "RenderWindow: Resize without changing viewport");
+          Resize(1280, 720, false);
         }
         if (windowEvent.key.key == SDLK_F9) {
           LOG_INFO(Xenos, "RenderWindow: Taking a XenosFB snapshot");
@@ -251,23 +260,27 @@ void Render::Renderer::Thread() {
       glBindBuffer(GL_SHADER_STORAGE_BUFFER, pixelBuffer);
       glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, pitch, ui_fbPointer);
 
-      // Use the compute shader
-      glUseProgram(shaderProgram);
-      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, pixelBuffer);
-      glUniform1i(glGetUniformLocation(shaderProgram, "internalWidth"), internalWidth);
-      glUniform1i(glGetUniformLocation(shaderProgram, "internalHeight"), internalHeight);
-      glUniform1i(glGetUniformLocation(shaderProgram, "resWidth"), width);
-      glUniform1i(glGetUniformLocation(shaderProgram, "resHeight"), height);
-      glDispatchCompute(width / 16, height / 16, 1);
-      glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_UPDATE_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+      if (!imguiRender) {
+        // Use the compute shader
+        glUseProgram(shaderProgram);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, pixelBuffer);
+        glUniform1i(glGetUniformLocation(shaderProgram, "internalWidth"), internalWidth);
+        glUniform1i(glGetUniformLocation(shaderProgram, "internalHeight"), internalHeight);
+        glUniform1i(glGetUniformLocation(shaderProgram, "resWidth"), width);
+        glUniform1i(glGetUniformLocation(shaderProgram, "resHeight"), height);
+        glDispatchCompute(width / 16, height / 16, 1);
+        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_UPDATE_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
+      }
     }
 
     // Render the texture
-    glUseProgram(renderShaderProgram);
-    backbuffer->Bind();
-    glBindVertexArray(dummyVAO);
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 3);
-    gui->Render();
+    if (!imguiRender) {
+      glUseProgram(renderShaderProgram);
+      backbuffer->Bind();
+      glBindVertexArray(dummyVAO);
+      glDrawArrays(GL_TRIANGLE_FAN, 0, 3);
+    }
+    gui->Render(backbuffer.get());
 
     SDL_GL_SwapWindow(mainWindow);
   }
