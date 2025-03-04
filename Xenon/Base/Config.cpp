@@ -118,11 +118,11 @@ void loadConfig(const std::filesystem::path &path) {
 
   if (data.contains("GPU")) {
     const toml::value &gpu = data.at("GPU");
-    screenWidth = toml::find_or<int>(gpu, "screenWidth", screenWidth);
-    screenHeight = toml::find_or<int>(gpu, "screenHeight", screenHeight);
-    internalWidth = toml::find_or<int>(gpu, "internalWidth", internalWidth);
-    internalHeight = toml::find_or<int>(gpu, "internalHeight", internalHeight);
-    // gpuId = toml::find_or<int>(gpu, "gpuId", -1);
+    screenWidth = toml::find_or<int&>(gpu, "screenWidth", screenWidth);
+    screenHeight = toml::find_or<int&>(gpu, "screenHeight", screenHeight);
+    internalWidth = toml::find_or<int&>(gpu, "internalWidth", internalWidth);
+    internalHeight = toml::find_or<int&>(gpu, "internalHeight", internalHeight);
+    // gpuId = toml::find_or<int&>(gpu, "gpuId", -1);
   }
 
   if (data.contains("Paths")) {
@@ -140,7 +140,7 @@ void loadConfig(const std::filesystem::path &path) {
   if (data.contains("HighlyExperimental")) {
     const toml::value &highlyExperimental = data.at("HighlyExperimental");
     ticksPerInstruction =
-        toml::find_or<int>(highlyExperimental, "TPI", ticksPerInstruction);
+        toml::find_or<int&>(highlyExperimental, "TPI", ticksPerInstruction);
   }
 }
 
