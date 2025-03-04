@@ -1,4 +1,4 @@
-# Compile Xenon with Visual Studio 2022
+# Compiling Xenon with Visual Studio 2022
 
 ### (Prerequisite) Download [**Git for Windows**](https://git-scm.com/download/win)
 

@@ -17,8 +17,8 @@
 
 <p align="center">
   <a href="https://discord.gg/TDvbdXRRQ6">
-  <img src="https://github.com/xenon-emu/Xenon/blob/main/Docs/screenshots/Xell_Reloaded.png" width="450">
-  <img src="https://github.com/xenon-emu/Xenon/blob/main/Docs/screenshots/WinDBG.png" width="510">
+  <img src="https://github.com/xenon-emu/Xenon/blob/main/Deps/Screenshots/Xell_Reloaded.png" width="450">
+  <img src="https://github.com/xenon-emu/Xenon/blob/main/Deps/Screenshots/WinDBG.png" width="510">
 </p>
 
 # Xenon
@@ -40,7 +40,9 @@ We need talented developers more than ever to contribute to the project and move
 </a>
 
 # Building
-Check the build instructions for [**Windows**](https://github.com/xenon-emu/Xenon/blob/main/Docs/Building/building-windows.md).
+#### [**Windows**](https://github.com/xenon-emu/Xenon/blob/main/Deps/Building/building-windows.md)
+####
+#### [**Linux**](https://github.com/xenon-emu/Xenon/blob/main/Deps/Building/building-linux.md)
 
 # License
 - [**GPL-2.0 license**](https://github.com/xenon-emu/Xenon/blob/main/LICENSE)

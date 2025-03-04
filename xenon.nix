@@ -24,6 +24,7 @@ stdenv.mkDerivation {
   nativeBuildInputs = [ cmake pkg-config ninja ];
   buildInputs = [ sdl3 fmt toml11 ];
   postUnpack = ''
+    rm -rf $sourceRoot/third_party/ImGui
     cp -r ${imgui} $sourceRoot/third_party/ImGui
     chmod -R +w $sourceRoot
   '';

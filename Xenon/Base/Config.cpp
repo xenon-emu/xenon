@@ -229,18 +229,14 @@ void saveConfig(const std::filesystem::path &path) {
   std::string pathPrefix{};
 #else
   // TODO(Vali0004): Pull if Linux or MacOS
-  std::string pathPrefix{ std::getenv("HOME") };
+  std::string pathPrefix{ getenv("HOME") };
 #endif
+  // Paths.                
   // Append a prefix if we need it (ex. Linux)
-  fusesTxtPath = pathPrefix + fusesTxtPath;
-  oneBlBinPath = pathPrefix + oneBlBinPath;
-  nandBinPath = pathPrefix + nandBinPath;
-  oddDiscImagePath = pathPrefix + oddDiscImagePath;
-  // Paths.
-  data["Paths"]["Fuses"] = fusesTxtPath;
-  data["Paths"]["OneBL"] = oneBlBinPath;
-  data["Paths"]["Nand"] = nandBinPath;
-  data["Paths"]["ODDImage"] = oddDiscImagePath;
+  data["Paths"]["Fuses"] = pathPrefix + fusesTxtPath;
+  data["Paths"]["OneBL"] = pathPrefix + oneBlBinPath;
+  data["Paths"]["Nand"] = pathPrefix + nandBinPath;
+  data["Paths"]["ODDImage"] = pathPrefix + oddDiscImagePath;
 
   // HighlyExperimental.
   data["HighlyExperimental"].comments().clear();
