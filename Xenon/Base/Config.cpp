@@ -225,6 +225,17 @@ void saveConfig(const std::filesystem::path &path) {
   data["GPU"]["internalHeight"] = internalHeight;
   //data["GPU"]["gpuId"] = gpuId;
 
+  // TODO(Vali0004): Pull if Linux or MacOS
+#ifndef _WIN32
+  std::string pathPrefix{ std::getenv("HOME") };
+#else   
+  std::string pathPrefix{};
+#endif    
+  // Append a prefix if we need it (ex. Linux)
+  fusesTxtPath = pathPrefix + fusesTxtPath;
+  oneBlBinPath = pathPrefix + oneBlBinPath;
+  nandBinPath = pathPrefix + nandBinPath;
+  oddDiscImagePath = pathPrefix + oddDiscImagePath;
   // Paths.
   data["Paths"]["Fuses"] = fusesTxtPath;
   data["Paths"]["OneBL"] = oneBlBinPath;

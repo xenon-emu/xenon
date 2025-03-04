@@ -40,12 +40,11 @@ inline std::string fusesTxtPath = "C:/Xbox/fuses.txt";
 inline std::string oneBlBinPath = "C:/Xbox/1bl.bin";
 inline std::string nandBinPath = "C:/Xbox/nand.bin";
 inline std::string oddDiscImagePath = "C:/Xbox/xenon.iso";
-#elif defined __linux__
-inline std::string home = getenv("HOME") ? getenv("HOME") : "";
-inline std::string fusesTxtPath = home + "/Xbox/fuses.txt";
-inline std::string oneBlBinPath = home + "/Xbox/1bl.bin";
-inline std::string nandBinPath = home + "/Xbox/nand.bin";
-inline std::string oddDiscImagePath = home + "/Xbox/xenon.iso";
+#else
+inline std::string fusesTxtPath = "/Xbox/fuses.txt";
+inline std::string oneBlBinPath = "/Xbox/1bl.bin";
+inline std::string nandBinPath = "/Xbox/nand.bin";
+inline std::string oddDiscImagePath = "/Xbox/xenon.iso";
 #endif
 
 // Highly experimental.
