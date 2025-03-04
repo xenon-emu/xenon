@@ -258,7 +258,8 @@ void SFCX::sfcxMainLoop() {
       case PHY_PAGE_TO_BUF:
         // Read Phyisical page into page buffer.
         // Physical pages are 0x210 bytes long, logical page (0x200) + meta data
-        // (0x10).                                                
+        // (0x10).
+        LOG_DEBUG(SFCX, "Reading from address {:#x} (reading {:#x} bytes)", sfcxState.addressReg, sizeof(sfcxState.pageBuffer));
         nandFile.seekg(sfcxState.addressReg);
         nandFile.read(reinterpret_cast<char*>(sfcxState.pageBuffer), sizeof(sfcxState.pageBuffer));
         // Issue Interrupt.

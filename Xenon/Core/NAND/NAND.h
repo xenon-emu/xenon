@@ -36,7 +36,7 @@ private:
   // 64 Mb NAND Data
   std::vector<u8> rawNANDData{};
 
-  bool CheckMagic();
+  bool CheckMagic(u8 magicOut[2] = nullptr);
   void CheckSpare();
   bool CheckPageECD(u8 *data, s32 offset);
   void CalculateECD(u8 *data, int offset, u8 ret[]);
