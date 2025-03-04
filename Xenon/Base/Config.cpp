@@ -237,6 +237,15 @@ void saveConfig(const std::filesystem::path &path) {
   data["Paths"]["OneBL"] = pathPrefix + oneBlBinPath;
   data["Paths"]["Nand"] = pathPrefix + nandBinPath;
   data["Paths"]["ODDImage"] = pathPrefix + oddDiscImagePath;
+  if (!fusesTxtPath.compare(data["Paths"]["Fuses"].as_string().data())) {
+    // If this is our first time running, write back into vars.
+    // Default initializing with getenv is a bad practice, because
+    // you are then just praying that getenv is valid.
+    fusesTxtPath = data["Paths"]["Fuses"].as_string();
+    oneBlBinPath = data["Paths"]["OneBL"].as_string();
+    nandBinPath = data["Paths"]["Nand"].as_string();
+    oddDiscImagePath = data["Paths"]["ODDImage"].as_string();
+  }
 
   // HighlyExperimental.
   data["HighlyExperimental"].comments().clear();
