@@ -42,7 +42,7 @@ void Render::GUI::Window(const std::string& title, std::function<void()> callbac
     }
   }
   ImGui::End();
-} 
+}
 
 void Render::GUI::Child(const std::string& title, std::function<void()> callback, const ImVec2& size, ImGuiChildFlags flags, ImGuiWindowFlags windowFlags) {
   if (ImGui::BeginChild(title.c_str(), size, flags, windowFlags)) {
@@ -62,7 +62,7 @@ void Render::GUI::MenuBar(std::function<void()> callback) {
     if (callback) {
       callback();
     }
-    ImGui::EndMenuBar();  
+    ImGui::EndMenuBar();
   }
 }
 
@@ -71,7 +71,7 @@ void Render::GUI::Menu(const std::string& title, std::function<void()> callback)
     if (callback) {
       callback();
     }
-    ImGui::EndMenu();  
+    ImGui::EndMenu();
   }
 }
 
@@ -79,9 +79,9 @@ void Render::GUI::MenuItem(const std::string& title, std::function<void()> callb
   if (ImGui::MenuItem(title.c_str(), shortcut.c_str(), selected, enabled)) {
     if (callback) {
       callback();
-    }  
+    }
   }
-}  
+}
 
 void Render::GUI::TabBar(const std::string& title, std::function<void()> callback, ImGuiTabBarFlags flags) {
   if (ImGui::BeginTabBar(title.c_str(), flags)) {
@@ -90,7 +90,7 @@ void Render::GUI::TabBar(const std::string& title, std::function<void()> callbac
     }
     ImGui::EndTabBar();
   }
-} 
+}
 
 void Render::GUI::TabItem(const std::string& title, std::function<void()> callback, bool* conditon, ImGuiTabItemFlags flags) {
   if (ImGui::BeginTabItem(title.c_str(), conditon, flags)) {
@@ -144,7 +144,7 @@ std::string Render::GUI::InputText(const std::string& title, std::string initVal
   }
 
   return buf.data();
-} 
+}
 
 void Render::GUI::Tooltip(const std::string& contents, ImGuiHoveredFlags delay) {
   if (delay != ImGuiHoveredFlags_DelayNone)
@@ -157,7 +157,7 @@ void Render::GUI::Tooltip(const std::string& contents, ImGuiHoveredFlags delay) 
     ImGui::EndTooltip();
   }
 }
- 
+
 
 void Render::GUI::Render(Texture* texture) {
   BeginSwap();
@@ -258,7 +258,7 @@ void Render::GUI::SetStyle() {
   style.TabBarOverlineSize = 0.f;
   style.ButtonTextAlign = { 0.5f, 0.5f };
   style.DisplaySafeAreaPadding = { 3.f, 22.f };
-  style.MouseCursorScale = 0.7f; 
+  style.MouseCursorScale = 0.7f;
   // Change some style vars for Viewports
   if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
     style.WindowRounding = 0.0f;

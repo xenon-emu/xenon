@@ -86,7 +86,7 @@ void GraphicsSettings(Render::OpenGLGUI *gui) {
     Xe_Main->renderer->VSYNC = Config::vsyncEnabled;
     SDL_GL_SetSwapInterval(Xe_Main->renderer->VSYNC ? 1 : 0);
   });
-} 
+}
 
 void CodeflowSettings(Render::OpenGLGUI *gui) {
   gui->Toggle("RGH2 Init Skip", &RGH2, [] {
@@ -98,7 +98,7 @@ void CodeflowSettings(Render::OpenGLGUI *gui) {
     Config::SKIP_HW_INIT_1 = RGH2 ? initSkip1 : 0x3003DC0;
     Config::SKIP_HW_INIT_2 = RGH2 ? initSkip2 : 0x3003E54;
   });
-}  
+}
 
 u32 texture_id{};
 u32 width{}, height{};
@@ -190,7 +190,7 @@ void Render::OpenGLGUI::OnSwap(Texture *texture) {
             ImGuiSettings(this);
           });
         });
-      });                          
+      });
 #ifdef TEST_IMGUI_RENDER
       // Render it in ImGui
       Child("##backbuffer", [&] {
@@ -201,7 +201,7 @@ void Render::OpenGLGUI::OnSwap(Texture *texture) {
         AddToDrawList(drawList);
       }, { 1280.f, 720.f });
 #endif
-    }, 
+    },
     { static_cast<float>(Xe_Main->renderer->width), static_cast<float>(Xe_Main->renderer->height) },
     ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_MenuBar, nullptr, {}, ImGuiCond_Always
     );
@@ -210,7 +210,7 @@ void Render::OpenGLGUI::OnSwap(Texture *texture) {
     Window("PPC Debugger", [this] {
       PPCDebugger(this);
     }, { 1200.f, 700.f }, ImGuiWindowFlags_NoCollapse, nullptr, { 500.f, 100.f });
-  }  
+  }
   if (!Xe_Main->renderer->imguiRender) {
     Window("Debug", [&] {
       TabBar("##main", [&] {
@@ -233,7 +233,7 @@ void Render::OpenGLGUI::OnSwap(Texture *texture) {
       });
     }, { 800.f, 500.f }, ImGuiWindowFlags_NoCollapse, nullptr, { 1750.f, 10.f });
   }
-} 
+}
 
 void Render::OpenGLGUI::EndSwap() {
   ImGuiIO& io = ImGui::GetIO();

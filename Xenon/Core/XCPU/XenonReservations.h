@@ -17,7 +17,7 @@ class XenonReservations {
 public:
   XenonReservations();
   virtual bool Register(PPU_RES *Res);
-  void Increment(void) {                  
+  void Increment(void) {
     std::lock_guard lck(ReservationLock);
     nReservations++;
   }
@@ -30,7 +30,7 @@ public:
       Scan(x);
   }
   virtual void Scan(u64 PhysAddress);
-  void AcquireLock(void) { 
+  void AcquireLock(void) {
     ReservationLock.lock();
   }
   void ReleaseLock(void) {

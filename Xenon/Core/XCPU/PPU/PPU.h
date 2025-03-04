@@ -33,7 +33,7 @@ private:
 
   // Can we quit?
   bool ppuExecutionDone = true;
-  
+
   // Halt thread
   bool ppcHalt = false;
 

@@ -85,7 +85,7 @@ void XeMain::createHostBridge() {
 
 void XeMain::createRootBus() {
   rootBus = std::make_unique<STRIP_UNIQUE(rootBus)>();
- 
+
   rootBus->AddHostBridge(hostBridge.get());
   rootBus->AddDevice(nandDevice.get());
   rootBus->AddDevice(ram.get());

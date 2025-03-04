@@ -18,7 +18,7 @@ inline Base::Log::Level currentLogLevel = Base::Log::Level::Warning;
 inline bool islogAdvanced = false;
 
 // SMC.
-inline int smcPowerOnReason = 0x11; // SMC_PWR_REAS_EJECT   
+inline int smcPowerOnReason = 0x11; // SMC_PWR_REAS_EJECT
 inline int smcAvPackType = 31; // Set to HDMI_NO_AUDIO. See SMC.cpp for a list of values.
 inline int comPort = 2;
 inline std::string com = "";
@@ -60,7 +60,7 @@ void saveConfig(const std::filesystem::path &path);
 // Selected COM Port.
 std::string* COMPort();
 // Show in fullscreen.
-bool fullscreenMode(); 
+bool fullscreenMode();
 // Enable VSync.
 bool vsync();
 // Enable GPU Render thread.
@@ -96,7 +96,7 @@ u64 HW_INIT_SKIP2();
 
 // Screen Size.
 s32 windowWidth();
-s32 windowHeight(); 
+s32 windowHeight();
 // Intermal Size.
 s32 internalWindowWidth();
 s32 internalWindowHeight();

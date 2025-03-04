@@ -25,7 +25,7 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, eFuses inFuseSet) {
     SYSTEM_PAUSE();
   } else {
     size_t fileSize = std::filesystem::file_size(blPath);
-    if (fileSize == XE_SROM_SIZE) {      
+    if (fileSize == XE_SROM_SIZE) {
       file.read(reinterpret_cast<char*>(xenonContext.SROM), XE_SROM_SIZE);
       LOG_INFO(Xenon, "1BL Loaded.");
     }
@@ -59,7 +59,7 @@ void Xenon::Step(int amount) {
   if (ppu0.get()) ppu0->Step(amount);
   if (ppu1.get()) ppu1->Step(amount);
   if (ppu2.get()) ppu2->Step(amount);
-} 
+}
 bool Xenon::IsHalted() {
   bool halted = false;
   if (ppu0.get()) halted = ppu0->IsHalted();

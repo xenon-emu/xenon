@@ -393,7 +393,7 @@ void PPCInterpreter::PPCInterpreter_mtspr(PPU_STATE *hCore) {
         hCore->ppuThread[hCore->currentThread].GPR[rD];
     break;
   case SPR_CTRLWR:
-    hCore->SPR.CTRL = (u32)hCore->ppuThread[hCore->currentThread].GPR[rD]; 
+    hCore->SPR.CTRL = (u32)hCore->ppuThread[hCore->currentThread].GPR[rD];
     // Also do the write on SPR_CTRLRD
     break;
   case SPR_RMOR:
@@ -524,27 +524,22 @@ void PPCInterpreter::PPCInterpreter_mtmsrd(PPU_STATE *hCore) {
   }
 }
 
-void PPCInterpreter::PPCInterpreter_sync(PPU_STATE* hCore)
-{
+void PPCInterpreter::PPCInterpreter_sync(PPU_STATE* hCore) {
     // Do nothing.
 }
 
-void PPCInterpreter::PPCInterpreter_dcbf(PPU_STATE* hCore)
-{
-    // Do nothing.
+void PPCInterpreter::PPCInterpreter_dcbf(PPU_STATE* hCore) {
+  // Do nothing.
 }
 
-void PPCInterpreter::PPCInterpreter_dcbi(PPU_STATE* hCore)
-{
-    // Do nothing.
+void PPCInterpreter::PPCInterpreter_dcbi(PPU_STATE* hCore) {
+  // Do nothing.
 }
 
-void PPCInterpreter::PPCInterpreter_dcbt(PPU_STATE* hCore)
-{
-    // Do nothing.
+void PPCInterpreter::PPCInterpreter_dcbt(PPU_STATE* hCore) {
+  // Do nothing.
 }
 
-void PPCInterpreter::PPCInterpreter_dcbtst(PPU_STATE* hCore)
-{
-    // Do nothing.
+void PPCInterpreter::PPCInterpreter_dcbtst(PPU_STATE* hCore) {
+  // Do nothing.
 }

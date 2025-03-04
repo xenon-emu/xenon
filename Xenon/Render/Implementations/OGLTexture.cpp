@@ -33,7 +33,7 @@ u32 Render::OGLTexture::GetDepthFromFlags(int flags) {
   if ((flags & Render::eTextureDepth::R16U) != 0) {
     return GL_R16UI;
   }
-  
+
   if ((flags & Render::eTextureDepth::R32) != 0) {
     return GL_R16;
   }
@@ -48,12 +48,12 @@ u32 Render::OGLTexture::GetDepthFromFlags(int flags) {
   }
 
   return 0;
-} 
+}
 u32 Render::OGLTexture::GetOGLTextureFormat(Render::eDataFormat format) {
  switch (format) {
     case Render::eDataFormat::RGB:
       return GL_RGB;
-      break;  
+      break;
     case Render::eDataFormat::RGBA:
       return GL_RGBA;
       break;
@@ -119,10 +119,10 @@ void Render::OGLTexture::ResizeTexture(u32 width, u32 height) {
 
 void Render::OGLTexture::Bind() {
   glBindTexture(GL_TEXTURE_2D, TextureHandle);
-}      
+}
 void Render::OGLTexture::Unbind() {
   glBindTexture(GL_TEXTURE_2D, 0);
-} 
+}
 
 void Render::OGLTexture::DestroyTexture() {
   glDeleteTextures(1, (u32*)GetTexture());

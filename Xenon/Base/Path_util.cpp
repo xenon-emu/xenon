@@ -41,7 +41,7 @@ static auto UserPaths = [] {
   insert_path(PathType::UserDir, userDir, createUserDir);
   insert_path(PathType::LogDir, userDir / LOG_DIR);
   fs::path fontDir = userDir / FONT_DIR;
-  bool createFontsDir = true;  
+  bool createFontsDir = true;
   if (!fs::exists(fontDir) && fs::exists(userDir / ".." / "share" / FONT_DIR)) {
     createFontsDir = false;
     fontDir = userDir / ".." / "share" / FONT_DIR / "truetype";

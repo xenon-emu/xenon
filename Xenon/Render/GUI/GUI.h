@@ -4,7 +4,7 @@
 
 #include <string>
 #include <functional>
-#include <SDL3/SDL.h>  
+#include <SDL3/SDL.h>
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
 #include <imgui_internal.h>

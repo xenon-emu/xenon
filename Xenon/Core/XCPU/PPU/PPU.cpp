@@ -134,7 +134,7 @@ void PPU::StartExecution() {
              instrCount++) {
           // Main processing loop.
 
-          // Debug tools 
+          // Debug tools
           if (ppcHalt) {
             if (ppcStep) {
               if (ppcStepCounter != ppcStepAmount) {

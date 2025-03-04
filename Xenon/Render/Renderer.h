@@ -23,7 +23,7 @@ extern "C" {
 #include "Core/RootBus/HostBridge/PCIe.h"
 #include "Render/Abstractions/Texture.h"
 #include "Render/GUI/GUI.h"
-   
+
 // ARGB (Console is BGRA)
 #define COLOR(r, g, b, a) ((a) << 24 | (r) << 16 | (g) << 8  | (b) << 0)
 #define TILE(x) ((x + 31) >> 5) << 5
@@ -80,7 +80,7 @@ private:
   SDL_WindowID windowID;
 public:
   // OpenGL Handles
-  // XeFB Pixel Buffer                                
+  // XeFB Pixel Buffer
   GLuint pixelBuffer;
   // Texture handles
   GLuint texture, dummyVAO;

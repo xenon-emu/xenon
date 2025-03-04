@@ -51,7 +51,7 @@ Render::Renderer::Renderer(RAM *ram) :
 {
   thread = std::thread(&Render::Renderer::Thread, this);
   thread.detach();
-}       
+}
 
 Render::Renderer::~Renderer() {
   Shutdown();
@@ -139,7 +139,7 @@ void Render::Renderer::Start() {
     Render::eTextureDepth::R32U
   );
 
-  // TODO(Vali0004): Setup a buffer implementation, abstract this away 
+  // TODO(Vali0004): Setup a buffer implementation, abstract this away
   // Init pixel buffer
   pitch = width * height * sizeof(u32);
   pixels.resize(pitch, COLOR(30, 30, 30, 255)); // Init with dark grey

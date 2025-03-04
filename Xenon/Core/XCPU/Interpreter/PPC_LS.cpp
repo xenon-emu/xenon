@@ -163,16 +163,14 @@ void PPCInterpreter::PPCInterpreter_stswi(PPU_STATE *hCore) {
   }
 }
 
-void PPCInterpreter::PPCInterpreter_stmw(PPU_STATE* hCore)
-{
-    D_FORM_rD_rA_D;
-    D = EXTS(D, 16);
+void PPCInterpreter::PPCInterpreter_stmw(PPU_STATE* hCore) {
+  D_FORM_rD_rA_D;
+  D = EXTS(D, 16);
 
-    u64 EA = (rA ? hCore->ppuThread[hCore->currentThread].GPR[rA] : 0) + D;
-    for (u32 idx = rD; idx < 32; ++idx, EA += 4)
-    {
-        MMUWrite32(hCore, EA, static_cast<u32>(hCore->ppuThread[hCore->currentThread].GPR[idx]));         
-    }
+  u64 EA = (rA ? hCore->ppuThread[hCore->currentThread].GPR[rA] : 0) + D;
+  for (u32 idx = rD; idx < 32; ++idx, EA += 4) {
+    MMUWrite32(hCore, EA, static_cast<u32>(hCore->ppuThread[hCore->currentThread].GPR[idx]));
+  }
 }
 
 //
@@ -580,17 +578,15 @@ void PPCInterpreter::PPCInterpreter_lswi(PPU_STATE *hCore) {
   }
 }
 
-void PPCInterpreter::PPCInterpreter_lmw(PPU_STATE* hCore)
-{
-    D_FORM_rD_rA_D;
-    D = EXTS(D, 16);
+void PPCInterpreter::PPCInterpreter_lmw(PPU_STATE* hCore) {
+  D_FORM_rD_rA_D;
+  D = EXTS(D, 16);
 
-    u64 EA = (rA ? hCore->ppuThread[hCore->currentThread].GPR[rA] : 0) + D;
-    for (u32 idx = rD; idx < 32; ++idx, EA += 4)
-    {
-        hCore->ppuThread[hCore->currentThread].GPR[idx] =
-            MMURead32(hCore, EA);
-    }
+  u64 EA = (rA ? hCore->ppuThread[hCore->currentThread].GPR[rA] : 0) + D;
+  for (u32 idx = rD; idx < 32; ++idx, EA += 4) {
+    hCore->ppuThread[hCore->currentThread].GPR[idx] =
+        MMURead32(hCore, EA);
+  }
 }
 
 //
