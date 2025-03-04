@@ -101,3 +101,13 @@ jobs:
       with:
         name: Xenon-linux64
         path: ${{github.workspace}}/build/Xenon
+
+  linux_nix:
+    name: Linux (nix)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v27
+      - name: Build Xenon
+        run: nix build .#xenon -L
