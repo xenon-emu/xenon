@@ -237,7 +237,9 @@ void saveConfig(const std::filesystem::path &path) {
   data["Paths"]["OneBL"] = pathPrefix + oneBlBinPath;
   data["Paths"]["Nand"] = pathPrefix + nandBinPath;
   data["Paths"]["ODDImage"] = pathPrefix + oddDiscImagePath;
-  if (!fusesTxtPath.compare(data["Paths"]["Fuses"].as_string().data())) {
+  // This is needed for Nix as it uses a older toml11 version in Nix 24.11
+  std::string fusesPathConfig = data["Paths"]["Fuses"].as_string();
+  if (!fusesTxtPath.compare(fusesPathConfig.data())) {
     // If this is our first time running, write back into vars.
     // Default initializing with getenv is a bad practice, because
     // you are then just praying that getenv is valid.

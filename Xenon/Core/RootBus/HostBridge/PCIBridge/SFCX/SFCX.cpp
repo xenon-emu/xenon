@@ -61,55 +61,55 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
   // Fix Endiannes
   sfcxState.nandHeader.nandMagic =
       std::byteswap<u16>(sfcxState.nandHeader.nandMagic);
-  LOG_INFO(SFCX, " * NAND Magic: ", sfcxState.nandHeader.nandMagic);
+  LOG_INFO(SFCX, " * NAND Magic: {:#x}", sfcxState.nandHeader.nandMagic);
 
   sfcxState.nandHeader.build = std::byteswap<u16>(sfcxState.nandHeader.build);
-  LOG_INFO(SFCX, " * Build: ", sfcxState.nandHeader.build);
+  LOG_INFO(SFCX, " * Build: {:#x}", sfcxState.nandHeader.build);
 
   sfcxState.nandHeader.qfe = std::byteswap<u16>(sfcxState.nandHeader.qfe);
   sfcxState.nandHeader.flags = std::byteswap<u16>(sfcxState.nandHeader.flags);
 
   sfcxState.nandHeader.entry = std::byteswap<u32>(sfcxState.nandHeader.entry);
-  LOG_INFO(SFCX, " * Entry: ", sfcxState.nandHeader.entry);
+  LOG_INFO(SFCX, " * Entry: {:#x}", sfcxState.nandHeader.entry);
 
   sfcxState.nandHeader.size = std::byteswap<u32>(sfcxState.nandHeader.size);
-  LOG_INFO(SFCX, " * Size: ", sfcxState.nandHeader.size);
+  LOG_INFO(SFCX, " * Size: {:#x}", sfcxState.nandHeader.size);
 
   sfcxState.nandHeader.keyvaultSize =
       std::byteswap<u32>(sfcxState.nandHeader.keyvaultSize);
-  LOG_INFO(SFCX, " * Keyvault Size: ", sfcxState.nandHeader.keyvaultSize);
+  LOG_INFO(SFCX, " * Keyvault Size: {:#x}", sfcxState.nandHeader.keyvaultSize);
 
   sfcxState.nandHeader.sysUpdateAddr =
       std::byteswap<u32>(sfcxState.nandHeader.sysUpdateAddr);
-  LOG_INFO(SFCX, " * System Update Addr: ", sfcxState.nandHeader.sysUpdateAddr);
+  LOG_INFO(SFCX, " * System Update Addr: {:#x}", sfcxState.nandHeader.sysUpdateAddr);
 
   sfcxState.nandHeader.sysUpdateCount =
       std::byteswap<u16>(sfcxState.nandHeader.sysUpdateCount);
-  LOG_INFO(SFCX, " * System Update Count: ", sfcxState.nandHeader.sysUpdateCount);
+  LOG_INFO(SFCX, " * System Update Count: {:#x}", sfcxState.nandHeader.sysUpdateCount);
 
   sfcxState.nandHeader.keyvaultVer =
       std::byteswap<u16>(sfcxState.nandHeader.keyvaultVer);
-  LOG_INFO(SFCX, " * Keyvault Ver: ", sfcxState.nandHeader.keyvaultVer);
+  LOG_INFO(SFCX, " * Keyvault Ver: {:#x}", sfcxState.nandHeader.keyvaultVer);
 
   sfcxState.nandHeader.keyvaultAddr =
       std::byteswap<u32>(sfcxState.nandHeader.keyvaultAddr);
-  LOG_INFO(SFCX, " * Keyvault Addr: ", sfcxState.nandHeader.keyvaultAddr);
+  LOG_INFO(SFCX, " * Keyvault Addr: {:#x}", sfcxState.nandHeader.keyvaultAddr);
 
   sfcxState.nandHeader.sysUpdateSize =
       std::byteswap<u32>(sfcxState.nandHeader.sysUpdateSize);
-  LOG_INFO(SFCX, " * System Update Size: ", sfcxState.nandHeader.sysUpdateSize);
+  LOG_INFO(SFCX, " * System Update Size: {:#x}", sfcxState.nandHeader.sysUpdateSize);
 
   sfcxState.nandHeader.smcConfigAddr =
       std::byteswap<u32>(sfcxState.nandHeader.smcConfigAddr);  
-  LOG_INFO(SFCX, " * SMC Config Addr: ", sfcxState.nandHeader.smcConfigAddr);
+  LOG_INFO(SFCX, " * SMC Config Addr: {:#x}", sfcxState.nandHeader.smcConfigAddr);
 
   sfcxState.nandHeader.smcBootSize =
       std::byteswap<u32>(sfcxState.nandHeader.smcBootSize);
-  LOG_INFO(SFCX, " * SMC Boot Size: ", sfcxState.nandHeader.smcBootSize);
+  LOG_INFO(SFCX, " * SMC Boot Size: {:#x}", sfcxState.nandHeader.smcBootSize);
 
   sfcxState.nandHeader.smcBootAddr =
       std::byteswap<u32>(sfcxState.nandHeader.smcBootAddr);
-  LOG_INFO(SFCX, " * SMC Boot Addr: ", sfcxState.nandHeader.smcBootAddr);
+  LOG_INFO(SFCX, " * SMC Boot Addr: {:#x}", sfcxState.nandHeader.smcBootAddr);
 
   // Check Image size and Meta type.
   size_t imageSize = std::filesystem::file_size(nandLoadPath);
