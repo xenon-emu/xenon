@@ -39,7 +39,7 @@ void PPCInterpreter::PPCInterpreter_mtfsfx(PPU_STATE* hCore) {
   }
 
   for (; b; b >>= 1) {
-    mask <<= 4
+    mask <<= 4;
 
     if (FLM & b){
       mask |= 0xF;
