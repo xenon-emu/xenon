@@ -151,7 +151,10 @@ void Render::GUI::Tooltip(const std::string& contents, ImGuiHoveredFlags delay) 
     delay |= ImGuiHoveredFlags_NoSharedDelay;
 
   if (ImGui::IsItemHovered(delay)) {
-    ImGui::SetTooltip(contents.c_str());
+    if (!ImGui::BeginTooltipEx(ImGuiTooltipFlags_OverridePrevious, ImGuiWindowFlags_None))
+      return;
+    ImGui::TextUnformatted(contents.c_str());
+    ImGui::EndTooltip();
   }
 }
  
