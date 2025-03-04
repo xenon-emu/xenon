@@ -77,33 +77,36 @@ void NAND::Write(u64 writeAddress, u64 data, u8 byteCount) {
 
 //*Checks ECD Page.
 bool NAND::CheckPageECD(u8 *data, s32 offset) {
-  u8 actualData[4]{};
-  u8 calculatedECD[4]{};
+  NANDMetadata metadata{};
+  NANDMetadata calculatedMetadata{};
 
   // This directly takes the NAND block's metadata
-  // and skips to the last 4 ECC bytes, calculates the error corrrecting data on it, 
+  // and calculates the error corrrecting data on the ECC bytes 
   // and checks against what the nand provided
-  memcpy(actualData, rawNANDData.data() + (offset + 0x200 + 0xC), sizeof(actualData));
+  memcpy(&metadata, rawNANDData.data() + (offset + 0x200), sizeof(metadata));
 
-  CalculateECD(data, offset, calculatedECD);
+  CalculateECD(data, offset, calculatedMetadata);
 
   return (
-      calculatedECD[0] == actualData[0] && calculatedECD[1] == actualData[1] &&
-      calculatedECD[2] == actualData[2] && calculatedECD[3] == actualData[3]);
+    metadata.ECC3 == calculatedMetadata.ECC3 &&
+    metadata.ECC2 == calculatedMetadata.ECC2 &&
+    metadata.ECC1 == calculatedMetadata.ECC1 &&
+    metadata.ECC0 == calculatedMetadata.ECC0
+  );
 }
 
 //*Calculates the ECD.
-void NAND::CalculateECD(u8 *data, int offset, u8 ret[]) {
+void NAND::CalculateECD(u8 *data, int offset, NANDMetadata &metadata) {
   u32 i, val = 0, v = 0;
   u32 count = 0;
   for (i = 0; i < 0x1066; i++) {
     if ((i & 31) == 0) {
-      u32 value = u32((u8)(data[count + offset]) << 24 |
-                      (u8)(data[count + offset + 1]) << 16 |
-                      (u8)(data[count + offset + 2]) << 8 |
-                      (u8)(data[count + offset + 3]));
-      value = std::byteswap<u32>(value);
-      v = ~value;
+      v = ~std::byteswap<u32>(
+        (u8)(data[count + offset + 0]) << 24 |
+        (u8)(data[count + offset + 1]) << 16 |
+        (u8)(data[count + offset + 2]) << 8  |
+        (u8)(data[count + offset + 3])
+      );
       count += 4;
     }
     val ^= v & 1;
@@ -113,10 +116,11 @@ void NAND::CalculateECD(u8 *data, int offset, u8 ret[]) {
     val >>= 1;
   }
   val = ~val;
-  ret[0] = (val << 6);
-  ret[1] = (val >> 2) & 0xFF;
-  ret[2] = (val >> 10) & 0xFF;
-  ret[3] = (val >> 18) & 0xFF;
+  // Shift ECC3 to the upper 2 bits
+  metadata.ECC3 = (val << 6);
+  metadata.ECC2 = (val >> 2) & 0xFF;
+  metadata.ECC1 = (val >> 10) & 0xFF;
+  metadata.ECC0 = (val >> 18) & 0xFF;
 }
 
 // Check if the nand provided to us contains a valid metadata or not

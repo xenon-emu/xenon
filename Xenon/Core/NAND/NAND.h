@@ -20,6 +20,26 @@ enum MetaType {
   metaTypeNone = 4           // No spare type or unknown
 };
 
+struct NANDMetadata {
+  u8 BlockID1; // LBA/ID = (((BlockID0 & 0xF) << 8) + (BlockID1))
+  u8 BlockID0 : 4;
+  u8 FsUnused0 : 4;
+  u8 FsSequence0; // Not reversed
+  u8 FsSequence1;
+  u8 FsSequence2;
+  u8 BadBlock;
+  u8 FsSequence3;
+  u8 FsSize1; // ((FsSize0 << 8) + FsSize1) = cert size
+  u8 FsSize0;
+  u8 FsPageCount; // Free pages left in block (ie: If 3 pages are used by cert then this would be 29:0x1D)
+  u8 FsUnused1[0x2];
+  u8 FsBlockType : 6;
+  u8 ECC3 : 2;
+  u8 ECC2; // 14 bit ECD
+  u8 ECC1;
+  u8 ECC0;
+};
+
 class NAND : public SystemDevice {
 public:
   NAND(const char *deviceName, const std::string filePath,
@@ -39,7 +59,7 @@ private:
   bool CheckMagic(u8 magicOut[2] = nullptr);
   void CheckSpare();
   bool CheckPageECD(u8 *data, s32 offset);
-  void CalculateECD(u8 *data, int offset, u8 ret[]);
+  void CalculateECD(u8 *data, int offset, NANDMetadata& metadata);
   MetaType DetectSpareType(bool firstTry = true);
 
   // void SeekPos(s32 address);
