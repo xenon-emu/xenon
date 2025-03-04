@@ -98,7 +98,8 @@ Xe::PCIDev::SMC::SMCCore::SMCCore(const char *deviceName, u64 size,
 
 // Class Destructor.
 Xe::PCIDev::SMC::SMCCore::~SMCCore() {
-    LOG_INFO(SMC, "Core: Exiting.");
+  smcThreadRunning = false;
+  LOG_INFO(SMC, "Core: Exiting.");
 }
 
 // PCI Read
@@ -379,11 +380,9 @@ void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
 // UART Thread
 void Xe::PCIDev::SMC::SMCCore::uartMainThread() {
   smcCoreState->uartInitialized = true;
-  while (smcCoreState->uartThreadRunning)
-  {
+  while (smcCoreState->uartThreadRunning) {
     std::unique_lock<std::mutex> lock(smcCoreState->uartMutex);
-    if (!smcCoreState->uartTxBuffer.empty())
-    {
+    if (!smcCoreState->uartTxBuffer.empty()) {
       printf("%c", smcCoreState->uartTxBuffer.front());
       smcCoreState->uartTxBuffer.pop();
     }
@@ -404,7 +403,7 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
   std::chrono::steady_clock::time_point timerStart =
       std::chrono::steady_clock::now();
 
-  while (true) {
+  while (smcThreadRunning) {
     // The System Management Controller (SMC) does the following:
     // * Communicates over a FIFO Queue with the kernel to execute commands and
     // provide system info.

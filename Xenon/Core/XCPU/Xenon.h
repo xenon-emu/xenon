@@ -14,7 +14,7 @@
 // - 768 bits of IBM's eFuse technology.
 
 #include "Core/RootBus/RootBus.h"
-#include "Core/XCPU/PPU/PPU.h" 
+#include "Core/XCPU/PPU/PPU.h"
 
 #include <filesystem>
 
@@ -24,6 +24,12 @@ public:
   ~Xenon();
 
   void Start(u64 resetVector = 0x100);
+
+  void Halt();
+  void Continue();
+  void Step(int amount = 1);
+  bool IsHalted();
+
   Xe::XCPU::IIC::XenonIIC *GetIICPointer() { return &xenonContext.xenonIIC; }
 
 private:

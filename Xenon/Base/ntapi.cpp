@@ -13,15 +13,15 @@ NtQueueApcThreadEx_t NtQueueApcThreadEx = nullptr;
 namespace Base::NtApi {
 
 void Initialize() {
-    HMODULE nt_handle = GetModuleHandleA("ntdll.dll");
+  HMODULE nt_handle = GetModuleHandleA("ntdll.dll");
 
-    // http://stackoverflow.com/a/31411628/4725495
-    NtClose = (NtClose_t)GetProcAddress(nt_handle, "NtClose");
-    NtSetInformationFile =
-        (NtSetInformationFile_t)GetProcAddress(nt_handle, "NtSetInformationFile");
-    NtCreateThread = (NtCreateThread_t)GetProcAddress(nt_handle, "NtCreateThread");
-    NtTerminateThread = (NtTerminateThread_t)GetProcAddress(nt_handle, "NtTerminateThread");
-    NtQueueApcThreadEx = (NtQueueApcThreadEx_t)GetProcAddress(nt_handle, "NtQueueApcThreadEx");
+  // http://stackoverflow.com/a/31411628/4725495
+  NtClose = (NtClose_t)GetProcAddress(nt_handle, "NtClose");
+  NtSetInformationFile =
+    (NtSetInformationFile_t)GetProcAddress(nt_handle, "NtSetInformationFile");
+  NtCreateThread = (NtCreateThread_t)GetProcAddress(nt_handle, "NtCreateThread");
+  NtTerminateThread = (NtTerminateThread_t)GetProcAddress(nt_handle, "NtTerminateThread");
+  NtQueueApcThreadEx = (NtQueueApcThreadEx_t)GetProcAddress(nt_handle, "NtQueueApcThreadEx");
 }
 
 } // namespace Base::NtApi

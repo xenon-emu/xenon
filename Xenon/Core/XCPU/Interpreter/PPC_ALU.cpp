@@ -15,24 +15,21 @@
 // Based on the work done by the rpcs3 team.
 
 // Add/Add Carrying implementation.
-template<typename T>
-struct addResult
-{
+template <typename T>
+struct addResult {
   T result;
   bool carry;
 
   addResult() = default;
 
   // Straighforward ADD with flags
-  addResult(T a, T b)
-    : result(a + b)
-    , carry(result < a)
-  {
-  }
+  addResult(T a, T b) :
+    result(a + b), carry(result < a)
+  {}
 
   // Straighforward ADC with flags
-  addResult(T a, T b, bool c)
-    : addResult(a, b)
+  addResult(T a, T b, bool c) :
+    addResult(a, b)
   {
     addResult r(result, c);
     result = r.result;
@@ -40,19 +37,16 @@ struct addResult
   }
 };
 
-static addResult<u64> add64Bits(u64 a, u64 b)
-{
-  return{ a, b };
+static addResult<u64> add64Bits(u64 a, u64 b) {
+  return { a, b };
 }
 
-static addResult<u64> add64Bits(u64 a, u64 b, bool c)
-{
-  return{ a, b, c };
+static addResult<u64> add64Bits(u64 a, u64 b, bool c) {
+  return { a, b, c };
 }
 
 // Multiply High Sign/Unsigned.
-inline u64 umulh64(u64 x, u64 y)
-{
+inline u64 umulh64(u64 x, u64 y) {
 #ifdef _MSC_VER
   return __umulh(x, y);
 #else
@@ -60,8 +54,7 @@ inline u64 umulh64(u64 x, u64 y)
 #endif
 }
 
-inline s64 mulh64(s64 x, s64 y)
-{
+inline s64 mulh64(s64 x, s64 y) {
 #ifdef _MSC_VER
   return __mulh(x, y);
 #else
@@ -469,7 +462,7 @@ void PPCInterpreter::PPCInterpreter_mtocrf(PPU_STATE *hCore) {
     if (FXM & b) {
       Mask |= 0xF;
     }
-  }  
+  }
   hCore->ppuThread[hCore->currentThread].CR.CR_Hex =
       ((u32)GPR(rS) & Mask) |
       (hCore->ppuThread[hCore->currentThread].CR.CR_Hex & ~Mask);

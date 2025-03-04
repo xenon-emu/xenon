@@ -23,7 +23,7 @@
 #include "Core/RootBus/HostBridge/PCIBridge/XMA/XMA.h"
 #include "Core/RootBus/RootBus.h"
 #include "Core/XCPU/Xenon.h"
-#include "Core/XGPU/XGPU.h" 
+#include "Core/XGPU/XGPU.h"
 
 #include "Render/Renderer.h"
 
@@ -51,6 +51,10 @@ public:
   }
   void shutdown() {
     running = false;
+  }
+
+  Xenon* getCPU() {
+    return xenonCPU.get();
   }
 private:
   // Main objects

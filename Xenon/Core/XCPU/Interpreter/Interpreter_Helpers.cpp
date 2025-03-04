@@ -5,7 +5,6 @@
 #include "PPCInterpreter.h"
 
 void PPCInterpreter::ppcUpdateCR(PPU_STATE *hCore, s8 crNum, u32 crValue) {
-
   switch (crNum) {
   case 0:
     hCore->ppuThread[hCore->currentThread].CR.CR0 = crValue;

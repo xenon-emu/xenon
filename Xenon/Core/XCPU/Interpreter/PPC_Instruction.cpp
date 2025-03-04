@@ -12,7 +12,7 @@
 #include "PPCInterpreter.h"
 
 #define D_STUB(name) void PPCInterpreter_##name(PPU_STATE *hCore) { return PPCInterpreter_known_unimplemented(#name, hCore); }
-#define D_STUBRC(name) void PPCInterpreter_##name##x(PPU_STATE *hCore) { return PPCInterpreter_known_unimplemented(#name "x", hCore); } 
+#define D_STUBRC(name) void PPCInterpreter_##name##x(PPU_STATE *hCore) { return PPCInterpreter_known_unimplemented(#name "x", hCore); }
 
 namespace PPCInterpreter {
   void PPCInterpreter_nop(PPU_STATE *hCore) {
@@ -1359,4 +1359,5 @@ namespace PPCInterpreter {
       return "Unknown instruction";
       break;
     }
-  }}
+  }
+}

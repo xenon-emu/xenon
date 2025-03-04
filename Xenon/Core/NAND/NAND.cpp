@@ -126,7 +126,7 @@ bool NAND::CheckMagic() {
 
 //*Checks Spare.
 void NAND::CheckSpare() {
-  u8 data[0x630]{};                       
+  u8 data[0x630]{};
   inputFile.seekg(0, std::ios::beg);
   inputFile.read(reinterpret_cast<char*>(data), sizeof(data));
   hasSpare = true;

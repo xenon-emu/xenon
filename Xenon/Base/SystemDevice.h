@@ -16,7 +16,8 @@ struct deviceInfo {
 class SystemDevice {
 public:
   SystemDevice(const char *deviceName, u64 startAddress, u64 endAddress,
-                  bool isSOCDevice) {
+               bool isSOCDevice)
+    {
     info.deviceName = deviceName;
     info.startAddr = startAddress;
     info.endAddr = endAddress;

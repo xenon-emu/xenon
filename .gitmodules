@@ -10,3 +10,7 @@
 	path = third_party/fmt
 	url = https://github.com/fmtlib/fmt.git
 	shallow = true
+[submodule "third_party/ImGui"]
+	path = third_party/ImGui
+	url = https://github.com/ocornut/imgui
+	branch = docking

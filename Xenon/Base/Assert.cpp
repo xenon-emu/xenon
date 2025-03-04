@@ -18,19 +18,19 @@
 #endif // _MSVC_VER
 
 void assert_fail_impl() {
-    Base::Log::Stop();
-    std::fflush(stdout);
-    Crash();
+  Base::Log::Stop();
+  std::fflush(stdout);
+  Crash();
 }
 
 [[noreturn]] void unreachable_impl() {
-    Base::Log::Stop();
-    std::fflush(stdout);
-    Crash();
-    throw std::runtime_error("Unreachable code");
+  Base::Log::Stop();
+  std::fflush(stdout);
+  Crash();
+  throw std::runtime_error("Unreachable code");
 }
 
 void assert_fail_debug_msg(const std::string& msg) {
-    LOG_CRITICAL(Debug, "Assertion Failed!\n{}", msg.data());
-    assert_fail_impl();
+  LOG_CRITICAL(Debug, "Assertion Failed!\n{}", msg.data());
+  assert_fail_impl();
 }

@@ -18,7 +18,7 @@ inline Base::Log::Level currentLogLevel = Base::Log::Level::Warning;
 inline bool islogAdvanced = false;
 
 // SMC.
-inline int smcPowerOnReason = 0x11; // SMC_PWR_REAS_EJECT   
+inline int smcPowerOnReason = 0x11; // SMC_PWR_REAS_EJECT
 inline int smcAvPackType = 31; // Set to HDMI_NO_AUDIO. See SMC.cpp for a list of values.
 inline int comPort = 2;
 inline std::string com = "";
@@ -40,12 +40,11 @@ inline std::string fusesTxtPath = "C:/Xbox/fuses.txt";
 inline std::string oneBlBinPath = "C:/Xbox/1bl.bin";
 inline std::string nandBinPath = "C:/Xbox/nand.bin";
 inline std::string oddDiscImagePath = "C:/Xbox/xenon.iso";
-#elif defined __linux__
-inline std::string home = getenv("HOME") ? getenv("HOME") : "";
-inline std::string fusesTxtPath = home + "/Xbox/fuses.txt";
-inline std::string oneBlBinPath = home + "/Xbox/1bl.bin";
-inline std::string nandBinPath = home + "/Xbox/nand.bin";
-inline std::string oddDiscImagePath = home + "/Xbox/xenon.iso";
+#else
+inline std::string fusesTxtPath = "/Xbox/fuses.txt";
+inline std::string oneBlBinPath = "/Xbox/1bl.bin";
+inline std::string nandBinPath = "/Xbox/nand.bin";
+inline std::string oddDiscImagePath = "/Xbox/xenon.iso";
 #endif
 
 // Highly experimental.
@@ -61,7 +60,7 @@ void saveConfig(const std::filesystem::path &path);
 // Selected COM Port.
 std::string* COMPort();
 // Show in fullscreen.
-bool fullscreenMode(); 
+bool fullscreenMode();
 // Enable VSync.
 bool vsync();
 // Enable GPU Render thread.
@@ -97,7 +96,7 @@ u64 HW_INIT_SKIP2();
 
 // Screen Size.
 s32 windowWidth();
-s32 windowHeight(); 
+s32 windowHeight();
 // Intermal Size.
 s32 internalWindowWidth();
 s32 internalWindowHeight();

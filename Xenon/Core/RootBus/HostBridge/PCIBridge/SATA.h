@@ -177,8 +177,8 @@
 
 /*
     This register contains the command code to be sent to the disk drive.
-   Command execution begins immediately after the command code is written into
-   the Command register. The contents of the Command Block registers become
+   Command execution begins immediately after the command code is written into
+   the Command register. The contents of the Command Block registers become
    parameters of the command when this register is written. Writing this
    register clears any pending interrupt condition.
 */
@@ -406,10 +406,10 @@
 #define XE_SIS_SCR_BASE        0xC0  // Sata0 PHY SCR Registers Base.
 
 /*
-* Serial ATA provides an additional block of registers to control the interface and to retrieve 
-* interface state information. There are 16 contiguous registers allocated of which the first five are 
-* defined and the remaining 11 are reserved for future definition. Table 76 defines the Serial ATA 
-* Status and Control registers. 
+* Serial ATA provides an additional block of registers to control the interface and to retrieve
+* interface state information. There are 16 contiguous registers allocated of which the first five are
+* defined and the remaining 11 are reserved for future definition. Table 76 defines the Serial ATA
+* Status and Control registers.
 * The registers start at offset that's specified by the arch.
 * Registers offsets are SCR_REG_BASE + RegNum * 4.
 */
@@ -425,37 +425,37 @@
 
 /*
 * SError register:
-* The Serial ATA interface Error register - SError - is a 32-bit register that conveys supplemental 
-* Interface error information to complement the error information available in the Shadow Register 
-* Block Error register. The register represents all the detected errors accumulated since the last 
-* time the SError register was cleared (whether recovered by the interface of not). Set bits in the 
-* error register are explicitly cleared by a write operation to the SError register, or a reset operation. 
-* The value written to clear set error bits shall have 1’s encoded in the bit positions corresponding 
-* to the bits that are to be cleared. Host software should clear the Interface SError register at 
-* appropriate checkpoints in order to best isolate error conditions and the commands they impact. 
+* The Serial ATA interface Error register - SError - is a 32-bit register that conveys supplemental
+* Interface error information to complement the error information available in the Shadow Register
+* Block Error register. The register represents all the detected errors accumulated since the last
+* time the SError register was cleared (whether recovered by the interface of not). Set bits in the
+* error register are explicitly cleared by a write operation to the SError register, or a reset operation.
+* The value written to clear set error bits shall have 1's encoded in the bit positions corresponding
+* to the bits that are to be cleared. Host software should clear the Interface SError register at
+* appropriate checkpoints in order to best isolate error conditions and the commands they impact.
 */
 #define SCR_ERROR_REG 1         // SCR[1] SError register.
 
 /*
 * SControl register:
-* The Serial ATA interface Control register - SControl - is a 32-bit read-write register that provides 
-* the interface by which software controls Serial ATA interface capabilities. Writes to the SControl 
-* register result in an action being taken by the host adapter or interface. Reads from the register 
-* return the last value written to it. 
+* The Serial ATA interface Control register - SControl - is a 32-bit read-write register that provides
+* the interface by which software controls Serial ATA interface capabilities. Writes to the SControl
+* register result in an action being taken by the host adapter or interface. Reads from the register
+* return the last value written to it.
 */
 #define SCR_CONTROL_REG 2         // SCR[2] SControl register.
 
 /*
 * SActive register:
-* The SActive register is a 32-bit register that conveys the information returned in the SActive field 
-* of the Set Device Bits FIS. If NCQ is not supported, then the SActive register does not need to 
+* The SActive register is a 32-bit register that conveys the information returned in the SActive field
+* of the Set Device Bits FIS. If NCQ is not supported, then the SActive register does not need to
 * be implemented.
 */
 #define SCR_ACTIVE_REG  3         // SCR[3] SActive register.
 
 /*
 * SNotification register (Optional):
-* The Serial ATA interface notification register - SNotification - is a 32-bit register that conveys the 
+* The Serial ATA interface notification register - SNotification - is a 32-bit register that conveys the
 * devices that have sent the host a Set Device Bits FIS with the Notification bit set, as specified in
 * section 10.3.6. When the host receives a Set Device Bits FIS with the Notification bit set to one,
 * the host shall set the bit in the SNotification register corresponding to the value of the PM Port
@@ -506,54 +506,54 @@
 ** SError:
 */
 
-// ERR: The ERR field contains error information for use by host software in determining the 
+// ERR: The ERR field contains error information for use by host software in determining the
 // appropriate response to the error condition.
 #define SERROR_ERR_BITS  0xFFFF
 // Possible values:
 // [R|R|R|R|E|P|C|T|R|R|R|R|R|R|M|I]
 
 /*
-* C Non-recovered persistent communication or data integrity error: A communication error 
-that was not recovered occurred that is expected to be persistent. Since the error 
-condition is expected to be persistent the operation need not be retried by host software. 
-Persistent communications errors may arise from faulty interconnect with the device, from 
-a device that has been removed or has failed, or a number of other causes. 
+* C Non-recovered persistent communication or data integrity error: A communication error
+that was not recovered occurred that is expected to be persistent. Since the error
+condition is expected to be persistent the operation need not be retried by host software.
+Persistent communications errors may arise from faulty interconnect with the device, from
+a device that has been removed or has failed, or a number of other causes.
 
-* E Internal error: The host bus adapter experienced an internal error that caused the 
-operation to fail and may have put the host bus adapter into an error state. Host software 
-should reset the interface before re-trying the operation. If the condition persists, the host 
-bus adapter may suffer from a design issue rendering it incompatible with the attached 
-device. 
+* E Internal error: The host bus adapter experienced an internal error that caused the
+operation to fail and may have put the host bus adapter into an error state. Host software
+should reset the interface before re-trying the operation. If the condition persists, the host
+bus adapter may suffer from a design issue rendering it incompatible with the attached
+device.
 
-* I Recovered data integrity error: A data integrity error occurred that was recovered by the 
-interface through a retry operation or other recovery action. This may arise from a noise 
-burst in the transmission, a voltage supply variation, or from other causes. No action is 
-required by host software since the operation ultimately succeeded, however, host 
-software may elect to track such recovered errors in order to gauge overall 
-communications integrity and potentially step down the negotiated communication speed. 
+* I Recovered data integrity error: A data integrity error occurred that was recovered by the
+interface through a retry operation or other recovery action. This may arise from a noise
+burst in the transmission, a voltage supply variation, or from other causes. No action is
+required by host software since the operation ultimately succeeded, however, host
+software may elect to track such recovered errors in order to gauge overall
+communications integrity and potentially step down the negotiated communication speed.
 
-* M Recovered communications error: Communications between the device and host was 
-temporarily lost but was re-established. This may arise from a device temporarily being 
-removed, from a temporary loss of Phy synchronization, or from other causes and may 
-be derived from the PHYRDYn signal between the Phy and Link layers. No action is 
-required by the host software since the operation ultimately succeeded, however, host 
-software may elect to track such recovered errors in order to gauge overall 
-communications integrity and potentially step down the negotiated communication speed. 
+* M Recovered communications error: Communications between the device and host was
+temporarily lost but was re-established. This may arise from a device temporarily being
+removed, from a temporary loss of Phy synchronization, or from other causes and may
+be derived from the PHYRDYn signal between the Phy and Link layers. No action is
+required by the host software since the operation ultimately succeeded, however, host
+software may elect to track such recovered errors in order to gauge overall
+communications integrity and potentially step down the negotiated communication speed.
 
-* P Protocol error: A violation of the Serial ATA protocol was detected. This may arise from 
-invalid or poorly formed FISes being received, from invalid state transitions, or from other 
-causes. Host software should reset the interface and retry the corresponding operation. If 
-such an error persists, the attached device may have a design issue rendering it 
+* P Protocol error: A violation of the Serial ATA protocol was detected. This may arise from
+invalid or poorly formed FISes being received, from invalid state transitions, or from other
+causes. Host software should reset the interface and retry the corresponding operation. If
+such an error persists, the attached device may have a design issue rendering it
 incompatible with the host bus adapter.
 
 * R Reserved bit for future use: Shall be cleared to zero.
 
-* T Non-recovered transient data integrity error: A data integrity error occurred that was not 
-recovered by the interface. Since the error condition is not expected to be persistent the 
+* T Non-recovered transient data integrity error: A data integrity error occurred that was not
+recovered by the interface. Since the error condition is not expected to be persistent the
 operation should be retried by host software.
 */
 
-// DIAG: The DIAG field contains diagnostic error information for use by diagnostic software in 
+// DIAG: The DIAG field contains diagnostic error information for use by diagnostic software in
 // validating correct operation or isolating failure modes.The field is bit significant as
 // defined in the following figure.
 #define SERROR_DIAG_BITS  0xFFFF0000
@@ -562,12 +562,12 @@ operation should be retried by host software.
 // [R|A|X|F|T|S|H|C|D|B|W|I|N]
 
 /*
-* A Port Selector presence detected: This bit is set to one when COMWAKE is received while 
-the host is in state HP2: HR_AwaitCOMINIT. On power-up reset this bit is cleared to 
-zero. The bit is cleared to zero when the host writes a one to this bit location. 
+* A Port Selector presence detected: This bit is set to one when COMWAKE is received while
+the host is in state HP2: HR_AwaitCOMINIT. On power-up reset this bit is cleared to
+zero. The bit is cleared to zero when the host writes a one to this bit location.
 
 * B 10b to 8b Decode error: When set to a one, this bit indicates that one or more 10b to 8b
-decoding errors occurred since the bit was last cleared to zero. 
+decoding errors occurred since the bit was last cleared to zero.
 
 * C CRC Error: When set to one, this bit indicates that one or more CRC errors occurred with
 the Link layer since the bit was last cleared to zero.
@@ -620,19 +620,19 @@ COMRESET having been issued, or in response to power-up.
 #define SCONTROL_DET_BITS  0xF
 // Possible values:
 #define SCONTROL_DET_NO_DEV   0 // No device detection or initialization action requested.
-#define SCONTROL_DET_INIT     1 // Perform interface communication initialization sequence to establish 
+#define SCONTROL_DET_INIT     1 // Perform interface communication initialization sequence to establish
                                 // communication.This is functionally equivalent to a hard reset and results in the
                                 // interface being reset and communications reinitialized.
 #define SCONTROL_DET_DISABLE  4 // Disable the Serial ATA interface and put Phy in offline mode.
 
-// SPD: The SPD field represents the highest allowed communication speed the interface is 
+// SPD: The SPD field represents the highest allowed communication speed the interface is
 // allowed to negotiate when interface communication speed is established.
 #define SCONTROL_SPD_BITS   0xF0
 #define SCONTROL_SPD_SHIFT  4
 // Possible values:
 #define SCONTROL_SPD_NO_LIMIT 0 // No speed negotiation restrictions.
-#define SCONTROL_SPD_GEN1     1 // Limit speed negotiation to a rate not greater than Gen 1 communication rate. 
-#define SCONTROL_SPD_HEN2     2 // Limit speed negotiation to a rate not greater than Gen 2 communication rate. 
+#define SCONTROL_SPD_GEN1     1 // Limit speed negotiation to a rate not greater than Gen 1 communication rate.
+#define SCONTROL_SPD_HEN2     2 // Limit speed negotiation to a rate not greater than Gen 2 communication rate.
 
 // IPM: The IPM field represents the enabled interface power management states that may be
 // invoked via the Serial ATA interface power management capabilities.
@@ -640,9 +640,9 @@ COMRESET having been issued, or in response to power-up.
 #define SCONTROL_IPM_SHIFT  8
 // Possible values:
 #define SCONTROL_IPM_NO_RESTRICTION       0 // No interface power management state restrictions.
-#define SCONTROL_IPM_PARTIAL_PM_DISABLED  1 // Transitions to the Partial power management state disabled. 
-#define SCONTROL_IPM_SLUMBER_PM_DISABLED  2 // Transitions to the Slumber power management state disabled. 
-#define SCONTROL_IPM_ALL_PM_DISABLED      3 // Transitions to both the Partial and Slumber power management states disabled. 
+#define SCONTROL_IPM_PARTIAL_PM_DISABLED  1 // Transitions to the Partial power management state disabled.
+#define SCONTROL_IPM_SLUMBER_PM_DISABLED  2 // Transitions to the Slumber power management state disabled.
+#define SCONTROL_IPM_ALL_PM_DISABLED      3 // Transitions to both the Partial and Slumber power management states disabled.
 
 // The rest of the bits are Power-management related. If required i'll implement them.
 
@@ -813,7 +813,7 @@ struct XE_ATA_IDENTIFY_DATA {
 
 // SCSI Status Codes.
 // The Status is a single byte returned by some SCSI commands.
-// Only nine status codes are defined under the SCSI-2 specification. All 
+// Only nine status codes are defined under the SCSI-2 specification. All
 // others are reserved.
 #define SCSI_STATUS_GOOD  0x00
 #define SCSI_STATUS_CHECK_CONDITION  0x01

@@ -86,8 +86,8 @@ void loadConfig(const std::filesystem::path &path) {
   try {
     data = toml::parse(path);
   } catch (std::exception &ex) {
-    LOG_ERROR(Config, "Got exception trying to load config file. Exception: {}", 
-        ex.what());
+    LOG_ERROR(Config, "Got exception trying to load config file. Exception: {}",
+              ex.what());
     return;
   }
 
@@ -118,11 +118,11 @@ void loadConfig(const std::filesystem::path &path) {
 
   if (data.contains("GPU")) {
     const toml::value &gpu = data.at("GPU");
-    screenWidth = toml::find_or<int>(gpu, "screenWidth", screenWidth);
-    screenHeight = toml::find_or<int>(gpu, "screenHeight", screenHeight);
-    internalWidth = toml::find_or<int>(gpu, "internalWidth", internalWidth);
-    internalHeight = toml::find_or<int>(gpu, "internalHeight", internalHeight);
-    // gpuId = toml::find_or<int>(gpu, "gpuId", -1);
+    screenWidth = toml::find_or<int&>(gpu, "screenWidth", screenWidth);
+    screenHeight = toml::find_or<int&>(gpu, "screenHeight", screenHeight);
+    internalWidth = toml::find_or<int&>(gpu, "internalWidth", internalWidth);
+    internalHeight = toml::find_or<int&>(gpu, "internalHeight", internalHeight);
+    // gpuId = toml::find_or<int&>(gpu, "gpuId", -1);
   }
 
   if (data.contains("Paths")) {
@@ -140,7 +140,7 @@ void loadConfig(const std::filesystem::path &path) {
   if (data.contains("HighlyExperimental")) {
     const toml::value &highlyExperimental = data.at("HighlyExperimental");
     ticksPerInstruction =
-        toml::find_or<int>(highlyExperimental, "TPI", ticksPerInstruction);
+        toml::find_or<int&>(highlyExperimental, "TPI", ticksPerInstruction);
   }
 }
 
@@ -168,7 +168,7 @@ void saveConfig(const std::filesystem::path &path) {
   // it'll have duplicates if we don't. So just follow what I did, and clear them for your sanity.
   // Note: Even if they don't cause problems, I'll still yell at you :P
 
-  // General.                                              
+  // General.
   data["General"]["GPURenderThreadEnabled"].comments().clear();
   data["General"]["LogLevel"].comments().clear();
 
@@ -181,7 +181,7 @@ void saveConfig(const std::filesystem::path &path) {
   data["General"]["LogLevel"] = (int)currentLogLevel;
   data["General"]["LogAdvanced"] = islogAdvanced;
 
-  // SMC.               
+  // SMC.
   data["SMC"]["COMPort"].comments().clear();
   data["SMC"]["SMCAvPackType"].comments().clear();
   data["SMC"]["SMCPowerOnType"].comments().clear();
@@ -200,7 +200,7 @@ void saveConfig(const std::filesystem::path &path) {
   data["SMC"]["SMCPowerOnType"].comments().push_back("# Note: When trying to boot Linux/XeLL Reloaded this must be set to 18");
   data["SMC"]["SMCPowerOnType"] = smcPowerOnReason;
 
-  // PowerPC.         
+  // PowerPC.
   data["PowerPC"]["HW_INIT_SKIP1"].comments().clear();
   data["PowerPC"]["HW_INIT_SKIP2"].comments().clear();
 
@@ -209,9 +209,9 @@ void saveConfig(const std::filesystem::path &path) {
   data["PowerPC"]["HW_INIT_SKIP2"].comments().push_back("# Hardware Init Skip address 2");
   data["PowerPC"]["HW_INIT_SKIP2"] = SKIP_HW_INIT_2;
 
-  // GPU.                                        
+  // GPU.
   data["GPU"]["screenWidth"].comments().clear();
-  data["GPU"]["screenHeight"].comments().clear(); 
+  data["GPU"]["screenHeight"].comments().clear();
   data["GPU"]["internalWidth"].comments().clear();
   data["GPU"]["internalHeight"].comments().clear();
 
@@ -225,13 +225,31 @@ void saveConfig(const std::filesystem::path &path) {
   data["GPU"]["internalHeight"] = internalHeight;
   //data["GPU"]["gpuId"] = gpuId;
 
-  // Paths.
-  data["Paths"]["Fuses"] = fusesTxtPath;
-  data["Paths"]["OneBL"] = oneBlBinPath;
-  data["Paths"]["Nand"] = nandBinPath;
-  data["Paths"]["ODDImage"] = oddDiscImagePath;
+#ifdef _WIN32
+  std::string pathPrefix{};
+#else
+  // TODO(Vali0004): Pull if Linux or MacOS
+  std::string pathPrefix{ getenv("HOME") };
+#endif
+  // Paths.                
+  // Append a prefix if we need it (ex. Linux)
+  data["Paths"]["Fuses"] = pathPrefix + fusesTxtPath;
+  data["Paths"]["OneBL"] = pathPrefix + oneBlBinPath;
+  data["Paths"]["Nand"] = pathPrefix + nandBinPath;
+  data["Paths"]["ODDImage"] = pathPrefix + oddDiscImagePath;
+  // This is needed for Nix as it uses a older toml11 version in Nix 24.11
+  std::string fusesPathConfig = data["Paths"]["Fuses"].as_string();
+  if (!fusesTxtPath.compare(fusesPathConfig.data())) {
+    // If this is our first time running, write back into vars.
+    // Default initializing with getenv is a bad practice, because
+    // you are then just praying that getenv is valid.
+    fusesTxtPath = data["Paths"]["Fuses"].as_string();
+    oneBlBinPath = data["Paths"]["OneBL"].as_string();
+    nandBinPath = data["Paths"]["Nand"].as_string();
+    oddDiscImagePath = data["Paths"]["ODDImage"].as_string();
+  }
 
-  // HighlyExperimental.                             
+  // HighlyExperimental.
   data["HighlyExperimental"].comments().clear();
   data["HighlyExperimental"]["TPI"].comments().clear();
 

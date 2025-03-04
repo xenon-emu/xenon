@@ -23,9 +23,9 @@ public:
   virtual void SetTexture(void* handle) { Texture = handle; }
   virtual void* GetTexture() { return Texture; }
   virtual void SetDepth(u32 depth) {  Depth = depth; }
-  virtual u32 GetDepth() { return Depth; }   
+  virtual u32 GetDepth() { return Depth; }
   virtual void SetWidth(u32 width) { Width = width; }
-  virtual u32 GetWidth() { return Width; }   
+  virtual u32 GetWidth() { return Width; }
   virtual void SetHeight(u32 height) { Height = height; }
   virtual u32 GetHeight() { return Height; }
 private:

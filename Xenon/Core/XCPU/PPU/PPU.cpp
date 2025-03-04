@@ -94,13 +94,33 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u32 PVR,
   ppuThread = std::thread(&PPU::StartExecution, this);
   ppuThread.detach();
 }
+PPU::~PPU() {
+  ppuRunning = false;
+  // Ensure our threads are finished running
+  while (!ppuExecutionDone) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  ppuState.reset();
+}
+
+void PPU::Halt() {
+  ppcHalt = true;
+}
+void PPU::Continue() {
+  ppcHalt = false;
+}
+void PPU::Step(int amount) {
+  ppcStepAmount = amount;
+  ppcStep = true;
+}
 
 // PPU Entry Point.
 void PPU::StartExecution() {
   // While the CPU is running
   while (ppuRunning) {
     // See if we have any threads active.
-    while (getCurrentRunningThreads() != PPU_THREAD_NONE) {
+    while (ppuRunning && getCurrentRunningThreads() != PPU_THREAD_NONE) {
+      ppuExecutionDone = false;
       // We have some threads active!
 
       // Check if the 1st thread is active and process instructions on it.
@@ -113,6 +133,21 @@ void PPU::StartExecution() {
         for (size_t instrCount = 0; instrCount < ppuState->SPR.TTR;
              instrCount++) {
           // Main processing loop.
+
+          // Debug tools
+          if (ppcHalt) {
+            if (ppcStep) {
+              if (ppcStepCounter != ppcStepAmount) {
+                ppcStepCounter++;
+              }
+              else {
+                ppcStep = false;
+              }
+            }
+            while (ppcHalt && !ppcStep) {
+              std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+          }
 
           // Read next intruction from Memory.
           if (ppuReadNextInstruction()) {
@@ -187,7 +222,10 @@ void PPU::StartExecution() {
           ppuCheckExceptions();
         }
       }
+      ppuExecutionDone = true;
     }
+    if (!ppuState.get())
+      break;
 
     //
     // Check for external interrupts that enable us if we're allowed to.
@@ -478,6 +516,10 @@ void PPU::updateTimeBase() {
 
 // Returns current executing thread by reading CTRL register.
 PPU_THREAD PPU::getCurrentRunningThreads() {
+  // If we have shutdown before current running threads is finished, force a shutdown
+  if (!ppuState.get()) {
+    return PPU_THREAD_NONE;
+  }
   // Check CTRL Register CTRL>TE[0,1];
   u8 ctrlTE = (ppuState->SPR.CTRL & 0xC00000) >> 22;
   switch (ctrlTE) {

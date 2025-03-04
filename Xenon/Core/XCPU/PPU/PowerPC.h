@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Core/XCPU/IIC/IIC.h"  
+#include "Core/XCPU/IIC/IIC.h"
 #include "Core/XCPU/Bitfield.h"
 #include "Core/XCPU/XenonReservations.h"
 #include "Core/XCPU/eFuse.h"
