@@ -45,13 +45,13 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
   nandFile.open(nandLoadPath, std::ios_base::in | std::ios_base::binary);
                   
   if (!nandFile.is_open()) {
-    LOG_CRITICAL(SFCX, "Fatal error, check your nand dump path!");
+    LOG_CRITICAL(SFCX, "Fatal error! Please make sure your NAND (or NAND path) is valid!");
     SYSTEM_PAUSE();
   }
 
   // Check file magic.
   if (!checkMagic()) {
-    LOG_CRITICAL(SFCX, "Fatal error, loaded faile magic does'nt correspond to Xbox 360 NAND.");
+    LOG_CRITICAL(SFCX, "Fatal error! The loaded 'nand.bin' doesn't correspond to a Xbox 360 NAND.");
     SYSTEM_PAUSE();
   }
 
