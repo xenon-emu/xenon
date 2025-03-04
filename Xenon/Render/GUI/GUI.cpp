@@ -57,6 +57,10 @@ void Render::GUI::Text(const std::string& label) {
   ImGui::TextUnformatted(label.c_str());
 }
 
+void Render::GUI::SameLine(float xOffset, float spacing) {
+  ImGui::SameLine(xOffset, spacing);
+}
+
 void Render::GUI::MenuBar(std::function<void()> callback) {
   if (ImGui::BeginMenuBar()) {
     if (callback) {

@@ -43,6 +43,7 @@ public:
   void Window(const std::string& title, std::function<void()> callback = {}, const ImVec2& size = {}, ImGuiWindowFlags flags = 0, bool* conditon = nullptr, const ImVec2& position = {}, ImGuiCond cond = ImGuiCond_Once);
   void Child(const std::string& title, std::function<void()> callback = {}, const ImVec2& size = {}, ImGuiChildFlags flags = 0, ImGuiWindowFlags windowFlags = 0);
   void Text(const std::string& label);
+  void SameLine(float xOffset = 0.f, float spacing = -1.f);
   void MenuBar(std::function<void()> callback = {});
   void MenuItem(const std::string& title, std::function<void()> callback = {}, bool enabled = true, bool selected = false, const std::string& shortcut = {});
   void Menu(const std::string& title, std::function<void()> callback = {});

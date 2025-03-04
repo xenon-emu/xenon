@@ -206,14 +206,36 @@ void Render::OpenGLGUI::OnSwap(Texture *texture) {
     ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_MenuBar, nullptr, {}, ImGuiCond_Always
     );
   }
-  if (!Xe_Main->renderer->imguiRender || (Xe_Main->renderer->imguiRender && !ppcDebuggerAttached)) {
+  if (ppcDebuggerActive && (!Xe_Main->renderer->imguiRender || (Xe_Main->renderer->imguiRender && !ppcDebuggerAttached))) {
     Window("PPC Debugger", [this] {
       PPCDebugger(this);
-    }, { 1200.f, 700.f }, ImGuiWindowFlags_NoCollapse, nullptr, { 500.f, 100.f });
+    }, { 1200.f, 700.f }, ImGuiWindowFlags_NoCollapse, &ppcDebuggerActive, { 500.f, 100.f });
   }
   if (!Xe_Main->renderer->imguiRender) {
     Window("Debug", [&] {
       TabBar("##main", [&] {
+        TabItem("Debug", [&] {          
+          Button("Start", [&] {
+            ppcDebuggerActive = true;
+          });
+          if (ppcDebuggerActive) {
+            if (!Xe_Main->getCPU()->IsHalted()) {
+              Button("Pause", [&] {
+                Xe_Main->getCPU()->Continue();
+              });
+              SameLine();
+            }
+            else {
+              Button("Continue", [&] {
+                Xe_Main->getCPU()->Continue();
+              });
+            }
+            SameLine();
+            Button("Step", [&] {
+              Xe_Main->getCPU()->Step();
+            });
+          }
+        });
         TabItem("Settings", [&] {
           TabBar("##settings", [&] {
             TabItem("General", [&] {
@@ -231,7 +253,7 @@ void Render::OpenGLGUI::OnSwap(Texture *texture) {
           });
         });
       });
-    }, { 800.f, 500.f }, ImGuiWindowFlags_NoCollapse, nullptr, { 1750.f, 10.f });
+    }, { 800.f, 500.f }, ImGuiWindowFlags_NoCollapse, nullptr, { 100.f, 10.f });
   }
 }
 
