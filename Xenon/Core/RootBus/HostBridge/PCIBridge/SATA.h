@@ -430,7 +430,7 @@
 * Block Error register. The register represents all the detected errors accumulated since the last
 * time the SError register was cleared (whether recovered by the interface of not). Set bits in the
 * error register are explicitly cleared by a write operation to the SError register, or a reset operation.
-* The value written to clear set error bits shall have 1�s encoded in the bit positions corresponding
+* The value written to clear set error bits shall have 1's encoded in the bit positions corresponding
 * to the bits that are to be cleared. Host software should clear the Interface SError register at
 * appropriate checkpoints in order to best isolate error conditions and the commands they impact.
 */
