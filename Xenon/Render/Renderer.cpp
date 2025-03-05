@@ -10,6 +10,7 @@
 #include "Base/Logging/Log.h"
 
 #include "Core/XGPU/XGPU.h"
+#include "Core/Xe_Main.h"
 
 
 // Shaders
@@ -216,7 +217,7 @@ void Render::Renderer::Thread() {
       case SDL_EVENT_QUIT:
         Shutdown();
         if (Config::quitOnWindowClosure()) {
-          exit(0);
+          Xe_Main->shutdown();
         }
         rendering = false;
         break;

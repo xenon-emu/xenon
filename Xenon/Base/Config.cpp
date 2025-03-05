@@ -145,6 +145,7 @@ void loadConfig(const std::filesystem::path &path) {
 }
 
 void saveConfig(const std::filesystem::path &path) {
+  bool firstTimeConfig{};
   toml::value data;
 
   std::error_code error;
@@ -160,7 +161,8 @@ void saveConfig(const std::filesystem::path &path) {
     if (error) {
       LOG_ERROR(Config, "Filesystem error: {}", error.message());
     }
-      LOG_INFO(Config, "Config not found. Saving new configuration file: {}", path.string());
+    firstTimeConfig = true;
+    LOG_INFO(Config, "Config not found. Saving new configuration file: {}", path.string());
   }
 
   // Vali0004:
@@ -239,7 +241,7 @@ void saveConfig(const std::filesystem::path &path) {
   data["Paths"]["ODDImage"] = pathPrefix + oddDiscImagePath;
   // This is needed for Nix as it uses a older toml11 version in Nix 24.11
   std::string fusesPathConfig = data["Paths"]["Fuses"].as_string();
-  if (!fusesTxtPath.compare(fusesPathConfig.data())) {
+  if (firstTimeConfig) {
     // If this is our first time running, write back into vars.
     // Default initializing with getenv is a bad practice, because
     // you are then just praying that getenv is valid.

@@ -1,81 +1,218 @@
 ﻿{
-    "version": 3,
-    "configurePresets": [
-        {
-            "name": "windows-base",
-            "hidden": true,
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build/${presetName}",
-            "installDir": "${sourceDir}/install/${presetName}",
-            "cacheVariables": {
-                "CMAKE_C_COMPILER": "cl.exe",
-                "CMAKE_CXX_COMPILER": "cl.exe"
-            },
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Windows"
-            }
-        },
-        {
-            "name": "x64-debug",
-            "displayName": "x64 Debug",
-            "inherits": "windows-base",
-            "architecture": {
-                "value": "x64",
-                "strategy": "external"
-            },
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
-            }
-        },
-        {
-            "name": "x64-release",
-            "displayName": "x64 Release",
-            "inherits": "x64-debug",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
-            }
-        },
-        {
-            "name": "x86-debug",
-            "displayName": "x86 Debug",
-            "inherits": "windows-base",
-            "architecture": {
-                "value": "x86",
-                "strategy": "external"
-            },
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
-            }
-        },
-        {
-            "name": "x86-release",
-            "displayName": "x86 Release",
-            "inherits": "x86-debug",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Release"
-            }
-        },
-        {
-            "name": "linux-debug",
-            "displayName": "Linux Debug",
-            "generator": "Ninja",
-            "binaryDir": "${sourceDir}/build/${presetName}",
-            "installDir": "${sourceDir}/install/${presetName}",
-            "cacheVariables": {
-                "CMAKE_BUILD_TYPE": "Debug"
-            },
-            "condition": {
-                "type": "equals",
-                "lhs": "${hostSystemName}",
-                "rhs": "Linux"
-            },
-            "vendor": {
-                "microsoft.com/VisualStudioRemoteSettings/CMake/1.0": {
-                    "sourceDir": "$env{HOME}/.vs/$ms{projectDirName}"
-                }
-            }
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "windows-clang-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "installDir": "${sourceDir}/install/${presetName}",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "cl.exe",
+        "CMAKE_CXX_COMPILER": "cl.exe"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "windows-msvc-base",
+      "hidden": true,
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "installDir": "${sourceDir}/install/${presetName}",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      }
+    },
+    {
+      "name": "x64-clang-debug",
+      "displayName": "x64-Clang-Debug",
+      "inherits": "windows-clang-base",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "x64-clang-release",
+      "displayName": "x64-Clang-Release",
+      "inherits": "x64-clang-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "x64-clang-relwithdebinfo",
+      "displayName": "x64-Clang-RelWithDebInfo",
+      "inherits": "x64-clang-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "x64-msvc-debug",
+      "displayName": "x64-MSVC-Debug",
+      "inherits": "windows-msvc-base",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "x64-msvc-release",
+      "displayName": "x64-MSVC-Release",
+      "inherits": "x64-msvc-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "x64-msvc-relwithdebinfo",
+      "displayName": "x64-MSVC-RelWithDebInfo",
+      "inherits": "x64-msvc-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "x86-msvc-debug",
+      "displayName": "x86-MSVC-Debug",
+      "inherits": "windows-msvc-base",
+      "architecture": {
+        "value": "Win32",
+        "strategy": "set"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "x86-msvc-release",
+      "displayName": "x86-MSVC-Release",
+      "inherits": "x86-msvc-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "x86-msvc-relwithdebinfo",
+      "displayName": "x86-MSVC-RelWithDebInfo",
+      "inherits": "x86-msvc-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "x86-clang-debug",
+      "displayName": "x86-Clang-Debug",
+      "inherits": "windows-clang-base",
+      "architecture": {
+        "value": "x86",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "x86-clang-release",
+      "displayName": "x86-Clang-Release",
+      "inherits": "x86-clang-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "x86-Clang-relwithdebinfo",
+      "displayName": "x86-Clang-RelWithDebInfo",
+      "inherits": "x86-clang-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "linux-base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "installDir": "${sourceDir}/install/${presetName}",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      },
+      "vendor": {
+        "microsoft.com/VisualStudioRemoteSettings/CMake/1.0": {
+          "sourceDir": "$env{HOME}/.vs/$ms{projectDirName}"
         }
-    ]
+      }
+    },
+    {
+      "name": "x64-linux-debug",
+      "displayName": "x64-Linux-Debug",
+      "inherits": "linux-base",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "x64-linux-release",
+      "displayName": "x64-Linux-Release",
+      "inherits": "x64-linux-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "x64-linux-relwithdebinfo",
+      "displayName": "x64-Linux-RelWithDebInfo",
+      "inherits": "x64-linux-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "x86-linux-debug",
+      "displayName": "x86-Linux-Debug",
+      "inherits": "linux-base",
+      "architecture": {
+        "value": "x86",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "x86-linux-release",
+      "displayName": "x86-Linux-Release",
+      "inherits": "x86-linux-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "x86-linux-relwithdebinfo",
+      "displayName": "x86-Linux-RelWithDebInfo",
+      "inherits": "x86-linux-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    }
+  ]
 }
