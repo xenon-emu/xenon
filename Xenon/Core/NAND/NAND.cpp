@@ -8,7 +8,7 @@
 NAND::NAND(const char* deviceName, const std::string filePath,
   u64 startAddress, u64 endAddress,
   bool isSOCDevice) : SystemDevice(deviceName, startAddress, endAddress, isSOCDevice) {
-  rawNANDData.resize(0x4000000);
+  rawNANDData.resize(0x4200000);
 
   LOG_INFO(System, "NAND: Loading file {}", filePath.c_str());
 
@@ -20,7 +20,7 @@ NAND::NAND(const char* deviceName, const std::string filePath,
 
   rawFileSize = std::filesystem::file_size(filePath);
 
-  if (rawFileSize > 0x4000000) {
+  if (rawFileSize > 0x4200000) {
     LOG_ERROR(System, "NAND: Nand size exceeds 64MB! This may cause unintended behaviour");
     SYSTEM_PAUSE();
     rawNANDData.resize(rawFileSize);
