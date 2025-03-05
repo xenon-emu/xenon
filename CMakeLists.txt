@@ -18,15 +18,15 @@ project(Xenon)
 # This function should be passed a list of all files in a target. It will automatically generate file groups
 # following the directory hierarchy, so that the layout of the files in IDEs matches the one in the filesystem.
 function(create_target_directory_groups target_name)
-    # Place any files that aren't in the source list in a separate group so that they don't get in the way.
-    source_group("Other Files" REGULAR_EXPRESSION ".")
-    get_target_property(target_sources "${target_name}" SOURCES)
-    foreach(file_name IN LISTS target_sources)
-        get_filename_component(dir_name "${file_name}" PATH)
-        # Group names use '\' as a separator even though the entire rest of CMake uses '/'...
-        string(REPLACE "/" "\\" group_name "${dir_name}")
-        source_group("${group_name}" FILES "${file_name}")
-    endforeach()
+  # Place any files that aren't in the source list in a separate group so that they don't get in the way.
+  source_group("Other Files" REGULAR_EXPRESSION ".")
+  get_target_property(target_sources "${target_name}" SOURCES)
+  foreach(file_name IN LISTS target_sources)
+    get_filename_component(dir_name "${file_name}" PATH)
+    # Group names use '\' as a separator even though the entire rest of CMake uses '/'...
+    string(REPLACE "/" "\\" group_name "${dir_name}")
+    source_group("${group_name}" FILES "${file_name}")
+  endforeach()
 endfunction()
 
 find_package(fmt 10.2.1 CONFIG)
@@ -218,16 +218,26 @@ create_target_directory_groups(Xenon)
 
 # Test compiler ID
 if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    set(MSVC True)
+	set(MSVC True)
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    set(GCC True)
+	set(GCC True)
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    set(Clang True)
+	set(Clang True)
 endif()
+
+# Copy fonts to build directory
+add_custom_target(copy-fonts
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+					"${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts" # Input
+					"${CMAKE_CURRENT_BINARY_DIR}/fonts"      # Output
+  COMMENT "Copying fonts (${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts) to build directory (${CMAKE_CURRENT_BINARY_DIR}/fonts)"
+  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts
+)
 
 # Include OPENGL Directory
 include_directories(Xenon third_party/glad/include)
 
+add_dependencies(Xenon copy-fonts)
 target_include_directories(Xenon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${IMGUI_DIR})
 target_link_libraries(Xenon PRIVATE fmt::fmt SDL3::SDL3 toml11::toml11)
 
@@ -235,11 +245,11 @@ add_definitions(-DNTDDI_VERSION=0x0A000006 -D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00
 add_definitions(-DNOMINMAX -DWIN32_LEAN_AND_MEAN)
 
 if (MSVC)
-    set(CMAKE_GENERATOR_PLATFORM x64)
-    set(CMAKE_SYSTEM_VERSION 10.0.19041.0)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
+  set(CMAKE_GENERATOR_PLATFORM x64)
+  set(CMAKE_SYSTEM_VERSION 10.0.19041.0)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
 endif()
 
 if (WIN32)
-    target_sources(Xenon PRIVATE Xenon/Xenon.rc)
+  target_sources(Xenon PRIVATE Xenon/Xenon.rc)
 endif()

@@ -75,11 +75,13 @@ int tpi() { return ticksPerInstruction; }
 void loadConfig(const std::filesystem::path &path) {
   // If the configuration file does not exist, create it and return.
   LOG_INFO(Config, "Loading configuration from: {}", path.string());
+  std::ifstream configFile{ path };
   std::error_code error;
-  if (!std::filesystem::exists(path, error)) {
+  if (!std::filesystem::exists(path, error) && !configFile.is_open()) {
     saveConfig(path);
     return;
   }
+  configFile.close();
 
   toml::value data;
 
@@ -145,6 +147,7 @@ void loadConfig(const std::filesystem::path &path) {
 }
 
 void saveConfig(const std::filesystem::path &path) {
+  bool firstTimeConfig{};
   toml::value data;
 
   std::error_code error;
@@ -160,7 +163,8 @@ void saveConfig(const std::filesystem::path &path) {
     if (error) {
       LOG_ERROR(Config, "Filesystem error: {}", error.message());
     }
-      LOG_INFO(Config, "Config not found. Saving new configuration file: {}", path.string());
+    firstTimeConfig = true;
+    LOG_INFO(Config, "Config not found. Saving new configuration file: {}", path.string());
   }
 
   // Vali0004:
@@ -230,24 +234,16 @@ void saveConfig(const std::filesystem::path &path) {
 #else
   // TODO(Vali0004): Pull if Linux or MacOS
   std::string pathPrefix{ getenv("HOME") };
+  fusesTxtPath.insert(0, pathPrefix.c_str());
+  oneBlBinPath.insert(0, pathPrefix.c_str());
+  nandBinPath.insert(0, pathPrefix.c_str());
+  oddDiscImagePath.insert(0, pathPrefix.c_str());
 #endif
   // Paths.                
-  // Append a prefix if we need it (ex. Linux)
-  data["Paths"]["Fuses"] = pathPrefix + fusesTxtPath;
-  data["Paths"]["OneBL"] = pathPrefix + oneBlBinPath;
-  data["Paths"]["Nand"] = pathPrefix + nandBinPath;
-  data["Paths"]["ODDImage"] = pathPrefix + oddDiscImagePath;
-  // This is needed for Nix as it uses a older toml11 version in Nix 24.11
-  std::string fusesPathConfig = data["Paths"]["Fuses"].as_string();
-  if (!fusesTxtPath.compare(fusesPathConfig.data())) {
-    // If this is our first time running, write back into vars.
-    // Default initializing with getenv is a bad practice, because
-    // you are then just praying that getenv is valid.
-    fusesTxtPath = data["Paths"]["Fuses"].as_string();
-    oneBlBinPath = data["Paths"]["OneBL"].as_string();
-    nandBinPath = data["Paths"]["Nand"].as_string();
-    oddDiscImagePath = data["Paths"]["ODDImage"].as_string();
-  }
+  data["Paths"]["Fuses"] = fusesTxtPath;
+  data["Paths"]["OneBL"] = oneBlBinPath;
+  data["Paths"]["Nand"] = nandBinPath;
+  data["Paths"]["ODDImage"] = oddDiscImagePath;
 
   // HighlyExperimental.
   data["HighlyExperimental"].comments().clear();
