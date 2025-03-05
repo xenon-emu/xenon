@@ -215,11 +215,12 @@ void Render::Renderer::Thread() {
         }
         break;
       case SDL_EVENT_QUIT:
-        Shutdown();
+        // TODO(Vali0004): Fix improper shutdown
+        rendering = false;
         if (Config::quitOnWindowClosure()) {
           Xe_Main->shutdown();
         }
-        rendering = false;
+        Shutdown();
         break;
       case SDL_EVENT_KEY_DOWN:
         if (windowEvent.key.key == SDLK_F5) {
@@ -281,7 +282,10 @@ void Render::Renderer::Thread() {
       glBindVertexArray(dummyVAO);
       glDrawArrays(GL_TRIANGLE_FAN, 0, 3);
     }
-    gui->Render(backbuffer.get());
+    // While we shutdown, we free this, thus creating a "use after free"
+    if (gui.get()) {
+      gui->Render(backbuffer.get());
+    }
 
     SDL_GL_SwapWindow(mainWindow);
   }
