@@ -11,6 +11,21 @@
 #include "Core/RootBus/HostBridge/PCIBridge/PCIBridge.h"
 #include "Core/RootBus/HostBridge/PCIBridge/PCIDevice.h"
 
+#define TEST_UART
+#ifdef TEST_UART
+#ifdef _WIN32
+#pragma comment(lib, "Ws2_32.lib")
+#define _CRT_SECURE_NO_WARNINGS
+#include <winsock2.h>
+#else
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#endif // _WIN32
+#endif // TEST_UART
+
 /*
         Xenon System Management Controller (SMC) Emulation.
 
@@ -235,6 +250,18 @@ struct SMC_CORE_STATE {
   // UART Present. Used to do a one time check on UART COM Port on the host
   // system.
   bool uartPresent;
+  // Use backup UART. If we are on Windows, and it doesn't have the proper COM port,
+  // use this instead
+  bool uartBackup;
+#ifdef TEST_UART
+  struct sockaddr_in sockAddr;
+#ifdef _WIN32
+  WSADATA wsaData;
+  SOCKET sockHandle;
+#else
+  int sockHandle;
+#endif // _WIN32
+#else
 #ifdef _WIN32
   // Current COM Port Device Control Block.
   // See
@@ -250,13 +277,14 @@ struct SMC_CORE_STATE {
   DWORD currentBytesWrittenCount = 0;
   // Bytes Read from the COM Port.
   DWORD currentBytesReadCount = 0;
-#else
+#endif // _WIN32
+#endif // TEST_UART
+  // Backup UART system
   std::queue<u8> uartTxBuffer;
   std::queue<u8> uartRxBuffer;
   std::mutex uartMutex;
   std::condition_variable uartConditionVar;
   bool uartThreadRunning;
-#endif
   // Read/Write Return Status Values
   bool retVal = false;
 };
@@ -279,7 +307,7 @@ private:
   PCIBridge *pciBridge;
 
   // SMC PCI State, tracking all communcation with the system.
-  SMC_PCI_STATE *smcPCIState;
+  SMC_PCI_STATE smcPCIState;
 
   // SMC Core State, tracking all general system status.
   SMC_CORE_STATE *smcCoreState;
@@ -290,17 +318,23 @@ private:
   // Is SMC Thread Running?
   bool smcThreadRunning = true;
 
-#ifndef _WIN32
   // UART Thread object
   std::thread uartThread;
+
+#ifdef TEST_UART
+  // UART Receive Thread object
+  std::thread uartSecondaryThread;
 #endif
 
   // SMC Main Thread
   void smcMainThread();
 
-#ifndef _WIN32
   // UART Thread
   void uartMainThread();
+
+#ifdef TEST_UART
+  // UART Receive Thread
+  void uartReceiveThread();
 #endif
 
   // UART/COM Port Setup

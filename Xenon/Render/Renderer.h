@@ -60,7 +60,7 @@ public:
   // Render in ImGui
   bool imguiRender = false;
 
-  int pitch = 0;
+  u64 pitch = 0;
 private:
   // Thread handle
   std::thread thread;

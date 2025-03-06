@@ -79,7 +79,7 @@ private:
   PCIBridge *pciBridge{};
 
   // Helpers
-  bool isAddressMappedinBAR(u32 address);
+  const bool isAddressMappedinBAR(u32 address) const;
 
   HOSTBRIDGE_REGS hostBridgeRegs{};
   BIU_REGS biuRegs{};

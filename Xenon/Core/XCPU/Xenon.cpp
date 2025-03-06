@@ -8,12 +8,18 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, eFuses inFuseSet) {
   // First, Initialize system bus.
   mainBus = inBus;
 
-  // Set SROM to 0.
-  memset(xenonContext.SROM, 0, XE_SROM_SIZE);
+  // Allocate and zero the SROM
+  xenonContext.SRAM.resize(XE_SRAM_SIZE);
+  memset(xenonContext.SRAM.data(), 0, XE_SRAM_SIZE);
+  // Allocate and zero the SRAM
+  xenonContext.SROM.resize(XE_SROM_SIZE);
+  memset(xenonContext.SROM.data(), 0, XE_SROM_SIZE);
+  // Allocate and zero the Security Engine Data
+  xenonContext.secEngData.resize(XE_SECENG_SIZE);
+  memset(xenonContext.secEngData.data(), 0, XE_SECENG_SIZE);
 
   // Set Security Engine context to 0.
   memset(&xenonContext.secEngBlock, 0, sizeof(SOCSECENG_BLOCK));
-  memset(xenonContext.secEngData, 0, XE_SECENG_SIZE);
 
   // Populate FuseSet.
   xenonContext.fuseSet = inFuseSet;
@@ -26,7 +32,7 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, eFuses inFuseSet) {
   } else {
     size_t fileSize = std::filesystem::file_size(blPath);
     if (fileSize == XE_SROM_SIZE) {
-      file.read(reinterpret_cast<char*>(xenonContext.SROM), XE_SROM_SIZE);
+      file.read(reinterpret_cast<char*>(xenonContext.SROM.data()), XE_SROM_SIZE);
       LOG_INFO(Xenon, "1BL Loaded.");
     }
   }
@@ -36,6 +42,9 @@ Xenon::~Xenon() {
   ppu0.reset();
   ppu1.reset();
   ppu2.reset();
+  xenonContext.SROM.clear();
+  xenonContext.SRAM.clear();
+  xenonContext.secEngData.clear();
 }
 
 void Xenon::Start(u64 resetVector) {

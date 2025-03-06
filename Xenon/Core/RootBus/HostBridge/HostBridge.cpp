@@ -245,15 +245,16 @@ void HostBridge::ConfigWrite(u64 writeAddress, u64 data, u8 byteCount) {
   pciBridge->ConfigWrite(writeAddress, data, byteCount);
 }
 
-bool HostBridge::isAddressMappedinBAR(u32 address) {
+const bool HostBridge::isAddressMappedinBAR(u32 address) const
+{
   #define ADDRESS_BOUNDS_CHECK(a, b) (address >= a && address <= (a + b))
 
-  if (ADDRESS_BOUNDS_CHECK(hostBridgeConfigSpace.configSpaceHeader.BAR0, XGPU_DEVICE_SIZE) ||
-      ADDRESS_BOUNDS_CHECK(hostBridgeConfigSpace.configSpaceHeader.BAR1, XGPU_DEVICE_SIZE) ||
-      ADDRESS_BOUNDS_CHECK(hostBridgeConfigSpace.configSpaceHeader.BAR2, XGPU_DEVICE_SIZE) ||
-      ADDRESS_BOUNDS_CHECK(hostBridgeConfigSpace.configSpaceHeader.BAR3, XGPU_DEVICE_SIZE) ||
-      ADDRESS_BOUNDS_CHECK(hostBridgeConfigSpace.configSpaceHeader.BAR4, XGPU_DEVICE_SIZE) ||
-      ADDRESS_BOUNDS_CHECK(hostBridgeConfigSpace.configSpaceHeader.BAR5, XGPU_DEVICE_SIZE)) {
+  if (ADDRESS_BOUNDS_CHECK(hostBridgeConfigSpace.configSpaceHeader.BAR0, Xe::Xenos::XGPU_DEVICE_SIZE) ||
+      ADDRESS_BOUNDS_CHECK(hostBridgeConfigSpace.configSpaceHeader.BAR1, Xe::Xenos::XGPU_DEVICE_SIZE) ||
+      ADDRESS_BOUNDS_CHECK(hostBridgeConfigSpace.configSpaceHeader.BAR2, Xe::Xenos::XGPU_DEVICE_SIZE) ||
+      ADDRESS_BOUNDS_CHECK(hostBridgeConfigSpace.configSpaceHeader.BAR3, Xe::Xenos::XGPU_DEVICE_SIZE) ||
+      ADDRESS_BOUNDS_CHECK(hostBridgeConfigSpace.configSpaceHeader.BAR4, Xe::Xenos::XGPU_DEVICE_SIZE) ||
+      ADDRESS_BOUNDS_CHECK(hostBridgeConfigSpace.configSpaceHeader.BAR5, Xe::Xenos::XGPU_DEVICE_SIZE)) {
     return true;
   }
 

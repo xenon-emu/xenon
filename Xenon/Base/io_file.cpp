@@ -241,7 +241,8 @@ void IOFile::Unlink() {
   NtSetInformationFile(hfile, &iosb, &disposition, sizeof(disposition),
                        FileDispositionInformation);
 #else
-  if (unlink(file_path.c_str()) != 0) {
+  std::string filePath = file_path.string();
+  if (unlink(filePath.c_str()) != 0) {
     const auto ec = std::error_code{errno, std::generic_category()};
     LOG_ERROR(Base_Filesystem, "Failed to unlink the file at path={}, ec_message={}",
               PathToUTF8String(file_path), ec.message());

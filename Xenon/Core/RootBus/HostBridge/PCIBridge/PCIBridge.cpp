@@ -157,7 +157,7 @@ bool PCIBridge::RouteInterrupt(u8 prio) {
   return false;
 }
 
-bool PCIBridge::isAddressMappedinBAR(u32 address) {
+const bool PCIBridge::isAddressMappedinBAR(u32 address) const {
   u32 bar0 = pciBridgeConfig.configSpaceHeader.BAR0;
   u32 bar1 = pciBridgeConfig.configSpaceHeader.BAR1;
 
@@ -170,6 +170,11 @@ bool PCIBridge::isAddressMappedinBAR(u32 address) {
 }
 
 void PCIBridge::addPCIDevice(PCIDevice *device) {
+  if (!device) {
+    LOG_CRITICAL(RootBus, "Attempted to attach a invalid device!");
+    SYSTEM_PAUSE();
+    return;
+  }
   LOG_INFO(PCIBridge, "Attatched: {}", device->GetDeviceName());
 
   connectedPCIDevices.push_back(device);

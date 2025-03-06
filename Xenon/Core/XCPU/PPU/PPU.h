@@ -49,7 +49,7 @@ private:
   bool systemReset = false;
 
   // Execution threads inside this PPU.
-  std::shared_ptr<PPU_STATE> ppuState;
+  PPU_STATE ppuState;
 
   // Main CPU Context.
   XENON_CONTEXT *xenonContext = nullptr;
@@ -70,5 +70,5 @@ private:
   // the amount of ticks per instr we should perform.
   void updateTimeBase();
   // Gets the current running threads.
-  PPU_THREAD getCurrentRunningThreads();
+  const PPU_THREAD getCurrentRunningThreads();
 };

@@ -11,16 +11,16 @@
 
 #include "PPCInterpreter.h"
 
-#define D_STUB(name) void PPCInterpreter_##name(PPU_STATE *hCore) { return PPCInterpreter_known_unimplemented(#name, hCore); }
-#define D_STUBRC(name) void PPCInterpreter_##name##x(PPU_STATE *hCore) { return PPCInterpreter_known_unimplemented(#name "x", hCore); }
+#define D_STUB(name) void PPCInterpreter_##name(PPU_STATE &ppuState) { return PPCInterpreter_known_unimplemented(#name, ppuState); }
+#define D_STUBRC(name) void PPCInterpreter_##name##x(PPU_STATE &ppuState) { return PPCInterpreter_known_unimplemented(#name "x", ppuState); }
 
 namespace PPCInterpreter {
-  void PPCInterpreter_nop(PPU_STATE *hCore) {
+  void PPCInterpreter_nop(PPU_STATE &ppuState) {
     // Do nothing
   }
-  void PPCInterpreter_invalid(PPU_STATE *hCore) {
+  void PPCInterpreter_invalid(PPU_STATE &ppuState) {
     PPU_THREAD_REGISTERS& thread =
-      hCore->ppuThread[hCore->currentThread];
+      ppuState.ppuThread[ppuState.currentThread];
 
     std::string name =
       legacy_GetOpcodeName(thread.CI.opcode);
@@ -31,9 +31,9 @@ namespace PPCInterpreter {
       thread.CIA);
   }
 
-  void PPCInterpreter_known_unimplemented(const char *name, PPU_STATE *hCore) {
+  void PPCInterpreter_known_unimplemented(const char *name, PPU_STATE &ppuState) {
     PPU_THREAD_REGISTERS& thread =
-      hCore->ppuThread[hCore->currentThread];
+      ppuState.ppuThread[ppuState.currentThread];
 
     LOG_CRITICAL(Xenon, "PPC Interpreter: {} is not implemented! data: {:#x}, address: {:#x}",
       name,

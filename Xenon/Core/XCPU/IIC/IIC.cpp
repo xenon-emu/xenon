@@ -35,7 +35,8 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, u64 intData) {
   case Xe::XCPU::IIC::CPU_IPI_DISPATCH_0:
     iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].REG_CPU_IPI_DISPATCH_0 =
         static_cast<u32>(std::byteswap<u64>(intData));
-    genInterrupt(intType, cpusToInterrupt);
+    LOG_DEBUG(Xenon, "Sending CPU(s) {} interrupt {} (ppeIntCtrlBlckReg is CPU_IPI_DISPATCH_0, likely trying to bring {} online)", cpusToInterrupt, intType, cpusToInterrupt);
+    //genInterrupt(intType, cpusToInterrupt);
     break;
   case Xe::XCPU::IIC::INT_0x30:
     // Dont know what this does, lets cause an interrupt?

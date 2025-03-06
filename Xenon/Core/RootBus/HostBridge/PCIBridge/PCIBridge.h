@@ -84,7 +84,7 @@ public:
 
   // Checks wheter the current address belongs to the PCI bridge via
   // the BAR's
-  bool isAddressMappedinBAR(u32 address);
+  const bool isAddressMappedinBAR(u32 address) const;
 
   void addPCIDevice(PCIDevice *device);
 

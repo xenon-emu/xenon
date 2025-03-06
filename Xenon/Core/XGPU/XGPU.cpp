@@ -18,19 +18,17 @@ Xe::Xenos::XGPU::XGPU(RAM *ram) {
   // Assign RAM Pointer
   ramPtr = ram;
 
-  memset(&xgpuConfigSpace.data, 0xf, sizeof(GENRAL_PCI_DEVICE_CONFIG_SPACE));
+  memset(&xgpuConfigSpace.data, 0xF, sizeof(GENRAL_PCI_DEVICE_CONFIG_SPACE));
+
   // Setup config space as per dump taken from a Jasper console.
   // Located at config address 0xD0010000.
-  u8 i = 0;
-  for (u16 idx = 0; idx < 256; idx += 4) {
-    memcpy(&xgpuConfigSpace.data[idx], &xgpuConfigMap[i], 4);
-    i++;
-  }
+  memcpy(xgpuConfigSpace.data, xgpuConfigMap, sizeof(xgpuConfigMap));
+
   // Set our PCI Dev Sizes.
   pciDevSizes[0] = 0x20000; // BAR0
 
-  xenosState.Regs = new u8[0xFFFFF];
-  memset(xenosState.Regs, 0, 0xFFFFF);
+  xenosRegisters = std::make_unique<STRIP_UNIQUE(xenosRegisters)>(0xFFFFF);
+  xenosState.Regs = xenosRegisters.get();
 
   // Set Clocks speeds.
   u32 reg = 0x09000000;
@@ -41,6 +39,9 @@ Xe::Xenos::XGPU::XGPU(RAM *ram) {
   memcpy(&xenosState.Regs[REG_FSB_CLK], &reg, 4);
   reg = 0x19100000;
   memcpy(&xenosState.Regs[REG_MEM_CLK], &reg, 4);
+}
+Xe::Xenos::XGPU::~XGPU() {
+  xenosRegisters.reset();
 }
 
 bool Xe::Xenos::XGPU::Read(u64 readAddress, u64 *data, u8 byteCount) {

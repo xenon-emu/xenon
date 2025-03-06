@@ -72,18 +72,13 @@ Xe::PCIDev::SMC::SMCCore::SMCCore(const char *deviceName, u64 size,
   smcCoreState = newSMCCoreState;
 
   // Create a new SMC PCI State
-  smcPCIState = new SMC_PCI_STATE;
-  memset(smcPCIState, 0, sizeof(SMC_PCI_STATE));
+  memset(&smcPCIState, 0, sizeof(smcPCIState));
 
   // Set UART Status to Empty.
-  smcPCIState->uartStatusReg = UART_STATUS_EMPTY;
+  smcPCIState.uartStatusReg = UART_STATUS_EMPTY;
 
   // Set PCI Config Space registers.
-  u8 i = 0;
-  for (u16 idx = 0; idx < 256; idx += 4) {
-    memcpy(&pciConfigSpace.data[idx], &smcConfigSpaceMap[i], 4);
-    i++;
-  }
+  memcpy(pciConfigSpace.data, smcConfigSpaceMap, sizeof(smcConfigSpaceMap));
 
   // Set our PCI Dev Sizes.
   pciDevSizes[0] = 0x100; // BAR0
@@ -93,13 +88,31 @@ Xe::PCIDev::SMC::SMCCore::SMCCore(const char *deviceName, u64 size,
 
   // Enter main execution thread.
   smcThread = std::thread(&SMCCore::smcMainThread, this);
-  smcThread.detach();
 }
 
 // Class Destructor.
 Xe::PCIDev::SMC::SMCCore::~SMCCore() {
-  smcThreadRunning = false;
   LOG_INFO(SMC, "Core: Exiting.");
+  smcThreadRunning = false;
+  if (smcThread.joinable())
+    smcThread.join();
+  // If we are on Linux, or the backup system is running, 
+  // kill it.
+  smcCoreState->uartThreadRunning = false;
+  if (uartThread.joinable())
+    uartThread.join();
+#ifdef TEST_UART
+  // Shutdown receive thread
+  if (uartSecondaryThread.joinable())
+    uartSecondaryThread.join();
+  // Shutdown socket
+#ifdef _WIN32
+  shutdown(smcCoreState->sockHandle, SD_BOTH);
+  closesocket(smcCoreState->sockHandle);
+#else
+  close(smcCoreState->sockHandle);
+#endif
+#endif
 }
 
 // PCI Read
@@ -108,33 +121,34 @@ void Xe::PCIDev::SMC::SMCCore::Read(u64 readAddress, u64 *data, u8 byteCount) {
 
   switch (regOffset) {
   case UART_CONFIG_REG: // UART Config Register
-    memcpy(data, &smcPCIState->uartConfigReg, byteCount);
+    memcpy(data, &smcPCIState.uartConfigReg, byteCount);
     break;
   case UART_BYTE_OUT_REG: // UART Data Out Register  
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(TEST_UART)
     smcCoreState->retVal =
-        ReadFile(smcCoreState->comPortHandle, &smcPCIState->uartOutReg, 1,
+        ReadFile(smcCoreState->comPortHandle, &smcPCIState.uartOutReg, 1,
                  &smcCoreState->currentBytesReadCount, nullptr);
-#else    
-    smcCoreState->retVal = false;
-    {
-      // We love mutexes
-      std::lock_guard<std::mutex> lock(smcCoreState->uartMutex);
-      if (!smcCoreState->uartRxBuffer.empty()) {
-        smcPCIState->uartOutReg = smcCoreState->uartRxBuffer.front();
-        smcCoreState->uartRxBuffer.pop();
-        smcCoreState->retVal = true;
-      }
+#endif // _WIN32  
+    if (smcCoreState->uartBackup) {
+      smcCoreState->retVal = false;
+      {
+        // We love mutexes
+        std::lock_guard<std::mutex> lock(smcCoreState->uartMutex);
+        if (!smcCoreState->uartRxBuffer.empty()) {
+          smcPCIState.uartOutReg = smcCoreState->uartRxBuffer.front();
+          smcCoreState->uartRxBuffer.pop();
+          smcCoreState->retVal = true;
+        }
+      }     
     }
-#endif                 
     if (smcCoreState->retVal) {
-      memcpy(data, &smcPCIState->uartOutReg, byteCount);
+      memcpy(data, &smcPCIState.uartOutReg, byteCount);
     }
     break;
   case UART_STATUS_REG: // UART Status Register
     // First lets check if the UART has already been setup, if so, proceed to do
     // the TX/RX.                   
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(TEST_UART)
     if (smcCoreState->uartInitialized) {
       // Get current COM Port Status
       ClearCommError(smcCoreState->comPortHandle, &smcCoreState->comPortError,
@@ -143,10 +157,10 @@ void Xe::PCIDev::SMC::SMCCore::Read(u64 readAddress, u64 *data, u8 byteCount) {
           0) // The queue has any bytes remaining?
       {
         // Got something to read in the input queue.
-        smcPCIState->uartStatusReg = UART_STATUS_DATA_PRES;
+        smcPCIState.uartStatusReg = UART_STATUS_DATA_PRES;
       } else {
         // The input queue is empty.
-        smcPCIState->uartStatusReg = UART_STATUS_EMPTY;
+        smcPCIState.uartStatusReg = UART_STATUS_EMPTY;
       }
     } else if (smcCoreState->uartPresent) // Init UART if this is our first try.
     {
@@ -154,32 +168,33 @@ void Xe::PCIDev::SMC::SMCCore::Read(u64 readAddress, u64 *data, u8 byteCount) {
       // it first then.
       setupUART(0x1e6); // 115200,8,N,1.
     }
-#else
-    if (smcCoreState->uartInitialized) {
-      smcPCIState->uartStatusReg = smcCoreState->uartRxBuffer.empty() ? UART_STATUS_EMPTY : UART_STATUS_DATA_PRES;
-    } else if (smcCoreState->uartPresent) // Init UART if this is our first try.
-    {
-      // XeLL doesn't initialize UART before sending data trough it. Initialize
-      // it first then.
-      setupUART(0x1e6); // 115200,8,N,1.
+#endif // _WIN32 
+    if (smcCoreState->uartBackup) {
+      if (smcCoreState->uartInitialized) {
+        smcPCIState.uartStatusReg = smcCoreState->uartRxBuffer.empty() ? UART_STATUS_EMPTY : UART_STATUS_DATA_PRES;
+      } else if (smcCoreState->uartPresent) // Init UART if this is our first try.
+      {
+        // XeLL doesn't initialize UART before sending data trough it. Initialize
+        // it first then.
+        setupUART(0x1e6); // 115200,8,N,1.
+      }
     }
-#endif
-    memcpy(data, &smcPCIState->uartStatusReg, byteCount);
+    memcpy(data, &smcPCIState.uartStatusReg, byteCount);
     break;
   case SMI_INT_STATUS_REG: // SMI INT Status Register
-    memcpy(data, &smcPCIState->smiIntPendingReg, byteCount);
+    memcpy(data, &smcPCIState.smiIntPendingReg, byteCount);
     break;
   case SMI_INT_ACK_REG: // SMI INT ACK Register
-    memcpy(data, &smcPCIState->smiIntAckReg, byteCount);
+    memcpy(data, &smcPCIState.smiIntAckReg, byteCount);
     break;
   case SMI_INT_ENABLED_REG: // SMI INT Enabled Register
-    memcpy(data, &smcPCIState->smiIntEnabledReg, byteCount);
+    memcpy(data, &smcPCIState.smiIntEnabledReg, byteCount);
     break;
   case FIFO_IN_STATUS_REG: // FIFO In Status Register
-    memcpy(data, &smcPCIState->fifoInStatusReg, byteCount);
+    memcpy(data, &smcPCIState.fifoInStatusReg, byteCount);
     break;
   case FIFO_OUT_STATUS_REG: // FIFO Out Status Register
-    memcpy(data, &smcPCIState->fifoOutStatusReg, byteCount);
+    memcpy(data, &smcPCIState.fifoOutStatusReg, byteCount);
     break;
   case FIFO_OUT_DATA_REG: // FIFO Data Out Register
     // Copy the data to our input buffer.
@@ -206,7 +221,7 @@ void Xe::PCIDev::SMC::SMCCore::Write(u64 writeAddress, u64 data, u8 byteCount) {
 
   switch (regOffset) {
   case UART_CONFIG_REG: // UART Config Register
-    memcpy(&smcPCIState->uartConfigReg, &data, byteCount);
+    memcpy(&smcPCIState.uartConfigReg, &data, byteCount);
     // Check if UART is already initialized.
     if (!smcCoreState->uartInitialized && smcCoreState->uartPresent) {
       // Initialize UART.
@@ -214,39 +229,40 @@ void Xe::PCIDev::SMC::SMCCore::Write(u64 writeAddress, u64 data, u8 byteCount) {
     }
     break;
   case UART_BYTE_IN_REG: // UART Data In Register
-    memcpy(&smcPCIState->uartInReg, &data, byteCount);
-#ifdef _WIN32
+    memcpy(&smcPCIState.uartInReg, &data, byteCount);
+#if defined(_WIN32) && !defined(TEST_UART)
     // Write the data out.
     smcCoreState->retVal =
         WriteFile(smcCoreState->comPortHandle, &data, 1,
                   &smcCoreState->currentBytesWrittenCount, nullptr);
-#else
-    {
-      // We love mutexes
-      std::lock_guard<std::mutex> lock(smcCoreState->uartMutex);
-      smcCoreState->uartTxBuffer.push(data);
-      smcCoreState->uartConditionVar.notify_one();
+#endif // _WIN32
+    if (smcCoreState->uartBackup) {
+      {
+        // We love mutexes
+        std::lock_guard<std::mutex> lock(smcCoreState->uartMutex);
+        smcCoreState->uartTxBuffer.push(data);
+        smcCoreState->uartConditionVar.notify_one();
+      }
+      smcCoreState->retVal = true;
     }
-    smcCoreState->retVal = true;
-#endif
     break;
   case SMI_INT_STATUS_REG: // SMI INT Status Register
-    memcpy(&smcPCIState->smiIntPendingReg, &data, byteCount);
+    memcpy(&smcPCIState.smiIntPendingReg, &data, byteCount);
     break;
   case SMI_INT_ACK_REG: // SMI INT ACK Register
-    memcpy(&smcPCIState->smiIntAckReg, &data, byteCount);
+    memcpy(&smcPCIState.smiIntAckReg, &data, byteCount);
     break;
   case SMI_INT_ENABLED_REG: // SMI INT Enabled Register
-    memcpy(&smcPCIState->smiIntEnabledReg, &data, byteCount);
+    memcpy(&smcPCIState.smiIntEnabledReg, &data, byteCount);
     break;
   case CLCK_INT_ENABLED_REG: // Clock INT Enabled Register
-    memcpy(&smcPCIState->clockIntEnabledReg, &data, byteCount);
+    memcpy(&smcPCIState.clockIntEnabledReg, &data, byteCount);
     break;
   case CLCK_INT_STATUS_REG: // Clock INT Status Register
-    memcpy(&smcPCIState->clockIntStatusReg, &data, byteCount);
+    memcpy(&smcPCIState.clockIntStatusReg, &data, byteCount);
     break;
   case FIFO_IN_STATUS_REG: // FIFO In Status Register
-    smcPCIState->fifoInStatusReg = static_cast<u32>(data);
+    smcPCIState.fifoInStatusReg = static_cast<u32>(data);
     if (data == FIFO_STATUS_READY) { // We're about to receive a message.
       // Reset our input buffer and buffer pointer.
       memset(&smcCoreState->fifoDataBuffer, 0, 16);
@@ -254,7 +270,7 @@ void Xe::PCIDev::SMC::SMCCore::Write(u64 writeAddress, u64 data, u8 byteCount) {
     }
     break;
   case FIFO_OUT_STATUS_REG: // FIFO Out Status Register
-    smcPCIState->fifoOutStatusReg = static_cast<u32>(data);
+    smcPCIState.fifoOutStatusReg = static_cast<u32>(data);
     if (data == FIFO_STATUS_READY) // We're about to send a reply.
     {
       // Reset our FIFO buffer pointer.
@@ -306,6 +322,24 @@ void Xe::PCIDev::SMC::SMCCore::ConfigWrite(u64 writeAddress, u64 data,
 
 // Setups the UART Communication at a given configuration.
 void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
+#ifdef TEST_UART
+  smcCoreState->uartBackup = true;
+  int port = 7000;
+  //const char* ip = "127.0.0.1";
+  const char* ip = "10.0.0.201";
+
+  smcCoreState->sockAddr.sin_family = AF_INET;
+  smcCoreState->sockAddr.sin_port = htons(port);
+  smcCoreState->sockAddr.sin_addr.s_addr = inet_addr(ip);
+#ifdef _WIN32
+  int start = WSAStartup(MAKEWORD(2, 2), &smcCoreState->wsaData);
+  smcCoreState->sockHandle = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, 0);
+  WSAConnect(smcCoreState->sockHandle, (SOCKADDR*)&smcCoreState->sockAddr, sizeof(smcCoreState->sockAddr), NULL, NULL, NULL, NULL);
+#else
+  smcCoreState->sockHandle = socket(AF_INET, SOCK_STREAM, 0);
+  connect(smcCoreState->sockHandle, (struct sockaddr*)&smcCoreState->sockAddr, sizeof(smcCoreState->sockAddr));
+#endif
+#else
 #ifdef _WIN32
   // Windows Init Code.
   LOG_INFO(SMC, "Initializing UART:");
@@ -350,43 +384,84 @@ void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
     LOG_ERROR(SMC, "CreateFile failed with error {:#x}. Make sure the Selected COM Port is avaliable "
         "in your system.", GetLastError());
     smcCoreState->uartPresent = false;
-    return;
+    if (!smcCoreState->uartBackup) {
+      printf("[SMC] <Info> Use backup UART system? (Y/N) ");
+      char opt = std::tolower(getchar());
+      smcCoreState->uartBackup = opt == 'y';     
+      if (!smcCoreState->uartBackup) {
+        return;
+      }
+    }
+    else {
+      LOG_INFO(SMC, "Using backup UART. Logging UART to Console");
+    }
   }
 
-  // Set The COM Port State as per config value.
-  if (!SetCommState(smcCoreState->comPortHandle, &smcCoreState->comPortDCB)) {
-    LOG_ERROR(SMC, "UART: SetCommState failed with error {:#x}.", GetLastError());
+  if (!smcCoreState->uartBackup) {
+    // Set The COM Port State as per config value.
+    if (!SetCommState(smcCoreState->comPortHandle, &smcCoreState->comPortDCB)) {
+      LOG_ERROR(SMC, "UART: SetCommState failed with error {:#x}.", GetLastError());
+    }
+
+    LOG_INFO(SMC, "UART Initialized Successfully!");
+
+    // Everything OK.
+    smcCoreState->uartInitialized = true;
   }
-
-  LOG_INFO(SMC, "UART Initialized Successfully!");
-
-  // Everything OK.
-  smcCoreState->uartInitialized = true;
 
 #else
-  smcCoreState->uartThreadRunning = true;
-  uartThread = std::thread(&SMCCore::uartMainThread, this);
-
-  smcCoreState->uartPresent = true;
-  smcCoreState->uartInitialized = true;
-
-  uartThread.detach();
-
+  smcCoreState->uartBackup = true;
   LOG_ERROR(SMC, "UART Initialization is fully supported on this platform! User beware.");
 #endif // _WIN32
+#endif // TEST_UART
+  if (smcCoreState->uartBackup) {
+    smcCoreState->uartThreadRunning = true;
+    uartThread = std::thread(&SMCCore::uartMainThread, this);
+#ifdef TEST_UART
+    uartSecondaryThread = std::thread(&SMCCore::uartReceiveThread, this);
+#endif
+
+    smcCoreState->uartPresent = true;
+    smcCoreState->uartInitialized = true;
+  }
 }
 
-#ifndef _WIN32
 // UART Thread
 void Xe::PCIDev::SMC::SMCCore::uartMainThread() {
   smcCoreState->uartInitialized = true;
+  LOG_INFO(SMC, "Backup UART Initialized Successfully!");
   while (smcCoreState->uartThreadRunning) {
     std::unique_lock<std::mutex> lock(smcCoreState->uartMutex);
     if (!smcCoreState->uartTxBuffer.empty()) {
+#ifdef TEST_UART
+      char c = smcCoreState->uartTxBuffer.front();
+      send(smcCoreState->sockHandle, &c, 1, 0);
+#else
       printf("%c", smcCoreState->uartTxBuffer.front());
+#endif
       smcCoreState->uartTxBuffer.pop();
     }
-    // We need to do *something* for rx
+    lock.unlock();
+  }
+}
+
+#ifdef TEST_UART
+// UART Receive Thread
+void Xe::PCIDev::SMC::SMCCore::uartReceiveThread() {
+  while (smcCoreState->uartThreadRunning) {
+    std::unique_lock<std::mutex> lock(smcCoreState->uartMutex);
+    char c = -1;
+    u64 bytesReceived = 0;
+#ifdef _WIN32    
+    //u_long mode = 1;
+    //ioctlsocket(smcCoreState->sockHandle, FIONBIO, &mode);
+    //bytesReceived = recv(smcCoreState->sockHandle, &c, 1, MSG_PEEK);
+#else
+    bytesReceived = recv(smcCoreState->sockHandle, &c, 1, MSG_PEEK | MSG_DONTWAIT);
+#endif
+    if (c != -1 && bytesReceived != 0) {
+      smcCoreState->uartRxBuffer.push(c);
+    }
     lock.unlock();
   }
 }
@@ -397,7 +472,7 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
   LOG_INFO(SMC, "Entered main thread.");
   // Set FIFO_IN_STATUS_REG to FIFO_STATUS_READY to indicate we are ready to
   // receive a message.
-  smcPCIState->fifoInStatusReg = FIFO_STATUS_READY;
+  smcPCIState.fifoInStatusReg = FIFO_STATUS_READY;
 
   // Timer for measuring elapsed time since last Clock Interrupt.
   std::chrono::steady_clock::time_point timerStart =
@@ -466,21 +541,21 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
     // Check wheter we've received a command. If so, process it.
     // Software sets FIFO_IN_STATUS_REG to FIFO_STATUS_BUSY after it has
     // finished sending a command.
-    if (smcPCIState->fifoInStatusReg == FIFO_STATUS_BUSY) {
+    if (smcPCIState.fifoInStatusReg == FIFO_STATUS_BUSY) {
       // This is set first as software waits for this register to become Ready
       // in order to read a reply. Set FIFO_OUT_STATUS_REG to FIFO_STATUS_BUSY
-      smcPCIState->fifoOutStatusReg = FIFO_STATUS_BUSY;
+      smcPCIState.fifoOutStatusReg = FIFO_STATUS_BUSY;
 
       // Set FIFO_IN_STATUS_REG to FIFO_STATUS_READY
-      smcPCIState->fifoInStatusReg = FIFO_STATUS_READY;
+      smcPCIState.fifoInStatusReg = FIFO_STATUS_READY;
 
       // Some commands does'nt have responses/interrupts.
       bool noResponse = false;
 
       // Note that the first byte in the response is always Command ID.
-
-      switch (
-          smcCoreState->fifoDataBuffer[0]) // Data Buffer[0] is our message ID.
+      // 
+      // Data Buffer[0] is our message ID.
+      switch (smcCoreState->fifoDataBuffer[0])
       {
       case Xe::PCIDev::SMC::SMC_PWRON_TYPE:
         // Zero out the buffer
@@ -615,11 +690,11 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
 
       // Set FIFO_OUT_STATUS_REG to FIFO_STATUS_READY, signaling we're ready to
       // transmit a response.
-      smcPCIState->fifoOutStatusReg = FIFO_STATUS_READY;
+      smcPCIState.fifoOutStatusReg = FIFO_STATUS_READY;
 
       // If interrupts are active set Int status and issue one.
-      if (smcPCIState->smiIntEnabledReg & SMI_INT_ENABLED && noResponse == false) {
-        smcPCIState->smiIntPendingReg = SMI_INT_PENDING;
+      if (smcPCIState.smiIntEnabledReg & SMI_INT_ENABLED && noResponse == false) {
+        smcPCIState.smiIntPendingReg = SMI_INT_PENDING;
         pciBridge->RouteInterrupt(PRIO_SMM);
       }
     }
@@ -629,10 +704,10 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
         std::chrono::steady_clock::now();
 
     // Check for SMC Clock interrupt register.
-    if (smcPCIState->clockIntEnabledReg ==
+    if (smcPCIState.clockIntEnabledReg ==
         CLCK_INT_ENABLED) // Clock Int Enabled.
     {
-      if (smcPCIState->clockIntStatusReg ==
+      if (smcPCIState.clockIntStatusReg ==
           CLCK_INT_READY) // Clock Interrupt Not Taken.
       {
         // Wait X time before next clock interrupt. TODO: Find the correct
@@ -640,7 +715,7 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
         if (timerNow >= timerStart + std::chrono::milliseconds(5000)) {
           // Update internal timer.
           timerStart = std::chrono::steady_clock::now();
-          smcPCIState->clockIntStatusReg = CLCK_INT_TAKEN;
+          smcPCIState.clockIntStatusReg = CLCK_INT_TAKEN;
           pciBridge->RouteInterrupt(PRIO_CLOCK);
         }
       }

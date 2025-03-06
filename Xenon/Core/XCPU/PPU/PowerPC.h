@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "Core/XCPU/IIC/IIC.h"
 #include "Core/XCPU/Bitfield.h"
 #include "Core/XCPU/XenonReservations.h"
@@ -518,24 +520,24 @@ struct PPU_STATE {
 
 struct XENON_CONTEXT {
   // 32Kb SROM
-  u8 *SROM = new u8[XE_SROM_SIZE];
+  std::vector<u8> SROM{};
   // 64 Kb SRAM
-  u8 *SRAM = new u8[XE_SRAM_SIZE];
+  std::vector<u8> SRAM{};
   // 768 bits eFuse
   eFuses fuseSet{};
 
   // Xenon IIC.
-  Xe::XCPU::IIC::XenonIIC xenonIIC;
+  Xe::XCPU::IIC::XenonIIC xenonIIC{};
 
-  XenonReservations xenonRes;
+  XenonReservations xenonRes{};
 
   // Time Base switch, possibly RTC register, the TB counter only runs if this
   // value is set.
-  bool timeBaseActive = false;
+  bool timeBaseActive{};
 
   // Security engine Context
-  u8 *secEngData = new u8[XE_SECENG_SIZE];
-  SOCSECENG_BLOCK secEngBlock = {};
+  std::vector<u8> secEngData{};
+  SOCSECENG_BLOCK secEngBlock{};
 };
 
 //

@@ -14,7 +14,7 @@
 
 
 // Shaders
-void compileShaders(GLuint shader, const char* source) {
+static void compileShaders(GLuint shader, const char* source) {
   glShaderSource(shader, 1, &source, nullptr);
   glCompileShader(shader);
   // Ensure the shader built
@@ -27,7 +27,7 @@ void compileShaders(GLuint shader, const char* source) {
   }
 }
 
-GLuint createShaderPrograms(const char* vertex, const char* fragment) {
+static GLuint createShaderPrograms(const char* vertex, const char* fragment) {
   GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
   compileShaders(vertexShader, vertex);
   GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -199,10 +199,13 @@ void Render::Renderer::Thread() {
   Start();
 
   // Framebuffer pointer from main memory.
-  fbPointer = ramPointer->getPointerToAddress(XE_FB_BASE);
+  fbPointer = ramPointer->getPointerToAddress(Xe::Xenos::XE_FB_BASE);
   // Should we render?
   bool rendering = Config::gpuThreadEnabled();
   while (rendering) {
+    while (Xe_Main->renderHalt) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
     // Process events.
     while (SDL_PollEvent(&windowEvent)) {
       if (gui.get())
@@ -216,11 +219,10 @@ void Render::Renderer::Thread() {
         break;
       case SDL_EVENT_QUIT:
         // TODO(Vali0004): Fix improper shutdown
-        rendering = false;
         if (Config::quitOnWindowClosure()) {
           Xe_Main->shutdown();
         }
-        Shutdown();
+        rendering = Config::quitOnWindowClosure();
         break;
       case SDL_EVENT_KEY_DOWN:
         if (windowEvent.key.key == SDLK_F5) {
@@ -254,6 +256,11 @@ void Render::Renderer::Thread() {
       default:
         break;
       }
+    }
+
+    // If we exit, then early break out of the window
+    if (!Xe_Main->isRunning()) {
+      break;
     }
 
     // Upload buffer

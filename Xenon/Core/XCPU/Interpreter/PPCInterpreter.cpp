@@ -1,4 +1,4 @@
-// Copyright 2025 Xenon Emulator Project
+﻿// Copyright 2025 Xenon Emulator Project
 
 #include "PPCInterpreter.h"
 
@@ -14,9 +14,9 @@ PPCInterpreter::PPCDecoder ppcDecoder{};
 
 
 // Interpreter Single Instruction Processing.
-void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE* hCore) {
+void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE &ppuState) {
   PPU_THREAD_REGISTERS& thread =
-    hCore->ppuThread[hCore->currentThread];
+    ppuState.ppuThread[ppuState.currentThread];
 
   // RGH 2 for CB_A 9188 in a JRunner XDKBuild.
   if (thread.CIA == 0x000000000200c870) {
@@ -65,10 +65,15 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE* hCore) {
       thread.GPR[11];
   }
 
+  //// 0x800000001C000DF4 - while loop
+  //if (thread.CIA >= 0x800000001C000D00 && thread.CIA <= 0x800000001C000F2C) {
+  //  LOG_DEBUG(Xenon, "PPCInterpreter: Entering XeLL's problem area");
+  //}
+
   instructionHandler function =
     ppcDecoder.decode(thread.CI.opcode);
 
-  function(hCore);
+  function(ppuState);
 }
 
 //
@@ -78,11 +83,11 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE* hCore) {
 /* Exception name(Reset Vector) */
 
 // System reset Exception (0x100)
-void PPCInterpreter::ppcResetException(PPU_STATE* hCore) {
+void PPCInterpreter::ppcResetException(PPU_STATE &ppuState) {
   PPU_THREAD_REGISTERS& thread =
-    hCore->ppuThread[hCore->currentThread];
+    ppuState.ppuThread[ppuState.currentThread];
 
-  LOG_INFO(Xenon, "[{}](Thrd{:#d}): Reset exception.", hCore->ppuName, (s8)hCore->currentThread);
+  LOG_INFO(Xenon, "[{}](Thrd{:#d}): Reset exception.", ppuState.ppuName, (s8)ppuState.currentThread);
   thread.SPR.SRR0 =
     thread.NIA;
   thread.SPR.SRR1 =
@@ -94,16 +99,16 @@ void PPCInterpreter::ppcResetException(PPU_STATE* hCore) {
   thread.SPR.MSR.MSR_Hex =
     thread.SPR.MSR.MSR_Hex |
     (QMASK(0, 0) | QMASK(3, 3));
-  thread.NIA = hCore->SPR.HRMOR + 0x100;
+  thread.NIA = ppuState.SPR.HRMOR + 0x100;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
 // Data Storage Exception (0x300)
-void PPCInterpreter::ppcDataStorageException(PPU_STATE* hCore) {
+void PPCInterpreter::ppcDataStorageException(PPU_STATE &ppuState) {
   PPU_THREAD_REGISTERS& thread =
-    hCore->ppuThread[hCore->currentThread];
+    ppuState.ppuThread[ppuState.currentThread];
 
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Data Storage exception.", hCore->ppuName, (s8)hCore->currentThread);
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Data Storage exception.", ppuState.ppuName, (s8)ppuState.currentThread);
   thread.SPR.SRR0 =
     thread.CIA;
   thread.SPR.SRR1 =
@@ -115,16 +120,16 @@ void PPCInterpreter::ppcDataStorageException(PPU_STATE* hCore) {
   thread.SPR.MSR.MSR_Hex =
     thread.SPR.MSR.MSR_Hex |
     (QMASK(0, 0) | QMASK(3, 3));
-  thread.NIA = hCore->SPR.HRMOR + 0x300;
+  thread.NIA = ppuState.SPR.HRMOR + 0x300;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
 // Data Segment Exception (0x380)
-void PPCInterpreter::ppcDataSegmentException(PPU_STATE* hCore) {
+void PPCInterpreter::ppcDataSegmentException(PPU_STATE &ppuState) {
   PPU_THREAD_REGISTERS& thread =
-    hCore->ppuThread[hCore->currentThread];
+    ppuState.ppuThread[ppuState.currentThread];
 
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Data Segment exception.", hCore->ppuName, (s8)hCore->currentThread);
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Data Segment exception.", ppuState.ppuName, (s8)ppuState.currentThread);
   thread.SPR.SRR0 =
     thread.CIA;
   thread.SPR.SRR1 =
@@ -136,16 +141,16 @@ void PPCInterpreter::ppcDataSegmentException(PPU_STATE* hCore) {
   thread.SPR.MSR.MSR_Hex =
     thread.SPR.MSR.MSR_Hex |
     (QMASK(0, 0) | QMASK(3, 3));
-  thread.NIA = hCore->SPR.HRMOR + 0x380;
+  thread.NIA = ppuState.SPR.HRMOR + 0x380;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
 // Instruction Storage Exception (0x400)
-void PPCInterpreter::ppcInstStorageException(PPU_STATE* hCore) {
+void PPCInterpreter::ppcInstStorageException(PPU_STATE &ppuState) {
   PPU_THREAD_REGISTERS& thread =
-    hCore->ppuThread[hCore->currentThread];
+    ppuState.ppuThread[ppuState.currentThread];
 
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Instruction Storage exception.", hCore->ppuName, (s8)hCore->currentThread);
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Instruction Storage exception.", ppuState.ppuName, (s8)ppuState.currentThread);
   thread.SPR.SRR0 =
     thread.CIA;
   thread.SPR.SRR1 =
@@ -158,16 +163,16 @@ void PPCInterpreter::ppcInstStorageException(PPU_STATE* hCore) {
   thread.SPR.MSR.MSR_Hex =
     thread.SPR.MSR.MSR_Hex |
     (QMASK(0, 0) | QMASK(3, 3));
-  thread.NIA = hCore->SPR.HRMOR + 0x400;
+  thread.NIA = ppuState.SPR.HRMOR + 0x400;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
 // Instruction Segment Exception (0x480)
-void PPCInterpreter::ppcInstSegmentException(PPU_STATE* hCore) {
+void PPCInterpreter::ppcInstSegmentException(PPU_STATE &ppuState) {
   PPU_THREAD_REGISTERS& thread =
-    hCore->ppuThread[hCore->currentThread];
+    ppuState.ppuThread[ppuState.currentThread];
 
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Instruction Segment exception.", hCore->ppuName, (s8)hCore->currentThread);
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Instruction Segment exception.", ppuState.ppuName, (s8)ppuState.currentThread);
   thread.SPR.SRR0 =
     thread.CIA;
   thread.SPR.SRR1 =
@@ -179,16 +184,16 @@ void PPCInterpreter::ppcInstSegmentException(PPU_STATE* hCore) {
   thread.SPR.MSR.MSR_Hex =
     thread.SPR.MSR.MSR_Hex |
     (QMASK(0, 0) | QMASK(3, 3));
-  thread.NIA = hCore->SPR.HRMOR + 0x480;
+  thread.NIA = ppuState.SPR.HRMOR + 0x480;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
 // External Exception (0x500)
-void PPCInterpreter::ppcExternalException(PPU_STATE* hCore) {
+void PPCInterpreter::ppcExternalException(PPU_STATE &ppuState) {
   PPU_THREAD_REGISTERS& thread =
-    hCore->ppuThread[hCore->currentThread];
+    ppuState.ppuThread[ppuState.currentThread];
 
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): External exception.", hCore->ppuName, (s8)hCore->currentThread);
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): External exception.", ppuState.ppuName, (s8)ppuState.currentThread);
   thread.SPR.SRR0 =
     thread.NIA;
   thread.SPR.SRR1 =
@@ -200,16 +205,16 @@ void PPCInterpreter::ppcExternalException(PPU_STATE* hCore) {
   thread.SPR.MSR.MSR_Hex =
     thread.SPR.MSR.MSR_Hex |
     (QMASK(0, 0) | QMASK(3, 3));
-  thread.NIA = hCore->SPR.HRMOR + 0x500;
+  thread.NIA = ppuState.SPR.HRMOR + 0x500;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
 // Program Exception (0x700)
-void PPCInterpreter::ppcProgramException(PPU_STATE* hCore) {
+void PPCInterpreter::ppcProgramException(PPU_STATE &ppuState) {
   PPU_THREAD_REGISTERS& thread =
-    hCore->ppuThread[hCore->currentThread];
+    ppuState.ppuThread[ppuState.currentThread];
 
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Program exception.", hCore->ppuName, (s8)hCore->currentThread);
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Program exception.", ppuState.ppuName, (s8)ppuState.currentThread);
   thread.SPR.SRR0 =
     thread.CIA;
   thread.SPR.SRR1 =
@@ -223,16 +228,16 @@ void PPCInterpreter::ppcProgramException(PPU_STATE* hCore) {
   thread.SPR.MSR.MSR_Hex =
     thread.SPR.MSR.MSR_Hex |
     (QMASK(0, 0) | QMASK(3, 3));
-  thread.NIA = hCore->SPR.HRMOR + 0x700;
+  thread.NIA = ppuState.SPR.HRMOR + 0x700;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
 
-void PPCInterpreter::ppcDecrementerException(PPU_STATE* hCore) {
+void PPCInterpreter::ppcDecrementerException(PPU_STATE &ppuState) {
   PPU_THREAD_REGISTERS& thread =
-    hCore->ppuThread[hCore->currentThread];
+    ppuState.ppuThread[ppuState.currentThread];
 
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Decrementer exception.", hCore->ppuName, (s8)hCore->currentThread);
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Decrementer exception.", ppuState.ppuName, (s8)ppuState.currentThread);
   thread.SPR.SRR0 =
     thread.NIA;
   thread.SPR.SRR1 =
@@ -244,17 +249,17 @@ void PPCInterpreter::ppcDecrementerException(PPU_STATE* hCore) {
   thread.SPR.MSR.MSR_Hex =
     thread.SPR.MSR.MSR_Hex | QMASK(0, 0) |
     (QMASK(3, 3));
-  thread.NIA = hCore->SPR.HRMOR + 0x900;
+  thread.NIA = ppuState.SPR.HRMOR + 0x900;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
 
 // System Call Exception (0xC00)
-void PPCInterpreter::ppcSystemCallException(PPU_STATE* hCore) {
+void PPCInterpreter::ppcSystemCallException(PPU_STATE &ppuState) {
   PPU_THREAD_REGISTERS& thread =
-    hCore->ppuThread[hCore->currentThread];
+    ppuState.ppuThread[ppuState.currentThread];
 
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): System Call exception.", hCore->ppuName, (s8)hCore->currentThread);
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): System Call exception.", ppuState.ppuName, (s8)ppuState.currentThread);
   thread.SPR.SRR0 =
     thread.NIA;
   thread.SPR.SRR1 =
@@ -267,14 +272,14 @@ void PPCInterpreter::ppcSystemCallException(PPU_STATE* hCore) {
     thread.SPR.MSR.MSR_Hex | QMASK(0, 0) |
     (thread.exceptHVSysCall ? 0
       : QMASK(3, 3));
-  thread.NIA = hCore->SPR.HRMOR + 0xc00;
+  thread.NIA = ppuState.SPR.HRMOR + 0xc00;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
 
-void PPCInterpreter::ppcInterpreterTrap(PPU_STATE* hCore, u32 trapNumber) {
+void PPCInterpreter::ppcInterpreterTrap(PPU_STATE &ppuState, u32 trapNumber) {
   PPU_THREAD_REGISTERS& thread =
-    hCore->ppuThread[hCore->currentThread];
+    ppuState.ppuThread[ppuState.currentThread];
 
   if (trapNumber ==
     0x14) // DbgPrint, r3 = PCSTR stringAddress, r4 = int String Size.
@@ -284,7 +289,7 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE* hCore, u32 trapNumber) {
     size_t strSize = (size_t)thread.GPR[0x4];
     for (int idx = 0; idx < strSize; idx++) {
       dbgString[idx] = MMURead8(
-        hCore, thread.GPR[0x3] + idx);
+        ppuState, thread.GPR[0x3] + idx);
     }
     LOG_XBOX(DebugPrint, "> {}", dbgString);
   }
@@ -294,7 +299,7 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE* hCore, u32 trapNumber) {
     // PUBLIC VOID DebugLoadImageSymbols(IN PSTRING ModuleName == $r3,
     //                   IN PKD_SYMBOLS_INFO Info == $r4)
 
-    ppcDebugLoadImageSymbols(hCore,
+    ppcDebugLoadImageSymbols(ppuState,
       thread.GPR[0x3],
       thread.GPR[4]);
   }
@@ -303,7 +308,7 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE* hCore, u32 trapNumber) {
     // PUBLIC VOID DebugUnloadImageSymbols(IN PSTRING ModuleName == $r3,
     //                   IN PKD_SYMBOLS_INFO Info == $r4)
 
-    ppcDebugUnloadImageSymbols(hCore,
+    ppcDebugUnloadImageSymbols(ppuState,
       thread.GPR[0x3],
       thread.GPR[4]);
   }

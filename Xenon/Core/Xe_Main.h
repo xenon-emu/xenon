@@ -42,7 +42,7 @@ public:
 
   void getFuses();
 
-  bool isRunning() {
+  const bool isRunning() {
     return running;
   }
 
@@ -61,54 +61,55 @@ private:
   //  Thread state
   bool running = true;
   //  Base path
-  std::filesystem::path userDirectory;
+  std::filesystem::path userDirectory{};
   //  Log level
-  std::unique_ptr<Base::Log::Filter> logFilter;
+  std::unique_ptr<Base::Log::Filter> logFilter{};
 
   // Main Emulator objects
-  std::unique_ptr<RootBus> rootBus; // RootBus Object
-  std::unique_ptr<HostBridge> hostBridge; // HostBridge Object
-  std::unique_ptr<PCIBridge> pciBridge; // PCIBridge Object
+  std::unique_ptr<RootBus> rootBus{}; // RootBus Object
+  std::unique_ptr<HostBridge> hostBridge{}; // HostBridge Object
+  std::unique_ptr<PCIBridge> pciBridge{}; // PCIBridge Object
 
 public:
   // Render thread
-  std::shared_ptr<Render::Renderer> renderer;
+  std::unique_ptr<Render::Renderer> renderer{};
+  bool renderHalt{};
 
   // PCI Devices
   //  SMC
-  std::shared_ptr<Xe::PCIDev::SMC::SMC_CORE_STATE> smcCoreState; // SMCCore State for setting diffrent SMC settings.
+  std::unique_ptr<Xe::PCIDev::SMC::SMC_CORE_STATE> smcCoreState; // SMCCore State for setting diffrent SMC settings.
   std::unique_ptr<Xe::PCIDev::SMC::SMCCore> smcCore; // SMCCore Object
   //  Ethernet
-  std::unique_ptr<Xe::PCIDev::ETHERNET::ETHERNET> ethernet;
+  std::unique_ptr<Xe::PCIDev::ETHERNET::ETHERNET> ethernet{};
   //  Audio
-  std::unique_ptr<Xe::PCIDev::AUDIOCTRLR::AUDIOCTRLR> audioController;
+  std::unique_ptr<Xe::PCIDev::AUDIOCTRLR::AUDIOCTRLR> audioController{};
   //  OHCI
-  std::unique_ptr<Xe::PCIDev::OHCI0::OHCI0> ohci0;
-  std::unique_ptr<Xe::PCIDev::OHCI1::OHCI1> ohci1;
+  std::unique_ptr<Xe::PCIDev::OHCI0::OHCI0> ohci0{};
+  std::unique_ptr<Xe::PCIDev::OHCI1::OHCI1> ohci1{};
   //  EHCI
-  std::unique_ptr<Xe::PCIDev::EHCI0::EHCI0> ehci0;
-  std::unique_ptr<Xe::PCIDev::EHCI1::EHCI1> ehci1;
+  std::unique_ptr<Xe::PCIDev::EHCI0::EHCI0> ehci0{};
+  std::unique_ptr<Xe::PCIDev::EHCI1::EHCI1> ehci1{};
   //  Secure Flash Controller for Xbox Device object
-  std::shared_ptr<SFCX> sfcx;
+  std::unique_ptr<SFCX> sfcx{};
   //  NAND
-  std::shared_ptr<NAND> nandDevice;
+  std::unique_ptr<NAND> nandDevice{};
   //  Random Access Memory (All console RAM, excluding Reserved memory which is mainly PCI Devices)
-  std::shared_ptr<RAM> ram;
+  std::unique_ptr<RAM> ram{};
   //  XMA
-  std::shared_ptr<XMA> xma;
+  std::unique_ptr<XMA> xma{};
   //  ODD (CD-ROM Drive)
-  std::shared_ptr<ODD> odd;
+  std::unique_ptr<ODD> odd{};
   //  HDD
-  std::shared_ptr<HDD> hdd;
+  std::unique_ptr<HDD> hdd{};
 
 private:
   // Console Handles
   //  Xenon CPU
-  std::shared_ptr<Xenon> xenonCPU;
+  std::unique_ptr<Xenon> xenonCPU{};
   //  Xenos GPU
-  std::shared_ptr<Xe::Xenos::XGPU> xenos;
+  std::unique_ptr<Xe::Xenos::XGPU> xenos{};
   //  Fuses
-  eFuses cpuFuses;
+  eFuses cpuFuses{};
 };
 
 inline std::unique_ptr<XeMain> Xe_Main{};

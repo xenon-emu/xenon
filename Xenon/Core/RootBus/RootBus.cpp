@@ -25,17 +25,17 @@ void RootBus::AddHostBridge(HostBridge *newHostBridge) {
 }
 
 void RootBus::AddDevice(SystemDevice *device) {
+  if (!device) {
+    LOG_CRITICAL(RootBus, "Attempted to attach a invalid device!");
+    SYSTEM_PAUSE();
+    return;
+  }
   deviceCount++;
   LOG_INFO(RootBus, "Device attached: {}", device->GetDeviceName());
   conectedDevices.push_back(device);
 }
 
-void RootBus::Read(u64 readAddress, u64 *data, u8 byteCount) {\
-  // Shutting down? Ignore.
-  if (!Xe_Main->isRunning()) {
-    return;
-  }
-
+void RootBus::Read(u64 readAddress, u64 *data, u8 byteCount) {
   // Configuration Read?
   if (readAddress >= PCI_CONFIG_REGION_ADDRESS &&
       readAddress <= PCI_CONFIG_REGION_ADDRESS + PCI_CONFIG_REGION_SIZE) {

@@ -25,10 +25,10 @@ constexpr u32 PPCDecode(u32 inst) {
 
 namespace PPCInterpreter {
   // Define a type alias for function pointers
-  using instructionHandler = void(*)(PPU_STATE*);
-  extern void PPCInterpreter_nop(PPU_STATE *hCore);
-  extern void PPCInterpreter_invalid(PPU_STATE *hCore);
-  extern void PPCInterpreter_known_unimplemented(const char *name, PPU_STATE *hCore);
+  using instructionHandler = void(*)(PPU_STATE&);
+  extern void PPCInterpreter_nop(PPU_STATE &ppuState);
+  extern void PPCInterpreter_invalid(PPU_STATE &ppuState);
+  extern void PPCInterpreter_known_unimplemented(const char *name, PPU_STATE &ppuState);
   class PPCDecoder {
     class InstrInfo {
     public:

@@ -87,25 +87,25 @@
 
 #define PPC_OPC_TEMPL3_XO()                                                    \
   s32 rD, rA, rB;                                                              \
-  rD = ((hCore->CI) >> 21) & 0x1f;                                             \
-  rA = ((hCore->CI) >> 16) & 0x1f;                                             \
-  rB = ((hCore->CI) >> 11) & 0x1f
+  rD = ((ppuState.CI) >> 21) & 0x1f;                                             \
+  rA = ((ppuState.CI) >> 16) & 0x1f;                                             \
+  rB = ((ppuState.CI) >> 11) & 0x1f
 #define PPC_OPC_TEMPL_X_CR()                                                   \
   s32 crD, crA, crB;                                                           \
-  crD = ((hCore->CI) >> 21) & 0x1f;                                            \
-  crA = ((hCore->CI) >> 16) & 0x1f;                                            \
-  crB = ((hCore->CI) >> 11) & 0x1f
+  crD = ((ppuState.CI) >> 21) & 0x1f;                                            \
+  crA = ((ppuState.CI) >> 16) & 0x1f;                                            \
+  crB = ((ppuState.CI) >> 11) & 0x1f
 
 static inline u64 GetBits64(u64 data, s8 begin, s8 end) {
   const u64 mask = (0xFFFFFFFFFFFFFFFF << (63 - end));
   return data & mask;
 }
 
-static inline u32 ExtractBits(u32 input, u32 begin, u32 end) {
+static inline u32 ExtractBits(u64 input, u64 begin, u64 end) {
   return (input >> (32 - 1 - end)) & ((1 << (end - begin + 1)) - 1);
 }
 
-static inline u64 ExtractBits64(u32 input, u32 begin, u32 end) {
+static inline u64 ExtractBits64(u64 input, u64 begin, u64 end) {
   return (input >> (64 - 1 - end)) & ((1 << (end - begin + 1)) - 1);
 }
 
@@ -122,9 +122,9 @@ static inline u64 ExtractBits64(u32 input, u32 begin, u32 end) {
   (dw) |= ((dwSet) << (31 - (e))) & DMASK(b, e);
 
 #define IFIELD(v, b, e)                                                        \
-  u32 v = DGET(hCore->ppuThread[hCore->currentThread].CI.opcode, b, e);
+  u32 v = DGET(ppuState.ppuThread[ppuState.currentThread].CI.opcode, b, e);
 #define IFIELDQ(v, b, e)                                                       \
-  u64 v = DGET(hCore->ppuThread[hCore->currentThread].CI.opcode, b, e);
+  u64 v = DGET(ppuState.ppuThread[ppuState.currentThread].CI.opcode, b, e);
 
 #define I_FORM_LI_AA_LK                                                        \
   IFIELD(LI, 6, 29);                                                           \
@@ -419,9 +419,9 @@ static inline u64 ExtractBits64(u32 input, u32 begin, u32 end) {
 
 #define BO_GET(i) BGET(BO, 5, i)
 
-#define CR_GET(i) BGET(hCore->ppuThread[hCore->currentThread].CR.CR_Hex, 32, i)
-#define CR_SET(i) BSET(hCore->ppuThread[hCore->currentThread].CR.CR_Hex, 32, i)
-#define CR_CLR(i) BCLR(hCore->ppuThread[hCore->currentThread].CR.CR_Hex, 32, i)
+#define CR_GET(i) BGET(ppuState.ppuThread[ppuState.currentThread].CR.CR_Hex, 32, i)
+#define CR_SET(i) BSET(ppuState.ppuThread[ppuState.currentThread].CR.CR_Hex, 32, i)
+#define CR_CLR(i) BCLR(ppuState.ppuThread[ppuState.currentThread].CR.CR_Hex, 32, i)
 
 #define CR_BIT_LT 0
 #define CR_BIT_GT 1
