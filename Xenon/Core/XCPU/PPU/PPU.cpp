@@ -292,7 +292,10 @@ void PPU::StartExecution() {
           PPU_EX_RESET; // Set CIA to 0x100 as per docs.
       ppuState->ppuThread[ppuState->currentThread].SPR.SRR1 =
           0x200000; // Set SRR1 42-44 = 100
-      // EOI the interrupt:
+      // ACK and EOI the interrupt:
+      u64 intData = 0;
+      xenonContext->xenonIIC.readInterrupt(
+        ppuState->ppuThread[ppuState->currentThread].SPR.PIR * 0x1000 + 0x50050, &intData);
       xenonContext->xenonIIC.writeInterrupt(
         ppuState->ppuThread[ppuState->currentThread].SPR.PIR * 0x1000 + 0x50060, 0);
     }
