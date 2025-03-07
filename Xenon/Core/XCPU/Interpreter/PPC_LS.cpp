@@ -4,6 +4,10 @@
 
 #include "PPCInterpreter.h"
 
+#define _instr        hCore->ppuThread[hCore->currentThread].CI
+#define GPR(x)        hCore->ppuThread[hCore->currentThread].GPR[_instr.x]
+#define FPR(x)        hCore->ppuThread[hCore->currentThread].FPR[_instr.x]
+
 //
 // Store Byte
 //
@@ -37,139 +41,200 @@ void PPCInterpreter::PPCInterpreter_icbi(PPU_STATE* hCore)
     // Do nothing.
 }
 
+// Store Byte (x’9800 0000’)
 void PPCInterpreter::PPCInterpreter_stb(PPU_STATE *hCore) {
-  D_FORM_rS_rA_D;
-  D = EXTS(D, 16);
-  u64 EA = (rA ? hCore->ppuThread[hCore->currentThread].GPR[rA] : 0) + D;
-  MMUWrite8(hCore, EA, (u8)hCore->ppuThread[hCore->currentThread].GPR[rS]);
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + EXTS(d)
+  MEM(EA, 1) <- rS[56–63]
+  */
+
+  const u64 EA = _instr.ra ? GPR(ra) + _instr.simm16 : _instr.simm16;
+  MMUWrite8(hCore, EA, static_cast<u8>(GPR(rs)));
 }
 
+// Store Byte with Update (x’9C00 0000’)
 void PPCInterpreter::PPCInterpreter_stbu(PPU_STATE *hCore) {
-  D_FORM_rS_rA_D;
-  D = EXTS(D, 16);
-  u64 EA = hCore->ppuThread[hCore->currentThread].GPR[rA] + D;
-  MMUWrite8(hCore, EA, (u8)hCore->ppuThread[hCore->currentThread].GPR[rS]);
+  /*
+  EA <- (rA) + EXTS(d)
+  MEM(EA, 1) <- rS[56–63]
+  rA <- EA
+  */
+  const u64 EA = GPR(ra) + _instr.simm16;
+  MMUWrite8(hCore, EA, static_cast<u8>(GPR(rs)));
+  
   if (hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASEGM ||
       hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASTOR)
     return;
 
-  hCore->ppuThread[hCore->currentThread].GPR[rA] = EA;
+  GPR(ra) = EA;
 }
 
+// Store Byte with Update Indexed (x’7C00 01EE’)
 void PPCInterpreter::PPCInterpreter_stbux(PPU_STATE *hCore) {
-  X_FORM_rS_rA_rB;
-  u64 EA = hCore->ppuThread[hCore->currentThread].GPR[rA] +
-           hCore->ppuThread[hCore->currentThread].GPR[rB];
-  MMUWrite8(hCore, EA, (u8)hCore->ppuThread[hCore->currentThread].GPR[rS]);
+  /*
+  EA <- (rA) + (rB)
+  MEM(EA, 1) <- rS[56–63]
+  rA <- EA
+  */
+  const u64 EA = GPR(ra) + GPR(rb);
+  MMUWrite8(hCore, EA, static_cast<u8>(GPR(rs)));
+
   if (hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASEGM ||
       hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASTOR)
     return;
 
-  hCore->ppuThread[hCore->currentThread].GPR[rA] = EA;
+  GPR(ra) = EA;
 }
 
+// Store Byte Indexed (x’7C00 01AE’)
 void PPCInterpreter::PPCInterpreter_stbx(PPU_STATE *hCore) {
-  X_FORM_rS_rA_rB;
-  u64 EA = (rA ? hCore->ppuThread[hCore->currentThread].GPR[rA] : 0) +
-           hCore->ppuThread[hCore->currentThread].GPR[rB];
-  MMUWrite8(hCore, EA, (u8)hCore->ppuThread[hCore->currentThread].GPR[rS]);
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + (rB)
+  MEM(EA, 1) <- rS[56–63]
+  */
+  const u64 EA = _instr.ra ? GPR(ra) + GPR(rb) : GPR(rb);
+  MMUWrite8(hCore, EA, static_cast<u8>(GPR(rs)));
 }
 
 //
 // Store Halfword
 //
 
+// Store Half Word (x’B000 0000’)
 void PPCInterpreter::PPCInterpreter_sth(PPU_STATE *hCore) {
-  D_FORM_rS_rA_D;
-  D = EXTS(D, 16);
-  u64 EA = (rA ? hCore->ppuThread[hCore->currentThread].GPR[rA] : 0) + D;
-  MMUWrite16(hCore, EA, (u16)hCore->ppuThread[hCore->currentThread].GPR[rS]);
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + EXTS(d)
+  MEM(EA, 2) <- rS[48–6316-31]
+  */
+  const u64 EA = _instr.ra ? GPR(ra) + _instr.simm16 : _instr.simm16;
+  MMUWrite16(hCore, EA, static_cast<u16>(GPR(rs)));
 }
 
+// Store Half Word Byte-Reverse Indexed (x’7C00 072C’)
 void PPCInterpreter::PPCInterpreter_sthbrx(PPU_STATE *hCore) {
-  X_FORM_rS_rA_rB;
-  u64 EA = (rA ? hCore->ppuThread[hCore->currentThread].GPR[rA] : 0) +
-           hCore->ppuThread[hCore->currentThread].GPR[rB];
-  MMUWrite16(
-      hCore, EA,
-      std::byteswap<u16>((u16)hCore->ppuThread[hCore->currentThread].GPR[rS]));
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + (rB)
+  MEM(EA, 2) <- rS[56–63] || rS[48–55]
+  */
+  const u64 EA = _instr.ra ? GPR(ra) + GPR(rb) : GPR(rb);
+  MMUWrite16(hCore, EA, std::byteswap<u16>(static_cast<u16>(GPR(rs))));
 }
 
+// Store Half Word with Update (x’B400 0000’)
 void PPCInterpreter::PPCInterpreter_sthu(PPU_STATE *hCore) {
-  D_FORM_rS_rA_D;
-  D = EXTS(D, 16);
-  u64 EA = hCore->ppuThread[hCore->currentThread].GPR[rA] + D;
-  MMUWrite16(hCore, EA, (u16)hCore->ppuThread[hCore->currentThread].GPR[rS]);
+  /*
+  EA <- (rA) + EXTS(d)
+  MEM(EA, 2) <- rS[48–63]
+  rA <- EA
+  */
+  const u64 EA = GPR(ra) + _instr.simm16;
+  MMUWrite16(hCore, EA, static_cast<u16>(GPR(rs)));
+  
   if (hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASEGM ||
       hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASTOR)
     return;
 
-  hCore->ppuThread[hCore->currentThread].GPR[rA] = EA;
+  GPR(ra) = EA;
 }
 
+// Store Half Word with Update Indexed (x’7C00 036E’)
 void PPCInterpreter::PPCInterpreter_sthux(PPU_STATE *hCore) {
-  X_FORM_rS_rA_rB;
-  u64 EA = (rA ? hCore->ppuThread[hCore->currentThread].GPR[rA] : 0) +
-           hCore->ppuThread[hCore->currentThread].GPR[rB];
-  MMUWrite16(hCore, EA, (u16)hCore->ppuThread[hCore->currentThread].GPR[rS]);
+  /*
+  EA <- (rA) + (rB)
+  MEM(EA, 2) <- rS[48–63]
+  rA <- EA
+  */
+  const u64 EA = GPR(ra) + GPR(rb);
+  MMUWrite16(hCore, EA, static_cast<u16>(GPR(rs)));
+  
   if (hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASEGM ||
       hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASTOR)
     return;
 
-  hCore->ppuThread[hCore->currentThread].GPR[rA] = EA;
+  GPR(ra) = EA;
 }
 
+// Store Half Word Indexed (x’7C00 032E’)
 void PPCInterpreter::PPCInterpreter_sthx(PPU_STATE *hCore) {
-  X_FORM_rS_rA_rB;
-  u64 EA = (rA ? hCore->ppuThread[hCore->currentThread].GPR[rA] : 0) +
-           hCore->ppuThread[hCore->currentThread].GPR[rB];
-  MMUWrite16(hCore, EA, (u16)hCore->ppuThread[hCore->currentThread].GPR[rS]);
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + (rB)
+  MEM(EA, 2) <- rS[48–63]
+  */
+  const u64 EA = _instr.ra ? GPR(ra) + GPR(rb) : GPR(rb);
+  MMUWrite16(hCore, EA, static_cast<u16>(GPR(rs)));
 }
 
-//
-// Store String Word
-//
-
-// Weird string instruction
-void PPCInterpreter::PPCInterpreter_stswi(PPU_STATE *hCore) {
-  X_FORM_rS_rA_NB_XO;
-
-  u64 EA = 0;
-  if (rA != 0) {
-    EA = hCore->ppuThread[hCore->currentThread].GPR[rA];
-  }
-
-  u32 n = 32;
-  if (NB != 0) {
-    n = NB;
-  }
-
-  u64 r = rS - 1;
-  u32 i = 0;
-  while (n > 0) {
-    if (i == 0) {
-      r++;
-      r &= 31;
-    }
-    MMUWrite8(hCore, EA,
-              (hCore->ppuThread[hCore->currentThread].GPR[r] >> (24 - i)) &
-                  0xFF);
-
-    i += 8;
-    if (i == 32)
-      i = 0;
-    EA++;
-    n--;
-  }
-}
-
+// Store Multiple Word (x’BC00 0000’)
 void PPCInterpreter::PPCInterpreter_stmw(PPU_STATE* hCore) {
-  D_FORM_rD_rA_D;
-  D = EXTS(D, 16);
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + EXTS(d)
+  r <- rS
+  do while r < 31
+    MEM(EA, 4) <- GPR(r)[32–63]
+    r <- r + 1
+    EA <- EA + 4
+  */
 
-  u64 EA = (rA ? hCore->ppuThread[hCore->currentThread].GPR[rA] : 0) + D;
-  for (u32 idx = rD; idx < 32; ++idx, EA += 4) {
+  u64 EA = _instr.ra ? GPR(ra) + _instr.simm16 : _instr.simm16;
+  for (u32 idx = _instr.rs; idx < 32; ++idx, EA += 4) {
     MMUWrite32(hCore, EA, static_cast<u32>(hCore->ppuThread[hCore->currentThread].GPR[idx]));
+  }
+}
+
+// Store String Word Immediate (x’7C00 05AA’)
+void PPCInterpreter::PPCInterpreter_stswi(PPU_STATE *hCore) {
+  /*
+  if rA = 0 then EA <- 0
+  else EA <- (rA)
+  if NB = 0 then n <- 32
+  else n <- NB
+  r <- rS – 1
+  i <- 32
+  do while n > 0
+    if i = 32 then r <- r + 1 (mod 32)
+    MEM(EA, 1) <- GPR(r)[i–i + 7]
+    i <- i + 8
+    if i = 64 then i <- 32
+    EA <- EA + 1
+    n <- n – 1
+  */
+
+  u64 EA = _instr.ra ? GPR(ra) : 0;
+  u64 N = _instr.rb ? _instr.rb : 32;
+  u8 reg = _instr.rd;
+
+  while (N > 0)
+  {
+    if (N > 3)
+    {
+      MMUWrite32(hCore, EA, static_cast<u32>(hCore->ppuThread[hCore->currentThread].GPR[reg]));
+      EA += 4;
+      N -= 4;
+    }
+    else
+    {
+      u32 buf = static_cast<u32>(hCore->ppuThread[hCore->currentThread].GPR[reg]);
+      while (N > 0)
+      {
+        N = N - 1;
+        MMUWrite8(hCore, EA, (0xFF000000 & buf) >> 24);
+        buf <<= 8;
+        EA++;
+      }
+    }
+    reg = (reg + 1) % 32;
   }
 }
 
@@ -177,27 +242,49 @@ void PPCInterpreter::PPCInterpreter_stmw(PPU_STATE* hCore) {
 // Store Word
 //
 
+// Store Word (x’9000 0000’)
 void PPCInterpreter::PPCInterpreter_stw(PPU_STATE *hCore) {
-  D_FORM_rS_rA_D;
-  D = EXTS(D, 16);
-  u64 EA = (rA ? hCore->ppuThread[hCore->currentThread].GPR[rA] : 0) + D;
-  MMUWrite32(hCore, EA, (u32)hCore->ppuThread[hCore->currentThread].GPR[rS]);
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + EXTS(d)
+  MEM(EA, 4) <- rS[32–63]
+  */
+  const u64 EA = _instr.ra ? GPR(ra) + _instr.simm16 : _instr.simm16;
+  MMUWrite32(hCore, EA, static_cast<u32>(GPR(rs)));
 }
 
+// Store Word Byte-Reverse Indexed (x’7C00 052C’)
 void PPCInterpreter::PPCInterpreter_stwbrx(PPU_STATE *hCore) {
-  X_FORM_rS_rA_rB;
-  u64 EA = (rA ? hCore->ppuThread[hCore->currentThread].GPR[rA] : 0) +
-           hCore->ppuThread[hCore->currentThread].GPR[rB];
-  MMUWrite32(hCore, EA,
-             std::byteswap<u32>(static_cast<u32>(
-                 hCore->ppuThread[hCore->currentThread].GPR[rS])));
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + (rB) 
+  MEM(EA, 4) <- rS[56–63] || rS[48–55] || rS[40–47] || rS[32–39]
+  */
+  const u64 EA = _instr.ra ? GPR(ra) + GPR(rb) : GPR(rb);
+  MMUWrite32(hCore, EA, std::byteswap<u32>(static_cast<u32>(GPR(rs))));
 }
 
+// Store Word Conditional Indexed (x’7C00 012D’)
 void PPCInterpreter::PPCInterpreter_stwcx(PPU_STATE *hCore) {
-  X_FORM_rS_rA_rB;
-
-  u64 EA = (rA ? hCore->ppuThread[hCore->currentThread].GPR[rA] : 0) +
-           hCore->ppuThread[hCore->currentThread].GPR[rB];
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + (rB)
+  if RESERVE then
+    if RESERVE_ADDR = physical_addr(EA)
+      MEM(EA, 4) <- rS[32–63]
+      CR0 <- 0b00 || 0b1 || XER[SO]
+    else
+      u <- undefined 1-bit value
+      if u then MEM(EA, 4) <- rS[32–63]
+      CR0 <- 0b00 || u || XER[SO]
+    RESERVE <- 0
+  else
+    CR0 <- 0b00 || 0b0 || XER[SO]
+  */
+  const u64 EA = _instr.ra ? GPR(ra) + GPR(rb) : GPR(rb);
   u64 RA = EA;
   u32 CR = 0;
 
@@ -216,11 +303,8 @@ void PPCInterpreter::PPCInterpreter_stwcx(PPU_STATE *hCore) {
     intXCPUContext->xenonRes.AcquireLock();
     if (hCore->ppuThread[hCore->currentThread].ppuRes->V) {
       if (hCore->ppuThread[hCore->currentThread].ppuRes->resAddr == RA) {
-        // std::cout << " * Res OK, storing data 0x" <<
-        // (u32)hCore->ppuThread[hCore->currentThread].GPR[rS] << std::endl;
         bool soc = false;
-        u32 data = std::byteswap<u32>(
-            (u32)hCore->ppuThread[hCore->currentThread].GPR[rS]);
+        u32 data = std::byteswap<u32>(static_cast<u32>(GPR(rs)));
         RA = mmuContructEndAddressFromSecEngAddr(RA, &soc);
         sysBus->Write(RA, data, 4);
         intXCPUContext->xenonRes.Check(RA);
@@ -236,53 +320,88 @@ void PPCInterpreter::PPCInterpreter_stwcx(PPU_STATE *hCore) {
   ppcUpdateCR(hCore, 0, CR);
 }
 
+// Store Word with Update (x’9400 0000’)
 void PPCInterpreter::PPCInterpreter_stwu(PPU_STATE *hCore) {
-  D_FORM_rS_rA_D;
-  D = EXTS(D, 16);
-  u64 EA = hCore->ppuThread[hCore->currentThread].GPR[rA] + D;
-  MMUWrite32(hCore, EA, (u32)hCore->ppuThread[hCore->currentThread].GPR[rS]);
+  /*
+  EA <- (rA) + EXTS(d)
+  MEM(EA, 4) <- rS[32–63]
+  rA <- EA
+  */
+  const u64 EA = GPR(ra) + _instr.simm16;
+  MMUWrite32(hCore, EA, static_cast<u32>(GPR(rs)));
+  
   if (hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASEGM ||
       hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASTOR)
     return;
 
-  hCore->ppuThread[hCore->currentThread].GPR[rA] = EA;
+  GPR(ra) = EA;
 }
 
+// Store Word with Update Indexed (x’7C00 016E’)
 void PPCInterpreter::PPCInterpreter_stwux(PPU_STATE *hCore) {
-  X_FORM_rS_rA_rB;
-  u64 EA = hCore->ppuThread[hCore->currentThread].GPR[rA] +
-           hCore->ppuThread[hCore->currentThread].GPR[rB];
-  MMUWrite32(hCore, EA, (u32)hCore->ppuThread[hCore->currentThread].GPR[rS]);
+  /*
+  EA <- (rA) + (rB)
+  MEM(EA, 4) <- rS[32–63]
+  rA <- EA
+  */
+  const u64 EA = GPR(ra) + GPR(rb);
+  MMUWrite32(hCore, EA, static_cast<u32>(GPR(rs)));
+  
   if (hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASEGM ||
       hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASTOR)
     return;
 
-  hCore->ppuThread[hCore->currentThread].GPR[rA] = EA;
+  GPR(ra) = EA;
 }
 
+// Store Word Indexed (x’7C00 012E’)
 void PPCInterpreter::PPCInterpreter_stwx(PPU_STATE *hCore) {
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + (rB)
+  MEM(EA, 4) <- rS[32–63]
+  */
   X_FORM_rD_rA_rB;
-  u64 EA = (rA ? hCore->ppuThread[hCore->currentThread].GPR[rA] : 0) +
-           hCore->ppuThread[hCore->currentThread].GPR[rB];
-  MMUWrite32(hCore, EA, (u32)hCore->ppuThread[hCore->currentThread].GPR[rD]);
+  const u64 EA = _instr.ra ? GPR(ra) + GPR(rb) : GPR(rb);
+  MMUWrite32(hCore, EA, static_cast<u32>(GPR(rs)));
 }
 
 //
 // Store Doubleword
 //
 
+// Store Double Word (x’F800 0000’)
 void PPCInterpreter::PPCInterpreter_std(PPU_STATE *hCore) {
-  DS_FORM_rS_rA_DS;
-  DS = EXTS(DS, 14) << 2;
-  u64 EA = (rA ? hCore->ppuThread[hCore->currentThread].GPR[rA] : 0) + DS;
-  MMUWrite64(hCore, EA, hCore->ppuThread[hCore->currentThread].GPR[rS]);
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + EXTS(ds || 0b00)
+  (MEM(EA, 8)) <- (rS)
+  */
+  const u64 EA = (_instr.simm16 & ~3) + (_instr.ra ? GPR(ra) : 0);
+  MMUWrite64(hCore, EA, GPR(rs));
 }
 
+// Store Double Word Conditional Indexed (x’7C00 01AD’)
 void PPCInterpreter::PPCInterpreter_stdcx(PPU_STATE *hCore) {
-  X_FORM_rS_rA_rB;
-
-  u64 EA = (rA ? hCore->ppuThread[hCore->currentThread].GPR[rA] : 0) +
-           hCore->ppuThread[hCore->currentThread].GPR[rB];
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + (rB)
+  if RESERVE then
+    if RESERVE_ADDR = physical_addr(EA)
+    MEM(EA, 8) <- (rS)
+    CR0 <- 0b00 || 0b1 || XER[SO]
+  else
+    u <- undefined 1-bit value
+    if u then MEM(EA, 8) <- (rS)
+    CR0 <- 0b00 || u || XER[SO]
+  RESERVE <- 0
+  else
+    CR0 <- 0b00 || 0b0 || XER[SO]
+  */
+  const u64 EA = _instr.ra ? GPR(ra) + GPR(rb) : GPR(rb);
   u64 RA = EA;
   u32 CR = 0;
 
@@ -300,7 +419,7 @@ void PPCInterpreter::PPCInterpreter_stdcx(PPU_STATE *hCore) {
     if (hCore->ppuThread[hCore->currentThread].ppuRes->V) {
       if (hCore->ppuThread[hCore->currentThread].ppuRes->resAddr == (RA & ~7)) {
         u64 data =
-            std::byteswap<u64>(hCore->ppuThread[hCore->currentThread].GPR[rS]);
+            std::byteswap<u64>(GPR(rs));
         bool soc = false;
         RA = mmuContructEndAddressFromSecEngAddr(RA, &soc);
         sysBus->Write(RA, data, 8);
@@ -316,49 +435,66 @@ void PPCInterpreter::PPCInterpreter_stdcx(PPU_STATE *hCore) {
   ppcUpdateCR(hCore, 0, CR);
 }
 
+// Store Double Word with Update (x’F800 0001’)
 void PPCInterpreter::PPCInterpreter_stdu(PPU_STATE *hCore) {
-  DS_FORM_rD_rA_DS;
-  DS = EXTS(DS, 14) << 2;
-  u64 EA = hCore->ppuThread[hCore->currentThread].GPR[rA] + DS;
-  MMUWrite64(hCore, EA, hCore->ppuThread[hCore->currentThread].GPR[rD]);
+  /*
+  EA <- (rA) + EXTS(ds || 0b00)
+  (MEM(EA, 8)) <- (rS)
+  rA <- EA
+  */
+  const u64 EA = GPR(ra) + (_instr.simm16 & ~3);
+  MMUWrite64(hCore, EA, GPR(rs));
+
   if (hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASEGM ||
       hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASTOR)
     return;
 
-  hCore->ppuThread[hCore->currentThread].GPR[rA] = EA;
+  GPR(ra) = EA;
 }
 
+// Store Double Word with Update Indexed (x’7C00 016A’)
 void PPCInterpreter::PPCInterpreter_stdux(PPU_STATE *hCore) {
-  X_FORM_rS_rA_rB;
-  u64 EA = (rA ? hCore->ppuThread[hCore->currentThread].GPR[rA] : 0) +
-           hCore->ppuThread[hCore->currentThread].GPR[rB];
-  MMUWrite64(hCore, EA, hCore->ppuThread[hCore->currentThread].GPR[rS]);
+  /*
+  EA <- (rA) + (rB)
+  MEM(EA, 8) <- (rS)
+  rA <- EA
+  */
+  const u64 EA = GPR(ra) + GPR(rb);
+  MMUWrite64(hCore, EA, GPR(rs));
+
   if (hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASEGM ||
       hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASTOR)
     return;
 
-  hCore->ppuThread[hCore->currentThread].GPR[rA] = EA;
+  GPR(ra) = EA;
 }
 
+// Store Double Word Indexed (x’7C00 012A’)
 void PPCInterpreter::PPCInterpreter_stdx(PPU_STATE *hCore) {
-  X_FORM_rS_rA_rB;
-  u64 EA = (rA ? hCore->ppuThread[hCore->currentThread].GPR[rA] : 0) +
-           hCore->ppuThread[hCore->currentThread].GPR[rB];
-  MMUWrite64(hCore, EA, hCore->ppuThread[hCore->currentThread].GPR[rS]);
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + (rB)
+  (MEM(EA, 8)) <- (rS)
+  */
+  const u64 EA = _instr.ra ? GPR(ra) + GPR(rb) : GPR(rb);
+  MMUWrite64(hCore, EA, GPR(rs));
 }
 
 //
 // Store Floating
 //
+
+// Store Floating-Point Double (x’D800 0000’)
 void PPCInterpreter::PPCInterpreter_stfd(PPU_STATE *hCore) {
-  D_FORM_FrS_rA_D;
-
-  D = EXTS(D, 16);
-
-  u64 EA = (rA ? hCore->ppuThread[hCore->currentThread].GPR[rA] : 0) + D;
-
-  MMUWrite64(hCore, EA,
-             hCore->ppuThread[hCore->currentThread].FPR[FrS].valueAsU64);
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + EXTS(d)
+  MEM(EA, 8) <- (frS)
+  */
+  const u64 EA = _instr.ra || 1 ? GPR(ra) + _instr.simm16 : _instr.simm16;
+  MMUWrite64(hCore, EA, FPR(frs).valueAsU64);
 }
 
 //
@@ -764,6 +900,7 @@ void PPCInterpreter::PPCInterpreter_ldarx(PPU_STATE *hCore) {
 
   u64 RA = EA & ~7;
   MMUTranslateAddress(&RA, hCore, false);
+
   if (hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASEGM ||
       hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASTOR)
     return;
@@ -773,10 +910,13 @@ void PPCInterpreter::PPCInterpreter_ldarx(PPU_STATE *hCore) {
   intXCPUContext->xenonRes.Increment();
 
   u64 data = MMURead64(hCore, EA);
+
   if (hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASEGM ||
       hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASTOR)
     return;
+
   DBG_LOAD("ldarx:Addr 0x" << std::hex << EA << " data = 0x" << std::hex << (int)data << std::endl;)
+
   hCore->ppuThread[hCore->currentThread].GPR[rD] = data;
 }
 
@@ -785,12 +925,15 @@ void PPCInterpreter::PPCInterpreter_ldu(PPU_STATE *hCore) {
   DS = EXTS(DS, 14) << 2;
 
   u64 EA = hCore->ppuThread[hCore->currentThread].GPR[rA] + DS;
+
   u64 data = MMURead64(hCore, EA);
+
   if (hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASEGM ||
       hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASTOR)
     return;
 
   DBG_LOAD("ldu: Addr 0x" << EA << " data = 0x" << data << std::endl;)
+
   hCore->ppuThread[hCore->currentThread].GPR[rD] = data;
   hCore->ppuThread[hCore->currentThread].GPR[rA] = EA;
 }
@@ -800,12 +943,15 @@ void PPCInterpreter::PPCInterpreter_ldux(PPU_STATE *hCore) {
 
   u64 EA = hCore->ppuThread[hCore->currentThread].GPR[rA] +
            hCore->ppuThread[hCore->currentThread].GPR[rB];
+
   u64 data = MMURead64(hCore, EA);
+
   if (hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASEGM ||
       hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASTOR)
     return;
 
   DBG_LOAD("ldux: Addr 0x" << EA << " data = 0x" << data << std::endl;)
+
   hCore->ppuThread[hCore->currentThread].GPR[rD] = data;
   hCore->ppuThread[hCore->currentThread].GPR[rA] = EA;
 }
@@ -815,7 +961,9 @@ void PPCInterpreter::PPCInterpreter_ldx(PPU_STATE *hCore) {
 
   u64 EA = (rA ? hCore->ppuThread[hCore->currentThread].GPR[rA] : 0) +
            hCore->ppuThread[hCore->currentThread].GPR[rB];
+
   u64 data = MMURead64(hCore, EA);
+
   if (hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASEGM ||
       hCore->ppuThread[hCore->currentThread].exceptReg & PPU_EX_DATASTOR)
     return;
