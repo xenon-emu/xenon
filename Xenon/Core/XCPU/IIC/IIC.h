@@ -8,15 +8,15 @@
 #include "Base/Types.h"
 
 namespace Xe {
-namespace XCPU {
-namespace IIC {
+  namespace XCPU {
+    namespace IIC {
 
 #define XE_IIC_BASE 0x50000
 #define XE_IIC_SIZE 0xFF // 1 IIC Ctrl Block?
 
-//
-// Interrupt Types
-//
+      //
+      // Interrupt Types
+      //
 #define PRIO_IPI_4 0x08
 #define PRIO_IPI_3 0x10
 #define PRIO_SMM 0x14
@@ -41,57 +41,59 @@ namespace IIC {
 #define PRIO_IPI_1 0x78
 #define PRIO_NONE 0x7C
 
-enum XE_IIC_CPU_REG {
-  CPU_WHOAMI = 0x0,
-  CPU_CURRENT_TSK_PRI = 0x8,
-  CPU_IPI_DISPATCH_0 = 0x10,
-  INT_0x30 = 0x30,
-  ACK = 0x50,
-  ACK_SET_CPU_CURRENT_TSK_PRI = 0x58,
-  EOI = 0x60,
-  EOI_SET_CPU_CURRENT_TSK_PRI = 0x68,
-  INT_MCACK = 0x70
-};
+      enum XE_IIC_CPU_REG {
+        CPU_WHOAMI = 0x0,
+        CPU_CURRENT_TSK_PRI = 0x8,
+        CPU_IPI_DISPATCH_0 = 0x10,
+        INT_0x30 = 0x30,
+        ACK = 0x50,
+        ACK_SET_CPU_CURRENT_TSK_PRI = 0x58,
+        EOI = 0x60,
+        EOI_SET_CPU_CURRENT_TSK_PRI = 0x68,
+        INT_MCACK = 0x70
+      };
 
-struct XE_INT {
-  bool ack = false;
-  u8 pendingInt = 0;
-};
+      // Xenon Interrupt.
+      struct Xe_Int {
+        // Flag for determining wheter an interrupt was ack'd to the target PPU thread.
+        bool ack = false;
+        // Interrupt to signal.
+        u64 interrupt = 0;
+      };
 
-// Each logical thread has its own Interrupt Control Block.
-struct PPE_INT_CTRL_BLCK {
-  u32 REG_CPU_WHOAMI;
-  u32 REG_CPU_CURRENT_TSK_PRI;
-  u32 REG_CPU_IPI_DISPATCH_0;
-  u32 REG_ACK;
-  u32 REG_ACK_SET_CPU_CURRENT_TSK_PRI;
-  u32 REG_EOI;
-  u32 REG_EOI_SET_CPU_CURRENT_TSK_PRI;
-  u32 REG_INT_MCACK;
-  std::vector<XE_INT> pendingInt;
-  // Interrupt Queue (Higher priority interrupts come first).
-  std::priority_queue<u64> intQueue;
-  // Interrupt Ack flag.
-  bool intAck = false;
-};
+      // Each logical thread has its own Interrupt Control Block.
+      struct PPE_INT_CTRL_BLCK {
+        u32 REG_CPU_WHOAMI;
+        u32 REG_CPU_CURRENT_TSK_PRI;
+        u32 REG_CPU_IPI_DISPATCH_0;
+        u32 REG_ACK;
+        u32 REG_ACK_SET_CPU_CURRENT_TSK_PRI;
+        u32 REG_EOI;
+        u32 REG_EOI_SET_CPU_CURRENT_TSK_PRI;
+        u32 REG_INT_MCACK;
+        // Stored pending interrupts.
+        std::vector<Xe_Int> interrupts;
+        // Stores wheter an interrupt was already signaled to the target thread.
+        bool intSignaled = false;
+      };
 
-struct IIC_State {
-  // There are 6 total PPE's in the Xenon.
-  PPE_INT_CTRL_BLCK ppeIntCtrlBlck[6] = {};
-};
+      struct IIC_State {
+        // There are 6 total PPE's in the Xenon.
+        PPE_INT_CTRL_BLCK ppeIntCtrlBlck[6] = {};
+      };
 
-class XenonIIC {
-public:
-  XenonIIC();
-  void writeInterrupt(u64 intAddress, u64 intData);
-  void readInterrupt(u64 intAddress, u64 *intData);
-  bool checkExtInterrupt(u8 ppuID);
-  void genInterrupt(u8 interruptType, u8 cpusToInterrupt);
+      class XenonIIC {
+      public:
+        XenonIIC();
+        void writeInterrupt(u64 intAddress, u64 intData);
+        void readInterrupt(u64 intAddress, u64* intData);
+        bool checkExtInterrupt(u8 ppuID);
+        void genInterrupt(u8 interruptType, u8 cpusToInterrupt);
 
-private:
-  IIC_State iicState;
-  std::recursive_mutex mutex;
-};
-} // namespace IIC
-} // namespace XCPU
+      private:
+        IIC_State iicState;
+        std::recursive_mutex mutex;
+      };
+    } // namespace IIC
+  } // namespace XCPU
 } // namespace Xe
