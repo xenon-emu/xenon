@@ -619,6 +619,9 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
 
       // If interrupts are active set Int status and issue one.
       if (smcPCIState->smiIntEnabledReg & SMI_INT_ENABLED && noResponse == false) {
+        // Wait a small delay to mimic hardware. This allows code in xboxkrnl.exe such as
+        // KeWaitForSingleObject to correctly setup waiting code.
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
         smcPCIState->smiIntPendingReg = SMI_INT_PENDING;
         pciBridge->RouteInterrupt(PRIO_SMM);
       }
@@ -637,7 +640,7 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
       {
         // Wait X time before next clock interrupt. TODO: Find the correct
         // delay.
-        if (timerNow >= timerStart + std::chrono::milliseconds(5000)) {
+        if (timerNow >= timerStart + std::chrono::milliseconds(1000)) {
           // Update internal timer.
           timerStart = std::chrono::steady_clock::now();
           smcPCIState->clockIntStatusReg = CLCK_INT_TAKEN;
