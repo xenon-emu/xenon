@@ -218,11 +218,11 @@ create_target_directory_groups(Xenon)
 
 # Test compiler ID
 if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-	set(MSVC True)
+	set(msvc TRUE)
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-	set(GCC True)
+	set(gcc TRUE)
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-	set(Clang True)
+	set(clang TRUE)
 endif()
 
 # Copy fonts to build directory
@@ -245,7 +245,7 @@ add_definitions(-DNTDDI_VERSION=0x0A000006 -D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00
 add_definitions(-DNOMINMAX -DWIN32_LEAN_AND_MEAN)
 add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 
-if (MSVC)
+if (msvc)
   set(CMAKE_GENERATOR_PLATFORM x64)
   set(CMAKE_SYSTEM_VERSION 10.0.19041.0)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
