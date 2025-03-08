@@ -36,11 +36,12 @@ private:
   // System Bus
   RootBus *mainBus = nullptr;
 
+  // Global Xenon CPU Content (shared between PPUs)
   XENON_CONTEXT xenonContext = {};
 
   // Power Processing Units, the effective execution units inside the XBox
   // 360 CPU.
-  std::unique_ptr<PPU> ppu0;
-  std::unique_ptr<PPU> ppu1;
-  std::unique_ptr<PPU> ppu2;
+  std::unique_ptr<PPU> ppu0{};
+  std::unique_ptr<PPU> ppu1{};
+  std::unique_ptr<PPU> ppu2{};
 };

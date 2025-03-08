@@ -34,7 +34,7 @@ public:
   void Shutdown();
 
   virtual ~GUI() = default;
-  virtual void InitBackend(SDL_Window* window, void* context) = 0;
+  virtual void InitBackend(void* context) = 0;
   virtual void ShutdownBackend() = 0;
   virtual void BeginSwap() = 0;
   virtual void OnSwap(Texture* texture) = 0;

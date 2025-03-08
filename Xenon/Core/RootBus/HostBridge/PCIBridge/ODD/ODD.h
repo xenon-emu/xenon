@@ -11,12 +11,14 @@
 #include <sys/stat.h>
 #endif
 #include <cstring>
+#include <memory>
 #include <string>
 
 #include "Core/RAM/RAM.h"
 #include "Core/RootBus/HostBridge/PCIBridge/SATA.h"
 #include "Core/RootBus/HostBridge/PCIBridge/PCIBridge.h"
 #include "Core/RootBus/HostBridge/PCIBridge/PCIDevice.h"
+#include "Core/XCPU/Interpreter/PPCInternal.h"
 
 #define ODD_DEV_SIZE 0x30
 
@@ -89,8 +91,6 @@ public:
     DWORD cbRead;
     OVERLAPPED Over;
 
-    #define HIDW(qw) (((u64)(qw)) >> 32)
-    #define LODW(qw) ((u32)(qw))
     memset(&Over, 0, sizeof Over);
     Over.Offset = LODW(Offset);
     Over.OffsetHigh = HIDW(Offset);
@@ -370,7 +370,7 @@ struct XE_ATAPI_DEV_STATE {
   // Direct Memroy Access Processing
   XE_ATAPI_DMA_STATE dmaState = {0};
   // Mounted ISO Image
-  Storage *mountedCDImage;
+  std::unique_ptr<Storage> mountedCDImage{};
 };
 
 class ODD : public PCIDevice {

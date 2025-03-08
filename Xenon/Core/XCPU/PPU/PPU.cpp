@@ -53,9 +53,9 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u32 PVR,
     LOG_INFO(Xenon, "{} TPI: {} ticks per instruction (overrwriten! actual tps: {})", ppuName, ticksPerInstruction, TPI_FORMULA(instrPerSecond));
 
   for (u8 thrdID = 0; thrdID < 2; thrdID++) {
-    ppuState->ppuThread[thrdID].ppuRes = new PPU_RES;
-    memset(ppuState->ppuThread[thrdID].ppuRes, 0, sizeof(PPU_RES));
-    xenonContext->xenonRes.Register(ppuState->ppuThread[thrdID].ppuRes);
+    ppuState->ppuThread[thrdID].ppuRes = std::make_unique<STRIP_UNIQUE(PPU_THREAD_REGISTERS::ppuRes)>();
+    memset(ppuState->ppuThread[thrdID].ppuRes.get(), 0, sizeof(PPU_RES));
+    xenonContext->xenonRes.Register(ppuState->ppuThread[thrdID].ppuRes.get());
 
     // Set the decrementer as per docs. See CBE Public Registers pdf in Docs.
     ppuState->ppuThread[ppuState->currentThread].SPR.DEC = 0x7FFFFFFF;

@@ -2,10 +2,11 @@
 
 #pragma once
 
+#include <fstream>
+#include <memory>
 #include <mutex>
 #include <thread>
 #include <vector>
-#include <fstream>
 
 #include <SDL3/SDL.h>
 
@@ -117,8 +118,10 @@ private:
   // PCI Device Size, using when determining PCI device size of each BAR in Linux.
   u32 pciDevSizes[6]{};
 
+  // RAM Pointer
   RAM *ramPtr{};
 
+  // GPU State
   XenosState xenosState{};
 };
 } // namespace Xenos

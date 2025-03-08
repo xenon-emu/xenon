@@ -18,11 +18,15 @@
       }
     },
     {
-      "name": "windows-msvc-base",
+      "name": "windows-gcc-base",
       "hidden": true,
-      "generator": "Visual Studio 17 2022",
+      "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "installDir": "${sourceDir}/install/${presetName}",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "gcc.exe",
+        "CMAKE_CXX_COMPILER": "g++.exe"
+      },
       "condition": {
         "type": "equals",
         "lhs": "${hostSystemName}",
@@ -42,9 +46,29 @@
       }
     },
     {
+      "name": "x86-clang-debug",
+      "displayName": "x86-Clang-Debug",
+      "inherits": "windows-clang-base",
+      "architecture": {
+        "value": "x86",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
       "name": "x64-clang-release",
       "displayName": "x64-Clang-Release",
       "inherits": "x64-clang-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "x86-clang-release",
+      "displayName": "x86-Clang-Release",
+      "inherits": "x86-clang-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
@@ -58,9 +82,17 @@
       }
     },
     {
-      "name": "x64-msvc-debug",
-      "displayName": "x64-MSVC-Debug",
-      "inherits": "windows-msvc-base",
+      "name": "x86-Clang-relwithdebinfo",
+      "displayName": "x86-Clang-RelWithDebInfo",
+      "inherits": "x86-clang-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "x64-gcc-debug",
+      "displayName": "x64-GCC-Debug",
+      "inherits": "windows-gcc-base",
       "architecture": {
         "value": "x64",
         "strategy": "external"
@@ -70,53 +102,9 @@
       }
     },
     {
-      "name": "x64-msvc-release",
-      "displayName": "x64-MSVC-Release",
-      "inherits": "x64-msvc-debug",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
-      }
-    },
-    {
-      "name": "x64-msvc-relwithdebinfo",
-      "displayName": "x64-MSVC-RelWithDebInfo",
-      "inherits": "x64-msvc-debug",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
-      }
-    },
-    {
-      "name": "x86-msvc-debug",
-      "displayName": "x86-MSVC-Debug",
-      "inherits": "windows-msvc-base",
-      "architecture": {
-        "value": "Win32",
-        "strategy": "set"
-      },
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug"
-      }
-    },
-    {
-      "name": "x86-msvc-release",
-      "displayName": "x86-MSVC-Release",
-      "inherits": "x86-msvc-debug",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
-      }
-    },
-    {
-      "name": "x86-msvc-relwithdebinfo",
-      "displayName": "x86-MSVC-RelWithDebInfo",
-      "inherits": "x86-msvc-debug",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
-      }
-    },
-    {
-      "name": "x86-clang-debug",
-      "displayName": "x86-Clang-Debug",
-      "inherits": "windows-clang-base",
+      "name": "x86-gcc-debug",
+      "displayName": "x86-GCC-Debug",
+      "inherits": "windows-gcc-base",
       "architecture": {
         "value": "x86",
         "strategy": "external"
@@ -126,17 +114,33 @@
       }
     },
     {
-      "name": "x86-clang-release",
-      "displayName": "x86-Clang-Release",
-      "inherits": "x86-clang-debug",
+      "name": "x64-gcc-release",
+      "displayName": "x64-GCC-Release",
+      "inherits": "x64-gcc-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
       }
     },
     {
-      "name": "x86-Clang-relwithdebinfo",
-      "displayName": "x86-Clang-RelWithDebInfo",
-      "inherits": "x86-clang-debug",
+      "name": "x86-gcc-release",
+      "displayName": "x86-GCC-Release",
+      "inherits": "x86-gcc-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "x64-gcc-relwithdebinfo",
+      "displayName": "x64-GCC-RelWithDebInfo",
+      "inherits": "x64-gcc-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
+      }
+    },
+    {
+      "name": "x86-gcc-relwithdebinfo",
+      "displayName": "x86-GCC-RelWithDebInfo",
+      "inherits": "x86-gcc-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
@@ -171,22 +175,6 @@
       }
     },
     {
-      "name": "x64-linux-release",
-      "displayName": "x64-Linux-Release",
-      "inherits": "x64-linux-debug",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Release"
-      }
-    },
-    {
-      "name": "x64-linux-relwithdebinfo",
-      "displayName": "x64-Linux-RelWithDebInfo",
-      "inherits": "x64-linux-debug",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
-      }
-    },
-    {
       "name": "x86-linux-debug",
       "displayName": "x86-Linux-Debug",
       "inherits": "linux-base",
@@ -199,11 +187,27 @@
       }
     },
     {
+      "name": "x64-linux-release",
+      "displayName": "x64-Linux-Release",
+      "inherits": "x64-linux-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
       "name": "x86-linux-release",
       "displayName": "x86-Linux-Release",
       "inherits": "x86-linux-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release"
+      }
+    },
+    {
+      "name": "x64-linux-relwithdebinfo",
+      "displayName": "x64-Linux-RelWithDebInfo",
+      "inherits": "x64-linux-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo"
       }
     },
     {

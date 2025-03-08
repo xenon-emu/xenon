@@ -8,38 +8,38 @@
 #define PPC_OPC_LK 1
 #define PPC_OPC_AA (1 << 1)
 
-#define HIDW(data) ((u32)(((u64)(data)) >> 32))
-#define LODW(data) ((u32)(data))
+#define HIDW(data) (static_cast<u64>(data) >> 32)
+#define LODW(data) (static_cast<u32>(data))
 
 #define PPC_OPC_TEMPL_A(opc, rD, rA, rB, RC)                                   \
   {                                                                            \
-    rD = ((opc) >> 21) & 0x1f;                                                 \
-    rA = ((opc) >> 16) & 0x1f;                                                 \
-    rB = ((opc) >> 11) & 0x1f;                                                 \
-    RC = ((opc) >> 6) & 0x1f;                                                  \
+    rD = ((opc) >> 21) & 0x1F;                                                 \
+    rA = ((opc) >> 16) & 0x1F;                                                 \
+    rB = ((opc) >> 11) & 0x1F;                                                 \
+    RC = ((opc) >> 6) & 0x1F;                                                  \
   }
 #define PPC_OPC_TEMPL_B(opc, BO, BI, BD)                                       \
   {                                                                            \
-    BO = ((opc) >> 21) & 0x1f;                                                 \
-    BI = ((opc) >> 16) & 0x1f;                                                 \
+    BO = ((opc) >> 21) & 0x1F;                                                 \
+    BI = ((opc) >> 16) & 0x1F;                                                 \
     BD = (u32)(s32)(s16)((opc) & 0xfffc);                                      \
   }
 #define PPC_OPC_TEMPL_D_SImm(opc, rD, rA, imm)                                 \
   {                                                                            \
-    rD = ((opc) >> 21) & 0x1f;                                                 \
-    rA = ((opc) >> 16) & 0x1f;                                                 \
+    rD = ((opc) >> 21) & 0x1F;                                                 \
+    rA = ((opc) >> 16) & 0x1F;                                                 \
     imm = (u32)(s32)(s16)((opc) & 0xffff);                                     \
   }
 #define PPC_OPC_TEMPL_D_UImm(opc, rD, rA, imm)                                 \
   {                                                                            \
-    rD = ((opc) >> 21) & 0x1f;                                                 \
-    rA = ((opc) >> 16) & 0x1f;                                                 \
+    rD = ((opc) >> 21) & 0x1F;                                                 \
+    rA = ((opc) >> 16) & 0x1F;                                                 \
     imm = (opc) & 0xffff;                                                      \
   }
 #define PPC_OPC_TEMPL_D_Shift16(opc, rD, rA, imm)                              \
   {                                                                            \
-    rD = ((opc) >> 21) & 0x1f;                                                 \
-    rA = ((opc) >> 16) & 0x1f;                                                 \
+    rD = ((opc) >> 21) & 0x1F;                                                 \
+    rA = ((opc) >> 16) & 0x1F;                                                 \
     imm = (opc) << 16;                                                         \
   }
 #define PPC_OPC_TEMPL_I(opc, LI)                                               \
@@ -50,62 +50,62 @@
   }
 #define PPC_OPC_TEMPL_M(opc, rS, rA, SH, MB, ME)                               \
   {                                                                            \
-    rS = ((opc) >> 21) & 0x1f;                                                 \
-    rA = ((opc) >> 16) & 0x1f;                                                 \
-    SH = ((opc) >> 11) & 0x1f;                                                 \
-    MB = ((opc) >> 6) & 0x1f;                                                  \
-    ME = ((opc) >> 1) & 0x1f;                                                  \
+    rS = ((opc) >> 21) & 0x1F;                                                 \
+    rA = ((opc) >> 16) & 0x1F;                                                 \
+    SH = ((opc) >> 11) & 0x1F;                                                 \
+    MB = ((opc) >> 6) & 0x1F;                                                  \
+    ME = ((opc) >> 1) & 0x1F;                                                  \
   }
 #define PPC_OPC_TEMPL_X(opc, rS, rA, rB)                                       \
   {                                                                            \
-    rS = ((opc) >> 21) & 0x1f;                                                 \
-    rA = ((opc) >> 16) & 0x1f;                                                 \
-    rB = ((opc) >> 11) & 0x1f;                                                 \
+    rS = ((opc) >> 21) & 0x1F;                                                 \
+    rA = ((opc) >> 16) & 0x1F;                                                 \
+    rB = ((opc) >> 11) & 0x1F;                                                 \
   }
 #define PPC_OPC_TEMPL_XFX(opc, rS, CRM)                                        \
   {                                                                            \
-    rS = ((opc) >> 21) & 0x1f;                                                 \
+    rS = ((opc) >> 21) & 0x1F;                                                 \
     CRM = ((opc) >> 12) & 0xff;                                                \
   }
 #define PPC_OPC_TEMPL_XO(opc, rS, rA, rB)                                      \
   {                                                                            \
-    rS = ((opc) >> 21) & 0x1f;                                                 \
-    rA = ((opc) >> 16) & 0x1f;                                                 \
-    rB = ((opc) >> 11) & 0x1f;                                                 \
+    rS = ((opc) >> 21) & 0x1F;                                                 \
+    rA = ((opc) >> 16) & 0x1F;                                                 \
+    rB = ((opc) >> 11) & 0x1F;                                                 \
   }
 #define PPC_OPC_TEMPL_XL(opc, BO, BI, BD)                                      \
   {                                                                            \
-    BO = ((opc) >> 21) & 0x1f;                                                 \
-    BI = ((opc) >> 16) & 0x1f;                                                 \
-    BD = ((opc) >> 11) & 0x1f;                                                 \
+    BO = ((opc) >> 21) & 0x1F;                                                 \
+    BI = ((opc) >> 16) & 0x1F;                                                 \
+    BD = ((opc) >> 11) & 0x1F;                                                 \
   }
 #define PPC_OPC_TEMPL_XFL(opc, rB, FM)                                         \
   {                                                                            \
-    rB = ((opc) >> 11) & 0x1f;                                                 \
+    rB = ((opc) >> 11) & 0x1F;                                                 \
     FM = ((opc) >> 17) & 0xff;                                                 \
   }
 
 #define PPC_OPC_TEMPL3_XO()                                                    \
   s32 rD, rA, rB;                                                              \
-  rD = ((hCore->CI) >> 21) & 0x1f;                                             \
-  rA = ((hCore->CI) >> 16) & 0x1f;                                             \
-  rB = ((hCore->CI) >> 11) & 0x1f
+  rD = ((hCore->CI) >> 21) & 0x1F;                                             \
+  rA = ((hCore->CI) >> 16) & 0x1F;                                             \
+  rB = ((hCore->CI) >> 11) & 0x1F
 #define PPC_OPC_TEMPL_X_CR()                                                   \
   s32 crD, crA, crB;                                                           \
-  crD = ((hCore->CI) >> 21) & 0x1f;                                            \
-  crA = ((hCore->CI) >> 16) & 0x1f;                                            \
-  crB = ((hCore->CI) >> 11) & 0x1f
+  crD = ((hCore->CI) >> 21) & 0x1F;                                            \
+  crA = ((hCore->CI) >> 16) & 0x1F;                                            \
+  crB = ((hCore->CI) >> 11) & 0x1F
 
-static inline u64 GetBits64(u64 data, s8 begin, s8 end) {
+static constexpr u64 GetBits64(u64 data, s8 begin, s8 end) {
   const u64 mask = (0xFFFFFFFFFFFFFFFF << (63 - end));
   return data & mask;
 }
 
-static inline u32 ExtractBits(u32 input, u32 begin, u32 end) {
+static constexpr u32 ExtractBits(u32 input, u32 begin, u32 end) {
   return (input >> (32 - 1 - end)) & ((1 << (end - begin + 1)) - 1);
 }
 
-static inline u64 ExtractBits64(u32 input, u32 begin, u32 end) {
+static constexpr u64 ExtractBits64(u32 input, u32 begin, u32 end) {
   return (input >> (64 - 1 - end)) & ((1 << (end - begin + 1)) - 1);
 }
 
@@ -122,9 +122,9 @@ static inline u64 ExtractBits64(u32 input, u32 begin, u32 end) {
   (dw) |= ((dwSet) << (31 - (e))) & DMASK(b, e);
 
 #define IFIELD(v, b, e)                                                        \
-  u32 v = DGET(hCore->ppuThread[hCore->currentThread].CI.opcode, b, e);
+  u32 v = DGET(curThread.CI.opcode, b, e);
 #define IFIELDQ(v, b, e)                                                       \
-  u64 v = DGET(hCore->ppuThread[hCore->currentThread].CI.opcode, b, e);
+  u64 v = DGET(curThread.CI.opcode, b, e);
 
 #define I_FORM_LI_AA_LK                                                        \
   IFIELD(LI, 6, 29);                                                           \
@@ -419,9 +419,9 @@ static inline u64 ExtractBits64(u32 input, u32 begin, u32 end) {
 
 #define BO_GET(i) BGET(BO, 5, i)
 
-#define CR_GET(i) BGET(hCore->ppuThread[hCore->currentThread].CR.CR_Hex, 32, i)
-#define CR_SET(i) BSET(hCore->ppuThread[hCore->currentThread].CR.CR_Hex, 32, i)
-#define CR_CLR(i) BCLR(hCore->ppuThread[hCore->currentThread].CR.CR_Hex, 32, i)
+#define CR_GET(i) BGET(curThread.CR.CR_Hex, 32, i)
+#define CR_SET(i) BSET(curThread.CR.CR_Hex, 32, i)
+#define CR_CLR(i) BCLR(curThread.CR.CR_Hex, 32, i)
 
 #define CR_BIT_LT 0
 #define CR_BIT_GT 1

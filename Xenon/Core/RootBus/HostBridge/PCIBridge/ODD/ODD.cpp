@@ -20,7 +20,7 @@ void ODD::atapiReset() {
   memcpy(&atapiState.atapiInquiryData.vendorIdentification,
          vendorIdentification, sizeof(vendorIdentification));
 
-  atapiState.mountedCDImage = new Storage(Config::oddImagePath());
+  atapiState.mountedCDImage = std::make_unique<STRIP_UNIQUE(atapiState.mountedCDImage)>(Config::oddImagePath());
 }
 
 void ODD::atapiIdentifyPacketDeviceCommand() {

@@ -17,7 +17,7 @@ namespace Render {
 
 class OpenGLGUI : public GUI {
 public:
-  void InitBackend(SDL_Window *window, void *context) override;
+  void InitBackend(void *context) override;
   void ShutdownBackend() override;
   void BeginSwap() override;
   void OnSwap(Texture *texture) override;
