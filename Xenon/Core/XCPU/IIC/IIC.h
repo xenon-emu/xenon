@@ -93,6 +93,8 @@ namespace Xe {
       private:
         IIC_State iicState;
         std::recursive_mutex mutex;
+        // Returns the name of the input interrupt ID.
+        std::string getIntName(u8 intID);
       };
     } // namespace IIC
   } // namespace XCPU

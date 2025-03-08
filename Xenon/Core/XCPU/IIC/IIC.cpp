@@ -1,10 +1,11 @@
 // Copyright 2025 Xenon Emulator Project
 
 #include "IIC.h"
-
-#include <thread>
-
 #include "Base/Logging/Log.h"
+
+#include <unordered_map>
+
+#define IIC_DEBUG true
 
 Xe::XCPU::IIC::XenonIIC::XenonIIC() {
   for (s8 idx = 0; idx < 6; idx++) {
@@ -25,6 +26,10 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, u64 intData) {
 
   switch (ppeIntCtrlBlckReg) {
   case Xe::XCPU::IIC::CPU_WHOAMI:
+    if (IIC_DEBUG) {
+      LOG_DEBUG(Xenon_IIC, "Control block number {:#x} beign set to PPU {:#x}",
+        ppeIntCtrlBlckID, static_cast<u8>(std::byteswap<u64>(intData)));
+    }
     iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].REG_CPU_WHOAMI =
       static_cast<u32>(std::byteswap<u64>(intData));
     break;
@@ -182,11 +187,48 @@ void Xe::XCPU::IIC::XenonIIC::genInterrupt(u8 interruptType,
   for (u8 ppuID = 0; ppuID < 6; ppuID++) {
     if ((cpusToInterrupt & 0x1) == 1) {
 
-      LOG_DEBUG(Xenon_IIC, "Generating interrupt: Thread {}, intType: {:#x}", ppuID, interruptType);
+      LOG_DEBUG(Xenon_IIC, "Generating interrupt: Thread {}, intType: {}", ppuID, getIntName(interruptType));
 
       // Store the interrupt in the interrupt queue.
       iicState.ppeIntCtrlBlck[ppuID].interrupts.push_back(newInt);
     }
     cpusToInterrupt = cpusToInterrupt >> 1;
+  }
+}
+
+std::string Xe::XCPU::IIC::XenonIIC::getIntName(u8 intID)
+{
+  static const std::unordered_map<u8, std::string> interruptMap = {
+      {0x08, "PRIO_IPI_4"},
+      {0x10, "PRIO_IPI_3"},
+      {0x14, "PRIO_SMM"},
+      {0x18, "PRIO_SFCX"},
+      {0x20, "PRIO_SATA_HDD"},
+      {0x24, "PRIO_SATA_CDROM"},
+      {0x2C, "PRIO_OHCI_0"},
+      {0x30, "PRIO_EHCI_0"},
+      {0x34, "PRIO_OHCI_1"},
+      {0x38, "PRIO_EHCI_1"},
+      {0x40, "PRIO_XMA"},
+      {0x44, "PRIO_AUDIO"},
+      {0x4C, "PRIO_ENET"},
+      {0x54, "PRIO_XPS"},
+      {0x58, "PRIO_GRAPHICS"},
+      {0x60, "PRIO_PROFILER"},
+      {0x64, "PRIO_BIU"},
+      {0x68, "PRIO_IOC"},
+      {0x6C, "PRIO_FSB"},
+      {0x70, "PRIO_IPI_2"},
+      {0x74, "PRIO_CLOCK"},
+      {0x78, "PRIO_IPI_1"},
+      {0x7C, "PRIO_NONE"}
+  };
+
+  auto it = interruptMap.find(intID);
+  if (it != interruptMap.end()) {
+    return it->second;
+  }
+  else {
+    return "Unknown interrupt";
   }
 }
