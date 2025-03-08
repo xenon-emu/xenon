@@ -104,10 +104,10 @@ jobs:
 
   linux_nix:
     name: Linux (nix)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@main
       - uses: cachix/install-nix-action@v27
       - name: Build Xenon
         run: nix build .#xenon -L

@@ -243,6 +243,7 @@ target_link_libraries(Xenon PRIVATE fmt::fmt SDL3::SDL3 toml11::toml11)
 
 add_definitions(-DNTDDI_VERSION=0x0A000006 -D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00)
 add_definitions(-DNOMINMAX -DWIN32_LEAN_AND_MEAN)
+add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 
 if (MSVC)
   set(CMAKE_GENERATOR_PLATFORM x64)

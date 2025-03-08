@@ -236,7 +236,7 @@ void Render::GUI::SetStyle() {
   style.Alpha = 1.f;
   style.DisabledAlpha = 0.95f;
   style.WindowPadding = { 10.f, 10.f };
-  style.WindowRounding = 0.f;
+  style.WindowRounding = 5.f;
   style.WindowBorderSize = 1.f;
   style.WindowMinSize = { 1.f, 1.f };
   style.WindowTitleAlign = { 0.f, 0.5f };
