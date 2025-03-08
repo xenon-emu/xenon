@@ -56,6 +56,13 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, u64 intData) {
         }
         intIdx++;
       }
+
+      if (IIC_DEBUG) {
+        LOG_DEBUG(Xenon_IIC, "EOI interrupt {} for thread {:#x} ", 
+          getIntName(static_cast<u8>(iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts[intIdx].interrupt)), 
+          ppeIntCtrlBlckID);
+      }
+
       iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts.erase(
         iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts.begin() + intIdx);
 
@@ -72,6 +79,13 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, u64 intData) {
         }
         intIdx++;
       }
+
+      if (IIC_DEBUG) {
+        LOG_DEBUG(Xenon_IIC, "EOI + Set PRIO: interrupt {} for thread {:#x}, new PRIO: {:#x}",
+          getIntName(static_cast<u8>(iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts[intIdx].interrupt)),
+          ppeIntCtrlBlckID, static_cast<u8>(std::byteswap<u64>(intData)));
+      }
+
       iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts.erase(
         iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts.begin() + intIdx);
 
@@ -165,6 +179,9 @@ bool Xe::XCPU::IIC::XenonIIC::checkExtInterrupt(u8 ppuID) {
   }
 
   if (priorityOk) {
+    if (IIC_DEBUG) {
+      LOG_DEBUG(Xenon_IIC, "Signaling interrupt for thread {:#x} ", ppuID);
+    }
     iicState.ppeIntCtrlBlck[ppuID].intSignaled = true;
     return true;
   }
