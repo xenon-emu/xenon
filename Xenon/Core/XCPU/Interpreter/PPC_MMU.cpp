@@ -1091,7 +1091,7 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
 
   EA = mmuContructEndAddressFromSecEngAddr(EA, &socRead);
 
-  // When the xboxkrnl writes to address 0x7fffxxxx is writing to the IIC
+  // When the xboxkrnl writes to address 0x7FFFxxxx is writing to the IIC
   // so we use that address here to validate its an soc write.
   if (((oldEA & 0x000000007fff0000) >> 16) == 0x7FFF) {
     socRead = true;
@@ -1285,9 +1285,9 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
 
   EA = mmuContructEndAddressFromSecEngAddr(EA, &socWrite);
 
-  // When the xboxkrnl writes to address 0x7fffxxxx is writing to the IIC
+  // When the xboxkrnl writes to address 0x7FFFxxxx is writing to the IIC
   // so we use that address here to validate its an soc write.
-  if (((oldEA & 0x000000007fff0000) >> 16) == 0x7FFF) {
+  if (((oldEA & 0x000000007FFFF0000) >> 16) == 0x7FFF) {
     socWrite = true;
   }
 
@@ -1298,11 +1298,11 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   }
 
   // Time Base register. Writing here starts or stops the RTC apparently.
-  if (socWrite && EA == 0x611a0) {
+  if (socWrite && EA == 0x611A0) {
     if (data == 0) {
       intXCPUContext->timeBaseActive = false;
       return;
-    } else if (data == 0xff01000000000000 ||
+    } else if (data == 0xFF01000000000000 ||
                data == 0x0001000000000000) // 0x1FF byte reversed!
     {
       intXCPUContext->timeBaseActive = true;

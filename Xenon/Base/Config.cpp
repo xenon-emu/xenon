@@ -54,7 +54,7 @@ std::string oddImagePath() { return oddDiscImagePath; }
 //     return gpuId;
 // }
 
-int tpi() { return ticksPerInstruction; }
+int cpi() { return clocksPerInstruction; }
 
 void loadConfig(const std::filesystem::path &path) {
   // If the configuration file does not exist, create it and return.
@@ -138,8 +138,8 @@ void loadConfig(const std::filesystem::path &path) {
 
   if (data.contains("HighlyExperimental")) {
     const toml::value &highlyExperimental = data.at("HighlyExperimental");
-    ticksPerInstruction =
-        toml::find_or<int&>(highlyExperimental, "TPI", ticksPerInstruction);
+    clocksPerInstruction =
+        toml::find_or<int&>(highlyExperimental, "CPI", clocksPerInstruction);
   }
 }
 
@@ -236,10 +236,10 @@ void saveConfig(const std::filesystem::path &path) {
 
   data["HighlyExperimental"].comments().push_back("# Do not touch these options unless you know what you're doing!");
   data["HighlyExperimental"].comments().push_back("# It can break execution! User beware");
-  data["HighlyExperimental"]["TPI"].comments().push_back("# Ticks Per Instruction. If your system has a lower-than-average TPI, adjust accordingly");
-  data["HighlyExperimental"]["TPI"].comments().push_back("# Note: This will mess with execution timing, and may break time-sensitive things like XeLL");
-  data["HighlyExperimental"]["TPI"].comments().push_back("# Zero will use the estimated TPI for your system (check log for more info)");
-  data["HighlyExperimental"]["TPI"] = ticksPerInstruction;
+  data["HighlyExperimental"]["CPI"].comments().push_back("# Clocks Per Instruction. If your system has a lower-than-average CPI, adjust accordingly");
+  data["HighlyExperimental"]["CPI"].comments().push_back("# Note: This will mess with execution timing, and may break time-sensitive things like XeLL");
+  data["HighlyExperimental"]["CPI"].comments().push_back("# Zero will use the estimated CPI for your system (check log for more info)");
+  data["HighlyExperimental"]["CPI"] = clocksPerInstruction;
 
   std::ofstream file(path, std::ios::binary);
   file << data;

@@ -126,7 +126,7 @@ void XeMain::createSMCState() {
     (Xe::PCIDev::SMC::SMC_AVPACK_TYPE)Config::smcCurrentAvPack();
   smcCoreState->currPowerOnReas =
     (Xe::PCIDev::SMC::SMC_PWR_REAS)Config::smcPowerOnType();
-  smcCoreState->currTrayState = Xe::PCIDev::SMC::SMC_TRAY_STATE::SMC_TRAY_CLOSE;
+  smcCoreState->currTrayState = Xe::PCIDev::SMC::SMC_TRAY_STATE::SMC_TRAY_CLOSED;
 }
 
 void XeMain::getFuses() {

@@ -531,7 +531,7 @@ struct XENON_CONTEXT {
 
   // Time Base switch, possibly RTC register, the TB counter only runs if this
   // value is set.
-  bool timeBaseActive{};
+  bool timeBaseActive = false;
 
   // Security engine Context
   u8 *secEngData = new u8[XE_SECENG_SIZE];

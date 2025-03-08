@@ -91,7 +91,7 @@ namespace Xenos {
 #define REG_DCP_LB_DATA_GAP_BETWEEN_CHUNK 0x6cbc
 
 struct XenosState {
-  u8 *Regs;
+  std::unique_ptr<u8[]> Regs;
 };
 
 // ARGB (Console is BGRA)
@@ -100,6 +100,7 @@ struct XenosState {
 class XGPU {
 public:
   XGPU(RAM *ram);
+  ~XGPU();
 
   // Memory Read/Write methods.
   bool Read(u64 readAddress, u64 *data, u8 byteCount);
@@ -112,7 +113,7 @@ public:
 
 private:
   // Mutex handle
-  std::mutex mutex{};
+  std::recursive_mutex mutex{};
   // XGPU Config Space Data at address 0xD0010000.
   GENRAL_PCI_DEVICE_CONFIG_SPACE xgpuConfigSpace{};
   // PCI Device Size, using when determining PCI device size of each BAR in Linux.

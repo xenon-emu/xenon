@@ -82,7 +82,7 @@ enum SMC_FIFO_CMD {
 enum SMC_TRAY_STATE {
   SMC_TRAY_OPEN = 0x60,
   SMC_TRAY_OPEN_REQUEST = 0x61,
-  SMC_TRAY_CLOSE = 0x62,
+  SMC_TRAY_CLOSED = 0x62,
   SMC_TRAY_OPENING = 0x63,
   SMC_TRAY_CLOSING = 0x64,
   SMC_TRAY_UNKNOWN = 0x65,
@@ -306,6 +306,9 @@ public:
   void ConfigWrite(u64 writeAddress, u64 data, u8 byteCount) override;
 
 private:
+  // Mutex, stops other threads from writing to values without the previous one finishing
+  std::recursive_mutex mutex;
+
   // Parent PCI Bridge (Used for interrupts/communication):
   PCIBridge *pciBridge;
 
