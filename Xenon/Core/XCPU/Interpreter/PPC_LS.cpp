@@ -1,7 +1,8 @@
 // Copyright 2025 Xenon Emulator Project
 
-#include <assert.h>
+#include <bit>
 
+#include "Base/Assert.h"
 #include "PPCInterpreter.h"
 
 //
@@ -1032,7 +1033,7 @@ void PPCInterpreter::PPCInterpreter_lfd(PPU_STATE *ppuState) {
   frD <- MEM(EA, 8)
   */
   // Check if Floating Point is available.
-  assert(ppuState->ppuThread[ppuState->currentThread].SPR.MSR.FP == 1);
+  ASSERT(ppuState->ppuThread[ppuState->currentThread].SPR.MSR.FP == 1);
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
   u64 data = MMURead64(ppuState, EA);
@@ -1052,7 +1053,7 @@ void PPCInterpreter::PPCInterpreter_lfs(PPU_STATE *ppuState) {
   frD <- DOUBLE(MEM(EA, 4))
   */
   // Check if Floating Point is available.
-  assert(ppuState->ppuThread[ppuState->currentThread].SPR.MSR.FP == 1);
+  ASSERT(ppuState->ppuThread[ppuState->currentThread].SPR.MSR.FP == 1);
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
   SFPRegister singlePresFP;

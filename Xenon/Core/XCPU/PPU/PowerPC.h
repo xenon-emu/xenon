@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "Core/XCPU/IIC/IIC.h"
 #include "Core/XCPU/Bitfield.h"
 #include "Core/XCPU/XenonReservations.h"
