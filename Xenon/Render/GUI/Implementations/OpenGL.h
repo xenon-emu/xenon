@@ -22,7 +22,7 @@ public:
   void BeginSwap() override;
   void OnSwap(Texture *texture) override;
   void EndSwap() override;
-  bool ppcDebuggerActive{};
+  bool ppcDebuggerActive{ true };
   bool ppcDebuggerAttached{ true };
 private:
 };

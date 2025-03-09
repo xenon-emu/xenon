@@ -265,7 +265,7 @@ void PPUThread(Render::OpenGLGUI *gui, PPU_STATE *PPUState, u32 threadID) {
 }
 
 void RenderInstr(Render::OpenGLGUI *gui, u32 addr, u32 instr) {
-  std::string_view instrName = PPCInterpreter::ppcDecoder->decodeName(instr);
+  std::string instrName = PPCInterpreter::ppcDecoder->decodeName(instr);
   u32 b0 = static_cast<u8>((instr >> 24) & 0xFF);
   u32 b1 = static_cast<u8>((instr >> 16) & 0xFF);
   u32 b2 = static_cast<u8>((instr >> 8) & 0xFF);

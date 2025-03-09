@@ -10,7 +10,7 @@
 
 class PPU {
 public:
-  PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u32 resetVector, u32 PVR,
+  PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PVR,
                   u32 PIR, const char *ppuName);
   ~PPU();
 

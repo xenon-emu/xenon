@@ -28,7 +28,7 @@ static constexpr u64 get_cpi_value(u64 instrPerSecond, u64 epochNs) {
   return cycles / instrExecuted;
 }
 
-PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u32 resetVector, u32 PVR,
+PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PVR,
                   u32 PIR, const char *ppuName) {
   //
   // Set evrything as in POR. See CELL-BE Programming Handbook.
@@ -91,9 +91,9 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u32 resetVector, u32 P
 
   // If we're PPU0,thread0 then enable THRD 0 and set Reset Vector.
   if (strcmp(ppuState->ppuName, "PPU0") == false) {
-    //ppuState->SPR.CTRL = 0x800000; // CTRL[TE0] = 1;
-    //ppuState->SPR.HRMOR = 0x0000020000000000;
-    //ppuState->ppuThread[PPU_THREAD_0].NIA = resetVector;
+    ppuState->SPR.CTRL = 0x800000; // CTRL[TE0] = 1;
+    ppuState->SPR.HRMOR = 0x0000020000000000;
+    ppuState->ppuThread[PPU_THREAD_0].NIA = resetVector;
   }
 
   ppuThread = std::thread(&PPU::StartExecution, this);

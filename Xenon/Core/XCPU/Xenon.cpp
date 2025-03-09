@@ -45,22 +45,22 @@ Xenon::~Xenon() {
 void Xenon::Start(u64 resetVector) {
   // Start execution on every thread.
   ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(&xenonContext, mainBus, resetVector, XE_PVR, 0, "PPU0"); // Threads 0-1
-  //ppu1 = std::make_unique<STRIP_UNIQUE(ppu1)>(&xenonContext, mainBus, resetVector, XE_PVR, 2, "PPU1"); // Threads 2-3
-  //ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(&xenonContext, mainBus, resetVector, XE_PVR, 4, "PPU2"); // Threads 4-5
+  ppu1 = std::make_unique<STRIP_UNIQUE(ppu1)>(&xenonContext, mainBus, resetVector, XE_PVR, 2, "PPU1"); // Threads 2-3
+  ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(&xenonContext, mainBus, resetVector, XE_PVR, 4, "PPU2"); // Threads 4-5
   // Halt the CPU to ensure no opcodes are ran
-  //Halt();
-  // Load a elf (test)
-  ppu0->Halt();
-  std::filesystem::path filePath{ "C:/Users/Vali/Desktop/files/kernel.elf" };
-  std::ifstream file{ filePath, std::ios_base::in | std::ios_base::binary };
-  size_t fileSize = std::filesystem::file_size(filePath);
-  std::unique_ptr<u8[]> elfBinary = std::make_unique<u8[]>(fileSize);
-  file.read(reinterpret_cast<char*>(elfBinary.get()), fileSize);
-  file.close();
-  ppu0->loadElfImage(elfBinary.get(), fileSize);
+  Halt();
+  //// Load a elf (test)
+  //ppu0->Halt();
+  //std::filesystem::path filePath{ "C:/Users/Vali/Desktop/files/kernel.elf" };
+  //std::ifstream file{ filePath, std::ios_base::in | std::ios_base::binary };
+  //size_t fileSize = std::filesystem::file_size(filePath);
+  //std::unique_ptr<u8[]> elfBinary = std::make_unique<u8[]>(fileSize);
+  //file.read(reinterpret_cast<char*>(elfBinary.get()), fileSize);
+  //file.close();
+  //ppu0->loadElfImage(elfBinary.get(), fileSize);
   // Get our CPI based on the first PPU, then share it across all PPUs
-  //ppu1->SetCPI(ppu0->GetCPI());
-  //ppu2->SetCPI(ppu0->GetCPI());
+  ppu1->SetCPI(ppu0->GetCPI());
+  ppu2->SetCPI(ppu0->GetCPI());
   // Continue after halting
   Continue();
 }

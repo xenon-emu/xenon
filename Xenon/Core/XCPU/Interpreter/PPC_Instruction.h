@@ -9,7 +9,7 @@
 */
 
 #include <array>
-#include <string_view>
+#include <string>
 
 #include "Base/Types.h"
 #include "Base/Logging/Log.h"
@@ -523,7 +523,7 @@ namespace PPCInterpreter {
       #undef GETRC
     }
     void fillNameTables() {
-      #define GET_(name) #name
+      #define GET_(name) std::string(#name)
   	  #define GET(name) GET_(name), GET_(name)
       #define GETRC(name) GET_(name##x), GET_(name##x)
   	  for (auto& x : nameTable) {
@@ -994,23 +994,20 @@ namespace PPCInterpreter {
     }
     PPCDecoder();
     ~PPCDecoder() = default;
-    const std::array<instructionHandler, 0x20000>& getTable() const noexcept {
+    const std::array<instructionHandler, 0x20000> &getTable() const noexcept {
       return table;
     }
     instructionHandler decode(u32 instr) const noexcept {
       if (instr == 0x60000000) {
         return &PPCInterpreter_nop;
       }
-      return table[PPCDecode(instr)];
+      return getTable()[PPCDecode(instr)];
     }
-    const std::array<std::string, 0x20000>& getNameTable() const noexcept {
+    const std::array<std::string, 0x20000> &getNameTable() const noexcept {
       return nameTable;
     }
     std::string decodeName(u32 instr) const noexcept {
-      if (instr == 0x60000000) {
-        return "nop";
-      }
-      return nameTable[PPCDecode(instr)];
+      return getNameTable()[PPCDecode(instr)];
     }
   private:
     // Fast lookup table
