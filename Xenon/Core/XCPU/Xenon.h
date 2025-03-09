@@ -25,6 +25,8 @@ public:
 
   void Start(u64 resetVector = 0x100);
 
+  void LoadElf(const std::string path);
+
   void Halt();
 
   void Continue();

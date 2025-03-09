@@ -169,6 +169,12 @@ void PPU::StartExecution() {
              instrCount++) {
           // Main processing loop.
 
+          // Read next intruction from Memory.
+          if (ppuReadNextInstruction()) {
+            // Execute next intrucrtion.
+            PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
+          }
+          
           // Debug tools
           if (ppcHalt) {
             if (ppcStep) {
@@ -185,16 +191,10 @@ void PPU::StartExecution() {
           }
 
           // We early returned, likely a elf binary
-          if (curThread.CIA == NULL) {
+          if (curThread.CIA == 0x00 && curThread.NIA == 0x04 && ppuElfExecution) {
             ppuRunning = false;
             ppuExecutionDone = true;
             break;
-          }
-
-          // Read next intruction from Memory.
-          if (ppuReadNextInstruction()) {
-            // Execute next intrucrtion.
-            PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
           }
 
           // Increase Time Base Counter
@@ -232,6 +232,12 @@ void PPU::StartExecution() {
         for (size_t instrCount = 0; instrCount < ppuState->SPR.TTR;
              instrCount++) {
           // Main processing loop.
+
+          // Read next intruction from Memory.
+          if (ppuReadNextInstruction()) {
+            // Execute next intrucrtion.
+            PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
+          }
           
           // Debug tools
           if (ppcHalt) {
@@ -249,16 +255,10 @@ void PPU::StartExecution() {
           }
 
           // We early returned, likely a elf binary
-          if (curThread.CIA == NULL) {
+          if (curThread.CIA == 0x00 && curThread.NIA == 0x04 && ppuElfExecution) {
             ppuRunning = false;
             ppuExecutionDone = true;
             break;
-          }
-
-          // Read next intruction from Memory.
-          if (ppuReadNextInstruction()) {
-            // Execute next intrucrtion.
-            PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
           }
 
           // Check if time base is active.
@@ -292,7 +292,7 @@ void PPU::StartExecution() {
       break;
 
     // We early returned, likely a elf binary
-    if (curThread.CIA == NULL) {
+    if (curThread.CIA == 0x00 && curThread.NIA == 0x04 && ppuElfExecution) {
       ppuRunning = false;
       ppuExecutionDone = true;
       break;
@@ -386,6 +386,7 @@ u32 PPU::getIPS() {
                       (ehdr).e_ident[EI_MAG3] == ELFMAG3)
 #define SWAP(v, s) v = byteswap<s>(v);
 u64 PPU::loadElfImage(u8 *data, u64 size) {
+  ppuElfExecution = true;
   elf64_hdr* header{ reinterpret_cast<decltype(header)>(data) };
   if (!IS_ELF(*header)) {
     LOG_CRITICAL(Xenon, "Attempting to load a bianry which is not a elf!");
@@ -401,6 +402,7 @@ u64 PPU::loadElfImage(u8 *data, u64 size) {
     LOG_CRITICAL(Xenon, "Attempting to load a bianry which is not a PowerPC 64!");
     return 0;
   }
+
   // Setup HRMOR for elf binaries
   ppuState->SPR.CTRL = 0x800000; // CTRL[TE0] = 1;
   ppuState->SPR.HRMOR = 0x0000000000000000; // we use real mode like gigachads

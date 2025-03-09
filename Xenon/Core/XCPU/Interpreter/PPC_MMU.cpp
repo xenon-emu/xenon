@@ -1115,7 +1115,7 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
 
   // Hack Needed for CB to work, reading ram size to this address, further
   // research required. Free60.org shows this belongs to BIU address range.
-  if (socRead && EA == 0xe1040000) {
+  if (socRead && EA == 0xE1040000) {
     data = 0x0000000020000000;
     return data;
   }
@@ -1218,7 +1218,7 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   }
 
   // Time Base register. Writing here starts or stops the RTC apparently.
-  if (socRead && EA == 0x611a0) {
+  if (socRead && EA == 0x611A0) {
     if (!intXCPUContext->timeBaseActive) {
       data = 0;
       return data;
@@ -1230,7 +1230,7 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
 
   // CPU VID Register
   if (socRead && EA == 0x61188) {
-    data = 0x382c00000000b001;
+    data = 0x382C00000000b001;
     return byteswap<u64>(data);
   }
 

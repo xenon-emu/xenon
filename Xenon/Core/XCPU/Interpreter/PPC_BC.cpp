@@ -14,7 +14,8 @@ void PPCInterpreter::PPCInterpreter_bc(PPU_STATE *ppuState) {
   bool ctrOk = BO_GET(2) | ((curThread.SPR.CTR != 0) ^ BO_GET(3));
   bool condOk = BO_GET(0) || (CR_GET(BI) == BO_GET(1));
 
-  if (ctrOk && condOk) { curThread.NIA = (AA ? 0 : curThread.CIA) + (EXTS(BD, 14) << 2);
+  if (ctrOk && condOk) {
+    curThread.NIA = (AA ? 0 : curThread.CIA) + (EXTS(BD, 14) << 2);
   }
 
   if (LK) {

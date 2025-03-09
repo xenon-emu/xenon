@@ -384,16 +384,16 @@ void PPCDebugger(Render::OpenGLGUI *gui) {
   ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 8.f, 4.f });
   gui->Child("##instrs", [&] {
     gui->MenuBar([&gui] {
-      gui->Menu("Debugger Window", [&gui] {  
+      gui->Menu("Window", [&gui] {  
         if (!gui->ppcDebuggerActive) {
-          gui->MenuItem("Start", [&] {
+          gui->MenuItem("Enable", [&] {
             gui->ppcDebuggerActive = true;
           });
         } else {
           gui->MenuItem(gui->ppcDebuggerAttached ? "Detach" : "Attach", [&] {
             gui->ppcDebuggerAttached ^= true;
           });
-          gui->MenuItem("Stop", [&] {
+          gui->MenuItem("Disable", [&] {
             gui->ppcDebuggerActive = false;
           });
         }

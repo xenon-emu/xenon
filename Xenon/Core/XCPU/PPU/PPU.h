@@ -55,6 +55,9 @@ private:
   // Can we quit?
   bool ppuExecutionDone = true;
 
+  // Are we running a elf? Should we early exit?
+  bool ppuElfExecution = false;
+
   // Halt thread
   bool ppcHalt = false;
 
