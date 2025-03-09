@@ -1,8 +1,9 @@
 // Copyright 2025 Xenon Emulator Project
 
 #include "NAND.h"
-
 #include "Base/Logging/Log.h"
+
+//#define NAND_DEBUG
 
 /********************Responsible for loading the NAND file********************/
 NAND::NAND(const char* deviceName, const std::string filePath,
@@ -62,7 +63,9 @@ NAND::~NAND() {
 void NAND::Read(u64 readAddress, u64 *data, u8 byteCount) {
   u32 offset = (u32)readAddress & 0xFFFFFF;
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
-  LOG_DEBUG(SFCX, "Reading raw data at {:#x} (offset {:#x}) for {:#x} bytes", readAddress, offset, byteCount);
+#ifdef NAND_DEBUG
+    LOG_DEBUG(SFCX, "Reading raw data at {:#x} (offset {:#x}) for {:#x} bytes", readAddress, offset, byteCount);
+#endif // NAND_DEBUG
   memcpy(data, rawNANDData.data() + offset, byteCount);
 }
 
@@ -70,7 +73,9 @@ void NAND::Read(u64 readAddress, u64 *data, u8 byteCount) {
 void NAND::Write(u64 writeAddress, u64 data, u8 byteCount) {
   u32 offset = (u32)writeAddress & 0xFFFFFF;
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
-  LOG_DEBUG(SFCX, "Writing raw data at {:#x} (offset {:#x}) for {:#x} bytes", writeAddress, offset, byteCount);
+#ifdef NAND_DEBUG
+    LOG_DEBUG(SFCX, "Writing raw data at {:#x} (offset {:#x}) for {:#x} bytes", writeAddress, offset, byteCount);
+#endif // NAND_DEBUG
   u8* NANDData = rawNANDData.data();
   memcpy(rawNANDData.data() + offset, &data, byteCount);
 }

@@ -402,6 +402,7 @@ void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
       CreateFileA(smcCoreState->currentCOMPort, GENERIC_READ | GENERIC_WRITE, 0, nullptr,
                  OPEN_EXISTING, 0, nullptr);
 
+  bool useBackup = false;
   if (smcCoreState->comPortHandle == INVALID_HANDLE_VALUE) {
     LOG_ERROR(SMC, "CreateFile failed with error {:#x}. Make sure the Selected COM Port is avaliable "
         "in your system.", GetLastError());
@@ -417,18 +418,22 @@ void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
     else {
       LOG_INFO(SMC, "Using backup UART. Logging UART to Console");
     }
+    useBackup = true;
   }
 
-  if (!smcCoreState->uartBackup) {
-    // Set The COM Port State as per config value.
-    if (!SetCommState(smcCoreState->comPortHandle, &smcCoreState->comPortDCB)) {
-      LOG_ERROR(SMC, "UART: SetCommState failed with error {:#x}.", GetLastError());
-    }
+  // Set The COM Port State as per config value.
+  if (!SetCommState(smcCoreState->comPortHandle, &smcCoreState->comPortDCB)) {
+    LOG_ERROR(SMC, "UART: SetCommState failed with error {:#x}.", GetLastError());
+  }
 
+  // Everything OK.
+  smcCoreState->uartInitialized = true;
+
+  if (useBackup) {
+    smcCoreState->uartInitialized = false;
+  } else {
+    smcCoreState->uartBackup = false;
     LOG_INFO(SMC, "UART Initialized Successfully!");
-
-    // Everything OK.
-    smcCoreState->uartInitialized = true;
   }
 
 #else
@@ -436,30 +441,27 @@ void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
   LOG_ERROR(SMC, "UART Initialization is fully supported on this platform! User beware.");
 #endif // _WIN32
 #endif // SOCKET_UART
-  if (smcCoreState->uartBackup) {
+  if (smcCoreState->uartBackup && !smcCoreState->uartInitialized) {
 #ifdef SOCKET_UART
     smcCoreState->uartThreadRunning = smcCoreState->socketCreated;
 #else
     smcCoreState->uartThreadRunning = true;
 #endif // SOCKET_UART
+    smcCoreState->uartPresent = true;
     uartThread = std::thread(&SMCCore::uartMainThread, this);
 #ifdef SOCKET_UART
     uartSecondaryThread = std::thread(&SMCCore::uartReceiveThread, this);
-#endif // SOCKET_UART
-
-#ifdef SOCKET_UART
-    smcCoreState->uartInitialized = smcCoreState->socketCreated;
-    smcCoreState->uartPresent = smcCoreState->socketCreated;
-#else
-    smcCoreState->uartPresent = true;
-    smcCoreState->uartInitialized = true;
 #endif // SOCKET_UART
   }
 }
 
 // UART Thread
 void Xe::PCIDev::SMC::SMCCore::uartMainThread() {
+#ifdef SOCKET_UART
+  smcCoreState->uartInitialized = smcCoreState->socketCreated;
+#else
   smcCoreState->uartInitialized = true;
+#endif // SOCKET_UART
   LOG_INFO(SMC, "Backup UART Initialized Successfully!");
   while (smcCoreState->uartThreadRunning) {
     std::unique_lock<std::mutex> lock(smcCoreState->uartMutex);
