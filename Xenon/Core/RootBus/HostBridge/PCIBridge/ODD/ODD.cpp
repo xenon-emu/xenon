@@ -86,8 +86,8 @@ void ODD::processSCSICommand() {
   memcpy(&readOffset, &atapiState.scsiCBD.CDB12.LogicalBlock, 4);
   u32 sectorCount = 0;
   memcpy(&sectorCount, &atapiState.scsiCBD.CDB12.TransferLength, 4);
-  readOffset = std::byteswap<u32>((u32)readOffset);
-  sectorCount = std::byteswap<u32>((u32)sectorCount);
+  readOffset = std::byteswap<u32>(static_cast<u32>(readOffset));
+  sectorCount = std::byteswap<u32>(static_cast<u32>(sectorCount));
 
   switch (atapiState.scsiCBD.CDB12.OperationCode) {
   case SCSIOP_INQUIRY:
@@ -139,7 +139,7 @@ void ODD::doDMA() {
 
     if (readOperation) {
       // Reading from us
-      byteCount = fmin((u32)byteCount, atapiState.dataReadBuffer.Space());
+      byteCount = fmin(static_cast<u32>(byteCount), atapiState.dataReadBuffer.Space());
 
       // Buffer overrun?
       if (byteCount == 0)
@@ -148,7 +148,7 @@ void ODD::doDMA() {
       atapiState.dataReadBuffer.Increment(byteCount);
     } else {
       // Writing to us
-      byteCount = fmin((u32)byteCount, atapiState.dataWriteBuffer.Space());
+      byteCount = fmin(static_cast<u32>(byteCount), atapiState.dataWriteBuffer.Space());
       // Buffer overrun?
       if (byteCount == 0)
         return;
@@ -224,11 +224,11 @@ ODD::ODD(const char* deviceName, u64 size,
 void ODD::Read(u64 readAddress, u64 *data, u8 byteCount) {
   // PCI BAR0 is the Primary Command Block Base Address.
   u8 atapiCommandReg =
-      (u8)(readAddress - pciConfigSpace.configSpaceHeader.BAR0);
+      static_cast<u8>(readAddress - pciConfigSpace.configSpaceHeader.BAR0);
 
   // PCI BAR1 is the Primary Control Block Base Address.
   u8 atapiControlReg =
-      (u8)(readAddress - pciConfigSpace.configSpaceHeader.BAR1);
+      static_cast<u8>(readAddress - pciConfigSpace.configSpaceHeader.BAR1);
 
   // Who are we reading from?
   if (atapiCommandReg < (pciConfigSpace.configSpaceHeader.BAR1 -
@@ -294,11 +294,11 @@ void ODD::Read(u64 readAddress, u64 *data, u8 byteCount) {
 void ODD::Write(u64 writeAddress, u64 data, u8 byteCount) {
   // PCI BAR0 is the Primary Command Block Base Address.
   u8 atapiCommandReg =
-      (u8)(writeAddress - pciConfigSpace.configSpaceHeader.BAR0);
+      static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR0);
 
   // PCI BAR1 is the Primary Control Block Base Address.
   u8 atapiControlReg =
-      (u8)(writeAddress - pciConfigSpace.configSpaceHeader.BAR1);
+      static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR1);
 
   // Who are we writing to?
   if (atapiCommandReg < (pciConfigSpace.configSpaceHeader.BAR1 -

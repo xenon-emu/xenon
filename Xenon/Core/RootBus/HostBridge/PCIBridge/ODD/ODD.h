@@ -113,14 +113,14 @@ public:
     fd = -1;
   }
 
-  uint32_t Size() {
+  u32 Size() {
     struct stat st;
     if (fstat(fd, &st) != 0)
       return 0;
-    return static_cast<uint32_t>(st.st_size);
+    return static_cast<u32>(st.st_size);
   }
 
-  bool Read(uint64_t Offset, uint8_t* Destination, uint32_t cu8s) {
+  bool Read(u64 Offset, u8* Destination, u32 cu8s) {
     if (lseek(fd, Offset, SEEK_SET) == (off_t)-1)
       return false;
     ssize_t bytesRead = read(fd, Destination, cu8s);

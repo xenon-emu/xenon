@@ -384,7 +384,7 @@ bool IOFile::Seek(s64 offset, SeekOrigin origin) const {
     if (origin == SeekOrigin::CurrentPosition && Tell() + offset > size) {
       LOG_ERROR(Base_Filesystem, "Seeking past the end of the file");
       return false;
-    } else if (origin == SeekOrigin::SetOrigin && (u64)offset > size) {
+    } else if (origin == SeekOrigin::SetOrigin && static_cast<u64>(offset) > size) {
       LOG_ERROR(Base_Filesystem, "Seeking past the end of the file");
       return false;
     } else if (origin == SeekOrigin::End && offset > 0) {

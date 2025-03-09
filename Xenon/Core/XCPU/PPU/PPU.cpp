@@ -425,14 +425,14 @@ void PPU::ppuCheckExceptions() {
     if (exceptions & PPU_EX_PROG &&
         ppuState->ppuThread[ppuState->currentThread].exceptTrapType == 44) {
       LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Illegal Instruction.",
-          ppuState->ppuName, (u8)ppuState->currentThread);
+          ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
       exceptions &= ~PPU_EX_PROG;
       goto end;
     }
     // B. Floating-Point Unavailable
     if (exceptions & PPU_EX_FPU) {
         LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Floating-Point Unavailable.",
-            ppuState->ppuName, (u8)ppuState->currentThread);
+            ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
       exceptions &= ~PPU_EX_FPU;
       goto end;
     }
@@ -452,14 +452,14 @@ void PPU::ppuCheckExceptions() {
     // Alignment
     if (exceptions & PPU_EX_ALIGNM) {
       LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Alignment.",
-          ppuState->ppuName, (u8)ppuState->currentThread);
+          ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
       exceptions &= ~PPU_EX_ALIGNM;
       goto end;
     }
     // D. Trace
     if (exceptions & PPU_EX_TRACE) {
       LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Trace.",
-          ppuState->ppuName, (u8)ppuState->currentThread);
+          ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
       exceptions &= ~PPU_EX_TRACE;
       goto end;
     }
@@ -481,7 +481,7 @@ void PPU::ppuCheckExceptions() {
     if (exceptions & PPU_EX_PROG &&
         ppuState->ppuThread[ppuState->currentThread].exceptTrapType == 45) {
         LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Privileged Instruction.",
-            ppuState->ppuName, (u8)ppuState->currentThread);
+            ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
       exceptions &= ~PPU_EX_PROG;
       goto end;
     }
@@ -505,7 +505,7 @@ void PPU::ppuCheckExceptions() {
 
     if (exceptions & PPU_EX_PROG) {
         LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Imprecise Mode Floating-Point Enabled Exception.",
-            ppuState->ppuName, (u8)ppuState->currentThread);
+            ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
       exceptions &= ~PPU_EX_PROG;
       goto end;
     }
@@ -532,7 +532,7 @@ void PPU::ppuCheckExceptions() {
     // Hypervisor Decrementer
     if (exceptions & PPU_EX_HDEC) {
       LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Hypervisor Decrementer.",
-          ppuState->ppuName, (u8)ppuState->currentThread);
+          ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
       exceptions &= ~PPU_EX_HDEC;
       goto end;
     }

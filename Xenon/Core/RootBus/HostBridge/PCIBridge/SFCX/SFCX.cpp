@@ -172,35 +172,35 @@ void SFCX::Write(u64 writeAddress, u64 data, u8 byteCount) {
 
   switch (reg) {
   case SFCX_CONFIG_REG:
-    sfcxState.configReg = (u32)data;
+    sfcxState.configReg = static_cast<u32>(data);
     break;
   case SFCX_STATUS_REG:
-    sfcxState.statusReg = (u32)data;
+    sfcxState.statusReg = static_cast<u32>(data);
     break;
   case SFCX_COMMAND_REG:
-    sfcxState.commandReg = (u32)data;
+    sfcxState.commandReg = static_cast<u32>(data);
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     break;
   case SFCX_ADDRESS_REG:
-    sfcxState.addressReg = (u32)data;
+    sfcxState.addressReg = static_cast<u32>(data);
     break;
   case SFCX_DATA_REG:
-    sfcxState.dataReg = (u32)data;
+    sfcxState.dataReg = static_cast<u32>(data);
     break;
   case SFCX_LOGICAL_REG:
-    sfcxState.logicalReg = (u32)data;
+    sfcxState.logicalReg = static_cast<u32>(data);
     break;
   case SFCX_PHYSICAL_REG:
-    sfcxState.physicalReg = (u32)data;
+    sfcxState.physicalReg = static_cast<u32>(data);
     break;
   case SFCX_DATAPHYADDR_REG:
-    sfcxState.dataPhysAddrReg = (u32)data;
+    sfcxState.dataPhysAddrReg = static_cast<u32>(data);
     break;
   case SFCX_SPAREPHYADDR_REG:
-    sfcxState.sparePhysAddrReg = (u32)data;
+    sfcxState.sparePhysAddrReg = static_cast<u32>(data);
     break;
   case SFCX_MMC_ID_REG:
-    sfcxState.mmcIDReg = (u32)data;
+    sfcxState.mmcIDReg = static_cast<u32>(data);
     break;
   default:
     LOG_ERROR(SFCX, "Write from unknown register {:#x}", reg);

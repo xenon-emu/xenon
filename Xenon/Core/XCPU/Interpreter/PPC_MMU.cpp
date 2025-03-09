@@ -200,8 +200,8 @@ u8 PPCInterpreter::mmuGetPageSize(PPU_STATE *ppuState, bool L, u8 LP) {
 
   // HID6 16-17 bits select Large Page size 1.
   // HID6 18-19 bits select Large Page size 2.
-  u8 LB_16_17 = (u8)QGET(ppuState->SPR.HID6, 16, 17);
-  u8 LB_18_19 = (u8)QGET(ppuState->SPR.HID6, 18, 19);
+  u8 LB_16_17 = static_cast<u8>(QGET(ppuState->SPR.HID6, 16, 17));
+  u8 LB_18_19 = static_cast<u8>(QGET(ppuState->SPR.HID6, 18, 19));
 
   // Final p size.
   u8 p = 0;
@@ -249,8 +249,8 @@ u8 PPCInterpreter::mmuGetPageSize(PPU_STATE *ppuState, bool L, u8 LP) {
 // This is done when TLB Reload is in software-controlled mode.
 void PPCInterpreter::mmuAddTlbEntry(PPU_STATE *ppuState) {
 #define PPE_TLB_INDEX_LVPN_MASK 0xE00000000000
-#define MMU_GET_TLB_INDEX_TI(x) ((u16)((x & 0xFF0) >> 4))
-#define MMU_GET_TLB_INDEX_TS(x) ((u16)(x & 0xF))
+#define MMU_GET_TLB_INDEX_TI(x) (static_cast<u16>((x & 0xFF0) >> 4))
+#define MMU_GET_TLB_INDEX_TS(x) (static_cast<u16>(x & 0xF))
 
 #define PPE_TLB_VPN_V_MASK 0x1
 #define PPE_TLB_VPN_L_MASK 0x4
@@ -318,7 +318,7 @@ void PPCInterpreter::mmuAddTlbEntry(PPU_STATE *ppuState) {
   // std::cout << " *** VPN:         0x" << VPN << std::endl;
   // std::cout << "  *  TLB Set:     " << std::dec << TS << std::endl;
   // std::cout << "  *  TLB Index:   " << std::hex << TI << std::endl;
-  // std::cout << "  *  p Size:      " << (u16)p << std::endl;
+  // std::cout << "  *  p Size:      " << (static_cast<u16>(p) << std::endl;
   // std::cout << std::hex << std::endl;
 
   // TLB set to choose from
@@ -402,7 +402,7 @@ bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *ppuState, u64 *RPN, u64 VA,
   }
 
   if (ppuState->TLB.tlbSet0[tlbIndex].V) {
-    if ((u16)ppuState->TLB.tlbSet0[tlbIndex].VPN == (u16)VPN) {
+    if (static_cast<u16>(ppuState->TLB.tlbSet0[tlbIndex].VPN) == static_cast<u16>(VPN)) {
       // Check to see if its this entry!
       // Need to have a tag
       if (ppuState->TLB.tlbSet0[tlbIndex].p == p) {
@@ -424,7 +424,7 @@ bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *ppuState, u64 *RPN, u64 VA,
     tlbSet = 0b1000;
   }
   if (ppuState->TLB.tlbSet1[tlbIndex].V) {
-    if ((u16)ppuState->TLB.tlbSet1[tlbIndex].VPN == (u16)VPN) {
+    if (static_cast<u16>(ppuState->TLB.tlbSet1[tlbIndex].VPN) == static_cast<u16>(VPN)) {
       // Check to see if its this entry!
       // Need to have a tag
       if (ppuState->TLB.tlbSet1[tlbIndex].p == p) {
@@ -446,7 +446,7 @@ bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *ppuState, u64 *RPN, u64 VA,
     tlbSet = 0b0100;
   }
   if (ppuState->TLB.tlbSet2[tlbIndex].V) {
-    if ((u16)ppuState->TLB.tlbSet2[tlbIndex].VPN == (u16)VPN) {
+    if (static_cast<u16>(ppuState->TLB.tlbSet2[tlbIndex].VPN) == static_cast<u16>(VPN)) {
       // Check to see if its this entry!
       // Need to have a tag
       if (ppuState->TLB.tlbSet2[tlbIndex].p == p) {
@@ -468,7 +468,7 @@ bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *ppuState, u64 *RPN, u64 VA,
     tlbSet = 0b0010;
   }
   if (ppuState->TLB.tlbSet3[tlbIndex].V) {
-    if ((u16)ppuState->TLB.tlbSet3[tlbIndex].VPN == (u16)VPN) {
+    if (static_cast<u16>(ppuState->TLB.tlbSet3[tlbIndex].VPN) == static_cast<u16>(VPN)) {
       // Check to see if its this entry!
       // Need to have a tag
       if (ppuState->TLB.tlbSet3[tlbIndex].p == p) {
@@ -503,7 +503,7 @@ bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *ppuState, u64 *RPN, u64 VA,
     u64 tlbIndexHint =
         ppuState->ppuThread[ppuState->currentThread].SPR.PPE_TLB_Index_Hint;
     u8 currentTlbSet = tlbIndexHint & 0xF;
-    u8 currentTlbIndex = (u8)(tlbIndexHint & 0xFF0) >> 4;
+    u8 currentTlbIndex = static_cast<u8>(tlbIndexHint & 0xFF0) >> 4;
     currentTlbSet = tlbSet;
     if (currentTlbIndex == 0xFF) {
       if (currentTlbSet == 8) {
@@ -561,7 +561,7 @@ PPCInterpreter::mmuGetSecEngInfoFromAddress(u64 inputAddress) {
   u64 keyMask = 0xFF00000000;
   u32 region = (inputAddress & regionMask) >> 32;
 
-  addressInfo.keySelected = (u8)((inputAddress & keyMask) >> 32);
+  addressInfo.keySelected = static_cast<u8>((inputAddress & keyMask) >> 32);
   addressInfo.accesedAddr = static_cast<u32>(inputAddress);
 
   switch (region) {
@@ -1135,7 +1135,7 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
 
   // Check if reading from Security Engine config block
   if (socRead && EA >= XE_SECENG_ADDR && EA < XE_SECENG_ADDR + XE_SECENG_SIZE) {
-    u32 secAddr = (u32)(EA - XE_SECENG_ADDR);
+    u32 secAddr = static_cast<u32>(EA - XE_SECENG_ADDR);
     memcpy(&data, &intXCPUContext->secEngData[secAddr], byteCount);
     return data;
   }
@@ -1164,7 +1164,7 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   // Check if reading from eFuses section
   if (socRead && EA >= XE_FUSESET_LOC &&
       EA <= (XE_FUSESET_LOC + XE_FUSESET_SIZE)) {
-    switch ((u32)EA) {
+    switch (static_cast<u32>(EA)) {
     case 0x20000:
       data = cpuContext->fuseSet.fuseLine00;
       break;
@@ -1326,7 +1326,7 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
 
   // Check if writing to internal SRAM
   if (socWrite && EA >= XE_SRAM_ADDR && EA < XE_SRAM_ADDR + XE_SRAM_SIZE) {
-    u32 sramAddr = (u32)(EA - XE_SRAM_ADDR);
+    u32 sramAddr = static_cast<u32>(EA - XE_SRAM_ADDR);
     memcpy(&cpuContext->SRAM[sramAddr], &data, byteCount);
     return;
   }
@@ -1334,7 +1334,7 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   // Check if writing to Security Engine Config Block
   if (socWrite && EA >= XE_SECENG_ADDR &&
       EA < XE_SECENG_ADDR + XE_SECENG_SIZE) {
-    u32 secAddr = (u32)(EA - XE_SECENG_ADDR);
+    u32 secAddr = static_cast<u32>(EA - XE_SECENG_ADDR);
     memcpy(&intXCPUContext->secEngData[secAddr], &data, byteCount);
     return;
   }

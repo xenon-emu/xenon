@@ -61,7 +61,7 @@ NAND::~NAND() {
 
 /************Responsible for reading the NAND************/
 void NAND::Read(u64 readAddress, u64 *data, u8 byteCount) {
-  u32 offset = (u32)readAddress & 0xFFFFFF;
+  u32 offset = static_cast<u32>(readAddress & 0xFFFFFF);
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
 #ifdef NAND_DEBUG
     LOG_DEBUG(SFCX, "Reading raw data at {:#x} (offset {:#x}) for {:#x} bytes", readAddress, offset, byteCount);
@@ -71,7 +71,7 @@ void NAND::Read(u64 readAddress, u64 *data, u8 byteCount) {
 
 /************Responsible for writing the NAND************/
 void NAND::Write(u64 writeAddress, u64 data, u8 byteCount) {
-  u32 offset = (u32)writeAddress & 0xFFFFFF;
+  u32 offset = static_cast<u32>(writeAddress & 0xFFFFFF);
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
 #ifdef NAND_DEBUG
     LOG_DEBUG(SFCX, "Writing raw data at {:#x} (offset {:#x}) for {:#x} bytes", writeAddress, offset, byteCount);
@@ -107,10 +107,10 @@ void NAND::CalculateECD(u8 *data, int offset, NANDMetadata &metadata) {
   for (i = 0; i < 0x1066; i++) {
     if ((i & 31) == 0) {
       v = ~std::byteswap<u32>(
-        (u8)(data[count + offset + 0]) << 24 |
-        (u8)(data[count + offset + 1]) << 16 |
-        (u8)(data[count + offset + 2]) << 8  |
-        (u8)(data[count + offset + 3])
+        static_cast<u8>(data[count + offset + 0]) << 24 |
+        static_cast<u8>(data[count + offset + 1]) << 16 |
+        static_cast<u8>(data[count + offset + 2]) << 8  |
+        static_cast<u8>(data[count + offset + 3])
       );
       count += 4;
     }
@@ -173,7 +173,7 @@ MetaType NAND::DetectSpareType(bool firstTry) {
   }
 
   u8 tmp[0x10]{};
-  memcpy(tmp, rawNANDData.data() + (firstTry ? 0x4400 : (u32)rawFileSize - 0x4400), sizeof(tmp));
+  memcpy(tmp, rawNANDData.data() + (firstTry ? 0x4400 : static_cast<u32>(rawFileSize) - 0x4400), sizeof(tmp));
 
   return metaTypeNone;
 }
