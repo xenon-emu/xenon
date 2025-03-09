@@ -6,9 +6,7 @@
 #include <unordered_map>
 
 #ifdef DEBUG
-#define IIC_DEBUG true
-#else
-#define IIC_DEBUG false
+#define IIC_DEBUG
 #endif // DEBUG
 
 Xe::XCPU::IIC::XenonIIC::XenonIIC() {
@@ -27,13 +25,14 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, u64 intData) {
   u8 intType = (intData >> 56) & 0xFF;
   u8 cpusToInterrupt = (intData >> 40) & 0xFF;
   size_t intIndex = 0;
-
+  
+  auto& interrupts = iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts;
   switch (ppeIntCtrlBlckReg) {
   case Xe::XCPU::IIC::CPU_WHOAMI:
-    if (IIC_DEBUG) {
+#ifdef IIC_DEBUG
       LOG_DEBUG(Xenon_IIC, "Control block number {:#x} beign set to PPU {:#x}",
         ppeIntCtrlBlckID, static_cast<u8>(std::byteswap<u64>(intData)));
-    }
+#endif // IIC_DEBUG
     iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].REG_CPU_WHOAMI =
       static_cast<u32>(std::byteswap<u64>(intData));
     break;
@@ -52,7 +51,7 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, u64 intData) {
     break;
   case Xe::XCPU::IIC::EOI:
     // If there are interrupts stored in the queue, remove the ack'd.
-    if (!iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts.empty()) {
+    if (!interrupts.empty()) {
       u16 intIdx = 0;
       for (auto& interrupt : iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts) {
         if (interrupt.ack) {
@@ -61,21 +60,21 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, u64 intData) {
         intIdx++;
       }
 
-      if (IIC_DEBUG) {
+#ifdef IIC_DEBUG
         LOG_DEBUG(Xenon_IIC, "EOI interrupt {} for thread {:#x} ", 
           getIntName(static_cast<u8>(iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts[intIdx].interrupt)), 
           ppeIntCtrlBlckID);
-      }
+#endif // IIC_DEBUG
 
-      iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts.erase(
-        iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts.begin() + intIdx);
+      interrupts.erase(
+        interrupts.begin() + intIdx);
 
       iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].intSignaled = false;
     }
     break;
   case Xe::XCPU::IIC::EOI_SET_CPU_CURRENT_TSK_PRI:
     // If there are interrupts stored in the queue, remove the ack'd.
-    if (!iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts.empty()) {
+    if (!interrupts.empty()) {
       u16 intIdx = 0;
       for (auto& interrupt : iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts) {
         if (interrupt.ack) {
@@ -84,14 +83,14 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, u64 intData) {
         intIdx++;
       }
 
-      if (IIC_DEBUG) {
+#ifdef IIC_DEBUG
         LOG_DEBUG(Xenon_IIC, "EOI + Set PRIO: interrupt {} for thread {:#x}, new PRIO: {:#x}",
           getIntName(static_cast<u8>(iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts[intIdx].interrupt)),
           ppeIntCtrlBlckID, static_cast<u8>(std::byteswap<u64>(intData)));
-      }
+#endif // IIC_DEBUG
 
-      iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts.erase(
-        iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts.begin() + intIdx);
+      interrupts.erase(
+        interrupts.begin() + intIdx);
 
       iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].intSignaled = false;
     }
@@ -116,6 +115,8 @@ void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u64* intData) {
   u32 mask = 0xF000;
   u8 ppeIntCtrlBlckID = static_cast<u8>((intAddress & mask) >> 12);
   u8 ppeIntCtrlBlckReg = intAddress & 0xFF;
+
+  auto &interrupts = iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts;
   switch (ppeIntCtrlBlckReg) {
   case Xe::XCPU::IIC::CPU_CURRENT_TSK_PRI:
     *intData = std::byteswap<u64>(
@@ -123,7 +124,7 @@ void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u64* intData) {
     break;
   case Xe::XCPU::IIC::ACK:
     // Check if the queue isn't empty.
-    if (iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts.empty() != true) {
+    if (!interrupts.empty()) {
       // Return the top priority pending interrupt.
 
       // Current Interrupt position in the container.
@@ -133,7 +134,7 @@ void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u64* intData) {
       // Highest priority interrupt position.
       u16 highestPrioPos = 0;
 
-      for (auto& interrupt : iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts) {
+      for (auto& interrupt : interrupts) {
         // Signal first the top priority interrupt. 
         // If two of the same interrupt type exist, then signal the first that we find.
         if (interrupt.interrupt > highestPrio) {
@@ -144,7 +145,7 @@ void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u64* intData) {
       }
 
       // Set the top priority interrypt to signaled
-      iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts[highestPrioPos].ack = true;
+      interrupts[highestPrioPos].ack = true;
 
       *intData = std::byteswap<u64>(highestPrio);
     }
@@ -183,9 +184,9 @@ bool Xe::XCPU::IIC::XenonIIC::checkExtInterrupt(u8 ppuID) {
   }
 
   if (priorityOk) {
-    if (IIC_DEBUG) {
+#ifdef IIC_DEBUG
       LOG_DEBUG(Xenon_IIC, "Signaling interrupt for thread {:#x} ", ppuID);
-    }
+#endif // IIC_DEBUG
     iicState.ppeIntCtrlBlck[ppuID].intSignaled = true;
     return true;
   }
@@ -208,9 +209,9 @@ void Xe::XCPU::IIC::XenonIIC::genInterrupt(u8 interruptType,
   for (u8 ppuID = 0; ppuID < 6; ppuID++) {
     if ((cpusToInterrupt & 0x1) == 1) {
 
-      if (IIC_DEBUG) {
+#ifdef IIC_DEBUG
         LOG_DEBUG(Xenon_IIC, "Generating interrupt: Thread {}, intType: {}", ppuID, getIntName(interruptType));
-      }
+#endif // IIC_DEBUG
 
       // Store the interrupt in the interrupt queue.
       iicState.ppeIntCtrlBlck[ppuID].interrupts.push_back(newInt);
@@ -219,39 +220,41 @@ void Xe::XCPU::IIC::XenonIIC::genInterrupt(u8 interruptType,
   }
 }
 
-std::string Xe::XCPU::IIC::XenonIIC::getIntName(u8 intID)
-{
-  static const std::unordered_map<u8, std::string> interruptMap = {
-      {0x08, "PRIO_IPI_4"},
-      {0x10, "PRIO_IPI_3"},
-      {0x14, "PRIO_SMM"},
-      {0x18, "PRIO_SFCX"},
-      {0x20, "PRIO_SATA_HDD"},
-      {0x24, "PRIO_SATA_CDROM"},
-      {0x2C, "PRIO_OHCI_0"},
-      {0x30, "PRIO_EHCI_0"},
-      {0x34, "PRIO_OHCI_1"},
-      {0x38, "PRIO_EHCI_1"},
-      {0x40, "PRIO_XMA"},
-      {0x44, "PRIO_AUDIO"},
-      {0x4C, "PRIO_ENET"},
-      {0x54, "PRIO_XPS"},
-      {0x58, "PRIO_GRAPHICS"},
-      {0x60, "PRIO_PROFILER"},
-      {0x64, "PRIO_BIU"},
-      {0x68, "PRIO_IOC"},
-      {0x6C, "PRIO_FSB"},
-      {0x70, "PRIO_IPI_2"},
-      {0x74, "PRIO_CLOCK"},
-      {0x78, "PRIO_IPI_1"},
-      {0x7C, "PRIO_NONE"}
-  };
+struct IRQ_DATA {
+  u8 irq = 0;
+  std::string_view name = {};
+};
+static constexpr IRQ_DATA interruptMap[]{
+  { 0x08, "PRIO_IPI_4" },
+  { 0x10, "PRIO_IPI_3" },
+  { 0x14, "PRIO_SMM" },
+  { 0x18, "PRIO_SFCX" },
+  { 0x20, "PRIO_SATA_HDD" },
+  { 0x24, "PRIO_SATA_CDROM" },
+  { 0x2C, "PRIO_OHCI_0" },
+  { 0x30, "PRIO_EHCI_0" },
+  { 0x34, "PRIO_OHCI_1" },
+  { 0x38, "PRIO_EHCI_1" },
+  { 0x40, "PRIO_XMA" },
+  { 0x44, "PRIO_AUDIO" },
+  { 0x4C, "PRIO_ENET" },
+  { 0x54, "PRIO_XPS" },
+  { 0x58, "PRIO_GRAPHICS" },
+  { 0x60, "PRIO_PROFILER" },
+  { 0x64, "PRIO_BIU" },
+  { 0x68, "PRIO_IOC" },
+  { 0x6C, "PRIO_FSB" },
+  { 0x70, "PRIO_IPI_2" },
+  { 0x74, "PRIO_CLOCK" },
+  { 0x78, "PRIO_IPI_1" },
+  { 0x7C, "PRIO_NONE" }
+};
 
-  auto it = interruptMap.find(intID);
-  if (it != interruptMap.end()) {
-    return it->second;
+std::string Xe::XCPU::IIC::XenonIIC::getIntName(u8 intID) {
+  for (auto &irq : interruptMap) {
+    if (irq.irq == intID) {
+      return irq.name.data();
+    }
   }
-  else {
-    return "Unknown interrupt";
-  }
+  return "PRIO_UNK";
 }
