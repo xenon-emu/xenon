@@ -402,7 +402,7 @@ u64 PPU::loadElfImage(u8 *data, u64 size) {
     return 0;
   }
   // Setup HRMOR for elf binaries
-  //ppuState->SPR.CTRL = 0x800000; // CTRL[TE0] = 1;
+  ppuState->SPR.CTRL = 0x800000; // CTRL[TE0] = 1;
   ppuState->SPR.HRMOR = 0x0000000000000000; // we use real mode like gigachads
   //ppuState->ppuThread[PPU_THREAD_0].NIA = 0x100;
 
@@ -436,7 +436,8 @@ u64 PPU::loadElfImage(u8 *data, u64 size) {
     }
   }
 
-  u8* stringTable = reinterpret_cast<u8*>(data + byteswap(sections[stringTableIndex].sh_offset));
+  u64 strTableOffset = byteswap(sections[stringTableIndex].sh_offset);
+  u8* stringTable = reinterpret_cast<u8*>(data + strTableOffset);
 
   for (int i = 0; i < num_sections; ++i) {
     const auto& section = sections[i];
@@ -463,9 +464,9 @@ u64 PPU::loadElfImage(u8 *data, u64 size) {
     }
 
     if (sectionType == SHT_NOBITS) {
-      PPCInterpreter::MMUWrite(xenonContext, ppuState.get(), 0, sectionAddr, sectionSize);
+      PPCInterpreter::MMUWrite(xenonContext, ppuState.get(), 0, sectionAddr + base_offset, sectionSize);
     } else {
-      PPCInterpreter::MMUMemCpyFromHost(ppuState.get(), sectionAddr, data + sectionOffset, sectionSize);
+      PPCInterpreter::MMUMemCpyFromHost(ppuState.get(), sectionAddr + base_offset, data + sectionOffset, sectionSize);
     }
     std::cout << "Done!" << std::endl;
   }

@@ -51,7 +51,7 @@ void Xenon::Start(u64 resetVector) {
   //Halt();
   // Load a elf (test)
   ppu0->Halt();
-  std::filesystem::path filePath{ "C:/Users/Vali/Desktop/bin/baremetal-test-powerpc64-unknown-linux-gnuabielfv2.elf" };
+  std::filesystem::path filePath{ "C:/Users/Vali/Desktop/bin/kernel.elf" };
   std::ifstream file{ filePath, std::ios_base::in | std::ios_base::binary };
   size_t fileSize = std::filesystem::file_size(filePath);
   std::unique_ptr<u8[]> elfBinary = std::make_unique<u8[]>(fileSize);
