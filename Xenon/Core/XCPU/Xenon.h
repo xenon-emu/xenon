@@ -26,12 +26,16 @@ public:
   void Start(u64 resetVector = 0x100);
 
   void Halt();
+
   void Continue();
+
   void Step(int amount = 1);
+
   bool IsHalted();
 
   Xe::XCPU::IIC::XenonIIC *GetIICPointer() { return &xenonContext.xenonIIC; }
 
+  PPU *GetPPU(u8 ppuID);
 private:
   // System Bus
   RootBus *mainBus = nullptr;

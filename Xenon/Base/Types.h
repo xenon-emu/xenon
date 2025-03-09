@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <bit>
 #include <format>
 #include <type_traits>
 
@@ -42,6 +43,17 @@ using f64 = double;
 }
 [[nodiscard]] inline constexpr u64 operator""_GB(const u64 x) {
   return 1024_MB * x;
+}
+
+// Byteswap
+template <class T>
+  requires std::is_integral_v<T>
+static constexpr T byteswap(T value) {
+  if constexpr (std::endian::native == std::endian::little) {
+    return std::byteswap<T>(value);
+  }
+
+  return value;
 }
 
 // Min/max value of a typetemplate <typename T>

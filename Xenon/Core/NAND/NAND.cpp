@@ -106,10 +106,10 @@ void NAND::CalculateECD(u8 *data, int offset, NANDMetadata &metadata) {
   u32 count = 0;
   for (i = 0; i < 0x1066; i++) {
     if ((i & 31) == 0) {
-      v = ~std::byteswap<u32>(
+      v = ~byteswap<u32>(
         (u8)(data[count + offset + 0]) << 24 |
         (u8)(data[count + offset + 1]) << 16 |
-        (u8)(data[count + offset + 2]) << 8  |
+        (u8)(data[count + offset + 2]) << 8 |
         (u8)(data[count + offset + 3])
       );
       count += 4;

@@ -43,7 +43,7 @@ HDD::HDD(const char *deviceName, u64 size, PCIBridge *parentPCIBridge) :
   memcpy(&pciConfigSpace.data[0xC0], &data, 4); // SSTATUS_DET_NO_DEVICE_DETECTED.
                                                 // SSTATUS_SPD_NO_SPEED.
                                                 // SSTATUS_IPM_NO_DEVICE.
-// SError.
+  // SError.
   data = 0x001F0201;
   memcpy(&pciConfigSpace.data[0xC4], &data, 4);
   // SControl.

@@ -23,8 +23,8 @@ public:
   void OnSwap(Texture *texture) override;
   void EndSwap() override;
   bool ppcDebuggerActive{};
-private:
   bool ppcDebuggerAttached{ true };
+private:
 };
 
 } // namespace Render
