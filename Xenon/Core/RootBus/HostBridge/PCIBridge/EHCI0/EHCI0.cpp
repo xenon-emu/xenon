@@ -2,7 +2,8 @@
 
 #include "EHCI0.h"
 
-Xe::PCIDev::EHCI0::EHCI0::EHCI0(const char *deviceName, u64 size) : PCIDevice(deviceName, size) {
+Xe::PCIDev::EHCI0::EHCI0::EHCI0(const char *deviceName, u64 size) :
+  PCIDevice(deviceName, size) {
   // Set PCI Properties.
   pciConfigSpace.configSpaceHeader.reg0.hexData = 0x58051414;
   pciConfigSpace.configSpaceHeader.reg1.hexData = 0x02900106;
@@ -11,18 +12,17 @@ Xe::PCIDev::EHCI0::EHCI0::EHCI0(const char *deviceName, u64 size) : PCIDevice(de
   pciDevSizes[0] = 0x1000; // BAR0
 }
 
-void Xe::PCIDev::EHCI0::EHCI0::Read(u64 readAddress, u64 *data, u8 byteCount) {}
+void Xe::PCIDev::EHCI0::EHCI0::Read(u64 readAddress, u64 *data, u8 byteCount)
+{}
 
-void Xe::PCIDev::EHCI0::EHCI0::ConfigRead(u64 readAddress, u64 *data,
-                                          u8 byteCount) {
+void Xe::PCIDev::EHCI0::EHCI0::ConfigRead(u64 readAddress, u64 *data, u8 byteCount) {
   memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], byteCount);
 }
 
-void Xe::PCIDev::EHCI0::EHCI0::Write(u64 writeAddress, u64 data, u8 byteCount) {
-}
+void Xe::PCIDev::EHCI0::EHCI0::Write(u64 writeAddress, u64 data, u8 byteCount)
+{}
 
-void Xe::PCIDev::EHCI0::EHCI0::ConfigWrite(u64 writeAddress, u64 data,
-                                           u8 byteCount) {
+void Xe::PCIDev::EHCI0::EHCI0::ConfigWrite(u64 writeAddress, u64 data, u8 byteCount) {
   // Check if we're being scanned.
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;

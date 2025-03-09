@@ -13,18 +13,17 @@ Xe::PCIDev::OHCI0::OHCI0::OHCI0(const char *deviceName, u64 size) : PCIDevice(de
   pciDevSizes[0] = 0x1000; // BAR0
 }
 
-void Xe::PCIDev::OHCI0::OHCI0::Read(u64 readAddress, u64 *data, u8 byteCount) {}
+void Xe::PCIDev::OHCI0::OHCI0::Read(u64 readAddress, u64 *data, u8 byteCount)
+{}
 
-void Xe::PCIDev::OHCI0::OHCI0::ConfigRead(u64 readAddress, u64 *data,
-                                          u8 byteCount) {
+void Xe::PCIDev::OHCI0::OHCI0::ConfigRead(u64 readAddress, u64 *data, u8 byteCount) {
   memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], byteCount);
 }
 
-void Xe::PCIDev::OHCI0::OHCI0::Write(u64 writeAddress, u64 data, u8 byteCount) {
-}
+void Xe::PCIDev::OHCI0::OHCI0::Write(u64 writeAddress, u64 data, u8 byteCount)
+{}
 
-void Xe::PCIDev::OHCI0::OHCI0::ConfigWrite(u64 writeAddress, u64 data,
-                                           u8 byteCount) {
+void Xe::PCIDev::OHCI0::OHCI0::ConfigWrite(u64 writeAddress, u64 data, u8 byteCount) {
   // Check if we're being scanned.
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;

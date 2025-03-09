@@ -18,14 +18,12 @@ Xe::Xenos::XGPU::XGPU(RAM *ram) {
   // Assign RAM Pointer
   ramPtr = ram;
 
-  memset(&xgpuConfigSpace.data, 0xf, sizeof(GENRAL_PCI_DEVICE_CONFIG_SPACE));
+  memset(&xgpuConfigSpace.data, 0xF, sizeof(GENRAL_PCI_DEVICE_CONFIG_SPACE));
+
   // Setup config space as per dump taken from a Jasper console.
   // Located at config address 0xD0010000.
-  u8 i = 0;
-  for (u16 idx = 0; idx < 256; idx += 4) {
-    memcpy(&xgpuConfigSpace.data[idx], &xgpuConfigMap[i], 4);
-    i++;
-  }
+  memcpy(xgpuConfigSpace.data, xgpuConfigMap, sizeof(xgpuConfigSpace.data));
+
   // Set our PCI Dev Sizes.
   pciDevSizes[0] = 0x20000; // BAR0
 

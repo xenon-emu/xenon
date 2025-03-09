@@ -2,8 +2,7 @@
 
 #include "XMA.h"
 
-XMA::XMA(const char *deviceName, u64 size) :
-  PCIDevice(deviceName, size) {
+XMA::XMA(const char *deviceName, u64 size) : PCIDevice(deviceName, size) {
   // Set PCI Properties.
   pciConfigSpace.configSpaceHeader.reg0.hexData = 0x58011414;
   pciConfigSpace.configSpaceHeader.reg1.hexData = 0x02000002;
@@ -11,9 +10,11 @@ XMA::XMA(const char *deviceName, u64 size) :
   pciDevSizes[0] = 0x400; // BAR0
 }
 
-void XMA::Read(u64 readAddress, u64 *data, u8 byteCount) {}
+void XMA::Read(u64 readAddress, u64 *data, u8 byteCount)
+{}
 
-void XMA::Write(u64 writeAddress, u64 data, u8 byteCount) {}
+void XMA::Write(u64 writeAddress, u64 data, u8 byteCount)
+{}
 
 void XMA::ConfigRead(u64 readAddress, u64 *data, u8 byteCount) {
   memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], byteCount);

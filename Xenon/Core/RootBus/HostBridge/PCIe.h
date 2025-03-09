@@ -128,7 +128,7 @@ struct GENRAL_PCI_DEVICE_CONFIG_HDR {
 };
 
 union GENRAL_PCI_DEVICE_CONFIG_SPACE {
-  u8 data[0xFF];
+  u8 data[0x100];
   GENRAL_PCI_DEVICE_CONFIG_HDR configSpaceHeader;
 };
 
