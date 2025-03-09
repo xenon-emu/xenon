@@ -25,52 +25,36 @@ std::filesystem::path find_fs_path_or(const basic_value<TC> &v, const K &ky,
 
 namespace Config {
 
-std::string* COMPort() {
-    com = "\\\\.\\COM" + std::to_string(comPort);
-    return &com;
-}
-
 bool fullscreenMode() { return isFullscreen; }
-
 bool vsync() { return vsyncEnabled; }
-
 bool gpuThreadEnabled() { return gpuRenderThreadEnabled; }
-
 bool quitOnWindowClosure() { return shouldQuitOnWindowClosure; }
-
 Base::Log::Level getCurrentLogLevel() { return currentLogLevel; }
-
 bool logAdvanced() { return islogAdvanced; }
 
 int smcCurrentAvPack() { return smcAvPackType; }
-
 int smcPowerOnType() { return smcPowerOnReason; }
+std::string& COMPort() { return com = "\\\\.\\COM" + std::to_string(comPort); }
+bool useBackupUART() { return useBackupUart; }
 
 u64 HW_INIT_SKIP1() { return SKIP_HW_INIT_1; }
-
 u64 HW_INIT_SKIP2() { return SKIP_HW_INIT_2; }
 
 s32 windowWidth() { return screenWidth; }
-
 s32 windowHeight() { return screenHeight; }
-
 s32 internalWindowWidth() { return internalWidth; }
-
 s32 internalWindowHeight() { return internalHeight; }
 
 std::string fusesPath() { return fusesTxtPath; }
-
 std::string oneBlPath() { return oneBlBinPath; }
-
 std::string nandPath() { return nandBinPath; }
-
 std::string oddImagePath() { return oddDiscImagePath; }
 
 // s32 getGpuId() {
 //     return gpuId;
 // }
 
-int tpi() { return ticksPerInstruction; }
+int cpi() { return clocksPerInstruction; }
 
 void loadConfig(const std::filesystem::path &path) {
   // If the configuration file does not exist, create it and return.
@@ -78,6 +62,16 @@ void loadConfig(const std::filesystem::path &path) {
   std::ifstream configFile{ path };
   std::error_code error;
   if (!std::filesystem::exists(path, error) && !configFile.is_open()) {
+#ifdef _WIN32
+    std::string pathPrefix{};
+#else
+    // TODO(Vali0004): Pull if Linux or MacOS
+    std::string pathPrefix{ getenv("HOME") };
+    fusesTxtPath.insert(0, pathPrefix.c_str());
+    oneBlBinPath.insert(0, pathPrefix.c_str());
+    nandBinPath.insert(0, pathPrefix.c_str());
+    oddDiscImagePath.insert(0, pathPrefix.c_str());
+#endif
     saveConfig(path);
     return;
   }
@@ -96,26 +90,29 @@ void loadConfig(const std::filesystem::path &path) {
   if (data.contains("General")) {
     const toml::value &general = data.at("General");
     gpuRenderThreadEnabled =
-        toml::find_or<bool>(general, "GPURenderThreadEnabled", false);
-    isFullscreen = toml::find_or<bool>(general, "Fullscreen", false);
-    vsyncEnabled = toml::find_or<bool>(general, "VSync", false);
+        toml::find_or<bool>(general, "GPURenderThreadEnabled", gpuRenderThreadEnabled);
+    isFullscreen = toml::find_or<bool>(general, "Fullscreen", isFullscreen);
+    vsyncEnabled = toml::find_or<bool>(general, "VSync", vsyncEnabled);
     shouldQuitOnWindowClosure =
-        toml::find_or<bool>(general, "QuitOnWindowClosure", false);
-    currentLogLevel = (Base::Log::Level)find_or<int>(general, "LogLevel", false);
-    islogAdvanced = toml::find_or<bool>(general, "logAdvanced", false);
+        toml::find_or<bool>(general, "QuitOnWindowClosure", shouldQuitOnWindowClosure);
+    int logLevel = static_cast<int>(currentLogLevel);
+    logLevel = toml::find_or<int&>(general, "LogLevel", logLevel);
+    currentLogLevel = static_cast<Base::Log::Level>(logLevel);
+    islogAdvanced = toml::find_or<bool>(general, "logAdvanced", islogAdvanced);
   }
 
   if (data.contains("SMC")) {
     const toml::value &smc = data.at("SMC");
-    comPort = toml::find_or<int>(smc, "COMPort", false);
-    smcAvPackType = toml::find_or<int>(smc, "SMCAvPackType", false);
-    smcPowerOnReason = toml::find_or<int>(smc, "SMCPowerOnType", false);
+    comPort = toml::find_or<int&>(smc, "COMPort", comPort);
+    smcAvPackType = toml::find_or<int&>(smc, "SMCAvPackType", smcAvPackType);
+    smcPowerOnReason = toml::find_or<int&>(smc, "SMCPowerOnType", smcPowerOnReason);
+    useBackupUart = toml::find_or<bool>(smc, "UseBackupUART", useBackupUart);
   }
 
   if (data.contains("PowerPC")) {
     const toml::value &powerpc = data.at("PowerPC");
-    SKIP_HW_INIT_1 = toml::find_or<u64>(powerpc, "HW_INIT_SKIP1", false);
-    SKIP_HW_INIT_2 = toml::find_or<u64>(powerpc, "HW_INIT_SKIP2", false);
+    SKIP_HW_INIT_1 = toml::find_or<u64&>(powerpc, "HW_INIT_SKIP1", SKIP_HW_INIT_1);
+    SKIP_HW_INIT_2 = toml::find_or<u64&>(powerpc, "HW_INIT_SKIP2", SKIP_HW_INIT_2);
   }
 
   if (data.contains("GPU")) {
@@ -124,7 +121,7 @@ void loadConfig(const std::filesystem::path &path) {
     screenHeight = toml::find_or<int&>(gpu, "screenHeight", screenHeight);
     internalWidth = toml::find_or<int&>(gpu, "internalWidth", internalWidth);
     internalHeight = toml::find_or<int&>(gpu, "internalHeight", internalHeight);
-    // gpuId = toml::find_or<int&>(gpu, "gpuId", -1);
+    // gpuId = toml::find_or<int&>(gpu, "gpuId", gpuId);
   }
 
   if (data.contains("Paths")) {
@@ -141,13 +138,12 @@ void loadConfig(const std::filesystem::path &path) {
 
   if (data.contains("HighlyExperimental")) {
     const toml::value &highlyExperimental = data.at("HighlyExperimental");
-    ticksPerInstruction =
-        toml::find_or<int&>(highlyExperimental, "TPI", ticksPerInstruction);
+    clocksPerInstruction =
+        toml::find_or<int&>(highlyExperimental, "CPI", clocksPerInstruction);
   }
 }
 
 void saveConfig(const std::filesystem::path &path) {
-  bool firstTimeConfig{};
   toml::value data;
 
   std::error_code error;
@@ -163,7 +159,6 @@ void saveConfig(const std::filesystem::path &path) {
     if (error) {
       LOG_ERROR(Config, "Filesystem error: {}", error.message());
     }
-    firstTimeConfig = true;
     LOG_INFO(Config, "Config not found. Saving new configuration file: {}", path.string());
   }
 
@@ -229,16 +224,6 @@ void saveConfig(const std::filesystem::path &path) {
   data["GPU"]["internalHeight"] = internalHeight;
   //data["GPU"]["gpuId"] = gpuId;
 
-#ifdef _WIN32
-  std::string pathPrefix{};
-#else
-  // TODO(Vali0004): Pull if Linux or MacOS
-  std::string pathPrefix{ getenv("HOME") };
-  fusesTxtPath.insert(0, pathPrefix.c_str());
-  oneBlBinPath.insert(0, pathPrefix.c_str());
-  nandBinPath.insert(0, pathPrefix.c_str());
-  oddDiscImagePath.insert(0, pathPrefix.c_str());
-#endif
   // Paths.                
   data["Paths"]["Fuses"] = fusesTxtPath;
   data["Paths"]["OneBL"] = oneBlBinPath;
@@ -251,10 +236,10 @@ void saveConfig(const std::filesystem::path &path) {
 
   data["HighlyExperimental"].comments().push_back("# Do not touch these options unless you know what you're doing!");
   data["HighlyExperimental"].comments().push_back("# It can break execution! User beware");
-  data["HighlyExperimental"]["TPI"].comments().push_back("# Ticks Per Instruction. If your system has a lower-than-average TPI, adjust accordingly");
-  data["HighlyExperimental"]["TPI"].comments().push_back("# Note: This will mess with execution timing, and may break time-sensitive things like XeLL");
-  data["HighlyExperimental"]["TPI"].comments().push_back("# Zero will use the estimated TPI for your system (check log for more info)");
-  data["HighlyExperimental"]["TPI"] = ticksPerInstruction;
+  data["HighlyExperimental"]["CPI"].comments().push_back("# Clocks Per Instruction. If your system has a lower-than-average CPI, adjust accordingly");
+  data["HighlyExperimental"]["CPI"].comments().push_back("# Note: This will mess with execution timing, and may break time-sensitive things like XeLL");
+  data["HighlyExperimental"]["CPI"].comments().push_back("# Zero will use the estimated CPI for your system (check log for more info)");
+  data["HighlyExperimental"]["CPI"] = clocksPerInstruction;
 
   std::ofstream file(path, std::ios::binary);
   file << data;

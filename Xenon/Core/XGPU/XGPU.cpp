@@ -18,29 +18,31 @@ Xe::Xenos::XGPU::XGPU(RAM *ram) {
   // Assign RAM Pointer
   ramPtr = ram;
 
-  memset(&xgpuConfigSpace.data, 0xf, sizeof(GENRAL_PCI_DEVICE_CONFIG_SPACE));
+  memset(&xgpuConfigSpace.data, 0xF, sizeof(GENRAL_PCI_DEVICE_CONFIG_SPACE));
+
   // Setup config space as per dump taken from a Jasper console.
   // Located at config address 0xD0010000.
-  u8 i = 0;
-  for (u16 idx = 0; idx < 256; idx += 4) {
-    memcpy(&xgpuConfigSpace.data[idx], &xgpuConfigMap[i], 4);
-    i++;
-  }
+  memcpy(xgpuConfigSpace.data, xgpuConfigMap, sizeof(xgpuConfigSpace.data));
+
   // Set our PCI Dev Sizes.
   pciDevSizes[0] = 0x20000; // BAR0
 
-  xenosState.Regs = new u8[0xFFFFF];
-  memset(xenosState.Regs, 0, 0xFFFFF);
+  xenosState.Regs = std::make_unique<STRIP_UNIQUE_ARR(xenosState.Regs)>(0xFFFFF);
+  memset(xenosState.Regs.get(), 0, 0xFFFFF);
 
   // Set Clocks speeds.
   u32 reg = 0x09000000;
   memcpy(&xenosState.Regs[REG_GPU_CLK], &reg, 4);
-  reg = 0x11000c00;
+  reg = 0x11000C00;
   memcpy(&xenosState.Regs[REG_EDRAM_CLK], &reg, 4);
-  reg = 0x1a000001;
+  reg = 0x1A000001;
   memcpy(&xenosState.Regs[REG_FSB_CLK], &reg, 4);
   reg = 0x19100000;
   memcpy(&xenosState.Regs[REG_MEM_CLK], &reg, 4);
+}
+
+Xe::Xenos::XGPU::~XGPU() {
+  xenosState.Regs.reset();
 }
 
 bool Xe::Xenos::XGPU::Read(u64 readAddress, u64 *data, u8 byteCount) {
@@ -73,13 +75,13 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u64 *data, u8 byteCount) {
 
     *data = regData;
 
-    if (regIndex == 0x00000a07)
+    if (regIndex == 0x00000A07)
       *data = 0x2000000;
 
     if (regIndex == 0x00001928)
       *data = 0x2000000;
 
-    if (regIndex == 0x00001e54)
+    if (regIndex == 0x00001E54)
       *data = 0;
 
     return true;
@@ -132,8 +134,7 @@ void Xe::Xenos::XGPU::ConfigWrite(u64 writeAddress, u64 data, u8 byteCount) {
   // Check if we're being scanned.
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
-    if (pciDevSizes[regOffset] != 0)
-    {
+    if (pciDevSizes[regOffset] != 0) {
       if (data == 0xFFFFFFFF) { // PCI BAR Size discovery.
         u64 x = 2;
         for (int idx = 2; idx < 31; idx++) {

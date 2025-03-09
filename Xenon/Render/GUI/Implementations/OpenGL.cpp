@@ -13,12 +13,17 @@
 bool RGH2{};
 bool storedPreviousInitSkips{};
 int initSkip1{}, initSkip2{};
-void Render::OpenGLGUI::InitBackend(SDL_Window *window, void *context) {
+void Render::OpenGLGUI::InitBackend(void *context) {
   ImGuiIO &io = ImGui::GetIO();
-  const char* glsl_version = "#version 430";
 
-  ImGui_ImplSDL3_InitForOpenGL(window, context);
-  ImGui_ImplOpenGL3_Init(glsl_version);
+  if (!ImGui_ImplSDL3_InitForOpenGL(mainWindow, context)) {
+    LOG_ERROR(System, "Failed to initialize ImGui's SDL3 implementation");
+    SYSTEM_PAUSE();
+  }
+  if (!ImGui_ImplOpenGL3_Init()) {
+    LOG_ERROR(System, "Failed to initialize ImGui's OpenGL implementation");
+    SYSTEM_PAUSE();
+  }
   // It might not be a bad idea to take the Xbox 360 font and convert it to TTF
   std::filesystem::path fontsPath{ Base::FS::GetUserPath(Base::FS::PathType::FontDir) };
   std::string robotoRegular = (fontsPath / "Roboto-Regular.ttf").string();
@@ -145,7 +150,7 @@ void ImGuiSettings(Render::OpenGLGUI *gui) {
 }
 
 void Render::OpenGLGUI::OnSwap(Texture *texture) {
-  if (Xe_Main->renderer->imguiRender) {
+  if (false) {
     OGLTexture* ogl_texture = reinterpret_cast<OGLTexture*>(texture);
     u32* ptexture_id = reinterpret_cast<u32*>(ogl_texture->GetTexture());
     if (texture_id != *ptexture_id) {
@@ -206,12 +211,12 @@ void Render::OpenGLGUI::OnSwap(Texture *texture) {
     ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_MenuBar, nullptr, {}, ImGuiCond_Always
     );
   }
-  if (ppcDebuggerActive && (!Xe_Main->renderer->imguiRender || (Xe_Main->renderer->imguiRender && !ppcDebuggerAttached))) {
+  if (ppcDebuggerActive && (!false || (false && !ppcDebuggerAttached))) {
     Window("PPC Debugger", [this] {
       PPCDebugger(this);
     }, { 1200.f, 700.f }, ImGuiWindowFlags_NoCollapse, &ppcDebuggerActive, { 500.f, 100.f });
   }
-  if (!Xe_Main->renderer->imguiRender) {
+  if (!false) {
     Window("Debug", [&] {
       TabBar("##main", [&] {
         TabItem("Debug", [&] {          
@@ -259,7 +264,6 @@ void Render::OpenGLGUI::OnSwap(Texture *texture) {
 
 void Render::OpenGLGUI::EndSwap() {
   ImGuiIO& io = ImGui::GetIO();
-  ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
   if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
     SDL_Window* backupCurrentWindow = SDL_GL_GetCurrentWindow();
     SDL_GLContext backupCurrentContext = SDL_GL_GetCurrentContext();
@@ -267,4 +271,5 @@ void Render::OpenGLGUI::EndSwap() {
     ImGui::RenderPlatformWindowsDefault();
     SDL_GL_MakeCurrent(backupCurrentWindow, backupCurrentContext);
   }
+  ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }

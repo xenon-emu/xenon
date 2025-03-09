@@ -14,16 +14,30 @@ public:
                   u32 PIR, const char *ppuName);
   ~PPU();
 
+  // Calulate our Clocks Per Instruction
+  void CalculateCPI();
+  
+  // Reset the PPU state
+  void Reset();
+
+  // Debug tools
   void Halt();
   void Continue();
   void Step(int amount = 1);
 
+  // Start execution (thread function)
   void StartExecution();
 
-  // Returns a pointer to a thread.
+  // Returns a pointer to a thread
   PPU_THREAD_REGISTERS *GetPPUThread(u8 thrdID);
 
+  // Returns if the PPU is halted
   bool IsHalted() { return ppcHalt; }
+
+  // Sets the clocks per instruction
+  void SetCPI(u32 CPI) { clocksPerInstruction = CPI; }
+  // Gets the clocks per instruction
+  u32 GetCPI() { return clocksPerInstruction; }
 private:
   // Thread handle
   std::thread ppuThread;
@@ -54,8 +68,8 @@ private:
   // Main CPU Context.
   XENON_CONTEXT *xenonContext = nullptr;
 
-  // Amount of CPU ticks per instruction executed.
-  u32 ticksPerInstruction = 0;
+  // Amount of CPU clocls per instruction executed.
+  u32 clocksPerInstruction = 0;
 
   // Helpers
 

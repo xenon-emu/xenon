@@ -3,7 +3,12 @@
 #include "GUI.h"
 
 void Render::GUI::Init(SDL_Window* window, void* context) {
+  // Set our mainWindow handle
+  mainWindow = window;
+
+  // Check ImGui version
   IMGUI_CHECKVERSION();
+  // Create ImGui Context
   ImGui::CreateContext();
   ImGuiIO& io = ImGui::GetIO();
   // We don't want to create a ini because it stores positions.
@@ -21,7 +26,7 @@ void Render::GUI::Init(SDL_Window* window, void* context) {
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
   }
   SetStyle();
-  InitBackend(window, context);
+  InitBackend(context);
 }
 void Render::GUI::Shutdown() {
   if (!this) {

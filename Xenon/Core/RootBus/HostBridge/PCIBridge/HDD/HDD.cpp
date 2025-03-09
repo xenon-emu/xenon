@@ -25,16 +25,16 @@ HDD::HDD(const char *deviceName, u64 size, PCIBridge *parentPCIBridge) :
   memcpy(&pciConfigSpace.data[0x58], &data, 4);
   data = 0x00112400;
   memcpy(&pciConfigSpace.data[0x60], &data, 4);
-  data = 0x7f7f7f7f;
+  data = 0x7F7F7F7F;
   memcpy(&pciConfigSpace.data[0x70], &data, 4);
   memcpy(&pciConfigSpace.data[0x74], &data, 4); // Field value is the same as above.
-  data = 0xc07231be;
+  data = 0xC07231BE;
   memcpy(&pciConfigSpace.data[0x80], &data, 4);
   data = 0x40;
   memcpy(&pciConfigSpace.data[0x90], &data, 4);
-  data = 0x100c04cc;
+  data = 0x100C04CC;
   memcpy(&pciConfigSpace.data[0x98], &data, 4);
-  data = 0x004108c0;
+  data = 0x004108C0;
   memcpy(&pciConfigSpace.data[0x9C], &data, 4);
 
   // Set the SCR's at offset 0xC0 (SiS-like).
@@ -44,7 +44,7 @@ HDD::HDD(const char *deviceName, u64 size, PCIBridge *parentPCIBridge) :
                                                 // SSTATUS_SPD_NO_SPEED.
                                                 // SSTATUS_IPM_NO_DEVICE.
 // SError.
-  data = 0x001f0201;
+  data = 0x001F0201;
   memcpy(&pciConfigSpace.data[0xC4], &data, 4);
   // SControl.
   data = 0x00000300;

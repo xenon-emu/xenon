@@ -58,16 +58,20 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
   // Load NAND header and display info about it.
   nandFile.seekg(0, std::ios::beg);
   nandFile.read(reinterpret_cast<char*>(&sfcxState.nandHeader), sizeof(sfcxState.nandHeader));
+  nandFile.close();
+
   // Fix Endiannes
-  sfcxState.nandHeader.nandMagic =
-      std::byteswap<u16>(sfcxState.nandHeader.nandMagic);
+  sfcxState.nandHeader.nandMagic = std::byteswap<u16>(sfcxState.nandHeader.nandMagic);
   LOG_INFO(SFCX, " * NAND Magic: {:#x}", sfcxState.nandHeader.nandMagic);
 
   sfcxState.nandHeader.build = std::byteswap<u16>(sfcxState.nandHeader.build);
   LOG_INFO(SFCX, " * Build: {:#x}", sfcxState.nandHeader.build);
 
   sfcxState.nandHeader.qfe = std::byteswap<u16>(sfcxState.nandHeader.qfe);
+  LOG_INFO(SFCX, " * QFE: {:#x}", sfcxState.nandHeader.qfe);
+
   sfcxState.nandHeader.flags = std::byteswap<u16>(sfcxState.nandHeader.flags);
+  LOG_INFO(SFCX, " * Flags: {:#x}", sfcxState.nandHeader.flags);
 
   sfcxState.nandHeader.entry = std::byteswap<u32>(sfcxState.nandHeader.entry);
   LOG_INFO(SFCX, " * Entry: {:#x}", sfcxState.nandHeader.entry);
@@ -75,40 +79,31 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
   sfcxState.nandHeader.size = std::byteswap<u32>(sfcxState.nandHeader.size);
   LOG_INFO(SFCX, " * Size: {:#x}", sfcxState.nandHeader.size);
 
-  sfcxState.nandHeader.keyvaultSize =
-      std::byteswap<u32>(sfcxState.nandHeader.keyvaultSize);
+  sfcxState.nandHeader.keyvaultSize = std::byteswap<u32>(sfcxState.nandHeader.keyvaultSize);
   LOG_INFO(SFCX, " * Keyvault Size: {:#x}", sfcxState.nandHeader.keyvaultSize);
 
-  sfcxState.nandHeader.sysUpdateAddr =
-      std::byteswap<u32>(sfcxState.nandHeader.sysUpdateAddr);
+  sfcxState.nandHeader.sysUpdateAddr = std::byteswap<u32>(sfcxState.nandHeader.sysUpdateAddr);
   LOG_INFO(SFCX, " * System Update Addr: {:#x}", sfcxState.nandHeader.sysUpdateAddr);
 
-  sfcxState.nandHeader.sysUpdateCount =
-      std::byteswap<u16>(sfcxState.nandHeader.sysUpdateCount);
+  sfcxState.nandHeader.sysUpdateCount = std::byteswap<u16>(sfcxState.nandHeader.sysUpdateCount);
   LOG_INFO(SFCX, " * System Update Count: {:#x}", sfcxState.nandHeader.sysUpdateCount);
 
-  sfcxState.nandHeader.keyvaultVer =
-      std::byteswap<u16>(sfcxState.nandHeader.keyvaultVer);
+  sfcxState.nandHeader.keyvaultVer = std::byteswap<u16>(sfcxState.nandHeader.keyvaultVer);
   LOG_INFO(SFCX, " * Keyvault Ver: {:#x}", sfcxState.nandHeader.keyvaultVer);
 
-  sfcxState.nandHeader.keyvaultAddr =
-      std::byteswap<u32>(sfcxState.nandHeader.keyvaultAddr);
+  sfcxState.nandHeader.keyvaultAddr = std::byteswap<u32>(sfcxState.nandHeader.keyvaultAddr);
   LOG_INFO(SFCX, " * Keyvault Addr: {:#x}", sfcxState.nandHeader.keyvaultAddr);
 
-  sfcxState.nandHeader.sysUpdateSize =
-      std::byteswap<u32>(sfcxState.nandHeader.sysUpdateSize);
+  sfcxState.nandHeader.sysUpdateSize = std::byteswap<u32>(sfcxState.nandHeader.sysUpdateSize);
   LOG_INFO(SFCX, " * System Update Size: {:#x}", sfcxState.nandHeader.sysUpdateSize);
 
-  sfcxState.nandHeader.smcConfigAddr =
-      std::byteswap<u32>(sfcxState.nandHeader.smcConfigAddr);  
+  sfcxState.nandHeader.smcConfigAddr = std::byteswap<u32>(sfcxState.nandHeader.smcConfigAddr);  
   LOG_INFO(SFCX, " * SMC Config Addr: {:#x}", sfcxState.nandHeader.smcConfigAddr);
 
-  sfcxState.nandHeader.smcBootSize =
-      std::byteswap<u32>(sfcxState.nandHeader.smcBootSize);
+  sfcxState.nandHeader.smcBootSize = std::byteswap<u32>(sfcxState.nandHeader.smcBootSize);
   LOG_INFO(SFCX, " * SMC Boot Size: {:#x}", sfcxState.nandHeader.smcBootSize);
 
-  sfcxState.nandHeader.smcBootAddr =
-      std::byteswap<u32>(sfcxState.nandHeader.smcBootAddr);
+  sfcxState.nandHeader.smcBootAddr = std::byteswap<u32>(sfcxState.nandHeader.smcBootAddr);
   LOG_INFO(SFCX, " * SMC Boot Addr: {:#x}", sfcxState.nandHeader.smcBootAddr);
 
   // Check Image size and Meta type.
@@ -117,8 +112,14 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
   // There are two SFCX Versions, original (Pre Jasper) and Jasper+.
 
   // Enter SFCX Thread.
+  sfcxThreadRunning = true;
   sfcxThread = std::thread(&SFCX::sfcxMainLoop, this);
-  sfcxThread.detach();
+}
+
+SFCX::~SFCX() {
+  sfcxThreadRunning = false;
+  if (sfcxThread.joinable())
+    sfcxThread.join();
 }
 
 void SFCX::Read(u64 readAddress, u64 *data, u8 byteCount) {
@@ -236,7 +237,7 @@ void SFCX::ConfigWrite(u64 writeAddress, u64 data, u8 byteCount) {
 
 void SFCX::sfcxMainLoop() {
   // Config register should be initialized by now.
-  while (true) {
+  while (sfcxThreadRunning) {
     // Did we got a command?
     if (sfcxState.commandReg != NO_CMD) {
       // Set status to busy.

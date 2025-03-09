@@ -1,6 +1,7 @@
 // Copyright 2025 Xenon Emulator Project
 
 #pragma once
+#include <type_traits>
 
 namespace Base {
 

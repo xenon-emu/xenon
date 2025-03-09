@@ -20,7 +20,7 @@ void ODD::atapiReset() {
   memcpy(&atapiState.atapiInquiryData.vendorIdentification,
          vendorIdentification, sizeof(vendorIdentification));
 
-  atapiState.mountedCDImage = new Storage(Config::oddImagePath());
+  atapiState.mountedCDImage = std::make_unique<STRIP_UNIQUE(atapiState.mountedCDImage)>(Config::oddImagePath());
 }
 
 void ODD::atapiIdentifyPacketDeviceCommand() {
@@ -38,8 +38,7 @@ void ODD::atapiIdentifyPacketDeviceCommand() {
   // Reset the pointer.
   atapiState.dataReadBuffer.ResetPtr();
   // Copy the data.
-  memcpy(atapiState.dataReadBuffer.Ptr(), &atapiState.atapiIdentifyData, 
-    sizeof(XE_ATA_IDENTIFY_DATA));
+  memcpy(atapiState.dataReadBuffer.Ptr(), &atapiState.atapiIdentifyData, sizeof(XE_ATA_IDENTIFY_DATA));
   // Set the drive status.
   atapiState.atapiRegs.statusReg |= ATA_STATUS_DRQ;
   // Request an interrupt.
@@ -187,10 +186,10 @@ ODD::ODD(const char* deviceName, u64 size,
   memcpy(&pciConfigSpace.data[0x58], &data, 4);
   data = 0x00112400;
   memcpy(&pciConfigSpace.data[0x60], &data, 4);
-  data = 0x7f7f7f7f;
+  data = 0x7F7F7F7F;
   memcpy(&pciConfigSpace.data[0x70], &data, 4);
   memcpy(&pciConfigSpace.data[0x74], &data, 4); // Field value is the same as above.
-  data = 0xc07231be;
+  data = 0xC07231BE;
   memcpy(&pciConfigSpace.data[0x80], &data, 4);
   data = 0x100c04cc;
   memcpy(&pciConfigSpace.data[0x98], &data, 4);

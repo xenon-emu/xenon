@@ -86,28 +86,28 @@ struct PPC_HPTE64 {
   u64 pte1;
 };
 
-void PPCInterpreter::PPCInterpreter_slbia(PPU_STATE *hCore) {
-  for (auto &slbEntry : hCore->ppuThread[hCore->currentThread].SLB) {
+void PPCInterpreter::PPCInterpreter_slbia(PPU_STATE *ppuState) {
+  for (auto &slbEntry : ppuState->ppuThread[ppuState->currentThread].SLB) {
     slbEntry.V = 0;
   }
 }
 
-void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *hCore) {
+void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
   X_FORM_L_rB
 
   // The PPU adds two new fields to this instruction, them being LP abd IS.
 
-  bool LP = (hCore->ppuThread[hCore->currentThread].GPR[rB] & 0x1000) >> 12;
+  bool LP = (ppuState->ppuThread[ppuState->currentThread].GPR[rB] & 0x1000) >> 12;
   bool invalSelector =
-      (hCore->ppuThread[hCore->currentThread].GPR[rB] & 0x800) >> 11;
-  u8 p = mmuGetPageSize(hCore, L, LP);
+      (ppuState->ppuThread[ppuState->currentThread].GPR[rB] & 0x800) >> 11;
+  u8 p = mmuGetPageSize(ppuState, L, LP);
   u64 VA, VPN = 0;
 
   if (invalSelector == 0) {
     // The TLB is as selective as possible when invalidating TLB entries.The
     // invalidation match criteria is VPN[38:79 - p], L, LP, and LPID.
 
-    VA = hCore->ppuThread[hCore->currentThread].GPR[rB];
+    VA = ppuState->ppuThread[ppuState->currentThread].GPR[rB];
 
     if (VA > 0x7FFFFFFF) {
       VPN = (VA >> 16) & ~0x7F;
@@ -120,22 +120,22 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *hCore) {
       VPN = (VA >> 16) & ~0xF;
     }
 
-    for (auto &tlbEntry : hCore->TLB.tlbSet0) {
+    for (auto &tlbEntry : ppuState->TLB.tlbSet0) {
       if (tlbEntry.V && tlbEntry.VPN == VPN && tlbEntry.p == p) {
         tlbEntry.V = 0;
       }
     }
-    for (auto &tlbEntry : hCore->TLB.tlbSet1) {
+    for (auto &tlbEntry : ppuState->TLB.tlbSet1) {
       if (tlbEntry.V && tlbEntry.VPN == VPN && tlbEntry.p == p) {
         tlbEntry.V = 0;
       }
     }
-    for (auto &tlbEntry : hCore->TLB.tlbSet2) {
+    for (auto &tlbEntry : ppuState->TLB.tlbSet2) {
       if (tlbEntry.V && tlbEntry.VPN == VPN && tlbEntry.p == p) {
         tlbEntry.V = 0;
       }
     }
-    for (auto &tlbEntry : hCore->TLB.tlbSet3) {
+    for (auto &tlbEntry : ppuState->TLB.tlbSet3) {
       if (tlbEntry.V && tlbEntry.VPN == VPN && tlbEntry.p == p) {
         tlbEntry.V = 0;
       }
@@ -145,35 +145,35 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *hCore) {
     // invalidation.
     u8 tlbCongruenceClass = 0;
     u64 rb_44_51 =
-        (hCore->ppuThread[hCore->currentThread].GPR[rB] & 0xFF000) >> 12;
+        (ppuState->ppuThread[ppuState->currentThread].GPR[rB] & 0xFF000) >> 12;
 
-    hCore->TLB.tlbSet0[rb_44_51].V = false;
-    hCore->TLB.tlbSet0[rb_44_51].VPN = 0;
-    hCore->TLB.tlbSet0[rb_44_51].RPN = 0;
-    hCore->TLB.tlbSet0[rb_44_51].L = false;
-    hCore->TLB.tlbSet0[rb_44_51].LP = 0;
-    hCore->TLB.tlbSet0[rb_44_51].p = 0;
+    ppuState->TLB.tlbSet0[rb_44_51].V = false;
+    ppuState->TLB.tlbSet0[rb_44_51].VPN = 0;
+    ppuState->TLB.tlbSet0[rb_44_51].RPN = 0;
+    ppuState->TLB.tlbSet0[rb_44_51].L = false;
+    ppuState->TLB.tlbSet0[rb_44_51].LP = 0;
+    ppuState->TLB.tlbSet0[rb_44_51].p = 0;
 
-    hCore->TLB.tlbSet1[rb_44_51].V = false;
-    hCore->TLB.tlbSet1[rb_44_51].VPN = 0;
-    hCore->TLB.tlbSet1[rb_44_51].RPN = 0;
-    hCore->TLB.tlbSet1[rb_44_51].L = false;
-    hCore->TLB.tlbSet1[rb_44_51].LP = 0;
-    hCore->TLB.tlbSet1[rb_44_51].p = 0;
+    ppuState->TLB.tlbSet1[rb_44_51].V = false;
+    ppuState->TLB.tlbSet1[rb_44_51].VPN = 0;
+    ppuState->TLB.tlbSet1[rb_44_51].RPN = 0;
+    ppuState->TLB.tlbSet1[rb_44_51].L = false;
+    ppuState->TLB.tlbSet1[rb_44_51].LP = 0;
+    ppuState->TLB.tlbSet1[rb_44_51].p = 0;
 
-    hCore->TLB.tlbSet2[rb_44_51].V = false;
-    hCore->TLB.tlbSet2[rb_44_51].VPN = 0;
-    hCore->TLB.tlbSet2[rb_44_51].RPN = 0;
-    hCore->TLB.tlbSet2[rb_44_51].L = false;
-    hCore->TLB.tlbSet2[rb_44_51].LP = 0;
-    hCore->TLB.tlbSet2[rb_44_51].p = 0;
+    ppuState->TLB.tlbSet2[rb_44_51].V = false;
+    ppuState->TLB.tlbSet2[rb_44_51].VPN = 0;
+    ppuState->TLB.tlbSet2[rb_44_51].RPN = 0;
+    ppuState->TLB.tlbSet2[rb_44_51].L = false;
+    ppuState->TLB.tlbSet2[rb_44_51].LP = 0;
+    ppuState->TLB.tlbSet2[rb_44_51].p = 0;
 
-    hCore->TLB.tlbSet3[rb_44_51].V = false;
-    hCore->TLB.tlbSet3[rb_44_51].VPN = 0;
-    hCore->TLB.tlbSet3[rb_44_51].RPN = 0;
-    hCore->TLB.tlbSet3[rb_44_51].L = false;
-    hCore->TLB.tlbSet3[rb_44_51].LP = 0;
-    hCore->TLB.tlbSet3[rb_44_51].p = 0;
+    ppuState->TLB.tlbSet3[rb_44_51].V = false;
+    ppuState->TLB.tlbSet3[rb_44_51].VPN = 0;
+    ppuState->TLB.tlbSet3[rb_44_51].RPN = 0;
+    ppuState->TLB.tlbSet3[rb_44_51].L = false;
+    ppuState->TLB.tlbSet3[rb_44_51].LP = 0;
+    ppuState->TLB.tlbSet3[rb_44_51].p = 0;
   }
 }
 
@@ -190,7 +190,7 @@ void PPCInterpreter::PPCInterpreter_tlbsync(PPU_STATE* hCore)
 }
 
 // Helper function for getting Page Size (p bit).
-u8 PPCInterpreter::mmuGetPageSize(PPU_STATE *hCore, bool L, u8 LP) {
+u8 PPCInterpreter::mmuGetPageSize(PPU_STATE *ppuState, bool L, u8 LP) {
 
   // Large page selection works the following way:
   // First check if pages are large (L)
@@ -200,8 +200,8 @@ u8 PPCInterpreter::mmuGetPageSize(PPU_STATE *hCore, bool L, u8 LP) {
 
   // HID6 16-17 bits select Large Page size 1.
   // HID6 18-19 bits select Large Page size 2.
-  u8 LB_16_17 = (u8)QGET(hCore->SPR.HID6, 16, 17);
-  u8 LB_18_19 = (u8)QGET(hCore->SPR.HID6, 18, 19);
+  u8 LB_16_17 = (u8)QGET(ppuState->SPR.HID6, 16, 17);
+  u8 LB_18_19 = (u8)QGET(ppuState->SPR.HID6, 18, 19);
 
   // Final p size.
   u8 p = 0;
@@ -247,7 +247,7 @@ u8 PPCInterpreter::mmuGetPageSize(PPU_STATE *hCore, bool L, u8 LP) {
 }
 
 // This is done when TLB Reload is in software-controlled mode.
-void PPCInterpreter::mmuAddTlbEntry(PPU_STATE *hCore) {
+void PPCInterpreter::mmuAddTlbEntry(PPU_STATE *ppuState) {
 #define PPE_TLB_INDEX_LVPN_MASK 0xE00000000000
 #define MMU_GET_TLB_INDEX_TI(x) ((u16)((x & 0xFF0) >> 4))
 #define MMU_GET_TLB_INDEX_TS(x) ((u16)(x & 0xF))
@@ -261,9 +261,9 @@ void PPCInterpreter::mmuAddTlbEntry(PPU_STATE *hCore) {
 #define PPE_TLB_RPN_ARPN_AND_LP_MASK 0x3FFFFFFF000
 #define PPE_TLB_RPN_LP_MASK 0x1000
 
-  u64 tlbIndex = hCore->SPR.PPE_TLB_Index;
-  u64 tlbVpn = hCore->SPR.PPE_TLB_VPN;
-  u64 tlbRpn = hCore->SPR.PPE_TLB_RPN;
+  u64 tlbIndex = ppuState->SPR.PPE_TLB_Index;
+  u64 tlbVpn = ppuState->SPR.PPE_TLB_VPN;
+  u64 tlbRpn = ppuState->SPR.PPE_TLB_RPN;
 
   // Valid entry.
   bool vpnValid = tlbVpn & PPE_TLB_VPN_V_MASK;
@@ -273,7 +273,7 @@ void PPCInterpreter::mmuAddTlbEntry(PPU_STATE *hCore) {
   u32 LP = (tlbRpn & PPE_TLB_RPN_LP_MASK) >> 12;
 
   // Get Page Size
-  u8 p = mmuGetPageSize(hCore, L, LP);
+  u8 p = mmuGetPageSize(ppuState, L, LP);
 
   // AVPN
   u64 AVPN = 0;
@@ -312,7 +312,7 @@ void PPCInterpreter::mmuAddTlbEntry(PPU_STATE *hCore) {
   u16 TI = MMU_GET_TLB_INDEX_TI(tlbIndex);
   u16 TS = MMU_GET_TLB_INDEX_TS(tlbIndex);
 
-  // std::cout << "XCPU[" << hCore->ppuName << "(Thrd"<< hCore->currentThread
+  // std::cout << "XCPU[" << ppuState->ppuName << "(Thrd"<< ppuState->currentThread
   //     << ")](MMU) : Adding tlb entry : (" << TI * TS << ")" << std::endl;
   // std::cout << " *** RPN:         0x" << RPN << std::endl;
   // std::cout << " *** VPN:         0x" << VPN << std::endl;
@@ -325,42 +325,42 @@ void PPCInterpreter::mmuAddTlbEntry(PPU_STATE *hCore) {
   // There are 4 sets of 256 entries each:
   switch (TS) {
   case 0b1000:
-    hCore->TLB.tlbSet0[TI].V = true;
-    hCore->TLB.tlbSet0[TI].RPN = RPN;
-    hCore->TLB.tlbSet0[TI].VPN = VPN;
-    hCore->TLB.tlbSet0[TI].p = p;
-    hCore->TLB.tlbSet0[TI].L = L;
-    hCore->TLB.tlbSet0[TI].LP = LP;
+    ppuState->TLB.tlbSet0[TI].V = true;
+    ppuState->TLB.tlbSet0[TI].RPN = RPN;
+    ppuState->TLB.tlbSet0[TI].VPN = VPN;
+    ppuState->TLB.tlbSet0[TI].p = p;
+    ppuState->TLB.tlbSet0[TI].L = L;
+    ppuState->TLB.tlbSet0[TI].LP = LP;
     break;
   case 0b0100:
-    hCore->TLB.tlbSet1[TI].V = true;
-    hCore->TLB.tlbSet1[TI].RPN = RPN;
-    hCore->TLB.tlbSet1[TI].VPN = VPN;
-    hCore->TLB.tlbSet1[TI].p = p;
-    hCore->TLB.tlbSet1[TI].L = L;
-    hCore->TLB.tlbSet1[TI].LP = LP;
+    ppuState->TLB.tlbSet1[TI].V = true;
+    ppuState->TLB.tlbSet1[TI].RPN = RPN;
+    ppuState->TLB.tlbSet1[TI].VPN = VPN;
+    ppuState->TLB.tlbSet1[TI].p = p;
+    ppuState->TLB.tlbSet1[TI].L = L;
+    ppuState->TLB.tlbSet1[TI].LP = LP;
     break;
   case 0b0010:
-    hCore->TLB.tlbSet2[TI].V = true;
-    hCore->TLB.tlbSet2[TI].RPN = RPN;
-    hCore->TLB.tlbSet2[TI].VPN = VPN;
-    hCore->TLB.tlbSet2[TI].p = p;
-    hCore->TLB.tlbSet2[TI].L = L;
-    hCore->TLB.tlbSet2[TI].LP = LP;
+    ppuState->TLB.tlbSet2[TI].V = true;
+    ppuState->TLB.tlbSet2[TI].RPN = RPN;
+    ppuState->TLB.tlbSet2[TI].VPN = VPN;
+    ppuState->TLB.tlbSet2[TI].p = p;
+    ppuState->TLB.tlbSet2[TI].L = L;
+    ppuState->TLB.tlbSet2[TI].LP = LP;
     break;
   case 0b0001:
-    hCore->TLB.tlbSet3[TI].V = true;
-    hCore->TLB.tlbSet3[TI].RPN = RPN;
-    hCore->TLB.tlbSet3[TI].VPN = VPN;
-    hCore->TLB.tlbSet3[TI].p = p;
-    hCore->TLB.tlbSet3[TI].L = L;
-    hCore->TLB.tlbSet3[TI].LP = LP;
+    ppuState->TLB.tlbSet3[TI].V = true;
+    ppuState->TLB.tlbSet3[TI].RPN = RPN;
+    ppuState->TLB.tlbSet3[TI].VPN = VPN;
+    ppuState->TLB.tlbSet3[TI].p = p;
+    ppuState->TLB.tlbSet3[TI].L = L;
+    ppuState->TLB.tlbSet3[TI].LP = LP;
     break;
   }
 }
 
 // Translation Lookaside Buffer Search
-bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *hCore, u64 *RPN, u64 VA,
+bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *ppuState, u64 *RPN, u64 VA,
                                        u64 VPN, u8 p, bool LP) {
   // Index to choose from the 256 ways of the TLB
   u16 tlbIndex = 0;
@@ -401,20 +401,20 @@ bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *hCore, u64 *RPN, u64 VA,
     break;
   }
 
-  if (hCore->TLB.tlbSet0[tlbIndex].V) {
-    if ((u16)hCore->TLB.tlbSet0[tlbIndex].VPN == (u16)VPN) {
+  if (ppuState->TLB.tlbSet0[tlbIndex].V) {
+    if ((u16)ppuState->TLB.tlbSet0[tlbIndex].VPN == (u16)VPN) {
       // Check to see if its this entry!
       // Need to have a tag
-      if (hCore->TLB.tlbSet0[tlbIndex].p == p) {
-        if (hCore->TLB.tlbSet0[tlbIndex].L) {
-          if (hCore->TLB.tlbSet0[tlbIndex].LP == LP) {
+      if (ppuState->TLB.tlbSet0[tlbIndex].p == p) {
+        if (ppuState->TLB.tlbSet0[tlbIndex].L) {
+          if (ppuState->TLB.tlbSet0[tlbIndex].LP == LP) {
             // Probably It!
-            *RPN = hCore->TLB.tlbSet0[tlbIndex].RPN;
+            *RPN = ppuState->TLB.tlbSet0[tlbIndex].RPN;
             return true;
           }
         } else {
           // Probably It!
-          *RPN = hCore->TLB.tlbSet0[tlbIndex].RPN;
+          *RPN = ppuState->TLB.tlbSet0[tlbIndex].RPN;
           return true;
         }
       }
@@ -423,20 +423,20 @@ bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *hCore, u64 *RPN, u64 VA,
     // Entry was invalid, make this set the a candidate for refill.
     tlbSet = 0b1000;
   }
-  if (hCore->TLB.tlbSet1[tlbIndex].V) {
-    if ((u16)hCore->TLB.tlbSet1[tlbIndex].VPN == (u16)VPN) {
+  if (ppuState->TLB.tlbSet1[tlbIndex].V) {
+    if ((u16)ppuState->TLB.tlbSet1[tlbIndex].VPN == (u16)VPN) {
       // Check to see if its this entry!
       // Need to have a tag
-      if (hCore->TLB.tlbSet1[tlbIndex].p == p) {
-        if (hCore->TLB.tlbSet1[tlbIndex].L) {
-          if (hCore->TLB.tlbSet1[tlbIndex].LP == LP) {
+      if (ppuState->TLB.tlbSet1[tlbIndex].p == p) {
+        if (ppuState->TLB.tlbSet1[tlbIndex].L) {
+          if (ppuState->TLB.tlbSet1[tlbIndex].LP == LP) {
             // Probably It!
-            *RPN = hCore->TLB.tlbSet1[tlbIndex].RPN;
+            *RPN = ppuState->TLB.tlbSet1[tlbIndex].RPN;
             return true;
           }
         } else {
           // Probably It!
-          *RPN = hCore->TLB.tlbSet1[tlbIndex].RPN;
+          *RPN = ppuState->TLB.tlbSet1[tlbIndex].RPN;
           return true;
         }
       }
@@ -445,20 +445,20 @@ bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *hCore, u64 *RPN, u64 VA,
     // Entry was invalid, make this set the a candidate for refill.
     tlbSet = 0b0100;
   }
-  if (hCore->TLB.tlbSet2[tlbIndex].V) {
-    if ((u16)hCore->TLB.tlbSet2[tlbIndex].VPN == (u16)VPN) {
+  if (ppuState->TLB.tlbSet2[tlbIndex].V) {
+    if ((u16)ppuState->TLB.tlbSet2[tlbIndex].VPN == (u16)VPN) {
       // Check to see if its this entry!
       // Need to have a tag
-      if (hCore->TLB.tlbSet2[tlbIndex].p == p) {
-        if (hCore->TLB.tlbSet2[tlbIndex].L) {
-          if (hCore->TLB.tlbSet2[tlbIndex].LP == LP) {
+      if (ppuState->TLB.tlbSet2[tlbIndex].p == p) {
+        if (ppuState->TLB.tlbSet2[tlbIndex].L) {
+          if (ppuState->TLB.tlbSet2[tlbIndex].LP == LP) {
             // Probably It!
-            *RPN = hCore->TLB.tlbSet2[tlbIndex].RPN;
+            *RPN = ppuState->TLB.tlbSet2[tlbIndex].RPN;
             return true;
           }
         } else {
           // Probably It!
-          *RPN = hCore->TLB.tlbSet2[tlbIndex].RPN;
+          *RPN = ppuState->TLB.tlbSet2[tlbIndex].RPN;
           return true;
         }
       }
@@ -467,20 +467,20 @@ bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *hCore, u64 *RPN, u64 VA,
     // Entry was invalid, make this set the a candidate for refill.
     tlbSet = 0b0010;
   }
-  if (hCore->TLB.tlbSet3[tlbIndex].V) {
-    if ((u16)hCore->TLB.tlbSet3[tlbIndex].VPN == (u16)VPN) {
+  if (ppuState->TLB.tlbSet3[tlbIndex].V) {
+    if ((u16)ppuState->TLB.tlbSet3[tlbIndex].VPN == (u16)VPN) {
       // Check to see if its this entry!
       // Need to have a tag
-      if (hCore->TLB.tlbSet3[tlbIndex].p == p) {
-        if (hCore->TLB.tlbSet3[tlbIndex].L) {
-          if (hCore->TLB.tlbSet3[tlbIndex].LP == LP) {
+      if (ppuState->TLB.tlbSet3[tlbIndex].p == p) {
+        if (ppuState->TLB.tlbSet3[tlbIndex].L) {
+          if (ppuState->TLB.tlbSet3[tlbIndex].LP == LP) {
             // Probably It!
-            *RPN = hCore->TLB.tlbSet3[tlbIndex].RPN;
+            *RPN = ppuState->TLB.tlbSet3[tlbIndex].RPN;
             return true;
           }
         } else {
           // Probably It!
-          *RPN = hCore->TLB.tlbSet3[tlbIndex].RPN;
+          *RPN = ppuState->TLB.tlbSet3[tlbIndex].RPN;
           return true;
         }
       }
@@ -497,11 +497,11 @@ bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *hCore, u64 *RPN, u64 VA,
   // On normal conditions this is done for the LRU index of the TLB.
 
   // Software management of the TLB. 0 = Hardware, 1 = Software.
-  bool tlbSoftwareManaged = ((hCore->SPR.LPCR & 0x400) >> 10);
+  bool tlbSoftwareManaged = ((ppuState->SPR.LPCR & 0x400) >> 10);
 
   if (tlbSoftwareManaged) {
     u64 tlbIndexHint =
-        hCore->ppuThread[hCore->currentThread].SPR.PPE_TLB_Index_Hint;
+        ppuState->ppuThread[ppuState->currentThread].SPR.PPE_TLB_Index_Hint;
     u8 currentTlbSet = tlbIndexHint & 0xF;
     u8 currentTlbIndex = (u8)(tlbIndexHint & 0xFF0) >> 4;
     currentTlbSet = tlbSet;
@@ -518,28 +518,28 @@ bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *hCore, u64 *RPN, u64 VA,
 
     tlbIndex = tlbIndex << 4;
     tlbIndexHint = tlbIndex |= currentTlbSet;
-    hCore->ppuThread[hCore->currentThread].SPR.PPE_TLB_Index_Hint =
+    ppuState->ppuThread[ppuState->currentThread].SPR.PPE_TLB_Index_Hint =
         tlbIndexHint;
   }
   return false;
 }
 
 // Routine to read a string from memory, using a PSTRNG given by the kernel.
-void PPCInterpreter::mmuReadString(PPU_STATE *hCore, u64 stringAddress,
+void PPCInterpreter::mmuReadString(PPU_STATE *ppuState, u64 stringAddress,
                                    char *string, u32 maxLenght) {
   u32 strIndex;
   u32 stringBufferAddress = 0;
   u16 Length = 0;
 
-  Length = MMURead16(hCore, stringAddress);
+  Length = MMURead16(ppuState, stringAddress);
   if (Length < maxLenght)
     maxLenght = Length + 1;
 
   // Search Buffer
-  stringBufferAddress = MMURead32(hCore, stringAddress + 4);
+  stringBufferAddress = MMURead32(ppuState, stringAddress + 4);
 
   for (strIndex = 0; strIndex < maxLenght; strIndex++, stringBufferAddress++) {
-    string[strIndex] = MMURead8(hCore, stringBufferAddress);
+    string[strIndex] = MMURead8(ppuState, stringBufferAddress);
     if (string[strIndex] == 0)
       break;
   }
@@ -614,7 +614,7 @@ u64 PPCInterpreter::mmuContructEndAddressFromSecEngAddr(u64 inputAddress,
 }
 
 // Main address translation mechanism used on the XCPU.
-bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *hCoreState,
+bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
                                          bool memWrite) {
   // Every time the CPU does a load or store, it goes trough the MMU.
   // The MMU decides based on MSR, and some other regs if address translation
@@ -638,13 +638,13 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *hCoreState,
   //
 
   // Machine State Register.
-  MSRegister _msr = hCoreState->ppuThread[hCoreState->currentThread].SPR.MSR;
+  MSRegister _msr = ppuState->ppuThread[ppuState->currentThread].SPR.MSR;
   // Logical Partition Control Register.
-  u64 LPCR = hCoreState->SPR.LPCR;
+  u64 LPCR = ppuState->SPR.LPCR;
   // Hypervisor Real Mode Offset Register.
-  u64 HRMOR = hCoreState->SPR.HRMOR;
+  u64 HRMOR = ppuState->SPR.HRMOR;
   // Real Mode Offset Register.
-  u64 RMOR = hCoreState->SPR.RMOR;
+  u64 RMOR = ppuState->SPR.RMOR;
   // Upper 32 bits of EA, used when getting the VPN.
   u64 upperEA = (*EA & 0xFFFFFFFF00000000);
 
@@ -668,7 +668,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *hCoreState,
   bool tlbSoftwareManaged = ((LPCR & 0x400) >> 10);
 
   // Instruction relocate and instruction fetch
-  if (_msr.IR && hCoreState->ppuThread[hCoreState->currentThread].iFetch)
+  if (_msr.IR && ppuState->ppuThread[ppuState->currentThread].iFetch)
     realMode = false;
   // Data fetch
   else if (_msr.DR)
@@ -724,7 +724,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *hCoreState,
     bool slbHit = false;
     // Search the SLB to get the VSID
     for (auto &slbEntry :
-         hCoreState->ppuThread[hCoreState->currentThread].SLB) {
+         ppuState->ppuThread[ppuState->currentThread].SLB) {
       if (slbEntry.V && (slbEntry.ESID == ESID)) {
         // Entry valid & SLB->ESID = EA->VSID
         currslbEntry = slbEntry;
@@ -752,7 +752,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *hCoreState,
       //
 
       // 1. Get the p Size
-      p = mmuGetPageSize(hCoreState, L, LP);
+      p = mmuGetPageSize(ppuState, L, LP);
 
       // Get our Virtual Address - 65 bit
       // VSID + 28 bit adress data.
@@ -771,27 +771,27 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *hCoreState,
         VPN = (VA >> 16) & ~0xF;
       }
 
-      if (mmuSearchTlbEntry(hCoreState, &RPN, VA, VPN, p, LP)) {
+      if (mmuSearchTlbEntry(ppuState, &RPN, VA, VPN, p, LP)) {
         // TLB Hit, proceed.
         goto end;
       } else {
         // TLB miss, if we are in software managed mode, generate an
         // interrupt, else do page table search.
         if (tlbSoftwareManaged) {
-          bool hv = hCoreState->ppuThread[hCoreState->currentThread].SPR.MSR.HV;
+          bool hv = ppuState->ppuThread[ppuState->currentThread].SPR.MSR.HV;
           bool sfMode =
-              hCoreState->ppuThread[hCoreState->currentThread].SPR.MSR.SF;
-          u64 CIA = hCoreState->ppuThread[hCoreState->currentThread].CIA;
+              ppuState->ppuThread[ppuState->currentThread].SPR.MSR.SF;
+          u64 CIA = ppuState->ppuThread[ppuState->currentThread].CIA;
 
-          if (hCoreState->ppuThread[hCoreState->currentThread].iFetch) {
-            hCoreState->ppuThread[hCoreState->currentThread].exceptReg |=
+          if (ppuState->ppuThread[ppuState->currentThread].iFetch) {
+            ppuState->ppuThread[ppuState->currentThread].exceptReg |=
                 PPU_EX_INSSTOR;
           } else {
 
-            hCoreState->ppuThread[hCoreState->currentThread].exceptReg |=
+            ppuState->ppuThread[ppuState->currentThread].exceptReg |=
                 PPU_EX_DATASTOR;
-            hCoreState->ppuThread[hCoreState->currentThread].SPR.DAR = *EA;
-            hCoreState->ppuThread[hCoreState->currentThread].SPR.DSISR =
+            ppuState->ppuThread[ppuState->currentThread].SPR.DAR = *EA;
+            ppuState->ppuThread[ppuState->currentThread].SPR.DSISR =
                 DSISR_NOPTE;
           }
           return false;
@@ -802,21 +802,21 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *hCoreState,
           // Save MSR DR & IR Bits. When an exception occurs they must be reset
           // to whatever they where.
           bool msrDR =
-              hCoreState->ppuThread[hCoreState->currentThread].SPR.MSR.DR;
+              ppuState->ppuThread[ppuState->currentThread].SPR.MSR.DR;
           bool msrIR =
-              hCoreState->ppuThread[hCoreState->currentThread].SPR.MSR.IR;
+              ppuState->ppuThread[ppuState->currentThread].SPR.MSR.IR;
 
           // Disable relocation.
-          hCoreState->ppuThread[hCoreState->currentThread].SPR.MSR.DR = 0;
-          hCoreState->ppuThread[hCoreState->currentThread].SPR.MSR.IR = 0;
+          ppuState->ppuThread[ppuState->currentThread].SPR.MSR.DR = 0;
+          ppuState->ppuThread[ppuState->currentThread].SPR.MSR.IR = 0;
 
           // Get the primary and secondary hashes.
           u64 hash0 = (VSID >> 28) ^ (PAGE >> p);
           u64 hash1 = ~hash0;
 
           // Get hash table origin and hash table mask.
-          u64 htabOrg = hCoreState->SPR.SDR1 & PPC_SPR_SDR_64_HTABORG;
-          u64 htabSize = hCoreState->SPR.SDR1 & PPC_SPR_SDR_64_HTABSIZE;
+          u64 htabOrg = ppuState->SPR.SDR1 & PPC_SPR_SDR_64_HTABORG;
+          u64 htabSize = ppuState->SPR.SDR1 & PPC_SPR_SDR_64_HTABSIZE;
 
           // Create the mask.
           u64 htabMask = QMASK(64 - (11 + htabSize), 63);
@@ -851,9 +851,9 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *hCoreState,
           // Get the pteg data from memory while relocation is off.
           for (size_t i = 0; i < PPC_HPTES_PER_GROUP; i++) {
             pteg0[i].pte0 =
-                PPCInterpreter::MMURead64(hCoreState, pteg0Addr + i * 16);
+                PPCInterpreter::MMURead64(ppuState, pteg0Addr + i * 16);
             pteg0[i].pte1 =
-                PPCInterpreter::MMURead64(hCoreState, pteg0Addr + i * 16 + 8);
+                PPCInterpreter::MMURead64(ppuState, pteg0Addr + i * 16 + 8);
           }
 
           // We compare all pte's in order for simplicity.
@@ -903,20 +903,20 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *hCoreState,
             // Match found. Extract the RPN from the page table.
 
             // Set relocation back to whatever it was.
-            hCoreState->ppuThread[hCoreState->currentThread].SPR.MSR.DR = msrDR;
-            hCoreState->ppuThread[hCoreState->currentThread].SPR.MSR.IR = msrIR;
+            ppuState->ppuThread[ppuState->currentThread].SPR.MSR.DR = msrDR;
+            ppuState->ppuThread[ppuState->currentThread].SPR.MSR.IR = msrIR;
 
             // Update Referenced and Change Bits if necessary.
             if (!((pteg0[i].pte1 & PPC_HPTE64_R) >> 8)) {
               // Referenced
-              MMUWrite64(hCoreState, pteg0Addr + i * 16 + 8,
+              MMUWrite64(ppuState, pteg0Addr + i * 16 + 8,
                          (pteg0[i].pte1 | 0x100));
             }
             if (!((pteg0[i].pte1 & PPC_HPTE64_C) >> 7)) {
               // Access is a data write?
               if (memWrite) {
                 // Change
-                MMUWrite64(hCoreState, pteg0Addr + i * 16 + 8,
+                MMUWrite64(ppuState, pteg0Addr + i * 16 + 8,
                            (pteg0[i].pte1 | 0x80));
               }
             }
@@ -937,9 +937,9 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *hCoreState,
 
           for (size_t i = 0; i < PPC_HPTES_PER_GROUP; i++) {
             pteg1[i].pte0 =
-                PPCInterpreter::MMURead64(hCoreState, pteg1Addr + i * 16);
+                PPCInterpreter::MMURead64(ppuState, pteg1Addr + i * 16);
             pteg1[i].pte1 =
-                PPCInterpreter::MMURead64(hCoreState, pteg1Addr + i * 16 + 8);
+                PPCInterpreter::MMURead64(ppuState, pteg1Addr + i * 16 + 8);
           }
 
           // We compare all pte's in order for simplicity.
@@ -989,20 +989,20 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *hCoreState,
             // Match found. Extract the RPN from the page table.
 
             // Set relocation back to whatever it was.
-            hCoreState->ppuThread[hCoreState->currentThread].SPR.MSR.DR = msrDR;
-            hCoreState->ppuThread[hCoreState->currentThread].SPR.MSR.IR = msrIR;
+            ppuState->ppuThread[ppuState->currentThread].SPR.MSR.DR = msrDR;
+            ppuState->ppuThread[ppuState->currentThread].SPR.MSR.IR = msrIR;
 
             // Update Referenced and Change Bits if necessary.
             if (!((pteg1[i].pte1 & PPC_HPTE64_R) >> 8)) {
               // Referenced
-              MMUWrite64(hCoreState, pteg1Addr + i * 16 + 8,
+              MMUWrite64(ppuState, pteg1Addr + i * 16 + 8,
                          (pteg1[i].pte1 | 0x100));
             }
             if (!((pteg1[i].pte1 & PPC_HPTE64_C) >> 7)) {
               // Access is a data write?
               if (memWrite) {
                 // Change
-                MMUWrite64(hCoreState, pteg1Addr + i * 16 + 8,
+                MMUWrite64(ppuState, pteg1Addr + i * 16 + 8,
                            (pteg1[i].pte1 | 0x80));
               }
             }
@@ -1020,30 +1020,30 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *hCoreState,
 
           // Set MSR to IR/DR mode before raising the interrupt to whatever they
           // were.
-          hCoreState->ppuThread[hCoreState->currentThread].SPR.MSR.DR = msrDR;
-          hCoreState->ppuThread[hCoreState->currentThread].SPR.MSR.IR = msrIR;
+          ppuState->ppuThread[ppuState->currentThread].SPR.MSR.DR = msrDR;
+          ppuState->ppuThread[ppuState->currentThread].SPR.MSR.IR = msrIR;
 
           // Page Table Lookup Fault.
           // Issue Data/Instr Storage interrupt.
 
           // Instruction read.
-          if (hCoreState->ppuThread[hCoreState->currentThread].iFetch) {
-            hCoreState->ppuThread[hCoreState->currentThread].exceptReg |=
+          if (ppuState->ppuThread[ppuState->currentThread].iFetch) {
+            ppuState->ppuThread[ppuState->currentThread].exceptReg |=
                 PPU_EX_INSSTOR;
 
           } else if (memWrite) {
             // Data write.
-            hCoreState->ppuThread[hCoreState->currentThread].exceptReg |=
+            ppuState->ppuThread[ppuState->currentThread].exceptReg |=
                 PPU_EX_DATASTOR;
-            hCoreState->ppuThread[hCoreState->currentThread].SPR.DAR = *EA;
-            hCoreState->ppuThread[hCoreState->currentThread].SPR.DSISR =
+            ppuState->ppuThread[ppuState->currentThread].SPR.DAR = *EA;
+            ppuState->ppuThread[ppuState->currentThread].SPR.DSISR =
                 DSISR_NOPTE | DSISR_ISSTORE;
           } else {
             // Data read.
-            hCoreState->ppuThread[hCoreState->currentThread].exceptReg |=
+            ppuState->ppuThread[ppuState->currentThread].exceptReg |=
                 PPU_EX_DATASTOR;
-            hCoreState->ppuThread[hCoreState->currentThread].SPR.DAR = *EA;
-            hCoreState->ppuThread[hCoreState->currentThread].SPR.DSISR =
+            ppuState->ppuThread[ppuState->currentThread].SPR.DAR = *EA;
+            ppuState->ppuThread[ppuState->currentThread].SPR.DSISR =
                 DSISR_NOPTE;
           }
           return false;
@@ -1052,13 +1052,13 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *hCoreState,
     } else {
       // SLB Miss
       // Data or Inst Segment Exception
-      if (hCoreState->ppuThread[hCoreState->currentThread].iFetch) {
-        hCoreState->ppuThread[hCoreState->currentThread].exceptReg |=
+      if (ppuState->ppuThread[ppuState->currentThread].iFetch) {
+        ppuState->ppuThread[ppuState->currentThread].exceptReg |=
             PPU_EX_INSTSEGM;
       } else {
-        hCoreState->ppuThread[hCoreState->currentThread].exceptReg |=
+        ppuState->ppuThread[ppuState->currentThread].exceptReg |=
             PPU_EX_DATASEGM;
-        hCoreState->ppuThread[hCoreState->currentThread].SPR.DAR = *EA;
+        ppuState->ppuThread[ppuState->currentThread].SPR.DAR = *EA;
       }
       return false;
     }
@@ -1091,7 +1091,7 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
 
   EA = mmuContructEndAddressFromSecEngAddr(EA, &socRead);
 
-  // When the xboxkrnl writes to address 0x7fffxxxx is writing to the IIC
+  // When the xboxkrnl writes to address 0x7FFFxxxx is writing to the IIC
   // so we use that address here to validate its an soc write.
   if (((oldEA & 0x000000007fff0000) >> 16) == 0x7FFF) {
     socRead = true;
@@ -1285,9 +1285,9 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
 
   EA = mmuContructEndAddressFromSecEngAddr(EA, &socWrite);
 
-  // When the xboxkrnl writes to address 0x7fffxxxx is writing to the IIC
+  // When the xboxkrnl writes to address 0x7FFFxxxx is writing to the IIC
   // so we use that address here to validate its an soc write.
-  if (((oldEA & 0x000000007fff0000) >> 16) == 0x7FFF) {
+  if (((oldEA & 0x000000007FFFF0000) >> 16) == 0x7FFF) {
     socWrite = true;
   }
 
@@ -1298,11 +1298,11 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   }
 
   // Time Base register. Writing here starts or stops the RTC apparently.
-  if (socWrite && EA == 0x611a0) {
+  if (socWrite && EA == 0x611A0) {
     if (data == 0) {
       intXCPUContext->timeBaseActive = false;
       return;
-    } else if (data == 0xff01000000000000 ||
+    } else if (data == 0xFF01000000000000 ||
                data == 0x0001000000000000) // 0x1FF byte reversed!
     {
       intXCPUContext->timeBaseActive = true;

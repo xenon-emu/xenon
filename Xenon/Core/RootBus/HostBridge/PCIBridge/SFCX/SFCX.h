@@ -145,8 +145,8 @@ struct SFCX_STATE {
   u8 metaType = 0;
   u16 pageSize = 0x200;
   u8 metaSize = 0x10;
-  u16 pageSizePhys = pageSize + metaSize;
-  u8 pageBuffer[0x210];
+  u16 pageSizePhys = static_cast<u16>(pageSize + metaSize);
+  u8 pageBuffer[0x210] = {};
   u16 currentPageBufferPos = 0;
   u8 currentDataReadPos = 0;
 
@@ -158,6 +158,7 @@ class SFCX : public PCIDevice {
 public:
   SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
     PCIBridge *parentPCIBridge);
+  ~SFCX();
 
   void Read(u64 readAddress, u64 *data, u8 byteCount) override;
   void ConfigRead(u64 readAddress, u64 *data, u8 byteCount) override;
@@ -171,10 +172,12 @@ private:
   bool checkMagic();
   // Thread object
   std::thread sfcxThread;
+  // Thread running
+  bool sfcxThreadRunning = false;
   // SFCX State
-  SFCX_STATE sfcxState;
+  SFCX_STATE sfcxState{};
   // I/O File stream.
   std::ifstream nandFile;
   // PCI Bridge pointer. Used for Interrupts.
-  PCIBridge *parentBus;
+  PCIBridge *parentBus = nullptr;
 };

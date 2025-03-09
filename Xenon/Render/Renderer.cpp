@@ -12,7 +12,6 @@
 #include "Core/XGPU/XGPU.h"
 #include "Core/Xe_Main.h"
 
-
 // Shaders
 void compileShaders(GLuint shader, const char* source) {
   glShaderSource(shader, 1, &source, nullptr);
@@ -66,22 +65,28 @@ Render::Renderer::~Renderer() {
 // Just why...
 
 void Render::Renderer::Start() {
-  // Init SDL
-  if (!SDL_Init(SDL_INIT_VIDEO)) {
-    LOG_ERROR(System, "Failed to initialize SDL video subsystem: {}", SDL_GetError());
+  // Init SDL Events, Video, Joystick, and Gamepad
+  if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
+    LOG_ERROR(System, "Failed to initialize SDL: {}", SDL_GetError());
   }
 
   std::string title = std::format("Xenon {}", Base::VERSION);
   // SDL3 window properties.
   SDL_PropertiesID props = SDL_CreateProperties();
   SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, title.c_str());
+  // Set starting X and Y position to be centered
   SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_CENTERED);
   SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_Y_NUMBER, SDL_WINDOWPOS_CENTERED);
+  // Set width and height
   SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, width);
   SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, height);
   // For a new Vulkan support, don't forget to change 'SDL_WINDOW_OPENGL' by 'SDL_WINDOW_VULKAN'.
   SDL_SetNumberProperty(props, "flags", SDL_WINDOW_OPENGL);
+  // Allow resizing
   SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, true);
+  // Enable HiDPI
+  SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_HIGH_PIXEL_DENSITY_BOOLEAN, true);
+  // Enable OpenGL
   SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true);
   // Create window
   mainWindow = SDL_CreateWindowWithProperties(props);
@@ -91,6 +96,8 @@ void Render::Renderer::Start() {
   SDL_SetWindowMinimumSize(mainWindow, 640, 480);
   // Set OpenGL SDL Properties
   SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+  SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+  SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
   SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
   // Set RGBA size (R8G8B8A8)
   SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
@@ -282,10 +289,9 @@ void Render::Renderer::Thread() {
       glBindVertexArray(dummyVAO);
       glDrawArrays(GL_TRIANGLE_FAN, 0, 3);
     }
-    // While we shutdown, we free this, thus creating a "use after free"
-    if (gui.get()) {
-      gui->Render(backbuffer.get());
-    }
+
+    // Render the GUI
+    gui->Render(backbuffer.get());
 
     SDL_GL_SwapWindow(mainWindow);
   }

@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "Core/XCPU/IIC/IIC.h"
 #include "Core/XCPU/Bitfield.h"
 #include "Core/XCPU/XenonReservations.h"
@@ -498,14 +500,14 @@ struct PPU_THREAD_REGISTERS {
   u64 lastWriteAddress = 0;
   u64 lastRegValue = 0;
 
-  PPU_RES *ppuRes;
+  std::unique_ptr<PPU_RES> ppuRes{};
 };
 
 struct PPU_STATE {
   // Thread Specific State.
-  PPU_THREAD_REGISTERS ppuThread[2];
+  PPU_THREAD_REGISTERS ppuThread[2]{};
   // Current executing thread.
-  PPU_THREAD currentThread;
+  PPU_THREAD currentThread = PPU_THREAD_0;
   // Shared Special Purpose Registers.
   PPU_STATE_SPRS SPR{};
   // Translation Lookaside Buffer
@@ -522,12 +524,12 @@ struct XENON_CONTEXT {
   // 64 Kb SRAM
   u8 *SRAM = new u8[XE_SRAM_SIZE];
   // 768 bits eFuse
-  eFuses fuseSet{};
+  eFuses fuseSet = {};
 
   // Xenon IIC.
-  Xe::XCPU::IIC::XenonIIC xenonIIC;
+  Xe::XCPU::IIC::XenonIIC xenonIIC = {};
 
-  XenonReservations xenonRes;
+  XenonReservations xenonRes = {};
 
   // Time Base switch, possibly RTC register, the TB counter only runs if this
   // value is set.

@@ -11,6 +11,23 @@
 #include "Core/RootBus/HostBridge/PCIBridge/PCIBridge.h"
 #include "Core/RootBus/HostBridge/PCIBridge/PCIDevice.h"
 
+//#define SOCKET_UART
+
+#ifdef SOCKET_UART
+#ifdef _WIN32
+#pragma comment(lib, "Ws2_32.lib")
+#include <winsock2.h>
+#define socketclose closesocket
+#else
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <sys/ioctl.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#define socketclose close
+#endif // _WIN32
+#endif // SOCKET_UART
+
 /*
         Xenon System Management Controller (SMC) Emulation.
 
@@ -65,7 +82,7 @@ enum SMC_FIFO_CMD {
 enum SMC_TRAY_STATE {
   SMC_TRAY_OPEN = 0x60,
   SMC_TRAY_OPEN_REQUEST = 0x61,
-  SMC_TRAY_CLOSE = 0x62,
+  SMC_TRAY_CLOSED = 0x62,
   SMC_TRAY_OPENING = 0x63,
   SMC_TRAY_CLOSING = 0x64,
   SMC_TRAY_UNKNOWN = 0x65,
@@ -235,6 +252,19 @@ struct SMC_CORE_STATE {
   // UART Present. Used to do a one time check on UART COM Port on the host
   // system.
   bool uartPresent;
+  // Use backup UART. If we are on Windows, and it doesn't have the proper COM port,
+  // use this instead
+  bool uartBackup;
+#ifdef SOCKET_UART
+  bool socketCreated;
+  struct sockaddr_in sockAddr;
+#ifdef _WIN32
+  WSADATA wsaData;
+  SOCKET sockHandle;
+#else
+  int sockHandle;
+#endif // _WIN32
+#else
 #ifdef _WIN32
   // Current COM Port Device Control Block.
   // See
@@ -250,13 +280,14 @@ struct SMC_CORE_STATE {
   DWORD currentBytesWrittenCount = 0;
   // Bytes Read from the COM Port.
   DWORD currentBytesReadCount = 0;
-#else
+#endif // _WIN32
+#endif // SOCKET_UART
+  // Backup UART system
   std::queue<u8> uartTxBuffer;
   std::queue<u8> uartRxBuffer;
   std::mutex uartMutex;
   std::condition_variable uartConditionVar;
   bool uartThreadRunning;
-#endif
   // Read/Write Return Status Values
   bool retVal = false;
 };
@@ -275,11 +306,14 @@ public:
   void ConfigWrite(u64 writeAddress, u64 data, u8 byteCount) override;
 
 private:
+  // Mutex, stops other threads from writing to values without the previous one finishing
+  std::recursive_mutex mutex;
+
   // Parent PCI Bridge (Used for interrupts/communication):
   PCIBridge *pciBridge;
 
   // SMC PCI State, tracking all communcation with the system.
-  SMC_PCI_STATE *smcPCIState;
+  SMC_PCI_STATE smcPCIState;
 
   // SMC Core State, tracking all general system status.
   SMC_CORE_STATE *smcCoreState;
@@ -290,17 +324,23 @@ private:
   // Is SMC Thread Running?
   bool smcThreadRunning = true;
 
-#ifndef _WIN32
   // UART Thread object
   std::thread uartThread;
+
+#ifdef SOCKET_UART
+  // UART Receive Thread object
+  std::thread uartSecondaryThread;
 #endif
 
   // SMC Main Thread
   void smcMainThread();
 
-#ifndef _WIN32
   // UART Thread
   void uartMainThread();
+
+#ifdef SOCKET_UART
+  // UART Receive Thread
+  void uartReceiveThread();
 #endif
 
   // UART/COM Port Setup

@@ -11,7 +11,21 @@
 #include "Base/Logging/Log.h"
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
 
-#define TPI_FORMULA(ips) ((ips) / 500000)
+// Clocks per instruction / Ticks per instruction
+static constexpr u64 cpi_base_freq = 50000000ull; // 50Mhz
+static constexpr u64 cpi_scale = 100u; // Scale of how many clocks to speed up by divided by 100 | Default: 100
+static constexpr u64 cpi_base = (cpi_base_freq / 1000000ull) * (cpi_scale / 100u);
+#define EPOCH_TIME std::chrono::steady_clock::now().time_since_epoch()
+#define DURATION_CAST(x, t) std::chrono::duration_cast<x>(t).count()
+static constexpr u64 get_cpi_value(u64 instrPerSecond, u64 epochNs) {
+  // Compute CPU cycles elapsed based on epoch time
+  u64 cycles = (epochNs / 1000000000ull * cpi_base_freq) +
+               ((epochNs % 1000000000ull) * cpi_base_freq / 1000000000ull) *
+               (cpi_scale / 100u);
+  u64 instrExecuted = (instrPerSecond * epochNs) / 1000000000ull;
+  instrExecuted = instrExecuted ? instrExecuted : 1;
+  return cycles / instrExecuted;
+}
 
 PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u32 PVR,
                   u32 PIR, const char *ppuName) {
@@ -19,10 +33,16 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u32 PVR,
   // Set evrything as in POR. See CELL-BE Programming Handbook.
   //
 
-  // Allocate memory for our PPU state.
+  // Allocate memory for our PPU state
   ppuState = std::make_shared<STRIP_UNIQUE(ppuState)>();
 
-  // Initialize Both threads as in a Reset.
+  // Set PPU Name
+  ppuState->ppuName = ppuName;
+
+  // Set thread name
+  Base::SetCurrentThreadName(ppuName);
+
+  // Initialize Both threads as in a Reset
   for (u8 thrdNum = 0; thrdNum < 2; thrdNum++) {
     // Set Reset vector for both threads
     ppuState->ppuThread[thrdNum].NIA = XE_RESET_VECTOR;
@@ -30,42 +50,26 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u32 PVR,
     ppuState->ppuThread[thrdNum].SPR.MSR.MSR_Hex = 0x9000000000000000;
   }
 
-  // Set Thread Timeout Register.
-  ppuState->SPR.TTR = 0x1000; // Execute 4096 instructions.
+  // Set Thread Timeout Register
+  ppuState->SPR.TTR = 0x1000; // Execute 4096 instructions
 
-  // Asign global Xenon context.
+  // Asign global Xenon context
   xenonContext = inXenonContext;
 
-  // Asign Interpreter global variables.
+  // Asign Interpreter global variables
   PPCInterpreter::intXCPUContext = xenonContext;
   PPCInterpreter::sysBus = mainBus;
 
-  // Get the instructions per second that we're able to execute.
-  u32 instrPerSecond = getIPS();
-  LOG_INFO(Xenon, "{} Speed: {:#d} instructions per second.", ppuName, instrPerSecond);
-
-  // Find a way to calculate the right ticks/IPS ratio.
-  int configTpi = Config::tpi();
-  ticksPerInstruction = configTpi ? configTpi : TPI_FORMULA(instrPerSecond);
-  if (!configTpi)
-    LOG_INFO(Xenon, "{} TPI: {} ticks per instruction", ppuName, ticksPerInstruction);
-  else
-    LOG_INFO(Xenon, "{} TPI: {} ticks per instruction (overrwriten! actual tps: {})", ppuName, ticksPerInstruction, TPI_FORMULA(instrPerSecond));
+  CalculateCPI();
 
   for (u8 thrdID = 0; thrdID < 2; thrdID++) {
-    ppuState->ppuThread[thrdID].ppuRes = new PPU_RES;
-    memset(ppuState->ppuThread[thrdID].ppuRes, 0, sizeof(PPU_RES));
-    xenonContext->xenonRes.Register(ppuState->ppuThread[thrdID].ppuRes);
+    ppuState->ppuThread[thrdID].ppuRes = std::make_unique<STRIP_UNIQUE(PPU_THREAD_REGISTERS::ppuRes)>();
+    memset(ppuState->ppuThread[thrdID].ppuRes.get(), 0, sizeof(PPU_RES));
+    xenonContext->xenonRes.Register(ppuState->ppuThread[thrdID].ppuRes.get());
 
-    // Set the decrementer as per docs. See CBE Public Registers pdf in Docs.
+    // Set the decrementer as per docs. See CBE Public Registers pdf in Docs
     ppuState->ppuThread[ppuState->currentThread].SPR.DEC = 0x7FFFFFFF;
   }
-
-  // Set PPU Name.
-  ppuState->ppuName = ppuName;
-
-  // Set thread name.
-  Base::SetCurrentThreadName(ppuName);
 
   // Set PVR and PIR
   ppuState->SPR.PVR.PVR_Hex = PVR;
@@ -101,6 +105,35 @@ PPU::~PPU() {
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   ppuState.reset();
+}
+
+void PPU::CalculateCPI() {
+  // Get the instructions per second that we're able to execute.
+  u32 instrPerSecond = getIPS();
+
+  // Get our CPI
+  u64 cpi = get_cpi_value(instrPerSecond, DURATION_CAST(std::chrono::nanoseconds, EPOCH_TIME));
+
+  LOG_INFO(Xenon, "{} Speed: {:#d} instructions per second.", ppuState->ppuName, instrPerSecond);
+
+  // Find a way to calculate the right ticks/IPS ratio.
+  int configCpi = Config::cpi();
+  clocksPerInstruction = configCpi ? configCpi : cpi;
+  if (!configCpi)
+    LOG_INFO(Xenon, "{} CPI: {} clocks per instruction", ppuState->ppuName, clocksPerInstruction);
+  else
+    LOG_INFO(Xenon, "{} CPI: {} clocks per instruction (overrwriten! actual CPI: {})", ppuState->ppuName, clocksPerInstruction, cpi);
+}
+
+void PPU::Reset() {
+  // Zero out the memory
+  PPCInterpreter::MMUWrite(xenonContext, ppuState.get(), 4, XE_SRAM_ADDR, 32);
+
+  // Set the NIP back to default
+  ppuState->ppuThread[ppuState->currentThread].NIA = 0x100;
+
+  // Reset the registers
+  memset(ppuState->ppuThread[ppuState->currentThread].GPR, 0, sizeof(ppuState->ppuThread[ppuState->currentThread].GPR));
 }
 
 void PPU::Halt() {
@@ -190,6 +223,21 @@ void PPU::StartExecution() {
         for (size_t instrCount = 0; instrCount < ppuState->SPR.TTR;
              instrCount++) {
           // Main processing loop.
+          
+          // Debug tools
+          if (ppcHalt) {
+            if (ppcStep) {
+              if (ppcStepCounter != ppcStepAmount) {
+                ppcStepCounter++;
+              }
+              else {
+                ppcStep = false;
+              }
+            }
+            while (ppcHalt && !ppcStep) {
+              std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+          }
 
           // Read next intruction from Memory.
           if (ppuReadNextInstruction()) {
@@ -266,25 +314,25 @@ static u32 ipsCalibrationCode[] = {
 };
 
 // Performs a test using a loop to check the amount of IPS we're able to
-// execute.
+// execute
 u32 PPU::getIPS() {
-  // Instr Count: The amount of instructions to execute in order to test.
+  // Instr Count: The amount of instructions to execute in order to test
 
-  // Write the calibration code to main memory.
+  // Write the calibration code to main memory
   for (int i = 0; i < 4; i++) {
     PPCInterpreter::MMUWrite32(ppuState.get(), 4 + (i * 4), ipsCalibrationCode[i]);
   }
 
-  // Set our NIP to our calibration code address.
+  // Set our NIP to our calibration code address
   ppuState->ppuThread[ppuState->currentThread].NIA = 4;
 
-  // Start a timer.
+  // Start a timer
   auto timerStart = std::chrono::steady_clock::now();
 
-  // Instruction count.
+  // Instruction count
   u64 instrCount = 0;
 
-  // Execute the amount of cycles we're requested.
+  // Execute the amount of cycles we're requested
   while (auto timerEnd = std::chrono::steady_clock::now() <=
                          timerStart + std::chrono::seconds(1)) {
     ppuReadNextInstruction();
@@ -292,17 +340,17 @@ u32 PPU::getIPS() {
     instrCount++;
   }
 
-  // Reset our state.
-
-  // Set the main memory to 0.
+  // Reset our state
+  
+  // Zero out the memory after execution
   for (int i = 0; i < 4; i++) {
     PPCInterpreter::MMUWrite32(ppuState.get(), 4 + (i * 4), 0x00000000);
   }
 
-  // Set the NIP back to default.
+  // Set the NIP back to default
   ppuState->ppuThread[ppuState->currentThread].NIA = 0x100;
 
-  // Set the registers back to 0.
+  // Reset the registers
   for (int i = 0; i < 32; i++) {
     ppuState->ppuThread[ppuState->currentThread].GPR[i] = 0;
   }
@@ -499,10 +547,10 @@ void PPU::updateTimeBase() {
   u32 newDec = 0;
   u32 dec = 0;
   // Update the Time Base.
-  ppuState->SPR.TB += ticksPerInstruction;
+  ppuState->SPR.TB += clocksPerInstruction;
   // Get the decrementer value.
   dec = ppuState->ppuThread[ppuState->currentThread].SPR.DEC;
-  newDec = dec - ticksPerInstruction;
+  newDec = dec - clocksPerInstruction;
   // Update the new decrementer value.
   ppuState->ppuThread[ppuState->currentThread].SPR.DEC = newDec;
   // Check if Previous decrementer measurement is smaller than current and a

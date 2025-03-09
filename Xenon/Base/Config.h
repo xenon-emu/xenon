@@ -21,6 +21,7 @@ inline bool islogAdvanced = false;
 inline int smcPowerOnReason = 0x11; // SMC_PWR_REAS_EJECT
 inline int smcAvPackType = 31; // Set to HDMI_NO_AUDIO. See SMC.cpp for a list of values.
 inline int comPort = 2;
+inline bool useBackupUart = false;
 inline std::string com = "";
 
 // PowerPC.
@@ -48,7 +49,7 @@ inline std::string oddDiscImagePath = "/Xbox/xenon.iso";
 #endif
 
 // Highly experimental.
-inline int ticksPerInstruction = 1;
+inline int clocksPerInstruction = 0;
 
 void loadConfig(const std::filesystem::path &path);
 void saveConfig(const std::filesystem::path &path);
@@ -56,9 +57,6 @@ void saveConfig(const std::filesystem::path &path);
 //
 // General Options.
 //
-
-// Selected COM Port.
-std::string* COMPort();
 // Show in fullscreen.
 bool fullscreenMode();
 // Enable VSync.
@@ -81,6 +79,10 @@ bool logAdvanced();
 int smcCurrentAvPack();
 // SMC Power On type (PowerButton, eject button, controller, etc...).
 int smcPowerOnType();
+// Selected COM Port.
+std::string& COMPort();
+// Selected COM Port.
+bool useBackupUART();
 
 //
 // PowerPC Options.
@@ -119,6 +121,6 @@ std::string oddImagePath();
 //
 // Highly experimental. (things that can either break the emulator or drastically increase performance)
 //
-int tpi();
+int cpi();
 
 } // namespace Config
