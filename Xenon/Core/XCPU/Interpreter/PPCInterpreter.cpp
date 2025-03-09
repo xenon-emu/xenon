@@ -61,6 +61,11 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
     thread.lastRegValue = GPR(11);
   }
 
+  // We early returned, likely a elf binary
+  if (curThread.CIA == NULL) {
+    return;
+  }
+
   instructionHandler function =
     ppcDecoder->decode(_instr.opcode);
 

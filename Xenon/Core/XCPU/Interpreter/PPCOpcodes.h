@@ -78,9 +78,6 @@ D_STUB(td);
 D_STUB(dst);
 D_STUB(dss);
 D_STUB(dstst);
-D_STUB(lfdx);
-D_STUB(lfdu);
-D_STUB(lfdux);
 D_STUB(lfsx);
 D_STUB(lfsu);
 D_STUB(lfsux);
@@ -490,6 +487,9 @@ extern void PPCInterpreter_ldx(PPU_STATE *ppuState);
 //
 
 extern void PPCInterpreter_lfd(PPU_STATE *ppuState);
+extern void PPCInterpreter_lfdx(PPU_STATE *ppuState);
+extern void PPCInterpreter_lfdu(PPU_STATE *ppuState);
+extern void PPCInterpreter_lfdux(PPU_STATE *ppuState);
 extern void PPCInterpreter_lfs(PPU_STATE *ppuState);
 
 }

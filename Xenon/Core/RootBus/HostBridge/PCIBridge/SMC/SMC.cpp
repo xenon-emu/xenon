@@ -169,9 +169,8 @@ void Xe::PCIDev::SMC::SMCCore::Read(u64 readAddress, u64 *data, u8 byteCount) {
         smcPCIState.uartStatusReg = smcCoreState->uartRxBuffer.empty() ? UART_STATUS_EMPTY : UART_STATUS_DATA_PRES;
       }
     }
-    if (!smcCoreState->uartInitialized &&
-      smcCoreState->uartPresent)
-    { // Init UART if this is our first try.
+    // Check if UART is already initialized.
+    if (!smcCoreState->uartInitialized && smcCoreState->uartPresent) {
       // XeLL doesn't initialize UART before sending data trough it. Initialize
       // it first then.
       setupUART(0x1e6); // 115200,8,N,1.
@@ -331,6 +330,7 @@ void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
   smcCoreState->sockAddr.sin_family = AF_INET;
   smcCoreState->sockAddr.sin_port = htons(port);
   smcCoreState->sockAddr.sin_addr.s_addr = inet_addr(ip);
+  smcCoreState->socketCreated = true;
 #ifdef _WIN32
   int start = WSAStartup(MAKEWORD(2, 2), &smcCoreState->wsaData);
   if (start != 0) {
@@ -347,13 +347,13 @@ void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
     SYSTEM_PAUSE();
   }
   if (!smcCoreState->socketCreated) {
-    smcCoreState->socketCreated = true;
     sockert_connect = connect(smcCoreState->sockHandle, (struct sockaddr*)&smcCoreState->sockAddr, sizeof(smcCoreState->sockAddr));
     if (sockert_connect != 0) {
       LOG_CRITICAL(SMC, "SOCKET_UART failed! Failed to connect to socket. (x2) Error: {}", Base::GetLastErrorMsg());
-      smcCoreState->socketCreated = false;
       socketclose(smcCoreState->sockHandle);
       SYSTEM_PAUSE();
+    } else {
+      smcCoreState->socketCreated = true;
     }
   }
 #else
@@ -444,6 +444,7 @@ void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
 #else
     smcCoreState->uartThreadRunning = true;
 #endif // SOCKET_UART
+    smcCoreState->uartInitialized = true;
     smcCoreState->uartPresent = true;
     uartThread = std::thread(&SMCCore::uartMainThread, this);
     uartThread.detach();

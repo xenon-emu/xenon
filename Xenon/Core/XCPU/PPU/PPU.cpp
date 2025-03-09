@@ -4,6 +4,7 @@
 
 #include <assert.h>
 #include <chrono>
+#include <iostream>
 #include <thread>
 
 #include "Base/Config.h"
@@ -183,6 +184,13 @@ void PPU::StartExecution() {
             }
           }
 
+          // We early returned, likely a elf binary
+          if (curThread.CIA == NULL) {
+            ppuRunning = false;
+            ppuExecutionDone = true;
+            break;
+          }
+
           // Read next intruction from Memory.
           if (ppuReadNextInstruction()) {
             // Execute next intrucrtion.
@@ -240,6 +248,13 @@ void PPU::StartExecution() {
             }
           }
 
+          // We early returned, likely a elf binary
+          if (curThread.CIA == NULL) {
+            ppuRunning = false;
+            ppuExecutionDone = true;
+            break;
+          }
+
           // Read next intruction from Memory.
           if (ppuReadNextInstruction()) {
             // Execute next intrucrtion.
@@ -276,6 +291,13 @@ void PPU::StartExecution() {
     if (!ppuState.get())
       break;
 
+    // We early returned, likely a elf binary
+    if (curThread.CIA == NULL) {
+      ppuRunning = false;
+      ppuExecutionDone = true;
+      break;
+    }
+
     //
     // Check for external interrupts that enable us if we're allowed to.
     //
@@ -287,16 +309,12 @@ void PPU::StartExecution() {
       ppuState->SPR.CTRL = 0x800000;
       // Issue reset!
       ppuState->ppuThread[PPU_THREAD_0].exceptReg |= PPU_EX_RESET;
-      ppuState->ppuThread[PPU_THREAD_1].exceptReg |=
-          PPU_EX_RESET; // Set CIA to 0x100 as per docs.
-      curThread.SPR.SRR1 =
-          0x200000; // Set SRR1 42-44 = 100
+      ppuState->ppuThread[PPU_THREAD_1].exceptReg |= PPU_EX_RESET;
+      curThread.SPR.SRR1 = 0x200000; // Set SRR1 42-44 = 100
       // ACK and EOI the interrupt:
       u64 intData = 0;
-      xenonContext->xenonIIC.readInterrupt(
-        curThread.SPR.PIR * 0x1000 + 0x50050, &intData);
-      xenonContext->xenonIIC.writeInterrupt(
-        curThread.SPR.PIR * 0x1000 + 0x50060, 0);
+      xenonContext->xenonIIC.readInterrupt(curThread.SPR.PIR * 0x1000 + 0x50050, &intData);
+      xenonContext->xenonIIC.writeInterrupt(curThread.SPR.PIR * 0x1000 + 0x50060, 0);
     }
   }
 }
@@ -367,70 +385,94 @@ u32 PPU::getIPS() {
                       (ehdr).e_ident[EI_MAG2] == ELFMAG2 && \
                       (ehdr).e_ident[EI_MAG3] == ELFMAG3)
 #define SWAP(v, s) v = byteswap<s>(v);
-u32 PPU::loadElfImage(u8 *data, u64 size) {
-  elf32_hdr* header{ reinterpret_cast<decltype(header)>(data) };
+u64 PPU::loadElfImage(u8 *data, u64 size) {
+  elf64_hdr* header{ reinterpret_cast<decltype(header)>(data) };
   if (!IS_ELF(*header)) {
     LOG_CRITICAL(Xenon, "Attempting to load a bianry which is not a elf!");
     return 0;
   }
-  assert(header->e_ident[EI_DATA] == 2);
-  u32 entry_point = byteswap<u32>(header->e_entry);
-  u32 base_offset = 0;
+  if (header->e_ident[EI_DATA] != 2) {
+    LOG_CRITICAL(Xenon, "Attempting to load a bianry which is not a elf64!");
+    return 0;
+  }
+  SWAP(header->e_type, u16);
+  SWAP(header->e_machine, u16);
+  if (header->e_machine != 0x15) {
+    LOG_CRITICAL(Xenon, "Attempting to load a bianry which is not a PowerPC 64!");
+    return 0;
+  }
+  // Setup HRMOR for elf binaries
+  //ppuState->SPR.CTRL = 0x800000; // CTRL[TE0] = 1;
+  ppuState->SPR.HRMOR = 0x0000000000000000; // we use real mode like gigachads
+  //ppuState->ppuThread[PPU_THREAD_0].NIA = 0x100;
 
-  auto stringTableIndex = byteswap<u32>(header->e_shstrndx);
+  SWAP(header->e_version, u16);
+  SWAP(header->e_entry, u64);
+  SWAP(header->e_phoff, u64);
+  SWAP(header->e_shoff, u64);
+  SWAP(header->e_flags, u32);
+  SWAP(header->e_ehsize, u16);
+  SWAP(header->e_phentsize, u16);
+  SWAP(header->e_phnum, u16);
+  SWAP(header->e_shentsize, u16);
+  SWAP(header->e_shnum, u16);
+  SWAP(header->e_shstrndx, u16);
 
-  const auto numSections = byteswap<u32>(header->e_shnum);
-  const auto psections_num = byteswap<u32>(header->e_phnum);
+  u64 entry_point = header->e_entry;
+  u64 base_offset = 0;
 
-  const elf32_shdr* sections =  reinterpret_cast<elf32_shdr*>(data + byteswap(header->e_shoff));
-  const elf32_phdr* psections = reinterpret_cast<elf32_phdr*>(data + byteswap(header->e_phoff));
+  auto stringTableIndex = header->e_shstrndx;
 
-  for (size_t i = 0; i < psections_num; i++) {
-    if (psections[i].p_type == byteswap<u32>((Elf32_Word)PT_LOAD)) {
-      base_offset = byteswap<u32>(psections[i].p_vaddr);
+  const auto num_sections =  header->e_shnum;
+  const auto num_psections = header->e_phnum;
+
+  const elf64_shdr* sections =  reinterpret_cast<elf64_shdr*>(data + header->e_shoff);
+  const elf64_phdr* psections = reinterpret_cast<elf64_phdr*>(data + header->e_phoff);
+
+  for (size_t i = 0; i < num_psections; i++) {
+    if (psections[i].p_type == byteswap<u64>(PT_LOAD)) {
+      base_offset = byteswap<u64>(psections[i].p_vaddr);
       break;
     }
   }
 
-  auto* stringTable =
-    reinterpret_cast<const char*>(data + byteswap(sections[stringTableIndex].sh_offset));
+  u8* stringTable = reinterpret_cast<u8*>(data + byteswap(sections[stringTableIndex].sh_offset));
 
-	for (int i = 0; i < numSections; ++i) {
+  for (int i = 0; i < num_sections; ++i) {
     const auto& section = sections[i];
     if (section.sh_type == 0) {
       continue;
     }
-    u32 sectionAddr = byteswap<u32>(section.sh_addr);
-    u32 sectionSize = byteswap<u32>(section.sh_size);
+    u64 sectionAddr = byteswap<u64>(section.sh_addr);
+    u64 sectionSize = byteswap<u64>(section.sh_size);
     u32 sectionType = byteswap<u32>(section.sh_type);
-    u32 sectionOffset = byteswap<u32>(section.sh_offset);
+    u64 sectionOffset = byteswap<u64>(section.sh_offset);
 
-		if (!(byteswap<u32>(section.sh_flags) & SHF_ALLOC) || sectionSize == 0)
-			continue;
+    if (!(byteswap<u64>(section.sh_flags) & SHF_ALLOC) || sectionSize == 0)
+      continue;
 
-		if (stringTable) {
-      const char *string = section.sh_name != 0 ?
-        stringTable + byteswap<u32>(section.sh_name) :
-        nullptr;
+    if (stringTable) {
+      u8 *string = section.sh_name != 0 ?
+        stringTable + byteswap<u32>(section.sh_name) : (u8*)"";
 
-      LOG_INFO(Xenon, "0x{:08x} 0x{:08x}, {}ing {}...",
-        (int)sectionAddr,
-        (int)sectionSize,
+      std::cout << fmt::format("[Xenon] <Info> {:08x} {:08x}, {}ing {}...",
+        sectionAddr,
+        sectionSize,
         (sectionType == SHT_NOBITS) ? "Clear" : "Load",
-        string ? string : "");
-		}
+        (char*)string);
+    }
 
-		if (sectionType == SHT_NOBITS) {
+    if (sectionType == SHT_NOBITS) {
       PPCInterpreter::MMUWrite(xenonContext, ppuState.get(), 0, sectionAddr, sectionSize);
-		} else {
+    } else {
       PPCInterpreter::MMUMemCpyFromHost(ppuState.get(), sectionAddr, data + sectionOffset, sectionSize);
-		}
-    LOG_INFO(Xenon, "Done!");
-	}
+    }
+    std::cout << "Done!" << std::endl;
+  }
 
-  curThread.NIA = byteswap<u32>(header->e_entry);
+  curThread.NIA = entry_point;
 
-	return curThread.NIA;
+  return curThread.NIA;
 }
 
 // Reads the next instruction from memory and advances the NIP accordingly.
