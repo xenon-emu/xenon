@@ -25,7 +25,7 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, u64 intData) {
   u8 intType = (intData >> 56) & 0xFF;
   u8 cpusToInterrupt = (intData >> 40) & 0xFF;
   size_t intIndex = 0;
-  
+
   auto& interrupts = iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts;
   switch (ppeIntCtrlBlckReg) {
   case Xe::XCPU::IIC::CPU_WHOAMI:
@@ -61,8 +61,8 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, u64 intData) {
       }
 
 #ifdef IIC_DEBUG
-        LOG_DEBUG(Xenon_IIC, "EOI interrupt {} for thread {:#x} ", 
-          getIntName(static_cast<u8>(iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts[intIdx].interrupt)), 
+        LOG_DEBUG(Xenon_IIC, "EOI interrupt {} for thread {:#x} ",
+          getIntName(static_cast<u8>(iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts[intIdx].interrupt)),
           ppeIntCtrlBlckID);
 #endif // IIC_DEBUG
 
@@ -120,7 +120,7 @@ void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u64* intData) {
   switch (ppeIntCtrlBlckReg) {
   case Xe::XCPU::IIC::CPU_CURRENT_TSK_PRI:
     *intData = byteswap<u64>(
-      (u64)iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].REG_CPU_CURRENT_TSK_PRI);
+      static_cast<u64>(iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].REG_CPU_CURRENT_TSK_PRI));
     break;
   case Xe::XCPU::IIC::ACK:
     // Check if the queue isn't empty.
@@ -135,7 +135,7 @@ void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u64* intData) {
       u16 highestPrioPos = 0;
 
       for (auto& interrupt : interrupts) {
-        // Signal first the top priority interrupt. 
+        // Signal first the top priority interrupt.
         // If two of the same interrupt type exist, then signal the first that we find.
         if (interrupt.interrupt > highestPrio) {
           highestPrio = interrupt.interrupt;

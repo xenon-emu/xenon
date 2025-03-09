@@ -77,7 +77,7 @@ void Xe::PCIDev::ETHERNET::ETHERNET::Read(u64 readAddress, u64 *data, u8 byteCou
     memcpy(data, &ethPciState.address1Reg, byteCount);
     break;
   default:
-    LOG_ERROR(ETH, "Unknown PCI Reg being read {:#x}", (u16)offset);
+    LOG_ERROR(ETH, "Unknown PCI Reg being read {:#x}", static_cast<u16>(offset));
     memset(data, 0xFF, byteCount);
     break;
   }
@@ -146,7 +146,7 @@ void Xe::PCIDev::ETHERNET::ETHERNET::Write(u64 writeAddress, u64 data, u8 byteCo
     ethPciState.address1Reg = static_cast<u32>(data);
     break;
   default:
-    LOG_ERROR(ETH, "Unknown PCI Reg being written {:#x} data = {:#x}", (u16)offset, data);
+    LOG_ERROR(ETH, "Unknown PCI Reg being written {:#x} data = {:#x}", static_cast<u16>(offset), data);
     break;
   }
 }

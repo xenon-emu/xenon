@@ -42,5 +42,5 @@ void PPCInterpreter::PPCInterpreter_mtfsfx(PPU_STATE *ppuState) {
     }
   }
 
-  SET_FPSCR(((u32)FPR(FrB).valueAsU64 & mask) | (GET_FPSCR & ~mask));
+  SET_FPSCR((static_cast<u32>(FPR(FrB).valueAsU64 & mask)) | (GET_FPSCR & ~mask));
 }

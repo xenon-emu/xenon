@@ -159,7 +159,7 @@ void PPCInterpreter::PPCInterpreter_twi(PPU_STATE *ppuState) {
   if ((a < static_cast<s32>(SI) && BGET(TO, 5, 0)) || (a > static_cast<s32>(SI) && BGET(TO, 5, 1)) ||
       (a == static_cast<s32>(SI) && BGET(TO, 5, 2)) || (static_cast<u32>(a) < SI && BGET(TO, 5, 3)) ||
       (static_cast<u32>(a) > SI && BGET(TO, 5, 4))) {
-    ppcInterpreterTrap(ppuState, (u32)SI);
+    ppcInterpreterTrap(ppuState, static_cast<u32>(SI));
   }
 }
 
@@ -174,7 +174,7 @@ void PPCInterpreter::PPCInterpreter_tdi(PPU_STATE *ppuState) {
       (rAReg == static_cast<s64>(SI) && BGET(TO, 5, 2)) ||
       (static_cast<u64>(rAReg) < SI && BGET(TO, 5, 3)) ||
       (static_cast<u64>(rAReg) > SI && BGET(TO, 5, 4))) {
-    ppcInterpreterTrap(ppuState, (u32)SI);
+    ppcInterpreterTrap(ppuState, static_cast<u32>(SI));
   }
 }
 
@@ -287,7 +287,7 @@ void PPCInterpreter::PPCInterpreter_mfspr(PPU_STATE *ppuState) {
     value = ppuState->SPR.CTRL;
     break;
   default:
-    LOG_ERROR(Xenon, "{}(Thrd{:#d}) mfspr: Unknown SPR: 0x{:#x}", ppuState->ppuName, (u8)ppuState->currentThread, sprNum);
+    LOG_ERROR(Xenon, "{}(Thrd{:#d}) mfspr: Unknown SPR: 0x{:#x}", ppuState->ppuName, static_cast<u8>(ppuState->currentThread), sprNum);
     break;
   }
 
@@ -359,7 +359,7 @@ void PPCInterpreter::PPCInterpreter_mtspr(PPU_STATE *ppuState) {
     ppuState->SPR.TTR = GPR(rD);
     break;
   case SPR_TSCR:
-    ppuState->SPR.TSCR = (u32)GPR(rD);
+    ppuState->SPR.TSCR = static_cast<u32>(GPR(rD));
     break;
   case SPR_HSPRG0:
     curThread.SPR.HSPRG0 = GPR(rD);
@@ -368,17 +368,17 @@ void PPCInterpreter::PPCInterpreter_mtspr(PPU_STATE *ppuState) {
     curThread.SPR.HSPRG1 = GPR(rD);
     break;
   case SPR_CTRLWR:
-    ppuState->SPR.CTRL = (u32)GPR(rD);
+    ppuState->SPR.CTRL = static_cast<u32>(GPR(rD));
     // Also do the write on SPR_CTRLRD
     break;
   case SPR_RMOR:
     ppuState->SPR.RMOR = GPR(rD);
     break;
   case SPR_HDEC:
-    ppuState->SPR.HDEC = (u32)GPR(rD);
+    ppuState->SPR.HDEC = static_cast<u32>(GPR(rD));
     break;
   case SPR_LPIDR:
-    ppuState->SPR.LPIDR = (u32)GPR(rD);
+    ppuState->SPR.LPIDR = static_cast<u32>(GPR(rD));
     break;
   case SPR_SPRG0:
     curThread.SPR.SPRG0 = GPR(rD);
@@ -409,7 +409,7 @@ void PPCInterpreter::PPCInterpreter_mtspr(PPU_STATE *ppuState) {
         (GPR(rD) << 32);
     break;
   default:
-    LOG_ERROR(Xenon, "{}(Thrd{:#d}) SPR {:#x} ={:#x}", ppuState->ppuName, (u8)ppuState->currentThread, spr, GPR(rD));
+    LOG_ERROR(Xenon, "{}(Thrd{:#d}) SPR {:#x} ={:#x}", ppuState->ppuName, static_cast<u8>(ppuState->currentThread), spr, GPR(rD));
     break;
   }
 }

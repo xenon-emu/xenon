@@ -203,7 +203,7 @@ void Render::GUI::SetStyle() {
   colors[ImGuiCol_WindowBg] = ImColor(15, 15, 15, 248);
   colors[ImGuiCol_ChildBg] = ImColor(0, 0, 0, 0);
   colors[ImGuiCol_PopupBg] = ImColor(20, 20, 20, 240);
-  colors[ImGuiCol_Border] = ImColor(76, 76, 76, 127);
+  colors[ImGuiCol_Border] = ImColor(255, 255, 255, 200);
   colors[ImGuiCol_BorderShadow] = ImColor(0, 0, 0, 0);
   colors[ImGuiCol_FrameBg] = ImColor(10, 10, 10, 138);
   colors[ImGuiCol_FrameBgHovered] = ImColor(10, 10, 10, 199);
@@ -252,7 +252,7 @@ void Render::GUI::SetStyle() {
   style.WindowPadding = { 10.f, 10.f };
   style.WindowRounding = 5.f;
   style.WindowBorderSize = 1.f;
-  style.WindowMinSize = { 1.f, 1.f };
+  style.WindowMinSize = { 200.f, 200.f };
   style.WindowTitleAlign = { 0.f, 0.5f };
   style.WindowMenuButtonPosition = ImGuiDir_Left;
   style.ChildRounding = 6.f;
@@ -270,7 +270,7 @@ void Render::GUI::SetStyle() {
   style.ScrollbarRounding = 0.f;
   style.GrabMinSize = 8.f;
   style.GrabRounding = 3.f;
-  style.TabRounding = 5.f;
+  style.TabRounding = 4.f;
   style.TabBorderSize = 1.f;
   style.TabBarBorderSize = 0.5f;
   style.TabBarOverlineSize = 0.f;

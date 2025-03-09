@@ -110,10 +110,10 @@ static constexpr u64 ExtractBits64(u32 input, u32 begin, u32 end) {
 }
 
 #define QMASK(b, e) ((0xFFFFFFFFFFFFFFFF << ((63 + (b)) - (e))) >> (b))
-#define QGET(qw, b, e) (((u64)(qw) & QMASK((b), (e))) >> (63 - (e)))
+#define QGET(qw, b, e) ((static_cast<u64>(qw) & QMASK((b), (e))) >> (63 - (e)))
 #define QSET(qw, b, e, qwSet)                                                  \
   (qw) &= ~QMASK(b, e);                                                        \
-  (qw) |= ((u64)(qwSet) << (63 - (e))) & QMASK(b, e);
+  (qw) |= (static_cast<u64>(qwSet) << (63 - (e))) & QMASK(b, e);
 
 #define DMASK(b, e) (((0xFFFFFFFF << ((31 + (b)) - (e))) >> (b)))
 #define DGET(dw, b, e) (((dw) & DMASK((b), (e))) >> (31 - (e)))
@@ -407,11 +407,11 @@ static constexpr u64 ExtractBits64(u32 input, u32 begin, u32 end) {
 #define VX_FORM_rB IFIELD(rB, 16, 20);
 
 #define EXTS(qw, ib)                                                           \
-  ((((u64)(qw)) & (((u64)(1)) << ((ib) - 1)))                                  \
-       ? (((u64)(qw)) | QMASK(0, 63 - (ib)))                                   \
-       : ((u64)(qw)))
+  (((static_cast<u64>(qw)) & ((static_cast<u64>(1)) << ((ib) - 1)))                                  \
+       ? ((static_cast<u64>(qw)) | QMASK(0, 63 - (ib)))                                   \
+       : (static_cast<u64>(qw)))
 
-#define BMSK(w, i) (((u64)(1)) << ((w) - (i) - (1)))
+#define BMSK(w, i) ((static_cast<u64>(1)) << ((w) - (i) - (1)))
 
 #define BGET(dw, w, i) (((dw) & BMSK(w, i)) ? 1 : 0)
 #define BSET(dw, w, i) (dw) |= BMSK(w, i)

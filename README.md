@@ -22,14 +22,18 @@
 </p>
 
 # Xenon
-**Xenon** is an **Xbox 360 emulator** written in **C++** available for **Windows**.\
+**Xenon** is an **Xbox 360 emulator** written in **C++** available for **Windows** and **Linux**.\
 Experimental, currently only small programs work.\
 If you need help or want to talk about development, there is a [**Discord server**](https://discord.gg/TDvbdXRRQ6)!\
+For the latest news on **Xenon**, watch our [**YouTube channel**](https://www.youtube.com/@Xenon.emulator).\
 For those who want to **support** the project, a [**Kofi page**](https://ko-fi.com/bitsh1ft3r) is available for donations!
 
+# Status
+
 > [!IMPORTANT]
-> **Xenon is an early stage emulator, so don't expect games/demos to run.**\
-> **XeLL Reloaded does work and Linux will soon ;)**
+> **Xenon is an early stage emulator, so don't expect games/demos to run.**
+
+Currently, XeLL Reloaded is working and a GUI is in development (with imgui)
 
 # Contributing
 We need talented developers more than ever to contribute to the project and move emulation forward!
@@ -40,9 +44,8 @@ We need talented developers more than ever to contribute to the project and move
 </a>
 
 # Building
-#### [**Windows**](https://github.com/xenon-emu/Xenon/blob/main/Deps/Building/building-windows.md)
-####
-#### [**Linux**](https://github.com/xenon-emu/Xenon/blob/main/Deps/Building/building-linux.md)
+- [**Windows**](https://github.com/xenon-emu/Xenon/blob/main/Deps/Building/building-windows.md)
+- [**Linux**](https://github.com/xenon-emu/Xenon/blob/main/Deps/Building/building-linux.md)
 
 # License
 - [**GPL-2.0 license**](https://github.com/xenon-emu/Xenon/blob/main/LICENSE)

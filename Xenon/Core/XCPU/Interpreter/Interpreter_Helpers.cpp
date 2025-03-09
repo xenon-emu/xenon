@@ -53,9 +53,9 @@ u32 PPCInterpreter::CRCompS32(PPU_STATE *ppuState, u32 num1, u32 num2) {
 u32 PPCInterpreter::CRCompS64(PPU_STATE *ppuState, u64 num1, u64 num2) {
   u32 CR = 0;
 
-  if ((s64)num1 < (s64)num2)
+  if (static_cast<s64>(num1) < static_cast<s64>(num2))
     BSET(CR, 4, CR_BIT_LT);
-  else if ((s64)num1 > (s64)num2)
+  else if (static_cast<s64>(num1) > static_cast<s64>(num2))
     BSET(CR, 4, CR_BIT_GT);
   else
     BSET(CR, 4, CR_BIT_EQ);
@@ -70,7 +70,7 @@ u32 PPCInterpreter::CRCompS(PPU_STATE *ppuState, u64 num1, u64 num2) {
   if (curThread.SPR.MSR.SF)
     return (CRCompS64(ppuState, num1, num2));
   else
-    return (CRCompS32(ppuState, (u32)num1, (u32)num2));
+    return (CRCompS32(ppuState, static_cast<u32>(num1), static_cast<u32>(num2)));
 }
 
 void PPCInterpreter::ppcDebugLoadImageSymbols(PPU_STATE *ppuState,
