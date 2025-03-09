@@ -36,9 +36,9 @@ Xenon::~Xenon() {
   ppu0.reset();
   ppu1.reset();
   ppu2.reset();
-  delete xenonContext.SRAM;
-  delete xenonContext.SROM;
-  delete xenonContext.secEngData;
+  delete[] xenonContext.SRAM;
+  delete[] xenonContext.SROM;
+  delete[] xenonContext.secEngData;
 }
 
 void Xenon::Start(u64 resetVector) {
