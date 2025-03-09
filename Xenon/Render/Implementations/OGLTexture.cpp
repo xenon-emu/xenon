@@ -50,14 +50,15 @@ u32 Render::OGLTexture::GetDepthFromFlags(int flags) {
   return 0;
 }
 u32 Render::OGLTexture::GetOGLTextureFormat(Render::eDataFormat format) {
- switch (format) {
-    case Render::eDataFormat::RGB:
-      return GL_RGB;
-      break;
-    case Render::eDataFormat::RGBA:
-      return GL_RGBA;
-      break;
+  switch (format) {
+  case Render::eDataFormat::RGB:
+    return GL_RGB;
+    break;
+  case Render::eDataFormat::RGBA:
+    return GL_RGBA;
+    break;
   }
+
   return 0;
 }
 void Render::OGLTexture::SetupTextureFlags(int flags) {
