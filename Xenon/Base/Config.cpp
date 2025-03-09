@@ -232,7 +232,7 @@ void saveConfig(const std::filesystem::path &path) {
 
   // HighlyExperimental.
   data["HighlyExperimental"].comments().clear();
-  data["HighlyExperimental"]["TPI"].comments().clear();
+  data["HighlyExperimental"]["CPI"].comments().clear();
 
   data["HighlyExperimental"].comments().push_back("# Do not touch these options unless you know what you're doing!");
   data["HighlyExperimental"].comments().push_back("# It can break execution! User beware");

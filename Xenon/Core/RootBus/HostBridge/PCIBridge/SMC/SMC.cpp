@@ -1,4 +1,4 @@
-// Copyright 2025 Xenon Emulator Project
+// Copyright 2025 XeEmulator Project
 
 #include "SMC.h"
 
@@ -100,8 +100,6 @@ Xe::PCIDev::SMC::SMCCore::~SMCCore() {
   // If we are on Linux, or the backup system is running, 
   // kill it.
   smcCoreState->uartThreadRunning = false;
-  if (uartThread.joinable())
-    uartThread.join();
 #ifdef SOCKET_UART
   // Shutdown receive thread
   if (uartSecondaryThread.joinable())
@@ -164,22 +162,19 @@ void Xe::PCIDev::SMC::SMCCore::Read(u64 readAddress, u64 *data, u8 byteCount) {
         // The input queue is empty.
         smcPCIState.uartStatusReg = UART_STATUS_EMPTY;
       }
-    } else if (smcCoreState->uartPresent) // Init UART if this is our first try.
-    {
-      // XeLL doesn't initialize UART before sending data trough it. Initialize
-      // it first then.
-      setupUART(0x1e6); // 115200,8,N,1.
     }
 #endif // _WIN32 && !SOCKET_UART
     if (smcCoreState->uartBackup) {
       if (smcCoreState->uartInitialized) {
         smcPCIState.uartStatusReg = smcCoreState->uartRxBuffer.empty() ? UART_STATUS_EMPTY : UART_STATUS_DATA_PRES;
-      } else if (smcCoreState->uartPresent) // Init UART if this is our first try.
-      {
-        // XeLL doesn't initialize UART before sending data trough it. Initialize
-        // it first then.
-        setupUART(0x1e6); // 115200,8,N,1.
       }
+    }
+    if (!smcCoreState->uartInitialized &&
+      smcCoreState->uartPresent)
+    { // Init UART if this is our first try.
+      // XeLL doesn't initialize UART before sending data trough it. Initialize
+      // it first then.
+      setupUART(0x1e6); // 115200,8,N,1.
     }
     memcpy(data, &smcPCIState.uartStatusReg, byteCount);
     break;
@@ -422,8 +417,10 @@ void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
   }
 
   // Set The COM Port State as per config value.
-  if (!SetCommState(smcCoreState->comPortHandle, &smcCoreState->comPortDCB)) {
-    LOG_ERROR(SMC, "UART: SetCommState failed with error {:#x}.", GetLastError());
+  if (!useBackup) {
+    if (!SetCommState(smcCoreState->comPortHandle, &smcCoreState->comPortDCB)) {
+      LOG_ERROR(SMC, "UART: SetCommState failed with error {:#x}.", GetLastError());
+    }
   }
 
   // Everything OK.
@@ -449,6 +446,7 @@ void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
 #endif // SOCKET_UART
     smcCoreState->uartPresent = true;
     uartThread = std::thread(&SMCCore::uartMainThread, this);
+    uartThread.detach();
 #ifdef SOCKET_UART
     uartSecondaryThread = std::thread(&SMCCore::uartReceiveThread, this);
 #endif // SOCKET_UART
@@ -488,9 +486,9 @@ void Xe::PCIDev::SMC::SMCCore::uartReceiveThread() {
 #ifdef _WIN32    
     u_long mode = 1;
     ioctlsocket(smcCoreState->sockHandle, FIONBIO, &mode);
-    bytesReceived = recv(smcCoreState->sockHandle, &c, 1, MSG_PEEK);
+    bytesReceived = recv(smcCoreState->sockHandle, &c, 1, 0);
 #else
-    bytesReceived = recv(smcCoreState->sockHandle, &c, 1, MSG_PEEK | MSG_DONTWAIT);
+    bytesReceived = recv(smcCoreState->sockHandle, &c, 1, 0 | MSG_DONTWAIT);
 #endif
     if (c != -1 && bytesReceived != 0) {
       smcCoreState->uartRxBuffer.push(c);
