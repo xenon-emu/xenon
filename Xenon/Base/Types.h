@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include <format>
+#include <fmt/format.h>
 #include <type_traits>
 
 // Vali0004: Helper macro to make me sane when doing RAII
@@ -107,7 +107,7 @@ template <typename cT, typename T>
   // Associative container
   size_t cSize = c.size();
   if (cSize <= idx) [[unlikely]] {
-    assert_fail_debug_msg(std::format("Range check failed! (index: {}{})", idx, cSize != max_v<size_t> ? std::format(", size: {}", cSize) : ""));
+    assert_fail_debug_msg(fmt::format("Range check failed! (index: {}{})", idx, cSize != max_v<size_t> ? fmt::format(", size: {}", cSize) : ""));
   }
   auto it = std::begin(std::forward<cT>(c));
   std::advance(it, idx);
@@ -123,7 +123,7 @@ template <typename cT, typename T>
   if constexpr ((requires() { c.size(); }))
     cSize = c.size();
   if (found == c.end()) [[unlikely]] {
-    assert_fail_debug_msg(std::format("Range check failed! (index: {}{})", idx, cSize != max_v<size_t> ? std::format(", size: {}", cSize) : ""));
+    assert_fail_debug_msg(fmt::format("Range check failed! (index: {}{})", idx, cSize != max_v<size_t> ? fmt::format(", size: {}", cSize) : ""));
   }
   return found->second;
 }

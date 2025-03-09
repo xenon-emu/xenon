@@ -446,13 +446,13 @@ typedef struct SOCSECENG_BLOCK {       // Addr = 80000200_00024000
 
 union SFPRegister // Single Precision
 {
-  float valueAsFloat;
+  f32 valueAsFloat;
   u32 valueAsU32;
 };
 
 union FPRegister // Double Precision
 {
-  double valueAsDouble;
+  f64 valueAsDouble;
   u64 valueAsU64;
 };
 

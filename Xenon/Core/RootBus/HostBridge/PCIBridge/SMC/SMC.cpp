@@ -1,4 +1,4 @@
-// Copyright 2025 XeEmulator Project
+// Copyright 2025 Xenon Emulator Project
 
 #include "SMC.h"
 

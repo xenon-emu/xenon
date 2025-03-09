@@ -43,12 +43,12 @@ void SetCurrentThreadRealtime(const std::chrono::nanoseconds period_ns) {
   struct mach_timebase_info timebase {};
   mach_timebase_info(&timebase);
   const auto ticks_per_ns =
-    static_cast<double>(timebase.denom) / static_cast<double>(timebase.numer);
+    static_cast<f64>(timebase.denom) / static_cast<f64>(timebase.numer);
 
   const auto period_ticks =
-    static_cast<u32>(static_cast<double>(period_ns.count()) * ticks_per_ns);
+    static_cast<u32>(static_cast<f64>(period_ns.count()) * ticks_per_ns);
   const auto computation_ticks =
-    static_cast<u32>(static_cast<double>(computation_ns.count()) * ticks_per_ns);
+    static_cast<u32>(static_cast<f64>(computation_ns.count()) * ticks_per_ns);
 
   thread_time_constraint_policy policy = {
     .period = period_ticks,

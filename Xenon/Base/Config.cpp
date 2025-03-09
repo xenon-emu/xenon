@@ -177,7 +177,7 @@ void saveConfig(const std::filesystem::path &path) {
   data["General"]["VSync"] = vsyncEnabled;
   data["General"]["QuitOnWindowClosure"] = shouldQuitOnWindowClosure;
   data["General"]["LogLevel"].comments().push_back("# Controls the current log level output filter");
-  data["General"]["LogLevel"] = (int)currentLogLevel;
+  data["General"]["LogLevel"] = static_cast<int>(currentLogLevel);
   data["General"]["LogAdvanced"] = islogAdvanced;
 
   // SMC.

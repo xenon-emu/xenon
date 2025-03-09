@@ -154,8 +154,8 @@ void PPCInterpreter::PPCInterpreter_rfid(PPU_STATE *ppuState) {
 void PPCInterpreter::PPCInterpreter_tw(PPU_STATE *ppuState) {
   X_FORM_TO_rA_rB;
 
-  long a = (long)ppuState->ppuThread[ppuState->currentThread].GPR[rA];
-  long b = (long)ppuState->ppuThread[ppuState->currentThread].GPR[rB];
+  sl32 a = static_cast<sl32>(ppuState->ppuThread[ppuState->currentThread].GPR[rA]);
+  sl32 b = static_cast<sl32>(ppuState->ppuThread[ppuState->currentThread].GPR[rB]);
 
   if ((a < b && BGET(TO, 5, 0)) || (a > b && BGET(TO, 5, 1)) ||
       (a == b && BGET(TO, 5, 2)) || (static_cast<u32>(a) < static_cast<u32>(b) && BGET(TO, 5, 3)) ||
@@ -168,10 +168,10 @@ void PPCInterpreter::PPCInterpreter_twi(PPU_STATE *ppuState) {
   D_FORM_TO_rA_SI;
   SI = EXTS(SI, 16);
 
-  long a = (long)ppuState->ppuThread[ppuState->currentThread].GPR[rA];
+  sl32 a = static_cast<sl32>(ppuState->ppuThread[ppuState->currentThread].GPR[rA]);
 
-  if ((a < (long)SI && BGET(TO, 5, 0)) || (a > (long)SI && BGET(TO, 5, 1)) ||
-      (a == (long)SI && BGET(TO, 5, 2)) || (static_cast<u32>(a) < SI && BGET(TO, 5, 3)) ||
+  if ((a < static_cast<sl32>(SI) && BGET(TO, 5, 0)) || (a > static_cast<sl32>(SI) && BGET(TO, 5, 1)) ||
+      (a == static_cast<sl32>(SI) && BGET(TO, 5, 2)) || (static_cast<u32>(a) < SI && BGET(TO, 5, 3)) ||
       (static_cast<u32>(a) > SI && BGET(TO, 5, 4))) {
     ppcInterpreterTrap(ppuState, static_cast<u32>(SI));
   }

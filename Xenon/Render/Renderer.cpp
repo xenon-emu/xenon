@@ -70,7 +70,7 @@ void Render::Renderer::Start() {
     LOG_ERROR(System, "Failed to initialize SDL: {}", SDL_GetError());
   }
 
-  std::string title = std::format("Xenon {}", Base::VERSION);
+  const std::string title = fmt::format("Xenon {}", Base::VERSION);
   // SDL3 window properties.
   SDL_PropertiesID props = SDL_CreateProperties();
   SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, title.c_str());

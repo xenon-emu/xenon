@@ -1041,7 +1041,7 @@ void PPCInterpreter::PPCInterpreter_lfd(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  FPRi(frd).valueAsDouble = static_cast<double>(data);
+  FPRi(frd).valueAsDouble = static_cast<f64>(data);
 }
 
 // Load Floating-Point Single (x'C000 0000')
@@ -1062,5 +1062,5 @@ void PPCInterpreter::PPCInterpreter_lfs(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  FPRi(frd).valueAsDouble = static_cast<double>(singlePresFP.valueAsFloat);
+  FPRi(frd).valueAsDouble = static_cast<f64>(singlePresFP.valueAsFloat);
 }
