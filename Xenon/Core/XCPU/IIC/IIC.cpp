@@ -5,7 +5,11 @@
 
 #include <unordered_map>
 
+#ifdef DEBUG
 #define IIC_DEBUG true
+#else
+#define IIC_DEBUG false
+#endif // DEBUG
 
 Xe::XCPU::IIC::XenonIIC::XenonIIC() {
   for (s8 idx = 0; idx < 6; idx++) {
@@ -204,7 +208,9 @@ void Xe::XCPU::IIC::XenonIIC::genInterrupt(u8 interruptType,
   for (u8 ppuID = 0; ppuID < 6; ppuID++) {
     if ((cpusToInterrupt & 0x1) == 1) {
 
-      LOG_DEBUG(Xenon_IIC, "Generating interrupt: Thread {}, intType: {}", ppuID, getIntName(interruptType));
+      if (IIC_DEBUG) {
+        LOG_DEBUG(Xenon_IIC, "Generating interrupt: Thread {}, intType: {}", ppuID, getIntName(interruptType));
+      }
 
       // Store the interrupt in the interrupt queue.
       iicState.ppeIntCtrlBlck[ppuID].interrupts.push_back(newInt);
