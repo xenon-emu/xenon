@@ -10,26 +10,23 @@ using namespace PPCInterpreter;
 XENON_CONTEXT* PPCInterpreter::intXCPUContext = nullptr;
 RootBus* PPCInterpreter::sysBus = nullptr;
 
-PPCInterpreter::PPCDecoder ppcDecoder{};
-
-
 // Interpreter Single Instruction Processing.
 void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
   PPU_THREAD_REGISTERS& thread =
     ppuState->ppuThread[ppuState->currentThread];
 
   // RGH 2 for CB_A 9188 in a JRunner XDKBuild.
-  if (thread.CIA == 0x000000000200c870) {
+  if (thread.CIA == 0x000000000200C870) {
     // GPR(5) = 0;
   }
 
   // RGH 2 for CB_A 9188 in a JRunner Normal Build.
-  if (thread.CIA == 0x000000000200c820) {
+  if (thread.CIA == 0x000000000200C820) {
     GPR(3) = 0;
   }
 
   // RGH 2 17489 in a JRunner Corona XDKBuild.
-  if (thread.CIA == 0x200c7f0) {
+  if (thread.CIA == 0x000000000200C7F0) {
     GPR(3) = 0;
   }
 
@@ -39,7 +36,7 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
   }
 
   // 4BL Check Bypass Devkit 2.0.1838.1
-  if (thread.CIA == 0x0000000003004bf0) {
+  if (thread.CIA == 0x0000000003004BF0) {
     // GPR(3) = 1;
   }
 
@@ -50,12 +47,12 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
 
   // XDK 17.489.0 AudioChipCorder Device Detect bypass. This is not needed for
   // older console revisions.
-  if ((u32)thread.CIA == 0x801AF580) {
+  if (static_cast<u32>(thread.CIA) == 0x801AF580) {
     return;
   }
 
   // This is just to set a PC breakpoint in any PPU/Thread.
-  if ((u32)thread.CIA == 0x8009ce40) {
+  if (static_cast<u32>(thread.CIA) == 0x8009CE40) {
     u8 a = 0;
   }
 
@@ -64,8 +61,13 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
     thread.lastRegValue = GPR(11);
   }
 
+  // We early returned, likely a elf binary
+  if (curThread.CIA == NULL) {
+    return;
+  }
+
   instructionHandler function =
-    ppcDecoder.decode(thread.CI.opcode);
+    ppcDecoder->decode(_instr.opcode);
 
   function(ppuState);
 }

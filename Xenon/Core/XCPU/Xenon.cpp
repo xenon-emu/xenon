@@ -30,6 +30,7 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, eFuses inFuseSet) {
       LOG_INFO(Xenon, "1BL Loaded.");
     }
   }
+  file.close();
 }
 
 Xenon::~Xenon() {
@@ -43,9 +44,9 @@ Xenon::~Xenon() {
 
 void Xenon::Start(u64 resetVector) {
   // Start execution on every thread.
-  ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(&xenonContext, mainBus, XE_PVR, 0, "PPU0"); // Threads 0-1
-  ppu1 = std::make_unique<STRIP_UNIQUE(ppu1)>(&xenonContext, mainBus, XE_PVR, 2, "PPU1"); // Threads 2-3
-  ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(&xenonContext, mainBus, XE_PVR, 4, "PPU2"); // Threads 4-5
+  ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(&xenonContext, mainBus, resetVector, XE_PVR, 0, "PPU0"); // Threads 0-1
+  ppu1 = std::make_unique<STRIP_UNIQUE(ppu1)>(&xenonContext, mainBus, resetVector, XE_PVR, 2, "PPU1"); // Threads 2-3
+  ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(&xenonContext, mainBus, resetVector, XE_PVR, 4, "PPU2"); // Threads 4-5
   // Halt the CPU to ensure no opcodes are ran
   Halt();
   // Get our CPI based on the first PPU, then share it across all PPUs
@@ -55,24 +56,59 @@ void Xenon::Start(u64 resetVector) {
   Continue();
 }
 
-void Xenon::Halt() {
+void Xenon::LoadElf(const std::string path) {
+  // TODO(Vali0004): Fix multi-threading for ELF loading
+  // Start execution on main thread
+  ppu0.reset();
+  ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(&xenonContext, mainBus, NULL, XE_PVR, 0, "PPU0"); // Threads 0-1
+  // Load a elf (test)
   ppu0->Halt();
-  ppu1->Halt();
-  ppu2->Halt();
+  std::filesystem::path filePath{ path };
+  std::ifstream file{ filePath, std::ios_base::in | std::ios_base::binary };
+  size_t fileSize = std::filesystem::file_size(filePath);
+  std::unique_ptr<u8[]> elfBinary = std::make_unique<u8[]>(fileSize);
+  file.read(reinterpret_cast<char*>(elfBinary.get()), fileSize);
+  file.close();
+  ppu0->loadElfImage(elfBinary.get(), fileSize);
+  // Continue after halting
+  Continue();
 }
+
+void Xenon::Halt() {
+  if (ppu0.get()) ppu0->Halt();
+  if (ppu1.get()) ppu1->Halt();
+  if (ppu2.get()) ppu2->Halt();
+}
+
 void Xenon::Continue() {
-  ppu0->Continue();
-  ppu1->Continue();
-  ppu2->Continue();
+  if (ppu0.get()) ppu0->Continue();
+  if (ppu1.get()) ppu1->Continue();
+  if (ppu2.get()) ppu2->Continue();
 }
+
 void Xenon::Step(int amount) {
-  ppu0->Step(amount);
-  ppu1->Step(amount);
-  ppu2->Step(amount);
+  if (ppu0.get()) ppu0->Step(amount);
+  if (ppu1.get()) ppu1->Step(amount);
+  if (ppu2.get()) ppu2->Step(amount);
 }
+
 bool Xenon::IsHalted() {
-  bool halted = ppu0->IsHalted();
-  halted = ppu1->IsHalted();
-  halted = ppu2->IsHalted();
+  bool halted = false;
+  if (ppu0.get()) halted = ppu0->IsHalted();
+  if (ppu1.get()) halted = ppu1->IsHalted();
+  if (ppu2.get()) halted = ppu2->IsHalted();
   return halted;
+}
+
+PPU *Xenon::GetPPU(u8 ppuID) {
+  switch (ppuID) {
+  case 0:
+    return ppu0.get();
+  case 1:
+    return ppu1.get();
+  case 2:
+    return ppu2.get();
+  }
+
+  return nullptr;
 }

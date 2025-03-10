@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "PPCInternal.h"
 
 #include "PPC_Instruction.h"
@@ -13,6 +15,7 @@
 namespace PPCInterpreter {
 extern RootBus *sysBus;
 extern XENON_CONTEXT *intXCPUContext;
+inline std::unique_ptr<PPCDecoder> ppcDecoder = std::make_unique<STRIP_UNIQUE(ppcDecoder)>();
 
 //
 //  Helper macros for instructions
@@ -106,6 +109,10 @@ u64 MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState, u64 EA,
             s8 byteCount);
 void MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState, u64 data, u64 EA,
               s8 byteCount, bool cacheStore = false);
+
+void MMUMemCpyFromHost(PPU_STATE* ppuState, u32 dest, const void* source, u64 size, bool cacheStore = false);
+
+void MMUMemCpy(PPU_STATE* ppuState, u32 dest, u32 source, u64 size, bool cacheStore = false);
 
 // Helper Read Routines.
 u8 MMURead8(PPU_STATE *ppuState, u64 EA);

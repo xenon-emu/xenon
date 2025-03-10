@@ -10,7 +10,7 @@
 
 class PPU {
 public:
-  PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u32 PVR,
+  PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PVR,
                   u32 PIR, const char *ppuName);
   ~PPU();
 
@@ -38,6 +38,13 @@ public:
   void SetCPI(u32 CPI) { clocksPerInstruction = CPI; }
   // Gets the clocks per instruction
   u32 GetCPI() { return clocksPerInstruction; }
+
+  // Get ppuState
+  PPU_STATE *GetPPUState() { return ppuState.get(); }
+
+  // Load a elf image from host memory. Copies into RAM
+  // Returns entrypoint
+  u64 loadElfImage(u8 *data, u64 size);
 private:
   // Thread handle
   std::thread ppuThread;
@@ -47,6 +54,9 @@ private:
 
   // Can we quit?
   bool ppuExecutionDone = true;
+
+  // Are we running a elf? Should we early exit?
+  bool ppuElfExecution = false;
 
   // Halt thread
   bool ppcHalt = false;
