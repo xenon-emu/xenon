@@ -12,7 +12,6 @@ RootBus* PPCInterpreter::sysBus = nullptr;
 
 PPCInterpreter::PPCDecoder ppcDecoder{};
 
-
 // Interpreter Single Instruction Processing.
 void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
   PPU_THREAD_REGISTERS& thread =
