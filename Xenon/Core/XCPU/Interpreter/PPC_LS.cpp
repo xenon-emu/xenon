@@ -117,7 +117,7 @@ void PPCInterpreter::PPCInterpreter_sthbrx(PPU_STATE *ppuState) {
   MEM(EA, 2) <- rS[56-63] || rS[48-55]
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite16(ppuState, EA, std::byteswap<u16>(static_cast<u16>(GPRi(rs))));
+  MMUWrite16(ppuState, EA, byteswap<u16>(static_cast<u16>(GPRi(rs))));
 }
 
 // Store Half Word with Update (x'B400 0000')
@@ -248,7 +248,7 @@ void PPCInterpreter::PPCInterpreter_stwbrx(PPU_STATE *ppuState) {
   MEM(EA, 4) <- rS[56-63] || rS[48-55] || rS[40-47] || rS[32-39]
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite32(ppuState, EA, std::byteswap<u32>(static_cast<u32>(GPRi(rs))));
+  MMUWrite32(ppuState, EA, byteswap<u32>(static_cast<u32>(GPRi(rs))));
 }
 
 // Store Word Conditional Indexed (x'7C00 012D')
@@ -288,7 +288,7 @@ void PPCInterpreter::PPCInterpreter_stwcx(PPU_STATE *ppuState) {
     if (ppuState->ppuThread[ppuState->currentThread].ppuRes->V) {
       if (ppuState->ppuThread[ppuState->currentThread].ppuRes->resAddr == RA) {
         bool soc = false;
-        u32 data = std::byteswap<u32>(static_cast<u32>(GPRi(rs)));
+        u32 data = byteswap<u32>(static_cast<u32>(GPRi(rs)));
         RA = mmuContructEndAddressFromSecEngAddr(RA, &soc);
         sysBus->Write(RA, data, 4);
         intXCPUContext->xenonRes.Check(RA);
@@ -401,7 +401,7 @@ void PPCInterpreter::PPCInterpreter_stdcx(PPU_STATE *ppuState) {
     if (ppuState->ppuThread[ppuState->currentThread].ppuRes->V) {
       if (ppuState->ppuThread[ppuState->currentThread].ppuRes->resAddr == (RA & ~7)) {
         u64 data =
-            std::byteswap<u64>(GPRi(rs));
+            byteswap<u64>(GPRi(rs));
         bool soc = false;
         RA = mmuContructEndAddressFromSecEngAddr(RA, &soc);
         sysBus->Write(RA, data, 8);
@@ -618,7 +618,7 @@ void PPCInterpreter::PPCInterpreter_lhbrx(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  GPRi(rd) = std::byteswap<u16>(data);
+  GPRi(rd) = byteswap<u16>(data);
 }
 
 // Load Half Word and Zero (x'A000 0000')
@@ -837,7 +837,7 @@ void PPCInterpreter::PPCInterpreter_lwbrx(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  GPRi(rd) = std::byteswap<u32>(data);
+  GPRi(rd) = byteswap<u32>(data);
 }
 
 // Load Word and Zero (x'8000 0000')
