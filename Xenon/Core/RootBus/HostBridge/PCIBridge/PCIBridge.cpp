@@ -65,8 +65,7 @@ PCIBridge::PCIBridge() {
   pciBridgeConfig.configSpaceHeader.regF.hexData = pciBridgeConfigMap[0xF];
 
   // PCI Bridge Config regs
-  pciBridgeState.REG_EA00000C =
-      0x7cff; // Software writes here to enable interrupts (Bus IRQL).
+  pciBridgeState.REG_EA00000C = 0x7CFF; // Software writes here to enable interrupts (Bus IRQL).
 }
 
 void PCIBridge::RegisterIIC(Xe::XCPU::IIC::XenonIIC *xenonIICPtr) {

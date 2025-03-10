@@ -10,6 +10,9 @@ using namespace PPCInterpreter;
 XENON_CONTEXT* PPCInterpreter::intXCPUContext = nullptr;
 RootBus* PPCInterpreter::sysBus = nullptr;
 
+PPCInterpreter::PPCDecoder ppcDecoder{};
+
+
 // Interpreter Single Instruction Processing.
 void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
   PPU_THREAD_REGISTERS& thread =
@@ -61,13 +64,8 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
     thread.lastRegValue = GPR(11);
   }
 
-  // We early returned, likely a elf binary
-  if (curThread.CIA == NULL) {
-    return;
-  }
-
   instructionHandler function =
-    ppcDecoder->decode(_instr.opcode);
+    ppcDecoder.decode(thread.CI.opcode);
 
   function(ppuState);
 }

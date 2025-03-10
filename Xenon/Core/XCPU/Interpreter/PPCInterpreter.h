@@ -2,8 +2,6 @@
 
 #pragma once
 
-#include <memory>
-
 #include "PPCInternal.h"
 
 #include "PPC_Instruction.h"
@@ -15,7 +13,6 @@
 namespace PPCInterpreter {
 extern RootBus *sysBus;
 extern XENON_CONTEXT *intXCPUContext;
-inline std::unique_ptr<PPCDecoder> ppcDecoder = std::make_unique<STRIP_UNIQUE(ppcDecoder)>();
 
 //
 //  Helper macros for instructions

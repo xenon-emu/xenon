@@ -34,7 +34,7 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
                                     // about Meta/NAND Type.
   sfcxState.statusReg = 0x00000600;
   sfcxState.statusReg = 0x00000600;
-  sfcxState.addressReg = 0x00f70030;
+  sfcxState.addressReg = 0x00F70030;
   sfcxState.logicalReg = 0x00000100;
   sfcxState.physicalReg = 0x0000100;
   sfcxState.commandReg = NO_CMD;
@@ -310,15 +310,15 @@ bool SFCX::checkMagic() {
   // Devkit Nand Magic is 0x0F4F.
   // Older Devkit Nand's magic is 0x0F3F.
 
-  if (magic[0] == (char)0xff && magic[1] == (char)0x4f) {
+  if (magic[0] == (char)0xFF && magic[1] == (char)0x4F) {
     LOG_INFO(SFCX, "Retail NAND Magic found.");
     return true;
   }
-  if (magic[0] == (char)0x0f && magic[1] == (char)0x4f) {
+  if (magic[0] == (char)0x0F && magic[1] == (char)0x4F) {
     LOG_INFO(SFCX, "Devkit NAND Magic found.");
     return true;
   }
-  if (magic[0] == (char)0x0f && magic[1] == (char)0x3f) {
+  if (magic[0] == (char)0x0F && magic[1] == (char)0x3F) {
     LOG_INFO(SFCX, "Old Devkit NAND Magic found.");
     return true;
   }
