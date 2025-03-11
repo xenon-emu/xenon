@@ -11,6 +11,7 @@
 #include "Core/XCPU/PPU/PowerPC.h"
 
 namespace PPCInterpreter {
+extern PPCInterpreter::PPCDecoder ppcDecoder;
 extern RootBus *sysBus;
 extern XENON_CONTEXT *intXCPUContext;
 

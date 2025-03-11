@@ -772,8 +772,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 
     bool slbHit = false;
     // Search the SLB to get the VSID
-    for (auto &slbEntry :
-         curThread.SLB) {
+    for (auto &slbEntry : curThread.SLB) {
       if (slbEntry.V && (slbEntry.ESID == ESID)) {
         // Entry valid & SLB->ESID = EA->VSID
         currslbEntry = slbEntry;
@@ -828,17 +827,13 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
         // interrupt, else do page table search.
         if (tlbSoftwareManaged) {
           bool hv = curThread.SPR.MSR.HV;
-          bool sfMode =
-              curThread.SPR.MSR.SF;
+          bool sfMode = curThread.SPR.MSR.SF;
           u64 CIA = curThread.CIA;
 
           if (curThread.iFetch) {
-            curThread.exceptReg |=
-                PPU_EX_INSSTOR;
+            _ex |= PPU_EX_INSSTOR;
           } else {
-
-            curThread.exceptReg |=
-                PPU_EX_DATASTOR;
+            _ex |= PPU_EX_DATASTOR;
             curThread.SPR.DAR = *EA;
             curThread.SPR.DSISR =
                 DSISR_NOPTE;
@@ -850,10 +845,8 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 
           // Save MSR DR & IR Bits. When an exception occurs they must be reset
           // to whatever they where.
-          bool msrDR =
-              curThread.SPR.MSR.DR;
-          bool msrIR =
-              curThread.SPR.MSR.IR;
+          bool msrDR = curThread.SPR.MSR.DR;
+          bool msrIR = curThread.SPR.MSR.IR;
 
           // Disable relocation.
           curThread.SPR.MSR.DR = 0;
@@ -1077,16 +1070,16 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 
           // Instruction read.
           if (curThread.iFetch) {
-            curThread.exceptReg |= PPU_EX_INSSTOR;
+            _ex |= PPU_EX_INSSTOR;
 
           } else if (memWrite) {
             // Data write.
-            curThread.exceptReg |= PPU_EX_DATASTOR;
+            _ex |= PPU_EX_DATASTOR;
             curThread.SPR.DAR = *EA;
             curThread.SPR.DSISR = DSISR_NOPTE | DSISR_ISSTORE;
           } else {
             // Data read.
-            curThread.exceptReg |= PPU_EX_DATASTOR;
+            _ex |= PPU_EX_DATASTOR;
             curThread.SPR.DAR = *EA;
             curThread.SPR.DSISR = DSISR_NOPTE;
           }
@@ -1097,9 +1090,9 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
       // SLB Miss
       // Data or Inst Segment Exception
       if (curThread.iFetch) {
-        curThread.exceptReg |= PPU_EX_INSTSEGM;
+        _ex |= PPU_EX_INSTSEGM;
       } else {
-        curThread.exceptReg |= PPU_EX_DATASEGM;
+        _ex |= PPU_EX_DATASEGM;
         curThread.SPR.DAR = *EA;
       }
       return false;

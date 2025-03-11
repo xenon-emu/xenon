@@ -3,12 +3,12 @@
 #include "OpenGL.h"
 
 #include "Core/Xe_Main.h"
+#include "Core/XCPU/Interpreter/PPCInterpreter.h"
 #include "Base/Config.h"
 #include "Render/Renderer.h"
 #include "Render/Implementations/OGLTexture.h"
 
-// Does not currently work
-//#define TEST_IMGUI_RENDER
+#define TextFmt(x, ...) Text(fmt::format(x, __VA_ARGS__))
 
 bool RGH2{};
 bool storedPreviousInitSkips{};
@@ -44,6 +44,338 @@ void Render::OpenGLGUI::BeginSwap() {
   ImGui_ImplSDL3_NewFrame();
 }
 
+#define CustomBase(x, fmt, ...) gui->TextFmt(x ": " fmt, __VA_ARGS__)
+#define Custom(x, fmt, ...) CustomBase(#x, fmt, __VA_ARGS__)
+#define HexBase(x, ...) CustomBase(x, "0x{:X}", __VA_ARGS__)
+#define Hex(c, x) HexBase(#x, c.x)
+#define BFHex(c, x) HexBase(#x, u32(c.x))
+#define U8Hex(c, x) HexBase(#x, static_cast<u32>(c.x))
+#define HexArr(a, i) HexBase("[{}]", i, a[i])
+#define Dec(c, x) Custom(x, "{}", c.x)
+#define U8Dec(c, x) Custom(x, "{}", static_cast<u32>(c.x))
+#define Bool(c, x) Custom(x, "{}", c.x ? "true" : "false")
+void PPUThread(Render::OpenGLGUI *gui, PPU_STATE *PPUState, u32 threadID) {
+  gui->Node(fmt::format("[{}]", threadID), [&] {
+    PPU_THREAD_REGISTERS &ppuRegisters = PPUState->ppuThread[threadID];
+    gui->Node("SPR", [&] {
+      PPU_THREAD_SPRS &SPR = ppuRegisters.SPR;
+      gui->Node("XER", [&] {
+        XERegister &XER = SPR.XER;
+        Hex(XER, XER_Hex);
+        BFHex(XER, ByteCount);
+        BFHex(XER, R0);
+        BFHex(XER, CA);
+        BFHex(XER, OV);
+        BFHex(XER, SO);
+      });
+      Hex(SPR, LR);
+      Hex(SPR, CTR);
+      Hex(SPR, CFAR);
+      Hex(SPR, VRSAVE);
+      Hex(SPR, DSISR);
+      Hex(SPR, DAR);
+      Dec(SPR, DEC);
+      Hex(SPR, SRR0);
+      Hex(SPR, SRR1);
+      Hex(SPR, ACCR);
+      Hex(SPR, SPRG0);
+      Hex(SPR, SPRG1);
+      Hex(SPR, SPRG2);
+      Hex(SPR, SPRG3);
+      Hex(SPR, HSPRG0);
+      Hex(SPR, HSPRG1);
+      Hex(SPR, HSRR0);
+      Hex(SPR, HSRR1);
+      Hex(SPR, TSRL);
+      Hex(SPR, TSSR);
+      Hex(SPR, PPE_TLB_Index_Hint);
+      Hex(SPR, DABR);
+      Hex(SPR, DABRX);
+      gui->Node("MSR", [&] {
+        MSRegister &MSR = SPR.MSR;
+        BFHex(MSR, LE);
+        BFHex(MSR, RI);
+        BFHex(MSR, PMM);
+        BFHex(MSR, DR);
+        BFHex(MSR, IR);
+        BFHex(MSR, FE1);
+        BFHex(MSR, BE);
+        BFHex(MSR, SE);
+        BFHex(MSR, FE0);
+        BFHex(MSR, ME);
+        BFHex(MSR, FP);
+        BFHex(MSR, PR);
+        BFHex(MSR, EE);
+        BFHex(MSR, ILE);
+        BFHex(MSR, VXU);
+        BFHex(MSR, HV);
+        BFHex(MSR, TA);
+        BFHex(MSR, SF);
+      });
+      Hex(SPR, PIR);
+    });
+    Hex(ppuRegisters, CIA);
+    Hex(ppuRegisters, NIA);
+    gui->Node("CI", [&] {
+      PPCOpcode &CI = ppuRegisters.CI;
+      Hex(CI, opcode);
+      BFHex(CI, main);
+      BFHex(CI, sh64);
+      BFHex(CI, mbe64);
+      BFHex(CI, vuimm);
+      BFHex(CI, vs);
+      BFHex(CI, vsh);
+      BFHex(CI, oe);
+      BFHex(CI, spr);
+      BFHex(CI, vc);
+      BFHex(CI, vb);
+      BFHex(CI, va);
+      BFHex(CI, vd);
+      BFHex(CI, lk);
+      BFHex(CI, aa);
+      BFHex(CI, rb);
+      BFHex(CI, ra);
+      BFHex(CI, rd);
+      BFHex(CI, uimm16);
+      BFHex(CI, l11);
+      BFHex(CI, rs);
+      BFHex(CI, simm16);
+      BFHex(CI, ds);
+      BFHex(CI, vsimm);
+      BFHex(CI, ll);
+      BFHex(CI, li);
+      BFHex(CI, lev);
+      BFHex(CI, i);
+      BFHex(CI, crfs);
+      BFHex(CI, l10);
+      BFHex(CI, crfd);
+      BFHex(CI, crbb);
+      BFHex(CI, crba);
+      BFHex(CI, crbd);
+      BFHex(CI, rc);
+      BFHex(CI, me32);
+      BFHex(CI, mb32);
+      BFHex(CI, sh32);
+      BFHex(CI, bi);
+      BFHex(CI, bo);
+      BFHex(CI, bh);
+      BFHex(CI, frc);
+      BFHex(CI, frb);
+      BFHex(CI, fra);
+      BFHex(CI, frd);
+      BFHex(CI, crm);
+      BFHex(CI, frs);
+      BFHex(CI, flm);
+      BFHex(CI, l6);
+      BFHex(CI, l15);
+      BFHex(CI, bt14);
+      BFHex(CI, bt24);
+    });
+    Bool(ppuRegisters, iFetch);
+    gui->Node("GPRs", [&] {
+      for (u64 i = 0; i != 32; ++i) {
+        HexArr(ppuRegisters.GPR, i);
+      }
+    });
+    gui->Node("FPRs", [&] {
+      for (u64 i = 0; i != 32; ++i) {
+        FPRegister &FPR = ppuRegisters.FPR[i];
+        gui->Node(fmt::format("[{}]", i), [&] {
+          Custom(valueAsDouble, "{}", FPR.valueAsDouble);
+          Custom(valueAsU64, "0x{:X}",FPR.valueAsU64);
+        });
+      }
+    });
+    gui->Node("CR", [&] {
+      CRegister &CR = ppuRegisters.CR;
+      Hex(CR, CR_Hex);
+      BFHex(CR, CR0);
+      BFHex(CR, CR1);
+      BFHex(CR, CR2);
+      BFHex(CR, CR3);
+      BFHex(CR, CR4);
+      BFHex(CR, CR5);
+      BFHex(CR, CR6);
+      BFHex(CR, CR7);
+    });
+    gui->Node("FPSCR", [&] {
+      FPSCRegister &FPSCR = ppuRegisters.FPSCR;
+      Hex(FPSCR, FPSCR_Hex);
+      BFHex(FPSCR, RN);
+      BFHex(FPSCR, NI);
+      BFHex(FPSCR, XE);
+      BFHex(FPSCR, ZE);
+      BFHex(FPSCR, UE);
+      BFHex(FPSCR, OE);
+      BFHex(FPSCR, VE);
+      BFHex(FPSCR, VXCVI);
+      BFHex(FPSCR, VXSQRT);
+      BFHex(FPSCR, VXSOFT);
+      BFHex(FPSCR, R0);
+      BFHex(FPSCR, FPRF);
+      BFHex(FPSCR, FI);
+      BFHex(FPSCR, FR);
+      BFHex(FPSCR, VXVC);
+      BFHex(FPSCR, VXIMZ);
+      BFHex(FPSCR, VXZDZ);
+      BFHex(FPSCR, VXIDI);
+      BFHex(FPSCR, VXISI);
+      BFHex(FPSCR, VXSNAN);
+      BFHex(FPSCR, XX);
+      BFHex(FPSCR, ZX);
+      BFHex(FPSCR, UX);
+      BFHex(FPSCR, OX);
+      BFHex(FPSCR, VX);
+      BFHex(FPSCR, FEX);
+      BFHex(FPSCR, FX);
+    });
+    gui->Node("SLBs", [&] {
+      for (u64 i = 0; i != 64; ++i) {
+        SLBEntry &SLB = ppuRegisters.SLB[i];
+        gui->Node(fmt::format("[{}]", i), [&] {
+          U8Hex(SLB, V);
+          U8Hex(SLB, LP);
+          U8Hex(SLB, C);
+          U8Hex(SLB, L);
+          U8Hex(SLB, N);
+          U8Hex(SLB, Kp);
+          U8Hex(SLB, Ks);
+          Hex(SLB, VSID);
+          Hex(SLB, ESID);
+          Hex(SLB, vsidReg);
+          Hex(SLB, esidReg);
+        });
+      }
+    });
+    Hex(ppuRegisters, exceptReg);
+    Bool(ppuRegisters, exceptionTaken);
+    Hex(ppuRegisters, exceptEA);
+    Hex(ppuRegisters, exceptTrapType);
+    Bool(ppuRegisters, exceptHVSysCall);
+    Hex(ppuRegisters, intEA);
+    Hex(ppuRegisters, lastWriteAddress);
+    Hex(ppuRegisters, lastRegValue);
+    gui->Node("ppuRes", [&] {
+        PPU_RES &ppuRes = *(ppuRegisters.ppuRes.get());
+        U8Hex(ppuRes, ppuID);
+        Bool(ppuRes, V);
+        Hex(ppuRes, resAddr);
+    });
+  });
+}
+
+void RenderInstr(Render::OpenGLGUI *gui, u32 addr, u32 instr) {
+  std::string instrName = PPCInterpreter::ppcDecoder.decodeName(instr);
+  u32 b0 = static_cast<u8>((instr >> 24) & 0xFF);
+  u32 b1 = static_cast<u8>((instr >> 16) & 0xFF);
+  u32 b2 = static_cast<u8>((instr >> 8) & 0xFF);
+  u32 b3 = static_cast<u8>((instr >> 0) & 0xFF);
+  gui->TextFmt("{:08X} {:02X} {:02X} {:02X} {:02X}                             {}", addr, b0, b1, b2, b3, instrName);
+}
+
+void PPC_PPU(Render::OpenGLGUI *gui, PPU *PPU) {
+  if (!PPU) {
+    return;
+  }
+  PPU_STATE *PPUStatePtr = PPU->GetPPUState();
+  #define ppuState PPUStatePtr
+  PPU_STATE &PPUState = *PPUStatePtr;
+  gui->Node(PPUState.ppuName, [&] {
+    u32 curInstr = _instr.opcode;
+    u32 nextInstr = PPCInterpreter::MMURead32(ppuState, curThread.NIA);
+    RenderInstr(gui, curThread.CIA, curInstr);
+    RenderInstr(gui, curThread.NIA, nextInstr);
+    gui->Node("ppuThread", [&] {
+      PPUThread(gui, PPUStatePtr, 0);
+      PPUThread(gui, PPUStatePtr, 1);
+    });
+    U8Dec(PPUState, currentThread);
+    gui->Node("SPR", [&] {
+      PPU_STATE_SPRS &SPR = PPUState.SPR;
+      Hex(SPR, SDR1);
+      Hex(SPR, CTRL);
+      Hex(SPR, TB);
+      gui->Node("PVR", [&] {
+        PVRegister &PVR = SPR.PVR;
+        Hex(PVR, PVR_Hex);
+        U8Hex(PVR, Revision);
+        U8Hex(PVR, Version);
+      });
+      Hex(SPR, HDEC);
+      Hex(SPR, RMOR);
+      Hex(SPR, HRMOR);
+      Hex(SPR, LPCR);
+      Hex(SPR, LPIDR);
+      Hex(SPR, TSCR);
+      Hex(SPR, TTR);
+      Hex(SPR, PPE_TLB_Index);
+      Hex(SPR, PPE_TLB_VPN);
+      Hex(SPR, PPE_TLB_RPN);
+      Hex(SPR, PPE_TLB_RMT);
+      Hex(SPR, HID0);
+      Hex(SPR, HID1);
+      Hex(SPR, HID4);
+      Hex(SPR, HID6);
+    });
+    gui->Node("TLB", [&] {
+      TLB_Reg &TLB = PPUState.TLB;
+      gui->Node("tlbSet0", [&] {
+        for (u64 i = 0; i != 256; ++i) {
+          TLBEntry& TLBEntry = TLB.tlbSet0[i];
+          gui->Node(fmt::format("[{}]", i), [&] {
+            Bool(TLBEntry, V);
+            U8Hex(TLBEntry, p);
+            Hex(TLBEntry, RPN);
+            Hex(TLBEntry, VPN);
+            Bool(TLBEntry, L);
+            Bool(TLBEntry, LP);
+          });
+        }
+      });
+      gui->Node("tlbSet1", [&] {
+        for (u64 i = 0; i != 256; ++i) {
+          TLBEntry& TLBEntry = TLB.tlbSet1[i];
+          gui->Node(fmt::format("[{}]", i), [&] {
+            Bool(TLBEntry, V);
+            U8Hex(TLBEntry, p);
+            Hex(TLBEntry, RPN);
+            Hex(TLBEntry, VPN);
+            Bool(TLBEntry, L);
+            Bool(TLBEntry, LP);
+          });
+        }
+      });
+      gui->Node("tlbSet2", [&] {
+        for (u64 i = 0; i != 256; ++i) {
+          TLBEntry& TLBEntry = TLB.tlbSet2[i];
+          gui->Node(fmt::format("[{}]", i), [&] {
+            Bool(TLBEntry, V);
+            U8Hex(TLBEntry, p);
+            Hex(TLBEntry, RPN);
+            Hex(TLBEntry, VPN);
+            Bool(TLBEntry, L);
+            Bool(TLBEntry, LP);
+          });
+        }
+      });
+      gui->Node("tlbSet3", [&] {
+        for (u64 i = 0; i != 256; ++i) {
+          TLBEntry& TLBEntry = TLB.tlbSet3[i];
+          gui->Node(fmt::format("[{}]", i), [&] {
+            Bool(TLBEntry, V);
+            U8Hex(TLBEntry, p);
+            Hex(TLBEntry, RPN);
+            Hex(TLBEntry, VPN);
+            Bool(TLBEntry, L);
+            Bool(TLBEntry, LP);
+          });
+        }
+      });
+    });
+    Bool(PPUState, traslationInProgress);
+    Custom(ppuName, "{}", PPUState.ppuName);
+  }, ImGuiTreeNodeFlags_DefaultOpen);
+}
 void PPCDebugger(Render::OpenGLGUI *gui) {
   ImGuiWindow *window = ImGui::GetCurrentWindow();
   ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.f);
@@ -52,26 +384,43 @@ void PPCDebugger(Render::OpenGLGUI *gui) {
   ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 8.f, 4.f });
   gui->Child("##instrs", [&] {
     gui->MenuBar([&gui] {
-      if (!Xe_Main->getCPU()->IsHalted()) {
-        gui->MenuItem("Pause", [&gui] {
-          Xe_Main->getCPU()->Halt();
-        });
-      }
-      else {
-        gui->MenuItem("Continue", [&gui] {
-          Xe_Main->getCPU()->Continue();
-        });
-        gui->MenuItem("Step", [&gui] {
-          Xe_Main->getCPU()->Step();
-        });
-      }
+      gui->Menu("Window", [&gui] {  
+        if (!gui->ppcDebuggerActive) {
+          gui->MenuItem("Enable", [&] {
+            gui->ppcDebuggerActive = true;
+          });
+        } else {
+          gui->MenuItem(gui->ppcDebuggerAttached ? "Detach" : "Attach", [&] {
+            gui->ppcDebuggerAttached ^= true;
+          });
+          gui->MenuItem("Disable", [&] {
+            gui->ppcDebuggerActive = false;
+          });
+        }
+      });
+      gui->Menu("Debug", [&gui] {
+        if (!Xe_Main->getCPU()->IsHalted()) {
+          gui->MenuItem("Pause", [&gui] {
+            Xe_Main->getCPU()->Halt();
+          });
+        } else {
+          gui->MenuItem("Continue", [&gui] {
+            Xe_Main->getCPU()->Continue();
+          });
+          gui->MenuItem("Step (F10)", [&gui] {
+            Xe_Main->getCPU()->Step();
+          });
+        }
+      });
     });
-    gui->Text("This is all of the instructions!");
-  }, { window->Size.x - 264.f, window->Size.y - 46.f }, ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_MenuBar);
-  ImGui::SameLine();
-  gui->Child("##regs", [&] {
-    gui->Text("This is all of the register context!");
-  }, { 245.f, window->Size.y - 46.f }, ImGuiChildFlags_FrameStyle);
+    if (ImGui::IsKeyPressed(ImGuiKey_F10)) {
+      Xe_Main->getCPU()->Step();
+    }
+    Xenon *CPU = Xe_Main->getCPU();
+    PPC_PPU(gui, CPU->GetPPU(0));
+    PPC_PPU(gui, CPU->GetPPU(1));
+    PPC_PPU(gui, CPU->GetPPU(2));
+  }, { window->Size.x - 27.5f, window->Size.y - 74.f }, ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_MenuBar);
   ImGui::PopStyleVar(4);
 }
 
@@ -105,40 +454,9 @@ void CodeflowSettings(Render::OpenGLGUI *gui) {
   });
 }
 
-u32 texture_id{};
-u32 width{}, height{};
-#ifdef TEST_IMGUI_RENDER
-void AddToDrawList(ImDrawList* drawList) {
-  drawList->AddCallback([](const ImDrawList* parent_list, const ImDrawCmd* cmd) {
-    // Use the compute shader
-    glUseProgram(Xe_Main->renderer->shaderProgram);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, Xe_Main->renderer->pixelBuffer);
-    glUniform1i(glGetUniformLocation(Xe_Main->renderer->shaderProgram, "internalWidth"), Xe_Main->renderer->internalWidth);
-    glUniform1i(glGetUniformLocation(Xe_Main->renderer->shaderProgram, "internalHeight"), Xe_Main->renderer->internalHeight);
-    glUniform1i(glGetUniformLocation(Xe_Main->renderer->shaderProgram, "resWidth"), width);
-    glUniform1i(glGetUniformLocation(Xe_Main->renderer->shaderProgram, "resHeight"),height);
-    glDispatchCompute(width / 16, height / 16, 1);
-    glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_UPDATE_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
-
-    // Draw the texture
-    glUseProgram(Xe_Main->renderer->renderShaderProgram);
-    glBindTexture(GL_TEXTURE_2D, texture_id);
-    glBindVertexArray(Xe_Main->renderer->dummyVAO);
-    glDrawArrays(GL_TRIANGLE_FAN, 0, 3);
-
-    // Cleanup state after drawing
-    glBindVertexArray(0);
-    glUseProgram(0);
-  }, nullptr);
-}
-#endif
 void ImGuiSettings(Render::OpenGLGUI *gui) {
   gui->Toggle("Style Editor", &gui->styleEditor);
   gui->Toggle("Demo", &gui->demoWindow);
-#ifdef TEST_IMGUI_RENDER
-  gui->Toggle("Render Xenon in ImGui", &Xe_Main->renderer->imguiRender);
-  gui->Tooltip("Renders Xenon into a viewport.\nNote: There may be some performance loss");
-#endif
   gui->Toggle("Viewports", &gui->viewports, [&] {
     ImGuiIO& io = ImGui::GetIO();
     if (gui->viewports)
@@ -150,116 +468,41 @@ void ImGuiSettings(Render::OpenGLGUI *gui) {
 }
 
 void Render::OpenGLGUI::OnSwap(Texture *texture) {
-  if (false) {
-    OGLTexture* ogl_texture = reinterpret_cast<OGLTexture*>(texture);
-    u32* ptexture_id = reinterpret_cast<u32*>(ogl_texture->GetTexture());
-    if (texture_id != *ptexture_id) {
-      texture_id = *ptexture_id;
-    }
-    Window("##main", [&] {
-      MenuBar([&] {
-        Menu("Debug", [&] {
-          Button("Start", [&] {
-            ppcDebuggerActive = true;
-          });
-          if (ppcDebuggerActive) {
-            Button("Detach from window", [&] {
-              ppcDebuggerAttached = false;
-            });
-            if (!Xe_Main->getCPU()->IsHalted()) {
-              MenuItem("Pause", [&] {
-                Xe_Main->getCPU()->Continue();
-              });
-            }
-            else {
-              MenuItem("Continue", [&] {
-                Xe_Main->getCPU()->Continue();
-              });
-            }
-            MenuItem("Step", [&] {
-              Xe_Main->getCPU()->Step();
-            });
-          }
-        });
-        Menu("Settings", [&] {
-          Menu("General", [&] {
-            GeneralSettings(this);
-          });
-          Menu("Codeflow", [&] {
-            CodeflowSettings(this);
-          });
-          Menu("Graphics", [&] {
-            GraphicsSettings(this);
-          });
-          Menu("ImGui", [&] {
-            ImGuiSettings(this);
-          });
-        });
-      });
-#ifdef TEST_IMGUI_RENDER
-      // Render it in ImGui
-      Child("##backbuffer", [&] {
-        width = TILE(1280);
-        height = TILE(720);
-        ImGuiWindow* window = ImGui::GetCurrentWindow();
-        ImDrawList* drawList = window->DrawList;
-        AddToDrawList(drawList);
-      }, { 1280.f, 720.f });
-#endif
-    },
-    { static_cast<float>(Xe_Main->renderer->width), static_cast<float>(Xe_Main->renderer->height) },
-    ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_MenuBar, nullptr, {}, ImGuiCond_Always
-    );
-  }
-  if (ppcDebuggerActive && (!false || (false && !ppcDebuggerAttached))) {
+  if (ppcDebuggerActive && !ppcDebuggerAttached) {
     Window("PPC Debugger", [this] {
       PPCDebugger(this);
     }, { 1200.f, 700.f }, ImGuiWindowFlags_NoCollapse, &ppcDebuggerActive, { 500.f, 100.f });
   }
-  if (!false) {
-    Window("Debug", [&] {
-      TabBar("##main", [&] {
-        TabItem("Debug", [&] {          
+  Window("Debug", [&] {
+    TabBar("##main", [&] {
+      TabItem("Debug", [&] {
+        if (!ppcDebuggerActive) {
           Button("Start", [&] {
             ppcDebuggerActive = true;
           });
-          if (ppcDebuggerActive) {
-            if (!Xe_Main->getCPU()->IsHalted()) {
-              Button("Pause", [&] {
-                Xe_Main->getCPU()->Continue();
-              });
-              SameLine();
-            }
-            else {
-              Button("Continue", [&] {
-                Xe_Main->getCPU()->Continue();
-              });
-            }
-            SameLine();
-            Button("Step", [&] {
-              Xe_Main->getCPU()->Step();
-            });
-          }
-        });
-        TabItem("Settings", [&] {
-          TabBar("##settings", [&] {
-            TabItem("General", [&] {
-              GeneralSettings(this);
-            });
-            TabItem("Codeflow", [&] {
-              CodeflowSettings(this);
-            });
-            TabItem("Graphics", [&] {
-              GraphicsSettings(this);
-            });
-            TabItem("ImGui", [&] {
-              ImGuiSettings(this);
-            });
+        }
+        if (ppcDebuggerActive && ppcDebuggerAttached) {
+          PPCDebugger(this);
+        }
+      });
+      TabItem("Settings", [&] {
+        TabBar("##settings", [&] {
+          TabItem("General", [&] {
+            GeneralSettings(this);
+          });
+          TabItem("Codeflow", [&] {
+            CodeflowSettings(this);
+          });
+          TabItem("Graphics", [&] {
+            GraphicsSettings(this);
+          });
+          TabItem("ImGui", [&] {
+            ImGuiSettings(this);
           });
         });
       });
-    }, { 800.f, 500.f }, ImGuiWindowFlags_NoCollapse, nullptr, { 100.f, 10.f });
-  }
+    });
+  }, { 1200.f, 700.f }, ImGuiWindowFlags_NoCollapse, nullptr, { 0.f, 0.f });
 }
 
 void Render::OpenGLGUI::EndSwap() {
