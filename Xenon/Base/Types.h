@@ -2,7 +2,8 @@
 
 #pragma once
 
-#include <fmt/format.h>
+#include <bit>
+#include <format>
 #include <type_traits>
 
 // Vali0004: Helper macro to make me sane when doing RAII
@@ -34,19 +35,30 @@ using f32 = float;
 using f64 = double;
 
 // UDLs for memory size values
-[[nodiscard]] inline constexpr u64 operator""_KB(const u64 x) {
+[[nodiscard]] constexpr u64 operator""_KB(const u64 x) {
   return 1024ULL * x;
 }
-[[nodiscard]] inline constexpr u64 operator""_MB(const u64 x) {
+[[nodiscard]] constexpr u64 operator""_MB(const u64 x) {
   return 1024_KB * x;
 }
-[[nodiscard]] inline constexpr u64 operator""_GB(const u64 x) {
+[[nodiscard]] constexpr u64 operator""_GB(const u64 x) {
   return 1024_MB * x;
+}
+
+// Byteswap
+template <class T>
+  requires std::is_integral_v<T>
+[[nodiscard]] constexpr T byteswap(T value) noexcept {
+  if constexpr (std::endian::native == std::endian::little) {
+    return std::byteswap<T>(value);
+  }
+
+  return value;
 }
 
 // Min/max value of a typetemplate <typename T>
 template <typename T>
-static consteval T min_t() {
+[[nodiscard]] consteval T min_t() noexcept {
   if constexpr (std::is_unsigned_v<T>) {
     return 0;
   } else if constexpr (std::is_same_v<T, s64>) {
@@ -69,7 +81,7 @@ public:
 template <typename T>
 constexpr T min_v = min<T>::value;
 template <typename T>
-static consteval T max_t() {
+[[nodiscard]] consteval T max_t() noexcept {
   if constexpr (std::is_same_v<T, u64>) {
     return 0xFFFFFFFFFFFFFFFFu;
   } else if constexpr (std::is_same_v<T, s64>) {
@@ -107,7 +119,7 @@ template <typename cT, typename T>
   // Associative container
   size_t cSize = c.size();
   if (cSize <= idx) [[unlikely]] {
-    assert_fail_debug_msg(fmt::format("Range check failed! (index: {}{})", idx, cSize != max_v<size_t> ? fmt::format(", size: {}", cSize) : ""));
+    assert_fail_debug_msg(std::format("Range check failed! (index: {}{})", idx, cSize != max_v<size_t> ? std::format(", size: {}", cSize) : ""));
   }
   auto it = std::begin(std::forward<cT>(c));
   std::advance(it, idx);
@@ -123,7 +135,7 @@ template <typename cT, typename T>
   if constexpr ((requires() { c.size(); }))
     cSize = c.size();
   if (found == c.end()) [[unlikely]] {
-    assert_fail_debug_msg(fmt::format("Range check failed! (index: {}{})", idx, cSize != max_v<size_t> ? fmt::format(", size: {}", cSize) : ""));
+    assert_fail_debug_msg(std::format("Range check failed! (index: {}{})", idx, cSize != max_v<size_t> ? std::format(", size: {}", cSize) : ""));
   }
   return found->second;
 }

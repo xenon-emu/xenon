@@ -43,7 +43,7 @@ HDD::HDD(const char *deviceName, u64 size, PCIBridge *parentPCIBridge) :
   memcpy(&pciConfigSpace.data[0xC0], &data, 4); // SSTATUS_DET_NO_DEVICE_DETECTED.
                                                 // SSTATUS_SPD_NO_SPEED.
                                                 // SSTATUS_IPM_NO_DEVICE.
-// SError.
+  // SError.
   data = 0x001F0201;
   memcpy(&pciConfigSpace.data[0xC4], &data, 4);
   // SControl.
@@ -161,11 +161,9 @@ void HDD::Write(u64 writeAddress, u64 data, u8 byteCount) {
       default:
         break;
       }
-    default:
-      break;
     }
 
-    memcpy((u8 *)&ataDeviceState.ataWriteState + regOffset, &data, byteCount);
+    memcpy(reinterpret_cast<u8*>(&ataDeviceState.ataWriteState + regOffset), &data, byteCount);
   } else {
     LOG_ERROR(HDD, "Unknown register being accessed: (Write) {:#x}", regOffset);
   }

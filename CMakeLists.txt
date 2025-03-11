@@ -131,6 +131,7 @@ set(XCPU
     Xenon/Core/XCPU/XenonReservations.cpp
     Xenon/Core/XCPU/XenonReservations.h
     Xenon/Core/XCPU/eFuse.h
+    Xenon/Core/XCPU/elf_abi.h
     Xenon/Core/XCPU/IIC/IIC.cpp
     Xenon/Core/XCPU/IIC/IIC.h
     Xenon/Core/XCPU/Interpreter/PPC_ALU.cpp

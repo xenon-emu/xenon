@@ -117,7 +117,7 @@ void PPCInterpreter::PPCInterpreter_sthbrx(PPU_STATE *ppuState) {
   MEM(EA, 2) <- rS[56-63] || rS[48-55]
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite16(ppuState, EA, std::byteswap<u16>(static_cast<u16>(GPRi(rs))));
+  MMUWrite16(ppuState, EA, byteswap<u16>(static_cast<u16>(GPRi(rs))));
 }
 
 // Store Half Word with Update (x'B400 0000')
@@ -248,7 +248,7 @@ void PPCInterpreter::PPCInterpreter_stwbrx(PPU_STATE *ppuState) {
   MEM(EA, 4) <- rS[56-63] || rS[48-55] || rS[40-47] || rS[32-39]
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite32(ppuState, EA, std::byteswap<u32>(static_cast<u32>(GPRi(rs))));
+  MMUWrite32(ppuState, EA, byteswap<u32>(static_cast<u32>(GPRi(rs))));
 }
 
 // Store Word Conditional Indexed (x'7C00 012D')
@@ -288,7 +288,7 @@ void PPCInterpreter::PPCInterpreter_stwcx(PPU_STATE *ppuState) {
     if (ppuState->ppuThread[ppuState->currentThread].ppuRes->V) {
       if (ppuState->ppuThread[ppuState->currentThread].ppuRes->resAddr == RA) {
         bool soc = false;
-        u32 data = std::byteswap<u32>(static_cast<u32>(GPRi(rs)));
+        u32 data = byteswap<u32>(static_cast<u32>(GPRi(rs)));
         RA = mmuContructEndAddressFromSecEngAddr(RA, &soc);
         sysBus->Write(RA, data, 4);
         intXCPUContext->xenonRes.Check(RA);
@@ -401,7 +401,7 @@ void PPCInterpreter::PPCInterpreter_stdcx(PPU_STATE *ppuState) {
     if (ppuState->ppuThread[ppuState->currentThread].ppuRes->V) {
       if (ppuState->ppuThread[ppuState->currentThread].ppuRes->resAddr == (RA & ~7)) {
         u64 data =
-            std::byteswap<u64>(GPRi(rs));
+            byteswap<u64>(GPRi(rs));
         bool soc = false;
         RA = mmuContructEndAddressFromSecEngAddr(RA, &soc);
         sysBus->Write(RA, data, 8);
@@ -618,7 +618,7 @@ void PPCInterpreter::PPCInterpreter_lhbrx(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  GPRi(rd) = std::byteswap<u16>(data);
+  GPRi(rd) = byteswap<u16>(data);
 }
 
 // Load Half Word and Zero (x'A000 0000')
@@ -837,7 +837,7 @@ void PPCInterpreter::PPCInterpreter_lwbrx(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  GPRi(rd) = std::byteswap<u32>(data);
+  GPRi(rd) = byteswap<u32>(data);
 }
 
 // Load Word and Zero (x'8000 0000')
@@ -1033,7 +1033,7 @@ void PPCInterpreter::PPCInterpreter_lfd(PPU_STATE *ppuState) {
   frD <- MEM(EA, 8)
   */
   // Check if Floating Point is available.
-  ASSERT(ppuState->ppuThread[ppuState->currentThread].SPR.MSR.FP == 1);
+  ASSERT(curThread.SPR.MSR.FP == 1);
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
   u64 data = MMURead64(ppuState, EA);
@@ -1041,7 +1041,67 @@ void PPCInterpreter::PPCInterpreter_lfd(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  FPRi(frd).valueAsDouble = static_cast<f64>(data);
+  FPRi(frd).valueAsDouble = static_cast<double>(data);
+}
+
+// Load Floating-Point Double-Indexed (x'C800 0000')
+void PPCInterpreter::PPCInterpreter_lfdx(PPU_STATE *ppuState) {
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + (rB)
+  frD <- MEM(EA, 8)
+  */
+  // Check if Floating Point is available.
+  ASSERT(curThread.SPR.MSR.FP == 1);
+
+  const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
+  u64 data = MMURead64(ppuState, EA);
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  FPRi(frd).valueAsDouble = static_cast<double>(data);
+}
+
+// Load Floating-Point Double with Update
+void PPCInterpreter::PPCInterpreter_lfdu(PPU_STATE *ppuState) {
+  /*
+  EA <- (rA) + EXTS(d)
+  frD <- MEM(EA, 8)
+  rA <- EA
+  */
+  // Check if Floating Point is available.
+  ASSERT(curThread.SPR.MSR.FP == 1);
+
+  const u64 EA = GPRi(ra) + _instr.simm16;
+  u64 data = MMURead64(ppuState, EA);
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  FPRi(frd).valueAsDouble = static_cast<double>(data);
+  GPRi(ra) = EA;
+}
+
+// Load Floating-Point Double with Update Indexed
+void PPCInterpreter::PPCInterpreter_lfdux(PPU_STATE *ppuState) {
+  /*
+  EA <- (rA) + (rB)
+  frD <- MEM(EA, 8)
+  rA <- EA
+  */
+  // Check if Floating Point is available.
+  ASSERT(curThread.SPR.MSR.FP == 1);
+
+  const u64 EA = GPRi(ra) + GPRi(rb);
+  u64 data = MMURead64(ppuState, EA);
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  FPRi(frd).valueAsDouble = static_cast<double>(data);
+  GPRi(ra) = EA;
 }
 
 // Load Floating-Point Single (x'C000 0000')
@@ -1053,7 +1113,7 @@ void PPCInterpreter::PPCInterpreter_lfs(PPU_STATE *ppuState) {
   frD <- DOUBLE(MEM(EA, 4))
   */
   // Check if Floating Point is available.
-  ASSERT(ppuState->ppuThread[ppuState->currentThread].SPR.MSR.FP == 1);
+  ASSERT(curThread.SPR.MSR.FP == 1);
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
   SFPRegister singlePresFP;
@@ -1062,5 +1122,5 @@ void PPCInterpreter::PPCInterpreter_lfs(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  FPRi(frd).valueAsDouble = static_cast<f64>(singlePresFP.valueAsFloat);
+  FPRi(frd).valueAsDouble = static_cast<double>(singlePresFP.valueAsFloat);
 }

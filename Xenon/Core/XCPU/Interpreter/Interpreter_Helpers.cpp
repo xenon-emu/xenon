@@ -37,9 +37,9 @@ u32 PPCInterpreter::CRCompU(PPU_STATE *ppuState, u64 num1, u64 num2) {
 u32 PPCInterpreter::CRCompS32(PPU_STATE *ppuState, u32 num1, u32 num2) {
   u32 CR = 0;
 
-  if (static_cast<sl32>(num1) < static_cast<sl32>(num2))
+  if ((long)num1 < (long)num2)
     BSET(CR, 4, CR_BIT_LT);
-  else if (static_cast<sl32>(num1) > static_cast<sl32>(num2))
+  else if ((long)num1 > (long)num2)
     BSET(CR, 4, CR_BIT_GT);
   else
     BSET(CR, 4, CR_BIT_EQ);

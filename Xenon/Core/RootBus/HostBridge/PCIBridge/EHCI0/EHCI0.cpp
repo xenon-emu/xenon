@@ -7,7 +7,7 @@ Xe::PCIDev::EHCI0::EHCI0::EHCI0(const char *deviceName, u64 size) :
   // Set PCI Properties.
   pciConfigSpace.configSpaceHeader.reg0.hexData = 0x58051414;
   pciConfigSpace.configSpaceHeader.reg1.hexData = 0x02900106;
-  pciConfigSpace.configSpaceHeader.reg2.hexData = 0x0c032001;
+  pciConfigSpace.configSpaceHeader.reg2.hexData = 0x0C032001;
   // Set our PCI Dev Sizes.
   pciDevSizes[0] = 0x1000; // BAR0
 }

@@ -310,7 +310,7 @@ struct PPU_STATE_SPRS {
   u64 RMOR;
   // Hypervisor Real Mode Offset Register
   u64 HRMOR;
-  // Logical Partition Control Register (This reg has partially shaed fields.)
+  // Logical Partition Control Register (This register has partially shared fields)
   // FIXME!
   u64 LPCR;
   // Logical Partition Identity Register
@@ -444,15 +444,13 @@ typedef struct SOCSECENG_BLOCK {       // Addr = 80000200_00024000
 
 // Floating Point Register
 
-union SFPRegister // Single Precision
-{
-  f32 valueAsFloat;
+union SFPRegister { // Single Precision
+  float valueAsFloat;
   u32 valueAsU32;
 };
 
-union FPRegister // Double Precision
-{
-  f64 valueAsDouble;
+union FPRegister { // Double Precision
+  double valueAsDouble;
   u64 valueAsU64;
 };
 

@@ -34,7 +34,7 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
                                     // about Meta/NAND Type.
   sfcxState.statusReg = 0x00000600;
   sfcxState.statusReg = 0x00000600;
-  sfcxState.addressReg = 0x00f70030;
+  sfcxState.addressReg = 0x00F70030;
   sfcxState.logicalReg = 0x00000100;
   sfcxState.physicalReg = 0x0000100;
   sfcxState.commandReg = NO_CMD;
@@ -61,49 +61,49 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
   nandFile.close();
 
   // Fix Endiannes
-  sfcxState.nandHeader.nandMagic = std::byteswap<u16>(sfcxState.nandHeader.nandMagic);
+  sfcxState.nandHeader.nandMagic = byteswap<u16>(sfcxState.nandHeader.nandMagic);
   LOG_INFO(SFCX, " * NAND Magic: {:#x}", sfcxState.nandHeader.nandMagic);
 
-  sfcxState.nandHeader.build = std::byteswap<u16>(sfcxState.nandHeader.build);
+  sfcxState.nandHeader.build = byteswap<u16>(sfcxState.nandHeader.build);
   LOG_INFO(SFCX, " * Build: {:#x}", sfcxState.nandHeader.build);
 
-  sfcxState.nandHeader.qfe = std::byteswap<u16>(sfcxState.nandHeader.qfe);
+  sfcxState.nandHeader.qfe = byteswap<u16>(sfcxState.nandHeader.qfe);
   LOG_INFO(SFCX, " * QFE: {:#x}", sfcxState.nandHeader.qfe);
 
-  sfcxState.nandHeader.flags = std::byteswap<u16>(sfcxState.nandHeader.flags);
+  sfcxState.nandHeader.flags = byteswap<u16>(sfcxState.nandHeader.flags);
   LOG_INFO(SFCX, " * Flags: {:#x}", sfcxState.nandHeader.flags);
 
-  sfcxState.nandHeader.entry = std::byteswap<u32>(sfcxState.nandHeader.entry);
+  sfcxState.nandHeader.entry = byteswap<u32>(sfcxState.nandHeader.entry);
   LOG_INFO(SFCX, " * Entry: {:#x}", sfcxState.nandHeader.entry);
 
-  sfcxState.nandHeader.size = std::byteswap<u32>(sfcxState.nandHeader.size);
+  sfcxState.nandHeader.size = byteswap<u32>(sfcxState.nandHeader.size);
   LOG_INFO(SFCX, " * Size: {:#x}", sfcxState.nandHeader.size);
 
-  sfcxState.nandHeader.keyvaultSize = std::byteswap<u32>(sfcxState.nandHeader.keyvaultSize);
+  sfcxState.nandHeader.keyvaultSize = byteswap<u32>(sfcxState.nandHeader.keyvaultSize);
   LOG_INFO(SFCX, " * Keyvault Size: {:#x}", sfcxState.nandHeader.keyvaultSize);
 
-  sfcxState.nandHeader.sysUpdateAddr = std::byteswap<u32>(sfcxState.nandHeader.sysUpdateAddr);
+  sfcxState.nandHeader.sysUpdateAddr = byteswap<u32>(sfcxState.nandHeader.sysUpdateAddr);
   LOG_INFO(SFCX, " * System Update Addr: {:#x}", sfcxState.nandHeader.sysUpdateAddr);
 
-  sfcxState.nandHeader.sysUpdateCount = std::byteswap<u16>(sfcxState.nandHeader.sysUpdateCount);
+  sfcxState.nandHeader.sysUpdateCount = byteswap<u16>(sfcxState.nandHeader.sysUpdateCount);
   LOG_INFO(SFCX, " * System Update Count: {:#x}", sfcxState.nandHeader.sysUpdateCount);
 
-  sfcxState.nandHeader.keyvaultVer = std::byteswap<u16>(sfcxState.nandHeader.keyvaultVer);
+  sfcxState.nandHeader.keyvaultVer = byteswap<u16>(sfcxState.nandHeader.keyvaultVer);
   LOG_INFO(SFCX, " * Keyvault Ver: {:#x}", sfcxState.nandHeader.keyvaultVer);
 
-  sfcxState.nandHeader.keyvaultAddr = std::byteswap<u32>(sfcxState.nandHeader.keyvaultAddr);
+  sfcxState.nandHeader.keyvaultAddr = byteswap<u32>(sfcxState.nandHeader.keyvaultAddr);
   LOG_INFO(SFCX, " * Keyvault Addr: {:#x}", sfcxState.nandHeader.keyvaultAddr);
 
-  sfcxState.nandHeader.sysUpdateSize = std::byteswap<u32>(sfcxState.nandHeader.sysUpdateSize);
+  sfcxState.nandHeader.sysUpdateSize = byteswap<u32>(sfcxState.nandHeader.sysUpdateSize);
   LOG_INFO(SFCX, " * System Update Size: {:#x}", sfcxState.nandHeader.sysUpdateSize);
 
-  sfcxState.nandHeader.smcConfigAddr = std::byteswap<u32>(sfcxState.nandHeader.smcConfigAddr);  
+  sfcxState.nandHeader.smcConfigAddr = byteswap<u32>(sfcxState.nandHeader.smcConfigAddr);  
   LOG_INFO(SFCX, " * SMC Config Addr: {:#x}", sfcxState.nandHeader.smcConfigAddr);
 
-  sfcxState.nandHeader.smcBootSize = std::byteswap<u32>(sfcxState.nandHeader.smcBootSize);
+  sfcxState.nandHeader.smcBootSize = byteswap<u32>(sfcxState.nandHeader.smcBootSize);
   LOG_INFO(SFCX, " * SMC Boot Size: {:#x}", sfcxState.nandHeader.smcBootSize);
 
-  sfcxState.nandHeader.smcBootAddr = std::byteswap<u32>(sfcxState.nandHeader.smcBootAddr);
+  sfcxState.nandHeader.smcBootAddr = byteswap<u32>(sfcxState.nandHeader.smcBootAddr);
   LOG_INFO(SFCX, " * SMC Boot Addr: {:#x}", sfcxState.nandHeader.smcBootAddr);
 
   // Check Image size and Meta type.
@@ -310,15 +310,15 @@ bool SFCX::checkMagic() {
   // Devkit Nand Magic is 0x0F4F.
   // Older Devkit Nand's magic is 0x0F3F.
 
-  if (magic[0] == (char)0xff && magic[1] == (char)0x4f) {
+  if (magic[0] == (char)0xFF && magic[1] == (char)0x4F) {
     LOG_INFO(SFCX, "Retail NAND Magic found.");
     return true;
   }
-  if (magic[0] == (char)0x0f && magic[1] == (char)0x4f) {
+  if (magic[0] == (char)0x0F && magic[1] == (char)0x4F) {
     LOG_INFO(SFCX, "Devkit NAND Magic found.");
     return true;
   }
-  if (magic[0] == (char)0x0f && magic[1] == (char)0x3f) {
+  if (magic[0] == (char)0x0F && magic[1] == (char)0x3F) {
     LOG_INFO(SFCX, "Old Devkit NAND Magic found.");
     return true;
   }

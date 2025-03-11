@@ -58,6 +58,15 @@ void Render::GUI::Child(const std::string& title, std::function<void()> callback
   ImGui::EndChild();
 }
 
+void Render::GUI::Node(const std::string& title, std::function<void()> callback, ImGuiTreeNodeFlags flags) {
+  if (ImGui::TreeNodeEx(title.c_str(), flags)) {
+    if (callback) {
+      callback();
+    }
+    ImGui::TreePop();
+  }
+}
+
 void Render::GUI::Text(const std::string& label) {
   ImGui::TextUnformatted(label.c_str());
 }
