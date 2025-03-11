@@ -15,18 +15,9 @@
 
 // Clocks per instruction / Ticks per instruction
 static constexpr u64 cpi_base_freq = 50000000ull; // 50Mhz
-static constexpr u64 cpi_scale = 100u; // Scale of how many clocks to speed up by divided by 100 | Default: 100
-static constexpr u64 cpi_base = (cpi_base_freq / 1000000ull) * (cpi_scale / 100u);
-#define EPOCH_TIME std::chrono::steady_clock::now().time_since_epoch()
-#define DURATION_CAST(x, t) std::chrono::duration_cast<x>(t).count()
-static constexpr u64 get_cpi_value(u64 instrPerSecond, u64 epochNs) {
-  // Compute CPU cycles elapsed based on epoch time
-  u64 cycles = (epochNs / 1000000000ull * cpi_base_freq) +
-               ((epochNs % 1000000000ull) * cpi_base_freq / 1000000000ull) *
-               (cpi_scale / 100u);
-  u64 instrExecuted = (instrPerSecond * epochNs) / 1000000000ull;
-  instrExecuted = instrExecuted ? instrExecuted : 1;
-  return cycles / instrExecuted;
+static constexpr u64 cpi_scale = 100u; // Scale of how many clocks to speed up in percentage of speed
+static constexpr u64 get_cpi_value(u64 instrPerSecond) {
+  return (instrPerSecond / 100000ull) / (cpi_base_freq / 1000000ull) * (cpi_scale / 100u);
 }
 
 PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PVR,
@@ -114,7 +105,7 @@ void PPU::CalculateCPI() {
   u32 instrPerSecond = getIPS();
 
   // Get our CPI
-  u64 cpi = get_cpi_value(instrPerSecond, DURATION_CAST(std::chrono::nanoseconds, EPOCH_TIME));
+  u64 cpi = get_cpi_value(instrPerSecond);
 
   LOG_INFO(Xenon, "{} Speed: {:#d} instructions per second.", ppuState->ppuName, instrPerSecond);
 
@@ -124,7 +115,7 @@ void PPU::CalculateCPI() {
   if (!configCpi)
     LOG_INFO(Xenon, "{} CPI: {} clocks per instruction", ppuState->ppuName, clocksPerInstruction);
   else
-    LOG_INFO(Xenon, "{} CPI: {} clocks per instruction (overrwriten! actual CPI: {})", ppuState->ppuName, clocksPerInstruction, cpi);
+    LOG_INFO(Xenon, "{} CPI: {} clocks per instruction (Overwritten! Actual CPI: {})", ppuState->ppuName, clocksPerInstruction, cpi);
 }
 
 void PPU::Reset() {

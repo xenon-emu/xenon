@@ -163,7 +163,7 @@ void HDD::Write(u64 writeAddress, u64 data, u8 byteCount) {
       }
     }
 
-    memcpy(reinterpret_cast<u8*>(&ataDeviceState.ataWriteState) + regOffset, &data, byteCount);
+    memcpy(reinterpret_cast<u8*>(&ataDeviceState.ataWriteState + regOffset), &data, byteCount);
   } else {
     LOG_ERROR(HDD, "Unknown register being accessed: (Write) {:#x}", regOffset);
   }
