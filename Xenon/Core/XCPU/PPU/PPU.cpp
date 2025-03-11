@@ -430,7 +430,7 @@ u64 PPU::loadElfImage(u8 *data, u64 size) {
   const elf64_phdr* psections = reinterpret_cast<elf64_phdr*>(data + header->e_phoff);
 
   for (size_t i = 0; i < num_psections; i++) {
-    if (psections[i].p_type == byteswap<u64>(PT_LOAD)) {
+    if (byteswap<u32>(psections[i].p_type) == PT_LOAD) {
       base_offset = byteswap<u64>(psections[i].p_vaddr);
       break;
     }

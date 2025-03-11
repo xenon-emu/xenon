@@ -7,7 +7,8 @@
 class LRUCache {
 private:
   int capacity = 0;
-  std::list<uint64_t> keys; // Lista doblemente enlazada
+  std::list<uint64_t> keys;
+  // Double linked list
   std::unordered_map<uint64_t, std::pair<uint64_t, std::list<uint64_t>::iterator>> cache;
 
 public:
