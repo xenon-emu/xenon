@@ -131,8 +131,8 @@ void PPCInterpreter::PPCInterpreter_rfid(PPU_STATE *ppuState) {
 
   // NB: we dont do half-modes
   if (diff_msr & QMASK(58, 59)) {
-    curThread.SPR.MSR.IR = usr != NULL || (new_msr & QMASK(58, 59)) != NULL;
-    curThread.SPR.MSR.DR = usr != NULL || (new_msr & QMASK(58, 59)) != NULL;
+    curThread.SPR.MSR.IR = usr != 0 || (new_msr & QMASK(58, 59)) != 0;
+    curThread.SPR.MSR.DR = usr != 0 || (new_msr & QMASK(58, 59)) != 0;
   }
 
   curThread.SPR.MSR.MSR_Hex = new_msr;

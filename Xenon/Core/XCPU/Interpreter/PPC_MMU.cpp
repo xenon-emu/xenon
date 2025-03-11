@@ -628,7 +628,7 @@ u64 PPCInterpreter::mmuContructEndAddressFromSecEngAddr(u64 inputAddress,
 
 // Main address translation mechanism used on the XCPU.
 bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
-                                         bool memWrite) {
+                                         bool memWrite, bool speculativeLoad) {
   // Every time the CPU does a load or store, it goes trough the MMU.
   // The MMU decides based on MSR, and some other regs if address translation
   // for Instr/Data is in Real Mode (EA = RA) or in Virtual Mode (Page
@@ -685,22 +685,24 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
   // See IBM_CBE_Handbook_v1.1 Page 82.
   
   // Search ERAT's
-  if (curThread.iFetch) {
-    // iERAT
-    RA = curThread.iERAT.getElement((*EA & ~0xFFF));
-    if (RA != -1) {
-      RA |= (*EA & 0xFFF);
-      *EA = RA;
-      return true;
+  if (!speculativeLoad) {
+    if (curThread.iFetch) {
+      // iERAT
+      RA = curThread.iERAT.getElement((*EA & ~0xFFF));
+      if (RA != -1) {
+        RA |= (*EA & 0xFFF);
+        *EA = RA;
+        return true;
+      }
     }
-  }
-  else {
-    // dERAT
-    RA = curThread.dERAT.getElement((*EA & ~0xFFF));
-    if (RA != -1) {
-      RA |= (*EA & 0xFFF);
-      *EA = RA;
-      return true;
+    else {
+      // dERAT
+      RA = curThread.dERAT.getElement((*EA & ~0xFFF));
+      if (RA != -1) {
+        RA |= (*EA & 0xFFF);
+        *EA = RA;
+        return true;
+      }
     }
   }
 
@@ -772,8 +774,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 
     bool slbHit = false;
     // Search the SLB to get the VSID
-    for (auto &slbEntry :
-         curThread.SLB) {
+    for (auto &slbEntry : curThread.SLB) {
       if (slbEntry.V && (slbEntry.ESID == ESID)) {
         // Entry valid & SLB->ESID = EA->VSID
         currslbEntry = slbEntry;
@@ -828,17 +829,13 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
         // interrupt, else do page table search.
         if (tlbSoftwareManaged) {
           bool hv = curThread.SPR.MSR.HV;
-          bool sfMode =
-              curThread.SPR.MSR.SF;
+          bool sfMode = curThread.SPR.MSR.SF;
           u64 CIA = curThread.CIA;
 
           if (curThread.iFetch) {
-            curThread.exceptReg |=
-                PPU_EX_INSSTOR;
+            _ex |= PPU_EX_INSSTOR;
           } else {
-
-            curThread.exceptReg |=
-                PPU_EX_DATASTOR;
+            _ex |= PPU_EX_DATASTOR;
             curThread.SPR.DAR = *EA;
             curThread.SPR.DSISR =
                 DSISR_NOPTE;
@@ -850,10 +847,8 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 
           // Save MSR DR & IR Bits. When an exception occurs they must be reset
           // to whatever they where.
-          bool msrDR =
-              curThread.SPR.MSR.DR;
-          bool msrIR =
-              curThread.SPR.MSR.IR;
+          bool msrDR = curThread.SPR.MSR.DR;
+          bool msrIR = curThread.SPR.MSR.IR;
 
           // Disable relocation.
           curThread.SPR.MSR.DR = 0;
@@ -1077,16 +1072,16 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 
           // Instruction read.
           if (curThread.iFetch) {
-            curThread.exceptReg |= PPU_EX_INSSTOR;
+            _ex |= PPU_EX_INSSTOR;
 
           } else if (memWrite) {
             // Data write.
-            curThread.exceptReg |= PPU_EX_DATASTOR;
+            _ex |= PPU_EX_DATASTOR;
             curThread.SPR.DAR = *EA;
             curThread.SPR.DSISR = DSISR_NOPTE | DSISR_ISSTORE;
           } else {
             // Data read.
-            curThread.exceptReg |= PPU_EX_DATASTOR;
+            _ex |= PPU_EX_DATASTOR;
             curThread.SPR.DAR = *EA;
             curThread.SPR.DSISR = DSISR_NOPTE;
           }
@@ -1097,9 +1092,9 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
       // SLB Miss
       // Data or Inst Segment Exception
       if (curThread.iFetch) {
-        curThread.exceptReg |= PPU_EX_INSTSEGM;
+        _ex |= PPU_EX_INSTSEGM;
       } else {
-        curThread.exceptReg |= PPU_EX_DATASEGM;
+        _ex |= PPU_EX_DATASEGM;
         curThread.SPR.DAR = *EA;
       }
       return false;
@@ -1112,13 +1107,15 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
   }
 
   // Save in ERAT's
-  if (curThread.iFetch) {
-    // iERAT
-    curThread.iERAT.putElement((*EA & ~0xFFF), (RA & ~0xFFF));
-  }
-  else {
-    // dERAT
-    curThread.dERAT.putElement((*EA & ~0xFFF), (RA & ~0xFFF));
+  if (!speculativeLoad) {
+    if (curThread.iFetch) {
+      // iERAT
+      curThread.iERAT.putElement((*EA & ~0xFFF), (RA & ~0xFFF));
+    }
+    else {
+      // dERAT
+      curThread.dERAT.putElement((*EA & ~0xFFF), (RA & ~0xFFF));
+    }
   }
 
   *EA = RA;
@@ -1127,7 +1124,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 
 // MMU Read Routine, used by the CPU
 u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
-                            u64 EA, s8 byteCount) {
+                            u64 EA, s8 byteCount, bool speculativeLoad) {
   u64 data = 0;
   u64 oldEA = EA;
 
@@ -1136,7 +1133,7 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   }
 
   // Exception ocurred?
-  if (MMUTranslateAddress(&EA, ppuState, false) == false)
+  if (MMUTranslateAddress(&EA, ppuState, false, speculativeLoad) == false)
     return 0;
 
   bool socRead = false;
@@ -1446,27 +1443,27 @@ void PPCInterpreter::MMUMemCpy(PPU_STATE *ppuState,
 }
 
 // Reads 1 Byte of memory.
-u8 PPCInterpreter::MMURead8(PPU_STATE *ppuState, u64 EA) {
+u8 PPCInterpreter::MMURead8(PPU_STATE *ppuState, u64 EA, bool speculativeLoad) {
   u8 data = 0;
-  data = static_cast<u8>(MMURead(intXCPUContext, ppuState, EA, 1));
+  data = static_cast<u8>(MMURead(intXCPUContext, ppuState, EA, 1, speculativeLoad));
   return data;
 }
 // Reads 2 Bytes of memory.
-u16 PPCInterpreter::MMURead16(PPU_STATE *ppuState, u64 EA) {
+u16 PPCInterpreter::MMURead16(PPU_STATE *ppuState, u64 EA, bool speculativeLoad) {
   u16 data = 0;
-  data = static_cast<u16>(MMURead(intXCPUContext, ppuState, EA, 2));
+  data = static_cast<u16>(MMURead(intXCPUContext, ppuState, EA, 2, speculativeLoad));
   return byteswap<u16>(data);
 }
 // Reads 4 Bytes of memory.
-u32 PPCInterpreter::MMURead32(PPU_STATE *ppuState, u64 EA) {
+u32 PPCInterpreter::MMURead32(PPU_STATE *ppuState, u64 EA, bool speculativeLoad) {
   u32 data = 0;
-  data = static_cast<u32>(MMURead(intXCPUContext, ppuState, EA, 4));
+  data = static_cast<u32>(MMURead(intXCPUContext, ppuState, EA, 4, speculativeLoad));
   return byteswap<u32>(data);
 }
 // Reads 8 Bytes of memory.
-u64 PPCInterpreter::MMURead64(PPU_STATE *ppuState, u64 EA) {
+u64 PPCInterpreter::MMURead64(PPU_STATE *ppuState, u64 EA, bool speculativeLoad) {
   u64 data = 0;
-  data = MMURead(intXCPUContext, ppuState, EA, 8);
+  data = MMURead(intXCPUContext, ppuState, EA, 8, speculativeLoad);
   return byteswap<u64>(data);
 }
 // Writes 1 Byte to memory.

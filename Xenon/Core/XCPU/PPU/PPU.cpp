@@ -16,13 +16,13 @@
 // Clocks per instruction / Ticks per instruction
 static constexpr f64 cpi_base_freq = 50000000ull; // 50Mhz
 static constexpr f64 cpi_scale = 1.00; // Scale of how many clocks to speed up in percentage of speed
-static u64 get_cpi_value(u64 instrPerSecond) {
+static constexpr u64 get_cpi_value(u64 instrPerSecond) {
   u64 tpi = 0;
   // Use floating point for a more percise CPI
   f64 cpi_value = (instrPerSecond / 100000ull) / ((cpi_base_freq / 1000000ull) * cpi_scale);
-  LOG_INFO(Xenon, "CPI Floating: {} MIPS.", cpi_value);
-  tpi = static_cast<u64>(cpi_value); // Round up
-  if ((cpi_value - static_cast<f64>(tpi)) >= 0.5)
+  tpi = static_cast<u64>(cpi_value);
+  // Round up
+  if ((cpi_value - static_cast<f64>(tpi)) >= 0.5 || tpi == 0)
     tpi++;
   return tpi;
 }
@@ -213,10 +213,8 @@ void PPU::StartExecution() {
           // Check if External interrupts are enabled and the IIC has a pending
           // interrupt.
           if (curThread.SPR.MSR.EE) {
-            if (xenonContext->xenonIIC.checkExtInterrupt(
-                    curThread.SPR.PIR)) {
-              curThread.exceptReg |=
-                  PPU_EX_EXT;
+            if (xenonContext->xenonIIC.checkExtInterrupt(curThread.SPR.PIR)) {
+              _ex |= PPU_EX_EXT;
             }
           }
 
@@ -277,10 +275,8 @@ void PPU::StartExecution() {
           // Check if External interrupts are enabled and the IIC has a pending
           // interrupt.
           if (curThread.SPR.MSR.EE) {
-            if (xenonContext->xenonIIC.checkExtInterrupt(
-                    curThread.SPR.PIR)) {
-              curThread.exceptReg |=
-                  PPU_EX_EXT;
+            if (xenonContext->xenonIIC.checkExtInterrupt(curThread.SPR.PIR)) {
+              _ex |= PPU_EX_EXT;
             }
           }
 
@@ -434,7 +430,7 @@ u64 PPU::loadElfImage(u8 *data, u64 size) {
   const elf64_phdr* psections = reinterpret_cast<elf64_phdr*>(data + header->e_phoff);
 
   for (size_t i = 0; i < num_psections; i++) {
-    if (psections[i].p_type == byteswap<u64>(PT_LOAD)) {
+    if (byteswap<u32>(psections[i].p_type) == PT_LOAD) {
       base_offset = byteswap<u64>(psections[i].p_vaddr);
       break;
     }
@@ -489,7 +485,7 @@ bool PPU::ppuReadNextInstruction() {
   curThread.iFetch = true;
   // Fetch the instruction from memory.
   curThread.CI.opcode = PPCInterpreter::MMURead32(ppuState.get(), curThread.CIA);
-  if (curThread.exceptReg & PPU_EX_INSSTOR || curThread.exceptReg & PPU_EX_INSTSEGM) {
+  if (_ex & PPU_EX_INSSTOR || _ex & PPU_EX_INSTSEGM) {
     return false;
   }
   curThread.iFetch = false;
@@ -499,7 +495,7 @@ bool PPU::ppuReadNextInstruction() {
 // Checks for exceptions and process them in the correct order.
 void PPU::ppuCheckExceptions() {
   // Check Exceptions pending and process them in order.
-  u16 exceptions = curThread.exceptReg;
+  u16 exceptions = _ex;
   if (exceptions != PPU_EX_NONE) {
     // Non Maskable:
 
@@ -654,7 +650,7 @@ void PPU::ppuCheckExceptions() {
 
     // Set the new value for our exception register.
   end:
-    curThread.exceptReg = exceptions;
+    _ex = exceptions;
   }
 }
 
@@ -673,10 +669,9 @@ void PPU::updateTimeBase() {
   curThread.SPR.DEC = newDec;
   // Check if Previous decrementer measurement is smaller than current and a
   // decrementer exception is not pending.
-  if (newDec > dec && ((curThread.exceptReg &
-                        PPU_EX_DEC) == 0)) {
+  if (newDec > dec && ((_ex & PPU_EX_DEC) == 0)) {
     // The decrementer must issue an interrupt.
-    curThread.exceptReg |= PPU_EX_DEC;
+    _ex |= PPU_EX_DEC;
   }
 }
 

@@ -22,9 +22,8 @@ public:
   void BeginSwap() override;
   void OnSwap(Texture *texture) override;
   void EndSwap() override;
-  bool ppcDebuggerActive{};
-private:
-  bool ppcDebuggerAttached{ true };
+  bool ppcDebuggerActive = false;
+  bool ppcDebuggerAttached = true;
 };
 
 } // namespace Render

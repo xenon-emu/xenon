@@ -29,9 +29,6 @@ void Render::GUI::Init(SDL_Window* window, void* context) {
   InitBackend(context);
 }
 void Render::GUI::Shutdown() {
-  if (!this) {
-    return;
-  }
   ShutdownBackend();
   ImGui::DestroyContext();
 }

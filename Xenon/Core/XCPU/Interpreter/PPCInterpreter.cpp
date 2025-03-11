@@ -9,8 +9,7 @@ using namespace PPCInterpreter;
 // Forward Declaration
 XENON_CONTEXT* PPCInterpreter::intXCPUContext = nullptr;
 RootBus* PPCInterpreter::sysBus = nullptr;
-
-PPCInterpreter::PPCDecoder ppcDecoder{};
+PPCInterpreter::PPCDecoder PPCInterpreter::ppcDecoder{};
 
 // Interpreter Single Instruction Processing.
 void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
