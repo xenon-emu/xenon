@@ -49,9 +49,9 @@ void Xenon::Start(u64 resetVector) {
   ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(&xenonContext, mainBus, resetVector, XE_PVR, 4, "PPU2"); // Threads 4-5
   // Halt the CPU to ensure no opcodes are ran
   Halt();
-  // Get our CPI based on the second PPU (as init has finished), then share it across all PPUs
-  ppu0->SetCPI(ppu1->GetCPI());
-  ppu2->SetCPI(ppu1->GetCPI());
+  // Get our CPI based on the last PPU (as init has finished), then share it across all PPUs
+  ppu0->SetCPI(ppu2->GetCPI());
+  ppu1->SetCPI(ppu2->GetCPI());
   // Continue after halting
   Continue();
 }

@@ -282,7 +282,7 @@ void PPC_PPU(Render::OpenGLGUI *gui, PPU *PPU) {
   PPU_STATE &PPUState = *PPUStatePtr;
   gui->Node(PPUState.ppuName, [&] {
     u32 curInstr = _instr.opcode;
-    u32 nextInstr = PPCInterpreter::MMURead32(ppuState, curThread.NIA);
+    u32 nextInstr = PPCInterpreter::MMURead32(ppuState, curThread.NIA, true);
     RenderInstr(gui, curThread.CIA, curInstr);
     RenderInstr(gui, curThread.NIA, nextInstr);
     gui->Node("ppuThread", [&] {

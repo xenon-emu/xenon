@@ -483,8 +483,8 @@ struct PPU_THREAD_REGISTERS {
 
   // ERAT's
 
-  LRUCache iERAT; // Instruction effective to real address cache.
-  LRUCache dERAT; // Data effective to real address cache.
+  LRUCache iERAT{ 64 }; // Instruction effective to real address cache.
+  LRUCache dERAT{ 64 }; // Data effective to real address cache.
 
   // Interrupt Register
   u16 exceptReg = 0;
