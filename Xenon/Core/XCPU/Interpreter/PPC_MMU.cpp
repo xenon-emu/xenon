@@ -90,6 +90,9 @@ void PPCInterpreter::PPCInterpreter_slbia(PPU_STATE *ppuState) {
   for (auto &slbEntry : curThread.SLB) {
     slbEntry.V = 0;
   }
+  // Invalidate both ERAT's
+  curThread.iERAT.invalidateAll();
+  curThread.dERAT.invalidateAll();
 }
 
 void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
@@ -175,15 +178,25 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
     ppuState->TLB.tlbSet3[rb_44_51].LP = 0;
     ppuState->TLB.tlbSet3[rb_44_51].p = 0;
   }
+
+  // Should only invalidate entries for a specific set of addresses.
+  // Invalidate both ERAT's *** BUG *** !!!
+  curThread.iERAT.invalidateAll();
+  curThread.dERAT.invalidateAll();
 }
 
-void PPCInterpreter::PPCInterpreter_tlbie(PPU_STATE* hCore)
+void PPCInterpreter::PPCInterpreter_tlbie(PPU_STATE* ppuState)
 {
     // Do nothing.
     LOG_INFO(Xenon, "tlbie");
+
+    // Should only invalidate entries for a specific set of addresses.
+    // Invalidate both ERAT's *** BUG *** !!!
+    curThread.iERAT.invalidateAll();
+    curThread.dERAT.invalidateAll();
 }
 
-void PPCInterpreter::PPCInterpreter_tlbsync(PPU_STATE* hCore)
+void PPCInterpreter::PPCInterpreter_tlbsync(PPU_STATE* ppuState)
 {
     // Do nothing.
     LOG_INFO(Xenon, "tlbsync");
@@ -630,7 +643,6 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
   // This is controlled via TL bit of the LPCR SPR.
 
   /* TODO */
-  // Implement ERATS and ERAT handling code.
   // Implement L1 per-core data/inst cache and cache handling code.
 
   //
@@ -655,6 +667,43 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 
   // Real Adress, this is what we want.
   u64 RA = 0;
+
+  //
+  // ERAT's
+  //
+
+  // Each ERAT entry holds the EA-to-RA translation for an aligned 4 KB area of memory. When 
+  // using a 4 KB page size, each ERAT entry holds the information for exactly one page.When
+  // using large pages, each ERAT entry contains a 4 KB section of the page, meaning that large
+  // pages can occupy several ERAT entries.All EA - to - RA mappings are kept in the ERAT including
+  // both real - mode and virtual - mode addresses(that is, addresses accessed with MSR[IR] equal to
+  // 0 or 1).
+  // TODO:
+  // The ERATs identify each translation entry with some combination of the MSR[SF, IR, DR, 
+  // PR, and HV] bits, depending on whether the entry is in the I - ERAT or D - ERAT.This allows the
+  // ERATs to distinguish between translations that are valid for the various modes of operation.
+  // See IBM_CBE_Handbook_v1.1 Page 82.
+  
+  // Search ERAT's
+  if (curThread.iFetch) {
+    // iERAT
+    RA = curThread.iERAT.getElement((*EA & ~0xFFF));
+    if (RA != -1) {
+      RA |= (*EA & 0xFFF);
+      *EA = RA;
+      return true;
+    }
+  }
+  else {
+    // dERAT
+    RA = curThread.dERAT.getElement((*EA & ~0xFFF));
+    if (RA != -1) {
+      RA |= (*EA & 0xFFF);
+      *EA = RA;
+      return true;
+    }
+  }
+
   // Holds whether the cpu thread issuing the fetch is running in Real or
   // Virtual mode. It defaults to Real Mode, as this is how the XCPU starts
   // all threads.
@@ -1060,6 +1109,16 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
     RA = (RPN | QGET(*EA, 64 - p, 63));
     // Real Address 0 - 21 bits are not implemented;
     QSET(RA, 0, 21, 0)
+  }
+
+  // Save in ERAT's
+  if (curThread.iFetch) {
+    // iERAT
+    curThread.iERAT.putElement((*EA & ~0xFFF), (RA & ~0xFFF));
+  }
+  else {
+    // dERAT
+    curThread.dERAT.putElement((*EA & ~0xFFF), (RA & ~0xFFF));
   }
 
   *EA = RA;

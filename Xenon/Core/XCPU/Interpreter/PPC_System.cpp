@@ -67,6 +67,11 @@ void PPCInterpreter::PPCInterpreter_slbie(PPU_STATE *ppuState) {
       slbEntry.V = false;
     }
   }
+
+  // Should only invalidate entries for a specific set of addresses.
+  // Invalidate both ERAT's *** BUG *** !!!
+  curThread.iERAT.invalidateAll();
+  curThread.dERAT.invalidateAll();
 }
 
 void PPCInterpreter::PPCInterpreter_rfid(PPU_STATE *ppuState) {

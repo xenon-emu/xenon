@@ -63,6 +63,7 @@ set(Base
     Xenon/Base/Enum.h
     Xenon/Base/io_file.cpp
     Xenon/Base/io_file.h
+    Xenon/Base/LRUCache.h
     Xenon/Base/ntapi.cpp
     Xenon/Base/ntapi.h
     Xenon/Base/Path_util.cpp

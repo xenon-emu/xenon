@@ -4,6 +4,7 @@
 
 #include <memory>
 
+#include "Base/LRUCache.h"
 #include "Core/XCPU/IIC/IIC.h"
 #include "Core/XCPU/Bitfield.h"
 #include "Core/XCPU/XenonReservations.h"
@@ -479,6 +480,11 @@ struct PPU_THREAD_REGISTERS {
   FPSCRegister FPSCR;
   // Segment Lookaside Buffer
   SLBEntry SLB[64]{};
+
+  // ERAT's
+
+  LRUCache iERAT; // Instruction effective to real address cache.
+  LRUCache dERAT; // Data effective to real address cache.
 
   // Interrupt Register
   u16 exceptReg = 0;
