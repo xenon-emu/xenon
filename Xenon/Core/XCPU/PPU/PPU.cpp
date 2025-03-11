@@ -387,17 +387,17 @@ u64 PPU::loadElfImage(u8 *data, u64 size) {
   ppuElfExecution = true;
   elf64_hdr* header{ reinterpret_cast<decltype(header)>(data) };
   if (!IS_ELF(*header)) {
-    LOG_CRITICAL(Xenon, "Attempting to load a bianry which is not a elf!");
+    LOG_CRITICAL(Xenon, "Attempting to load a binary which is not a elf!");
     return 0;
   }
   if (header->e_ident[EI_DATA] != 2) {
-    LOG_CRITICAL(Xenon, "Attempting to load a bianry which is not a elf64!");
+    LOG_CRITICAL(Xenon, "Attempting to load a binary which is not a elf64!");
     return 0;
   }
   SWAP(header->e_type, u16);
   SWAP(header->e_machine, u16);
   if (header->e_machine != 0x15) {
-    LOG_CRITICAL(Xenon, "Attempting to load a bianry which is not a PowerPC 64!");
+    LOG_CRITICAL(Xenon, "Attempting to load a binary which is not a PowerPC 64!");
     return 0;
   }
 
@@ -419,57 +419,30 @@ u64 PPU::loadElfImage(u8 *data, u64 size) {
   SWAP(header->e_shstrndx, u16);
 
   u64 entry_point = header->e_entry;
-  u64 base_offset = 0;
 
-  auto stringTableIndex = header->e_shstrndx;
-
-  const auto num_sections =  header->e_shnum;
   const auto num_psections = header->e_phnum;
 
-  const elf64_shdr* sections =  reinterpret_cast<elf64_shdr*>(data + header->e_shoff);
   const elf64_phdr* psections = reinterpret_cast<elf64_phdr*>(data + header->e_phoff);
 
   for (size_t i = 0; i < num_psections; i++) {
     if (byteswap<u32>(psections[i].p_type) == PT_LOAD) {
-      base_offset = byteswap<u64>(psections[i].p_vaddr);
-      break;
+      u64 vaddr = byteswap<u64>(psections[i].p_vaddr);
+      u64 paddr = byteswap<u64>(psections[i].p_paddr);
+      u64 filesize = byteswap<u64>(psections[i].p_filesz);
+      u64 memsize = byteswap<u64>(psections[i].p_memsz);
+      u64 file_offset = byteswap<u64>(psections[i].p_offset);
+      bool physical_load = true;
+      u64 target_addr = physical_load ? paddr : vaddr;
+      std::cout << fmt::format("Loading 0x{:x} bytes from offset 0x{:x} in the ELF to 0x{:x}\n", filesize, file_offset, target_addr);
+      PPCInterpreter::MMUMemCpyFromHost(ppuState.get(), target_addr, data + file_offset, filesize);
+      if (memsize > filesize) { // memory size greater then file, zero out remainer
+        u64 remainer = memsize - filesize;
+        PPCInterpreter::MMUWrite(xenonContext, ppuState.get(), 0, target_addr + filesize, remainer);
+      }
     }
   }
 
-  u64 strTableOffset = byteswap(sections[stringTableIndex].sh_offset);
-  u8* stringTable = reinterpret_cast<u8*>(data + strTableOffset);
-
-  for (int i = 0; i < num_sections; ++i) {
-    const auto& section = sections[i];
-    if (section.sh_type == 0) {
-      continue;
-    }
-    u64 sectionAddr = byteswap<u64>(section.sh_addr);
-    u64 sectionSize = byteswap<u64>(section.sh_size);
-    u32 sectionType = byteswap<u32>(section.sh_type);
-    u64 sectionOffset = byteswap<u64>(section.sh_offset);
-
-    if (!(byteswap<u64>(section.sh_flags) & SHF_ALLOC) || sectionSize == 0)
-      continue;
-
-    if (stringTable) {
-      u8 *string = section.sh_name != 0 ?
-        stringTable + byteswap<u32>(section.sh_name) : (u8*)"";
-
-      std::cout << fmt::format("[Xenon] <Info> {:08x} {:08x}, {}ing {}...",
-        sectionAddr,
-        sectionSize,
-        (sectionType == SHT_NOBITS) ? "Clear" : "Load",
-        (char*)string);
-    }
-
-    if (sectionType == SHT_NOBITS) {
-      PPCInterpreter::MMUWrite(xenonContext, ppuState.get(), 0, sectionAddr + base_offset, sectionSize);
-    } else {
-      PPCInterpreter::MMUMemCpyFromHost(ppuState.get(), sectionAddr + base_offset, data + sectionOffset, sectionSize);
-    }
-    std::cout << "Done!" << std::endl;
-  }
+  std::cout << fmt::format("Done loading elf, entry-point is 0x{:x}\n", entry_point);
 
   curThread.NIA = entry_point;
 
