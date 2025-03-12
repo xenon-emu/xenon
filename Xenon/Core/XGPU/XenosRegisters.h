@@ -5,7 +5,7 @@
 #include <string>
 #include <unordered_map>
 
-std::string GetRegisterNameById(u32 id) {
+const std::string GetRegisterNameById(u32 id) {
   static const std::unordered_map<u32, std::string> registerMap = {
       {0x0000, "RBBM_RTL_RELEASE"},
       {0x0001, "RBBM_PATCH_RELEASE"},

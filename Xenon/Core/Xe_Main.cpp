@@ -62,7 +62,7 @@ XeMain::~XeMain() {
 void XeMain::start() {
   if (!xenonCPU.get()) {
     renderHalt = true;
-    LOG_CRITICAL(Xenon, "Failed to intialize Xenon's CPU!");
+    LOG_CRITICAL(Xenon, "Failed to initialize Xenon's CPU!");
     SYSTEM_PAUSE();
     renderHalt = false;
     return;
@@ -148,7 +148,7 @@ void XeMain::getFuses() {
   LOG_INFO(System, "Current FuseSet:");
   for (int i = 0; i < 12; i++) {
     fuseset = fusesets[i];
-    fuses[i] = strtoull(fuseset.c_str(), 0, 16);
+    fuses[i] = strtoull(fuseset.c_str(), nullptr, 16);
     LOG_INFO(System, " * FuseSet {:02}: 0x{}", i, fuseset.c_str());
   }
 }

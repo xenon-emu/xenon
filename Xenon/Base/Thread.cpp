@@ -107,8 +107,8 @@ static void AccurateSleep(std::chrono::nanoseconds duration) {
   LARGE_INTEGER interval{
     .QuadPart = -1 * (duration.count() / 100u),
   };
-  HANDLE timer = ::CreateWaitableTimer(NULL, TRUE, NULL);
-  SetWaitableTimer(timer, &interval, 0, NULL, NULL, 0);
+  HANDLE timer = ::CreateWaitableTimer(nullptr, TRUE, nullptr);
+  SetWaitableTimer(timer, &interval, 0, nullptr, nullptr, 0);
   WaitForSingleObject(timer, INFINITE);
   ::CloseHandle(timer);
 }

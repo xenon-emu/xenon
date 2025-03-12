@@ -40,7 +40,7 @@ enum class FileAccessMode {
    */
   ReadAppend = Read | Append,
 };
-DECLARE_ENUM_FLAG_OPERATORS(FileAccessMode);
+DECLARE_ENUM_FLAG_OPERATORS(FileAccessMode)
 
 enum class FileType {
   BinaryFile,

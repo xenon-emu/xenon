@@ -21,7 +21,7 @@ void compileShaders(GLuint shader, const char* source) {
   char infoLog[512];
   glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
   if (!success) {
-    glGetShaderInfoLog(shader, 512, NULL, infoLog);
+    glGetShaderInfoLog(shader, 512, nullptr, infoLog);
     LOG_ERROR(System, "Failed to initialize SDL video subsystem: {}", infoLog);
   }
 }

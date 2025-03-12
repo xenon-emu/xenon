@@ -61,5 +61,5 @@ public:
   // PCI Device Size, using when determining PCI device size of each BAR in Linux.
   u32 pciDevSizes[6] = {};
 private:
-  PCIDeviceInfo deviceInfo = {0};
+  PCIDeviceInfo deviceInfo = {nullptr};
 };

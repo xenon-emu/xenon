@@ -254,7 +254,7 @@ private:
   PCIBridge *parentBus;
 
   // Device State
-  ATA_DEV_STATE ataDeviceState = {0};
+  ATA_DEV_STATE ataDeviceState = {};
 
   void ataCopyIdentifyDeviceData();
 };

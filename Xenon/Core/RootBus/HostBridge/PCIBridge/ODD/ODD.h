@@ -362,13 +362,13 @@ struct XE_ATAPI_DEV_STATE {
   // Data Write Buffer
   DataBuffer dataWriteBuffer;
   // ATAPI Inquiry Data
-  XE_ATAPI_INQUIRY_DATA atapiInquiryData = {0};
+  XE_ATAPI_INQUIRY_DATA atapiInquiryData = {};
   // ATA Identify structure.
   XE_ATA_IDENTIFY_DATA atapiIdentifyData = {0};
   // SCSI Command Descriptor Block
-  XE_CDB scsiCBD = {0};
+  XE_CDB scsiCBD = {};
   // Direct Memroy Access Processing
-  XE_ATAPI_DMA_STATE dmaState = {0};
+  XE_ATAPI_DMA_STATE dmaState = {};
   // Mounted ISO Image
   std::unique_ptr<Storage> mountedCDImage{};
 };
@@ -391,7 +391,7 @@ private:
   RAM *mainMemory;
 
   // ATAPI Device State.
-  XE_ATAPI_DEV_STATE atapiState = {0};
+  XE_ATAPI_DEV_STATE atapiState = {};
 
   // SCSI Command Processing
   void processSCSICommand();

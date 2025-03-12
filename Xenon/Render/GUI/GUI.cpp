@@ -14,7 +14,7 @@ void Render::GUI::Init(SDL_Window* window, void* context) {
   // We don't want to create a ini because it stores positions.
   // Because we initialize with a 1280x720 window, then resize to whatever,
   // this will break the window positions, causing them to render off screen
-  io.IniFilename = NULL;
+  io.IniFilename = nullptr;
   // Enable ImGui Keyboard Navigation
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
   // Enable ImGui Gamepad Navigation
