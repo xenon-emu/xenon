@@ -48,6 +48,7 @@ s32 internalWindowHeight() { return internalHeight; }
 std::string fusesPath() { return fusesTxtPath; }
 std::string oneBlPath() { return oneBlBinPath; }
 std::string nandPath() { return nandBinPath; }
+std::string kernelPath() { return kernelBinPath; }
 std::string oddImagePath() { return oddDiscImagePath; }
 
 // s32 getGpuId() {
@@ -70,6 +71,7 @@ void loadConfig(const std::filesystem::path &path) {
     fusesTxtPath.insert(0, pathPrefix.c_str());
     oneBlBinPath.insert(0, pathPrefix.c_str());
     nandBinPath.insert(0, pathPrefix.c_str());
+    kernelBinPath.insert(0, pathPrefix.c_str());
     oddDiscImagePath.insert(0, pathPrefix.c_str());
 #endif
     saveConfig(path);
@@ -132,6 +134,8 @@ void loadConfig(const std::filesystem::path &path) {
         toml::find_or<std::string>(paths, "OneBL", oneBlBinPath);
     nandBinPath =
         toml::find_or<std::string>(paths, "Nand", nandBinPath);
+    kernelBinPath =
+        toml::find_or<std::string>(paths, "Kernel", nandBinPath);
     oddDiscImagePath =
         toml::find_or<std::string>(paths, "ODDImage", oddDiscImagePath);
   }
@@ -231,6 +235,7 @@ void saveConfig(const std::filesystem::path &path) {
   data["Paths"]["Fuses"] = fusesTxtPath;
   data["Paths"]["OneBL"] = oneBlBinPath;
   data["Paths"]["Nand"] = nandBinPath;
+  data["Paths"]["Kernel"] = kernelBinPath;
   data["Paths"]["ODDImage"] = oddDiscImagePath;
 
   // HighlyExperimental.

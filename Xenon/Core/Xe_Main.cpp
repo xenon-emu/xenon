@@ -71,7 +71,7 @@ void XeMain::start() {
     // CPU Start routine and entry point.
     xenonCPU->Start(0x20000000100);
   } else {
-    xenonCPU->LoadElf("C:/Users/Vali/Desktop/bin/kernel.elf");
+    xenonCPU->LoadElf(Config::kernelPath());
   }
 }
 

@@ -40,11 +40,13 @@ inline s32 internalHeight = 720;
 inline std::string fusesTxtPath = "C:/Xbox/fuses.txt";
 inline std::string oneBlBinPath = "C:/Xbox/1bl.bin";
 inline std::string nandBinPath = "C:/Xbox/nand.bin";
+inline std::string kernelBinPath = "C:/Xbox/kernel.elf";
 inline std::string oddDiscImagePath = "C:/Xbox/xenon.iso";
 #else
 inline std::string fusesTxtPath = "/Xbox/fuses.txt";
 inline std::string oneBlBinPath = "/Xbox/1bl.bin";
 inline std::string nandBinPath = "/Xbox/nand.bin";
+inline std::string kernelBinPath = "/Xbox/kernel.elf";
 inline std::string oddDiscImagePath = "/Xbox/xenon.iso";
 #endif
 
@@ -115,6 +117,8 @@ std::string fusesPath();
 std::string oneBlPath();
 // nand.bin path
 std::string nandPath();
+// kernel.elf path
+std::string kernelPath();
 // ODD Image path
 std::string oddImagePath();
 
