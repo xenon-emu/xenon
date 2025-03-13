@@ -1324,7 +1324,7 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
                               u64 data, u64 EA, s8 byteCount, bool cacheStore) {
   u64 oldEA = EA;
   if (false) {
-    std::cout << fmt::format("MMUWrite(context, state, data=0x{:08x}, EA=0x{:08x}, byteCount={:d}, cachestore)\n", data, EA, byteCount);
+    LOG_INFO(Xenon_MMU, "context, state, data=0x{:08x}, EA=0x{:08x}, byteCount={:d}, cachestore)", data, EA, byteCount);
   }
 
   if (MMUTranslateAddress(&EA, ppuState, true) == false)
