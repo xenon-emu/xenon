@@ -184,6 +184,7 @@ void saveConfig(const std::filesystem::path &path) {
   data["SMC"]["COMPort"].comments().clear();
   data["SMC"]["SMCAvPackType"].comments().clear();
   data["SMC"]["SMCPowerOnType"].comments().clear();
+  data["SMC"]["UseBackupUART"].comments().clear();
 
   data["SMC"]["COMPort"].comments().push_back("# Current vCOM Port used for communication between Xenon and your PC");
   data["SMC"]["COMPort"] = comPort;
@@ -198,6 +199,8 @@ void saveConfig(const std::filesystem::path &path) {
   data["SMC"]["SMCPowerOnType"].comments().push_back("# 18: Console is being powered by an Eject button press");
   data["SMC"]["SMCPowerOnType"].comments().push_back("# Note: When trying to boot Linux/XeLL Reloaded this must be set to 18");
   data["SMC"]["SMCPowerOnType"] = smcPowerOnReason;
+  data["SMC"]["UseBackupUART"].comments().push_back("# If the selected COM port is unavaliable, use printf instead");
+  data["SMC"]["UseBackupUART"] = useBackupUart;
 
   // PowerPC.
   data["PowerPC"]["HW_INIT_SKIP1"].comments().clear();

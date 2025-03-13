@@ -67,8 +67,12 @@ void XeMain::start() {
     renderHalt = false;
     return;
   }
-  // CPU Start routine and entry point.
-  xenonCPU->Start(0x20000000100);
+  if (false) {
+    // CPU Start routine and entry point.
+    xenonCPU->Start(0x20000000100);
+  } else {
+    xenonCPU->LoadElf("C:/Users/Vali/Desktop/bin/kernel.elf");
+  }
 }
 
 void XeMain::addPCIDevices() {
