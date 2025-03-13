@@ -57,7 +57,7 @@ std::string oddImagePath() { return oddDiscImagePath; }
 
 int cpi() { return clocksPerInstruction; }
 
-int loadElfs() { return elfLoader; }
+bool loadElfs() { return elfLoader; }
 
 void loadConfig(const std::filesystem::path &path) {
   // If the configuration file does not exist, create it and return.
