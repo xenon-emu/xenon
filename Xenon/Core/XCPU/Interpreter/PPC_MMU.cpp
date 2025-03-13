@@ -570,9 +570,9 @@ PPCInterpreter::mmuGetSecEngInfoFromAddress(u64 inputAddress) {
 
   SECENG_ADDRESS_INFO addressInfo;
 
-  u64 regionMask = 0xF0000000000;
-  u64 keyMask = 0xFF00000000;
-  u32 region = (inputAddress & regionMask) >> 32;
+  constexpr u64 regionMask = 0xF0000000000;
+  constexpr u64 keyMask = 0xFF00000000;
+  const u32 region = (inputAddress & regionMask) >> 32;
 
   addressInfo.keySelected = static_cast<u8>((inputAddress & keyMask) >> 32);
   addressInfo.accesedAddr = static_cast<u32>(inputAddress);

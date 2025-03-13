@@ -36,7 +36,7 @@ NAND::NAND(const char* deviceName, const std::string filePath,
     SYSTEM_PAUSE();
   }
 
-  const u32 blockSize = 0x4000;
+  constexpr u32 blockSize = 0x4000;
 
   for (int currentBlock = 0; currentBlock < rawFileSize;
        currentBlock += blockSize) {
