@@ -67,11 +67,11 @@ void XeMain::start() {
     renderHalt = false;
     return;
   }
-  if (true) {
+  if (false) {
     // CPU Start routine and entry point.
     xenonCPU->Start(0x20000000100);
   } else {
-    xenonCPU->LoadElf("/home/clever/apps/ppc/xenon-utils/result/bin/kernel.elf");
+    xenonCPU->LoadElf("C:/Users/Vali/Desktop/bin/kernel.elf");
   }
 }
 

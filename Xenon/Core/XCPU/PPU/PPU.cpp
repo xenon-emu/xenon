@@ -403,8 +403,7 @@ u64 PPU::loadElfImage(u8 *data, u64 size) {
 
   // Setup HRMOR for elf binaries
   ppuState->SPR.CTRL = 0x800000; // CTRL[TE0] = 1;
-  ppuState->SPR.HRMOR = 0x0000000000000000; // we use real mode like gigachads
-  //ppuState->ppuThread[PPU_THREAD_0].NIA = 0x100;
+  ppuState->SPR.HRMOR = 0x0000000000000000;
 
   SWAP(header->e_version, u16);
   SWAP(header->e_entry, u64);
@@ -433,16 +432,16 @@ u64 PPU::loadElfImage(u8 *data, u64 size) {
       u64 file_offset = byteswap<u64>(psections[i].p_offset);
       bool physical_load = true;
       u64 target_addr = physical_load ? paddr : vaddr;
-      std::cout << fmt::format("Loading 0x{:x} bytes from offset 0x{:x} in the ELF to 0x{:x}\n", filesize, file_offset, target_addr);
+      LOG_INFO(Xenon, "Loading {:#x} bytes from offset {:#x} in the ELF to {:#x}", filesize, file_offset, target_addr);
       PPCInterpreter::MMUMemCpyFromHost(ppuState.get(), target_addr, data + file_offset, filesize);
-      if (memsize > filesize) { // memory size greater then file, zero out remainer
+      if (memsize > filesize) { // Memory size greater then file, zero out remainer
         u64 remainer = memsize - filesize;
         PPCInterpreter::MMUWrite(xenonContext, ppuState.get(), 0, target_addr + filesize, remainer);
       }
     }
   }
 
-  std::cout << fmt::format("Done loading elf, entry-point is 0x{:x}\n", entry_point);
+  LOG_INFO(Xenon, "Done loading elf, entry-point is {:#x}", entry_point);
 
   curThread.NIA = entry_point;
 
