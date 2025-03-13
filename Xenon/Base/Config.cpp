@@ -57,6 +57,8 @@ std::string oddImagePath() { return oddDiscImagePath; }
 
 int cpi() { return clocksPerInstruction; }
 
+int loadElfs() { return elfLoader; }
+
 void loadConfig(const std::filesystem::path &path) {
   // If the configuration file does not exist, create it and return.
   LOG_INFO(Config, "Loading configuration from: {}", path.string());
@@ -144,6 +146,8 @@ void loadConfig(const std::filesystem::path &path) {
     const toml::value &highlyExperimental = data.at("HighlyExperimental");
     clocksPerInstruction =
         toml::find_or<int&>(highlyExperimental, "CPI", clocksPerInstruction);
+    elfLoader =
+        toml::find_or<bool>(highlyExperimental, "ElfLoader", elfLoader);
   }
 }
 
@@ -203,7 +207,7 @@ void saveConfig(const std::filesystem::path &path) {
   data["SMC"]["SMCPowerOnType"].comments().push_back("# 18: Console is being powered by an Eject button press");
   data["SMC"]["SMCPowerOnType"].comments().push_back("# Note: When trying to boot Linux/XeLL Reloaded this must be set to 18");
   data["SMC"]["SMCPowerOnType"] = smcPowerOnReason;
-  data["SMC"]["UseBackupUART"].comments().push_back("# If the selected COM port is unavaliable, use printf instead");
+  data["SMC"]["UseBackupUART"].comments().push_back("# If the selected vCOM port is unavailable, use printf instead");
   data["SMC"]["UseBackupUART"] = useBackupUart;
 
   // PowerPC.
@@ -241,6 +245,7 @@ void saveConfig(const std::filesystem::path &path) {
   // HighlyExperimental.
   data["HighlyExperimental"].comments().clear();
   data["HighlyExperimental"]["CPI"].comments().clear();
+  data["HighlyExperimental"]["ElfLoader"].comments().clear();
 
   data["HighlyExperimental"].comments().push_back("# Do not touch these options unless you know what you're doing!");
   data["HighlyExperimental"].comments().push_back("# It can break execution! User beware");
@@ -248,6 +253,8 @@ void saveConfig(const std::filesystem::path &path) {
   data["HighlyExperimental"]["CPI"].comments().push_back("# Note: This will mess with execution timing, and may break time-sensitive things like XeLL");
   data["HighlyExperimental"]["CPI"].comments().push_back("# Zero will use the estimated CPI for your system (check log for more info)");
   data["HighlyExperimental"]["CPI"] = clocksPerInstruction;
+  data["HighlyExperimental"]["ElfLoader"].comments().push_back("# Disables normal codeflow and loads kernel.elf");
+  data["HighlyExperimental"]["ElfLoader"] = elfLoader;
 
   std::ofstream file(path, std::ios::binary);
   file << data;

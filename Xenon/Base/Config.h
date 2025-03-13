@@ -52,6 +52,7 @@ inline std::string oddDiscImagePath = "/Xbox/xenon.iso";
 
 // Highly experimental.
 inline int clocksPerInstruction = 0;
+inline bool elfLoader = false;
 
 void loadConfig(const std::filesystem::path &path);
 void saveConfig(const std::filesystem::path &path);
@@ -126,5 +127,6 @@ std::string oddImagePath();
 // Highly experimental. (things that can either break the emulator or drastically increase performance)
 //
 int cpi();
+bool loadElfs();
 
 } // namespace Config
