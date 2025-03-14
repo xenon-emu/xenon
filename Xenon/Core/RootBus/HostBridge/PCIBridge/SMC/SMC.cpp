@@ -166,14 +166,16 @@ void Xe::PCIDev::SMC::SMCCore::Read(u64 readAddress, u64 *data, u8 byteCount) {
 #endif // _WIN32 && !SOCKET_UART
     if (smcCoreState->uartBackup) {
       if (smcCoreState->uartInitialized) {
-        smcPCIState.uartStatusReg = smcCoreState->uartRxBuffer.empty() ? UART_STATUS_EMPTY : UART_STATUS_DATA_PRES;
+        smcPCIState.uartStatusReg = 0;
+        smcPCIState.uartStatusReg |= smcCoreState->uartTxBuffer.size() <= 16 ? UART_STATUS_EMPTY : 0;
+        smcPCIState.uartStatusReg |= smcCoreState->uartRxBuffer.empty() ? 0 : UART_STATUS_DATA_PRES;
       }
     }
     // Check if UART is already initialized.
     if (!smcCoreState->uartInitialized && smcCoreState->uartPresent) {
       // XeLL doesn't initialize UART before sending data trough it. Initialize
       // it first then.
-      setupUART(0x1e6); // 115200,8,N,1.
+      setupUART(0x1E6); // 115200,8,N,1.
     }
     memcpy(data, &smcPCIState.uartStatusReg, byteCount);
     break;
