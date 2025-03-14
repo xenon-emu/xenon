@@ -679,7 +679,7 @@ void Render::GUI::Render(Texture* texture) {
   if (styleEditor) {
     Window("Style Editor", [] {
       ImGui::ShowStyleEditor();
-    }, { 1000.f, 900.f }, ImGuiWindowFlags_NoCollapse, nullptr, { 600.f, 60.f });
+    }, { 1000.f, 900.f }, ImGuiWindowFlags_NoCollapse, &styleEditor, { 600.f, 60.f });
   }
   if (demoWindow) {
     ImGui::ShowDemoWindow(&demoWindow);

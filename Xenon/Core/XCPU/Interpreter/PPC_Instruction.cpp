@@ -7,6 +7,8 @@
 * License: GPL2
 */
 
+#include "Core/Xe_Main.h"
+
 #include "PPC_Instruction.h"
 
 #include "PPCInterpreter.h"
@@ -16,6 +18,7 @@ namespace PPCInterpreter {
     // Do nothing
   }
   void PPCInterpreter_invalid(PPU_STATE *ppuState) {
+    Xe_Main->getCPU()->Halt();
 
     LOG_CRITICAL(Xenon, "PPC Interpreter: Invalid instruction found! Data: {:#x} (opcode, value[s]), address: {:#x}",
       _instr.opcode,
