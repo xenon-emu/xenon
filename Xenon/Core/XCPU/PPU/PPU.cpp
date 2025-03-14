@@ -456,10 +456,10 @@ u64 PPU::loadElfImage(u8 *data, u64 size) {
       u64 target_addr = physical_load ? paddr : vaddr;
       LOG_INFO(Xenon, "Loading {:#x} bytes from offset {:#x} in the ELF to {:#x}", filesize, file_offset, target_addr);
       PPCInterpreter::MMUMemCpyFromHost(ppuState.get(), target_addr, data + file_offset, filesize);
-      if (memsize > filesize) { // Memory size greater then file, zero out remainer
-        u64 remainer = memsize - filesize;
-        LOG_DEBUG(Xenon, "Zeroing {:#x} bytes at addr {:#x}", remainer, target_addr + filesize);
-        PPCInterpreter::MMUWrite(xenonContext, ppuState.get(), 0, target_addr + filesize, remainer);
+      if (memsize > filesize) { // If the memory size greater than the file, zero out the remainder
+        u64 remainder = memsize - filesize;
+        LOG_DEBUG(Xenon, "Zeroing {:#x} bytes at addr {:#x}", remainder, target_addr + filesize);
+        PPCInterpreter::MMUWrite(xenonContext, ppuState.get(), 0, target_addr + filesize, remainder);
       }
     }
   }
