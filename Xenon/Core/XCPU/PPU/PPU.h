@@ -24,7 +24,7 @@ public:
   void Reset();
 
   // Debug tools
-  void Halt();
+  void Halt(u64 haltOn = 0);
   void Continue();
   void Step(int amount = 1);
 
@@ -63,6 +63,8 @@ private:
 
   // Halt thread
   bool ppcHalt = false;
+  // If this is set to a non-zero value, it will halt on that address then clear it
+  u64 ppcHaltOn = 0;
 
   // Should we single step?
   bool ppcStep = false;

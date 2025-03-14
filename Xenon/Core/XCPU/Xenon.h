@@ -27,7 +27,7 @@ public:
 
   void LoadElf(const std::string path);
 
-  void Halt();
+  void Halt(u64 haltOn = 0);
 
   void Continue();
 

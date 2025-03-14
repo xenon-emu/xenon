@@ -1,6 +1,7 @@
 // Copyright 2025 Xenon Emulator Project
 
 #include "PPCInterpreter.h"
+#include "Core/Xe_Main.h"
 #include "Core/XCPU/PostBus/PostBus.h"
 
 //
@@ -1319,6 +1320,8 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   return data;
 }
 
+#define TEST_HALT_ADDR 0x69690
+
 // MMU Write Routine, used by the CPU
 void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
                               u64 data, u64 EA, s8 byteCount, bool cacheStore) {
@@ -1347,6 +1350,13 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   // CPU POST Bus
   if (socWrite && EA == POST_BUS_ADDR) {
     Xe::XCPU::POSTBUS::POST(data);
+    return;
+  }
+
+  // Halting in the debugger
+  if (socWrite && EA == TEST_HALT_ADDR) {
+    u64 dataByteswapped = byteswap<u64>(data);
+    Xe_Main->getCPU()->Halt(dataByteswapped);
     return;
   }
 

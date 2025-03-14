@@ -143,13 +143,16 @@ void PPU::Reset() {
   memset(curThread.GPR, 0, sizeof(curThread.GPR));
 }
 
-void PPU::Halt() {
+void PPU::Halt(u64 haltOn) {
+  ppcHaltOn = haltOn;
   ppcHalt = true;
 }
 void PPU::Continue() {
+  ppcHaltOn = 0;
   ppcHalt = false;
 }
 void PPU::Step(int amount) {
+  ppcHaltOn = 0;
   ppcStepAmount = amount;
   ppcStep = true;
 }
@@ -182,6 +185,8 @@ void PPU::Thread() {
           
           // Debug tools
           if (ppcHalt) {
+            bool shouldHalt = ppcHalt && ppcHaltOn != 0 &&
+              ppcHaltOn == ppuState->ppuThread[ppuState->currentThread].CIA;
             if (ppcStep) {
               if (ppcStepCounter != ppcStepAmount) {
                 ppcStepCounter++;
@@ -190,7 +195,7 @@ void PPU::Thread() {
                 ppcStep = false;
               }
             }
-            while (ppcHalt && !ppcStep) {
+            while (shouldHalt && !ppcStep) {
               std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
           }
@@ -244,6 +249,8 @@ void PPU::Thread() {
           
           // Debug tools
           if (ppcHalt) {
+            bool shouldHalt = ppcHalt && ppcHaltOn != 0 &&
+              ppcHaltOn == ppuState->ppuThread[ppuState->currentThread].CIA;
             if (ppcStep) {
               if (ppcStepCounter != ppcStepAmount) {
                 ppcStepCounter++;
@@ -252,7 +259,7 @@ void PPU::Thread() {
                 ppcStep = false;
               }
             }
-            while (ppcHalt && !ppcStep) {
+            while (shouldHalt && !ppcStep) {
               std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
           }
