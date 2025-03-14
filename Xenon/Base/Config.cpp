@@ -146,7 +146,7 @@ void loadConfig(const std::filesystem::path &path) {
   }
 
   if (data.contains("ImGui")) {
-    const toml::value &imgui = data.at("HighlyExperimental");
+    const toml::value &imgui = data.at("ImGui");
     imguiConfigPath =
       toml::find_or<std::string>(imgui, "Config", imguiConfigPath);
     imguiDebugWindow =
@@ -246,9 +246,7 @@ void saveConfig(const std::filesystem::path &path) {
   data["GPU"]["internalHeight"] = internalHeight;
   //data["GPU"]["gpuId"] = gpuId;
 
-  // Paths.
-  data["Paths"]["ImGuiConfig"].comments().clear();
-
+  // Paths
   data["Paths"]["Fuses"] = fusesTxtPath;
   data["Paths"]["OneBL"] = oneBlBinPath;
   data["Paths"]["Nand"] = nandBinPath;
@@ -256,11 +254,16 @@ void saveConfig(const std::filesystem::path &path) {
   data["Paths"]["ElfBinary"] = elfBinaryPath;
 
   // ImGui
+  data["ImGui"]["Config"].comments().clear();
+  data["ImGui"]["DebugWindow"].comments().clear();
+
   data["ImGui"]["Config"].comments().push_back("# ImGui Ini Path");
   data["ImGui"]["Config"].comments().push_back("# 'none' is disabled. It's relative based on the binary path");
   data["ImGui"]["Config"] = imguiConfigPath;
+  data["ImGui"]["DebugWindow"].comments().push_back("# Debug GUI Window");
+  data["ImGui"]["DebugWindow"] = imguiDebugWindow;
 
-  // HighlyExperimental.
+  // HighlyExperimental
   data["HighlyExperimental"].comments().clear();
   data["HighlyExperimental"]["CPI"].comments().clear();
   data["HighlyExperimental"]["ElfLoader"].comments().clear();
