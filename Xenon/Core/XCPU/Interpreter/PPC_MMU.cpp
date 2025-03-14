@@ -570,9 +570,9 @@ PPCInterpreter::mmuGetSecEngInfoFromAddress(u64 inputAddress) {
 
   SECENG_ADDRESS_INFO addressInfo;
 
-  u64 regionMask = 0xF0000000000;
-  u64 keyMask = 0xFF00000000;
-  u32 region = (inputAddress & regionMask) >> 32;
+  constexpr u64 regionMask = 0xF0000000000;
+  constexpr u64 keyMask = 0xFF00000000;
+  const u32 region = (inputAddress & regionMask) >> 32;
 
   addressInfo.keySelected = static_cast<u8>((inputAddress & keyMask) >> 32);
   addressInfo.accesedAddr = static_cast<u32>(inputAddress);
@@ -1324,7 +1324,7 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
                               u64 data, u64 EA, s8 byteCount, bool cacheStore) {
   u64 oldEA = EA;
   if (false) {
-    std::cout << fmt::format("MMUWrite(context, state, data=0x{:08x}, EA=0x{:08x}, byteCount={:d}, cachestore)\n", data, EA, byteCount);
+    LOG_INFO(Xenon_MMU, "context, state, data=0x{:08x}, EA=0x{:08x}, byteCount={:d}, cachestore)", data, EA, byteCount);
   }
 
   if (MMUTranslateAddress(&EA, ppuState, true) == false)

@@ -324,8 +324,8 @@ void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
   smcCoreState->uartBackup = true;
   smcCoreState->socketCreated = true;
   int port = 7000;
-  //const char* ip = "127.0.0.1";
-  const char* ip = "10.0.0.201";
+  // constexpr char* ip = "127.0.0.1";
+  constexpr char* ip = "10.0.0.201";
 
   smcCoreState->sockAddr.sin_family = AF_INET;
   smcCoreState->sockAddr.sin_port = htons(port);

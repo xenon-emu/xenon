@@ -19,7 +19,7 @@ Xe::XCPU::IIC::XenonIIC::XenonIIC() {
 void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, u64 intData) {
   std::lock_guard lck(mutex);
 
-  u32 mask = 0xF000;
+  constexpr u32 mask = 0xF000;
   u8 ppeIntCtrlBlckID = static_cast<u8>((intAddress & mask) >> 12);
   u8 ppeIntCtrlBlckReg = intAddress & 0xFF;
   u8 intType = (intData >> 56) & 0xFF;
@@ -112,7 +112,7 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, u64 intData) {
 void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u64* intData) {
   std::lock_guard lck(mutex);
 
-  u32 mask = 0xF000;
+  constexpr u32 mask = 0xF000;
   u8 ppeIntCtrlBlckID = static_cast<u8>((intAddress & mask) >> 12);
   u8 ppeIntCtrlBlckReg = intAddress & 0xFF;
 
@@ -155,7 +155,7 @@ void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u64* intData) {
     }
     break;
   default:
-    LOG_ERROR(Xenon_IIC, "Unknown interupt being read {:#x}", ppeIntCtrlBlckReg);
+    LOG_ERROR(Xenon_IIC, "Unknown interrupt being read {:#x}", ppeIntCtrlBlckReg);
     break;
   }
 }

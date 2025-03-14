@@ -16,7 +16,7 @@ void ODD::atapiReset() {
   atapiState.dataReadBuffer.ResetPtr();
 
   // Set our Inquiry Data
-  const char vendorIdentification[] = "PLDS   16D2S";
+  constexpr char vendorIdentification[] = "PLDS   16D2S";
   memcpy(&atapiState.atapiInquiryData.vendorIdentification,
          vendorIdentification, sizeof(vendorIdentification));
 

@@ -119,12 +119,12 @@ enum SMC_PWR_REAS {
                                // slim back bottom USB port
                                //
   // Possibles/reboot reasons  0x23, 0x2A, 0x42, 0x61, 0x64.
-  // slim with wired controller when horozontal, 3 back usb ports top to bottom
+  // slim with wired controller when horizontal, 3 back usb ports top to bottom
   // 0x59, 0x58, 0x5A front left 0x56, right 0x57. slim with wireless controller
-  // w/pnc when horozontal, 3 back usb ports top to bottom 0x55, 0x58, 0x5A
-  // front left 0x56, right 0x57. fat with wired controller when horozontal, 1
+  // w/pnc when horizontal, 3 back usb ports top to bottom 0x55, 0x58, 0x5A
+  // front left 0x56, right 0x57. fat with wired controller when horizontal, 1
   // back usb port 0x5A front top 0x56, bottom 0x57 fat with wireless controller
-  // w/pnc when horozontal, 1 back usb port 0x5A front top 0x56, bottom 0x57
+  // w/pnc when horizontal, 1 back usb port 0x5A front top 0x56, bottom 0x57
   // Using Microsoft Wireless Controller: 0x55
   // Using Madcatz Wireless Keyboard (Rockband 3 Keyboard - Item Number 98161):
   // 0x55 Using Activision Wireless Turntable Controller (DJ Hero Turntable):
