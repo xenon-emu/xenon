@@ -406,7 +406,7 @@ void ODD::Write(u64 writeAddress, u64 data, u8 byteCount) {
 }
 
 void ODD::ConfigRead(u64 readAddress, u64 *data, u8 byteCount) {
-  u8 readReg = static_cast<u8>(readAddress);
+  const u8 readReg = static_cast<u8>(readAddress);
   if (readReg >= XE_SIS_SCR_BASE && readReg <= 0xFF)
   {
     // Confiduration read to the SATA Status and Control Registers.

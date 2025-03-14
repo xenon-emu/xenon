@@ -116,23 +116,21 @@ s32 internalWindowHeight();
 //
 
 // Fuses path
-std::string fusesPath();
+const std::string fusesPath();
 // 1bl.bin path
-std::string oneBlPath();
+const std::string oneBlPath();
 // nand.bin path
-std::string nandPath();
+const std::string nandPath();
 // Elf path
-std::string elfPath();
+const std::string elfPath();
 // ODD Image path
-std::string oddImagePath();
-// ImGui Ini path
-std::string imguiIniPath();
+const std::string oddImagePath();
 
 //
 // ImGui
 // 
 // ImGui Ini path
-std::string imguiIniPath();
+const std::string imguiIniPath();
 // ImGui Debug Window
 bool imguiDebug();
 
