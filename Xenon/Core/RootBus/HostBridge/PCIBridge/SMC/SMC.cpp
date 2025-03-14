@@ -324,8 +324,8 @@ void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
   smcCoreState->uartBackup = true;
   smcCoreState->socketCreated = true;
   int port = 7000;
-  // constexpr const char* ip = "127.0.0.1";
-  constexpr const char* ip = "10.0.0.201";
+  constexpr const char* ip = "127.0.0.1";
+  //constexpr const char* ip = "10.0.0.201";
 
   smcCoreState->sockAddr.sin_family = AF_INET;
   smcCoreState->sockAddr.sin_port = htons(port);
@@ -484,7 +484,7 @@ void Xe::PCIDev::SMC::SMCCore::uartReceiveThread() {
     std::unique_lock<std::mutex> lock(smcCoreState->uartMutex);
     char c = -1;
     u64 bytesReceived = 0;
-#ifdef _WIN32    
+#ifdef _WIN32
     u_long mode = 1;
     ioctlsocket(smcCoreState->sockHandle, FIONBIO, &mode);
     bytesReceived = recv(smcCoreState->sockHandle, &c, 1, 0);
