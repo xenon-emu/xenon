@@ -172,6 +172,7 @@ void Render::Renderer::Start() {
 }
 
 void Render::Renderer::Shutdown() {
+  threadRunning = false;
   gui->Shutdown();
   gui.reset();
   glDeleteVertexArrays(1, &dummyVAO);
@@ -203,17 +204,22 @@ void Render::Renderer::Resize(int x, int y, bool resizeViewport) {
 }
 
 void Render::Renderer::Thread() {
-  Start();
-
   // Framebuffer pointer from main memory.
   fbPointer = ramPointer->getPointerToAddress(XE_FB_BASE);
   // Should we render?
-  bool rendering = Config::gpuThreadEnabled();
-  while (rendering) {
+  threadRunning = Config::gpuThreadEnabled();
+  if (!threadRunning) {
+    return;
+  }
+
+  // Start exec
+  Start();
+
+  // Main loop
+  while (threadRunning && XeRunning) {
     // Process events.
     while (SDL_PollEvent(&windowEvent)) {
-      if (gui.get())
-        ImGui_ImplSDL3_ProcessEvent(&windowEvent);
+      ImGui_ImplSDL3_ProcessEvent(&windowEvent);
       switch (windowEvent.type) {
       case SDL_EVENT_WINDOW_RESIZED:
         if (windowEvent.window.windowID == windowID) {
@@ -222,12 +228,9 @@ void Render::Renderer::Thread() {
         }
         break;
       case SDL_EVENT_QUIT:
-        // TODO(Vali0004): Fix improper shutdown
-        rendering = false;
         if (Config::quitOnWindowClosure()) {
           Xe_Main->shutdown();
         }
-        Shutdown();
         break;
       case SDL_EVENT_KEY_DOWN:
         if (windowEvent.key.key == SDLK_F5) {
@@ -262,6 +265,9 @@ void Render::Renderer::Thread() {
         break;
       }
     }
+    // Exit early if needed
+    if (!threadRunning)
+      break;
 
     // Upload buffer
     if (fbPointer) {

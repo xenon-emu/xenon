@@ -172,7 +172,7 @@ void PPU::StartExecution() {
           // Main processing loop.
 
           // Read next intruction from Memory.
-          if (ppuReadNextInstruction()) {
+          if (ppuRunning && ppuReadNextInstruction()) {
             // Execute next intrucrtion.
             PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
           }

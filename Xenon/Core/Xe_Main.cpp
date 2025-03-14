@@ -26,8 +26,9 @@ XeMain::~XeMain() {
   // Save config incase it was modified
   Config::saveConfig(userDirectory / "xenon_config.toml");
 
-  // Delete the log filter
-  logFilter.reset();
+  // Delete the XGPU and XCPU
+  xenos.reset();
+  xenonCPU.reset();
 
   // Delete all PCI devices and their deps
   smcCore.reset();
@@ -54,9 +55,8 @@ XeMain::~XeMain() {
   // Delete the renderer
   renderer.reset();
 
-  // Delete the XGPU and XCPU
-  xenos.reset();
-  xenonCPU.reset();
+  // Delete the log filter
+  logFilter.reset();
 }
 
 void XeMain::start() {

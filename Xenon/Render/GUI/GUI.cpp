@@ -1,6 +1,7 @@
 // Copyright 2025 Xenon Emulator Project
 
 #include "GUI.h"
+#include "Core/Xe_Main.h"
 
 void Render::GUI::Init(SDL_Window* window, void* context) {
   // Set our mainWindow handle

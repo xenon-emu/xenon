@@ -59,6 +59,8 @@ public:
   bool fullscreen = false;
   // Render in ImGui
   bool imguiRender = false;
+  // Thread Running
+  bool threadRunning = true;
 
   int pitch = 0;
 private:

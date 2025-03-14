@@ -67,7 +67,7 @@ bool HostBridge::Read(u64 readAddress, u64 *data, u8 byteCount) {
   }
 
   // If we are shutting down threads, ignore
-  if (!xGPU || !Xe_Main->isRunning()) {
+  if (!xGPU || !XeRunning) {
     return true;
   }
 

@@ -27,6 +27,8 @@
 
 #include "Render/Renderer.h"
 
+// Global thread state
+inline bool XeRunning{ true };
 class XeMain {
 public:
   XeMain();
@@ -42,15 +44,8 @@ public:
 
   void getFuses();
 
-  const bool isRunning() {
-    return running;
-  }
-
-  void setRunning() {
-    running = true;
-  }
   void shutdown() {
-    running = false;
+    XeRunning = false;
   }
 
   Xenon* getCPU() {
@@ -58,8 +53,6 @@ public:
   }
 private:
   // Main objects
-  //  Thread state
-  bool running = true;
   //  Base path
   std::filesystem::path userDirectory{};
   //  Log level
@@ -112,4 +105,5 @@ private:
   eFuses cpuFuses{};
 };
 
+// Global pointer
 inline std::unique_ptr<XeMain> Xe_Main{};
