@@ -76,7 +76,7 @@ void loadConfig(const std::filesystem::path &path) {
     fusesTxtPath.insert(0, pathPrefix.c_str());
     oneBlBinPath.insert(0, pathPrefix.c_str());
     nandBinPath.insert(0, pathPrefix.c_str());
-    kernelBinPath.insert(0, pathPrefix.c_str());
+    elfBinaryPath.insert(0, pathPrefix.c_str());
     oddDiscImagePath.insert(0, pathPrefix.c_str());
 #endif
     saveConfig(path);
