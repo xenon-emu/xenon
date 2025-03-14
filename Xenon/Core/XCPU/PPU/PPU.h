@@ -15,7 +15,7 @@ public:
   ~PPU();
 
   // Start execution
-  void StartExecution();
+  void StartExecution(bool setHRMOR = true);
 
   // Calulate our Clocks Per Instruction
   void CalculateCPI();

@@ -70,7 +70,7 @@ void Xenon::LoadElf(const std::string path) {
   file.read(reinterpret_cast<char*>(elfBinary.get()), fileSize);
   file.close();
   ppu0->loadElfImage(elfBinary.get(), fileSize);
-  ppu0->StartExecution();
+  ppu0->StartExecution(false);
 }
 
 void Xenon::Halt() {

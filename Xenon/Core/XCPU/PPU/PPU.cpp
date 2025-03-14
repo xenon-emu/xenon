@@ -90,7 +90,7 @@ PPU::~PPU() {
   ppuState.reset();
 }
 
-void PPU::StartExecution() {
+void PPU::StartExecution(bool setHRMOR) {
   // PPU is running!
   ppuRunning = true;
 
@@ -104,7 +104,7 @@ void PPU::StartExecution() {
   ppuState->SPR.TSCR = 0x100000;
 
   // If we're PPU0,thread0 then enable THRD 0 and set Reset Vector.
-  if (strcmp(ppuState->ppuName, "PPU0") == false) {
+  if (!strcmp(ppuState->ppuName, "PPU0") && setHRMOR) {
     ppuState->SPR.CTRL = 0x800000; // CTRL[TE0] = 1;
     ppuState->SPR.HRMOR = 0x0000020000000000;
     ppuState->ppuThread[PPU_THREAD_0].NIA = resetVector;
