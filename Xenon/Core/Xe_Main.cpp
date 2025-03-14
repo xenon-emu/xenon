@@ -67,11 +67,12 @@ void XeMain::start() {
     renderHalt = false;
     return;
   }
-  if (!Config::loadElfs()) {
+  if (Config::loadElfs()) {
+    // Load the elf
+    xenonCPU->LoadElf(Config::elfPath());
+  } else {
     // CPU Start routine and entry point.
     xenonCPU->Start(0x20000000100);
-  } else {
-    xenonCPU->LoadElf(Config::kernelPath());
   }
 }
 

@@ -14,6 +14,9 @@ public:
                   u32 PIR, const char *ppuName);
   ~PPU();
 
+  // Start execution
+  void StartExecution();
+
   // Calulate our Clocks Per Instruction
   void CalculateCPI();
   
@@ -25,8 +28,8 @@ public:
   void Continue();
   void Step(int amount = 1);
 
-  // Start execution (thread function)
-  void StartExecution();
+  // Thread function
+  void Thread();
 
   // Returns a pointer to a thread
   PPU_THREAD_REGISTERS *GetPPUThread(u8 thrdID);
@@ -80,6 +83,9 @@ private:
 
   // Amount of CPU clocls per instruction executed.
   u32 clocksPerInstruction = 0;
+
+  // Initial reset vector
+  u32 resetVector = 0;
 
   // Helpers
 

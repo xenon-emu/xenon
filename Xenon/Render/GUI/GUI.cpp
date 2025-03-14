@@ -30,7 +30,8 @@ void Render::GUI::Init(SDL_Window* window, void* context) {
   // We don't want to create a ini because it stores positions.
   // Because we initialize with a 1280x720 window, then resize to whatever,
   // this will break the window positions, causing them to render off screen
-  io.IniFilename = nullptr;
+  std::string iniPath = Config::imguiIniPath();
+  io.IniFilename = iniPath.compare("none") ? iniPath.data() : nullptr;
   // Enable ImGui Keyboard Navigation
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
   // Enable ImGui Gamepad Navigation
@@ -605,6 +606,15 @@ void CodeflowSettings(Render::GUI *gui) {
     Config::SKIP_HW_INIT_1 = RGH2 ? 0x3003DC0 : initSkip1;
     Config::SKIP_HW_INIT_2 = RGH2 ? 0x3003E54 : initSkip2;
   });
+  gui->Toggle("Load Elf", &Config::elfLoader);
+}
+
+void PathSettings(Render::GUI *gui) {
+  Config::fusesTxtPath = gui->InputText("Fuses", Config::fusesTxtPath);
+  Config::oneBlBinPath = gui->InputText("1bl", Config::oneBlBinPath);
+  Config::nandBinPath = gui->InputText("NAND", Config::nandBinPath);
+  Config::elfBinaryPath = gui->InputText("ELF Binary", Config::elfBinaryPath);
+  Config::oddDiscImagePath = gui->InputText("ODD Image File (iso)", Config::oddDiscImagePath);
 }
 
 void ImGuiSettings(Render::GUI *gui) {
@@ -626,36 +636,41 @@ void Render::GUI::OnSwap(Texture *texture) {
       PPCDebugger(this);
     }, { 1200.f, 700.f }, ImGuiWindowFlags_NoCollapse, &ppcDebuggerActive, { 500.f, 100.f });
   }
-  Window("Debug", [&] {
-    TabBar("##main", [&] {
-      TabItem("Debug", [&] {
-        if (!ppcDebuggerActive) {
-          Button("Start", [&] {
-            ppcDebuggerActive = true;
-          });
-        }
-        if (ppcDebuggerActive && ppcDebuggerAttached) {
-          PPCDebugger(this);
-        }
-      });
-      TabItem("Settings", [&] {
-        TabBar("##settings", [&] {
-          TabItem("General", [&] {
-            GeneralSettings(this);
-          });
-          TabItem("Codeflow", [&] {
-            CodeflowSettings(this);
-          });
-          TabItem("Graphics", [&] {
-            GraphicsSettings(this);
-          });
-          TabItem("ImGui", [&] {
-            ImGuiSettings(this);
+  if (Config::imguiDebug()) {
+    Window("Debug", [&] {
+      TabBar("##main", [&] {
+        TabItem("Debug", [&] {
+          if (!ppcDebuggerActive) {
+            Button("Start", [&] {
+              ppcDebuggerActive = true;
+            });
+          }
+          if (ppcDebuggerActive && ppcDebuggerAttached) {
+            PPCDebugger(this);
+          }
+        });
+        TabItem("Settings", [&] {
+          TabBar("##settings", [&] {
+            TabItem("General", [&] {
+              GeneralSettings(this);
+            });
+            TabItem("Codeflow", [&] {
+              CodeflowSettings(this);
+            });
+            TabItem("Paths", [&] {
+              PathSettings(this);
+            });
+            TabItem("Graphics", [&] {
+              GraphicsSettings(this);
+            });
+            TabItem("ImGui", [&] {
+              ImGuiSettings(this);
+            });
           });
         });
       });
-    });
-  }, { 1200.f, 700.f }, ImGuiWindowFlags_NoCollapse, nullptr, { 0.f, 0.f });
+    }, { 1200.f, 700.f }, ImGuiWindowFlags_NoCollapse, &Config::imguiDebugWindow, { 1000.f, 400.f });
+  }
 }
 
 void Render::GUI::Render(Texture* texture) {

@@ -9,7 +9,7 @@
 #include "Logging/Backend.h"
 
 namespace Config {
-// General.
+// General
 inline bool gpuRenderThreadEnabled = true;
 inline bool isFullscreen = false;
 inline bool vsyncEnabled = true;
@@ -17,40 +17,43 @@ inline bool shouldQuitOnWindowClosure = false;
 inline Base::Log::Level currentLogLevel = Base::Log::Level::Warning;
 inline bool islogAdvanced = false;
 
-// SMC.
+// SMC
 inline int smcPowerOnReason = 0x11; // SMC_PWR_REAS_EJECT
 inline int smcAvPackType = 31; // Set to HDMI_NO_AUDIO. See SMC.cpp for a list of values.
 inline int comPort = 2;
 inline bool useBackupUart = false;
 inline std::string com = "";
 
-// PowerPC.
+// PowerPC
 inline u64 SKIP_HW_INIT_1 = 0;
 inline u64 SKIP_HW_INIT_2 = 0;
 
-// GPU.
+// GPU
 inline s32 screenWidth = 1280;
 inline s32 screenHeight = 720;
 inline s32 internalWidth = 1280;
 inline s32 internalHeight = 720;
 // inline s32 gpuId = -1; // Vulkan physical device index. Set to negative for auto select
 
-// Filepaths.
+// Filepaths
 #ifdef _WIN32
-inline std::string fusesTxtPath = "C:/Xbox/fuses.txt";
-inline std::string oneBlBinPath = "C:/Xbox/1bl.bin";
-inline std::string nandBinPath = "C:/Xbox/nand.bin";
-inline std::string kernelBinPath = "C:/Xbox/kernel.elf";
-inline std::string oddDiscImagePath = "C:/Xbox/xenon.iso";
+#define PATH_PREPEND "C:/"
 #else
-inline std::string fusesTxtPath = "/Xbox/fuses.txt";
-inline std::string oneBlBinPath = "/Xbox/1bl.bin";
-inline std::string nandBinPath = "/Xbox/nand.bin";
-inline std::string kernelBinPath = "/Xbox/kernel.elf";
-inline std::string oddDiscImagePath = "/Xbox/xenon.iso";
+#define PATH_PREPEND "/"
 #endif
+inline std::string fusesTxtPath = PATH_PREPEND "Xbox/fuses.txt";
+inline std::string oneBlBinPath = PATH_PREPEND "Xbox/1bl.bin";
+inline std::string nandBinPath = PATH_PREPEND "Xbox/nand.bin";
+inline std::string elfBinaryPath = PATH_PREPEND "Xbox/kernel.elf";
+inline std::string oddDiscImagePath = PATH_PREPEND "Xbox/xenon.iso";
 
-// Highly experimental.
+// ImGui
+// None is disabled, and it is relative
+inline std::string imguiConfigPath = "none";
+// Debug Window
+inline bool imguiDebugWindow = true;
+
+// Highly experimental
 inline int clocksPerInstruction = 0;
 inline bool elfLoader = false;
 
@@ -118,10 +121,20 @@ std::string fusesPath();
 std::string oneBlPath();
 // nand.bin path
 std::string nandPath();
-// kernel.elf path
-std::string kernelPath();
+// Elf path
+std::string elfPath();
 // ODD Image path
 std::string oddImagePath();
+// ImGui Ini path
+std::string imguiIniPath();
+
+//
+// ImGui
+// 
+// ImGui Ini path
+std::string imguiIniPath();
+// ImGui Debug Window
+bool imguiDebug();
 
 //
 // Highly experimental. (things that can either break the emulator or drastically increase performance)

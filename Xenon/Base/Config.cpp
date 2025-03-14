@@ -48,12 +48,15 @@ s32 internalWindowHeight() { return internalHeight; }
 std::string fusesPath() { return fusesTxtPath; }
 std::string oneBlPath() { return oneBlBinPath; }
 std::string nandPath() { return nandBinPath; }
-std::string kernelPath() { return kernelBinPath; }
+std::string elfPath() { return elfBinaryPath; }
 std::string oddImagePath() { return oddDiscImagePath; }
 
-// s32 getGpuId() {
-//     return gpuId;
-// }
+std::string imguiIniPath() { return imguiConfigPath; }
+bool imguiDebug() { return imguiDebugWindow; }
+
+//s32 getGpuId() {
+//  return gpuId;
+//}
 
 int cpi() { return clocksPerInstruction; }
 
@@ -136,10 +139,18 @@ void loadConfig(const std::filesystem::path &path) {
         toml::find_or<std::string>(paths, "OneBL", oneBlBinPath);
     nandBinPath =
         toml::find_or<std::string>(paths, "Nand", nandBinPath);
-    kernelBinPath =
-        toml::find_or<std::string>(paths, "Kernel", nandBinPath);
     oddDiscImagePath =
         toml::find_or<std::string>(paths, "ODDImage", oddDiscImagePath);
+    elfBinaryPath =
+      toml::find_or<std::string>(paths, "ElfBinary", elfBinaryPath);
+  }
+
+  if (data.contains("ImGui")) {
+    const toml::value &imgui = data.at("HighlyExperimental");
+    imguiConfigPath =
+      toml::find_or<std::string>(imgui, "Config", imguiConfigPath);
+    imguiDebugWindow =
+        toml::find_or<bool>(imgui, "DebugWindow", imguiDebugWindow);
   }
 
   if (data.contains("HighlyExperimental")) {
@@ -235,12 +246,19 @@ void saveConfig(const std::filesystem::path &path) {
   data["GPU"]["internalHeight"] = internalHeight;
   //data["GPU"]["gpuId"] = gpuId;
 
-  // Paths.                
+  // Paths.
+  data["Paths"]["ImGuiConfig"].comments().clear();
+
   data["Paths"]["Fuses"] = fusesTxtPath;
   data["Paths"]["OneBL"] = oneBlBinPath;
   data["Paths"]["Nand"] = nandBinPath;
-  data["Paths"]["Kernel"] = kernelBinPath;
   data["Paths"]["ODDImage"] = oddDiscImagePath;
+  data["Paths"]["ElfBinary"] = elfBinaryPath;
+
+  // ImGui
+  data["ImGui"]["Config"].comments().push_back("# ImGui Ini Path");
+  data["ImGui"]["Config"].comments().push_back("# 'none' is disabled. It's relative based on the binary path");
+  data["ImGui"]["Config"] = imguiConfigPath;
 
   // HighlyExperimental.
   data["HighlyExperimental"].comments().clear();

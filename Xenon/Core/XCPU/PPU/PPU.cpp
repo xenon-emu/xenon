@@ -28,7 +28,8 @@ static constexpr u64 get_cpi_value(u64 instrPerSecond) {
 }
 
 PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PVR,
-                  u32 PIR, const char *ppuName) {
+                  u32 PIR, const char *ppuName) :
+  resetVector(resetVector) {
   //
   // Set evrything as in POR. See CELL-BE Programming Handbook.
   //
@@ -79,7 +80,17 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
   ppuState->SPR.PVR.PVR_Hex = PVR;
   ppuState->ppuThread[PPU_THREAD_0].SPR.PIR = PIR;
   ppuState->ppuThread[PPU_THREAD_1].SPR.PIR = PIR + 1;
+}
+PPU::~PPU() {
+  ppuRunning = false;
+  // Ensure our threads are finished running
+  while (!ppuExecutionDone) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  }
+  ppuState.reset();
+}
 
+void PPU::StartExecution() {
   // PPU is running!
   ppuRunning = true;
 
@@ -99,16 +110,8 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
     ppuState->ppuThread[PPU_THREAD_0].NIA = resetVector;
   }
 
-  ppuThread = std::thread(&PPU::StartExecution, this);
+  ppuThread = std::thread(&PPU::Thread, this);
   ppuThread.detach();
-}
-PPU::~PPU() {
-  ppuRunning = false;
-  // Ensure our threads are finished running
-  while (!ppuExecutionDone) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  }
-  ppuState.reset();
 }
 
 void PPU::CalculateCPI() {
@@ -152,7 +155,7 @@ void PPU::Step(int amount) {
 }
 
 // PPU Entry Point.
-void PPU::StartExecution() {
+void PPU::Thread() {
   // While the CPU is running
   while (ppuRunning) {
     // See if we have any threads active.
@@ -419,9 +422,9 @@ u64 PPU::loadElfImage(u8 *data, u64 size) {
 
   u64 entry_point = header->e_entry;
 
-  const auto num_psections = header->e_phnum;
+  const u16 num_psections = header->e_phnum;
 
-  const elf64_phdr* psections = reinterpret_cast<elf64_phdr*>(data + header->e_phoff);
+  const Elf64_Phdr* psections = reinterpret_cast<Elf64_Phdr*>(data + header->e_phoff);
 
   for (size_t i = 0; i < num_psections; i++) {
     if (byteswap<u32>(psections[i].p_type) == PT_LOAD) {
