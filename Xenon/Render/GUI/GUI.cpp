@@ -57,6 +57,7 @@ void Render::GUI::PostInit() {
   robotRegular14 = io.Fonts->AddFontFromFileTTF(robotoRegular.c_str(), 14.f);
   defaultFont13 = io.Fonts->AddFontDefault();
   if (Config::SKIP_HW_INIT_1 == 0x3003DC0 && Config::SKIP_HW_INIT_2 == 0x3003E54) {
+    storedPreviousInitSkips = true; // If we already have RGH2, ignore
     RGH2 = true;
   }
 }
@@ -596,7 +597,7 @@ void GraphicsSettings(Render::GUI *gui) {
 
 void CodeflowSettings(Render::GUI *gui) {
   gui->Toggle("RGH2 Init Skip", &RGH2, [] {
-    if (!storedPreviousInitSkips || !RGH2) {
+    if (!storedPreviousInitSkips && !RGH2) {
       initSkip1 = Config::SKIP_HW_INIT_1;
       initSkip2 = Config::SKIP_HW_INIT_2;
       storedPreviousInitSkips = true;
