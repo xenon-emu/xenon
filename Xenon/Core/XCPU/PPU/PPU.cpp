@@ -28,7 +28,7 @@ static constexpr u64 get_cpi_value(u64 instrPerSecond) {
 }
 
 PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PVR,
-                  u32 PIR, const char *ppuName) :
+                  u32 PIR) :
   resetVector(resetVector) {
   //
   // Set evrything as in POR. See CELL-BE Programming Handbook.
@@ -37,11 +37,14 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
   // Allocate memory for our PPU state
   ppuState = std::make_shared<STRIP_UNIQUE(ppuState)>();
 
+  // Set PPU ID (PIR, as 0 indexed. So 0-4)
+  ppuState->ppuID = PIR / 2;
+
   // Set PPU Name
-  ppuState->ppuName = ppuName;
+  ppuState->ppuName = fmt::format("PPU{}", ppuState->ppuID);
 
   // Set thread name
-  Base::SetCurrentThreadName(ppuName);
+  Base::SetCurrentThreadName(ppuState->ppuName.data());
 
   // Initialize Both threads as in a Reset
   for (u8 thrdNum = 0; thrdNum < 2; thrdNum++) {
@@ -111,7 +114,7 @@ void PPU::StartExecution(bool setHRMOR) {
   ppuState->SPR.TSCR = 0x100000;
 
   // If we're PPU0,thread0 then enable THRD 0 and set Reset Vector.
-  if (!strcmp(ppuState->ppuName, "PPU0") && setHRMOR) {
+  if (ppuState->ppuID == 0 && setHRMOR) {
     ppuState->SPR.CTRL = 0x800000; // CTRL[TE0] = 1;
     ppuState->SPR.HRMOR = 0x0000020000000000;
     ppuState->ppuThread[PPU_THREAD_0].NIA = resetVector;
@@ -151,14 +154,18 @@ void PPU::Reset() {
 }
 
 void PPU::Halt(u64 haltOn) {
+  if (haltOn != 0)
+    LOG_DEBUG(Xenon, "Halting PPU{} on address {:#x}", ppuState->ppuID, haltOn);
   ppuHaltOn = haltOn;
   ppuHalt = true;
 }
 void PPU::Continue() {
+  LOG_DEBUG(Xenon, "Continuing execution on PPU{}", ppuState->ppuID);
   ppuHaltOn = 0;
   ppuHalt = false;
 }
 void PPU::Step(int amount) {
+  LOG_DEBUG(Xenon, "Continuing PPU{} for {} Instructions", ppuState->ppuID, amount);
   ppuHaltOn = 0;
   ppuStepAmount = amount;
   ppuStep = true;
@@ -177,7 +184,7 @@ void PPU::Thread() {
       if (getCurrentRunningThreads() == PPU_THREAD_0 ||
           getCurrentRunningThreads() == PPU_THREAD_BOTH) {
         // Thread 0 is running, process instructions until we reach TTR timeout.
-        ppuState->currentThread = PPU_THREAD_0;
+        curThreadId = PPU_THREAD_0;
 
         // Loop on this thread for the amount of Instructions that TTR tells us.
         for (size_t instrCount = 0; instrCount < ppuState->SPR.TTR;
@@ -185,13 +192,13 @@ void PPU::Thread() {
           // Main processing loop.
 
           // Read next intruction from Memory.
-          if (ppuRunning && !ppuStartHalted && ppuReadNextInstruction()) {
+          if (ppuRunning && ppuReadNextInstruction()) {
             // Execute next intrucrtion.
             PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
           }
           
           // Debug tools
-          if (ppuHalt) {
+          if (false) {
             bool shouldHalt = ppuHalt && (ppuStartHalted ? ppuHaltOn != 0 && ppuHaltOn == curThread.CIA : true);
             if (ppuStep) {
               if (ppuStepCounter != ppuStepAmount) {
@@ -240,7 +247,7 @@ void PPU::Thread() {
       if (getCurrentRunningThreads() == PPU_THREAD_1 ||
           getCurrentRunningThreads() == PPU_THREAD_BOTH) {
         // Thread 0 is running, process instructions until we reach TTR timeout.
-        ppuState->currentThread = PPU_THREAD_1;
+        curThreadId = PPU_THREAD_1;
 
         // Loop on this thread for the amount of Instructions that TTR tells us.
         for (size_t instrCount = 0; instrCount < ppuState->SPR.TTR;
@@ -248,13 +255,13 @@ void PPU::Thread() {
           // Main processing loop.
 
           // Read next intruction from Memory.
-          if (ppuRunning && !ppuStartHalted && ppuReadNextInstruction()) {
+          if (ppuRunning && ppuReadNextInstruction()) {
             // Execute next intrucrtion.
             PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
           }
           
           // Debug tools
-          if (ppuHalt) {
+          if (false) {
             bool shouldHalt = ppuHalt && (ppuStartHalted ? ppuHaltOn != 0 && ppuHaltOn == curThread.CIA : true);
             if (ppuStep) {
               if (ppuStepCounter != ppuStepAmount) {
@@ -451,6 +458,7 @@ u64 PPU::loadElfImage(u8 *data, u64 size) {
       PPCInterpreter::MMUMemCpyFromHost(ppuState.get(), target_addr, data + file_offset, filesize);
       if (memsize > filesize) { // Memory size greater then file, zero out remainer
         u64 remainer = memsize - filesize;
+        LOG_DEBUG(Xenon, "Zeroing {:#x} bytes at addr {:#x}", remainer, target_addr + filesize);
         PPCInterpreter::MMUWrite(xenonContext, ppuState.get(), 0, target_addr + filesize, remainer);
       }
     }
@@ -471,7 +479,7 @@ bool PPU::ppuReadNextInstruction() {
   curThread.NIA += 4;
   curThread.iFetch = true;
   // Fetch the instruction from memory.
-  curThread.CI.opcode = PPCInterpreter::MMURead32(ppuState.get(), curThread.CIA);
+  _instr.opcode = PPCInterpreter::MMURead32(ppuState.get(), curThread.CIA);
   if (_ex & PPU_EX_INSSTOR || _ex & PPU_EX_INSTSEGM) {
     return false;
   }
@@ -520,17 +528,14 @@ void PPU::ppuCheckExceptions() {
     //
 
     // A. Program - Illegal Instruction
-    if (exceptions & PPU_EX_PROG &&
-        curThread.exceptTrapType == 44) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Illegal Instruction.",
-          ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
+    if (exceptions & PPU_EX_PROG && curThread.exceptTrapType == 44) {
+      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Illegal Instruction.", ppuState->ppuName, static_cast<u8>(curThreadId));
       exceptions &= ~PPU_EX_PROG;
       goto end;
     }
     // B. Floating-Point Unavailable
     if (exceptions & PPU_EX_FPU) {
-        LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Floating-Point Unavailable.",
-            ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
+      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Floating-Point Unavailable.", ppuState->ppuName, static_cast<u8>(curThreadId));
       exceptions &= ~PPU_EX_FPU;
       goto end;
     }
@@ -549,22 +554,19 @@ void PPU::ppuCheckExceptions() {
     }
     // Alignment
     if (exceptions & PPU_EX_ALIGNM) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Alignment.",
-          ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
+      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Alignment.", ppuState->ppuName, static_cast<u8>(curThreadId));
       exceptions &= ~PPU_EX_ALIGNM;
       goto end;
     }
     // D. Trace
     if (exceptions & PPU_EX_TRACE) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Trace.",
-          ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
+      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Trace.", ppuState->ppuName, static_cast<u8>(curThreadId));
       exceptions &= ~PPU_EX_TRACE;
       goto end;
     }
     // E. Program Trap, System Call, Program Priv Inst, Program Illegal Inst
     // Program Trap
-    if (exceptions & PPU_EX_PROG &&
-        curThread.exceptTrapType == 46) {
+    if (exceptions & PPU_EX_PROG && curThread.exceptTrapType == 46) {
       PPCInterpreter::ppcProgramException(ppuState.get());
       exceptions &= ~PPU_EX_PROG;
       goto end;
@@ -577,9 +579,8 @@ void PPU::ppuCheckExceptions() {
     }
     // Program - Privileged Instruction
     if (exceptions & PPU_EX_PROG &&
-        curThread.exceptTrapType == 45) {
-        LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Privileged Instruction.",
-            ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
+      curThread.exceptTrapType == 45) {
+      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Privileged Instruction.", ppuState->ppuName, static_cast<u8>(curThreadId));
       exceptions &= ~PPU_EX_PROG;
       goto end;
     }
@@ -602,8 +603,7 @@ void PPU::ppuCheckExceptions() {
     //
 
     if (exceptions & PPU_EX_PROG) {
-        LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Imprecise Mode Floating-Point Enabled Exception.",
-            ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
+      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Imprecise Mode Floating-Point Enabled Exception.", ppuState->ppuName, static_cast<u8>(curThreadId));
       exceptions &= ~PPU_EX_PROG;
       goto end;
     }
@@ -613,24 +613,21 @@ void PPU::ppuCheckExceptions() {
     //
 
     // External
-    if (exceptions & PPU_EX_EXT &&
-        curThread.SPR.MSR.EE) {
+    if (exceptions & PPU_EX_EXT && curThread.SPR.MSR.EE) {
       PPCInterpreter::ppcExternalException(ppuState.get());
       exceptions &= ~PPU_EX_EXT;
       goto end;
     }
     // Decrementer. A dec exception may be present but will only be taken when
     // the EE bit of MSR is set.
-    if (exceptions & PPU_EX_DEC &&
-        curThread.SPR.MSR.EE) {
+    if (exceptions & PPU_EX_DEC && curThread.SPR.MSR.EE) {
       PPCInterpreter::ppcDecrementerException(ppuState.get());
       exceptions &= ~PPU_EX_DEC;
       goto end;
     }
     // Hypervisor Decrementer
     if (exceptions & PPU_EX_HDEC) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Hypervisor Decrementer.",
-          ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
+      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Hypervisor Decrementer.", ppuState->ppuName, static_cast<u8>(curThreadId));
       exceptions &= ~PPU_EX_HDEC;
       goto end;
     }

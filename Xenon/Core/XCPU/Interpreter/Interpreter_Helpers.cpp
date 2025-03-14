@@ -94,4 +94,5 @@ void PPCInterpreter::ppcDebugLoadImageSymbols(PPU_STATE *ppuState,
 
 void PPCInterpreter::ppcDebugUnloadImageSymbols(PPU_STATE *ppuState,
                                                 u64 moduleNameAddress,
-                                                u64 moduleInfoAddress) {}
+                                                u64 moduleInfoAddress)
+{}

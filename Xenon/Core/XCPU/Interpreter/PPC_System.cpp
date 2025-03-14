@@ -185,8 +185,8 @@ void PPCInterpreter::PPCInterpreter_tdi(PPU_STATE *ppuState) {
 
 void PPCInterpreter::PPCInterpreter_mfspr(PPU_STATE *ppuState) {
   u64 rS, crm = 0;
-  PPC_OPC_TEMPL_XFX(curThread.CI.opcode, rS, crm);
-  u32 sprNum = curThread.CI.spr;
+  PPC_OPC_TEMPL_XFX(_instr.opcode, rS, crm);
+  u32 sprNum = _instr.spr;
   sprNum = ((sprNum & 0x1F) << 5) | ((sprNum >> 5) & 0x1F);
 
   u64 value = 0;
@@ -292,7 +292,7 @@ void PPCInterpreter::PPCInterpreter_mfspr(PPU_STATE *ppuState) {
     value = ppuState->SPR.CTRL;
     break;
   default:
-    LOG_ERROR(Xenon, "{}(Thrd{:#d}) mfspr: Unknown SPR: 0x{:#x}", ppuState->ppuName, static_cast<u8>(ppuState->currentThread), sprNum);
+    LOG_ERROR(Xenon, "{}(Thrd{:#d}) mfspr: Unknown SPR: 0x{:#x}", ppuState->ppuName, static_cast<u8>(curThreadId), sprNum);
     break;
   }
 
@@ -413,7 +413,7 @@ void PPCInterpreter::PPCInterpreter_mtspr(PPU_STATE *ppuState) {
     ppuState->SPR.TB = ppuState->SPR.TB |= (GPR(rD) << 32);
     break;
   default:
-    LOG_ERROR(Xenon, "{}(Thrd{:#d}) SPR {:#x} ={:#x}", ppuState->ppuName, static_cast<u8>(ppuState->currentThread), spr, GPR(rD));
+    LOG_ERROR(Xenon, "{}(Thrd{:#d}) SPR {:#x} ={:#x}", ppuState->ppuName, static_cast<u8>(curThreadId), spr, GPR(rD));
     break;
   }
 }

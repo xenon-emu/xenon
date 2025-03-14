@@ -15,10 +15,8 @@ void PPCInterpreter::PPCInterpreter_dcbst(PPU_STATE *ppuState) {
 }
 
 void PPCInterpreter::PPCInterpreter_dcbz(PPU_STATE *ppuState) {
-  X_FORM_rA_rB;
-
-  u64 EA = (rA ? GPR(rA) : 0) +
-           GPR(rB);
+  u64 EA = (_instr.ra ? GPR(_instr.ra) : 0) +
+           GPR(_instr.rb);
   EA = EA & ~(128 - 1); // Cache line size
 
   // Temporarely diasable caching.
@@ -275,18 +273,18 @@ void PPCInterpreter::PPCInterpreter_stwcx(PPU_STATE *ppuState) {
 
   // If address is not aligned by 4, then we must issue a trap.
 
-  if (ppuState->ppuThread[ppuState->currentThread].SPR.XER.SO)
+  if (curThread.SPR.XER.SO)
     BSET(CR, 4, CR_BIT_SO);
 
-  if (ppuState->ppuThread[ppuState->currentThread].ppuRes->V) {
+  if (curThread.ppuRes->V) {
     // Translate address
     MMUTranslateAddress(&RA, ppuState, true);
     if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
       return;
 
     intXCPUContext->xenonRes.AcquireLock();
-    if (ppuState->ppuThread[ppuState->currentThread].ppuRes->V) {
-      if (ppuState->ppuThread[ppuState->currentThread].ppuRes->resAddr == RA) {
+    if (curThread.ppuRes->V) {
+      if (curThread.ppuRes->resAddr == RA) {
         bool soc = false;
         u32 data = byteswap<u32>(static_cast<u32>(GPRi(rs)));
         RA = mmuContructEndAddressFromSecEngAddr(RA, &soc);
@@ -295,7 +293,7 @@ void PPCInterpreter::PPCInterpreter_stwcx(PPU_STATE *ppuState) {
         BSET(CR, 4, CR_BIT_EQ);
       } else {
         intXCPUContext->xenonRes.Decrement();
-        ppuState->ppuThread[ppuState->currentThread].ppuRes->V = false;
+        curThread.ppuRes->V = false;
       }
     }
     intXCPUContext->xenonRes.ReleaseLock();
@@ -344,7 +342,6 @@ void PPCInterpreter::PPCInterpreter_stwx(PPU_STATE *ppuState) {
   EA <- b + (rB)
   MEM(EA, 4) <- rS[32-63]
   */
-  X_FORM_rD_rA_rB;
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   MMUWrite32(ppuState, EA, static_cast<u32>(GPRi(rs)));
 }
@@ -387,19 +384,19 @@ void PPCInterpreter::PPCInterpreter_stdcx(PPU_STATE *ppuState) {
   u64 RA = EA;
   u32 CR = 0;
 
-  if (ppuState->ppuThread[ppuState->currentThread].SPR.XER.SO)
+  if (curThread.SPR.XER.SO)
     BSET(CR, 4, CR_BIT_SO);
 
   // If address is not aligned by 4, the we must issue a trap.
-  if (ppuState->ppuThread[ppuState->currentThread].ppuRes->V) {
+  if (curThread.ppuRes->V) {
     MMUTranslateAddress(&RA, ppuState, true);
 
     if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
       return;
 
     intXCPUContext->xenonRes.AcquireLock();
-    if (ppuState->ppuThread[ppuState->currentThread].ppuRes->V) {
-      if (ppuState->ppuThread[ppuState->currentThread].ppuRes->resAddr == (RA & ~7)) {
+    if (curThread.ppuRes->V) {
+      if (curThread.ppuRes->resAddr == (RA & ~7)) {
         u64 data =
             byteswap<u64>(GPRi(rs));
         bool soc = false;
@@ -408,7 +405,7 @@ void PPCInterpreter::PPCInterpreter_stdcx(PPU_STATE *ppuState) {
         BSET(CR, 4, CR_BIT_EQ);
       } else {
         intXCPUContext->xenonRes.Decrement();
-        ppuState->ppuThread[ppuState->currentThread].ppuRes->V = false;
+        curThread.ppuRes->V = false;
       }
     }
     intXCPUContext->xenonRes.ReleaseLock();
@@ -795,8 +792,8 @@ void PPCInterpreter::PPCInterpreter_lwarx(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  ppuState->ppuThread[ppuState->currentThread].ppuRes->V = true;
-  ppuState->ppuThread[ppuState->currentThread].ppuRes->resAddr = RA;
+  curThread.ppuRes->V = true;
+  curThread.ppuRes->resAddr = RA;
   intXCPUContext->xenonRes.Increment();
   u32 data = MMURead32(ppuState, EA);
 
@@ -961,8 +958,8 @@ void PPCInterpreter::PPCInterpreter_ldarx(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  ppuState->ppuThread[ppuState->currentThread].ppuRes->resAddr = RA;
-  ppuState->ppuThread[ppuState->currentThread].ppuRes->V = true;
+  curThread.ppuRes->resAddr = RA;
+  curThread.ppuRes->V = true;
   intXCPUContext->xenonRes.Increment();
 
   u64 data = MMURead64(ppuState, EA);

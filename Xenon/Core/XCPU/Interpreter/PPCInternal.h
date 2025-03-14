@@ -122,9 +122,9 @@ static constexpr u64 ExtractBits64(u32 input, u32 begin, u32 end) {
   (dw) |= ((dwSet) << (31 - (e))) & DMASK(b, e);
 
 #define IFIELD(v, b, e)                                                        \
-  u32 v = DGET(curThread.CI.opcode, b, e);
+  u32 v = DGET(_instr.opcode, b, e);
 #define IFIELDQ(v, b, e)                                                       \
-  u64 v = DGET(curThread.CI.opcode, b, e);
+  u64 v = DGET(_instr.opcode, b, e);
 
 #define I_FORM_LI_AA_LK                                                        \
   IFIELD(LI, 6, 29);                                                           \
@@ -420,6 +420,7 @@ static constexpr u64 ExtractBits64(u32 input, u32 begin, u32 end) {
 #define BO_GET(i) BGET(BO, 5, i)
 
 #define CR_GET(i) BGET(curThread.CR.CR_Hex, 32, i)
+#define CR_GETi(i) BGET(curThread.CR.CR_Hex, 32, _instr.cr##i)
 #define CR_SET(i) BSET(curThread.CR.CR_Hex, 32, i)
 #define CR_CLR(i) BCLR(curThread.CR.CR_Hex, 32, i)
 

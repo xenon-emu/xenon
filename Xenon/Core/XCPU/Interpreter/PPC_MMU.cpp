@@ -97,21 +97,18 @@ void PPCInterpreter::PPCInterpreter_slbia(PPU_STATE *ppuState) {
 }
 
 void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
-  X_FORM_L_rB
-
   // The PPU adds two new fields to this instruction, them being LP abd IS.
 
-  bool LP = (curThread.GPR[rB] & 0x1000) >> 12;
-  bool invalSelector =
-      (curThread.GPR[rB] & 0x800) >> 11;
-  u8 p = mmuGetPageSize(ppuState, L, LP);
+  bool LP = (GPRi(rb) & 0x1000) >> 12;
+  bool invalSelector = (GPRi(rb) & 0x800) >> 11;
+  u8 p = mmuGetPageSize(ppuState, _instr.l10, LP);
   u64 VA, VPN = 0;
 
   if (invalSelector == 0) {
     // The TLB is as selective as possible when invalidating TLB entries.The
     // invalidation match criteria is VPN[38:79 - p], L, LP, and LPID.
 
-    VA = curThread.GPR[rB];
+    VA = GPRi(rb);
 
     if (VA > 0x7FFFFFFF) {
       VPN = (VA >> 16) & ~0x7F;
@@ -148,8 +145,7 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
     // Index to one of the 256 rows of the tlb. Possible entire tlb
     // invalidation.
     u8 tlbCongruenceClass = 0;
-    u64 rb_44_51 =
-        (curThread.GPR[rB] & 0xFF000) >> 12;
+    u64 rb_44_51 = (GPRi(rb) & 0xFF000) >> 12;
 
     ppuState->TLB.tlbSet0[rb_44_51].V = false;
     ppuState->TLB.tlbSet0[rb_44_51].VPN = 0;
@@ -326,7 +322,7 @@ void PPCInterpreter::mmuAddTlbEntry(PPU_STATE *ppuState) {
   u16 TI = MMU_GET_TLB_INDEX_TI(tlbIndex);
   u16 TS = MMU_GET_TLB_INDEX_TS(tlbIndex);
 
-  // std::cout << "XCPU[" << ppuState->ppuName << "(Thrd"<< ppuState->currentThread
+  // std::cout << "XCPU[" << ppuState->ppuName << "(Thrd"<< curThreadId
   //     << ")](MMU) : Adding tlb entry : (" << TI * TS << ")" << std::endl;
   // std::cout << " *** RPN:         0x" << RPN << std::endl;
   // std::cout << " *** VPN:         0x" << VPN << std::endl;
@@ -1134,7 +1130,11 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   }
 
   if (EA == Config::haltOnRead()) {
-    Xe_Main->getCPU()->Halt(EA);
+    Xenon* CPU = Xe_Main->getCPU();
+    PPU *PPU = Xe_Main->getCPU()->GetPPU(ppuState->ppuID);
+    if (PPU->ThreadRunning()) {
+      CPU->Halt(EA);
+    }
   }
 
   // Exception ocurred?

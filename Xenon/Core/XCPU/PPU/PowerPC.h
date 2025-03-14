@@ -30,6 +30,7 @@ union PPCOpcode {
 	PPCBitfield<u32, 21, 1> oe; // 21
 	PPCBitfield<u32, 11, 10> spr; // 11..20
 	PPCBitfield<u32, 21, 5> vc; // 21..25
+  PPCBitfield<u32, 21, 11> xo; // 21..30
 	PPCBitfield<u32, 16, 5> vb; // 16..20
 	PPCBitfield<u32, 11, 5> va; // 11..15
 	PPCBitfield<u32, 6, 5> vd; // 6..10
@@ -519,7 +520,9 @@ struct PPU_STATE {
   // Address Traslation Flag
   bool traslationInProgress = false;
   // Current PPU Name, for ease of debugging.
-  const char *ppuName = "";
+  std::string ppuName{};
+  // PPU ID
+  u8 ppuID = 0;
 };
 
 struct XENON_CONTEXT {

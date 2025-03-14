@@ -63,8 +63,12 @@ public:
 		return static_cast<vT>((value & bitfield::vmask) << bitpos);
 	}
 	// Load bitfield value
-	constexpr operator cT() const noexcept {
+	constexpr cT value() const noexcept {
 		return extract(this->data);
+	}
+	// Load bitfield value
+	constexpr operator cT() const noexcept {
+		return value();
 	}
 	// Load raw data with mask applied
 	constexpr T unshifted() const {

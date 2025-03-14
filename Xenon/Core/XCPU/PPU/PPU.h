@@ -11,7 +11,7 @@
 class PPU {
 public:
   PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PVR,
-                  u32 PIR, const char *ppuName);
+                  u32 PIR);
   ~PPU();
 
   // Start execution
@@ -41,6 +41,9 @@ public:
   void SetCPI(u32 CPI) { clocksPerInstruction = CPI; }
   // Gets the clocks per instruction
   u32 GetCPI() { return clocksPerInstruction; }
+
+  // Checks if the thread is active
+  bool ThreadRunning() { return ppuRunning; }
 
   // Get ppuState
   PPU_STATE *GetPPUState() { return ppuState.get(); }

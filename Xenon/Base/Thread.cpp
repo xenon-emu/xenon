@@ -26,6 +26,7 @@
 #include <unistd.h>
 #endif
 #include <thread>
+#include <algorithm>
 
 #ifdef __FreeBSD__
 #define cpu_set_t cpuset_t
@@ -142,11 +143,13 @@ static void AccurateSleep(std::chrono::nanoseconds duration) {
 #ifdef _MSC_VER
 
 // Sets the debugger-visible name of the current thread.
-void SetCurrentThreadName(const char* name) {
+void SetCurrentThreadName(const std::string_view &name) {
   SetThreadDescription(GetCurrentThread(), UTF8ToUTF16W(name).data());
 }
 
-void SetThreadName(void* thread, const char* name) {
+void SetThreadName(void *thread, const std::string_view &name) {
+  const char* nchar = name.data();
+  std::string truncated(nchar, std::min(name.size(), static_cast<size_t>(15)));
   SetThreadDescription(thread, UTF8ToUTF16W(name).data());
 }
 
@@ -154,27 +157,28 @@ void SetThreadName(void* thread, const char* name) {
 
 // MinGW with the POSIX threading model does not support pthread_setname_np
 #if !defined(_WIN32) || defined(_MSC_VER)
-void SetCurrentThreadName(const char* name) {
+void SetCurrentThreadName(const std::string_view &name) {
+  const char* nchar = name.data();
 #ifdef __APPLE__
   pthread_setname_np(name);
 #elif defined(__Bitrig__) || defined(__DragonFly__) || defined(__FreeBSD__) || defined(__OpenBSD__)
-  pthread_set_name_np(pthread_self(), name);
+  pthread_set_name_np(pthread_self(), nchar);
 #elif defined(__NetBSD__)
-  pthread_setname_np(pthread_self(), "%s", (void*)name);
+  pthread_setname_np(pthread_self(), "%s", (void*)nchar);
 #elif defined(__linux__)
   // Linux limits thread names to 15 characters and will outright reject any
   // attempt to set a longer name with ERANGE.
-  std::string truncated(name, std::min(strlen(name), static_cast<size_t>(15)));
+  std::string truncated(nchar, std::min(name.size(), static_cast<size_t>(15)));
   if (int e = pthread_setname_np(pthread_self(), truncated.c_str())) {
     errno = e;
     LOG_ERROR(Base, "Failed to set thread name to '{}': {}", truncated, GetLastErrorMsg());
   }
 #else
-  pthread_setname_np(pthread_self(), name);
+  pthread_setname_np(pthread_self(), nchar);
 #endif
 }
 
-void SetThreadName(void* thread, const char* name) {
+void SetThreadName(void *thread, const std::string_view &name) {
   // TODO
 }
 #endif
@@ -184,7 +188,7 @@ void SetCurrentThreadName(const char*) {
   // Do Nothing on MinGW
 }
 
-void SetThreadName(void* thread, const char* name) {
+void SetThreadName(void *thread, const std::string_view &name) {
   // Do Nothing on MinGW
 }
 #endif
