@@ -652,6 +652,9 @@ void Render::GUI::OnSwap(Texture *texture) {
         TabItem("Settings", [&] {
           TabBar("##settings", [&] {
             TabItem("General", [&] {
+              Button("Force exit", [] {
+                Xe_Main->shutdown();
+              });
               GeneralSettings(this);
             });
             TabItem("Codeflow", [&] {
