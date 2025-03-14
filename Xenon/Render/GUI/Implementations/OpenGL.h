@@ -20,10 +20,7 @@ public:
   void InitBackend(void *context) override;
   void ShutdownBackend() override;
   void BeginSwap() override;
-  void OnSwap(Texture *texture) override;
   void EndSwap() override;
-  bool ppcDebuggerActive = false;
-  bool ppcDebuggerAttached = true;
 };
 
 } // namespace Render

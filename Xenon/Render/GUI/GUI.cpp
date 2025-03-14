@@ -1,7 +1,22 @@
 // Copyright 2025 Xenon Emulator Project
 
-#include "GUI.h"
 #include "Core/Xe_Main.h"
+#include "Core/XCPU/Interpreter/PPCInterpreter.h"
+
+#include "GUI.h"
+
+// Helper functions for text/string formatting with the gui
+#define TextFmt(x, ...) Text(fmt::format(x, __VA_ARGS__))
+#define CustomBase(x, fmt, ...) TextFmt(x ": " fmt, __VA_ARGS__)
+#define Custom(x, fmt, ...) CustomBase(#x, fmt, __VA_ARGS__)
+#define HexBase(x, ...) CustomBase(x, "0x{:X}", __VA_ARGS__)
+#define Hex(c, x) HexBase(#x, c.x)
+#define BFHex(c, x) HexBase(#x, u32(c.x))
+#define U8Hex(c, x) HexBase(#x, static_cast<u32>(c.x))
+#define HexArr(a, i) HexBase("[{}]", i, a[i])
+#define Dec(c, x) Custom(x, "{}", c.x)
+#define U8Dec(c, x) Custom(x, "{}", static_cast<u32>(c.x))
+#define Bool(c, x) Custom(x, "{}", c.x ? "true" : "false")
 
 void Render::GUI::Init(SDL_Window* window, void* context) {
   // Set our mainWindow handle
@@ -29,6 +44,11 @@ void Render::GUI::Init(SDL_Window* window, void* context) {
   SetStyle();
   InitBackend(context);
 }
+
+void Render::GUI::PostInit() {
+
+}
+
 void Render::GUI::Shutdown() {
   ShutdownBackend();
   ImGui::DestroyContext();
@@ -174,6 +194,459 @@ void Render::GUI::Tooltip(const std::string& contents, ImGuiHoveredFlags delay) 
   }
 }
 
+void PPUThread(Render::GUI *gui, PPU_STATE *PPUState, u32 threadID) {
+  gui->Node(fmt::format("[{}]", threadID), [&] {
+    PPU_THREAD_REGISTERS &ppuRegisters = PPUState->ppuThread[threadID];
+    gui->Node("SPR", [&] {
+      PPU_THREAD_SPRS &SPR = ppuRegisters.SPR;
+      gui->Node("XER", [&] {
+        XERegister &XER = SPR.XER;
+        gui->Hex(XER, XER_Hex);
+        gui->BFHex(XER, ByteCount);
+        gui->BFHex(XER, R0);
+        gui->BFHex(XER, CA);
+        gui->BFHex(XER, OV);
+        gui->BFHex(XER, SO);
+      });
+      gui->Hex(SPR, LR);
+      gui->Hex(SPR, CTR);
+      gui->Hex(SPR, CFAR);
+      gui->Hex(SPR, VRSAVE);
+      gui->Hex(SPR, DSISR);
+      gui->Hex(SPR, DAR);
+      gui->Dec(SPR, DEC);
+      gui->Hex(SPR, SRR0);
+      gui->Hex(SPR, SRR1);
+      gui->Hex(SPR, ACCR);
+      gui->Hex(SPR, SPRG0);
+      gui->Hex(SPR, SPRG1);
+      gui->Hex(SPR, SPRG2);
+      gui->Hex(SPR, SPRG3);
+      gui->Hex(SPR, HSPRG0);
+      gui->Hex(SPR, HSPRG1);
+      gui->Hex(SPR, HSRR0);
+      gui->Hex(SPR, HSRR1);
+      gui->Hex(SPR, TSRL);
+      gui->Hex(SPR, TSSR);
+      gui->Hex(SPR, PPE_TLB_Index_Hint);
+      gui->Hex(SPR, DABR);
+      gui->Hex(SPR, DABRX);
+      gui->Node("MSR", [&] {
+        MSRegister &MSR = SPR.MSR;
+        gui->BFHex(MSR, LE);
+        gui->BFHex(MSR, RI);
+        gui->BFHex(MSR, PMM);
+        gui->BFHex(MSR, DR);
+        gui->BFHex(MSR, IR);
+        gui->BFHex(MSR, FE1);
+        gui->BFHex(MSR, BE);
+        gui->BFHex(MSR, SE);
+        gui->BFHex(MSR, FE0);
+        gui->BFHex(MSR, ME);
+        gui->BFHex(MSR, FP);
+        gui->BFHex(MSR, PR);
+        gui->BFHex(MSR, EE);
+        gui->BFHex(MSR, ILE);
+        gui->BFHex(MSR, VXU);
+        gui->BFHex(MSR, HV);
+        gui->BFHex(MSR, TA);
+        gui->BFHex(MSR, SF);
+      });
+      gui->Hex(SPR, PIR);
+    });
+    gui->Hex(ppuRegisters, CIA);
+    gui->Hex(ppuRegisters, NIA);
+    gui->Node("CI", [&] {
+      PPCOpcode &CI = ppuRegisters.CI;
+      gui->Hex(CI, opcode);
+      gui->BFHex(CI, main);
+      gui->BFHex(CI, sh64);
+      gui->BFHex(CI, mbe64);
+      gui->BFHex(CI, vuimm);
+      gui->BFHex(CI, vs);
+      gui->BFHex(CI, vsh);
+      gui->BFHex(CI, oe);
+      gui->BFHex(CI, spr);
+      gui->BFHex(CI, vc);
+      gui->BFHex(CI, vb);
+      gui->BFHex(CI, va);
+      gui->BFHex(CI, vd);
+      gui->BFHex(CI, lk);
+      gui->BFHex(CI, aa);
+      gui->BFHex(CI, rb);
+      gui->BFHex(CI, ra);
+      gui->BFHex(CI, rd);
+      gui->BFHex(CI, uimm16);
+      gui->BFHex(CI, l11);
+      gui->BFHex(CI, rs);
+      gui->BFHex(CI, simm16);
+      gui->BFHex(CI, ds);
+      gui->BFHex(CI, vsimm);
+      gui->BFHex(CI, ll);
+      gui->BFHex(CI, li);
+      gui->BFHex(CI, lev);
+      gui->BFHex(CI, i);
+      gui->BFHex(CI, crfs);
+      gui->BFHex(CI, l10);
+      gui->BFHex(CI, crfd);
+      gui->BFHex(CI, crbb);
+      gui->BFHex(CI, crba);
+      gui->BFHex(CI, crbd);
+      gui->BFHex(CI, rc);
+      gui->BFHex(CI, me32);
+      gui->BFHex(CI, mb32);
+      gui->BFHex(CI, sh32);
+      gui->BFHex(CI, bi);
+      gui->BFHex(CI, bo);
+      gui->BFHex(CI, bh);
+      gui->BFHex(CI, frc);
+      gui->BFHex(CI, frb);
+      gui->BFHex(CI, fra);
+      gui->BFHex(CI, frd);
+      gui->BFHex(CI, crm);
+      gui->BFHex(CI, frs);
+      gui->BFHex(CI, flm);
+      gui->BFHex(CI, l6);
+      gui->BFHex(CI, l15);
+      gui->BFHex(CI, bt14);
+      gui->BFHex(CI, bt24);
+    });
+    gui->Bool(ppuRegisters, iFetch);
+    gui->Node("GPRs", [&] {
+      for (u64 i = 0; i != 32; ++i) {
+        gui->HexArr(ppuRegisters.GPR, i);
+      }
+    });
+    gui->Node("FPRs", [&] {
+      for (u64 i = 0; i != 32; ++i) {
+        FPRegister &FPR = ppuRegisters.FPR[i];
+        gui->Node(fmt::format("[{}]", i), [&] {
+          gui->Custom(valueAsDouble, "{}", FPR.valueAsDouble);
+          gui->Custom(valueAsU64, "0x{:X}",FPR.valueAsU64);
+        });
+      }
+    });
+    gui->Node("CR", [&] {
+      CRegister &CR = ppuRegisters.CR;
+      gui->Hex(CR, CR_Hex);
+      gui->BFHex(CR, CR0);
+      gui->BFHex(CR, CR1);
+      gui->BFHex(CR, CR2);
+      gui->BFHex(CR, CR3);
+      gui->BFHex(CR, CR4);
+      gui->BFHex(CR, CR5);
+      gui->BFHex(CR, CR6);
+      gui->BFHex(CR, CR7);
+    });
+    gui->Node("FPSCR", [&] {
+      FPSCRegister &FPSCR = ppuRegisters.FPSCR;
+      gui->Hex(FPSCR, FPSCR_Hex);
+      gui->BFHex(FPSCR, RN);
+      gui->BFHex(FPSCR, NI);
+      gui->BFHex(FPSCR, XE);
+      gui->BFHex(FPSCR, ZE);
+      gui->BFHex(FPSCR, UE);
+      gui->BFHex(FPSCR, OE);
+      gui->BFHex(FPSCR, VE);
+      gui->BFHex(FPSCR, VXCVI);
+      gui->BFHex(FPSCR, VXSQRT);
+      gui->BFHex(FPSCR, VXSOFT);
+      gui->BFHex(FPSCR, R0);
+      gui->BFHex(FPSCR, FPRF);
+      gui->BFHex(FPSCR, FI);
+      gui->BFHex(FPSCR, FR);
+      gui->BFHex(FPSCR, VXVC);
+      gui->BFHex(FPSCR, VXIMZ);
+      gui->BFHex(FPSCR, VXZDZ);
+      gui->BFHex(FPSCR, VXIDI);
+      gui->BFHex(FPSCR, VXISI);
+      gui->BFHex(FPSCR, VXSNAN);
+      gui->BFHex(FPSCR, XX);
+      gui->BFHex(FPSCR, ZX);
+      gui->BFHex(FPSCR, UX);
+      gui->BFHex(FPSCR, OX);
+      gui->BFHex(FPSCR, VX);
+      gui->BFHex(FPSCR, FEX);
+      gui->BFHex(FPSCR, FX);
+    });
+    gui->Node("SLBs", [&] {
+      for (u64 i = 0; i != 64; ++i) {
+        SLBEntry &SLB = ppuRegisters.SLB[i];
+        gui->Node(fmt::format("[{}]", i), [&] {
+          gui->U8Hex(SLB, V);
+          gui->U8Hex(SLB, LP);
+          gui->U8Hex(SLB, C);
+          gui->U8Hex(SLB, L);
+          gui->U8Hex(SLB, N);
+          gui->U8Hex(SLB, Kp);
+          gui->U8Hex(SLB, Ks);
+          gui->Hex(SLB, VSID);
+          gui->Hex(SLB, ESID);
+          gui->Hex(SLB, vsidReg);
+          gui->Hex(SLB, esidReg);
+        });
+      }
+    });
+    gui->Hex(ppuRegisters, exceptReg);
+    gui->Bool(ppuRegisters, exceptionTaken);
+    gui->Hex(ppuRegisters, exceptEA);
+    gui->Hex(ppuRegisters, exceptTrapType);
+    gui->Bool(ppuRegisters, exceptHVSysCall);
+    gui->Hex(ppuRegisters, intEA);
+    gui->Hex(ppuRegisters, lastWriteAddress);
+    gui->Hex(ppuRegisters, lastRegValue);
+    gui->Node("ppuRes", [&] {
+        PPU_RES &ppuRes = *(ppuRegisters.ppuRes.get());
+        gui->U8Hex(ppuRes, ppuID);
+        gui->Bool(ppuRes, V);
+        gui->Hex(ppuRes, resAddr);
+    });
+  });
+}
+
+void RenderInstr(Render::GUI *gui, u32 addr, u32 instr) {
+  std::string instrName = PPCInterpreter::ppcDecoder.decodeName(instr);
+  u32 b0 = static_cast<u8>((instr >> 24) & 0xFF);
+  u32 b1 = static_cast<u8>((instr >> 16) & 0xFF);
+  u32 b2 = static_cast<u8>((instr >> 8) & 0xFF);
+  u32 b3 = static_cast<u8>((instr >> 0) & 0xFF);
+  gui->TextFmt("{:08X} {:02X} {:02X} {:02X} {:02X}                             {}", addr, b0, b1, b2, b3, instrName);
+}
+
+void PPC_PPU(Render::GUI *gui, PPU *PPU) {
+  if (!PPU) {
+    return;
+  }
+  PPU_STATE *PPUStatePtr = PPU->GetPPUState();
+  #define ppuState PPUStatePtr
+  PPU_STATE &PPUState = *PPUStatePtr;
+  gui->Node(PPUState.ppuName, [&] {
+    u32 curInstr = _instr.opcode;
+    u32 nextInstr = PPCInterpreter::MMURead32(ppuState, curThread.NIA, true);
+    RenderInstr(gui, curThread.CIA, curInstr);
+    RenderInstr(gui, curThread.NIA, nextInstr);
+    gui->Node("ppuThread", [&] {
+      PPUThread(gui, PPUStatePtr, 0);
+      PPUThread(gui, PPUStatePtr, 1);
+    });
+    gui->U8Dec(PPUState, currentThread);
+    gui->Node("SPR", [&] {
+      PPU_STATE_SPRS &SPR = PPUState.SPR;
+      gui->Hex(SPR, SDR1);
+      gui->Hex(SPR, CTRL);
+      gui->Hex(SPR, TB);
+      gui->Node("PVR", [&] {
+        PVRegister &PVR = SPR.PVR;
+        gui->Hex(PVR, PVR_Hex);
+        gui->U8Hex(PVR, Revision);
+        gui->U8Hex(PVR, Version);
+      });
+      gui->Hex(SPR, HDEC);
+      gui->Hex(SPR, RMOR);
+      gui->Hex(SPR, HRMOR);
+      gui->Hex(SPR, LPCR);
+      gui->Hex(SPR, LPIDR);
+      gui->Hex(SPR, TSCR);
+      gui->Hex(SPR, TTR);
+      gui->Hex(SPR, PPE_TLB_Index);
+      gui->Hex(SPR, PPE_TLB_VPN);
+      gui->Hex(SPR, PPE_TLB_RPN);
+      gui->Hex(SPR, PPE_TLB_RMT);
+      gui->Hex(SPR, HID0);
+      gui->Hex(SPR, HID1);
+      gui->Hex(SPR, HID4);
+      gui->Hex(SPR, HID6);
+    });
+    gui->Node("TLB", [&] {
+      TLB_Reg &TLB = PPUState.TLB;
+      gui->Node("tlbSet0", [&] {
+        for (u64 i = 0; i != 256; ++i) {
+          TLBEntry& TLBEntry = TLB.tlbSet0[i];
+          gui->Node(fmt::format("[{}]", i), [&] {
+            gui->Bool(TLBEntry, V);
+            gui->U8Hex(TLBEntry, p);
+            gui->Hex(TLBEntry, RPN);
+            gui->Hex(TLBEntry, VPN);
+            gui->Bool(TLBEntry, L);
+            gui->Bool(TLBEntry, LP);
+          });
+        }
+      });
+      gui->Node("tlbSet1", [&] {
+        for (u64 i = 0; i != 256; ++i) {
+          TLBEntry& TLBEntry = TLB.tlbSet1[i];
+          gui->Node(fmt::format("[{}]", i), [&] {
+            gui->Bool(TLBEntry, V);
+            gui->U8Hex(TLBEntry, p);
+            gui->Hex(TLBEntry, RPN);
+            gui->Hex(TLBEntry, VPN);
+            gui->Bool(TLBEntry, L);
+            gui->Bool(TLBEntry, LP);
+          });
+        }
+      });
+      gui->Node("tlbSet2", [&] {
+        for (u64 i = 0; i != 256; ++i) {
+          TLBEntry& TLBEntry = TLB.tlbSet2[i];
+          gui->Node(fmt::format("[{}]", i), [&] {
+            gui->Bool(TLBEntry, V);
+            gui->U8Hex(TLBEntry, p);
+            gui->Hex(TLBEntry, RPN);
+            gui->Hex(TLBEntry, VPN);
+            gui->Bool(TLBEntry, L);
+            gui->Bool(TLBEntry, LP);
+          });
+        }
+      });
+      gui->Node("tlbSet3", [&] {
+        for (u64 i = 0; i != 256; ++i) {
+          TLBEntry& TLBEntry = TLB.tlbSet3[i];
+          gui->Node(fmt::format("[{}]", i), [&] {
+            gui->Bool(TLBEntry, V);
+            gui->U8Hex(TLBEntry, p);
+            gui->Hex(TLBEntry, RPN);
+            gui->Hex(TLBEntry, VPN);
+            gui->Bool(TLBEntry, L);
+            gui->Bool(TLBEntry, LP);
+          });
+        }
+      });
+    });
+    gui->Bool(PPUState, traslationInProgress);
+    gui->Custom(ppuName, "{}", PPUState.ppuName);
+  }, ImGuiTreeNodeFlags_DefaultOpen);
+}
+void PPCDebugger(Render::GUI *gui) {
+  ImGuiWindow *window = ImGui::GetCurrentWindow();
+  ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.f);
+  ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.f);
+  ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 2.f, 8.f });
+  ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 8.f, 4.f });
+  gui->Child("##instrs", [&] {
+    gui->MenuBar([&gui] {
+      gui->Menu("Window", [&gui] {  
+        if (!gui->ppcDebuggerActive) {
+          gui->MenuItem("Enable", [&] {
+            gui->ppcDebuggerActive = true;
+          });
+        } else {
+          gui->MenuItem(gui->ppcDebuggerAttached ? "Detach" : "Attach", [&] {
+            gui->ppcDebuggerAttached ^= true;
+          });
+          gui->MenuItem("Disable", [&] {
+            gui->ppcDebuggerActive = false;
+          });
+        }
+      });
+      gui->Menu("Debug", [&gui] {
+        if (!Xe_Main->getCPU()->IsHalted()) {
+          gui->MenuItem("Pause", [&gui] {
+            Xe_Main->getCPU()->Halt();
+          });
+        } else {
+          gui->MenuItem("Continue", [&gui] {
+            Xe_Main->getCPU()->Continue();
+          });
+          gui->MenuItem("Step (F10)", [&gui] {
+            Xe_Main->getCPU()->Step();
+          });
+        }
+      });
+    });
+    if (ImGui::IsKeyPressed(ImGuiKey_F10)) {
+      Xe_Main->getCPU()->Step();
+    }
+    Xenon *CPU = Xe_Main->getCPU();
+    PPC_PPU(gui, CPU->GetPPU(0));
+    PPC_PPU(gui, CPU->GetPPU(1));
+    PPC_PPU(gui, CPU->GetPPU(2));
+  }, { window->Size.x - 27.5f, window->Size.y - 74.f }, ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_MenuBar);
+  ImGui::PopStyleVar(4);
+}
+
+void GeneralSettings(Render::GUI *gui) {
+  static int logLevel = static_cast<int>(Config::getCurrentLogLevel());
+  gui->Toggle("Exit on window close", &Config::shouldQuitOnWindowClosure);
+  gui->Toggle("Advanced log", &Config::islogAdvanced);
+}
+
+void GraphicsSettings(Render::GUI *gui) {
+  gui->Toggle("Enabled", &Config::gpuRenderThreadEnabled);
+  gui->Toggle("Fullscreen", &Config::isFullscreen, [&] {
+    Xe_Main->renderer->fullscreen = Config::isFullscreen;
+    SDL_SetWindowFullscreen(gui->mainWindow, Xe_Main->renderer->fullscreen);
+  });
+  gui->Toggle("VSync", &Config::vsyncEnabled, [&] {
+    Xe_Main->renderer->VSYNC = Config::vsyncEnabled;
+    SDL_GL_SetSwapInterval(Xe_Main->renderer->VSYNC ? 1 : 0);
+  });
+}
+
+bool RGH2{};
+bool storedPreviousInitSkips{};
+int initSkip1{}, initSkip2{};
+void CodeflowSettings(Render::GUI *gui) {
+  gui->Toggle("RGH2 Init Skip", &RGH2, [] {
+    if (!storedPreviousInitSkips || !RGH2) {
+      initSkip1 = Config::SKIP_HW_INIT_1;
+      initSkip2 = Config::SKIP_HW_INIT_2;
+      storedPreviousInitSkips = true;
+    }
+    Config::SKIP_HW_INIT_1 = RGH2 ? initSkip1 : 0x3003DC0;
+    Config::SKIP_HW_INIT_2 = RGH2 ? initSkip2 : 0x3003E54;
+  });
+}
+
+void ImGuiSettings(Render::GUI *gui) {
+  gui->Toggle("Style Editor", &gui->styleEditor);
+  gui->Toggle("Demo", &gui->demoWindow);
+  gui->Toggle("Viewports", &gui->viewports, [&] {
+    ImGuiIO& io = ImGui::GetIO();
+    if (gui->viewports)
+      io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    else
+      io.ConfigFlags &= ~(ImGuiConfigFlags_ViewportsEnable);
+  });
+  gui->Tooltip("Allows ImGui windows to be 'detached' from the main window. Useful for debugging");
+}
+
+void Render::GUI::OnSwap(Texture *texture) {
+  if (ppcDebuggerActive && !ppcDebuggerAttached) {
+    Window("PPC Debugger", [this] {
+      PPCDebugger(this);
+    }, { 1200.f, 700.f }, ImGuiWindowFlags_NoCollapse, &ppcDebuggerActive, { 500.f, 100.f });
+  }
+  Window("Debug", [&] {
+    TabBar("##main", [&] {
+      TabItem("Debug", [&] {
+        if (!ppcDebuggerActive) {
+          Button("Start", [&] {
+            ppcDebuggerActive = true;
+          });
+        }
+        if (ppcDebuggerActive && ppcDebuggerAttached) {
+          PPCDebugger(this);
+        }
+      });
+      TabItem("Settings", [&] {
+        TabBar("##settings", [&] {
+          TabItem("General", [&] {
+            GeneralSettings(this);
+          });
+          TabItem("Codeflow", [&] {
+            CodeflowSettings(this);
+          });
+          TabItem("Graphics", [&] {
+            GraphicsSettings(this);
+          });
+          TabItem("ImGui", [&] {
+            ImGuiSettings(this);
+          });
+        });
+      });
+    });
+  }, { 1200.f, 700.f }, ImGuiWindowFlags_NoCollapse, nullptr, { 0.f, 0.f });
+}
 
 void Render::GUI::Render(Texture* texture) {
   BeginSwap();
