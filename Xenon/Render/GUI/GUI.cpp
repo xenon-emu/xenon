@@ -557,6 +557,12 @@ void PPCDebugger(Render::GUI *gui) {
           gui->MenuItem("Pause", [&gui] {
             Xe_Main->getCPU()->Halt();
           });
+          gui->MenuItem("Exit (Soft)", [] {
+            Xe_Main->shutdown();
+          });
+          gui->MenuItem("Exit (Force)", [] {
+            exit(0);
+          });
         } else {
           gui->MenuItem("Continue", [&gui] {
             Xe_Main->getCPU()->Continue();
@@ -630,6 +636,15 @@ void ImGuiSettings(Render::GUI *gui) {
   gui->Tooltip("Allows ImGui windows to be 'detached' from the main window. Useful for debugging");
 }
 
+void ConfigSettings(Render::GUI *gui) {
+  gui->Button("Save", [] {
+    Xe_Main->saveConfig();
+  });
+  gui->Button("Load", [] {
+    Xe_Main->loadConfig();
+  });
+}
+
 void Render::GUI::OnSwap(Texture *texture) {
   if (ppcDebuggerActive && !ppcDebuggerAttached) {
     Window("PPC Debugger", [this] {
@@ -652,8 +667,11 @@ void Render::GUI::OnSwap(Texture *texture) {
         TabItem("Settings", [&] {
           TabBar("##settings", [&] {
             TabItem("General", [&] {
-              Button("Force exit", [] {
+              Button("Soft exit", [] {
                 Xe_Main->shutdown();
+              });
+              Button("Force exit", [] {
+                exit(0);
               });
               GeneralSettings(this);
             });
@@ -668,6 +686,9 @@ void Render::GUI::OnSwap(Texture *texture) {
             });
             TabItem("ImGui", [&] {
               ImGuiSettings(this);
+            });
+            TabItem("Config", [&] {
+              ConfigSettings(this);
             });
           });
         });

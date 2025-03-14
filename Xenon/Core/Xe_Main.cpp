@@ -4,7 +4,7 @@
 
 XeMain::XeMain() {
   userDirectory = Base::FS::GetUserPath(Base::FS::PathType::UserDir);
-  Config::loadConfig(userDirectory / "xenon_config.toml");
+  loadConfig();
   Base::Log::Initialize();
   Base::Log::Start();
   auto logLevel = Config::getCurrentLogLevel();
@@ -23,9 +23,7 @@ XeMain::XeMain() {
   pciBridge->RegisterIIC(xenonCPU->GetIICPointer());
 }
 XeMain::~XeMain() {
-  // Save config incase it was modified
-  Config::saveConfig(userDirectory / "xenon_config.toml");
-
+  saveConfig();
   // Delete the XGPU and XCPU
   xenos.reset();
   xenonCPU.reset();
@@ -58,6 +56,14 @@ XeMain::~XeMain() {
   // Delete the log filter
   logFilter.reset();
 }
+
+void XeMain::saveConfig() {
+  Config::saveConfig(userDirectory / "xenon_config.toml");
+}
+void XeMain::loadConfig() {
+  Config::loadConfig(userDirectory / "xenon_config.toml");
+}
+
 
 void XeMain::start() {
   if (!xenonCPU.get()) {

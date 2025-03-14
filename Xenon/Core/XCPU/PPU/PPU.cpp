@@ -64,9 +64,8 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
   CalculateCPI();
 
   // If we want to start halted, halt after CPI is done.
-  if (Config::startCPUHalted()) {
-    ppuStartHalted = true;
-  }
+  ppuStartHalted = Config::startCPUHalted();
+  ppuHalt = Config::startCPUHalted();
 
   // If we have a specific halt address, set it here
   ppuHaltOn = Config::haltOn();
@@ -186,14 +185,14 @@ void PPU::Thread() {
           // Main processing loop.
 
           // Read next intruction from Memory.
-          if (ppuRunning && Config::startCPUHalted() && ppuReadNextInstruction()) {
+          if (ppuRunning && !ppuStartHalted && ppuReadNextInstruction()) {
             // Execute next intrucrtion.
             PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
           }
           
           // Debug tools
-          if (ppuHalt || ppuStartHalted) {
-            bool shouldHalt = ppuStartHalted || (ppuHalt && ppuHaltOn != 0 && ppuHaltOn == curThread.CIA);
+          if (ppuHalt) {
+            bool shouldHalt = ppuHalt && (ppuStartHalted ? ppuHaltOn != 0 && ppuHaltOn == curThread.CIA : true);
             if (ppuStep) {
               if (ppuStepCounter != ppuStepAmount) {
                 ppuStepCounter++;
@@ -202,7 +201,7 @@ void PPU::Thread() {
                 ppuStep = false;
               }
             }
-            while (shouldHalt && !ppuStep) {
+            while (ppuHalt && !ppuStep) {
               std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
           }
@@ -249,14 +248,14 @@ void PPU::Thread() {
           // Main processing loop.
 
           // Read next intruction from Memory.
-          if (ppuRunning && Config::startCPUHalted() && ppuReadNextInstruction()) {
+          if (ppuRunning && !ppuStartHalted && ppuReadNextInstruction()) {
             // Execute next intrucrtion.
             PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
           }
           
           // Debug tools
-          if (ppuHalt || ppuStartHalted) {
-            bool shouldHalt = ppuStartHalted || (ppuHalt && ppuHaltOn != 0 && ppuHaltOn == curThread.CIA);
+          if (ppuHalt) {
+            bool shouldHalt = ppuHalt && (ppuStartHalted ? ppuHaltOn != 0 && ppuHaltOn == curThread.CIA : true);
             if (ppuStep) {
               if (ppuStepCounter != ppuStepAmount) {
                 ppuStepCounter++;
@@ -265,7 +264,7 @@ void PPU::Thread() {
                 ppuStep = false;
               }
             }
-            while (shouldHalt && !ppuStep) {
+            while (ppuHalt && !ppuStep) {
               std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
           }

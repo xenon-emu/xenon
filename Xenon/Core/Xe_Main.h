@@ -36,6 +36,9 @@ public:
 
   void start();
 
+  void saveConfig();
+  void loadConfig();
+
   void addPCIDevices();
   void createHostBridge();
   void createPCIDevices();
