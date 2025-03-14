@@ -35,7 +35,7 @@ public:
   PPU_THREAD_REGISTERS *GetPPUThread(u8 thrdID);
 
   // Returns if the PPU is halted
-  bool IsHalted() { return ppcHalt; }
+  bool IsHalted() { return ppuHalt; }
 
   // Sets the clocks per instruction
   void SetCPI(u32 CPI) { clocksPerInstruction = CPI; }
@@ -62,17 +62,19 @@ private:
   bool ppuElfExecution = false;
 
   // Halt thread
-  bool ppcHalt = false;
+  bool ppuHalt = false;
+  // Halt on startup
+  bool ppuStartHalted = false;
   // If this is set to a non-zero value, it will halt on that address then clear it
-  u64 ppcHaltOn = 0;
+  u64 ppuHaltOn = 0;
 
   // Should we single step?
-  bool ppcStep = false;
+  bool ppuStep = false;
   // Amount of instructions to step
-  int ppcStepAmount = 1;
+  int ppuStepAmount = 1;
   // How many times we have stepped since activating it
   // Counter ticks up until step amount is reached
-  int ppcStepCounter = 0;
+  int ppuStepCounter = 0;
 
   // Reset ocurred or signaled?
   bool systemReset = false;

@@ -54,6 +54,11 @@ const std::string oddImagePath() { return oddDiscImagePath; }
 const std::string imguiIniPath() { return imguiConfigPath; }
 bool imguiDebug() { return imguiDebugWindow; }
 
+u64 haltOnRead() { return haltOnReadAddress; }
+u64 haltOnWrite() { return haltOnWriteAddress; }
+u64 haltOn() { return haltOnAddress; }
+bool startCPUHalted() { return startHalted; }
+
 //s32 getGpuId() {
 //  return gpuId;
 //}
@@ -151,6 +156,18 @@ void loadConfig(const std::filesystem::path &path) {
       toml::find_or<std::string>(imgui, "Config", imguiConfigPath);
     imguiDebugWindow =
         toml::find_or<bool>(imgui, "DebugWindow", imguiDebugWindow);
+  }
+
+  if (data.contains("Debug")) {
+    const toml::value &debug = data.at("Debug");
+    haltOnReadAddress =
+        toml::find_or<u64&>(debug, "HaltOnRead", haltOnReadAddress);
+    haltOnWriteAddress =
+        toml::find_or<u64&>(debug, "HaltOnWrite", haltOnWriteAddress);
+    haltOnAddress =
+        toml::find_or<u64&>(debug, "HaltOnAddress", haltOnWriteAddress);
+    startHalted =
+        toml::find_or<bool>(debug, "StartHalted", startHalted);
   }
 
   if (data.contains("HighlyExperimental")) {
@@ -262,6 +279,18 @@ void saveConfig(const std::filesystem::path &path) {
   data["ImGui"]["Config"] = imguiConfigPath;
   data["ImGui"]["DebugWindow"].comments().push_back("# Debug GUI Window");
   data["ImGui"]["DebugWindow"] = imguiDebugWindow;
+
+  // Debug
+  data["Debug"]["HaltOnRead"].comments().clear();
+  data["Debug"]["HaltOnWrite"].comments().clear();
+  data["Debug"]["StartHalted"].comments().clear();
+
+  data["Debug"]["HaltOnRead"].comments().push_back("# Address to halt on when the MMU reads this EA");
+  data["Debug"]["HaltOnRead"] = haltOnReadAddress;
+  data["Debug"]["HaltOnWrite"].comments().push_back("# Address to halt on when the MMU writes this EA");
+  data["Debug"]["HaltOnWrite"] = haltOnWriteAddress;
+  data["Debug"]["StartHalted"].comments().push_back("# Starts with the CPU halted");
+  data["Debug"]["StartHalted"] = startHalted;
 
   // HighlyExperimental
   data["HighlyExperimental"].comments().clear();

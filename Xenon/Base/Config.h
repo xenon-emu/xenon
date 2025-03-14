@@ -53,6 +53,12 @@ inline std::string imguiConfigPath = "none";
 // Debug Window
 inline bool imguiDebugWindow = true;
 
+// Debug
+inline u64 haltOnReadAddress = 0;
+inline u64 haltOnWriteAddress = 0;
+inline u64 haltOnAddress = 0;
+inline bool startHalted = false;
+
 // Highly experimental
 inline int clocksPerInstruction = 0;
 inline bool elfLoader = false;
@@ -133,6 +139,18 @@ const std::string oddImagePath();
 const std::string imguiIniPath();
 // ImGui Debug Window
 bool imguiDebug();
+
+//
+// Debug
+// 
+// Halt on mmu read address
+u64 haltOnRead();
+// Halt on mmu write address
+u64 haltOnWrite();
+// Halt on execution of this address
+u64 haltOn();
+// Start the CPU halted
+bool startCPUHalted();
 
 //
 // Highly experimental. (things that can either break the emulator or drastically increase performance)

@@ -63,6 +63,14 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
 
   CalculateCPI();
 
+  // If we want to start halted, halt after CPI is done.
+  if (Config::startCPUHalted()) {
+    ppuStartHalted = true;
+  }
+
+  // If we have a specific halt address, set it here
+  ppuHaltOn = Config::haltOn();
+
   for (u8 thrdID = 0; thrdID < 2; thrdID++) {
     ppuState->ppuThread[thrdID].ppuRes = std::make_unique<STRIP_UNIQUE(PPU_THREAD_REGISTERS::ppuRes)>();
     memset(ppuState->ppuThread[thrdID].ppuRes.get(), 0, sizeof(PPU_RES));
@@ -144,17 +152,17 @@ void PPU::Reset() {
 }
 
 void PPU::Halt(u64 haltOn) {
-  ppcHaltOn = haltOn;
-  ppcHalt = true;
+  ppuHaltOn = haltOn;
+  ppuHalt = true;
 }
 void PPU::Continue() {
-  ppcHaltOn = 0;
-  ppcHalt = false;
+  ppuHaltOn = 0;
+  ppuHalt = false;
 }
 void PPU::Step(int amount) {
-  ppcHaltOn = 0;
-  ppcStepAmount = amount;
-  ppcStep = true;
+  ppuHaltOn = 0;
+  ppuStepAmount = amount;
+  ppuStep = true;
 }
 
 // PPU Entry Point.
@@ -178,24 +186,23 @@ void PPU::Thread() {
           // Main processing loop.
 
           // Read next intruction from Memory.
-          if (ppuRunning && ppuReadNextInstruction()) {
+          if (ppuRunning && Config::startCPUHalted() && ppuReadNextInstruction()) {
             // Execute next intrucrtion.
             PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
           }
           
           // Debug tools
-          if (ppcHalt) {
-            bool shouldHalt = ppcHalt && ppcHaltOn != 0 &&
-              ppcHaltOn == ppuState->ppuThread[ppuState->currentThread].CIA;
-            if (ppcStep) {
-              if (ppcStepCounter != ppcStepAmount) {
-                ppcStepCounter++;
+          if (ppuHalt || ppuStartHalted) {
+            bool shouldHalt = ppuStartHalted || (ppuHalt && ppuHaltOn != 0 && ppuHaltOn == curThread.CIA);
+            if (ppuStep) {
+              if (ppuStepCounter != ppuStepAmount) {
+                ppuStepCounter++;
               }
               else {
-                ppcStep = false;
+                ppuStep = false;
               }
             }
-            while (shouldHalt && !ppcStep) {
+            while (shouldHalt && !ppuStep) {
               std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
           }
@@ -242,24 +249,23 @@ void PPU::Thread() {
           // Main processing loop.
 
           // Read next intruction from Memory.
-          if (ppuReadNextInstruction()) {
+          if (ppuRunning && Config::startCPUHalted() && ppuReadNextInstruction()) {
             // Execute next intrucrtion.
             PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
           }
           
           // Debug tools
-          if (ppcHalt) {
-            bool shouldHalt = ppcHalt && ppcHaltOn != 0 &&
-              ppcHaltOn == ppuState->ppuThread[ppuState->currentThread].CIA;
-            if (ppcStep) {
-              if (ppcStepCounter != ppcStepAmount) {
-                ppcStepCounter++;
+          if (ppuHalt || ppuStartHalted) {
+            bool shouldHalt = ppuStartHalted || (ppuHalt && ppuHaltOn != 0 && ppuHaltOn == curThread.CIA);
+            if (ppuStep) {
+              if (ppuStepCounter != ppuStepAmount) {
+                ppuStepCounter++;
               }
               else {
-                ppcStep = false;
+                ppuStep = false;
               }
             }
-            while (shouldHalt && !ppcStep) {
+            while (shouldHalt && !ppuStep) {
               std::this_thread::sleep_for(std::chrono::milliseconds(1));
             }
           }

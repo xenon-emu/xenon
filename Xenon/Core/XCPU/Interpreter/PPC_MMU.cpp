@@ -1133,6 +1133,10 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
     u8 a = 0;
   }
 
+  if (EA == Config::haltOnRead()) {
+    Xe_Main->getCPU()->Halt(EA);
+  }
+
   // Exception ocurred?
   if (MMUTranslateAddress(&EA, ppuState, false, speculativeLoad) == false)
     return 0;
@@ -1440,6 +1444,10 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   sysBus->Write(EA, data, byteCount);
 
   intXCPUContext->xenonRes.Check(EA);
+
+  if (EA == Config::haltOnWrite()) {
+    Xe_Main->getCPU()->Halt(EA);
+  }
 }
 
 void PPCInterpreter::MMUMemCpyFromHost(PPU_STATE *ppuState,
