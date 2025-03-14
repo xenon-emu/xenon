@@ -43,10 +43,22 @@ void Render::GUI::Init(SDL_Window* window, void* context) {
   }
   SetStyle();
   InitBackend(context);
+  PostInit();
 }
 
+bool RGH2{};
+bool storedPreviousInitSkips{};
+int initSkip1{}, initSkip2{};
 void Render::GUI::PostInit() {
-
+  ImGuiIO& io = ImGui::GetIO();
+  // It might not be a bad idea to take the Xbox 360 font and convert it to TTF
+  std::filesystem::path fontsPath{ Base::FS::GetUserPath(Base::FS::PathType::FontDir) };
+  std::string robotoRegular = (fontsPath / "Roboto-Regular.ttf").string();
+  robotRegular14 = io.Fonts->AddFontFromFileTTF(robotoRegular.c_str(), 14.f);
+  defaultFont13 = io.Fonts->AddFontDefault();
+  if (Config::SKIP_HW_INIT_1 == 0x3003DC0 && Config::SKIP_HW_INIT_2 == 0x3003E54) {
+    RGH2 = true;
+  }
 }
 
 void Render::GUI::Shutdown() {
@@ -582,9 +594,6 @@ void GraphicsSettings(Render::GUI *gui) {
   });
 }
 
-bool RGH2{};
-bool storedPreviousInitSkips{};
-int initSkip1{}, initSkip2{};
 void CodeflowSettings(Render::GUI *gui) {
   gui->Toggle("RGH2 Init Skip", &RGH2, [] {
     if (!storedPreviousInitSkips || !RGH2) {
@@ -592,8 +601,8 @@ void CodeflowSettings(Render::GUI *gui) {
       initSkip2 = Config::SKIP_HW_INIT_2;
       storedPreviousInitSkips = true;
     }
-    Config::SKIP_HW_INIT_1 = RGH2 ? initSkip1 : 0x3003DC0;
-    Config::SKIP_HW_INIT_2 = RGH2 ? initSkip2 : 0x3003E54;
+    Config::SKIP_HW_INIT_1 = RGH2 ? 0x3003DC0 : initSkip1;
+    Config::SKIP_HW_INIT_2 = RGH2 ? 0x3003E54 : initSkip2;
   });
 }
 

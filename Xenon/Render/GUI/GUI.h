@@ -38,7 +38,7 @@ public:
   virtual void InitBackend(void *context) = 0;
   virtual void ShutdownBackend() = 0;
   virtual void BeginSwap() = 0;
-  virtual void OnSwap(Texture *texture) = 0;
+  virtual void OnSwap(Texture *texture);
   virtual void EndSwap() = 0;
 
   void Window(const std::string &title, std::function<void()> callback = {}, const ImVec2 &size = {}, ImGuiWindowFlags flags = 0, bool *conditon = nullptr, const ImVec2 &position = {}, ImGuiCond cond = ImGuiCond_Once);

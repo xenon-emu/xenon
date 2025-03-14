@@ -461,7 +461,9 @@ void Xe::PCIDev::SMC::SMCCore::uartMainThread() {
 #else
   smcCoreState->uartInitialized = true;
 #endif // SOCKET_UART
-  LOG_INFO(SMC, "Backup UART Initialized Successfully!");
+  if (smcCoreState->uartInitialized) {
+    LOG_INFO(SMC, "Backup UART Initialized Successfully!");
+  }
   while (smcCoreState->uartThreadRunning) {
     std::unique_lock<std::mutex> lock(smcCoreState->uartMutex);
     if (!smcCoreState->uartTxBuffer.empty()) {

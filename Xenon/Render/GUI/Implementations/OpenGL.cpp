@@ -9,8 +9,6 @@
 #include "Render/Implementations/OGLTexture.h"
 
 void Render::OpenGLGUI::InitBackend(void *context) {
-  ImGuiIO &io = ImGui::GetIO();
-
   if (!ImGui_ImplSDL3_InitForOpenGL(mainWindow, context)) {
     LOG_ERROR(System, "Failed to initialize ImGui's SDL3 implementation");
     SYSTEM_PAUSE();
@@ -18,14 +16,6 @@ void Render::OpenGLGUI::InitBackend(void *context) {
   if (!ImGui_ImplOpenGL3_Init()) {
     LOG_ERROR(System, "Failed to initialize ImGui's OpenGL implementation");
     SYSTEM_PAUSE();
-  }
-  // It might not be a bad idea to take the Xbox 360 font and convert it to TTF
-  std::filesystem::path fontsPath{ Base::FS::GetUserPath(Base::FS::PathType::FontDir) };
-  std::string robotoRegular = (fontsPath / "Roboto-Regular.ttf").string();
-  robotRegular14 = io.Fonts->AddFontFromFileTTF(robotoRegular.c_str(), 14.f);
-  defaultFont13 = io.Fonts->AddFontDefault();
-  if (Config::SKIP_HW_INIT_1 == 0x3003DC0 && Config::SKIP_HW_INIT_2 == 0x3003E54) {
-    RGH2 = true;
   }
 }
 
