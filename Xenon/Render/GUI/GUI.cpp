@@ -30,7 +30,7 @@ void Render::GUI::Init(SDL_Window* window, void* context) {
   // We don't want to create a ini because it stores positions.
   // Because we initialize with a 1280x720 window, then resize to whatever,
   // this will break the window positions, causing them to render off screen
-  std::string iniPath = Config::imguiIniPath();
+  const std::string iniPath = Config::imguiIniPath();
   io.IniFilename = iniPath.compare("none") ? iniPath.data() : nullptr;
   // Enable ImGui Keyboard Navigation
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
@@ -53,8 +53,8 @@ int initSkip1{}, initSkip2{};
 void Render::GUI::PostInit() {
   ImGuiIO& io = ImGui::GetIO();
   // It might not be a bad idea to take the Xbox 360 font and convert it to TTF
-  std::filesystem::path fontsPath{ Base::FS::GetUserPath(Base::FS::PathType::FontDir) };
-  std::string robotoRegular = (fontsPath / "Roboto-Regular.ttf").string();
+  const std::filesystem::path fontsPath{ Base::FS::GetUserPath(Base::FS::PathType::FontDir) };
+  const std::string robotoRegular = (fontsPath / "Roboto-Regular.ttf").string();
   robotRegular14 = io.Fonts->AddFontFromFileTTF(robotoRegular.c_str(), 14.f);
   defaultFont13 = io.Fonts->AddFontDefault();
   if (Config::SKIP_HW_INIT_1 == 0x3003DC0 && Config::SKIP_HW_INIT_2 == 0x3003E54) {

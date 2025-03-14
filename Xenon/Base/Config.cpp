@@ -45,13 +45,13 @@ s32 windowHeight() { return screenHeight; }
 s32 internalWindowWidth() { return internalWidth; }
 s32 internalWindowHeight() { return internalHeight; }
 
-std::string fusesPath() { return fusesTxtPath; }
-std::string oneBlPath() { return oneBlBinPath; }
-std::string nandPath() { return nandBinPath; }
-std::string elfPath() { return elfBinaryPath; }
-std::string oddImagePath() { return oddDiscImagePath; }
+const std::string fusesPath() { return fusesTxtPath; }
+const std::string oneBlPath() { return oneBlBinPath; }
+const std::string nandPath() { return nandBinPath; }
+const std::string elfPath() { return elfBinaryPath; }
+const std::string oddImagePath() { return oddDiscImagePath; }
 
-std::string imguiIniPath() { return imguiConfigPath; }
+const std::string imguiIniPath() { return imguiConfigPath; }
 bool imguiDebug() { return imguiDebugWindow; }
 
 //s32 getGpuId() {

@@ -70,7 +70,7 @@ private:
 #ifdef _WIN32
 class Storage {
 public:
-  Storage(std::string Filename) {
+  Storage(const std::string Filename) {
     hFile = CreateFileA(Filename.data(), GENERIC_READ, FILE_SHARE_READ, nullptr,
                         OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
   }
@@ -104,7 +104,7 @@ private:
 #else
 class Storage {
 public:
-  Storage(std::string Filename) {
+  Storage(const std::string Filename) {
     fd = open(Filename.c_str(), O_RDONLY);
   }
   ~Storage() {

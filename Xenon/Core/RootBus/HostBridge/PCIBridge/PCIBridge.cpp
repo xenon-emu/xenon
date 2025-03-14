@@ -169,7 +169,7 @@ bool PCIBridge::isAddressMappedinBAR(u32 address) {
 }
 
 void PCIBridge::addPCIDevice(PCIDevice *device) {
-  LOG_INFO(PCIBridge, "Attatched: {}", device->GetDeviceName());
+  LOG_INFO(PCIBridge, "Attached: {}", device->GetDeviceName());
 
   connectedPCIDevices.push_back(device);
 }
@@ -231,7 +231,7 @@ bool PCIBridge::Read(u64 readAddress, u64 *data, u8 byteCount) {
     return true;
   }
 
-  // Try writing to one of the attatched devices.
+  // Try writing to one of the attached devices.
   for (auto &device : connectedPCIDevices) {
     if (device->isAddressMappedInBAR(static_cast<u32>(readAddress))) {
       // Hit
@@ -353,7 +353,7 @@ bool PCIBridge::Write(u64 writeAddress, u64 data, u8 byteCount) {
     return true;
   }
 
-  // Try writing to one of the attatched devices.
+  // Try writing to one of the attached devices.
   for (auto &device : connectedPCIDevices) {
     if (device->isAddressMappedInBAR(static_cast<u32>(writeAddress))) {
       // Hit
