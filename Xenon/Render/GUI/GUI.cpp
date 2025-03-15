@@ -1,9 +1,10 @@
 // Copyright 2025 Xenon Emulator Project
 
+#include "GUI.h"
+
+#ifndef NO_GFX
 #include "Core/Xe_Main.h"
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
-
-#include "GUI.h"
 
 // Helper functions for text/string formatting with the gui
 #define TextFmt(x, ...) Text(fmt::format(x, __VA_ARGS__))
@@ -803,3 +804,4 @@ void Render::GUI::SetStyle() {
     style.Colors[ImGuiCol_WindowBg].w = 1.0f;
   }
 }
+#endif

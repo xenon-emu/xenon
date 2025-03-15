@@ -8,14 +8,6 @@
 #include <thread>
 #include <vector>
 
-#include <SDL3/SDL.h>
-
-#define GL_GLEXT_PROTOTYPES
-extern "C" {
-#include <KHR/khrplatform.h>
-#include <glad/glad.h>
-}
-
 #include "Base/Types.h"
 #include "Core/RAM/RAM.h"
 #include "Core/RootBus/HostBridge/PCIe.h"

@@ -4,6 +4,9 @@
 
 #include <string>
 #include <functional>
+
+#include "Base/Types.h"
+#ifndef NO_GFX
 #include <SDL3/SDL.h>
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
@@ -71,3 +74,5 @@ public:
 };
 
 } // namespace Render
+
+#endif

@@ -6,6 +6,9 @@
 #include <vector>
 #include <fstream>
 
+#include "Base/Types.h"
+
+#ifndef NO_GFX
 #include <SDL3/SDL.h>
 
 #define GL_GLEXT_PROTOTYPES
@@ -18,7 +21,6 @@ extern "C" {
 #include <backends/imgui_impl_opengl3.h>
 #include <backends/imgui_impl_sdl3.h>
 
-#include "Base/Types.h"
 #include "Core/RAM/RAM.h"
 #include "Core/RootBus/HostBridge/PCIe.h"
 #include "Render/Abstractions/Texture.h"
@@ -178,3 +180,5 @@ void main() {
 )";
 
 } // namespace Render
+
+#endif

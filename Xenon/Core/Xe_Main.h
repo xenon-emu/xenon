@@ -67,9 +67,11 @@ private:
   std::unique_ptr<PCIBridge> pciBridge{}; // PCIBridge Object
 
 public:
+#ifndef NO_GFX
   // Render thread
   std::unique_ptr<Render::Renderer> renderer{};
   bool renderHalt{};
+#endif
 
   // PCI Devices
   //  SMC

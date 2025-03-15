@@ -106,6 +106,7 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, u64 data, u8 byteCount) {
     XeRegister reg = static_cast<XeRegister>(regIndex);
 
     // Set our internal width.
+#ifndef NO_GFX
     if (reg == XeRegister::D1GRPH_X_END) {
       Xe_Main->renderer->internalWidth = byteswap<u32>(static_cast<u32>(data));
       LOG_INFO(Xenos, "Setting new Internal Width: {:#x}", Xe_Main->renderer->internalWidth);
@@ -115,6 +116,7 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, u64 data, u8 byteCount) {
       Xe_Main->renderer->internalHeight = byteswap<u32>(static_cast<u32>(data));
       LOG_INFO(Xenos, "Setting new Internal Height: {:#x}", Xe_Main->renderer->internalHeight);
     }
+#endif
 
     memcpy(&xenosState.Regs[regIndex * 4], &data, byteCount);
     return true;

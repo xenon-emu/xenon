@@ -4,6 +4,7 @@
 
 #include "Base/Types.h"
 
+#ifndef NO_GFX
 namespace Render {
 
 // TODO(Vali0004): Expand formats
@@ -35,3 +36,4 @@ private:
 };
 
 } // Namespace Render
+#endif

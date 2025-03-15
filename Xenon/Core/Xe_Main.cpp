@@ -15,7 +15,9 @@ XeMain::XeMain() {
   createPCIDevices();
   addPCIDevices();
   getFuses();
+#ifndef NO_GFX
   renderer = std::make_unique<STRIP_UNIQUE(renderer)>(ram.get());
+#endif
   xenos = std::make_unique<STRIP_UNIQUE(xenos)>(ram.get());
   createHostBridge();
   createRootBus();
@@ -50,8 +52,10 @@ XeMain::~XeMain() {
   hostBridge.reset();
   pciBridge.reset();
 
+#ifndef NO_GFX
   // Delete the renderer
   renderer.reset();
+#endif
 
   // Delete the log filter
   logFilter.reset();
@@ -67,10 +71,14 @@ void XeMain::loadConfig() {
 
 void XeMain::start() {
   if (!xenonCPU.get()) {
+#ifndef NO_GFX
     renderHalt = true;
+#endif
     LOG_CRITICAL(Xenon, "Failed to initialize Xenon's CPU!");
     SYSTEM_PAUSE();
+#ifndef NO_GFX
     renderHalt = false;
+#endif
     return;
   }
   if (Config::loadElfs()) {

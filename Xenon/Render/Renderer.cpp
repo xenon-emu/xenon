@@ -2,6 +2,8 @@
 
 #include "Renderer.h"
 
+#ifndef NO_GFX
+
 #include "Render/Implementations/OGLTexture.h" 
 #include "GUI/Implementations/OpenGL.h"
 #include "Base/Config.h"
@@ -302,3 +304,5 @@ void Render::Renderer::Thread() {
     SDL_GL_SwapWindow(mainWindow);
   }
 }
+
+#endif

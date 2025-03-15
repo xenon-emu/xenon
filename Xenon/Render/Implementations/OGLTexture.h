@@ -5,6 +5,7 @@
 #include "Base/Types.h"
 #include "Render/Abstractions/Texture.h"
 
+#ifndef NO_GFX
 #define GL_GLEXT_PROTOTYPES
 extern "C" {
 #include <KHR/khrplatform.h>
@@ -53,3 +54,4 @@ private:
 };
 
 } // Namespace Render
+#endif
