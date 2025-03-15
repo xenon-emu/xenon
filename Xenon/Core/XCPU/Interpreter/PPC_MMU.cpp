@@ -1130,11 +1130,19 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   }
 
   if (EA == Config::haltOnRead()) {
-    Xenon* CPU = Xe_Main->getCPU();
+    Xenon *CPU = Xe_Main->getCPU();
     PPU *PPU = Xe_Main->getCPU()->GetPPU(ppuState->ppuID);
     if (PPU->ThreadRunning()) {
-      CPU->Halt(EA);
+      CPU->Halt();
     }
+    Config::imguiDebugWindow = true; // Open debugger after halting
+  }
+
+  if (EA == 0xCDCDCDCDCDCDCDCD) {
+    LOG_CRITICAL(Xenon, "PPU{} had a bad read to a uninitialized region of memory! Halting...", ppuState->ppuID);
+    // Halt the CPU
+    Xe_Main->getCPU()->Halt();
+    Config::imguiDebugWindow = true; // Open debugger on bad fault
   }
 
   // Exception ocurred?
@@ -1446,7 +1454,16 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   intXCPUContext->xenonRes.Check(EA);
 
   if (EA == Config::haltOnWrite()) {
-    Xe_Main->getCPU()->Halt(EA);
+    Xe_Main->getCPU()->Halt(); // Halt the CPU
+    Config::imguiDebugWindow = true; // Open the debugger after halting
+  }
+
+  if (EA == 0xCDCDCDCDCDCDCDCD || data == 0xCDCDCDCDCDCDCDCD) {
+    Xenon* CPU = Xe_Main->getCPU();
+    PPU* PPU = Xe_Main->getCPU()->GetPPU(ppuState->ppuID);
+    LOG_CRITICAL(Xenon, "PPU{} had a bad read to a uninitialized region of memory! Halting...", ppuState->ppuID);
+    Xe_Main->getCPU()->Halt(); // Halt the CPU
+    Config::imguiDebugWindow = true; // Open the debugger on bad fault
   }
 }
 

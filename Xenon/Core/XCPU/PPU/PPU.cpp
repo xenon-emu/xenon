@@ -7,6 +7,7 @@
 #include <iostream>
 #include <thread>
 
+#include "Core/Xe_Main.h"
 #include "Base/Config.h"
 #include "Base/Thread.h"
 #include "Base/Logging/Log.h"
@@ -473,6 +474,11 @@ u64 PPU::loadElfImage(u8 *data, u64 size) {
 
 // Reads the next instruction from memory and advances the NIP accordingly.
 bool PPU::ppuReadNextInstruction() {
+  if (curThread.NIA == 0xCDCDCDCDCDCDCDCD) {
+    LOG_CRITICAL(Xenon, "PPU{} had a bad read to a uninitialized region of memory! Halting...", ppuState->ppuID);
+    Xe_Main->getCPU()->Halt(); // Halt CPU
+    Config::imguiDebugWindow = true; // Open debugger on bad fault
+  }
   // Update CIA.
   curThread.CIA = curThread.NIA;
   // Increase Next Instruction Address.
