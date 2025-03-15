@@ -1261,7 +1261,7 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
       break;
     }
 
-    return byteswap<u64>(data);
+    return byteswap_be<u64>(data);
   }
 
   // Integrated Interrupt Controller in real mode, used when the HV wants to
@@ -1286,7 +1286,7 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   // CPU VID Register
   if (socRead && EA == 0x61188) {
     data = 0x382C00000000b001;
-    return byteswap<u64>(data);
+    return byteswap_be<u64>(data);
   }
 
   bool nand = false;
@@ -1331,8 +1331,9 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
 void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
                               u64 data, u64 EA, s8 byteCount, bool cacheStore) {
   u64 oldEA = EA;
-  if (false) {
-    LOG_INFO(Xenon_MMU, "context, state, data=0x{:08x}, EA=0x{:08x}, byteCount={:d}, cachestore)", data, EA, byteCount);
+  if (true) {
+    u64 bsEA = byteswap_le<u64>(EA);
+    LOG_INFO(Xenon_MMU, "context, state, data=0x{:08x}, EA=0x{:08x}, bsEA=0x{:08x}, byteCount={:d}, cachestore)", data, EA, bsEA, byteCount);
   }
 
   if (MMUTranslateAddress(&EA, ppuState, true) == false)
@@ -1360,19 +1361,18 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
 
   // Halting in the debugger
   if (socWrite && EA == TEST_HALT_ADDR) {
-    u64 dataByteswapped = byteswap<u64>(data);
+    u64 dataByteswapped = byteswap_be<u64>(data);
     Xe_Main->getCPU()->Halt(dataByteswapped);
     return;
   }
 
   // Time Base register. Writing here starts or stops the RTC apparently.
   if (socWrite && EA == 0x611A0) {
-    if (data == 0) {
+    u64 dataByteswapped = byteswap_be<u64>(data);
+    if (dataByteswapped == 0) {
       intXCPUContext->timeBaseActive = false;
       return;
-    } else if (data == 0xFF01000000000000 ||
-               data == 0x0001000000000000) // 0x1FF byte reversed!
-    {
+    } else if (dataByteswapped == 0x1FF || dataByteswapped == 0x1) {
       intXCPUContext->timeBaseActive = true;
       return;
     }
@@ -1476,19 +1476,19 @@ u8 PPCInterpreter::MMURead8(PPU_STATE *ppuState, u64 EA, bool speculativeLoad) {
 u16 PPCInterpreter::MMURead16(PPU_STATE *ppuState, u64 EA, bool speculativeLoad) {
   u16 data = 0;
   data = static_cast<u16>(MMURead(intXCPUContext, ppuState, EA, 2, speculativeLoad));
-  return byteswap<u16>(data);
+  return byteswap_be<u16>(data);
 }
 // Reads 4 Bytes of memory.
 u32 PPCInterpreter::MMURead32(PPU_STATE *ppuState, u64 EA, bool speculativeLoad) {
   u32 data = 0;
   data = static_cast<u32>(MMURead(intXCPUContext, ppuState, EA, 4, speculativeLoad));
-  return byteswap<u32>(data);
+  return byteswap_be<u32>(data);
 }
 // Reads 8 Bytes of memory.
 u64 PPCInterpreter::MMURead64(PPU_STATE *ppuState, u64 EA, bool speculativeLoad) {
   u64 data = 0;
   data = MMURead(intXCPUContext, ppuState, EA, 8, speculativeLoad);
-  return byteswap<u64>(data);
+  return byteswap_be<u64>(data);
 }
 // Writes 1 Byte to memory.
 void PPCInterpreter::MMUWrite8(PPU_STATE *ppuState, u64 EA, u8 data) {
@@ -1496,16 +1496,16 @@ void PPCInterpreter::MMUWrite8(PPU_STATE *ppuState, u64 EA, u8 data) {
 }
 // Writes 2 Bytes to memory.
 void PPCInterpreter::MMUWrite16(PPU_STATE *ppuState, u64 EA, u16 data) {
-  u16 dataBS = byteswap<u16>(data);
+  u16 dataBS = byteswap_be<u16>(data);
   MMUWrite(intXCPUContext, ppuState, dataBS, EA, 2);
 }
 // Writes 4 Bytes to memory.
 void PPCInterpreter::MMUWrite32(PPU_STATE *ppuState, u64 EA, u32 data) {
-  u32 dataBS = byteswap<u32>(data);
+  u32 dataBS = byteswap_be<u32>(data);
   MMUWrite(intXCPUContext, ppuState, dataBS, EA, 4);
 }
 // Writes 8 Bytes to memory.
 void PPCInterpreter::MMUWrite64(PPU_STATE *ppuState, u64 EA, u64 data) {
-  u64 dataBS = byteswap<u64>(data);
+  u64 dataBS = byteswap_be<u64>(data);
   MMUWrite(intXCPUContext, ppuState, dataBS, EA, 8);
 }

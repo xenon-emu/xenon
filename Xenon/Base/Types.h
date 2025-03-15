@@ -45,11 +45,22 @@ using f64 = double;
   return 1024_MB * x;
 }
 
-// Byteswap
+// Byteswap to BE
 template <class T>
   requires std::is_integral_v<T>
-[[nodiscard]] constexpr T byteswap(T value) noexcept {
+[[nodiscard]] constexpr T byteswap_be(T value) noexcept {
   if constexpr (std::endian::native == std::endian::little) {
+    return std::byteswap<T>(value);
+  }
+
+  return value;
+}
+
+// Byteswap to LE
+template <class T>
+  requires std::is_integral_v<T>
+[[nodiscard]] constexpr T byteswap_le(T value) noexcept {
+  if constexpr (std::endian::native == std::endian::big) {
     return std::byteswap<T>(value);
   }
 

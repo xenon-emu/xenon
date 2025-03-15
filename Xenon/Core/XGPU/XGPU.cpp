@@ -96,24 +96,21 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, u64 data, u8 byteCount) {
     const u32 regIndex = (writeAddress & 0xFFFFF) / 4;
 
 #ifdef XE_DEBUG
-    LOG_DEBUG(Xenos, "Write to {}, index {:#x}, data = {:#x}", GetRegisterNameById(regIndex), regIndex,
-      byteswap<u32>(static_cast<u32>(data)));
+    LOG_DEBUG(Xenos, "Write to {} (addr: {:#x}), index {:#x}, data = {:#x}", GetRegisterNameById(regIndex), writeAddress, regIndex,
+      byteswap_be<u32>(static_cast<u32>(data)));
 #endif
-
-    LOG_TRACE(Xenos, "Write Addr = {:#x}, reg: {:#x}, data = {:#x}.", writeAddress, regIndex,
-      byteswap<u32>(static_cast<u32>(data)));
 
     XeRegister reg = static_cast<XeRegister>(regIndex);
 
     // Set our internal width.
 #ifndef NO_GFX
     if (reg == XeRegister::D1GRPH_X_END) {
-      Xe_Main->renderer->internalWidth = byteswap<u32>(static_cast<u32>(data));
+      Xe_Main->renderer->internalWidth = byteswap_be<u32>(static_cast<u32>(data));
       LOG_INFO(Xenos, "Setting new Internal Width: {:#x}", Xe_Main->renderer->internalWidth);
     }
     // Set our internal height.
     if (reg == XeRegister::D1GRPH_Y_END) {
-      Xe_Main->renderer->internalHeight = byteswap<u32>(static_cast<u32>(data));
+      Xe_Main->renderer->internalHeight = byteswap_be<u32>(static_cast<u32>(data));
       LOG_INFO(Xenos, "Setting new Internal Height: {:#x}", Xe_Main->renderer->internalHeight);
     }
 #endif

@@ -405,7 +405,7 @@ u32 PPU::getIPS() {
                       (ehdr).e_ident[EI_MAG1] == ELFMAG1 && \
                       (ehdr).e_ident[EI_MAG2] == ELFMAG2 && \
                       (ehdr).e_ident[EI_MAG3] == ELFMAG3)
-#define SWAP(v, s) v = byteswap<s>(v);
+#define SWAP(v, s) v = byteswap_be<s>(v);
 u64 PPU::loadElfImage(u8 *data, u64 size) {
   ppuElfExecution = true;
   elf64_hdr* header{ reinterpret_cast<decltype(header)>(data) };
@@ -447,12 +447,12 @@ u64 PPU::loadElfImage(u8 *data, u64 size) {
   const Elf64_Phdr* psections = reinterpret_cast<Elf64_Phdr*>(data + header->e_phoff);
 
   for (size_t i = 0; i < num_psections; i++) {
-    if (byteswap<u32>(psections[i].p_type) == PT_LOAD) {
-      u64 vaddr = byteswap<u64>(psections[i].p_vaddr);
-      u64 paddr = byteswap<u64>(psections[i].p_paddr);
-      u64 filesize = byteswap<u64>(psections[i].p_filesz);
-      u64 memsize = byteswap<u64>(psections[i].p_memsz);
-      u64 file_offset = byteswap<u64>(psections[i].p_offset);
+    if (byteswap_be<u32>(psections[i].p_type) == PT_LOAD) {
+      u64 vaddr = byteswap_be<u64>(psections[i].p_vaddr);
+      u64 paddr = byteswap_be<u64>(psections[i].p_paddr);
+      u64 filesize = byteswap_be<u64>(psections[i].p_filesz);
+      u64 memsize = byteswap_be<u64>(psections[i].p_memsz);
+      u64 file_offset = byteswap_be<u64>(psections[i].p_offset);
       bool physical_load = true;
       u64 target_addr = physical_load ? paddr : vaddr;
       LOG_INFO(Xenon, "Loading {:#x} bytes from offset {:#x} in the ELF to {:#x}", filesize, file_offset, target_addr);
