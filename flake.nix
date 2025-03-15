@@ -23,18 +23,14 @@
     };
     pkgs = pkgsLut.${system};
   in {
-    options = {
-      xenon.graphics_enabled = self.mkOption {
-        type = self.types.bool;
-      };
-    };
     packages = {
-      inherit (pkgs) xenon;
+      inherit (pkgs) xenon xenon-cli;
     };
     devShell = pkgs.xenon;
   })) // {
     overlay = self: super: {
       xenon = self.callPackage ./xenon.nix {};
+      xenon-cli = self.callPackage ./xenon.nix { withGraphics = false; };
       sdl3 = super.sdl3.overrideDerivation (old: {
         version = "3.2.6";
         src = self.fetchFromGitHub {
