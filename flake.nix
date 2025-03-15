@@ -24,11 +24,24 @@
     pkgs = pkgsLut.${system};
   in {
     packages = {
-      inherit (pkgs) xenon xenon-cli;
+      inherit (pkgs) xenon xenon-cli xenon-static xenon-cli-static;
     };
     devShell = pkgs.xenon;
   })) // {
-    overlay = self: super: {
+    overlay = self: super:
+    let
+      staticOverlay = self: super: {
+        waylandSupport = false;
+        libayatana-appindicator = null;
+        libdecorSupport = false;
+        libudevSupport = false;
+        ibusSupport = false;
+        pipewireSupport = false;
+        pulseaudioSupport = false;
+      };
+    in {
+      xenon-static = (self.extend staticOverlay).pkgsStatic.xenon;
+      xenon-cli-static = (self.extend staticOverlay).pkgsStatic.xenon-cli;
       xenon = self.callPackage ./xenon.nix {};
       xenon-cli = self.callPackage ./xenon.nix { withGraphics = false; };
       sdl3 = super.sdl3.overrideDerivation (old: {
