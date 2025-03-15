@@ -61,9 +61,10 @@ void Xenon::LoadElf(const std::string path) {
   ppu0.reset();
   ppu1.reset();
   ppu2.reset();
+  //TODO(Vali0004): Fix multi-threading
   ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(&xenonContext, mainBus, 0, XE_PVR, 0); // Threads 0-1
-  ppu1 = std::make_unique<STRIP_UNIQUE(ppu1)>(&xenonContext, mainBus, 0, XE_PVR, 2); // Threads 2-3
-  ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(&xenonContext, mainBus, 0, XE_PVR, 4); // Threads 4-5
+  //ppu1 = std::make_unique<STRIP_UNIQUE(ppu1)>(&xenonContext, mainBus, 0, XE_PVR, 2); // Threads 2-3
+  //ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(&xenonContext, mainBus, 0, XE_PVR, 4); // Threads 4-5
   std::filesystem::path filePath{ path };
   std::ifstream file{ filePath, std::ios_base::in | std::ios_base::binary };
   size_t fileSize = std::filesystem::file_size(filePath);
@@ -72,8 +73,8 @@ void Xenon::LoadElf(const std::string path) {
   file.close();
   ppu0->loadElfImage(elfBinary.get(), fileSize);
   ppu0->StartExecution(false);
-  ppu1->StartExecution(false);
-  ppu2->StartExecution(false);
+  //ppu1->StartExecution(false);
+  //ppu2->StartExecution(false);
 }
 
 void Xenon::Halt(u64 haltOn) {
