@@ -7,17 +7,17 @@
 #include "Types.h"
 
 struct deviceInfo {
-  const char *deviceName; // Device Name
-  u64 startAddr;          // Start Address
-  u64 endAddr;            // End Address
-  bool socDevice;         // SOC Device
+  const char *deviceName = ""; // Device Name
+  u64 startAddr = 0; // Start Address
+  u64 endAddr = 0; // End Address
+  bool socDevice = false; // SOC Device
 };
 
 class SystemDevice {
 public:
   SystemDevice(const char *deviceName, u64 startAddress, u64 endAddress,
                bool isSOCDevice)
-    {
+  {
     info.deviceName = deviceName;
     info.startAddr = startAddress;
     info.endAddr = endAddress;
@@ -33,5 +33,5 @@ public:
   bool IsSOCDevice() { return info.socDevice; }
 
 private:
-  deviceInfo info;
+  deviceInfo info{};
 };

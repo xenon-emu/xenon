@@ -3,7 +3,7 @@
 #pragma once
 
 #include "Base/SystemDevice.h"
-#include <vector>
+#include <memory>
 
 #define RAM_START_ADDR 0
 #define RAM_SIZE 0x20000000
@@ -19,5 +19,5 @@ public:
   u8 *getPointerToAddress(u32 address);
 
 private:
-  std::vector<u8> RAMData;
+  std::unique_ptr<u8[]> RAMData{};
 };

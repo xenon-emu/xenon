@@ -68,7 +68,7 @@ public:
   void ConfigWrite(u64 writeAddress, u64 data, u8 byteCount) override;
 
 private:
-  XE_PCI_STATE ethPciState = {};
+  XE_PCI_STATE ethPciState{};
 };
 
 } // namespace ETHERNET

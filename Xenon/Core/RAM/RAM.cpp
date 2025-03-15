@@ -5,14 +5,18 @@
 
 /***Sets the destination, value (205) and size (RAMData)***/
 RAM::RAM(const char* deviceName, u64 startAddress, u64 endAddress, bool isSOCDevice) :
-  SystemDevice(deviceName, startAddress, endAddress, isSOCDevice), RAMData(RAM_SIZE, 0xCD) {
-  if (RAMData.empty()) {
+  SystemDevice(deviceName, startAddress, endAddress, isSOCDevice) {
+  RAMData = std::make_unique<STRIP_UNIQUE_ARR(RAMData)>(RAM_SIZE);
+  if (!RAMData.get()) {
     LOG_CRITICAL(System, "RAM failed to allocate! This is really bad!");
     SYSTEM_PAUSE();
   }
+  else {
+    memset(RAMData.get(), 0xCD, RAM_SIZE);
+  }
 }
 RAM::~RAM() {
-  RAMData.clear();
+  RAMData.reset();
 }
 
 /*****************Responsible for RAM reading*****************/
@@ -29,5 +33,5 @@ void RAM::Write(u64 writeAddress, u64 data, u8 byteCount) {
 
 u8 *RAM::getPointerToAddress(u32 address) {
   const u64 offset = static_cast<u32>(address - RAM_START_ADDR);
-  return RAMData.data() + offset;
+  return RAMData.get() + offset;
 }
