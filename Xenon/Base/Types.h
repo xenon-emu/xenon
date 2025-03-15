@@ -17,18 +17,14 @@
 #endif
 
 // Compile time macros to get endianess
-#define LE_INT 0x41424344
-#define BE_INT 0x44434241
-#define PDP_INT 0x42414443
-#define ENDIAN_ORDER ('ABCD')
-#if ENDIAN_ORDER == LE_INT
+#ifdef _MSC_VER
 #define __LITTLE_ENDIAN__ 1
-#elif ENDIAN_ORDER == BE_INT
-#define __BIG_ENDIAN__ 1
-#elif ENDIAN_ORDER == PDP_INT
-#define __PDP_ENDIAN__ 1
 #else
-#error "Unknown endianess (?)"
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#define __LITTLE_ENDIAN__ 1
+#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#define __BIG_ENDIAN__ 1
+#endif
 #endif
 
 // Signed
