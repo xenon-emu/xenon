@@ -60,7 +60,7 @@ NAND::~NAND() {
 }
 
 /************Responsible for reading the NAND************/
-void NAND::Read(u64 readAddress, u64 *data, u8 byteCount) {
+void NAND::Read(u64 readAddress, u8 *data, u8 byteCount) {
   u32 offset = static_cast<u32>(readAddress & 0xFFFFFF);
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
 #ifdef NAND_DEBUG
@@ -70,14 +70,14 @@ void NAND::Read(u64 readAddress, u64 *data, u8 byteCount) {
 }
 
 /************Responsible for writing the NAND************/
-void NAND::Write(u64 writeAddress, u64 data, u8 byteCount) {
+void NAND::Write(u64 writeAddress, u8 *data, u8 byteCount) {
   u32 offset = static_cast<u32>(writeAddress & 0xFFFFFF);
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
 #ifdef NAND_DEBUG
     LOG_DEBUG(SFCX, "Writing raw data at {:#x} (offset {:#x}) for {:#x} bytes", writeAddress, offset, byteCount);
 #endif // NAND_DEBUG
   u8* NANDData = rawNANDData.data();
-  memcpy(rawNANDData.data() + offset, &data, byteCount);
+  memcpy(rawNANDData.data() + offset, data, byteCount);
 }
 
 //*Checks ECD Page.

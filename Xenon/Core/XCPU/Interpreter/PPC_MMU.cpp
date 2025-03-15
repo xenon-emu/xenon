@@ -1321,7 +1321,7 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   }
 
   // External Read
-  sysBus->Read(EA, &data, byteCount);
+  sysBus->Read(EA, (u8*)&data, byteCount);
   return data;
 }
 
@@ -1331,8 +1331,8 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
 void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
                               u64 data, u64 EA, s8 byteCount, bool cacheStore) {
   u64 oldEA = EA;
-  if (true) {
-    LOG_INFO(Xenon_MMU, "context, state, data=0x{:08x}, EA=0x{:08x}, byteCount={:d}, cachestore)", data, EA, byteCount);
+  if (false) {
+    LOG_INFO(Xenon_MMU, "context, state, data=0x{:08x}, EA=0x{:08x}, byteCount={:d}", data, EA, byteCount);
   }
 
   if (MMUTranslateAddress(&EA, ppuState, true) == false)
@@ -1342,7 +1342,7 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
     u8 a = 0;
   }
 
-  if (true) {
+  if (false) {
     LOG_INFO(Xenon_MMU, "EA after MMUTranslateAddress: 0x{:08x}", EA);
   }
 
@@ -1350,7 +1350,7 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
 
   EA = mmuContructEndAddressFromSecEngAddr(EA, &socWrite);
   
-  if (true) {
+  if (false) {
     LOG_INFO(Xenon_MMU, "EA after mmuContructEndAddressFromSecEngAddr: 0x{:08x}", EA);
   }
 
@@ -1449,7 +1449,7 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   }
 
   // External Write
-  sysBus->Write(EA, data, byteCount);
+  sysBus->Write(EA, (u8*)&data, byteCount);
 
   intXCPUContext->xenonRes.Check(EA);
 

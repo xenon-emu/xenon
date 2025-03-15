@@ -95,11 +95,11 @@ public:
   ~XGPU();
 
   // Memory Read/Write methods.
-  bool Read(u64 readAddress, u64 *data, u8 byteCount);
-  bool Write(u64 writeAddress, u64 data, u8 byteCount);
+  bool Read(u64 readAddress, u8 *data, u8 byteCount);
+  bool Write(u64 writeAddress, u8 *data, u8 byteCount);
 
-  void ConfigRead(u64 readAddress, u64 *data, u8 byteCount);
-  void ConfigWrite(u64 writeAddress, u64 data, u8 byteCount);
+  void ConfigRead(u64 readAddress, u8 *data, u8 byteCount);
+  void ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount);
 
   bool isAddressMappedInBAR(u32 address);
 

@@ -288,7 +288,7 @@ void PPCInterpreter::PPCInterpreter_stwcx(PPU_STATE *ppuState) {
         bool soc = false;
         u32 data = byteswap_be<u32>(static_cast<u32>(GPRi(rs)));
         RA = mmuContructEndAddressFromSecEngAddr(RA, &soc);
-        sysBus->Write(RA, data, 4);
+        sysBus->Write(RA, (u8*)&data, 4);
         intXCPUContext->xenonRes.Check(RA);
         BSET(CR, 4, CR_BIT_EQ);
       } else {
@@ -401,7 +401,7 @@ void PPCInterpreter::PPCInterpreter_stdcx(PPU_STATE *ppuState) {
             byteswap_be<u64>(GPRi(rs));
         bool soc = false;
         RA = mmuContructEndAddressFromSecEngAddr(RA, &soc);
-        sysBus->Write(RA, data, 8);
+        sysBus->Write(RA, (u8*)&data, 8);
         BSET(CR, 4, CR_BIT_EQ);
       } else {
         intXCPUContext->xenonRes.Decrement();

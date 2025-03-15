@@ -191,9 +191,9 @@ ODD::ODD(const char* deviceName, u64 size,
   memcpy(&pciConfigSpace.data[0x74], &data, 4); // Field value is the same as above.
   data = 0xC07231BE;
   memcpy(&pciConfigSpace.data[0x80], &data, 4);
-  data = 0x100c04cc;
+  data = 0x100C04CC;
   memcpy(&pciConfigSpace.data[0x98], &data, 4);
-  data = 0x004108c0;
+  data = 0x004108C0;
   memcpy(&pciConfigSpace.data[0x9C], &data, 4);
 
   // Set the SCR's at offset 0xC0 (SiS-like).
@@ -203,7 +203,7 @@ ODD::ODD(const char* deviceName, u64 size,
                                                 // SSTATUS_SPD_GEN1_COM_SPEED.
                                                 // SSTATUS_IPM_INTERFACE_ACTIVE_STATE.
   // SError.
-  data = 0x001f0201;
+  data = 0x001F0201;
   memcpy(&pciConfigSpace.data[0xC4], &data, 4);
   // SControl.
   data = 0x00000300;
@@ -221,7 +221,7 @@ ODD::ODD(const char* deviceName, u64 size,
   atapiReset();
 }
 
-void ODD::Read(u64 readAddress, u64 *data, u8 byteCount) {
+void ODD::Read(u64 readAddress, u8 *data, u8 byteCount) {
   // PCI BAR0 is the Primary Command Block Base Address.
   u8 atapiCommandReg =
       static_cast<u8>(readAddress - pciConfigSpace.configSpaceHeader.BAR0);
@@ -291,7 +291,7 @@ void ODD::Read(u64 readAddress, u64 *data, u8 byteCount) {
   }
 }
 
-void ODD::Write(u64 writeAddress, u64 data, u8 byteCount) {
+void ODD::Write(u64 writeAddress, u8 *data, u8 byteCount) {
   // PCI BAR0 is the Primary Command Block Base Address.
   u8 atapiCommandReg =
       static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR0);
@@ -309,11 +309,11 @@ void ODD::Write(u64 writeAddress, u64 data, u8 byteCount) {
       // Reset the DRQ status
       atapiState.atapiRegs.statusReg &= ~ATA_STATUS_DRQ;
 
-      memcpy(&atapiState.atapiRegs.dataReg, &data, byteCount);
+      memcpy(&atapiState.atapiRegs.dataReg, data, byteCount);
 
       // Push the data onto our buffer
       byteCount = fmin(byteCount, atapiState.dataWriteBuffer.Space());
-      memcpy(atapiState.dataWriteBuffer.Ptr(), &data, byteCount);
+      memcpy(atapiState.dataWriteBuffer.Ptr(), data, byteCount);
       atapiState.dataWriteBuffer.Increment(byteCount);
 
       // Check if we're executing a SCSI command input and we have a full
@@ -331,32 +331,32 @@ void ODD::Write(u64 writeAddress, u64 data, u8 byteCount) {
       }
       return;
     case ATAPI_REG_FEATURES:
-      memcpy(&atapiState.atapiRegs.featuresReg, &data, byteCount);
+      memcpy(&atapiState.atapiRegs.featuresReg, data, byteCount);
       return;
     case ATAPI_REG_SECTOR_COUNT:
-      memcpy(&atapiState.atapiRegs.sectorCountReg, &data, byteCount);
+      memcpy(&atapiState.atapiRegs.sectorCountReg, data, byteCount);
       return;
     case ATAPI_REG_LBA_LOW:
-      memcpy(&atapiState.atapiRegs.lbaLowReg, &data, byteCount);
+      memcpy(&atapiState.atapiRegs.lbaLowReg, data, byteCount);
       return;
     case ATAPI_REG_BYTE_COUNT_LOW:
-      memcpy(&atapiState.atapiRegs.byteCountLowReg, &data, byteCount);
+      memcpy(&atapiState.atapiRegs.byteCountLowReg, data, byteCount);
       return;
     case ATAPI_REG_BYTE_COUNT_HIGH:
-      memcpy(&atapiState.atapiRegs.byteCountHighReg, &data, byteCount);
+      memcpy(&atapiState.atapiRegs.byteCountHighReg, data, byteCount);
       return;
     case ATAPI_REG_DEVICE:
-      memcpy(&atapiState.atapiRegs.deviceReg, &data, byteCount);
+      memcpy(&atapiState.atapiRegs.deviceReg, data, byteCount);
       return;
     case ATAPI_REG_COMMAND:
-      memcpy(&atapiState.atapiRegs.commandReg, &data, byteCount);
+      memcpy(&atapiState.atapiRegs.commandReg, data, byteCount);
 
       // Reset the Status register.
       atapiState.atapiRegs.statusReg &= ~ATA_STATUS_ERR_CHK;
       // Reset the Error register.
       atapiState.atapiRegs.errorReg &= ~ATA_ERROR_ABRT;
 
-      switch (data) {
+      switch (*reinterpret_cast<u64*>(data)) {
       case ATA_COMMAND_PACKET:
         atapiState.atapiRegs.statusReg |= ATA_STATUS_DRQ;
         return;
@@ -367,25 +367,25 @@ void ODD::Write(u64 writeAddress, u64 data, u8 byteCount) {
         atapiIdentifyCommand();
         return;
       default:
-        LOG_ERROR(ODD, "Unknown command, command code = {:#x}", data);
+        LOG_ERROR(ODD, "Unknown command, command code = {:#x}", *reinterpret_cast<u64*>(data));
         break;
       }
       return;
     case ATAPI_REG_DEVICE_CONTROL:
-      memcpy(&atapiState.atapiRegs.devControlReg, &data, byteCount);
+      memcpy(&atapiState.atapiRegs.devControlReg, data, byteCount);
       return;
     default:
       LOG_ERROR(ODD, "Unknown Command Register Block register being written, command reg = {:#x}"
-        ", write address = {:#x}, data = {:#x}", atapiCommandReg, writeAddress, data);
+        ", write address = {:#x}, data = {:#x}", atapiCommandReg, writeAddress, *reinterpret_cast<u64*>(data));
       break;
     }
   } else {
     // Control Registers
     switch (atapiControlReg) {
     case ATAPI_DMA_REG_COMMAND:
-      memcpy(&atapiState.atapiRegs.dmaCmdReg, &data, byteCount);
+      memcpy(&atapiState.atapiRegs.dmaCmdReg, data, byteCount);
 
-      if (data & XE_ATAPI_DMA_ACTIVE) {
+      if (*reinterpret_cast<u64*>(data) & XE_ATAPI_DMA_ACTIVE) {
         // Start our DMA Operation
         doDMA();
         // Change our DMA Status after completion
@@ -393,10 +393,10 @@ void ODD::Write(u64 writeAddress, u64 data, u8 byteCount) {
       }
       break;
     case ATAPI_DMA_REG_STATUS:
-      memcpy(&atapiState.atapiRegs.dmaStatusReg, &data, byteCount);
+      memcpy(&atapiState.atapiRegs.dmaStatusReg, data, byteCount);
       break;
     case ATAPI_DMA_REG_TABLE_OFFSET:
-      memcpy(&atapiState.atapiRegs.dmaTableOffsetReg, &data, byteCount);
+      memcpy(&atapiState.atapiRegs.dmaTableOffsetReg, data, byteCount);
       break;
     default:
       LOG_ERROR(ODD, "Unknown Control Register Block register being written, command code = {:#x}", atapiControlReg);
@@ -405,13 +405,11 @@ void ODD::Write(u64 writeAddress, u64 data, u8 byteCount) {
   }
 }
 
-void ODD::ConfigRead(u64 readAddress, u64 *data, u8 byteCount) {
+void ODD::ConfigRead(u64 readAddress, u8 *data, u8 byteCount) {
   const u8 readReg = static_cast<u8>(readAddress);
-  if (readReg >= XE_SIS_SCR_BASE && readReg <= 0xFF)
-  {
+  if (readReg >= XE_SIS_SCR_BASE && readReg <= 0xFF) {
     // Confiduration read to the SATA Status and Control Registers.
-    switch ((readReg - XE_SIS_SCR_BASE) / 4)
-    {
+    switch ((readReg - XE_SIS_SCR_BASE) / 4) {
     case SCR_STATUS_REG:
       LOG_WARNING(ODD, "SCR ConfigRead to SCR_STATUS_REG.");
       break;
@@ -436,54 +434,52 @@ void ODD::ConfigRead(u64 readAddress, u64 *data, u8 byteCount) {
   LOG_DEBUG(ODD, "ConfigRead to reg {:#x}", readReg * 4);
 }
 
-void ODD::ConfigWrite(u64 writeAddress, u64 data, u8 byteCount) {
+void ODD::ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount) {
   // Check if we're being scanned.
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
-      if (data == 0xFFFFFFFF) { // PCI BAR Size discovery.
+      if (*reinterpret_cast<u64*>(data) == 0xFFFFFFFF) { // PCI BAR Size discovery.
         u64 x = 2;
         for (int idx = 2; idx < 31; idx++) {
-          data &= ~x;
+          *reinterpret_cast<u64*>(data) &= ~x;
           x <<= 1;
           if (x >= pciDevSizes[regOffset]) {
             break;
           }
         }
-        data &= ~0x3;
+        *reinterpret_cast<u64*>(data) &= ~0x3;
       }
     }
     if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address.
-      data = 0; // Register not implemented.
+      *reinterpret_cast<u64*>(data) = 0; // Register not implemented.
     }
   }
 
   u8 writeReg = static_cast<u8>(writeAddress);
-  if (writeReg >= XE_SIS_SCR_BASE && writeReg <= 0xFF)
-  {
+  if (writeReg >= XE_SIS_SCR_BASE && writeReg <= 0xFF) {
     // Confiduration write to the SATA Status and Control Registers.
-    switch ((writeReg - XE_SIS_SCR_BASE) / 4)
-    {
+    switch ((writeReg - XE_SIS_SCR_BASE) / 4) {
     case SCR_STATUS_REG:
-      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_STATUS_REG, data {:#x}", data);
+      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_STATUS_REG, data {:#x}", *reinterpret_cast<u64*>(data));
       break;
     case SCR_ERROR_REG:
-      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_ERROR_REG, data {:#x}", data);
+      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_ERROR_REG, data {:#x}", *reinterpret_cast<u32*>(data));
       break;
     case SCR_CONTROL_REG:
-      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_CONTROL_REG, data {:#x}", data);
+      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_CONTROL_REG, data {:#x}", *reinterpret_cast<u64*>(data));
       break;
     case SCR_ACTIVE_REG:
-      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_ACTIVE_REG, data {:#x}", data);
+      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_ACTIVE_REG, data {:#x}", *reinterpret_cast<u64*>(data));
       break;
     case SCR_NOTIFICATION_REG:
-      LOG_WARNING(ODD, "SCR ConfigRead to SCR_NOTIFICATION_REG, data {:#x}", data);
+      LOG_WARNING(ODD, "SCR ConfigRead to SCR_NOTIFICATION_REG, data {:#x}", *reinterpret_cast<u64*>(data));
       break;
     default:
-      LOG_ERROR(ODD, "SCR ConfigWrite to reg {:#x}, data {:#x}", writeReg * 4, data);
+      LOG_ERROR(ODD, "SCR ConfigWrite to reg {:#x}, data {:#x}", writeReg * 4, *reinterpret_cast<u64*>(data));
       break;
     }
   }
-  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &data, byteCount);
-  LOG_DEBUG(ODD, "ConfigWrite to reg {:#x}, data {:#x}", writeReg * 4, data);
+  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], data, byteCount);
+  LOG_DEBUG(ODD, "ConfigWrite to reg {:#x}, data {:#x}", writeReg * 4, *reinterpret_cast<u64*>(data));
 }

@@ -115,7 +115,7 @@ Xe::PCIDev::SMC::SMCCore::~SMCCore() {
 }
 
 // PCI Read
-void Xe::PCIDev::SMC::SMCCore::Read(u64 readAddress, u64 *data, u8 byteCount) {
+void Xe::PCIDev::SMC::SMCCore::Read(u64 readAddress, u8 *data, u8 byteCount) {
   const u8 regOffset = static_cast<u8>(readAddress);
 
   mutex.lock();
@@ -208,71 +208,71 @@ void Xe::PCIDev::SMC::SMCCore::Read(u64 readAddress, u64 *data, u8 byteCount) {
 }
 
 // PCI Config Read
-void Xe::PCIDev::SMC::SMCCore::ConfigRead(u64 readAddress, u64 *data, u8 byteCount) {
+void Xe::PCIDev::SMC::SMCCore::ConfigRead(u64 readAddress, u8 *data, u8 byteCount) {
   LOG_INFO(SMC, "ConfigRead: Address = {:#x}, ByteCount = {:#x}.", readAddress, byteCount);
   memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], byteCount);
 }
 
 // PCI Write
-void Xe::PCIDev::SMC::SMCCore::Write(u64 writeAddress, u64 data, u8 byteCount) {
+void Xe::PCIDev::SMC::SMCCore::Write(u64 writeAddress, u8 *data, u8 byteCount) {
   std::lock_guard lck(mutex);
   const u8 regOffset = static_cast<u8>(writeAddress);
 
   mutex.lock();
   switch (regOffset) {
   case UART_CONFIG_REG: // UART Config Register
-    memcpy(&smcPCIState.uartConfigReg, &data, byteCount);
+    memcpy(&smcPCIState.uartConfigReg, data, byteCount);
     // Check if UART is already initialized.
     if (!smcCoreState->uartInitialized && smcCoreState->uartPresent) {
       // Initialize UART.
-      setupUART(static_cast<u32>(data));
+      setupUART(*reinterpret_cast<u32*>(data));
     }
     break;
   case UART_BYTE_IN_REG: // UART Data In Register
-    memcpy(&smcPCIState.uartInReg, &data, byteCount);
+    memcpy(&smcPCIState.uartInReg, data, byteCount);
 #if defined(_WIN32) && !defined(SOCKET_UART)
     // Write the data out.
     smcCoreState->retVal =
-        WriteFile(smcCoreState->comPortHandle, &data, 1,
+        WriteFile(smcCoreState->comPortHandle, data, 1,
                   &smcCoreState->currentBytesWrittenCount, nullptr);
 #endif // _WIN32
     if (smcCoreState->uartBackup) {
       {
         // We love mutexes
         std::lock_guard<std::mutex> lock(smcCoreState->uartMutex);
-        smcCoreState->uartTxBuffer.push(data);
+        smcCoreState->uartTxBuffer.push(*data);
         smcCoreState->uartConditionVar.notify_one();
       }
       smcCoreState->retVal = true;
     }
     break;
   case SMI_INT_STATUS_REG: // SMI INT Status Register
-    memcpy(&smcPCIState.smiIntPendingReg, &data, byteCount);
+    memcpy(&smcPCIState.smiIntPendingReg, data, byteCount);
     break;
   case SMI_INT_ACK_REG: // SMI INT ACK Register
-    memcpy(&smcPCIState.smiIntAckReg, &data, byteCount);
+    memcpy(&smcPCIState.smiIntAckReg, data, byteCount);
     break;
   case SMI_INT_ENABLED_REG: // SMI INT Enabled Register
-    memcpy(&smcPCIState.smiIntEnabledReg, &data, byteCount);
+    memcpy(&smcPCIState.smiIntEnabledReg, data, byteCount);
     break;
   case CLCK_INT_ENABLED_REG: // Clock INT Enabled Register
-    memcpy(&smcPCIState.clockIntEnabledReg, &data, byteCount);
+    memcpy(&smcPCIState.clockIntEnabledReg, data, byteCount);
     break;
   case CLCK_INT_STATUS_REG: // Clock INT Status Register
-    memcpy(&smcPCIState.clockIntStatusReg, &data, byteCount);
+    memcpy(&smcPCIState.clockIntStatusReg, data, byteCount);
     break;
   case FIFO_IN_STATUS_REG: // FIFO In Status Register
-    smcPCIState.fifoInStatusReg = static_cast<u32>(data);
-    if (data == FIFO_STATUS_READY) { // We're about to receive a message.
+    smcPCIState.fifoInStatusReg = *reinterpret_cast<u32*>(data);
+    if (*reinterpret_cast<u64*>(data) == FIFO_STATUS_READY) { // We're about to receive a message.
       // Reset our input buffer and buffer pointer.
       memset(&smcCoreState->fifoDataBuffer, 0, 16);
       smcCoreState->fifoBufferPos = 0;
     }
     break;
   case FIFO_OUT_STATUS_REG: // FIFO Out Status Register
-    smcPCIState.fifoOutStatusReg = static_cast<u32>(data);
+    smcPCIState.fifoOutStatusReg = *reinterpret_cast<u32*>(data);
     // We're about to send a reply.
-    if (data == FIFO_STATUS_READY) {
+    if (*reinterpret_cast<u64*>(data) == FIFO_STATUS_READY) {
       // Reset our FIFO buffer pointer.
       smcCoreState->fifoBufferPos = 0;
     }
@@ -280,44 +280,44 @@ void Xe::PCIDev::SMC::SMCCore::Write(u64 writeAddress, u64 data, u8 byteCount) {
   case FIFO_IN_DATA_REG: // FIFO Data In Register
     // Copy the data to our input buffer at current position and increse buffer
     // pointer position.
-    memcpy(&smcCoreState->fifoDataBuffer[smcCoreState->fifoBufferPos], &data,
+    memcpy(&smcCoreState->fifoDataBuffer[smcCoreState->fifoBufferPos], data,
            byteCount);
     smcCoreState->fifoBufferPos += 4;
     break;
   default:
     LOG_ERROR(SMC, "Unknown register being written, offset {:#x}, data {:#x}", 
-        static_cast<u16>(regOffset), data);
+        static_cast<u16>(regOffset), *reinterpret_cast<u64*>(data));
     break;
   }
   mutex.unlock();
 }
 
 // PCI Config Write
-void Xe::PCIDev::SMC::SMCCore::ConfigWrite(u64 writeAddress, u64 data, u8 byteCount) {
-  LOG_INFO(SMC, "ConfigWrite: Address = {:#x}, Data = {:#x}, ByteCount = {:#x}.", writeAddress, data, byteCount);
+void Xe::PCIDev::SMC::SMCCore::ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount) {
+  LOG_INFO(SMC, "ConfigWrite: Address = {:#x}, Data = {:#x}, ByteCount = {:#x}.", writeAddress, *reinterpret_cast<u64*>(data), byteCount);
 
   // Check if we're being scanned.
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
-      if (data == 0xFFFFFFFF) { // PCI BAR Size discovery.
+      if (*reinterpret_cast<u64*>(data) == 0xFFFFFFFF) { // PCI BAR Size discovery.
         u64 x = 2;
         for (int idx = 2; idx < 31; idx++) {
-          data &= ~x;
+          *reinterpret_cast<u64*>(data) &= ~x;
           x <<= 1;
           if (x >= pciDevSizes[regOffset]) {
             break;
           }
         }
-        data &= ~0x3;
+        *reinterpret_cast<u64*>(data) &= ~0x3;
       }
     }
     if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address.
-      data = 0; // Register not implemented.
+      *reinterpret_cast<u64*>(data) = 0; // Register not implemented.
     }
   }
   
-  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &data, byteCount);
+  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], data, byteCount);
 }
 
 // Setups the UART Communication at a given configuration.
