@@ -164,7 +164,7 @@ void ODD::doDMA() {
     }
   }
 }
-                                                 
+
 ODD::ODD(const char* deviceName, u64 size,
   PCIBridge *parentPCIBridge, RAM *ram) : PCIDevice(deviceName, size) {
   // Note:
@@ -208,7 +208,7 @@ ODD::ODD(const char* deviceName, u64 size,
   // SControl.
   data = 0x00000300;
   memcpy(&pciConfigSpace.data[0xC8], &data, 4); // SCONTROL_IPM_ALL_PM_DISABLED.
-  
+
   // Set our PCI Dev Sizes.
   pciDevSizes[0] = 0x20; // BAR0
   pciDevSizes[1] = 0x10; // BAR1
