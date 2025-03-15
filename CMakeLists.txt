@@ -15,9 +15,7 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 
 project(Xenon)
 
-if (NOT GFX_ENABLED)
-  set(GFX_ENABLED True)
-endif()
+option(GFX_ENABLED "Enable graphics" ON)
 
 # This function should be passed a list of all files in a target. It will automatically generate file groups
 # following the directory hierarchy, so that the layout of the files in IDEs matches the one in the filesystem.
@@ -34,7 +32,7 @@ function(create_target_directory_groups target_name)
 endfunction()
 
 find_package(fmt 10.2.1 CONFIG)
-if (GFX_ENABLED STREQUAL "True")
+if (GFX_ENABLED)
   find_package(SDL3 3.2.4 CONFIG)
 endif()
 find_package(toml11 3.7.1 CONFIG)
@@ -161,7 +159,7 @@ set(XCPU
     Xenon/Core/XCPU/PPU/PowerPC.h
 )
 
-if (GFX_ENABLED STREQUAL "True")
+if (GFX_ENABLED)
   set(IMGUI_DIR third_party/ImGui)
   set(IMGUI
       ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
@@ -236,7 +234,7 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 endif()
 
 # Copy fonts to build directory
-if (GFX_ENABLED STREQUAL "True")
+if (GFX_ENABLED)
   add_custom_target(copy-fonts
     COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts" # Input
@@ -249,11 +247,11 @@ endif()
 # Include OPENGL Directory
 include_directories(Xenon third_party/glad/include)
 
-if (GFX_ENABLED STREQUAL "True")
+if (GFX_ENABLED)
   add_dependencies(Xenon copy-fonts)
 endif()
 target_include_directories(Xenon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${IMGUI_DIR})
-if (GFX_ENABLED STREQUAL "True")
+if (GFX_ENABLED)
   target_link_libraries(Xenon PRIVATE fmt::fmt SDL3::SDL3 toml11::toml11)
 else()
   target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11)
@@ -261,7 +259,9 @@ endif()
 
 add_definitions(-DNTDDI_VERSION=0x0A000006 -D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00)
 add_definitions(-DNOMINMAX -DWIN32_LEAN_AND_MEAN)
-if (GFX_ENABLED STREQUAL "False")
+if (GFX_ENABLED)
+  add_definitions(-DGFX_ENABLED)
+else()
   add_definitions(-DNO_GFX)
 endif()
 add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
