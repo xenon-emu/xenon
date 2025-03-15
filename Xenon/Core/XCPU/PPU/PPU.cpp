@@ -175,9 +175,9 @@ void PPU::Step(int amount) {
 // PPU Entry Point.
 void PPU::Thread() {
   // While the CPU is running
-  while (ppuRunning) {
+  while (ThreadRunning()) {
     // See if we have any threads active.
-    while (ppuRunning && getCurrentRunningThreads() != PPU_THREAD_NONE) {
+    while (ThreadRunning() && getCurrentRunningThreads() != PPU_THREAD_NONE) {
       ppuExecutionDone = false;
       // We have some threads active!
 
@@ -193,13 +193,13 @@ void PPU::Thread() {
           // Main processing loop.
 
           // Read next intruction from Memory.
-          if (ppuRunning && ppuReadNextInstruction()) {
+          if (ThreadRunning() && ppuReadNextInstruction()) {
             // Execute next intrucrtion.
             PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
           }
           
           // Debug tools
-          if (false) {
+          if (ppuHalt) {
             bool shouldHalt = ppuHalt && (ppuStartHalted ? ppuHaltOn != 0 && ppuHaltOn == curThread.CIA : true);
             if (ppuStep) {
               if (ppuStepCounter != ppuStepAmount) {
@@ -256,13 +256,13 @@ void PPU::Thread() {
           // Main processing loop.
 
           // Read next intruction from Memory.
-          if (ppuRunning && ppuReadNextInstruction()) {
+          if (ThreadRunning() && ppuReadNextInstruction()) {
             // Execute next intrucrtion.
             PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
           }
           
           // Debug tools
-          if (false) {
+          if (ppuHalt) {
             bool shouldHalt = ppuHalt && (ppuStartHalted ? ppuHaltOn != 0 && ppuHaltOn == curThread.CIA : true);
             if (ppuStep) {
               if (ppuStepCounter != ppuStepAmount) {
@@ -474,18 +474,27 @@ u64 PPU::loadElfImage(u8 *data, u64 size) {
 
 // Reads the next instruction from memory and advances the NIP accordingly.
 bool PPU::ppuReadNextInstruction() {
-  if (curThread.NIA == 0xCDCDCDCDCDCDCDCD) {
-    LOG_CRITICAL(Xenon, "PPU{} had a bad read to a uninitialized region of memory! Halting...", ppuState->ppuID);
+  if (ThreadRunning() && ((curThread.CIA > 0xCDCDC00000000000) && ((curThread.CIA - 0xCDCDC00000000000) > 0) || (curThread.NIA == 0 && ppuState->ppuID == 0))) {
+    LOG_CRITICAL(Xenon, "PPU{} was unable to get the next instruction! Halting...", ppuState->ppuID);
     Xe_Main->getCPU()->Halt(); // Halt CPU
-    Config::imguiDebugWindow = true; // Open debugger on bad fault
+    Config::imguiDebugWindow = true; // Open the debugger on bad fault
+    return false;
   }
-  // Update CIA.
+  // Update current instruction address
   curThread.CIA = curThread.NIA;
-  // Increase Next Instruction Address.
+  // Increase next instruction address
   curThread.NIA += 4;
   curThread.iFetch = true;
-  // Fetch the instruction from memory.
+  // Fetch the instruction from memory
   _instr.opcode = PPCInterpreter::MMURead32(ppuState.get(), curThread.CIA);
+  u8 first_byte = (_instr.opcode >> 24) & 0xFF;
+  u8 last_byte = (_instr.opcode >> 0) & 0xFF;
+  if (_instr.opcode == 0xFFFFFFFF || (first_byte == 0x00 && last_byte != 0x00)) {
+    LOG_CRITICAL(Xenon, "PPU{} returned a invalid opcode! Halting...", ppuState->ppuID);
+    Xe_Main->getCPU()->Halt(); // Halt CPU
+    Config::imguiDebugWindow = true; // Open the debugger on bad fault
+    return false;
+  }
   if (_ex & PPU_EX_INSSTOR || _ex & PPU_EX_INSTSEGM) {
     return false;
   }

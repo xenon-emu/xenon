@@ -82,7 +82,10 @@ void RootBus::Write(u64 writeAddress, u64 data, u8 byteCount) {
   }
 
   // Device or address not found.
-  LOG_ERROR(RootBus, "Write failed at address: {:#x} data: {:#x}", writeAddress, data);
+  LOG_ERROR(RootBus, "Write failed at address: {:#x}, data: {:#x}", writeAddress, data);
+  LOG_CRITICAL(Xenon, "Halting...");
+  Xe_Main->getCPU()->Halt(); // Halt the CPU
+  Config::imguiDebugWindow = true; // Open the debugger on bad fault
 }
 
 //
