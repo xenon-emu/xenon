@@ -227,12 +227,18 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 	set(clang TRUE)
 endif()
 
+if (WIN32)
+	set(FONT_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/Xenon/fonts") # Windows Output
+else()
+	set(FONT_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/fonts")       # Linux Output
+endif()
+
 # Copy fonts to build directory
 add_custom_target(copy-fonts
   COMMAND ${CMAKE_COMMAND} -E copy_directory
 					"${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts" # Input
-					"${CMAKE_CURRENT_BINARY_DIR}/fonts"      # Output
-  COMMENT "Copying fonts (${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts) to build directory (${CMAKE_CURRENT_BINARY_DIR}/fonts)"
+					${FONT_OUTPUT}
+  COMMENT "Copying fonts (${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts) to build directory (${FONT_OUTPUT})"
   DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts
 )
 
