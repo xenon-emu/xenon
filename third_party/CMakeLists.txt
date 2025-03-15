@@ -13,7 +13,7 @@ if (NOT TARGET fmt::fmt)
 endif()
 
 # SDL3
-if (GFX_ENABLED)
+if (GFX_ENABLED STREQUAL "True")
   if (NOT TARGET SDL3::SDL3)
       set(SDL_TEST_LIBRARY OFF)
       set(SDL_PIPEWIRE OFF)
