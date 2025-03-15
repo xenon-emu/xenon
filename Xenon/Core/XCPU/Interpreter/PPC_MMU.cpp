@@ -1332,8 +1332,7 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
                               u64 data, u64 EA, s8 byteCount, bool cacheStore) {
   u64 oldEA = EA;
   if (true) {
-    u64 bsEA = byteswap_le<u64>(EA);
-    LOG_INFO(Xenon_MMU, "context, state, data=0x{:08x}, EA=0x{:08x}, bsEA=0x{:08x}, byteCount={:d}, cachestore)", data, EA, bsEA, byteCount);
+    LOG_INFO(Xenon_MMU, "context, state, data=0x{:08x}, EA=0x{:08x}, byteCount={:d}, cachestore)", data, EA, byteCount);
   }
 
   if (MMUTranslateAddress(&EA, ppuState, true) == false)
@@ -1343,9 +1342,17 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
     u8 a = 0;
   }
 
+  if (true) {
+    LOG_INFO(Xenon_MMU, "EA after MMUTranslateAddress: 0x{:08x}", EA);
+  }
+
   bool socWrite = false;
 
   EA = mmuContructEndAddressFromSecEngAddr(EA, &socWrite);
+  
+  if (true) {
+    LOG_INFO(Xenon_MMU, "EA after mmuContructEndAddressFromSecEngAddr: 0x{:08x}", EA);
+  }
 
   // When the xboxkrnl writes to address 0x7FFFxxxx is writing to the IIC
   // so we use that address here to validate its an soc write.

@@ -54,6 +54,27 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
     // Set MSR for both Threads
     ppuState->ppuThread[thrdNum].SPR.MSR.MSR_Hex = 0x9000000000000000;
   }
+  #define LogMSR(x) LOG_INFO(Xenon, "MSR.{}: 0x{:02x}", #x, ppuState->ppuThread[0].SPR.MSR.x);
+  LogMSR(MSR_Hex);
+  LogMSR(LE);
+  LogMSR(RI);
+  LogMSR(PMM);
+  LogMSR(DR);
+  LogMSR(IR);
+  LogMSR(FE1);
+  LogMSR(BE);
+  LogMSR(SE);
+  LogMSR(FE0);
+  LogMSR(ME);
+  LogMSR(FP);
+  LogMSR(PR);
+  LogMSR(EE);
+  LogMSR(ILE);
+  LogMSR(VXU);
+  LogMSR(HV);
+  LogMSR(TA);
+  LogMSR(SF);
+  SYSTEM_PAUSE();
 
   // Set Thread Timeout Register
   ppuState->SPR.TTR = 0x1000; // Execute 4096 instructions

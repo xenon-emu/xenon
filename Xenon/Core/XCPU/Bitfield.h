@@ -17,7 +17,7 @@ public:
 	using bT = T;
   using vT = std::common_type_t<T>;
   using uT = std::make_unsigned_t<vT>;
-  static constexpr bool canBePacked = N < (sizeof(s64) * 8 + (std::is_unsigned_v<vT> ? 1 : 0)) && sizeof(vT) > sizeof(s64);
+  static constexpr bool canBePacked = N <(sizeof(s64) * 8 + (std::is_unsigned_v<vT> ? 1 : 0)) && sizeof(vT)> sizeof(s64);
   using cT = std::conditional_t<canBePacked, std::conditional_t<std::is_unsigned_v<vT>, u64, s64>, vT>;
   // Bitsize
   static constexpr u64 bitmax = sizeof(T) * 8;

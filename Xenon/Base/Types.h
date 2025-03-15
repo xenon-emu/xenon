@@ -16,6 +16,21 @@
 #define SYSTEM_PAUSE() printf("Press Enter to continue..."); (void)getchar()
 #endif
 
+// Compile time macros to get endianess
+#define LE_INT 0x41424344
+#define BE_INT 0x44434241
+#define PDP_INT 0x42414443
+#define ENDIAN_ORDER ('ABCD')
+#if ENDIAN_ORDER == LE_INT
+#define __LITTLE_ENDIAN__ 1
+#elif ENDIAN_ORDER == BE_INT
+#define __BIG_ENDIAN__ 1
+#elif ENDIAN_ORDER == PDP_INT
+#define __PDP_ENDIAN__ 1
+#else
+#error "Unknown endianess (?)"
+#endif
+
 // Signed
 using s8 = signed char;
 using s16 = short;

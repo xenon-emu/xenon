@@ -10,14 +10,22 @@
 
 union PCI_CONFIG_HDR_REG0 {
   u32 hexData;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u32 vendorID : 16;
     u32 deviceID : 16;
   };
+#else
+  struct {
+    u32 deviceID : 16;
+    u32 vendorID : 16;
+  };
+#endif
 };
 
 union PCI_CONFIG_HDR_REG1_COMMAND_REG {
   u16 hexData;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u16 ioSpace : 1;
     u16 memorySpace : 1;
@@ -32,34 +40,75 @@ union PCI_CONFIG_HDR_REG1_COMMAND_REG {
     u16 interruptDisable : 1;
     u16 res1 : 5;
   };
+#else
+  struct {
+    u16 res1 : 5;
+    u16 interruptDisable : 1;
+    u16 fastBackToBackEn : 1;
+    u16 SERR_En : 1;
+    u16 res0 : 1;
+    u16 parityErrorResp : 1;
+    u16 vgaPaletteSnoop : 1;
+    u16 writeMemAndInvEn : 1;
+    u16 specialCycles : 1;
+    u16 busMaster : 1;
+    u16 memorySpace : 1;
+    u16 ioSpace : 1;
+  };
+#endif
 };
 
 union PCI_CONFIG_HDR_REG1 {
   u32 hexData;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u32 status : 16;
     u32 command : 16;
   };
+#else
+  struct {
+    u32 command : 16;
+    u32 status : 16;
+  };
+#endif
 };
 
 union PCI_CONFIG_HDR_REG2 {
   u32 hexData;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u32 revID : 8;
     u32 progIF : 8;
     u32 subclass : 8;
     u32 classCode : 8;
   };
+#else
+  struct {
+    u32 classCode : 8;
+    u32 subclass : 8;
+    u32 progIF : 8;
+    u32 revID : 8;
+  };
+#endif
 };
 
 union PCI_CONFIG_HDR_REG3 {
   u32 hexData;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u32 cacheLineSize : 8;
     u32 latencyTimer : 8;
     u32 headerType : 8;
     u32 BIST : 8;
   };
+#else
+  struct {
+    u32 BIST : 8;
+    u32 headerType : 8;
+    u32 latencyTimer : 8;
+    u32 cacheLineSize : 8;
+  };
+#endif
 };
 
 //
@@ -68,28 +117,51 @@ union PCI_CONFIG_HDR_REG3 {
 
 union GENERAL_PCI_CONFIG_HDR_REGB {
   u32 hexData;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u32 subsystemVenID : 16;
     u32 susbsystemID : 16;
   };
+#else
+  struct {
+    u32 susbsystemID : 16;
+    u32 subsystemVenID : 16;
+  };
+#endif
 };
 
 union GENERAL_PCI_CONFIG_HDR_REGD {
   u32 hexData;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u32 pointerCapabilities : 8;
     u32 res : 24;
   };
+#else
+  struct {
+    u32 res : 24;
+    u32 pointerCapabilities : 8;
+  };
+#endif
 };
 
 union GENERAL_PCI_CONFIG_HDR_REGF {
   u32 hexData;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u32 interruptLine : 8;
     u32 interruptPin : 8;
     u32 minGrant : 8;
     u32 maxLatency : 8;
   };
+#else
+  struct {
+    u32 maxLatency : 8;
+    u32 minGrant : 8;
+    u32 interruptPin : 8;
+    u32 interruptLine : 8;
+  };
+#endif
 };
 
 struct GENRAL_PCI_DEVICE_CONFIG_HDR {
@@ -138,62 +210,115 @@ union GENRAL_PCI_DEVICE_CONFIG_SPACE {
 
 union PCI_PCI_BRIDGE_CONFIG_HDR_REG6 {
   u32 hexData;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u32 primaryBusNum : 8;
     u32 secondaryBusNum : 8;
     u32 subordinateBusNum : 8;
     u32 secondaryLatencyTimer : 8;
   };
+#else
+  struct {
+    u32 secondaryLatencyTimer : 8;
+    u32 subordinateBusNum : 8;
+    u32 secondaryBusNum : 8;
+    u32 primaryBusNum : 8;
+  };
+#endif
 };
 
 union PCI_PCI_BRIDGE_CONFIG_HDR_REG7 {
   u32 hexData;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u32 ioBase : 8;
     u32 ioLimit : 8;
     u32 secondaryStatus : 16;
   };
+#else
+  struct {
+    u32 secondaryStatus : 16;
+    u32 ioLimit : 8;
+    u32 ioBase : 8;
+  };
+#endif
 };
 
 union PCI_PCI_BRIDGE_CONFIG_HDR_REG8 {
   u32 hexData;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u32 memoryBase : 16;
     u32 memoryLimit : 16;
   };
+#else
+  struct {
+    u32 memoryLimit : 16;
+    u32 memoryBase : 16;
+  };
+#endif
 };
 
 union PCI_PCI_BRIDGE_CONFIG_HDR_REG9 {
   u32 hexData;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u32 prefetchableMemoryBase : 16;
     u32 prefetchableMemoryLimit : 16;
   };
+#else
+  struct {
+    u32 prefetchableMemoryLimit : 16;
+    u32 prefetchableMemoryBase : 16;
+  };
+#endif
 };
 
 union PCI_PCI_BRIDGE_CONFIG_HDR_REGC {
   u32 hexData;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u32 ioBaseUpper16bits : 16;
     u32 ioLimitUpper16bits : 16;
   };
+#else
+  struct {
+    u32 ioLimitUpper16bits : 16;
+    u32 ioBaseUpper16bits : 16;
+  };
+#endif
 };
 
 union PCI_PCI_BRIDGE_CONFIG_HDR_REGD {
   u32 hexData;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u32 capabilityPointer : 8;
     u32 reserved : 24;
   };
+#else
+  struct {
+    u32 reserved : 24;
+    u32 capabilityPointer : 8;
+  };
+#endif
 };
 
 union PCI_PCI_BRIDGE_CONFIG_HDR_REGF {
   u32 hexData;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u32 interruptLine : 8;
     u32 interruptPin : 8;
     u32 bridgeControl : 16;
   };
+#else
+  struct {
+    u32 bridgeControl : 16;
+    u32 interruptPin : 8;
+    u32 interruptLine : 8;
+  };
+#endif
 };
 
 struct PCI_PCI_BRIDGE_CONFIG_HEADER {
@@ -239,6 +364,7 @@ union PCI_PCI_BRIDGE_CONFIG_SPACE {
 // PCIe Configuration Space Address decoding.
 union PCIE_CONFIG_ADDR {
     u32 hexData;
+#ifdef __LITTLE_ENDIAN__
     struct {
         u32 regOffset : 8;
         u32 extendedReg : 4;
@@ -248,4 +374,6 @@ union PCIE_CONFIG_ADDR {
         u32 res0 : 7;
         u32 enable : 1;
     };
+#else
+#endif
 };
