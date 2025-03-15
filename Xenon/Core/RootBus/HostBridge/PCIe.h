@@ -363,17 +363,26 @@ union PCI_PCI_BRIDGE_CONFIG_SPACE {
 
 // PCIe Configuration Space Address decoding.
 union PCIE_CONFIG_ADDR {
-    u32 hexData;
+  u32 hexData;
 #ifdef __LITTLE_ENDIAN__
-    struct {
-        u32 regOffset : 8;
-        u32 extendedReg : 4;
-        u32 functNum : 3;
-        u32 devNum : 5;
-        u32 busNum : 8;
-        u32 res0 : 7;
-        u32 enable : 1;
-    };
+  struct {
+    u32 regOffset : 8;
+    u32 extendedReg : 4;
+    u32 functNum : 3;
+    u32 devNum : 5;
+    u32 busNum : 8;
+    u32 res0 : 7;
+    u32 enable : 1;
+  };
 #else
+  struct {
+    u32 enable : 1;
+    u32 res0 : 7;
+    u32 busNum : 8;
+    u32 devNum : 5;
+    u32 functNum : 3;
+    u32 extendedReg : 4;
+    u32 regOffset : 8;
+  };
 #endif
 };
