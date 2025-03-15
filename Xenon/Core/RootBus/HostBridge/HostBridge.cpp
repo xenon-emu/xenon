@@ -93,14 +93,14 @@ bool HostBridge::Write(u64 writeAddress, u8 *data, u8 byteCount) {
   // Writing to host bridge registers?
   if (isAddressMappedinBAR(static_cast<u32>(writeAddress))) {
     switch (writeAddress) {
-      // HostBridge
+    // HostBridge
     case 0xE0020000:
       hostBridgeRegs.REG_E0020000 = *reinterpret_cast<u32*>(data);
       break;
     case 0xE0020004:
       hostBridgeRegs.REG_E0020004 = *reinterpret_cast<u32*>(data);
       break;
-      // BIU
+    // BIU
     case 0xE1003000:
       biuRegs.REG_E1003000 = *reinterpret_cast<u32*>(data);
       break;
@@ -117,7 +117,7 @@ bool HostBridge::Write(u64 writeAddress, u8 *data, u8 byteCount) {
       biuRegs.REG_E1010000 = *reinterpret_cast<u32*>(data);
       biuRegs.REG_E1010010 =
         *reinterpret_cast<u32*>(data); // Reading to this addr on a retail returns
-                                     // the same data on this address.
+                                       // the same data on this address.
       break;
     case 0xE1010010:
       biuRegs.REG_E1010010 = *reinterpret_cast<u32*>(data);

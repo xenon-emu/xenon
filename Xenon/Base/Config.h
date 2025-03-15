@@ -48,6 +48,7 @@ inline std::string elfBinaryPath = PATH_PREPEND "Xbox/kernel.elf";
 inline std::string oddDiscImagePath = PATH_PREPEND "Xbox/xenon.iso";
 
 // ImGui
+inline bool isGUIDisabled = false;
 // None is disabled, and it is relative
 inline std::string imguiConfigPath = "none";
 // Debug Window
@@ -135,6 +136,8 @@ const std::string oddImagePath();
 //
 // ImGui
 // 
+// GUI Disabled
+bool guiDisabled();
 // ImGui Ini path
 const std::string imguiIniPath();
 // ImGui Debug Window

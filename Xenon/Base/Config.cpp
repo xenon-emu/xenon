@@ -51,6 +51,7 @@ const std::string nandPath() { return nandBinPath; }
 const std::string elfPath() { return elfBinaryPath; }
 const std::string oddImagePath() { return oddDiscImagePath; }
 
+bool guiDisabled() { return isGUIDisabled; }
 const std::string imguiIniPath() { return imguiConfigPath; }
 bool imguiDebug() { return imguiDebugWindow; }
 
@@ -157,6 +158,8 @@ void loadConfig(const std::filesystem::path &path) {
 #ifndef NO_GFX
   if (data.contains("ImGui")) {
     const toml::value &imgui = data.at("ImGui");
+    isGUIDisabled =
+      toml::find_or<bool>(imgui, "DisableGUI", isGUIDisabled);
     imguiConfigPath =
       toml::find_or<std::string>(imgui, "Config", imguiConfigPath);
     imguiDebugWindow =
@@ -287,8 +290,11 @@ void saveConfig(const std::filesystem::path &path) {
 #ifndef NO_GFX
   // ImGui
   data["ImGui"]["Config"].comments().clear();
+  data["ImGui"]["DisableGUI"].comments().clear();
   data["ImGui"]["DebugWindow"].comments().clear();
 
+  data["ImGui"]["DisableGUI"].comments().push_back("# GUI Implementation");
+  data["ImGui"]["DisableGUI"] = isGUIDisabled;
   data["ImGui"]["Config"].comments().push_back("# ImGui Ini Path");
   data["ImGui"]["Config"].comments().push_back("# 'none' is disabled. It's relative based on the binary path");
   data["ImGui"]["Config"] = imguiConfigPath;
@@ -321,6 +327,12 @@ void saveConfig(const std::filesystem::path &path) {
   data["HighlyExperimental"]["CPI"] = clocksPerInstruction;
   data["HighlyExperimental"]["ElfLoader"].comments().push_back("# Disables normal codeflow and loads kernel.elf");
   data["HighlyExperimental"]["ElfLoader"] = elfLoader;
+
+  // Copy file config to another version before overwriting
+  std::string prev_path_str{ path.string() };
+  std::string prev_file_str{ path.filename().string() };
+  std::filesystem::path base_path{ prev_path_str.substr(prev_path_str.length() - prev_file_str.length()) };
+  std::filesystem::copy_file(path, base_path / (prev_file_str + ".old"));
 
   std::ofstream file(path, std::ios::binary);
   file << data;

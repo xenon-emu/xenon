@@ -24,7 +24,7 @@ void RAM::Read(u64 readAddress, u8 *data, u8 byteCount) {
   const u64 offset = static_cast<u32>(readAddress - RAM_START_ADDR);
   if (false)
     LOG_INFO(Xenon, "Reading from address {:#08x} in RAM: byteCount={:#02x}", readAddress, (u32)byteCount);
-  memcpy(data, &RAMData[offset], byteCount);
+  memcpy(data, RAMData.get() + offset, byteCount);
 }
 
 /******************Responsible for RAM writing*****************/

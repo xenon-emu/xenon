@@ -169,14 +169,18 @@ void Render::Renderer::Start() {
   glDisable(GL_DEPTH_TEST);
 
   // Create our GUI
-  gui = std::make_unique<OpenGLGUI>();
-  gui->Init(mainWindow, reinterpret_cast<void*>(context));
+  if (!Config::guiDisabled()) {
+    gui = std::make_unique<OpenGLGUI>();
+    gui->Init(mainWindow, reinterpret_cast<void*>(context));
+  }
 }
 
 void Render::Renderer::Shutdown() {
   threadRunning = false;
-  gui->Shutdown();
-  gui.reset();
+  if (!Config::guiDisabled()) {
+    gui->Shutdown();
+    gui.reset();
+  }
   glDeleteVertexArrays(1, &dummyVAO);
   glDeleteBuffers(1, &pixelBuffer);
   glDeleteProgram(shaderProgram);
@@ -299,7 +303,9 @@ void Render::Renderer::Thread() {
     }
 
     // Render the GUI
-    gui->Render(backbuffer.get());
+    if (gui.get()) {
+      gui->Render(backbuffer.get());
+    }
 
     SDL_GL_SwapWindow(mainWindow);
   }
