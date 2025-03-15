@@ -2,15 +2,16 @@
 , cmake
 , fetchFromGitHub
 , fmt
+, lib
 , ninja
 , pkg-config
 , roboto
 , sdl3
 , toml11
+, withGraphics ? true
 }:
 
 let
-  withGraphics = false;
   imgui = if withGraphics
     then fetchFromGitHub {
       owner = "ocornut";
@@ -25,35 +26,31 @@ stdenv.mkDerivation {
   allowSubstitutes = false;
   src = ./.;
   nativeBuildInputs = [ cmake pkg-config ninja ];
-  
-  buildInputs = if withGraphics
-    then [ sdl3 fmt toml11 ]
-    else [ fmt toml11 ];
+
+  buildInputs = [
+    fmt toml11
+  ] ++ lib.optional withGraphics sdl3;
 
   cmakeFlags = if withGraphics
     then [ "-DGFX_ENABLED=True" ]
     else [ "-DGFX_ENABLED=False" ];
 
-  postUnpack = if withGraphics
-    then ''
+  postUnpack = ''
+    ${lib.optionalString withGraphics ''
       echo graphics present
       rm -rf $sourceRoot/third_party/ImGui
       cp -r ${imgui} $sourceRoot/third_party/ImGui
-      chmod -R +w $sourceRoot
-    ''
-    else ''
-      chmod -R +w $sourceRoot
-    '';
+    ''}
+    chmod -R +w $sourceRoot
+  '';
 
-  installPhase = if withGraphics
-    then ''
+  installPhase = ''
+    ${lib.optionalString withGraphics ''
       echo graphics present
-      mkdir -p $out/bin $out/share
-      cp -v Xenon $out/bin/Xenon
+      mkdir -p $out/share
       ln -sv ${roboto}/share/fonts $out/share/fonts
-    ''
-    else ''
-      mkdir -p $out/bin $out/share
-      cp -v Xenon $out/bin/Xenon
-    '';
+    ''}
+    mkdir -p $out/bin
+    cp -v Xenon $out/bin/Xenon
+  '';
 }
