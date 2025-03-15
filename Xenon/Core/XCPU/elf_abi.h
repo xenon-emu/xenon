@@ -2,31 +2,31 @@
 #ifndef _UAPI_LINUX_ELF_H
 #define _UAPI_LINUX_ELF_H
 
-typedef unsigned int __u32;
-typedef unsigned short __u16;
+typedef unsigned int _u32;
+typedef unsigned short _u16;
 
-typedef signed int __s32;
-typedef signed short __s16;
+typedef signed int _s32;
+typedef signed short _s16;
 
-typedef unsigned long long __u64;
-typedef signed long long __s64;
+typedef unsigned long long _u64;
+typedef signed long long _s64;
 
 /* 32-bit ELF base types. */
-typedef __u32  Elf32_Addr;
-typedef __u16  Elf32_Half;
-typedef __u32  Elf32_Off;
-typedef __s32  Elf32_Sword;
-typedef __u32  Elf32_Word;
+typedef _u32  Elf32_Addr;
+typedef _u16  Elf32_Half;
+typedef _u32  Elf32_Off;
+typedef _s32  Elf32_Sword;
+typedef _u32  Elf32_Word;
 
 /* 64-bit ELF base types. */
-typedef __u64  Elf64_Addr;
-typedef __u16  Elf64_Half;
-typedef __s16  Elf64_SHalf;
-typedef __u64  Elf64_Off;
-typedef __s32  Elf64_Sword;
-typedef __u32  Elf64_Word;
-typedef __u64  Elf64_Xword;
-typedef __s64  Elf64_Sxword;
+typedef _u64  Elf64_Addr;
+typedef _u16  Elf64_Half;
+typedef _s16  Elf64_SHalf;
+typedef _u64  Elf64_Off;
+typedef _s32  Elf64_Sword;
+typedef _u32  Elf64_Word;
+typedef _u64  Elf64_Xword;
+typedef _s64  Elf64_Sxword;
 
 /* These constants are for the segment types stored in the image headers */
 #define PT_NULL    0
