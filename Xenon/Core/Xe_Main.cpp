@@ -3,10 +3,10 @@
 #include "Core/Xe_Main.h"
 
 XeMain::XeMain() {
-  userDirectory = Base::FS::GetUserPath(Base::FS::PathType::UserDir);
-  loadConfig();
   Base::Log::Initialize();
   Base::Log::Start();
+  rootDirectory = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
+  loadConfig();
   auto logLevel = Config::getCurrentLogLevel();
   logFilter = std::make_unique<STRIP_UNIQUE(logFilter)>(logLevel);
   Base::Log::SetGlobalFilter(*logFilter);
@@ -62,10 +62,10 @@ XeMain::~XeMain() {
 }
 
 void XeMain::saveConfig() {
-  Config::saveConfig(userDirectory / "xenon_config.toml");
+  Config::saveConfig(rootDirectory / "config.toml");
 }
 void XeMain::loadConfig() {
-  Config::loadConfig(userDirectory / "xenon_config.toml");
+  Config::loadConfig(rootDirectory / "config.toml");
 }
 
 

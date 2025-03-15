@@ -57,7 +57,7 @@ public:
 private:
   // Main objects
   //  Base path
-  std::filesystem::path userDirectory{};
+  std::filesystem::path rootDirectory{};
   //  Log level
   std::unique_ptr<Base::Log::Filter> logFilter{};
 

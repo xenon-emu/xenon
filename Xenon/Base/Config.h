@@ -36,16 +36,11 @@ inline s32 internalHeight = 720;
 // inline s32 gpuId = -1; // Vulkan physical device index. Set to negative for auto select
 
 // Filepaths
-#ifdef _WIN32
-#define PATH_PREPEND "C:/"
-#else
-#define PATH_PREPEND "/"
-#endif
-inline std::string fusesTxtPath = PATH_PREPEND "Xbox/fuses.txt";
-inline std::string oneBlBinPath = PATH_PREPEND "Xbox/1bl.bin";
-inline std::string nandBinPath = PATH_PREPEND "Xbox/nand.bin";
-inline std::string elfBinaryPath = PATH_PREPEND "Xbox/kernel.elf";
-inline std::string oddDiscImagePath = PATH_PREPEND "Xbox/xenon.iso";
+inline std::string fusesTxtPath = "fuses.txt";
+inline std::string oneBlBinPath = "1bl.bin";
+inline std::string nandBinPath = "nand.bin";
+inline std::string elfBinaryPath = "kernel.elf";
+inline std::string oddDiscImagePath = "xenon.iso";
 
 // ImGui
 inline bool isGUIDisabled = false;

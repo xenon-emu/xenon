@@ -8,28 +8,9 @@
 namespace Base::FS {
 
 static auto UserPaths = [] {
-  auto userDir = fs::current_path() / PORTABLE_DIR;
+  auto currentDir = fs::current_path();
 
   std::unordered_map<PathType, fs::path> paths;
-
-  bool createUserDir = true;
-
-  // Vali0004:
-  // This is required to play nice when doing Linux builds
-  // What do you think happens if the files directory is Xenon, and the output is also Xenon?
-  // Very confusing errors, that I do not wi  sh to deal with
-
-  if (!fs::exists(userDir)) {;
-    // If we have xenon_config in the root of our directory, then just use it and create files there instead.
-    std::ifstream f(fs::current_path() / "xenon_config.toml");
-    if (f.is_open()) {
-      userDir = fs::current_path();
-      createUserDir = false;
-    }
-  } else if (!fs::is_directory(userDir)) {
-    userDir = fs::current_path();
-    createUserDir = false;
-  }
 
   const auto insert_path = [&](PathType xenon_path, const fs::path &new_path, bool create = true) {
     if (create && !fs::exists(new_path))
@@ -38,13 +19,14 @@ static auto UserPaths = [] {
     paths.insert_or_assign(xenon_path, new_path);
   };
 
-  insert_path(PathType::UserDir, userDir, createUserDir);
-  insert_path(PathType::LogDir, userDir / LOG_DIR);
-  fs::path fontDir = userDir / FONT_DIR;
+  insert_path(PathType::RootDir, currentDir, false);
+  insert_path(PathType::ConsoleDir, currentDir / CONSOLE_DIR);
+  insert_path(PathType::LogDir, currentDir / LOG_DIR);
+  fs::path fontDir = currentDir / FONT_DIR;
   bool createFontsDir = true;
-  if (!fs::exists(fontDir) && fs::exists(userDir / ".." / "share" / FONT_DIR)) {
+  if (!fs::exists(fontDir) && fs::exists(currentDir / ".." / "share" / FONT_DIR)) {
     createFontsDir = false;
-    fontDir = userDir / ".." / "share" / FONT_DIR / "truetype";
+    fontDir = currentDir / ".." / "share" / FONT_DIR / "truetype";
   }
   insert_path(PathType::FontDir, fontDir, createFontsDir);
 

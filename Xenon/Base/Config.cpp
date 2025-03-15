@@ -3,6 +3,7 @@
 #include <toml.hpp>
 
 #include "Config.h"
+#include "Path_util.h"
 
 #include "Logging/Log.h"
 
@@ -74,17 +75,12 @@ void loadConfig(const std::filesystem::path &path) {
   std::ifstream configFile{ path };
   std::error_code error;
   if (!std::filesystem::exists(path, error) && !configFile.is_open()) {
-#ifdef _WIN32
-    std::string pathPrefix{};
-#else
-    // TODO(Vali0004): Pull if Linux or MacOS
-    std::string pathPrefix{ getenv("HOME") };
-    fusesTxtPath.insert(0, pathPrefix.c_str());
-    oneBlBinPath.insert(0, pathPrefix.c_str());
-    nandBinPath.insert(0, pathPrefix.c_str());
-    elfBinaryPath.insert(0, pathPrefix.c_str());
-    oddDiscImagePath.insert(0, pathPrefix.c_str());
-#endif
+    const std::filesystem::path basePath{ Base::FS::GetUserPath(Base::FS::PathType::ConsoleDir) };
+    fusesTxtPath = std::filesystem::path(basePath).append(fusesTxtPath).string();
+    oneBlBinPath = std::filesystem::path(basePath).append(oneBlBinPath).string();
+    nandBinPath = std::filesystem::path(basePath).append(nandBinPath).string();
+    elfBinaryPath = std::filesystem::path(basePath).append(elfBinaryPath).string();
+    oddDiscImagePath = std::filesystem::path(basePath).append(oddDiscImagePath).string();
     saveConfig(path);
     return;
   }
@@ -328,11 +324,30 @@ void saveConfig(const std::filesystem::path &path) {
   data["HighlyExperimental"]["ElfLoader"].comments().push_back("# Disables normal codeflow and loads kernel.elf");
   data["HighlyExperimental"]["ElfLoader"] = elfLoader;
 
-  // Copy file config to another version before overwriting
-  std::string prev_path_str{ path.string() };
-  std::string prev_file_str{ path.filename().string() };
-  std::filesystem::path base_path{ prev_path_str.substr(prev_path_str.length() - prev_file_str.length()) };
-  std::filesystem::copy_file(path, base_path / (prev_file_str + ".old"));
+  // Copy file config to another version before overwriting (if present)
+  try {
+    std::error_code fs_error;
+    u64 fSize = std::filesystem::file_size(path, fs_error);
+    if (fSize != -1 && fSize) {
+      std::string prev_path_str{ path.string() };
+      LOG_INFO(Xenon, "Previous path: {}", prev_path_str);
+      std::string prev_file_str{ path.filename().string() };
+      LOG_INFO(Xenon, "Previous file: {}", prev_file_str);
+      std::string base_path_str{ prev_path_str.substr(0, prev_path_str.length() - prev_file_str.length() - 1) };
+      LOG_INFO(Xenon, "Base path: {}", base_path_str);
+      LOG_INFO(Xenon, "FSize: {}", fSize);
+      std::filesystem::path base_path{ base_path_str };
+      std::filesystem::copy_file(path, base_path / (prev_file_str + ".old"));
+    } else {
+      if (fs_error) {
+        LOG_ERROR(Config, "Filesystem error: {} ({})", fs_error.message(), fs_error.value());
+      }
+    }
+  } catch (const std::exception &ex) {
+    LOG_ERROR(Config, "Exception trying to copy backup config. Exception: {}",
+        ex.what());
+    return;
+  }
 
   std::ofstream file(path, std::ios::binary);
   file << data;

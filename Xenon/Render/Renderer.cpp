@@ -250,7 +250,7 @@ void Render::Renderer::Thread() {
         }
         if (windowEvent.key.key == SDLK_F9) {
           LOG_INFO(Xenos, "RenderWindow: Taking a XenosFB snapshot");
-          const auto UserDir = Base::FS::GetUserPath(Base::FS::PathType::UserDir);
+          const auto UserDir = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
           std::ofstream f(UserDir / "fbmem.bin", std::ios::out | std::ios::binary | std::ios::trunc);
           if (!f) {
             LOG_ERROR(Xenos, "Failed to open fbmem.bin for writing");
