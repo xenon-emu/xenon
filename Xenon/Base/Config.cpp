@@ -101,12 +101,14 @@ void loadConfig(const std::filesystem::path &path) {
 
   if (data.contains("General")) {
     const toml::value &general = data.at("General");
+#ifndef NO_GFX
     gpuRenderThreadEnabled =
         toml::find_or<bool>(general, "GPURenderThreadEnabled", gpuRenderThreadEnabled);
     isFullscreen = toml::find_or<bool>(general, "Fullscreen", isFullscreen);
     vsyncEnabled = toml::find_or<bool>(general, "VSync", vsyncEnabled);
     shouldQuitOnWindowClosure =
         toml::find_or<bool>(general, "QuitOnWindowClosure", shouldQuitOnWindowClosure);
+#endif
     int logLevel = static_cast<int>(currentLogLevel);
     logLevel = toml::find_or<int&>(general, "LogLevel", logLevel);
     currentLogLevel = static_cast<Base::Log::Level>(logLevel);
@@ -129,8 +131,10 @@ void loadConfig(const std::filesystem::path &path) {
 
   if (data.contains("GPU")) {
     const toml::value &gpu = data.at("GPU");
+#ifndef NO_GFX
     screenWidth = toml::find_or<int&>(gpu, "screenWidth", screenWidth);
     screenHeight = toml::find_or<int&>(gpu, "screenHeight", screenHeight);
+#endif
     internalWidth = toml::find_or<int&>(gpu, "internalWidth", internalWidth);
     internalHeight = toml::find_or<int&>(gpu, "internalHeight", internalHeight);
     // gpuId = toml::find_or<int&>(gpu, "gpuId", gpuId);
@@ -150,6 +154,7 @@ void loadConfig(const std::filesystem::path &path) {
       toml::find_or<std::string>(paths, "ElfBinary", elfBinaryPath);
   }
 
+#ifndef NO_GFX
   if (data.contains("ImGui")) {
     const toml::value &imgui = data.at("ImGui");
     imguiConfigPath =
@@ -157,6 +162,7 @@ void loadConfig(const std::filesystem::path &path) {
     imguiDebugWindow =
         toml::find_or<bool>(imgui, "DebugWindow", imguiDebugWindow);
   }
+#endif
 
   if (data.contains("Debug")) {
     const toml::value &debug = data.at("Debug");
@@ -204,13 +210,17 @@ void saveConfig(const std::filesystem::path &path) {
   // Note: Even if they don't cause problems, I'll still yell at you :P
 
   // General.
+#ifndef NO_GFX
   data["General"]["GPURenderThreadEnabled"].comments().clear();
+#endif
   data["General"]["LogLevel"].comments().clear();
 
+#ifndef NO_GFX
   data["General"]["GPURenderThreadEnabled"].comments().push_back("# Enable the GPU Render thread and main window.");
   data["General"]["GPURenderThreadEnabled"] = gpuRenderThreadEnabled;
   data["General"]["Fullscreen"] = isFullscreen;
   data["General"]["VSync"] = vsyncEnabled;
+#endif
   data["General"]["QuitOnWindowClosure"] = shouldQuitOnWindowClosure;
   data["General"]["LogLevel"].comments().push_back("# Controls the current log level output filter");
   data["General"]["LogLevel"] = static_cast<int>(currentLogLevel);
@@ -248,15 +258,19 @@ void saveConfig(const std::filesystem::path &path) {
   data["PowerPC"]["HW_INIT_SKIP2"] = SKIP_HW_INIT_2;
 
   // GPU.
+#ifndef NO_GFX
   data["GPU"]["screenWidth"].comments().clear();
   data["GPU"]["screenHeight"].comments().clear();
+#endif
   data["GPU"]["internalWidth"].comments().clear();
   data["GPU"]["internalHeight"].comments().clear();
 
+#ifndef NO_GFX
   data["GPU"]["screenWidth"].comments().push_back("# Window Width");
   data["GPU"]["screenWidth"] = screenWidth;
   data["GPU"]["screenHeight"].comments().push_back("# Window Height");
   data["GPU"]["screenHeight"] = screenHeight;
+#endif
   data["GPU"]["internalHeight"].comments().push_back("# Internal Width (The width of what XeLL uses, do not modify)");
   data["GPU"]["internalWidth"] = internalWidth;
   data["GPU"]["internalHeight"].comments().push_back("# Internal Height (The height of what XeLL uses, do not modify)");
@@ -270,6 +284,7 @@ void saveConfig(const std::filesystem::path &path) {
   data["Paths"]["ODDImage"] = oddDiscImagePath;
   data["Paths"]["ElfBinary"] = elfBinaryPath;
 
+#ifndef NO_GFX
   // ImGui
   data["ImGui"]["Config"].comments().clear();
   data["ImGui"]["DebugWindow"].comments().clear();
@@ -279,6 +294,7 @@ void saveConfig(const std::filesystem::path &path) {
   data["ImGui"]["Config"] = imguiConfigPath;
   data["ImGui"]["DebugWindow"].comments().push_back("# Debug GUI Window");
   data["ImGui"]["DebugWindow"] = imguiDebugWindow;
+#endif
 
   // Debug
   data["Debug"]["HaltOnRead"].comments().clear();
