@@ -339,7 +339,8 @@ void saveConfig(const std::filesystem::path &path) {
       std::filesystem::path base_path{ base_path_str };
       std::filesystem::copy_file(path, base_path / (prev_file_str + ".old"));
     } else {
-      if (fs_error) {
+      // 2 is file doesn't exist, just ignore it
+      if (fs_error && fs_error.value() != 2) {
         LOG_ERROR(Config, "Filesystem error: {} ({})", fs_error.message(), fs_error.value());
       }
     }

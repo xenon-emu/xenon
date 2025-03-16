@@ -12,7 +12,7 @@
 #include "Base/Version.h"
 #include "Base/Logging/Log.h"
 
-#define XE_DEBUG
+//#define XE_DEBUG
 
 Xe::Xenos::XGPU::XGPU(RAM *ram) {
   // Assign RAM Pointer

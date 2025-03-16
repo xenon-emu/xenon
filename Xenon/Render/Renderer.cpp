@@ -272,7 +272,7 @@ void Render::Renderer::Thread() {
       }
     }
     // Exit early if needed
-    if (!threadRunning)
+    if (!threadRunning || !XeRunning)
       break;
 
     // Upload buffer
