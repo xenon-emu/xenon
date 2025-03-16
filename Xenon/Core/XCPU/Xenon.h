@@ -20,14 +20,14 @@
 
 class Xenon {
 public:
-  Xenon(RootBus *inBus, const std::string blPath, eFuses inFuseSet);
+  Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPath);
   ~Xenon();
 
   void Start(u64 resetVector = 0x100);
 
   void LoadElf(const std::string path);
 
-  void Halt();
+  void Halt(u64 haltOn = 0);
 
   void Continue();
 

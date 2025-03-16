@@ -2,36 +2,55 @@
 , cmake
 , fetchFromGitHub
 , fmt
+, lib
 , ninja
 , pkg-config
 , roboto
 , sdl3
 , toml11
+, withGraphics ? true
 }:
 
 let
-  imgui = fetchFromGitHub {
-    owner = "ocornut";
-    repo = "imgui";
-    rev = "15b96fd051731254f4ed0ef78c183f3466bf9e1f";
-    hash = "sha256-VYNqqpE1bo4bjzVsPQhNlOVKemWOZeQg0JaryuAu/Tk=";
-  };
+  imgui = if withGraphics
+    then fetchFromGitHub {
+      owner = "ocornut";
+      repo = "imgui";
+      rev = "15b96fd051731254f4ed0ef78c183f3466bf9e1f";
+      hash = "sha256-VYNqqpE1bo4bjzVsPQhNlOVKemWOZeQg0JaryuAu/Tk=";
+    }
+    else {};
 in
 stdenv.mkDerivation {
   name = "xenon";
   allowSubstitutes = false;
   src = ./.;
   nativeBuildInputs = [ cmake pkg-config ninja ];
-  buildInputs = [ sdl3 fmt toml11 ];
+
+  buildInputs = [
+    fmt toml11
+  ] ++ lib.optional withGraphics sdl3;
+
+  cmakeFlags = if withGraphics
+    then [ "-DGFX_ENABLED=True" ]
+    else [ "-DGFX_ENABLED=False" ];
+
   postUnpack = ''
-    rm -rf $sourceRoot/third_party/ImGui
-    cp -r ${imgui} $sourceRoot/third_party/ImGui
+    ${lib.optionalString withGraphics ''
+      echo graphics present
+      rm -rf $sourceRoot/third_party/ImGui
+      cp -r ${imgui} $sourceRoot/third_party/ImGui
+    ''}
     chmod -R +w $sourceRoot
   '';
 
   installPhase = ''
-    mkdir -p $out/bin $out/share
+    ${lib.optionalString withGraphics ''
+      echo graphics present
+      mkdir -p $out/share
+      ln -sv ${roboto}/share/fonts $out/share/fonts
+    ''}
+    mkdir -p $out/bin
     cp -v Xenon $out/bin/Xenon
-    ln -sv ${roboto}/share/fonts $out/share/fonts
   '';
 }

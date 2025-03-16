@@ -52,7 +52,7 @@ enum class Class : u8 {
   XMA,
   SMC,                    // System Management Controller messages.
   UART,                   // UART output.
-  DebugPrint,                  // Guest hardware output. Xbox Kernel Debug Prints.
+  DebugPrint,             // Guest hardware output. Xbox Kernel Debug Prints.
   Count                   // Total number of logging classes.
 };
 

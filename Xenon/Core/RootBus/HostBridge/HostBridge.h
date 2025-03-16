@@ -56,16 +56,16 @@ public:
   void RegisterPCIBridge(PCIBridge *newPCIBridge);
 
   // Read
-  bool Read(u64 readAddress, u64 *data, u8 byteCount);
+  bool Read(u64 readAddress, u8 *data, u8 byteCount);
 
   // Write
-  bool Write(u64 writeAddress, u64 data, u8 byteCount);
+  bool Write(u64 writeAddress, u8 *data, u8 byteCount);
 
   // Configuration Read
-  void ConfigRead(u64 readAddress, u64 *data, u8 byteCount);
+  void ConfigRead(u64 readAddress, u8 *data, u8 byteCount);
 
   // Configuration Write
-  void ConfigWrite(u64 writeAddress, u64 data, u8 byteCount);
+  void ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount);
 
 private:
   std::mutex mutex{};

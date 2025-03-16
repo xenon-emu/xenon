@@ -1,6 +1,8 @@
 // Copyright 2025 Xenon Emulator Project
 
 #include "OGLTexture.h"
+
+#ifndef NO_GFX
 #include "Base/Logging/Log.h"
 
 u32 Render::OGLTexture::GetDepthFromFlags(int flags) {
@@ -129,3 +131,4 @@ void Render::OGLTexture::DestroyTexture() {
   glDeleteTextures(1, (u32*)GetTexture());
   SetTexture(nullptr);
 }
+#endif

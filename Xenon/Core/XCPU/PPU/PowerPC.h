@@ -30,6 +30,7 @@ union PPCOpcode {
 	PPCBitfield<u32, 21, 1> oe; // 21
 	PPCBitfield<u32, 11, 10> spr; // 11..20
 	PPCBitfield<u32, 21, 5> vc; // 21..25
+  PPCBitfield<u32, 21, 11> xo; // 21..30
 	PPCBitfield<u32, 16, 5> vb; // 16..20
 	PPCBitfield<u32, 11, 5> va; // 11..15
 	PPCBitfield<u32, 6, 5> vd; // 6..10
@@ -148,6 +149,7 @@ union FPSCRegister {
 */
 union XERegister {
   u32 XER_Hex;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u32 ByteCount : 7;
     u32 R0 : 22;
@@ -155,6 +157,15 @@ union XERegister {
     u32 OV : 1;
     u32 SO : 1;
   };
+#else
+  struct {
+    u32 SO : 1;
+    u32 OV : 1;
+    u32 CA : 1;
+    u32 R0 : 22;
+    u32 ByteCount : 7;
+  };
+#endif
 };
 
 /*
@@ -162,10 +173,17 @@ Time Base (TB)
 */
 union TB {
   u64 TB_Hex;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u64 TBL : 32;
     u64 TBU : 32;
   };
+#else
+  struct {
+    u64 TBU : 32;
+    u64 TBL : 32;
+  };
+#endif
 };
 
 /*
@@ -173,6 +191,7 @@ Machine State Register (MSR)
 */
 union MSRegister {
   u64 MSR_Hex;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u64 LE : 1;
     u64 RI : 1;
@@ -198,6 +217,33 @@ union MSRegister {
     u64 TA : 1;
     u64 SF : 1;
   };
+#else
+  struct {
+    u64 SF : 1;
+    u64 TA : 1;
+    u64 : 1;
+    u64 HV : 1;
+    u64 : 34;
+    u64 VXU : 1;
+    u64 : 8;
+    u64 ILE : 1;
+    u64 EE : 1;
+    u64 PR : 1;
+    u64 FP : 1;
+    u64 ME : 1;
+    u64 FE0 : 1;
+    u64 SE : 1;
+    u64 BE : 1;
+    u64 FE1 : 1;
+    u64 : 2;
+    u64 IR : 1;
+    u64 DR : 1;
+    u64 : 1;
+    u64 PMM : 1;
+    u64 RI : 1;
+    u64 LE : 1;
+  };
+#endif
 };
 
 /*
@@ -205,10 +251,17 @@ Processor Version Register (PVR)
 */
 union PVRegister {
   u32 PVR_Hex;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u32 Revision : 16;
     u32 Version : 16;
   };
+#else
+  struct {
+    u32 Version : 16;
+    u32 Revision : 16;
+  };
+#endif
 };
 
 // Segment Lookaside Buffer Entry
@@ -372,8 +425,13 @@ struct SECENG_ADDRESS_INFO {
 typedef union _SECENG_FAULT_ISOLATION {
   u64 AsULONGLONG; // 0x0 sz:0x8
   struct {
+#ifdef __LITTLE_ENDIAN__
     u64 IntegrityViolation : 1; // 0x0 bfo:0x63
     u64 Reserved1 : 63;         // 0x0 bfo:0x0
+#else
+    u64 Reserved1 : 63;         // 0x0 bfo:0x0
+    u64 IntegrityViolation : 1; // 0x0 bfo:0x63
+#endif
   } AsBits;
 } SECENG_FAULT_ISOLATION, *PSECENG_FAULT_ISOLATION; // size 8
 
@@ -519,7 +577,9 @@ struct PPU_STATE {
   // Address Traslation Flag
   bool traslationInProgress = false;
   // Current PPU Name, for ease of debugging.
-  const char *ppuName = "";
+  std::string ppuName{};
+  // PPU ID
+  u8 ppuID = 0;
 };
 
 struct XENON_CONTEXT {

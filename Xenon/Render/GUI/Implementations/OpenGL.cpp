@@ -2,6 +2,7 @@
 
 #include "OpenGL.h"
 
+#ifndef NO_GFX
 #include "Core/Xe_Main.h"
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
 #include "Base/Config.h"
@@ -40,3 +41,4 @@ void Render::OpenGLGUI::EndSwap() {
   }
   ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 }
+#endif

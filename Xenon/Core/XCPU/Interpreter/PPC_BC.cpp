@@ -58,17 +58,17 @@ void PPCInterpreter::PPCInterpreter_bclr(PPU_STATE *ppuState) {
 
   // Jrunner XDK build offsets are 0x3003F48 AND 0x3003FDC
   // XeLL offsets are 0x3003DC0 AND 0x3003E54
-  if ((Config::HW_INIT_SKIP1() && Config::HW_INIT_SKIP2()) == 0) {
+  if ((Config::xcpu.HW_INIT_SKIP_1 && Config::xcpu.HW_INIT_SKIP_2) == 0) {
     if (curThread.CIA == 0x3003F48)
       condOk = false;
 
     if (curThread.CIA == 0x3003FDC)
       condOk = true;
   } else {
-    if (curThread.CIA == Config::HW_INIT_SKIP1())
+    if (curThread.CIA == Config::xcpu.HW_INIT_SKIP_1)
       condOk = false;
 
-    if (curThread.CIA == Config::HW_INIT_SKIP2())
+    if (curThread.CIA == Config::xcpu.HW_INIT_SKIP_2)
       condOk = true;
   }
 

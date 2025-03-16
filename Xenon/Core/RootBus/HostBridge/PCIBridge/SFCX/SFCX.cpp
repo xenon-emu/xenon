@@ -3,7 +3,8 @@
 #include "SFCX.h"
 
 #include "Base/Logging/Log.h"
-                                                                          
+
+// There are two SFCX Versions, pre-Jasper and post-Jasper
 SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
   PCIBridge *parentPCIBridge) : PCIDevice(deviceName, size) {
   // Asign parent PCI Bridge pointer.
@@ -41,6 +42,24 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
 
   // Load the NAND dump.
   LOG_INFO(SFCX, "Loading NAND from path: {}", nandLoadPath);
+ 
+  // Check Image size
+  u64 imageSize = 0;
+  
+  // fs::file_size can cause a exception if it is not a valid file
+  try {
+    std::error_code ec;
+    imageSize = std::filesystem::file_size(nandLoadPath, ec);
+    if (imageSize == -1 || !imageSize) {
+      imageSize = 0;
+      LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of {} (Error: {})", nandLoadPath, ec.message());
+    }
+  }
+  catch (const std::exception& ex) {
+    LOG_ERROR(Base_Filesystem, "Exception trying to get file size. Exception: {}",
+      ex.what());
+    return;
+  }
 
   nandFile.open(nandLoadPath, std::ios_base::in | std::ios_base::binary);
                   
@@ -61,55 +80,50 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
   nandFile.close();
 
   // Fix Endiannes
-  sfcxState.nandHeader.nandMagic = byteswap<u16>(sfcxState.nandHeader.nandMagic);
+  sfcxState.nandHeader.nandMagic = byteswap_be<u16>(sfcxState.nandHeader.nandMagic);
   LOG_INFO(SFCX, " * NAND Magic: {:#x}", sfcxState.nandHeader.nandMagic);
 
-  sfcxState.nandHeader.build = byteswap<u16>(sfcxState.nandHeader.build);
+  sfcxState.nandHeader.build = byteswap_be<u16>(sfcxState.nandHeader.build);
   LOG_INFO(SFCX, " * Build: {:#x}", sfcxState.nandHeader.build);
 
-  sfcxState.nandHeader.qfe = byteswap<u16>(sfcxState.nandHeader.qfe);
+  sfcxState.nandHeader.qfe = byteswap_be<u16>(sfcxState.nandHeader.qfe);
   LOG_INFO(SFCX, " * QFE: {:#x}", sfcxState.nandHeader.qfe);
 
-  sfcxState.nandHeader.flags = byteswap<u16>(sfcxState.nandHeader.flags);
+  sfcxState.nandHeader.flags = byteswap_be<u16>(sfcxState.nandHeader.flags);
   LOG_INFO(SFCX, " * Flags: {:#x}", sfcxState.nandHeader.flags);
 
-  sfcxState.nandHeader.entry = byteswap<u32>(sfcxState.nandHeader.entry);
+  sfcxState.nandHeader.entry = byteswap_be<u32>(sfcxState.nandHeader.entry);
   LOG_INFO(SFCX, " * Entry: {:#x}", sfcxState.nandHeader.entry);
 
-  sfcxState.nandHeader.size = byteswap<u32>(sfcxState.nandHeader.size);
+  sfcxState.nandHeader.size = byteswap_be<u32>(sfcxState.nandHeader.size);
   LOG_INFO(SFCX, " * Size: {:#x}", sfcxState.nandHeader.size);
 
-  sfcxState.nandHeader.keyvaultSize = byteswap<u32>(sfcxState.nandHeader.keyvaultSize);
+  sfcxState.nandHeader.keyvaultSize = byteswap_be<u32>(sfcxState.nandHeader.keyvaultSize);
   LOG_INFO(SFCX, " * Keyvault Size: {:#x}", sfcxState.nandHeader.keyvaultSize);
 
-  sfcxState.nandHeader.sysUpdateAddr = byteswap<u32>(sfcxState.nandHeader.sysUpdateAddr);
+  sfcxState.nandHeader.sysUpdateAddr = byteswap_be<u32>(sfcxState.nandHeader.sysUpdateAddr);
   LOG_INFO(SFCX, " * System Update Addr: {:#x}", sfcxState.nandHeader.sysUpdateAddr);
 
-  sfcxState.nandHeader.sysUpdateCount = byteswap<u16>(sfcxState.nandHeader.sysUpdateCount);
+  sfcxState.nandHeader.sysUpdateCount = byteswap_be<u16>(sfcxState.nandHeader.sysUpdateCount);
   LOG_INFO(SFCX, " * System Update Count: {:#x}", sfcxState.nandHeader.sysUpdateCount);
 
-  sfcxState.nandHeader.keyvaultVer = byteswap<u16>(sfcxState.nandHeader.keyvaultVer);
+  sfcxState.nandHeader.keyvaultVer = byteswap_be<u16>(sfcxState.nandHeader.keyvaultVer);
   LOG_INFO(SFCX, " * Keyvault Ver: {:#x}", sfcxState.nandHeader.keyvaultVer);
 
-  sfcxState.nandHeader.keyvaultAddr = byteswap<u32>(sfcxState.nandHeader.keyvaultAddr);
+  sfcxState.nandHeader.keyvaultAddr = byteswap_be<u32>(sfcxState.nandHeader.keyvaultAddr);
   LOG_INFO(SFCX, " * Keyvault Addr: {:#x}", sfcxState.nandHeader.keyvaultAddr);
 
-  sfcxState.nandHeader.sysUpdateSize = byteswap<u32>(sfcxState.nandHeader.sysUpdateSize);
+  sfcxState.nandHeader.sysUpdateSize = byteswap_be<u32>(sfcxState.nandHeader.sysUpdateSize);
   LOG_INFO(SFCX, " * System Update Size: {:#x}", sfcxState.nandHeader.sysUpdateSize);
 
-  sfcxState.nandHeader.smcConfigAddr = byteswap<u32>(sfcxState.nandHeader.smcConfigAddr);  
+  sfcxState.nandHeader.smcConfigAddr = byteswap_be<u32>(sfcxState.nandHeader.smcConfigAddr);  
   LOG_INFO(SFCX, " * SMC Config Addr: {:#x}", sfcxState.nandHeader.smcConfigAddr);
 
-  sfcxState.nandHeader.smcBootSize = byteswap<u32>(sfcxState.nandHeader.smcBootSize);
+  sfcxState.nandHeader.smcBootSize = byteswap_be<u32>(sfcxState.nandHeader.smcBootSize);
   LOG_INFO(SFCX, " * SMC Boot Size: {:#x}", sfcxState.nandHeader.smcBootSize);
 
-  sfcxState.nandHeader.smcBootAddr = byteswap<u32>(sfcxState.nandHeader.smcBootAddr);
+  sfcxState.nandHeader.smcBootAddr = byteswap_be<u32>(sfcxState.nandHeader.smcBootAddr);
   LOG_INFO(SFCX, " * SMC Boot Addr: {:#x}", sfcxState.nandHeader.smcBootAddr);
-
-  // Check Image size and Meta type.
-  size_t imageSize = std::filesystem::file_size(nandLoadPath);
-
-  // There are two SFCX Versions, original (Pre Jasper) and Jasper+.
 
   // Enter SFCX Thread.
   sfcxThreadRunning = true;
@@ -122,39 +136,39 @@ SFCX::~SFCX() {
     sfcxThread.join();
 }
 
-void SFCX::Read(u64 readAddress, u64 *data, u8 byteCount) {
+void SFCX::Read(u64 readAddress, u8 *data, u8 byteCount) {
   const u16 reg = readAddress & 0xFF;
 
   switch (reg) {
   case SFCX_CONFIG_REG:
-    *data = sfcxState.configReg;
+    *reinterpret_cast<u32*>(data) = sfcxState.configReg;
     break;
   case SFCX_STATUS_REG:
-    *data = sfcxState.statusReg;
+    *reinterpret_cast<u32*>(data) = sfcxState.statusReg;
     break;
   case SFCX_COMMAND_REG:
-    *data = sfcxState.commandReg;
+    *reinterpret_cast<u32*>(data) = sfcxState.commandReg;
     break;
   case SFCX_ADDRESS_REG:
-    *data = sfcxState.addressReg;
+    *reinterpret_cast<u32*>(data) = sfcxState.addressReg;
     break;
   case SFCX_DATA_REG:
-    *data = sfcxState.dataReg;
+    *reinterpret_cast<u32*>(data) = sfcxState.dataReg;
     break;
   case SFCX_LOGICAL_REG:
-    *data = sfcxState.logicalReg;
+    *reinterpret_cast<u32*>(data) = sfcxState.logicalReg;
     break;
   case SFCX_PHYSICAL_REG:
-    *data = sfcxState.physicalReg;
+    *reinterpret_cast<u32*>(data) = sfcxState.physicalReg;
     break;
   case SFCX_DATAPHYADDR_REG:
-    *data = sfcxState.dataPhysAddrReg;
+    *reinterpret_cast<u32*>(data) = sfcxState.dataPhysAddrReg;
     break;
   case SFCX_SPAREPHYADDR_REG:
-    *data = sfcxState.sparePhysAddrReg;
+    *reinterpret_cast<u32*>(data) = sfcxState.sparePhysAddrReg;
     break;
   case SFCX_MMC_ID_REG:
-    *data = sfcxState.mmcIDReg;
+    *reinterpret_cast<u32*>(data) = sfcxState.mmcIDReg;
     break;
   default:
     LOG_ERROR(SFCX, "Read from unknown register {:#x}", reg);
@@ -162,45 +176,45 @@ void SFCX::Read(u64 readAddress, u64 *data, u8 byteCount) {
   }
 }
 
-void SFCX::ConfigRead(u64 readAddress, u64 *data, u8 byteCount) {
+void SFCX::ConfigRead(u64 readAddress, u8 *data, u8 byteCount) {
   const u8 offset = readAddress & 0xFF;
   memcpy(data, &pciConfigSpace.data[offset], byteCount);
 }
 
-void SFCX::Write(u64 writeAddress, u64 data, u8 byteCount) {
+void SFCX::Write(u64 writeAddress, u8 *data, u8 byteCount) {
   const u16 reg = writeAddress & 0xFF;
 
   switch (reg) {
   case SFCX_CONFIG_REG:
-    sfcxState.configReg = static_cast<u32>(data);
+    sfcxState.configReg = *reinterpret_cast<u32*>(data);
     break;
   case SFCX_STATUS_REG:
-    sfcxState.statusReg = static_cast<u32>(data);
+    sfcxState.statusReg = *reinterpret_cast<u32*>(data);
     break;
   case SFCX_COMMAND_REG:
-    sfcxState.commandReg = static_cast<u32>(data);
+    sfcxState.commandReg = *reinterpret_cast<u32*>(data);
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     break;
   case SFCX_ADDRESS_REG:
-    sfcxState.addressReg = static_cast<u32>(data);
+    sfcxState.addressReg = *reinterpret_cast<u32*>(data);
     break;
   case SFCX_DATA_REG:
-    sfcxState.dataReg = static_cast<u32>(data);
+    sfcxState.dataReg = *reinterpret_cast<u32*>(data);
     break;
   case SFCX_LOGICAL_REG:
-    sfcxState.logicalReg = static_cast<u32>(data);
+    sfcxState.logicalReg = *reinterpret_cast<u32*>(data);
     break;
   case SFCX_PHYSICAL_REG:
-    sfcxState.physicalReg = static_cast<u32>(data);
+    sfcxState.physicalReg = *reinterpret_cast<u32*>(data);
     break;
   case SFCX_DATAPHYADDR_REG:
-    sfcxState.dataPhysAddrReg = static_cast<u32>(data);
+    sfcxState.dataPhysAddrReg = *reinterpret_cast<u32*>(data);
     break;
   case SFCX_SPAREPHYADDR_REG:
-    sfcxState.sparePhysAddrReg = static_cast<u32>(data);
+    sfcxState.sparePhysAddrReg = *reinterpret_cast<u32*>(data);
     break;
   case SFCX_MMC_ID_REG:
-    sfcxState.mmcIDReg = static_cast<u32>(data);
+    sfcxState.mmcIDReg = *reinterpret_cast<u32*>(data);
     break;
   default:
     LOG_ERROR(SFCX, "Write from unknown register {:#x}", reg);
@@ -208,31 +222,31 @@ void SFCX::Write(u64 writeAddress, u64 data, u8 byteCount) {
   }
 }
 
-void SFCX::ConfigWrite(u64 writeAddress, u64 data, u8 byteCount) {
+void SFCX::ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount) {
   const u8 offset = writeAddress & 0xFF;
 
   // Check if we're being scanned.
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
-      if (data == 0xFFFFFFFF) { // PCI BAR Size discovery.
+      if (*reinterpret_cast<u64*>(data) == 0xFFFFFFFF) { // PCI BAR Size discovery.
         u64 x = 2;
         for (int idx = 2; idx < 31; idx++) {
-          data &= ~x;
+          *reinterpret_cast<u64*>(data) &= ~x;
           x <<= 1;
           if (x >= pciDevSizes[regOffset]) {
             break;
           }
         }
-        data &= ~0x3;
+        *reinterpret_cast<u64*>(data) &= ~0x3;
       }
     }
     if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address.
-      data = 0; // Register not implemented.
+      *reinterpret_cast<u64*>(data) = 0; // Register not implemented.
     }
   }
 
-  memcpy(&pciConfigSpace.data[offset], &data, byteCount);
+  memcpy(&pciConfigSpace.data[offset], data, byteCount);
 }
 
 void SFCX::sfcxMainLoop() {

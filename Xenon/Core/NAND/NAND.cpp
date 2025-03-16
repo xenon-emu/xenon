@@ -18,13 +18,30 @@ NAND::NAND(const char* deviceName, const std::string filePath,
     LOG_CRITICAL(System, "NAND: Unable to load file!");
     SYSTEM_PAUSE();
   }
-
-  rawFileSize = std::filesystem::file_size(filePath);
+  
+  // fs::file_size can cause a exception if it is not a valid file
+  try {
+    std::error_code ec;
+    rawFileSize = std::filesystem::file_size(filePath, ec);
+    if (rawFileSize == -1 || !rawFileSize) {
+      rawFileSize = 0;
+      LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of {} (Error: {})", filePath, ec.message());
+    }
+  }
+  catch (const std::exception& ex) {
+    LOG_ERROR(Base_Filesystem, "Exception trying to get file size. Exception: {}",
+      ex.what());
+    return;
+  }
 
   if (rawFileSize > 0x4200000) {
     LOG_ERROR(System, "NAND: Nand size exceeds 64MB! This may cause unintended behaviour");
     SYSTEM_PAUSE();
     rawNANDData.resize(rawFileSize);
+  }
+  if (rawFileSize <= 0) {
+    LOG_ERROR(System, "NAND: Nand is zero or less! This may cause unintended behaviour, as it's highly likely it is corrupt or missing");
+    SYSTEM_PAUSE();
   }
 
   LOG_INFO(System, "NAND: File size = {:#x} bytes.", rawFileSize);
@@ -60,7 +77,7 @@ NAND::~NAND() {
 }
 
 /************Responsible for reading the NAND************/
-void NAND::Read(u64 readAddress, u64 *data, u8 byteCount) {
+void NAND::Read(u64 readAddress, u8 *data, u8 byteCount) {
   u32 offset = static_cast<u32>(readAddress & 0xFFFFFF);
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
 #ifdef NAND_DEBUG
@@ -70,14 +87,14 @@ void NAND::Read(u64 readAddress, u64 *data, u8 byteCount) {
 }
 
 /************Responsible for writing the NAND************/
-void NAND::Write(u64 writeAddress, u64 data, u8 byteCount) {
+void NAND::Write(u64 writeAddress, u8 *data, u8 byteCount) {
   u32 offset = static_cast<u32>(writeAddress & 0xFFFFFF);
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
 #ifdef NAND_DEBUG
     LOG_DEBUG(SFCX, "Writing raw data at {:#x} (offset {:#x}) for {:#x} bytes", writeAddress, offset, byteCount);
 #endif // NAND_DEBUG
   u8* NANDData = rawNANDData.data();
-  memcpy(rawNANDData.data() + offset, &data, byteCount);
+  memcpy(rawNANDData.data() + offset, data, byteCount);
 }
 
 //*Checks ECD Page.
@@ -106,7 +123,7 @@ void NAND::CalculateECD(u8 *data, int offset, NANDMetadata &metadata) {
   u32 count = 0;
   for (i = 0; i < 0x1066; i++) {
     if ((i & 31) == 0) {
-      v = ~byteswap<u32>(
+      v = ~byteswap_be<u32>(
         static_cast<u8>(data[count + offset + 0]) << 24 |
         static_cast<u8>(data[count + offset + 1]) << 16 |
         static_cast<u8>(data[count + offset + 2]) << 8  |

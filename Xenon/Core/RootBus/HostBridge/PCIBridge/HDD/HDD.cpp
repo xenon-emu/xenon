@@ -61,7 +61,7 @@ HDD::HDD(const char *deviceName, u64 size, PCIBridge *parentPCIBridge) :
   ataDeviceState.ataReadState.status = ATA_STATUS_DRDY;
 }
 
-void HDD::Read(u64 readAddress, u64 *data, u8 byteCount) {
+void HDD::Read(u64 readAddress, u8 *data, u8 byteCount) {
   const u32 regOffset = (readAddress & 0xFF) * 4;
 
   if (regOffset < sizeof(ATA_REG_STATE)) {
@@ -90,24 +90,24 @@ void HDD::Read(u64 readAddress, u64 *data, u8 byteCount) {
       break;
     }
 
-    memcpy(data, (u8 *)&ataDeviceState.ataReadState + regOffset, byteCount);
+    memcpy(data, (u8*)&ataDeviceState.ataReadState + regOffset, byteCount);
   } else {
     LOG_ERROR(HDD, "Unknown register being accessed: (Read) {:#x}", regOffset);
     memset(data, 0, byteCount);
   }
 }
 
-void HDD::Write(u64 writeAddress, u64 data, u8 byteCount) {
+void HDD::Write(u64 writeAddress, u8 *data, u8 byteCount) {
 
   const u32 regOffset = (writeAddress & 0xFF) * 4;
   u32 value = 0;
 
   if (regOffset < sizeof(ATA_REG_STATE)) {
-    memcpy(&value, &data, byteCount);
+    memcpy(&value, data, byteCount);
 
     switch (regOffset) {
     case ATA_REG_CMD_STATUS:
-      switch (data) {
+      switch (*reinterpret_cast<u64*>(data)) {
       case ATA_COMMAND_DEVICE_RESET:
         break;
       case ATA_COMMAND_READ_SECTORS:
@@ -163,38 +163,38 @@ void HDD::Write(u64 writeAddress, u64 data, u8 byteCount) {
       }
     }
 
-    memcpy(reinterpret_cast<u8*>(&ataDeviceState.ataWriteState + regOffset), &data, byteCount);
+    memcpy(reinterpret_cast<u8*>(&ataDeviceState.ataWriteState + regOffset), data, byteCount);
   } else {
     LOG_ERROR(HDD, "Unknown register being accessed: (Write) {:#x}", regOffset);
   }
 }
 
-void HDD::ConfigRead(u64 readAddress, u64 *data, u8 byteCount) {
+void HDD::ConfigRead(u64 readAddress, u8 *data, u8 byteCount) {
   memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], byteCount);
 }
 
-void HDD::ConfigWrite(u64 writeAddress, u64 data, u8 byteCount) {
+void HDD::ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount) {
   // Check if we're being scanned.
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
-      if (data == 0xFFFFFFFF) { // PCI BAR Size discovery.
+      if (*reinterpret_cast<u64*>(data) == 0xFFFFFFFF) { // PCI BAR Size discovery.
         u64 x = 2;
         for (int idx = 2; idx < 31; idx++) {
-          data &= ~x;
+          *reinterpret_cast<u64*>(data) &= ~x;
           x <<= 1;
           if (x >= pciDevSizes[regOffset]) {
             break;
           }
         }
-        data &= ~0x3;
+        *reinterpret_cast<u64*>(data) &= ~0x3;
       }
     }
     if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address.
-      data = 0; // Register not implemented.
+      *reinterpret_cast<u64*>(data) = 0; // Register not implemented.
     }
   }
-  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &data, byteCount);
+  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], data, byteCount);
 }
 
 void HDD::ataCopyIdentifyDeviceData() {
@@ -205,6 +205,6 @@ void HDD::ataCopyIdentifyDeviceData() {
 
   for (size_t buffPos = 0; buffPos <= sizeof(ATA_IDENTIFY_DATA); buffPos++) {
     memcpy(ataDeviceState.readBuffer.data() + buffPos,
-           (u8 *)&ataDeviceState.ataIdentifyData + buffPos, 1);
+           (u8*)&ataDeviceState.ataIdentifyData + buffPos, 1);
   }
 }

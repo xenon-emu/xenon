@@ -36,13 +36,14 @@ public:
 
   void start();
 
+  void saveConfig();
+  void loadConfig();
+
   void addPCIDevices();
   void createHostBridge();
   void createPCIDevices();
   void createRootBus();
   void createSMCState();
-
-  void getFuses();
 
   void shutdown() {
     XeRunning = false;
@@ -54,7 +55,7 @@ public:
 private:
   // Main objects
   //  Base path
-  std::filesystem::path userDirectory{};
+  std::filesystem::path rootDirectory{};
   //  Log level
   std::unique_ptr<Base::Log::Filter> logFilter{};
 
@@ -64,9 +65,11 @@ private:
   std::unique_ptr<PCIBridge> pciBridge{}; // PCIBridge Object
 
 public:
+#ifndef NO_GFX
   // Render thread
   std::unique_ptr<Render::Renderer> renderer{};
   bool renderHalt{};
+#endif
 
   // PCI Devices
   //  SMC
@@ -95,14 +98,11 @@ public:
   //  HDD
   std::unique_ptr<HDD> hdd{};
 
+  // Console Handles
   //  Xenon CPU
   std::unique_ptr<Xenon> xenonCPU{};
-private:
-  // Console Handles
   //  Xenos GPU
   std::unique_ptr<Xe::Xenos::XGPU> xenos{};
-  //  Fuses
-  eFuses cpuFuses{};
 };
 
 // Global pointer

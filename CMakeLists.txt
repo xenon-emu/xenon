@@ -8,12 +8,14 @@ set(CMAKE_C_STANDARD_REQUIRED True)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 if (NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
+  set(CMAKE_BUILD_TYPE Release)
 endif()
 
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 
 project(Xenon)
+
+option(GFX_ENABLED "Enable graphics" ON)
 
 # This function should be passed a list of all files in a target. It will automatically generate file groups
 # following the directory hierarchy, so that the layout of the files in IDEs matches the one in the filesystem.
@@ -30,7 +32,9 @@ function(create_target_directory_groups target_name)
 endfunction()
 
 find_package(fmt 10.2.1 CONFIG)
-find_package(SDL3 3.2.4 CONFIG)
+if (GFX_ENABLED)
+  find_package(SDL3 3.2.4 CONFIG)
+endif()
 find_package(toml11 3.7.1 CONFIG)
 
 add_subdirectory(third_party)
@@ -155,42 +159,44 @@ set(XCPU
     Xenon/Core/XCPU/PPU/PowerPC.h
 )
 
-set(IMGUI_DIR third_party/ImGui)
-set(IMGUI
-    ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
-    ${IMGUI_DIR}/backends/imgui_impl_opengl3.h
-    ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
-    ${IMGUI_DIR}/backends/imgui_impl_sdl3.h
-    ${IMGUI_DIR}/imconfig.h
-    ${IMGUI_DIR}/imgui.cpp
-    ${IMGUI_DIR}/imgui.h
-    ${IMGUI_DIR}/imgui_demo.cpp
-    ${IMGUI_DIR}/imgui_internal.h
-    ${IMGUI_DIR}/imgui_draw.cpp
-    ${IMGUI_DIR}/imgui_tables.cpp
-    ${IMGUI_DIR}/imgui_widgets.cpp
-    ${IMGUI_DIR}/imstb_rectpack.h
-    ${IMGUI_DIR}/imstb_textedit.h
-    ${IMGUI_DIR}/imstb_truetype.h
-)
+if (GFX_ENABLED)
+  set(IMGUI_DIR third_party/ImGui)
+  set(IMGUI
+      ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
+      ${IMGUI_DIR}/backends/imgui_impl_opengl3.h
+      ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
+      ${IMGUI_DIR}/backends/imgui_impl_sdl3.h
+      ${IMGUI_DIR}/imconfig.h
+      ${IMGUI_DIR}/imgui.cpp
+      ${IMGUI_DIR}/imgui.h
+      ${IMGUI_DIR}/imgui_demo.cpp
+      ${IMGUI_DIR}/imgui_internal.h
+      ${IMGUI_DIR}/imgui_draw.cpp
+      ${IMGUI_DIR}/imgui_tables.cpp
+      ${IMGUI_DIR}/imgui_widgets.cpp
+      ${IMGUI_DIR}/imstb_rectpack.h
+      ${IMGUI_DIR}/imstb_textedit.h
+      ${IMGUI_DIR}/imstb_truetype.h
+  )
 
-set(OPENGL
-    third_party/glad/src/glad.c
-)
+  set(OPENGL
+      third_party/glad/src/glad.c
+  )
 
-set(RENDER
-    ${OPENGL}
-    ${IMGUI}
-    Xenon/Render/Abstractions/Texture.h
-    Xenon/Render/Implementations/OGLTexture.cpp
-    Xenon/Render/Implementations/OGLTexture.h 
-    Xenon/Render/GUI/Implementations/OpenGL.cpp
-    Xenon/Render/GUI/Implementations/OpenGL.h
-    Xenon/Render/GUI/GUI.cpp
-    Xenon/Render/GUI/GUI.h
-    Xenon/Render/Renderer.cpp
-    Xenon/Render/Renderer.h
-)
+  set(RENDER
+      ${OPENGL}
+      ${IMGUI}
+      Xenon/Render/Abstractions/Texture.h
+      Xenon/Render/Implementations/OGLTexture.cpp
+      Xenon/Render/Implementations/OGLTexture.h
+      Xenon/Render/GUI/Implementations/OpenGL.cpp
+      Xenon/Render/GUI/Implementations/OpenGL.h
+      Xenon/Render/GUI/GUI.cpp
+      Xenon/Render/GUI/GUI.h
+      Xenon/Render/Renderer.cpp
+      Xenon/Render/Renderer.h
+  )
+endif()
 
 set(XGPU
     Xenon/Core/XGPU/XGPU.cpp
@@ -234,23 +240,36 @@ else()
 endif()
 
 # Copy fonts to build directory
-add_custom_target(copy-fonts
-  COMMAND ${CMAKE_COMMAND} -E copy_directory
-					"${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts" # Input
-					${FONT_OUTPUT}
-  COMMENT "Copying fonts (${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts) to build directory (${FONT_OUTPUT})"
-  DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts
-)
+if (GFX_ENABLED)
+  add_custom_target(copy-fonts
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts" # Input
+            "${CMAKE_CURRENT_BINARY_DIR}/fonts"      # Output
+    COMMENT "Copying fonts (${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts) to build directory (${CMAKE_CURRENT_BINARY_DIR}/fonts)"
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts
+  )
+endif()
 
 # Include OPENGL Directory
 include_directories(Xenon third_party/glad/include)
 
-add_dependencies(Xenon copy-fonts)
+if (GFX_ENABLED)
+  add_dependencies(Xenon copy-fonts)
+endif()
 target_include_directories(Xenon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${IMGUI_DIR})
-target_link_libraries(Xenon PRIVATE fmt::fmt SDL3::SDL3 toml11::toml11)
+if (GFX_ENABLED)
+  target_link_libraries(Xenon PRIVATE fmt::fmt SDL3::SDL3 toml11::toml11)
+else()
+  target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11)
+endif()
 
 add_definitions(-DNTDDI_VERSION=0x0A000006 -D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00)
 add_definitions(-DNOMINMAX -DWIN32_LEAN_AND_MEAN)
+if (GFX_ENABLED)
+  add_definitions(-DGFX_ENABLED)
+else()
+  add_definitions(-DNO_GFX)
+endif()
 add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 
 if (msvc)

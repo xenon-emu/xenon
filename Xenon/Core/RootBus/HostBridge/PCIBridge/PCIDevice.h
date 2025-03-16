@@ -7,8 +7,8 @@
 #include "Core/RootBus/HostBridge/PCIe.h"
 
 struct PCIDeviceInfo {
-  const char *deviceName;
-  u64 size;
+  const char *deviceName = "";
+  u64 size = 0;
 };
 
 class PCIDevice {
@@ -17,11 +17,11 @@ public:
     deviceInfo.deviceName = deviceName;
     deviceInfo.size = size;
   }
-  virtual void Read(u64 readAddress, u64 *data, u8 byteCount) {}
-  virtual void Write(u64 writeAddress, u64 data, u8 byteCount) {}
+  virtual void Read(u64 readAddress, u8 *data, u8 byteCount) {}
+  virtual void Write(u64 writeAddress, u8 *data, u8 byteCount) {}
 
-  virtual void ConfigRead(u64 readAddress, u64 *data, u8 byteCount) {}
-  virtual void ConfigWrite(u64 writeAddress, u64 data, u8 byteCount) {}
+  virtual void ConfigRead(u64 readAddress, u8 *data, u8 byteCount) {}
+  virtual void ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount) {}
 
   const char *GetDeviceName() { return deviceInfo.deviceName; }
 
@@ -61,5 +61,5 @@ public:
   // PCI Device Size, using when determining PCI device size of each BAR in Linux.
   u32 pciDevSizes[6] = {};
 private:
-  PCIDeviceInfo deviceInfo = {nullptr};
+  PCIDeviceInfo deviceInfo = { "" };
 };

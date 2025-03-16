@@ -3,18 +3,11 @@
 #pragma once
 
 #include <fstream>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <thread>
 #include <vector>
-
-#include <SDL3/SDL.h>
-
-#define GL_GLEXT_PROTOTYPES
-extern "C" {
-#include <KHR/khrplatform.h>
-#include <glad/glad.h>
-}
 
 #include "Base/Types.h"
 #include "Core/RAM/RAM.h"
@@ -103,13 +96,16 @@ public:
   ~XGPU();
 
   // Memory Read/Write methods.
-  bool Read(u64 readAddress, u64 *data, u8 byteCount);
-  bool Write(u64 writeAddress, u64 data, u8 byteCount);
+  bool Read(u64 readAddress, u8 *data, u8 byteCount);
+  bool Write(u64 writeAddress, u8 *data, u8 byteCount);
 
-  void ConfigRead(u64 readAddress, u64 *data, u8 byteCount);
-  void ConfigWrite(u64 writeAddress, u64 data, u8 byteCount);
+  void ConfigRead(u64 readAddress, u8 *data, u8 byteCount);
+  void ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount);
 
   bool isAddressMappedInBAR(u32 address);
+
+  // Dump framebuffer from RAM
+  void DumpFB(const std::filesystem::path &path, int pitch);
 
 private:
   // Mutex handle

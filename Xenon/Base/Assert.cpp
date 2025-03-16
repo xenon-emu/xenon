@@ -12,8 +12,15 @@
 #define Crash() __asm__ __volatile__("int $3")
 #elif defined(ARCH_ARM64)
 #define Crash() __asm__ __volatile__("brk 0")
+#elif defined(ARCH_PPC)
+#include <signal.h>
+#ifdef SIGTRAP
+#define Crash() raise(SIGTRAP)
 #else
-#error "Missing Crash() implementation for target CPU architecture."
+#define Crash() raise(SIGABRT)
+#endif
+#else
+#define Crash() __builtin_trap()
 #endif
 #endif // _MSVC_VER
 

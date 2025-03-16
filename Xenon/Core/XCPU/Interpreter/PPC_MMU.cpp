@@ -1,6 +1,7 @@
 // Copyright 2025 Xenon Emulator Project
 
 #include "PPCInterpreter.h"
+#include "Core/Xe_Main.h"
 #include "Core/XCPU/PostBus/PostBus.h"
 
 //
@@ -96,21 +97,18 @@ void PPCInterpreter::PPCInterpreter_slbia(PPU_STATE *ppuState) {
 }
 
 void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
-  X_FORM_L_rB
-
   // The PPU adds two new fields to this instruction, them being LP abd IS.
 
-  bool LP = (curThread.GPR[rB] & 0x1000) >> 12;
-  bool invalSelector =
-      (curThread.GPR[rB] & 0x800) >> 11;
-  u8 p = mmuGetPageSize(ppuState, L, LP);
+  bool LP = (GPRi(rb) & 0x1000) >> 12;
+  bool invalSelector = (GPRi(rb) & 0x800) >> 11;
+  u8 p = mmuGetPageSize(ppuState, _instr.l10, LP);
   u64 VA, VPN = 0;
 
   if (invalSelector == 0) {
     // The TLB is as selective as possible when invalidating TLB entries.The
     // invalidation match criteria is VPN[38:79 - p], L, LP, and LPID.
 
-    VA = curThread.GPR[rB];
+    VA = GPRi(rb);
 
     if (VA > 0x7FFFFFFF) {
       VPN = (VA >> 16) & ~0x7F;
@@ -147,8 +145,7 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
     // Index to one of the 256 rows of the tlb. Possible entire tlb
     // invalidation.
     u8 tlbCongruenceClass = 0;
-    u64 rb_44_51 =
-        (curThread.GPR[rB] & 0xFF000) >> 12;
+    u64 rb_44_51 = (GPRi(rb) & 0xFF000) >> 12;
 
     ppuState->TLB.tlbSet0[rb_44_51].V = false;
     ppuState->TLB.tlbSet0[rb_44_51].VPN = 0;
@@ -325,7 +322,7 @@ void PPCInterpreter::mmuAddTlbEntry(PPU_STATE *ppuState) {
   u16 TI = MMU_GET_TLB_INDEX_TI(tlbIndex);
   u16 TS = MMU_GET_TLB_INDEX_TS(tlbIndex);
 
-  // std::cout << "XCPU[" << ppuState->ppuName << "(Thrd"<< ppuState->currentThread
+  // std::cout << "XCPU[" << ppuState->ppuName << "(Thrd"<< curThreadId
   //     << ")](MMU) : Adding tlb entry : (" << TI * TS << ")" << std::endl;
   // std::cout << " *** RPN:         0x" << RPN << std::endl;
   // std::cout << " *** VPN:         0x" << VPN << std::endl;
@@ -1132,6 +1129,15 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
     u8 a = 0;
   }
 
+  if (EA != 0 && EA == Config::debug.haltOnReadAddress) {
+    Xenon *CPU = Xe_Main->getCPU();
+    PPU *PPU = Xe_Main->getCPU()->GetPPU(ppuState->ppuID);
+    if (PPU->ThreadRunning()) {
+      CPU->Halt();
+    }
+    Config::imgui.debugWindow = true; // Open debugger after halting
+  }
+
   // Exception ocurred?
   if (MMUTranslateAddress(&EA, ppuState, false, speculativeLoad) == false)
     return 0;
@@ -1255,7 +1261,7 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
       break;
     }
 
-    return byteswap<u64>(data);
+    return byteswap_be<u64>(data);
   }
 
   // Integrated Interrupt Controller in real mode, used when the HV wants to
@@ -1280,7 +1286,7 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   // CPU VID Register
   if (socRead && EA == 0x61188) {
     data = 0x382C00000000b001;
-    return byteswap<u64>(data);
+    return byteswap_be<u64>(data);
   }
 
   bool nand = false;
@@ -1315,16 +1321,18 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   }
 
   // External Read
-  sysBus->Read(EA, &data, byteCount);
+  sysBus->Read(EA, (u8*)&data, byteCount);
   return data;
 }
+
+#define TEST_HALT_ADDR 0x69690
 
 // MMU Write Routine, used by the CPU
 void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
                               u64 data, u64 EA, s8 byteCount, bool cacheStore) {
   u64 oldEA = EA;
   if (false) {
-    LOG_INFO(Xenon_MMU, "context, state, data=0x{:08x}, EA=0x{:08x}, byteCount={:d}, cachestore)", data, EA, byteCount);
+    LOG_INFO(Xenon_MMU, "context, state, data=0x{:08x}, EA=0x{:08x}, byteCount={:d}", data, EA, byteCount);
   }
 
   if (MMUTranslateAddress(&EA, ppuState, true) == false)
@@ -1334,9 +1342,17 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
     u8 a = 0;
   }
 
+  if (false) {
+    LOG_INFO(Xenon_MMU, "EA after MMUTranslateAddress: 0x{:08x}", EA);
+  }
+
   bool socWrite = false;
 
   EA = mmuContructEndAddressFromSecEngAddr(EA, &socWrite);
+  
+  if (false) {
+    LOG_INFO(Xenon_MMU, "EA after mmuContructEndAddressFromSecEngAddr: 0x{:08x}", EA);
+  }
 
   // When the xboxkrnl writes to address 0x7FFFxxxx is writing to the IIC
   // so we use that address here to validate its an soc write.
@@ -1350,14 +1366,20 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
     return;
   }
 
+  // Halting in the debugger
+  if (socWrite && EA == TEST_HALT_ADDR) {
+    u64 dataByteswapped = byteswap_be<u64>(data);
+    Xe_Main->getCPU()->Halt(dataByteswapped);
+    return;
+  }
+
   // Time Base register. Writing here starts or stops the RTC apparently.
   if (socWrite && EA == 0x611A0) {
-    if (data == 0) {
+    u64 dataByteswapped = byteswap_be<u64>(data);
+    if (dataByteswapped == 0) {
       intXCPUContext->timeBaseActive = false;
       return;
-    } else if (data == 0xFF01000000000000 ||
-               data == 0x0001000000000000) // 0x1FF byte reversed!
-    {
+    } else if (dataByteswapped == 0x1FF || dataByteswapped == 0x1) {
       intXCPUContext->timeBaseActive = true;
       return;
     }
@@ -1427,9 +1449,14 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   }
 
   // External Write
-  sysBus->Write(EA, data, byteCount);
+  sysBus->Write(EA, (u8*)&data, byteCount);
 
   intXCPUContext->xenonRes.Check(EA);
+
+  if (EA != 0 && EA == Config::debug.haltOnWriteAddress) {
+    Xe_Main->getCPU()->Halt(); // Halt the CPU
+    Config::imgui.debugWindow = true; // Open the debugger after halting
+  }
 }
 
 void PPCInterpreter::MMUMemCpyFromHost(PPU_STATE *ppuState,
@@ -1456,19 +1483,19 @@ u8 PPCInterpreter::MMURead8(PPU_STATE *ppuState, u64 EA, bool speculativeLoad) {
 u16 PPCInterpreter::MMURead16(PPU_STATE *ppuState, u64 EA, bool speculativeLoad) {
   u16 data = 0;
   data = static_cast<u16>(MMURead(intXCPUContext, ppuState, EA, 2, speculativeLoad));
-  return byteswap<u16>(data);
+  return byteswap_be<u16>(data);
 }
 // Reads 4 Bytes of memory.
 u32 PPCInterpreter::MMURead32(PPU_STATE *ppuState, u64 EA, bool speculativeLoad) {
   u32 data = 0;
   data = static_cast<u32>(MMURead(intXCPUContext, ppuState, EA, 4, speculativeLoad));
-  return byteswap<u32>(data);
+  return byteswap_be<u32>(data);
 }
 // Reads 8 Bytes of memory.
 u64 PPCInterpreter::MMURead64(PPU_STATE *ppuState, u64 EA, bool speculativeLoad) {
   u64 data = 0;
   data = MMURead(intXCPUContext, ppuState, EA, 8, speculativeLoad);
-  return byteswap<u64>(data);
+  return byteswap_be<u64>(data);
 }
 // Writes 1 Byte to memory.
 void PPCInterpreter::MMUWrite8(PPU_STATE *ppuState, u64 EA, u8 data) {
@@ -1476,16 +1503,16 @@ void PPCInterpreter::MMUWrite8(PPU_STATE *ppuState, u64 EA, u8 data) {
 }
 // Writes 2 Bytes to memory.
 void PPCInterpreter::MMUWrite16(PPU_STATE *ppuState, u64 EA, u16 data) {
-  u16 dataBS = byteswap<u16>(data);
+  u16 dataBS = byteswap_be<u16>(data);
   MMUWrite(intXCPUContext, ppuState, dataBS, EA, 2);
 }
 // Writes 4 Bytes to memory.
 void PPCInterpreter::MMUWrite32(PPU_STATE *ppuState, u64 EA, u32 data) {
-  u32 dataBS = byteswap<u32>(data);
+  u32 dataBS = byteswap_be<u32>(data);
   MMUWrite(intXCPUContext, ppuState, dataBS, EA, 4);
 }
 // Writes 8 Bytes to memory.
 void PPCInterpreter::MMUWrite64(PPU_STATE *ppuState, u64 EA, u64 data) {
-  u64 dataBS = byteswap<u64>(data);
+  u64 dataBS = byteswap_be<u64>(data);
   MMUWrite(intXCPUContext, ppuState, dataBS, EA, 8);
 }

@@ -2,6 +2,9 @@
 
 #pragma once
 
+#include "Base/Types.h"
+
+#ifndef NO_GFX
 #define GL_GLEXT_PROTOTYPES
 extern "C" {
 #include <KHR/khrplatform.h>
@@ -24,3 +27,4 @@ public:
 };
 
 } // namespace Render
+#endif

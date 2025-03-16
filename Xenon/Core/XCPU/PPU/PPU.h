@@ -11,7 +11,7 @@
 class PPU {
 public:
   PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PVR,
-                  u32 PIR, const char *ppuName);
+                  u32 PIR);
   ~PPU();
 
   // Start execution
@@ -24,7 +24,7 @@ public:
   void Reset();
 
   // Debug tools
-  void Halt();
+  void Halt(u64 haltOn = 0);
   void Continue();
   void Step(int amount = 1);
 
@@ -35,12 +35,15 @@ public:
   PPU_THREAD_REGISTERS *GetPPUThread(u8 thrdID);
 
   // Returns if the PPU is halted
-  bool IsHalted() { return ppcHalt; }
+  bool IsHalted() { return ppuHalt; }
 
   // Sets the clocks per instruction
   void SetCPI(u32 CPI) { clocksPerInstruction = CPI; }
   // Gets the clocks per instruction
   u32 GetCPI() { return clocksPerInstruction; }
+
+  // Checks if the thread is active
+  bool ThreadRunning() { return ppuRunning; }
 
   // Get ppuState
   PPU_STATE *GetPPUState() { return ppuState.get(); }
@@ -62,15 +65,19 @@ private:
   bool ppuElfExecution = false;
 
   // Halt thread
-  bool ppcHalt = false;
+  bool ppuHalt = false;
+  // Halt on startup
+  bool ppuStartHalted = false;
+  // If this is set to a non-zero value, it will halt on that address then clear it
+  u64 ppuHaltOn = 0;
 
   // Should we single step?
-  bool ppcStep = false;
+  bool ppuStep = false;
   // Amount of instructions to step
-  int ppcStepAmount = 1;
+  int ppuStepAmount = 1;
   // How many times we have stepped since activating it
   // Counter ticks up until step amount is reached
-  int ppcStepCounter = 0;
+  int ppuStepCounter = 0;
 
   // Reset ocurred or signaled?
   bool systemReset = false;

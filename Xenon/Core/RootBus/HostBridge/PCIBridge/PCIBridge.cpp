@@ -174,55 +174,55 @@ void PCIBridge::addPCIDevice(PCIDevice *device) {
   connectedPCIDevices.push_back(device);
 }
 
-bool PCIBridge::Read(u64 readAddress, u64 *data, u8 byteCount) {
+bool PCIBridge::Read(u64 readAddress, u8* data, u8 byteCount) {
   // Reading to our own space?
   if (readAddress >= PCI_BRIDGE_BASE_ADDRESS &&
       readAddress <= PCI_BRIDGE_BASE_END_ADDRESS) {
     switch (readAddress) {
     case 0xEA000000:
-      *data = pciBridgeState.REG_EA000000;
+      *reinterpret_cast<u64*>(data) = pciBridgeState.REG_EA000000;
       break;
     case 0xEA000004:
-      *data = pciBridgeState.REG_EA000004;
+      *reinterpret_cast<u64*>(data) = pciBridgeState.REG_EA000004;
       break;
     case 0xEA00000C:
-      *data = pciBridgeState.REG_EA00000C;
+      *reinterpret_cast<u64*>(data) = pciBridgeState.REG_EA00000C;
       break;
     case 0xEA000010:
-      *data = pciBridgeState.PRIO_REG_CLCK.hexData;
+      *reinterpret_cast<u64*>(data) = pciBridgeState.PRIO_REG_CLCK.hexData;
       break;
     case 0xEA000014:
-      *data = pciBridgeState.PRIO_REG_ODD.hexData;
+      *reinterpret_cast<u64*>(data) = pciBridgeState.PRIO_REG_ODD.hexData;
       break;
     case 0xEA000018:
-      *data = pciBridgeState.PRIO_REG_HDD.hexData;
+      *reinterpret_cast<u64*>(data) = pciBridgeState.PRIO_REG_HDD.hexData;
       break;
     case 0xEA00001C:
-      *data = pciBridgeState.PRIO_REG_SMM.hexData;
+      *reinterpret_cast<u64*>(data) = pciBridgeState.PRIO_REG_SMM.hexData;
       break;
     case 0xEA000020:
-      *data = pciBridgeState.PRIO_REG_OHCI0.hexData;
+      *reinterpret_cast<u64*>(data) = pciBridgeState.PRIO_REG_OHCI0.hexData;
       break;
     case 0xEA000024:
-      *data = pciBridgeState.PRIO_REG_OHCI1.hexData;
+      *reinterpret_cast<u64*>(data) = pciBridgeState.PRIO_REG_OHCI1.hexData;
       break;
     case 0xEA000028:
-      *data = pciBridgeState.PRIO_REG_EHCI0.hexData;
+      *reinterpret_cast<u64*>(data) = pciBridgeState.PRIO_REG_EHCI0.hexData;
       break;
     case 0xEA00002C:
-      *data = pciBridgeState.PRIO_REG_EHCI1.hexData;
+      *reinterpret_cast<u64*>(data) = pciBridgeState.PRIO_REG_EHCI1.hexData;
       break;
     case 0xEA000038:
-      *data = pciBridgeState.PRIO_REG_ENET.hexData;
+      *reinterpret_cast<u64*>(data) = pciBridgeState.PRIO_REG_ENET.hexData;
       break;
     case 0xEA00003C:
-      *data = pciBridgeState.PRIO_REG_XMA.hexData;
+      *reinterpret_cast<u64*>(data) = pciBridgeState.PRIO_REG_XMA.hexData;
       break;
     case 0xEA000040:
-      *data = pciBridgeState.PRIO_REG_AUDIO.hexData;
+      *reinterpret_cast<u64*>(data) = pciBridgeState.PRIO_REG_AUDIO.hexData;
       break;
     case 0xEA000044:
-      *data = pciBridgeState.PRIO_REG_SFCX.hexData;
+      *reinterpret_cast<u64*>(data) = pciBridgeState.PRIO_REG_SFCX.hexData;
       break;
     default:
       LOG_ERROR(PCIBridge, "Unknown reg being read: {:#x}", readAddress);
@@ -239,115 +239,115 @@ bool PCIBridge::Read(u64 readAddress, u64 *data, u8 byteCount) {
       return true;
     }
   }
-  *data = 0xFFFFFFFFFFFFFFFF;
+  *reinterpret_cast<u64*>(data) = 0xFFFFFFFFFFFFFFFF;
   return false;
 }
 
-bool PCIBridge::Write(u64 writeAddress, u64 data, u8 byteCount) {
-  bool enabled = (data & 0x00800000) >> 20;
-  bool latched = (data & 0x00200000) >> 20;
-  u8 targetCPU = (data & 0x00003F00) >> 8;
-  u8 cpuIRQ = (data & 0x0000003F) << 2;
+bool PCIBridge::Write(u64 writeAddress, u8 *data, u8 byteCount) {
+  bool enabled = (*reinterpret_cast<u64*>(data) & 0x00800000) >> 20;
+  bool latched = (*reinterpret_cast<u64*>(data) & 0x00200000) >> 20;
+  u8 targetCPU = (*reinterpret_cast<u64*>(data) & 0x00003F00) >> 8;
+  u8 cpuIRQ = (*reinterpret_cast<u64*>(data) & 0x0000003F) << 2;
 
   // Writing to our own space?
   if (writeAddress >= PCI_BRIDGE_BASE_ADDRESS &&
       writeAddress <= PCI_BRIDGE_BASE_END_ADDRESS) {
     switch (writeAddress) {
     case 0xEA000000:
-      pciBridgeState.REG_EA000000 = static_cast<u32>(data);
+      pciBridgeState.REG_EA000000 = *reinterpret_cast<u32*>(data);
       break;
     case 0xEA000004:
-      pciBridgeState.REG_EA000004 = static_cast<u32>(data);
+      pciBridgeState.REG_EA000004 = *reinterpret_cast<u32*>(data);
       break;
     case 0xEA00000C:
-      pciBridgeState.REG_EA00000C = static_cast<u32>(data);
+      pciBridgeState.REG_EA00000C = *reinterpret_cast<u32*>(data);
       break;
     case 0xEA000010: // PRIO_CLOCK
-      pciBridgeState.PRIO_REG_CLCK.hexData = static_cast<u32>(data);
+      pciBridgeState.PRIO_REG_CLCK.hexData = *reinterpret_cast<u32*>(data);
       pciBridgeState.PRIO_REG_CLCK.intEnabled = enabled;
       pciBridgeState.PRIO_REG_CLCK.latched = latched;
       pciBridgeState.PRIO_REG_CLCK.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_CLCK.cpuIRQ = cpuIRQ;
       break;    
     case 0xEA000014: // PRIO_SATA_ODD
-      pciBridgeState.PRIO_REG_ODD.hexData = static_cast<u32>(data);
+      pciBridgeState.PRIO_REG_ODD.hexData = *reinterpret_cast<u32*>(data);
       pciBridgeState.PRIO_REG_ODD.intEnabled = enabled;
       pciBridgeState.PRIO_REG_ODD.latched = latched;
       pciBridgeState.PRIO_REG_ODD.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_ODD.cpuIRQ = cpuIRQ;
       break;    
     case 0xEA000018: // PRIO_SATA_HDD
-      pciBridgeState.PRIO_REG_HDD.hexData = static_cast<u32>(data);
+      pciBridgeState.PRIO_REG_HDD.hexData = *reinterpret_cast<u32*>(data);
       pciBridgeState.PRIO_REG_HDD.intEnabled = enabled;
       pciBridgeState.PRIO_REG_HDD.latched = latched;
       pciBridgeState.PRIO_REG_HDD.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_HDD.cpuIRQ = cpuIRQ;
       break;
     case 0xEA00001C: // PRIO_SMM
-      pciBridgeState.PRIO_REG_SMM.hexData = static_cast<u32>(data);
+      pciBridgeState.PRIO_REG_SMM.hexData = *reinterpret_cast<u32*>(data);
       pciBridgeState.PRIO_REG_SMM.intEnabled = enabled;
       pciBridgeState.PRIO_REG_SMM.latched = latched;
       pciBridgeState.PRIO_REG_SMM.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_SMM.cpuIRQ = cpuIRQ;
       break;    
     case 0xEA000020: // PRIO_OHCI0
-      pciBridgeState.PRIO_REG_OHCI0.hexData = static_cast<u32>(data);
+      pciBridgeState.PRIO_REG_OHCI0.hexData = *reinterpret_cast<u32*>(data);
       pciBridgeState.PRIO_REG_OHCI0.intEnabled = enabled;
       pciBridgeState.PRIO_REG_OHCI0.latched = latched;
       pciBridgeState.PRIO_REG_OHCI0.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_OHCI0.cpuIRQ = cpuIRQ;
       break;    
     case 0xEA000024: // PRIO_OHCI1
-      pciBridgeState.PRIO_REG_OHCI1.hexData = static_cast<u32>(data);
+      pciBridgeState.PRIO_REG_OHCI1.hexData = *reinterpret_cast<u32*>(data);
       pciBridgeState.PRIO_REG_OHCI1.intEnabled = enabled;
       pciBridgeState.PRIO_REG_OHCI1.latched = latched;
       pciBridgeState.PRIO_REG_OHCI1.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_OHCI1.cpuIRQ = cpuIRQ;
       break;    
     case 0xEA000028: // PRIO_EHCI0
-      pciBridgeState.PRIO_REG_EHCI0.hexData = static_cast<u32>(data);
+      pciBridgeState.PRIO_REG_EHCI0.hexData = *reinterpret_cast<u32*>(data);
       pciBridgeState.PRIO_REG_EHCI0.intEnabled = enabled;
       pciBridgeState.PRIO_REG_EHCI0.latched = latched;
       pciBridgeState.PRIO_REG_EHCI0.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_EHCI0.cpuIRQ = cpuIRQ;
       break;    
     case 0xEA00002C: // PRIO_EHCI1
-      pciBridgeState.PRIO_REG_EHCI1.hexData = static_cast<u32>(data);
+      pciBridgeState.PRIO_REG_EHCI1.hexData = *reinterpret_cast<u32*>(data);
       pciBridgeState.PRIO_REG_EHCI1.intEnabled = enabled;
       pciBridgeState.PRIO_REG_EHCI1.latched = latched;
       pciBridgeState.PRIO_REG_EHCI1.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_EHCI1.cpuIRQ = cpuIRQ;
       break;    
     case 0xEA000038: // PRIO_ENET
-      pciBridgeState.PRIO_REG_ENET.hexData = static_cast<u32>(data);
+      pciBridgeState.PRIO_REG_ENET.hexData = *reinterpret_cast<u32*>(data);
       pciBridgeState.PRIO_REG_ENET.intEnabled = enabled;
       pciBridgeState.PRIO_REG_ENET.latched = latched;
       pciBridgeState.PRIO_REG_ENET.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_ENET.cpuIRQ = cpuIRQ;
       break;    
     case 0xEA00003C: // PRIO_XMA
-      pciBridgeState.PRIO_REG_XMA.hexData = static_cast<u32>(data);
+      pciBridgeState.PRIO_REG_XMA.hexData = *reinterpret_cast<u32*>(data);
       pciBridgeState.PRIO_REG_XMA.intEnabled = enabled;
       pciBridgeState.PRIO_REG_XMA.latched = latched;
       pciBridgeState.PRIO_REG_XMA.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_XMA.cpuIRQ = cpuIRQ;
       break;    
     case 0xEA000040: // PRIO_AUDIO
-      pciBridgeState.PRIO_REG_AUDIO.hexData = static_cast<u32>(data);
+      pciBridgeState.PRIO_REG_AUDIO.hexData = *reinterpret_cast<u32*>(data);
       pciBridgeState.PRIO_REG_AUDIO.intEnabled = enabled;
       pciBridgeState.PRIO_REG_AUDIO.latched = latched;
       pciBridgeState.PRIO_REG_AUDIO.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_AUDIO.cpuIRQ = cpuIRQ;
       break;
     case 0xEA000044: // PRIO_SFCX Secure Flash Controller for Xbox Int.
-      pciBridgeState.PRIO_REG_SFCX.hexData = static_cast<u32>(data);
+      pciBridgeState.PRIO_REG_SFCX.hexData = *reinterpret_cast<u32*>(data);
       pciBridgeState.PRIO_REG_SFCX.intEnabled = enabled;
       pciBridgeState.PRIO_REG_SFCX.latched = latched;
       pciBridgeState.PRIO_REG_SFCX.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_SFCX.cpuIRQ = cpuIRQ;
       break;
     default:
-      LOG_ERROR(PCIBridge, "Unknown reg being written: {:#x}, {:#x}", writeAddress, data);
+      LOG_ERROR(PCIBridge, "Unknown reg being written: {:#x}, {:#x}", writeAddress, *reinterpret_cast<u64*>(data));
       break;
     }
     return true;
@@ -364,7 +364,7 @@ bool PCIBridge::Write(u64 writeAddress, u64 data, u8 byteCount) {
   return false;
 }
 
-void PCIBridge::ConfigRead(u64 readAddress, u64 *data, u8 byteCount) {
+void PCIBridge::ConfigRead(u64 readAddress, u8 *data, u8 byteCount) {
   PCIE_CONFIG_ADDR configAddr = {};
   configAddr.hexData = static_cast<u32>(readAddress);
 
@@ -432,16 +432,16 @@ void PCIBridge::ConfigRead(u64 readAddress, u64 *data, u8 byteCount) {
     }
   }
   LOG_ERROR(PCIBridge, "Read to unimplemented device: {}", currentDevName.c_str());
-  *data = 0xFFFFFFFFFFFFFFFF;
+  *reinterpret_cast<u64*>(data) = 0xFFFFFFFFFFFFFFFF;
 }
 
-void PCIBridge::ConfigWrite(u64 writeAddress, u64 data, u8 byteCount) {
+void PCIBridge::ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount) {
   PCIE_CONFIG_ADDR configAddr = {};
   configAddr.hexData = static_cast<u32>(writeAddress);
 
   if (configAddr.busNum == 0 && configAddr.devNum == 0) {
     // Writing to our own config space!
-    memcpy(&pciBridgeConfig.data[configAddr.regOffset], &data, byteCount);
+    memcpy(&pciBridgeConfig.data[configAddr.regOffset], data, byteCount);
     return;
   }
 
@@ -489,7 +489,7 @@ void PCIBridge::ConfigWrite(u64 writeAddress, u64 data, u8 byteCount) {
     break;
   default:
     LOG_ERROR(PCIBridge, "Config Space Write: Unknown device accessed: Dev {:#x} Func {:#x}"
-        "Reg {:#x} data = {:#x}", configAddr.devNum, configAddr.functNum, configAddr.regOffset, data);
+        "Reg {:#x} data = {:#x}", configAddr.devNum, configAddr.functNum, configAddr.regOffset, *reinterpret_cast<u64*>(data));
     return;
     break;
   }
@@ -497,10 +497,10 @@ void PCIBridge::ConfigWrite(u64 writeAddress, u64 data, u8 byteCount) {
   for (auto &device : connectedPCIDevices) {
     if (device->GetDeviceName() == currentDevName) {
       // Hit!
-      LOG_TRACE(PCIBridge, "Config write, device: {}, offset = {:#x} data = {:#x}", currentDevName.c_str(), configAddr.regOffset, data);
+      LOG_TRACE(PCIBridge, "Config write, device: {}, offset = {:#x} data = {:#x}", currentDevName.c_str(), configAddr.regOffset, *reinterpret_cast<u64*>(data));
       device->ConfigWrite(writeAddress, data, byteCount);
       return;
     }
   }
-  LOG_ERROR(PCIBridge, "Write to unimplemented device: {} data = {:#x}", currentDevName.c_str(), data);
+  LOG_ERROR(PCIBridge, "Write to unimplemented device: {} data = {:#x}", currentDevName.c_str(), *reinterpret_cast<u64*>(data));
 }

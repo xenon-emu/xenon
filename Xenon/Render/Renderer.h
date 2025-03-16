@@ -6,6 +6,9 @@
 #include <vector>
 #include <fstream>
 
+#include "Base/Types.h"
+
+#ifndef NO_GFX
 #include <SDL3/SDL.h>
 
 #define GL_GLEXT_PROTOTYPES
@@ -18,7 +21,6 @@ extern "C" {
 #include <backends/imgui_impl_opengl3.h>
 #include <backends/imgui_impl_sdl3.h>
 
-#include "Base/Types.h"
 #include "Core/RAM/RAM.h"
 #include "Core/RootBus/HostBridge/PCIe.h"
 #include "Render/Abstractions/Texture.h"
@@ -41,10 +43,10 @@ public:
 
   void Thread();
 
+  // Debugger Pointers (RAM, and FrameBuffer)
   RAM *ramPointer{};
   u8 *fbPointer{};
 
-  // Vali0004: This may need to be in XGPU
   // Initial Internal rendering width/height.
   u32 internalWidth = 1280;
   u32 internalHeight = 720;
@@ -61,7 +63,8 @@ public:
   bool imguiRender = false;
   // Thread Running
   bool threadRunning = true;
-
+  
+  // FB Pitch
   int pitch = 0;
 private:
   // Thread handle
@@ -178,3 +181,5 @@ void main() {
 )";
 
 } // namespace Render
+
+#endif

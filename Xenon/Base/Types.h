@@ -16,6 +16,17 @@
 #define SYSTEM_PAUSE() printf("Press Enter to continue..."); (void)getchar()
 #endif
 
+// Compile time macros to get endianess
+#ifdef _MSC_VER
+#define __LITTLE_ENDIAN__ 1
+#else
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+#define __LITTLE_ENDIAN__ 1
+#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+#define __BIG_ENDIAN__ 1
+#endif
+#endif
+
 // Signed
 using s8 = signed char;
 using s16 = short;
@@ -45,11 +56,22 @@ using f64 = double;
   return 1024_MB * x;
 }
 
-// Byteswap
+// Byteswap to BE
 template <class T>
   requires std::is_integral_v<T>
-[[nodiscard]] constexpr T byteswap(T value) noexcept {
+[[nodiscard]] constexpr T byteswap_be(T value) noexcept {
   if constexpr (std::endian::native == std::endian::little) {
+    return std::byteswap<T>(value);
+  }
+
+  return value;
+}
+
+// Byteswap to LE
+template <class T>
+  requires std::is_integral_v<T>
+[[nodiscard]] constexpr T byteswap_le(T value) noexcept {
+  if constexpr (std::endian::native == std::endian::big) {
     return std::byteswap<T>(value);
   }
 

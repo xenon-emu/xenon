@@ -138,29 +138,46 @@ private:
 
 union inquiryDataByte0 {
   u8 dataHex;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u8 peripheralDevType : 5;
     u8 peripheralQualifier : 3;
   };
+#else
+  struct {
+    u8 peripheralQualifier : 3;
+    u8 peripheralDevType : 5;
+  };
+#endif
 };
 union inquiryDataByte1 {
   u8 dataHex;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u8 res : 7;
     u8 rmb : 1;
   };
+#else
+  struct {
+    u8 rmb : 1;
+    u8 res : 7;
+  };
+#endif
 };
 union inquiryDataByte3 {
   u8 dataHex;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u8 responseDataFormat : 4;
     u8 hisup : 1;
     u8 normaca : 1;
     u8 obs : 2;
   };
+#endif
 };
 union inquiryDataByte5 {
   u8 dataHex;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u8 protect : 1;
     u8 res : 2;
@@ -169,9 +186,20 @@ union inquiryDataByte5 {
     u8 acc : 1;
     u8 sccs : 1;
   };
+#else
+  struct {
+    u8 sccs : 1;
+    u8 acc : 1;
+    u8 tpgs : 2;
+    u8 threePc : 1;
+    u8 res : 2;
+    u8 protect : 1;
+  };
+#endif
 };
 union inquiryDataByte6 {
   u8 dataHex;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u8 re0 : 1;
     u8 obs0 : 3;
@@ -180,9 +208,20 @@ union inquiryDataByte6 {
     u8 encserv : 1;
     u8 ob1 : 1;
   };
+#else
+  struct {
+    u8 ob1 : 1;
+    u8 encserv : 1;
+    u8 vs : 1;
+    u8 multip : 1;
+    u8 obs0 : 3;
+    u8 re0 : 1;
+  };
+#endif
 };
 union inquiryDataByte7 {
   u8 dataHex;
+#ifdef __LITTLE_ENDIAN__
   struct {
     u8 vs : 1;
     u8 cmdque : 1;
@@ -190,6 +229,15 @@ union inquiryDataByte7 {
     u8 res : 2;
     u8 obs1 : 2;
   };
+#else
+  struct {
+    u8 obs1 : 2;
+    u8 res : 2;
+    u8 obs0 : 2;
+    u8 cmdque : 1;
+    u8 vs : 1;
+  };
+#endif
 };
 
 // XeLL only reads the first 36 bytes.
@@ -217,6 +265,7 @@ union XE_CDB {
   // Generic 6-Byte CDB
   //
 
+#ifdef __LITTLE_ENDIAN__
   struct _CDB6GENERIC {
     u8 OperationCode;
     u8 Immediate : 1;
@@ -228,11 +277,24 @@ union XE_CDB {
     u8 Reserved : 4;
     u8 VendorUnique : 2;
   } CDB6GENERIC, *PCDB6GENERIC;
-
+#else
+  struct _CDB6GENERIC {
+    u8 VendorUnique : 2;
+    u8 Reserved : 4;
+    u8 Flag : 1;
+    u8 Link : 1;
+    u8 CommandUniqueBytes[3];
+    u8 LogicalUnitNumber : 3;
+    u8 CommandUniqueBits : 4;
+    u8 Immediate : 1;
+    u8 OperationCode;
+  } CDB6GENERIC, *PCDB6GENERIC;
+#endif
   //
   // Standard 10-byte CDB
   //
 
+#ifdef __LITTLE_ENDIAN__
   struct _CDB10 {
     u8 OperationCode;
     u8 RelativeAddress : 1;
@@ -259,11 +321,40 @@ union XE_CDB {
     };
     u8 Control;
   } CDB10, *PCDB10;
+#else
+  struct _CDB10 {
+    u8 Control;
+    union {
+      struct {
+        u8 TransferBlocksMsb;
+        u8 TransferBlocksLsb;
+      };
+      u16 TransferBlocks;
+    };
+    u8 Reserved2;
+    union {
+      struct {
+        u8 LogicalBlockByte0;
+        u8 LogicalBlockByte1;
+        u8 LogicalBlockByte2;
+        u8 LogicalBlockByte3;
+      };
+      u32 LogicalBlock;
+    };
+    u8 LogicalUnitNumber : 3;
+    u8 DisablePageOut : 1;
+    u8 ForceUnitAccess : 1;
+    u8 Reserved1 : 2;
+    u8 RelativeAddress : 1;
+    u8 OperationCode;
+  } CDB10, *PCDB10;
+#endif
 
   //
   // Standard 12-byte CDB
   //
 
+#ifdef __LITTLE_ENDIAN__
   struct _CDB12 {
     u8 OperationCode;
     u8 RelativeAddress : 1;
@@ -276,6 +367,20 @@ union XE_CDB {
     u8 Reserved2;
     u8 Control;
   } CDB12, *PCDB12;
+#else
+  struct _CDB12 {
+    u8 Control;
+    u8 Reserved2;
+    u8 TransferLength[4]; // [0]=MSB, [3]=LSB
+    u8 LogicalBlock[4];   // [0]=MSB, [3]=LSB
+    u8 LogicalUnitNumber : 3;
+    u8 DisablePageOut : 1;
+    u8 ForceUnitAccess : 1;
+    u8 Reserved1 : 2;
+    u8 RelativeAddress : 1;
+    u8 OperationCode;
+  } CDB12, *PCDB12;
+#endif
 
   u32 AsUlong[4];
   u8 AsByte[16];
@@ -378,10 +483,10 @@ public:
   ODD(const char* deviceName, u64 size,
     PCIBridge *parentPCIBridge, RAM *ram);
 
-  void Read(u64 readAddress, u64 *data, u8 u8Count) override;
-  void ConfigRead(u64 readAddress, u64 *data, u8 u8Count) override;
-  void Write(u64 writeAddress, u64 data, u8 u8Count) override;
-  void ConfigWrite(u64 writeAddress, u64 data, u8 u8Count) override;
+  void Read(u64 readAddress, u8 *data, u8 u8Count) override;
+  void ConfigRead(u64 readAddress, u8 *data, u8 u8Count) override;
+  void Write(u64 writeAddress, u8 *data, u8 u8Count) override;
+  void ConfigWrite(u64 writeAddress, u8 *data, u8 u8Count) override;
 
 private:
   // PCI Bridge pointer. Used for Interrupts.

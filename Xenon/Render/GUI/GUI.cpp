@@ -1,9 +1,10 @@
 // Copyright 2025 Xenon Emulator Project
 
+#include "GUI.h"
+
+#ifndef NO_GFX
 #include "Core/Xe_Main.h"
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
-
-#include "GUI.h"
 
 // Helper functions for text/string formatting with the gui
 #define TextFmt(x, ...) Text(fmt::format(x, __VA_ARGS__))
@@ -30,7 +31,7 @@ void Render::GUI::Init(SDL_Window* window, void* context) {
   // We don't want to create a ini because it stores positions.
   // Because we initialize with a 1280x720 window, then resize to whatever,
   // this will break the window positions, causing them to render off screen
-  const std::string iniPath = Config::imguiIniPath();
+  const std::string iniPath = Config::imgui.configPath;
   io.IniFilename = iniPath.compare("none") ? iniPath.data() : nullptr;
   // Enable ImGui Keyboard Navigation
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
@@ -38,7 +39,7 @@ void Render::GUI::Init(SDL_Window* window, void* context) {
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
   // Enable Docking
   io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-  if (viewports) {
+  if (Config::imgui.viewports) {
     // Enable Viewport (Allows for no window background)
     io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
   }
@@ -57,7 +58,7 @@ void Render::GUI::PostInit() {
   const std::string robotoRegular = (fontsPath / "Roboto-Regular.ttf").string();
   robotRegular14 = io.Fonts->AddFontFromFileTTF(robotoRegular.c_str(), 14.f);
   defaultFont13 = io.Fonts->AddFontDefault();
-  if (Config::SKIP_HW_INIT_1 == 0x3003DC0 && Config::SKIP_HW_INIT_2 == 0x3003E54) {
+  if (Config::xcpu.HW_INIT_SKIP_1 == 0x3003DC0 && Config::xcpu.HW_INIT_SKIP_2 == 0x3003E54) {
     storedPreviousInitSkips = true; // If we already have RGH2, ignore
     RGH2 = true;
   }
@@ -557,6 +558,12 @@ void PPCDebugger(Render::GUI *gui) {
           gui->MenuItem("Pause", [&gui] {
             Xe_Main->getCPU()->Halt();
           });
+          gui->MenuItem("Exit (Soft)", [] {
+            Xe_Main->shutdown();
+          });
+          gui->MenuItem("Exit (Force)", [] {
+            exit(0);
+          });
         } else {
           gui->MenuItem("Continue", [&gui] {
             Xe_Main->getCPU()->Continue();
@@ -578,65 +585,79 @@ void PPCDebugger(Render::GUI *gui) {
   ImGui::PopStyleVar(4);
 }
 
-void GeneralSettings(Render::GUI *gui) {
-  static int logLevel = static_cast<int>(Config::getCurrentLogLevel());
-  gui->Toggle("Exit on window close", &Config::shouldQuitOnWindowClosure);
-  gui->Toggle("Advanced log", &Config::islogAdvanced);
+void LogSettings(Render::GUI *gui) {
+  static int logLevel = static_cast<int>(Config::log.currentLevel);
+  gui->Toggle("Advanced", &Config::log.advanced);
 }
 
 void GraphicsSettings(Render::GUI *gui) {
-  gui->Toggle("Enabled", &Config::gpuRenderThreadEnabled);
-  gui->Toggle("Fullscreen", &Config::isFullscreen, [&] {
-    Xe_Main->renderer->fullscreen = Config::isFullscreen;
+  gui->Toggle("Enable", &Config::rendering.enable);
+  gui->Tooltip("Enable GPU Rendering thread (Disabling this will kill rendering on next startup)");
+  gui->Toggle("Enable GUI", &Config::rendering.enableGui);
+  gui->Tooltip("Whether to create the GUI handle");
+  gui->Toggle("Fullscreen", &Config::rendering.isFullscreen, [&] {
+    Xe_Main->renderer->fullscreen = Config::rendering.isFullscreen;
     SDL_SetWindowFullscreen(gui->mainWindow, Xe_Main->renderer->fullscreen);
   });
-  gui->Toggle("VSync", &Config::vsyncEnabled, [&] {
-    Xe_Main->renderer->VSYNC = Config::vsyncEnabled;
+  gui->Toggle("VSync", &Config::rendering.vsync, [&] {
+    Xe_Main->renderer->VSYNC = Config::rendering.vsync;
     SDL_GL_SetSwapInterval(Xe_Main->renderer->VSYNC ? 1 : 0);
   });
+  gui->Toggle("Exit on window close", &Config::rendering.quitOnWindowClosure);
 }
 
 void CodeflowSettings(Render::GUI *gui) {
   gui->Toggle("RGH2 Init Skip", &RGH2, [] {
     if (!storedPreviousInitSkips && !RGH2) {
-      initSkip1 = Config::SKIP_HW_INIT_1;
-      initSkip2 = Config::SKIP_HW_INIT_2;
+      initSkip1 = Config::xcpu.HW_INIT_SKIP_1;
+      initSkip2 = Config::xcpu.HW_INIT_SKIP_2;
       storedPreviousInitSkips = true;
     }
-    Config::SKIP_HW_INIT_1 = RGH2 ? 0x3003DC0 : initSkip1;
-    Config::SKIP_HW_INIT_2 = RGH2 ? 0x3003E54 : initSkip2;
+    Config::xcpu.HW_INIT_SKIP_1 = RGH2 ? 0x3003DC0 : initSkip1;
+    Config::xcpu.HW_INIT_SKIP_2 = RGH2 ? 0x3003E54 : initSkip2;
   });
-  gui->Toggle("Load Elf", &Config::elfLoader);
+  gui->Toggle("Load Elf", &Config::highlyExperimental.elfLoader);
 }
 
 void PathSettings(Render::GUI *gui) {
-  Config::fusesTxtPath = gui->InputText("Fuses", Config::fusesTxtPath);
-  Config::oneBlBinPath = gui->InputText("1bl", Config::oneBlBinPath);
-  Config::nandBinPath = gui->InputText("NAND", Config::nandBinPath);
-  Config::elfBinaryPath = gui->InputText("ELF Binary", Config::elfBinaryPath);
-  Config::oddDiscImagePath = gui->InputText("ODD Image File (iso)", Config::oddDiscImagePath);
+  Config::filepaths.fuses = gui->InputText("Fuses", Config::filepaths.fuses);
+  Config::filepaths.oneBl = gui->InputText("1bl", Config::filepaths.oneBl);
+  Config::filepaths.nand = gui->InputText("NAND", Config::filepaths.nand);
+  Config::filepaths.elfBinary = gui->InputText("ELF Binary", Config::filepaths.elfBinary);
+  Config::filepaths.oddImage = gui->InputText("ODD Image File (iso)", Config::filepaths.oddImage);
 }
 
 void ImGuiSettings(Render::GUI *gui) {
   gui->Toggle("Style Editor", &gui->styleEditor);
   gui->Toggle("Demo", &gui->demoWindow);
-  gui->Toggle("Viewports", &gui->viewports, [&] {
+  gui->Toggle("Viewports", &Config::imgui.viewports, [&] {
     ImGuiIO& io = ImGui::GetIO();
-    if (gui->viewports)
+    if (Config::imgui.viewports)
       io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     else
       io.ConfigFlags &= ~(ImGuiConfigFlags_ViewportsEnable);
   });
   gui->Tooltip("Allows ImGui windows to be 'detached' from the main window. Useful for debugging");
+  Config::imgui.configPath = gui->InputText("Config path", Config::imgui.configPath);
+  gui->Tooltip("Where imgui.ini is present (none is disabled)");
+}
+
+void ConfigSettings(Render::GUI *gui) {
+  gui->Button("Save", [] {
+    Xe_Main->saveConfig();
+  });
+  gui->Button("Load", [] {
+    Xe_Main->loadConfig();
+  });
 }
 
 void Render::GUI::OnSwap(Texture *texture) {
   if (ppcDebuggerActive && !ppcDebuggerAttached) {
     Window("PPC Debugger", [this] {
       PPCDebugger(this);
-    }, { 1200.f, 700.f }, ImGuiWindowFlags_NoCollapse, &ppcDebuggerActive, { 500.f, 100.f });
+    }, { 1200.f, 700.f }, ImGuiWindowFlags_None, &ppcDebuggerActive, { 500.f, 100.f });
   }
-  if (Config::imguiDebug()) {
+  if (Config::imgui.debugWindow) {
     Window("Debug", [&] {
       TabBar("##main", [&] {
         TabItem("Debug", [&] {
@@ -649,13 +670,24 @@ void Render::GUI::OnSwap(Texture *texture) {
             PPCDebugger(this);
           }
         });
+        TabItem("Dump", [&] {
+          Button("Dump FB", [&] {
+            const auto UserDir = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
+            Xe_Main->xenos->DumpFB(UserDir / "fbmem.bin", Xe_Main->renderer->pitch);
+          });
+        });
         TabItem("Settings", [&] {
           TabBar("##settings", [&] {
             TabItem("General", [&] {
-              Button("Force exit", [] {
+              Button("Soft exit", [] {
                 Xe_Main->shutdown();
               });
-              GeneralSettings(this);
+              Button("Force exit", [] {
+                exit(0);
+              });
+            });
+            TabItem("Log", [&] {
+              LogSettings(this);
             });
             TabItem("Codeflow", [&] {
               CodeflowSettings(this);
@@ -669,10 +701,13 @@ void Render::GUI::OnSwap(Texture *texture) {
             TabItem("ImGui", [&] {
               ImGuiSettings(this);
             });
+            TabItem("Config", [&] {
+              ConfigSettings(this);
+            });
           });
         });
       });
-    }, { 1200.f, 700.f }, ImGuiWindowFlags_NoCollapse, &Config::imguiDebugWindow, { 1000.f, 400.f });
+    }, { 1200.f, 700.f }, ImGuiWindowFlags_None, &Config::imgui.debugWindow, { 1000.f, 400.f });
   }
 }
 
@@ -782,3 +817,4 @@ void Render::GUI::SetStyle() {
     style.Colors[ImGuiCol_WindowBg].w = 1.0f;
   }
 }
+#endif
