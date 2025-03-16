@@ -36,7 +36,7 @@ struct _resolution {
       { "Width", width },
       { "Height", height }
     };
-    _map = toml::find_or<std::map<std::string, double>>(value, key.c_str(), _map);
+    _map = toml::find_or<std::map<std::string, double>&>(value, key.c_str(), _map);
     width = _map["Width"];
     height = _map["Height"];
   }
