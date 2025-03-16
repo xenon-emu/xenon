@@ -105,10 +105,6 @@ u64 mmuContructEndAddressFromSecEngAddr(u64 inputAddress, bool *socAccess);
 
 // Main R/W Routines.
 
-/*void MMURead(XENON_CONTEXT* cpuContext, PPU_STATE* ppuState,
-             u64 EA, u8 *data, u64 byteCount, bool speculativeLoad = false);
-void MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
-             u64 EA, const u8 *data, u64 byteCount, bool cacheStore = false);*/
 u64 MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
                             u64 EA, s8 byteCount, bool speculativeLoad = false);
 void MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,

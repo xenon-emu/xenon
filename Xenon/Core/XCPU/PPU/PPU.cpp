@@ -516,6 +516,7 @@ bool PPU::ppuReadNextInstruction() {
   curThread.iFetch = true;
   // Fetch the instruction from memory
   _instr.opcode = PPCInterpreter::MMURead32(ppuState.get(), curThread.CIA);
+#ifdef __LITTLE_ENDIAN__
   u8 first_byte = (_instr.opcode >> 24) & 0xFF;
   u8 last_byte = (_instr.opcode >> 0) & 0xFF;
   if (_instr.opcode == 0xFFFFFFFF || (first_byte == 0x00 && last_byte != 0x00)) {
@@ -524,6 +525,7 @@ bool PPU::ppuReadNextInstruction() {
     Config::imgui.debugWindow = true; // Open the debugger on bad fault
     return false;
   }
+#endif
   if (_ex & PPU_EX_INSSTOR || _ex & PPU_EX_INSTSEGM) {
     return false;
   }
