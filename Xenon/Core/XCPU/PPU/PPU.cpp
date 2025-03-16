@@ -357,8 +357,9 @@ void PPU::Thread() {
       curThread.SPR.SRR1 = 0x200000; // Set SRR1 42-44 = 100
       // ACK and EOI the interrupt:
       u64 intData = 0;
-      xenonContext->xenonIIC.readInterrupt(curThread.SPR.PIR * 0x1000 + 0x50050, &intData);
-      xenonContext->xenonIIC.writeInterrupt(curThread.SPR.PIR * 0x1000 + 0x50060, 0);
+      xenonContext->xenonIIC.readInterrupt(curThread.SPR.PIR * 0x1000 + 0x50050, reinterpret_cast<u8*>(&intData), sizeof(intData));
+      u64 data = 0;
+      xenonContext->xenonIIC.writeInterrupt(curThread.SPR.PIR * 0x1000 + 0x50060, reinterpret_cast<const u8*>(&data), sizeof(data));
     }
   }
 }

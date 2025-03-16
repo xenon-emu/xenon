@@ -20,8 +20,7 @@ void PPCInterpreter::PPCInterpreter_dcbz(PPU_STATE *ppuState) {
   EA = EA & ~(128 - 1); // Cache line size
 
   // Temporarely diasable caching.
-  for (u8 n = 0; n < 128; n += sizeof(u64))
-    MMUWrite(intXCPUContext, ppuState, 0, EA + n, sizeof(u64));
+  MMUSet(intXCPUContext, ppuState, EA, 0, 128);
   return;
 
   // As far as i can tell, XCPU does all the crypto, scrambling of

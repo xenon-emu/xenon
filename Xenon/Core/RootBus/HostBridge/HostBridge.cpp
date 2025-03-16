@@ -195,8 +195,7 @@ void HostBridge::ConfigRead(u64 readAddress, u8 *data, u8 byteCount) {
       pciBridge->ConfigRead(readAddress, data, byteCount);
       break;
     case 0x1: // Host Bridge
-      memcpy(data, &hostBridgeConfigSpace.data[configAddress.regOffset],
-             byteCount);
+      memcpy(data, &hostBridgeConfigSpace.data[configAddress.regOffset], byteCount);
       break;
     case 0x2: // GPU + Memory Controller!
       xGPU->ConfigRead(readAddress, data, byteCount);
@@ -226,8 +225,7 @@ void HostBridge::ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount) {
       pciBridge->ConfigWrite(writeAddress, data, byteCount);
       break;
     case 0x1: // Host Bridge
-      memcpy(&hostBridgeConfigSpace.data[configAddress.regOffset], &data,
-             byteCount);
+      memcpy(&hostBridgeConfigSpace.data[configAddress.regOffset], data, byteCount);
       break;
     case 0x2: // GPU/Memory Controller
       xGPU->ConfigWrite(writeAddress, data, byteCount);

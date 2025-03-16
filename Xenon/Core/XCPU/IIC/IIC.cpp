@@ -16,8 +16,11 @@ Xe::XCPU::IIC::XenonIIC::XenonIIC() {
   }
 }
 
-void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, u64 intData) {
+void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64 byteCount) {
   std::lock_guard lck(mutex);
+
+  u64 intData = 0;
+  memcpy(&intData, data, byteCount);
 
   constexpr u32 mask = 0xF000;
   u8 ppeIntCtrlBlckID = static_cast<u8>((intAddress & mask) >> 12);
@@ -109,9 +112,10 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, u64 intData) {
   }
 }
 
-void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u64* intData) {
+void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u8 *data, u64 byteCount) {
   std::lock_guard lck(mutex);
 
+  u64 intData = 0;
   constexpr u32 mask = 0xF000;
   u8 ppeIntCtrlBlckID = static_cast<u8>((intAddress & mask) >> 12);
   u8 ppeIntCtrlBlckReg = intAddress & 0xFF;
@@ -119,7 +123,7 @@ void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u64* intData) {
   auto &interrupts = iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts;
   switch (ppeIntCtrlBlckReg) {
   case Xe::XCPU::IIC::CPU_CURRENT_TSK_PRI:
-    *intData = byteswap_be<u64>(
+    intData = byteswap_be<u64>(
       static_cast<u64>(iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].REG_CPU_CURRENT_TSK_PRI));
     break;
   case Xe::XCPU::IIC::ACK:
@@ -147,17 +151,18 @@ void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u64* intData) {
       // Set the top priority interrypt to signaled
       interrupts[highestPrioPos].ack = true;
 
-      *intData = byteswap_be<u64>(highestPrio);
+      intData = byteswap_be<u64>(highestPrio);
     }
     else {
       // If the queue is empty, return PRIO_NONE.
-      *intData = byteswap_be<u64>(PRIO_NONE);
+      intData = byteswap_be<u64>(PRIO_NONE);
     }
     break;
   default:
     LOG_ERROR(Xenon_IIC, "Unknown interrupt being read {:#x}", ppeIntCtrlBlckReg);
     break;
   }
+  memcpy(data, &intData, byteCount);
 }
 
 bool Xe::XCPU::IIC::XenonIIC::checkExtInterrupt(u8 ppuID) {

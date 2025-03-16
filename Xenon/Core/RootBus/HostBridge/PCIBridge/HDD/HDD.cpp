@@ -11,7 +11,7 @@ HDD::HDD(const char *deviceName, u64 size, PCIBridge *parentPCIBridge) :
    // The first is for the Command Block (Regs 0-7) + DevCtrl/AltStatus reg at offset 0xA.
    // The second is for the BMDMA (Bus Master DMA) block.
 
-   // Set PCI Properties.
+  // Set PCI Properties.
   pciConfigSpace.configSpaceHeader.reg0.hexData = 0x58031414;
   pciConfigSpace.configSpaceHeader.reg1.hexData = 0x02300006;
   pciConfigSpace.configSpaceHeader.reg2.hexData = 0x01060000;
