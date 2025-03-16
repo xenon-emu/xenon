@@ -1858,20 +1858,42 @@ u64 PPCInterpreter::MMURead64(PPU_STATE *ppuState, u64 EA, bool speculativeLoad)
 }
 // Writes 1 Byte to memory.
 void PPCInterpreter::MMUWrite8(PPU_STATE *ppuState, u64 EA, u8 data) {
-  MMUWrite(intXCPUContext, ppuState, data, EA, 1);
+#ifdef __BIG_ENDIAN__
+  u64 *data_ptr = reinterpret_cast<u64*>(&data);
+  *reinterpret_cast<decltype(data)*>((data_ptr + sizeof(u64)) - sizeof(data)) = data;
+  MMUWrite(intXCPUContext, ppuState, *data_ptr, EA, sizeof(data));
+#else
+  //MMUWrite(intXCPUContext, ppuState, EA, reinterpret_cast<u8*>(&data), sizeof(data));
+  MMUWrite(intXCPUContext, ppuState, data, EA, sizeof(data));
+#endif
 }
 // Writes 2 Bytes to memory.
 void PPCInterpreter::MMUWrite16(PPU_STATE *ppuState, u64 EA, u16 data) {
+#ifdef __BIG_ENDIAN__
+  u64 *data_ptr = reinterpret_cast<u64*>(&data);
+  *reinterpret_cast<decltype(data)*>((data_ptr + sizeof(u64)) - sizeof(data)) = data;
+  MMUWrite(intXCPUContext, ppuState, *data_ptr, EA, sizeof(data));
+#else
   u16 dataBS = byteswap_be<u16>(data);
-  MMUWrite(intXCPUContext, ppuState, dataBS, EA, 2);
+  //MMUWrite(intXCPUContext, ppuState, EA, reinterpret_cast<u8*>(&dataBS), sizeof(data));
+  MMUWrite(intXCPUContext, ppuState, dataBS, EA, sizeof(dataBS));
+#endif
 }
 // Writes 4 Bytes to memory.
 void PPCInterpreter::MMUWrite32(PPU_STATE *ppuState, u64 EA, u32 data) {
+#ifdef __BIG_ENDIAN__
+  u64 *data_ptr = reinterpret_cast<u64*>(&data);
+  *reinterpret_cast<decltype(data)*>((data_ptr + sizeof(u64)) - sizeof(data)) = data;
+  MMUWrite(intXCPUContext, ppuState, *data_ptr, EA, sizeof(data));
+#else
   u32 dataBS = byteswap_be<u32>(data);
-  MMUWrite(intXCPUContext, ppuState, dataBS, EA, 4);
+  //MMUWrite(intXCPUContext, ppuState, EA, reinterpret_cast<u8*>(&dataBS), sizeof(data));
+  MMUWrite(intXCPUContext, ppuState, dataBS, EA, sizeof(dataBS));
+#endif
 }
 // Writes 8 Bytes to memory.
 void PPCInterpreter::MMUWrite64(PPU_STATE *ppuState, u64 EA, u64 data) {
   u64 dataBS = byteswap_be<u64>(data);
-  MMUWrite(intXCPUContext, ppuState, dataBS, EA, 8);
+  //MMUWrite(intXCPUContext, ppuState, EA, reinterpret_cast<u8*>(&dataBS), sizeof(data));
+  MMUWrite(intXCPUContext, ppuState, dataBS, EA, sizeof(dataBS));
 }
