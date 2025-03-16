@@ -308,14 +308,10 @@ void saveConfig(const std::filesystem::path &path) {
     if (fSize != -1 && fSize) {
       fSize = 0;
       std::string prev_path_str{ path.string() };
-      LOG_INFO(Xenon, "Previous path: {}", prev_path_str);
       std::string prev_file_str{ path.filename().string() };
-      LOG_INFO(Xenon, "Previous file: {}", prev_file_str);
       std::string base_path_str{ prev_path_str.substr(0, prev_path_str.length() - prev_file_str.length() - 1) };
-      LOG_INFO(Xenon, "Base path: {}", base_path_str);
-      LOG_INFO(Xenon, "FSize: {}", fSize);
       std::filesystem::path base_path{ base_path_str };
-      std::filesystem::copy_file(path, base_path / (prev_file_str + ".old"));
+      std::filesystem::rename(path, base_path / (prev_file_str + ".old"));
     } else {
       // 2 is file doesn't exist, just ignore it
       if (fs_error && fs_error.value() != 2) {
