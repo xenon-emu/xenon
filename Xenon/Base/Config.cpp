@@ -294,6 +294,7 @@ void saveConfig(const std::filesystem::path &path) {
   imgui.to_toml(data["ImGui"]);
 #endif
   debug.to_toml(data["Debug"]);
+  smc.to_toml(data["SMC"]);
   xcpu.to_toml(data["XCPU"]);
   xgpu.to_toml(data["XGPU"]);
   filepaths.to_toml(data["Paths"]);
