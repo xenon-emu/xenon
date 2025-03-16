@@ -235,6 +235,7 @@ void Render::Renderer::Thread() {
         break;
       case SDL_EVENT_QUIT:
         if (Config::rendering.quitOnWindowClosure) {
+          LOG_INFO(Xenos, "Attempting to soft shutdown...");
           Xe_Main->shutdown();
         }
         break;

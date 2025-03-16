@@ -64,6 +64,7 @@ inline struct _rendering {
   // TOML Conversion
   void to_toml(toml::value &value);
   void from_toml(const toml::value &value);
+  bool verify_toml(toml::value &value);
 } rendering;
 
 //
@@ -80,6 +81,7 @@ inline struct _imgui {
   // TOML Conversion
   void to_toml(toml::value &value);
   void from_toml(const toml::value &value);
+  bool verify_toml(toml::value &value);
 } imgui;
 
 //
@@ -98,6 +100,7 @@ inline struct _debug {
   // TOML Conversion
   void to_toml(toml::value &value);
   void from_toml(const toml::value &value);
+  bool verify_toml(toml::value &value);
 } debug;
 
 //
@@ -120,6 +123,7 @@ inline struct _smc {
   // TOML Conversion
   void to_toml(toml::value &value);
   void from_toml(const toml::value &value);
+  bool verify_toml(toml::value& value);
 } smc;
 
 //
@@ -133,6 +137,7 @@ inline struct _xcpu {
   // TOML Conversion
   void to_toml(toml::value &value);
   void from_toml(const toml::value &value);
+  bool verify_toml(toml::value &value);
 } xcpu;
 
 //
@@ -145,6 +150,7 @@ inline struct _xgpu {
   // TOML Conversion
   void to_toml(toml::value &value);
   void from_toml(const toml::value &value);
+  bool verify_toml(toml::value &value);
 } xgpu;
 
 //
@@ -174,6 +180,7 @@ inline struct _filepaths {
   // TOML Conversion
   void to_toml(toml::value &value);
   void from_toml(const toml::value &value);
+  bool verify_toml(toml::value &value);
 } filepaths;
 
 //
@@ -188,6 +195,7 @@ inline struct _log {
   // TOML Conversion
   void to_toml(toml::value &value);
   void from_toml(const toml::value &value);
+  bool verify_toml(toml::value &value);
 } log;
 
 //
@@ -200,6 +208,7 @@ inline struct _highlyExperimental {
   // TOML Conversion
   void to_toml(toml::value &value);
   void from_toml(const toml::value &value);
+  bool verify_toml(toml::value &value);
 } highlyExperimental;
 
 void loadConfig(const std::filesystem::path &path);

@@ -29,6 +29,8 @@ namespace Config {
 // it'll have duplicates if we don't. So just follow what I did, and clear them for your sanity.
 // Note: Even if they don't cause problems, I'll still yell at you :P
 
+#define cache_value(x) auto prev_##x = x
+#define verify_value(x) if (prev_##x != x) { LOG_INFO(Config, "Value '{}' didn't match!", #x); return false; }
 void _rendering::from_toml(const toml::value &value) {
   enable = toml::find_or<bool>(value, "Enable", enable);
   enableGui = toml::find_or<bool>(value, "EnableGUI", enableGui);
@@ -62,6 +64,24 @@ void _rendering::to_toml(toml::value &value) {
   //value["GPU"].comments().push_back("# Chooeses which GPU to use if there are multiple (Vulkan/DirectX only)");
   //value["GPU"] = gpuId;
 }
+bool _rendering::verify_toml(toml::value &value) {
+  to_toml(value);
+  cache_value(enable);
+  cache_value(enableGui);
+  cache_value(window);
+  cache_value(isFullscreen);
+  cache_value(vsync);
+  cache_value(quitOnWindowClosure);
+  from_toml(value);
+  verify_value(enable);
+  verify_value(enableGui);
+  verify_value(window.width);
+  verify_value(window.height);
+  verify_value(isFullscreen);
+  verify_value(vsync);
+  verify_value(quitOnWindowClosure);
+  return true;
+}
 
 void _imgui::from_toml(const toml::value &value) {
   configPath = toml::find_or<std::string>(value, "Config", configPath);
@@ -82,6 +102,17 @@ void _imgui::to_toml(toml::value &value) {
   value["DebugWindow"].comments().push_back("# Debug ImGui Window");
   value["DebugWindow"].comments().push_back("# Contains the debugger and other things");
 }
+bool _imgui::verify_toml(toml::value &value) {
+  to_toml(value);
+  cache_value(configPath);
+  cache_value(viewports);
+  cache_value(debugWindow);
+  from_toml(value);
+  verify_value(configPath);
+  verify_value(viewports);
+  verify_value(debugWindow);
+  return true;
+}
 
 void _debug::from_toml(const toml::value &value) {
   haltOnReadAddress = toml::find_or<u64&>(value, "HaltOnRead", haltOnReadAddress);
@@ -92,13 +123,30 @@ void _debug::from_toml(const toml::value &value) {
 void _debug::to_toml(toml::value &value) {
   value["HaltOnRead"].comments().clear();
   value["HaltOnRead"] = haltOnReadAddress;
-  value["HaltOnRead"].comments().push_back("# Address to halt on when the MMU reads this EA");
+  value["HaltOnRead"].comments().push_back("# Address to halt on when the MMU reads from this address");
   value["HaltOnWrite"].comments().clear();
   value["HaltOnWrite"] = haltOnWriteAddress;
-  value["HaltOnWrite"].comments().push_back("# Address to halt on when the MMU writes this EA");
+  value["HaltOnWrite"].comments().push_back("# Address to halt on when the MMU writes to this address");
+  value["HaltOnWrite"].comments().clear();
+  value["HaltOn"].comments().push_back("# Address to halt on when the CPU executes this address");
+  value["HaltOn"] = haltOnAddress;
+  value["HaltOn"].comments().clear();
   value["StartHalted"].comments().clear();
   value["StartHalted"] = startHalted;
   value["StartHalted"].comments().push_back("# Starts with the CPU halted");
+}
+bool _debug::verify_toml(toml::value &value) {
+  to_toml(value);
+  cache_value(haltOnReadAddress);
+  cache_value(haltOnWriteAddress);
+  cache_value(haltOnAddress);
+  cache_value(startHalted);
+  from_toml(value);
+  verify_value(haltOnReadAddress);
+  verify_value(haltOnWriteAddress);
+  verify_value(haltOnAddress);
+  verify_value(startHalted);
+  return true;
 }
 
 void _smc::from_toml(const toml::value &value) {
@@ -129,6 +177,19 @@ void _smc::to_toml(toml::value &value) {
   value["UseBackupUART"] = useBackupUart;
   value["UseBackupUART"].comments().push_back("# If the selected vCOM port is unavailable, use printf instead");
 }
+bool _smc::verify_toml(toml::value &value) {
+  to_toml(value);
+  cache_value(comPort);
+  cache_value(avPackType);
+  cache_value(powerOnReason);
+  cache_value(useBackupUart);
+  from_toml(value);
+  verify_value(comPort);
+  verify_value(avPackType);
+  verify_value(powerOnReason);
+  verify_value(useBackupUart);
+  return true;
+}
 
 void _xcpu::from_toml(const toml::value &value) {
   HW_INIT_SKIP_1 = toml::find_or<u64&>(value, "HW_INIT_SKIP1", HW_INIT_SKIP_1);
@@ -143,6 +204,15 @@ void _xcpu::to_toml(toml::value &value) {
   value["HW_INIT_SKIP2"] = HW_INIT_SKIP_2;
   value["HW_INIT_SKIP2"].comments().push_back("# Hardware Init Skip address 2");
 }
+bool _xcpu::verify_toml(toml::value &value) {
+  to_toml(value);
+  cache_value(HW_INIT_SKIP_1);
+  cache_value(HW_INIT_SKIP_2);
+  from_toml(value);
+  verify_value(HW_INIT_SKIP_1);
+  verify_value(HW_INIT_SKIP_2);
+  return true;
+}
 
 void _xgpu::from_toml(const toml::value &value) {
   internal.from_toml("Internal", value);
@@ -151,6 +221,14 @@ void _xgpu::to_toml(toml::value &value) {
   value["Internal"].comments().clear();
   internal.to_toml(value["Internal"]);
   value["Internal"].comments().push_back("# Internal Resolution (The width of what XeLL uses, do not modify)");
+}
+bool _xgpu::verify_toml(toml::value &value) {
+  to_toml(value);
+  cache_value(internal);
+  from_toml(value);
+  verify_value(internal.width);
+  verify_value(internal.height);
+  return true;
 }
 
 void _filepaths::from_toml(const toml::value &value) {
@@ -167,6 +245,21 @@ void _filepaths::to_toml(toml::value &value) {
   value["ODDImage"] = oddImage;
   value["ElfBinary"] = elfBinary;
 }
+bool _filepaths::verify_toml(toml::value &value) {
+  to_toml(value);
+  cache_value(fuses);
+  cache_value(oneBl);
+  cache_value(nand);
+  cache_value(oddImage);
+  cache_value(elfBinary);
+  from_toml(value);
+  verify_value(fuses);
+  verify_value(oneBl);
+  verify_value(nand);
+  verify_value(oddImage);
+  verify_value(elfBinary);
+  return true;
+}
 
 void _log::from_toml(const toml::value &value) {
   int tmpLevel = static_cast<int>(currentLevel);
@@ -180,6 +273,15 @@ void _log::to_toml(toml::value &value) {
   int tmpLevel = static_cast<int>(currentLevel);
   value["Level"] = tmpLevel;
   value["Advanced"] = advanced;
+}
+bool _log::verify_toml(toml::value &value) {
+  to_toml(value);
+  cache_value(currentLevel);
+  cache_value(advanced);
+  from_toml(value);
+  verify_value(currentLevel);
+  verify_value(advanced);
+  return true;
 }
 
 void _highlyExperimental::from_toml(const toml::value &value) {
@@ -199,6 +301,42 @@ void _highlyExperimental::to_toml(toml::value &value) {
   value["ElfLoader"].comments().push_back("# Disables normal codeflow and loads kernel.elf");
   value["ElfLoader"] = elfLoader;
 }
+bool _highlyExperimental::verify_toml(toml::value &value) {
+  to_toml(value);
+  cache_value(clocksPerInstruction);
+  cache_value(elfLoader);
+  from_toml(value);
+  verify_value(clocksPerInstruction);
+  verify_value(elfLoader);
+  return true;
+}
+
+#define verify_section(x, n) if (!x.verify_toml(data[#n])) { LOG_INFO(Config, "Failed to write '{}'! Section '{}' had a bad value", path.filename().string(), #x); return false; }
+bool verifyConfig(const std::filesystem::path &path, toml::value &data) {
+  std::error_code error{};
+  // If it exists, parse it as a base
+  if (std::filesystem::exists(path, error)) {
+    try {
+      data = toml::parse(path);
+    } catch (std::exception &ex) {
+      // Parse failed, bad read
+      LOG_ERROR(Config, "Got an exception trying to load config file. {}", ex.what());
+      return false;
+    }
+  }
+#ifndef NO_GFX
+  verify_section(rendering, Rendering);
+  verify_section(imgui, ImGui);
+#endif
+  verify_section(debug, Debug);
+  verify_section(smc, SMC);
+  verify_section(xcpu, XCPU);
+  verify_section(xgpu, XGPU);
+  verify_section(filepaths, Paths);
+  verify_section(log, Log);
+  verify_section(highlyExperimental, HighlyExperimental);
+  return true;
+}
 
 void loadConfig(const std::filesystem::path &path) {
   // If the configuration file does not exist, create it and return.
@@ -217,7 +355,7 @@ void loadConfig(const std::filesystem::path &path) {
   try {
     data = toml::parse(path);
   } catch (std::exception &ex) {
-    LOG_ERROR(Config, "Got exception trying to load config file. Exception: {}",
+    LOG_ERROR(Config, "Got an exception trying to load config file. {}",
               ex.what());
     return;
   }
@@ -270,15 +408,13 @@ void loadConfig(const std::filesystem::path &path) {
 }
 
 void saveConfig(const std::filesystem::path &path) {
-  toml::value data;
-
-  std::error_code error;
+  toml::value data{};
+  std::error_code error{};
   if (std::filesystem::exists(path, error)) {
     try {
       data = toml::parse(path);
     } catch (const std::exception &ex) {
-      LOG_ERROR(Config, "Exception trying to parse config file. Exception: {}",
-          ex.what());
+      LOG_ERROR(Config, "Exception trying to parse config file. {}", ex.what());
       return;
     }
   } else {
@@ -288,47 +424,40 @@ void saveConfig(const std::filesystem::path &path) {
     LOG_INFO(Config, "Config not found. Saving new configuration file: {}", path.string());
   }
 
+  std::string prev_path_str{ path.string() };
+  std::string prev_file_str{ path.filename().string() };
+  std::filesystem::path base_path{ prev_path_str.substr(0, prev_path_str.length() - prev_file_str.length() - 1) };
+  std::filesystem::path new_path{ base_path / (prev_file_str + ".tmp") };
 
-#ifndef NO_GFX
-  rendering.to_toml(data["Rendering"]);
-  imgui.to_toml(data["ImGui"]);
-#endif
-  debug.to_toml(data["Debug"]);
-  smc.to_toml(data["SMC"]);
-  xcpu.to_toml(data["XCPU"]);
-  xgpu.to_toml(data["XGPU"]);
-  filepaths.to_toml(data["Paths"]);
-  log.to_toml(data["Log"]);
-  highlyExperimental.to_toml(data["HighlyExperimental"]);
+  // Write to toml, then verify contents
+  if (!verifyConfig(new_path, data)) {
+    return;
+  }
 
-  // Copy file config to another version before overwriting (if present)
+  // Write to file
+  try {
+    std::ofstream file(new_path, std::ios::binary);
+    file << data;
+    file.close();
+  } catch (const std::exception &ex) {
+    LOG_ERROR(Config, "Exception trying to write config. {}", ex.what());
+    return;
+  }
+
+  // Copy file config to current version, if it's valid
   try {
     std::error_code fs_error;
-    u64 fSize = std::filesystem::file_size(path, fs_error);
+    u64 fSize = std::filesystem::file_size(new_path, fs_error);
     if (fSize != -1 && fSize) {
-      fSize = 0;
-      std::string prev_path_str{ path.string() };
-      std::string prev_file_str{ path.filename().string() };
-      std::string base_path_str{ prev_path_str.substr(0, prev_path_str.length() - prev_file_str.length() - 1) };
-      std::filesystem::path base_path{ base_path_str };
-      std::filesystem::rename(path, base_path / (prev_file_str + ".old"));
+      std::filesystem::rename(new_path, path);
     } else {
-      // 2 is file doesn't exist, just ignore it
-      if (fs_error && fs_error.value() != 2) {
+      fSize = 0;
+      if (fs_error) {
         LOG_ERROR(Config, "Filesystem error: {} ({})", fs_error.message(), fs_error.value());
       }
     }
   } catch (const std::exception &ex) {
     LOG_ERROR(Config, "Exception trying to copy backup config. {}", ex.what());
-    return;
-  }
-  
-  try {
-    std::ofstream file(path, std::ios::binary);
-    file << data;
-    file.close();
-  } catch (const std::exception &ex) {
-    LOG_ERROR(Config, "Exception trying to write config. {}", ex.what());
     return;
   }
 }
