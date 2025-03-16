@@ -3,6 +3,7 @@
 #pragma once
 
 #include <fstream>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <thread>
