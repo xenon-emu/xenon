@@ -18,13 +18,30 @@ NAND::NAND(const char* deviceName, const std::string filePath,
     LOG_CRITICAL(System, "NAND: Unable to load file!");
     SYSTEM_PAUSE();
   }
-
-  rawFileSize = std::filesystem::file_size(filePath);
+  
+  // fs::file_size can cause a exception if it is not a valid file
+  try {
+    std::error_code ec;
+    rawFileSize = std::filesystem::file_size(filePath, ec);
+    if (rawFileSize == -1 || !rawFileSize) {
+      rawFileSize = 0;
+      LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of {} (Error: {})", filePath, ec.message());
+    }
+  }
+  catch (const std::exception& ex) {
+    LOG_ERROR(Base_Filesystem, "Exception trying to get file size. Exception: {}",
+      ex.what());
+    return;
+  }
 
   if (rawFileSize > 0x4200000) {
     LOG_ERROR(System, "NAND: Nand size exceeds 64MB! This may cause unintended behaviour");
     SYSTEM_PAUSE();
     rawNANDData.resize(rawFileSize);
+  }
+  if (rawFileSize <= 0) {
+    LOG_ERROR(System, "NAND: Nand is zero or less! This may cause unintended behaviour, as it's highly likely it is corrupt or missing");
+    SYSTEM_PAUSE();
   }
 
   LOG_INFO(System, "NAND: File size = {:#x} bytes.", rawFileSize);

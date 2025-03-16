@@ -3,7 +3,8 @@
 #include "SFCX.h"
 
 #include "Base/Logging/Log.h"
-                                                                          
+
+// There are two SFCX Versions, pre-Jasper and post-Jasper
 SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
   PCIBridge *parentPCIBridge) : PCIDevice(deviceName, size) {
   // Asign parent PCI Bridge pointer.
@@ -41,6 +42,24 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
 
   // Load the NAND dump.
   LOG_INFO(SFCX, "Loading NAND from path: {}", nandLoadPath);
+ 
+  // Check Image size
+  u64 imageSize = 0;
+  
+  // fs::file_size can cause a exception if it is not a valid file
+  try {
+    std::error_code ec;
+    imageSize = std::filesystem::file_size(nandLoadPath, ec);
+    if (imageSize == -1 || !imageSize) {
+      imageSize = 0;
+      LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of {} (Error: {})", nandLoadPath, ec.message());
+    }
+  }
+  catch (const std::exception& ex) {
+    LOG_ERROR(Base_Filesystem, "Exception trying to get file size. Exception: {}",
+      ex.what());
+    return;
+  }
 
   nandFile.open(nandLoadPath, std::ios_base::in | std::ios_base::binary);
                   
@@ -105,11 +124,6 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
 
   sfcxState.nandHeader.smcBootAddr = byteswap_be<u32>(sfcxState.nandHeader.smcBootAddr);
   LOG_INFO(SFCX, " * SMC Boot Addr: {:#x}", sfcxState.nandHeader.smcBootAddr);
-
-  // Check Image size and Meta type.
-  size_t imageSize = std::filesystem::file_size(nandLoadPath);
-
-  // There are two SFCX Versions, original (Pre Jasper) and Jasper+.
 
   // Enter SFCX Thread.
   sfcxThreadRunning = true;

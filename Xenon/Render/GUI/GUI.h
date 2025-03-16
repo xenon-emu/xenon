@@ -68,7 +68,6 @@ public:
   SDL_Window *mainWindow = nullptr;
   bool styleEditor = false;
   bool demoWindow = false;
-  bool viewports = false;
   bool ppcDebuggerActive = false;
   bool ppcDebuggerAttached = true;
 };

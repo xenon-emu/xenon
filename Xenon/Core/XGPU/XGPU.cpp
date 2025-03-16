@@ -169,3 +169,15 @@ bool Xe::Xenos::XGPU::isAddressMappedInBAR(u32 address) {
 
   return false;
 }
+
+void Xe::Xenos::XGPU::DumpFB(const std::filesystem::path &path, int pitch) {
+  std::ofstream f(path, std::ios::out | std::ios::binary | std::ios::trunc);
+  if (!f) {
+    LOG_ERROR(Xenos, "Failed to open {} for writing", path.filename().string());
+  }
+  else {
+    f.write(reinterpret_cast<const char*>(ramPtr->getPointerToAddress(XE_FB_BASE)), pitch);
+    LOG_INFO(Xenos, "Framebuffer dumped to Xenon/fbmem.bin");
+  }
+  f.close();
+}

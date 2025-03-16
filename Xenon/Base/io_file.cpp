@@ -361,17 +361,24 @@ u64 IOFile::GetSize() const {
   // Flush any unwritten buffered data into the file prior to retrieving the file size.
   std::fflush(file);
 
-  std::error_code ec;
 
-  const auto file_size = fs::file_size(file_path, ec);
-
-  if (ec) {
-    LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of path={}, ec_message={}",
-              PathToUTF8String(file_path), ec.message());
+  u64 fSize = 0;
+  // fs::file_size can cause a exception if it is not a valid file
+  try {
+    std::error_code ec;
+    fSize = fs::file_size(file_path, ec);
+    if (fSize == -1 || !fSize) {
+      LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of path={}, ec_message={}",
+        PathToUTF8String(file_path), ec.message());
+      return 0;
+    }
+  } catch (const std::exception &ex) {
+    LOG_ERROR(Base_Filesystem, "Exception trying to get file size. Exception: {}",
+        ex.what());
     return 0;
   }
 
-  return file_size;
+  return fSize;
 }
 
 bool IOFile::Seek(s64 offset, SeekOrigin origin) const {
@@ -425,7 +432,22 @@ u64 GetDirectorySize(const std::filesystem::path& path) {
   u64 total = 0;
   for (const auto& entry : fs::recursive_directory_iterator(path)) {
     if (fs::is_regular_file(entry.path())) {
-      total += fs::file_size(entry.path());
+      // fs::file_size can cause a exception if it is not a valid file
+      try {
+        std::error_code ec;
+        u64 fSize = fs::file_size(entry.path(), ec);
+        if (fSize != -1 && fSize) {
+          total += fSize;
+        }
+        else {
+          LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of path={}, ec_message={}",
+            PathToUTF8String(entry.path()), ec.message());
+        }
+      }
+      catch (const std::exception& ex) {
+        LOG_ERROR(Base_Filesystem, "Exception trying to get file size. Exception: {}",
+          ex.what());
+      }
     }
   }
   return total;

@@ -44,12 +44,12 @@ GLuint createShaderPrograms(const char* vertex, const char* fragment) {
 
 Render::Renderer::Renderer(RAM *ram) :
   ramPointer(ram),
-  internalWidth(Config::internalWindowWidth()),
-  internalHeight(Config::internalWindowHeight()),
-  width(TILE(Config::windowWidth())),
-  height(TILE(Config::windowHeight())),
-  VSYNC(Config::vsync()),
-  fullscreen(Config::fullscreenMode())
+  internalWidth(Config::xgpu.internal.width),
+  internalHeight(Config::xgpu.internal.height),
+  width(TILE(Config::rendering.window.width)),
+  height(TILE(Config::rendering.window.height)),
+  VSYNC(Config::rendering.vsync),
+  fullscreen(Config::rendering.isFullscreen)
 {
   thread = std::thread(&Render::Renderer::Thread, this);
   thread.detach();
@@ -169,7 +169,7 @@ void Render::Renderer::Start() {
   glDisable(GL_DEPTH_TEST);
 
   // Create our GUI
-  if (!Config::guiDisabled()) {
+  if (Config::rendering.enableGui) {
     gui = std::make_unique<OpenGLGUI>();
     gui->Init(mainWindow, reinterpret_cast<void*>(context));
   }
@@ -177,7 +177,7 @@ void Render::Renderer::Start() {
 
 void Render::Renderer::Shutdown() {
   threadRunning = false;
-  if (!Config::guiDisabled()) {
+  if (Config::rendering.enableGui) {
     gui->Shutdown();
     gui.reset();
   }
@@ -213,7 +213,7 @@ void Render::Renderer::Thread() {
   // Framebuffer pointer from main memory.
   fbPointer = ramPointer->getPointerToAddress(XE_FB_BASE);
   // Should we render?
-  threadRunning = Config::gpuThreadEnabled();
+  threadRunning = Config::rendering.enable;
   if (!threadRunning) {
     return;
   }
@@ -234,7 +234,7 @@ void Render::Renderer::Thread() {
         }
         break;
       case SDL_EVENT_QUIT:
-        if (Config::quitOnWindowClosure()) {
+        if (Config::rendering.quitOnWindowClosure) {
           Xe_Main->shutdown();
         }
         break;
@@ -249,17 +249,8 @@ void Render::Renderer::Thread() {
           Resize(1280, 720, false);
         }
         if (windowEvent.key.key == SDLK_F9) {
-          LOG_INFO(Xenos, "RenderWindow: Taking a XenosFB snapshot");
           const auto UserDir = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
-          std::ofstream f(UserDir / "fbmem.bin", std::ios::out | std::ios::binary | std::ios::trunc);
-          if (!f) {
-            LOG_ERROR(Xenos, "Failed to open fbmem.bin for writing");
-          }
-          else {
-            f.write(reinterpret_cast<const char*>(fbPointer), pitch);
-            LOG_INFO(Xenos, "Framebuffer dumped to Xenon/fbmem.bin");
-          }
-          f.close();
+          Xe_Main->xenos->DumpFB(UserDir / "fbmem.bin", pitch);
         }
         if (windowEvent.key.key == SDLK_F11) {
           SDL_WindowFlags flag = SDL_GetWindowFlags(mainWindow);

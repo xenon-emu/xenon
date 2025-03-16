@@ -19,7 +19,7 @@ namespace PPCInterpreter {
   }
   void PPCInterpreter_invalid(PPU_STATE *ppuState) {
     Xe_Main->getCPU()->Halt();
-    Config::imguiDebugWindow = true; // Open debugger on bad fault
+    Config::imgui.debugWindow = true; // Open debugger on bad fault
 
     LOG_CRITICAL(Xenon, "PPC Interpreter: Invalid instruction found! Data: {:#x} (opcode, value[s]), address: {:#x}",
       _instr.opcode,

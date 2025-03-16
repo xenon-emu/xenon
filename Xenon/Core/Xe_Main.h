@@ -45,8 +45,6 @@ public:
   void createRootBus();
   void createSMCState();
 
-  void getFuses();
-
   void shutdown() {
     XeRunning = false;
   }
@@ -100,14 +98,11 @@ public:
   //  HDD
   std::unique_ptr<HDD> hdd{};
 
+  // Console Handles
   //  Xenon CPU
   std::unique_ptr<Xenon> xenonCPU{};
-private:
-  // Console Handles
   //  Xenos GPU
   std::unique_ptr<Xe::Xenos::XGPU> xenos{};
-  //  Fuses
-  eFuses cpuFuses{};
 };
 
 // Global pointer

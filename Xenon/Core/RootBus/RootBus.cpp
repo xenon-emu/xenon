@@ -86,7 +86,7 @@ void RootBus::Write(u64 writeAddress, u8 *data, u8 byteCount) {
     LOG_ERROR(RootBus, "Write failed at address: {:#x}, data: {:#x}", writeAddress, *reinterpret_cast<u64*>(data));
     LOG_CRITICAL(Xenon, "Halting...");
     Xe_Main->getCPU()->Halt(); // Halt the CPU
-    Config::imguiDebugWindow = true; // Open the debugger on bad fault
+    Config::imgui.debugWindow = true; // Open the debugger on bad fault
   }
 }
 

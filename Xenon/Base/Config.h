@@ -3,157 +3,206 @@
 #pragma once
 
 #include <cstdlib>
+#include <map>
 #include <filesystem>
+#include <string>
+
+#include <toml.hpp>
 
 #include "Types.h"
 #include "Logging/Backend.h"
 
 namespace Config {
-// General
-inline bool gpuRenderThreadEnabled = true;
-inline bool isFullscreen = false;
-inline bool vsyncEnabled = true;
-inline bool shouldQuitOnWindowClosure = false;
-inline Base::Log::Level currentLogLevel = Base::Log::Level::Warning;
-inline bool islogAdvanced = false;
+//
+// A helper class for width/height values
+//
+struct _resolution {
+  // Width
+  s32 width;
+  // Height
+  s32 height;
 
-// SMC
-inline int smcPowerOnReason = 0x11; // SMC_PWR_REAS_EJECT
-inline int smcAvPackType = 31; // Set to HDMI_NO_AUDIO. See SMC.cpp for a list of values.
-inline int comPort = 2;
-inline bool useBackupUart = false;
-inline std::string com = "";
+  // TOML Conversion
+  void to_toml(toml::value& value) {
+    value["Width"].comments().clear();
+    value["Width"] = width;
+    value["Width"].comments().push_back("# Width");
+    value["Height"].comments().clear();
+    value["Height"] = height;
+    value["Height"].comments().push_back("# Height");
+  }
+  void from_toml(const std::string &key, const toml::value& value) {
+    std::map<std::string, double> _map{
+      { "Width", width },
+      { "Height", height }
+    };
+    _map = toml::find_or<std::map<std::string, double>>(value, key.c_str(), _map);
+    width = _map["Width"];
+    height = _map["Height"];
+  }
+};
 
-// PowerPC
-inline u64 SKIP_HW_INIT_1 = 0;
-inline u64 SKIP_HW_INIT_2 = 0;
+//
+// Rendering
+//
+inline struct _rendering {
+  // Enable GPU Render thread
+  bool enable = true;
+  // Whether to create the GUI handle
+  bool enableGui = true;
+  // Window Resolution
+  _resolution window{ 1280, 720 };
+  // Render in fullscreen
+  bool isFullscreen = false;
+  // Is VSync is present or not?
+  bool vsync = true;
+  // Should we quit when our rendering window is closed?
+  bool quitOnWindowClosure = false;
+  // GPU ID Selection (Only for Vulkan/DirectX)
+  //s32 gpuId = -1;
 
-// GPU
-inline s32 screenWidth = 1280;
-inline s32 screenHeight = 720;
-inline s32 internalWidth = 1280;
-inline s32 internalHeight = 720;
-// inline s32 gpuId = -1; // Vulkan physical device index. Set to negative for auto select
+  // TOML Conversion
+  void to_toml(toml::value &value);
+  void from_toml(const toml::value &value);
+} rendering;
 
-// Filepaths
-inline std::string fusesTxtPath = "fuses.txt";
-inline std::string oneBlBinPath = "1bl.bin";
-inline std::string nandBinPath = "nand.bin";
-inline std::string elfBinaryPath = "kernel.elf";
-inline std::string oddDiscImagePath = "xenon.iso";
-
+//
 // ImGui
-inline bool isGUIDisabled = false;
-// None is disabled, and it is relative
-inline std::string imguiConfigPath = "none";
-// Debug Window
-inline bool imguiDebugWindow = true;
+//
+inline struct _imgui {
+  // None is disabled, and it is relative
+  std::string configPath = "none";
+  // Viewports
+  bool viewports = false;
+  // Debug Window
+  bool debugWindow = true;
 
+  // TOML Conversion
+  void to_toml(toml::value &value);
+  void from_toml(const toml::value &value);
+} imgui;
+
+//
 // Debug
-inline u64 haltOnReadAddress = 0;
-inline u64 haltOnWriteAddress = 0;
-inline u64 haltOnAddress = 0;
-inline bool startHalted = false;
+//
+inline struct _debug {
+  // Halt on mmu write to this address
+  u64 haltOnReadAddress = 0;
+  // Halt on mmu read to this address
+  u64 haltOnWriteAddress = 0;
+  // Halt on execution of this address
+  u64 haltOnAddress = 0;
+  // Start the CPU halted
+  bool startHalted = false;
 
-// Highly experimental
-inline int clocksPerInstruction = 0;
-inline bool elfLoader = false;
+  // TOML Conversion
+  void to_toml(toml::value &value);
+  void from_toml(const toml::value &value);
+} debug;
+
+//
+// SMC
+//
+inline struct _smc {
+  // SMC Detected AV Pack. Tells the system what kind of video output it is connected to
+  // This is used to detect the current resolution
+  int avPackType = 31; // Set to HDMI_NO_AUDIO. See SMC.cpp for a list of values.
+  // SMC Power On type (Power button, eject button, controller, etc...)
+  int powerOnReason = 0x11; // SMC_PWR_REAS_EJECT
+  // Selected vCOM Port
+  int comPort = 2;
+  // Backup UART, kicks on when a vCOM is not present
+  bool useBackupUart = false;
+  std::string COMPort() {
+    return "\\\\.\\COM" + std::to_string(comPort);
+  }
+
+  // TOML Conversion
+  void to_toml(toml::value &value);
+  void from_toml(const toml::value &value);
+} smc;
+
+//
+// XCPU
+//
+inline struct _xcpu {
+  // HW_INIT_SKIP
+  u64 HW_INIT_SKIP_1 = 0;
+  u64 HW_INIT_SKIP_2 = 0;
+
+  // TOML Conversion
+  void to_toml(toml::value &value);
+  void from_toml(const toml::value &value);
+} xcpu;
+
+//
+// XGPU
+//
+inline struct _xgpu {
+  // Internal Resolution | The resolution XeLL uses
+  _resolution internal{ 1280, 720 };
+
+  // TOML Conversion
+  void to_toml(toml::value &value);
+  void from_toml(const toml::value &value);
+} xgpu;
+
+//
+// Filepaths
+//
+inline struct _filepaths {
+  // Fuses path
+  std::string fuses = "fuses.txt";
+  // 1bl.bin path
+  std::string oneBl = "1bl.bin";
+  // nand.bin path
+  std::string nand = "nand.bin";
+  // Elf binary path
+  std::string elfBinary = "kernel.elf";
+  // ODD Image path
+  std::string oddImage = "xenon.iso";
+
+  // Corrects the paths on first time creation
+  void correct(const std::filesystem::path &basePath) {
+    fuses = std::filesystem::path(basePath).append(fuses).string();
+    oneBl = std::filesystem::path(basePath).append(oneBl).string();
+    nand = std::filesystem::path(basePath).append(nand).string();
+    elfBinary = std::filesystem::path(basePath).append(elfBinary).string();
+    oddImage = std::filesystem::path(basePath).append(oddImage).string();
+  }
+
+  // TOML Conversion
+  void to_toml(toml::value &value);
+  void from_toml(const toml::value &value);
+} filepaths;
+
+//
+// Log
+//
+inline struct _log {
+  // Current log level
+  Base::Log::Level currentLevel = Base::Log::Level::Warning;
+  // Show more details on log
+  bool advanced = false;
+
+  // TOML Conversion
+  void to_toml(toml::value &value);
+  void from_toml(const toml::value &value);
+} log;
+
+//
+// Highly experimental (things that can either break the emulator or drastically increase performance)
+//
+inline struct _highlyExperimental {
+  int clocksPerInstruction = 0;
+  bool elfLoader = false;
+
+  // TOML Conversion
+  void to_toml(toml::value &value);
+  void from_toml(const toml::value &value);
+} highlyExperimental;
 
 void loadConfig(const std::filesystem::path &path);
 void saveConfig(const std::filesystem::path &path);
-
-//
-// General Options.
-//
-// Show in fullscreen.
-bool fullscreenMode();
-// Enable VSync.
-bool vsync();
-// Enable GPU Render thread.
-bool gpuThreadEnabled();
-// Should we quit when our rendering window is closed?
-bool quitOnWindowClosure();
-// Current log level.
-Base::Log::Level getCurrentLogLevel();
-// Show more details on log.
-bool logAdvanced();
-
-//
-// SMC Options.
-//
-
-// SMC Detected AV Pack. Tells the system what kind of video output it is connected to.
-// This is used to detect the current resolution.
-int smcCurrentAvPack();
-// SMC Power On type (PowerButton, eject button, controller, etc...).
-int smcPowerOnType();
-// Selected COM Port.
-std::string& COMPort();
-// Selected COM Port.
-bool useBackupUART();
-
-//
-// PowerPC Options.
-//
-
-// HW_INIT_SKIP.
-u64 HW_INIT_SKIP1();
-u64 HW_INIT_SKIP2();
-
-//
-// GPU Options.
-//
-
-// Screen Size.
-s32 windowWidth();
-s32 windowHeight();
-// Intermal Size.
-s32 internalWindowWidth();
-s32 internalWindowHeight();
-// GPU ID Selection (Only for Vulkan)
-// s32 getGpuId();
-
-//
-// Filepaths.
-//
-
-// Fuses path
-const std::string fusesPath();
-// 1bl.bin path
-const std::string oneBlPath();
-// nand.bin path
-const std::string nandPath();
-// Elf path
-const std::string elfPath();
-// ODD Image path
-const std::string oddImagePath();
-
-//
-// ImGui
-// 
-// GUI Disabled
-bool guiDisabled();
-// ImGui Ini path
-const std::string imguiIniPath();
-// ImGui Debug Window
-bool imguiDebug();
-
-//
-// Debug
-// 
-// Halt on mmu read address
-u64 haltOnRead();
-// Halt on mmu write address
-u64 haltOnWrite();
-// Halt on execution of this address
-u64 haltOn();
-// Start the CPU halted
-bool startCPUHalted();
-
-//
-// Highly experimental. (things that can either break the emulator or drastically increase performance)
-//
-int cpi();
-bool loadElfs();
 
 } // namespace Config

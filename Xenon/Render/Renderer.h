@@ -43,10 +43,10 @@ public:
 
   void Thread();
 
+  // Debugger Pointers (RAM, and FrameBuffer)
   RAM *ramPointer{};
   u8 *fbPointer{};
 
-  // Vali0004: This may need to be in XGPU
   // Initial Internal rendering width/height.
   u32 internalWidth = 1280;
   u32 internalHeight = 720;
@@ -63,7 +63,8 @@ public:
   bool imguiRender = false;
   // Thread Running
   bool threadRunning = true;
-
+  
+  // FB Pitch
   int pitch = 0;
 private:
   // Thread handle

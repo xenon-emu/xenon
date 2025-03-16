@@ -103,6 +103,9 @@ public:
 
   bool isAddressMappedInBAR(u32 address);
 
+  // Dump framebuffer from RAM
+  void DumpFB(const std::filesystem::path &path, int pitch);
+
 private:
   // Mutex handle
   std::recursive_mutex mutex{};

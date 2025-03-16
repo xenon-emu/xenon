@@ -1129,13 +1129,13 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
     u8 a = 0;
   }
 
-  if (EA != 0 && EA == Config::haltOnRead()) {
+  if (EA != 0 && EA == Config::debug.haltOnReadAddress) {
     Xenon *CPU = Xe_Main->getCPU();
     PPU *PPU = Xe_Main->getCPU()->GetPPU(ppuState->ppuID);
     if (PPU->ThreadRunning()) {
       CPU->Halt();
     }
-    Config::imguiDebugWindow = true; // Open debugger after halting
+    Config::imgui.debugWindow = true; // Open debugger after halting
   }
 
   // Exception ocurred?
@@ -1453,9 +1453,9 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
 
   intXCPUContext->xenonRes.Check(EA);
 
-  if (EA != 0 && EA == Config::haltOnWrite()) {
+  if (EA != 0 && EA == Config::debug.haltOnWriteAddress) {
     Xe_Main->getCPU()->Halt(); // Halt the CPU
-    Config::imguiDebugWindow = true; // Open the debugger after halting
+    Config::imgui.debugWindow = true; // Open the debugger after halting
   }
 }
 

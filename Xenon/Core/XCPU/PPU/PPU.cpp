@@ -91,11 +91,11 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
   CalculateCPI();
 
   // If we want to start halted, halt after CPI is done.
-  ppuStartHalted = Config::startCPUHalted();
-  ppuHalt = Config::startCPUHalted();
+  ppuStartHalted = Config::debug.startHalted;
+  ppuHalt = ppuStartHalted;
 
   // If we have a specific halt address, set it here
-  ppuHaltOn = Config::haltOn();
+  ppuHaltOn = Config::debug.haltOnAddress;
 
   for (u8 thrdID = 0; thrdID < 2; thrdID++) {
     ppuState->ppuThread[thrdID].ppuRes = std::make_unique<STRIP_UNIQUE(PPU_THREAD_REGISTERS::ppuRes)>();
@@ -158,7 +158,7 @@ void PPU::CalculateCPI() {
   LOG_INFO(Xenon, "{} Speed: {:#d} instructions per second.", ppuState->ppuName, instrPerSecond);
 
   // Find a way to calculate the right ticks/IPS ratio.
-  int configCpi = Config::cpi();
+  int configCpi = Config::highlyExperimental.clocksPerInstruction;
   clocksPerInstruction = configCpi ? configCpi : cpi;
   if (!configCpi)
     LOG_INFO(Xenon, "{} CPI: {} clocks per instruction", ppuState->ppuName, clocksPerInstruction);
@@ -498,10 +498,14 @@ u64 PPU::loadElfImage(u8 *data, u64 size) {
 // Reads the next instruction from memory and advances the NIP accordingly.
 bool PPU::ppuReadNextInstruction() {
   // Only if we're single-core
-  if (Config::loadElfs() && ThreadRunning() && ((curThread.CIA > 0xCDCDC00000000000) && ((curThread.CIA - 0xCDCDC00000000000) > 0) || (curThread.NIA == 0 && ppuState->ppuID == 0))) {
+  if (Config::highlyExperimental.elfLoader &&
+    ThreadRunning()
+    && ((curThread.CIA > 0xCDCDC00000000000)
+    && ((curThread.CIA - 0xCDCDC00000000000) > 0) || (curThread.NIA == 0 && ppuState->ppuID == 0)))
+  {
     LOG_CRITICAL(Xenon, "PPU{} was unable to get the next instruction! Halting...", ppuState->ppuID);
     Xe_Main->getCPU()->Halt(); // Halt CPU
-    Config::imguiDebugWindow = true; // Open the debugger on bad fault
+    Config::imgui.debugWindow = true; // Open the debugger on bad fault
     return false;
   }
   // Update current instruction address
@@ -516,7 +520,7 @@ bool PPU::ppuReadNextInstruction() {
   if (_instr.opcode == 0xFFFFFFFF || (first_byte == 0x00 && last_byte != 0x00)) {
     LOG_CRITICAL(Xenon, "PPU{} returned a invalid opcode! Halting...", ppuState->ppuID);
     Xe_Main->getCPU()->Halt(); // Halt CPU
-    Config::imguiDebugWindow = true; // Open the debugger on bad fault
+    Config::imgui.debugWindow = true; // Open the debugger on bad fault
     return false;
   }
   if (_ex & PPU_EX_INSSTOR || _ex & PPU_EX_INSTSEGM) {
