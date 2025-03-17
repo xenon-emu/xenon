@@ -428,8 +428,8 @@ template <typename T>
 void bswap_elf(T &value) {
   value = byteswap_be<T>(value);
 }
-#define SWAP(header, entry) if (elf32) { bswap_elf(header##entry); } else { bswap_elf(header##64##entry); }
-#define READ(header, entry) elf32 ? header##entry : header##64##entry
+#define SWAP(header, entry) if (elf32) { bswap_elf(header entry); } else { bswap_elf(header##64 entry); }
+#define READ(header, entry) elf32 ? header entry : header##64 entry
 u64 PPU::loadElfImage(u8* data, u64 size) {
   ppuElfExecution = true;
 
