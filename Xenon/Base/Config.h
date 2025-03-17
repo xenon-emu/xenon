@@ -33,8 +33,8 @@ struct _resolution {
   }
   void from_toml(const std::string &key, const toml::value& value) {
     const toml::value& _key = value.at(key);
-    width = toml::find_or<s32>(_key, "Width", width);
-    height = toml::find_or<s32>(_key, "Height", height);
+    width = toml::find_or<s32&>(_key, "Width", width);
+    height = toml::find_or<s32&>(_key, "Height", height);
   }
 };
 
