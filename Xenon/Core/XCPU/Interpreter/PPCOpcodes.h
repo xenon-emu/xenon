@@ -35,7 +35,6 @@ D_STUBRC(divwo)
 D_STUBRC(divwuo)
 D_STUBRC(mulhd)
 D_STUBRC(mulldo)
-D_STUBRC(mulhw)
 D_STUBRC(mullwo)
 D_STUBRC(nego)
 D_STUBRC(rldcl)
@@ -328,6 +327,7 @@ extern void PPCInterpreter_mtocrf(PPU_STATE *ppuState);
 extern void PPCInterpreter_mulli(PPU_STATE *ppuState);
 extern void PPCInterpreter_mulldx(PPU_STATE *ppuState);
 extern void PPCInterpreter_mullwx(PPU_STATE *ppuState);
+extern void PPCInterpreter_mulhwx(PPU_STATE *ppuState);
 extern void PPCInterpreter_mulhwux(PPU_STATE *ppuState);
 extern void PPCInterpreter_mulhdux(PPU_STATE *ppuState);
 extern void PPCInterpreter_nandx(PPU_STATE *ppuState);

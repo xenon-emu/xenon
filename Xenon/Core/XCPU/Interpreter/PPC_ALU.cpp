@@ -511,6 +511,18 @@ void PPCInterpreter::PPCInterpreter_mullwx(PPU_STATE *ppuState) {
   }
 }
 
+void PPCInterpreter::PPCInterpreter_mulhwx(PPU_STATE* ppuState)
+{
+  s32 a = static_cast<s32>(GPRi(ra));
+  s32 b = static_cast<s32>(GPRi(rb));
+  GPRi(rd) = (s64{ a } * b) >> 32;
+
+  if (_instr.rc) {
+    u32 CR = CRCompS(ppuState, GPRi(rd), 0);
+    ppcUpdateCR(ppuState, 0, CR);
+  }
+}
+
 void PPCInterpreter::PPCInterpreter_mulhwux(PPU_STATE *ppuState) {
   u32 a = static_cast<u32>(GPRi(ra));
   u32 b = static_cast<u32>(GPRi(rb));
