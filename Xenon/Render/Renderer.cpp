@@ -240,19 +240,6 @@ void Render::Renderer::Thread() {
         }
         break;
       case SDL_EVENT_KEY_DOWN:
-        if (windowEvent.key.key == SDLK_F5) {
-          SDL_GL_SetSwapInterval((int)!VSYNC);
-          LOG_INFO(Xenos, "RenderWindow: Setting Vsync to: {0:#b}", VSYNC);
-          VSYNC = !VSYNC;
-        }
-        if (windowEvent.key.key == SDLK_F6) {
-          LOG_INFO(Xenos, "RenderWindow: Resize without changing viewport");
-          Resize(1280, 720, false);
-        }
-        if (windowEvent.key.key == SDLK_F9) {
-          const auto UserDir = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
-          Xe_Main->xenos->DumpFB(UserDir / "fbmem.bin", pitch);
-        }
         if (windowEvent.key.key == SDLK_F11) {
           SDL_WindowFlags flag = SDL_GetWindowFlags(mainWindow);
           bool fullscreenMode = flag & SDL_WINDOW_FULLSCREEN;

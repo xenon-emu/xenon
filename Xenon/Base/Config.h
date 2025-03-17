@@ -32,13 +32,9 @@ struct _resolution {
     value["Height"].comments().push_back("# Height");
   }
   void from_toml(const std::string &key, const toml::value& value) {
-    std::map<std::string, double> _map{
-      { "Width", width },
-      { "Height", height }
-    };
-    _map = toml::find_or<std::map<std::string, double>&>(value, key.c_str(), _map);
-    width = _map["Width"];
-    height = _map["Height"];
+    const toml::value& _key = value.at(key);
+    width = toml::find_or<s32>(_key, "Width", width);
+    height = toml::find_or<s32>(_key, "Height", height);
   }
 };
 

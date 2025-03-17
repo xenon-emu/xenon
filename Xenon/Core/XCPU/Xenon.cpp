@@ -30,7 +30,7 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPa
         fusesets.push_back(fuseset);
       }
       // Got some fuses, let's print them!
-      u64* fuses = reinterpret_cast<u64*>(&xenonContext.fuseSet);
+      u64 *fuses = reinterpret_cast<u64*>(&xenonContext.fuseSet);
       LOG_INFO(System, "Current FuseSet:");
       for (int i = 0; i < 12; i++) {
         fuseset = fusesets[i];

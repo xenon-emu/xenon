@@ -4,6 +4,7 @@
 
 #ifndef NO_GFX
 #include "Core/Xe_Main.h"
+#include "Base/Exit.h"
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
 
 // Helper functions for text/string formatting with the gui
@@ -679,12 +680,20 @@ void Render::GUI::OnSwap(Texture *texture) {
         TabItem("Settings", [&] {
           TabBar("##settings", [&] {
             TabItem("General", [&] {
-              Button("Soft exit", [] {
+              Button("Exit", [] {
                 Xe_Main->shutdown();
               });
-              Button("Force exit", [] {
-                exit(0);
+              Tooltip("Cleanly exits the process");
+              Button("Soft exit", [] {
+                s32 exitCode = Base::exit(0);
+                LOG_INFO(Xenon, "Exited with code '{}'", exitCode);
               });
+              Tooltip("Uses 'exit(0);' instead of properly shutting down");
+              Button("Force exit", [] {
+                s32 exitCode = Base::fexit(0);
+                LOG_INFO(Xenon, "Exited with code '{}'", exitCode);
+              });
+              Tooltip("Forcefully closes the process using TerminateProcess and _exit");
             });
             TabItem("Log", [&] {
               LogSettings(this);

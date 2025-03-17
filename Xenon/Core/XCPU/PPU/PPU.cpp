@@ -117,10 +117,6 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
 }
 PPU::~PPU() {
   ppuRunning = false;
-  // Ensure our threads are finished running
-  while (!ppuExecutionDone) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  }
   ppuState.reset();
 }
 
@@ -211,12 +207,12 @@ void PPU::Thread() {
         curThreadId = PPU_THREAD_0;
 
         // Loop on this thread for the amount of Instructions that TTR tells us.
-        for (size_t instrCount = 0; instrCount < ppuState->SPR.TTR;
+        for (size_t instrCount = 0; ThreadRunning() && instrCount < ppuState->SPR.TTR;
              instrCount++) {
           // Main processing loop.
 
           // Read next intruction from Memory.
-          if (ThreadRunning() && ppuReadNextInstruction()) {
+          if (ppuReadNextInstruction()) {
             // Execute next intrucrtion.
             PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
           }
@@ -274,7 +270,7 @@ void PPU::Thread() {
         curThreadId = PPU_THREAD_1;
 
         // Loop on this thread for the amount of Instructions that TTR tells us.
-        for (size_t instrCount = 0; instrCount < ppuState->SPR.TTR;
+        for (size_t instrCount = 0; ThreadRunning() && instrCount < ppuState->SPR.TTR;
              instrCount++) {
           // Main processing loop.
 
@@ -428,21 +424,24 @@ u32 PPU::getIPS() {
                       (ehdr).e_ident[EI_MAG1] == ELFMAG1 && \
                       (ehdr).e_ident[EI_MAG2] == ELFMAG2 && \
                       (ehdr).e_ident[EI_MAG3] == ELFMAG3)
-#define SWAP(v, s) v = byteswap_be<s>(v);
+template <typename T>
+void bswap_elf(T &value) {
+  value = byteswap_be<T>(value);
+}
+#define SWAP(header, entry) if (elf32) { bswap_elf(header##entry); } else { bswap_elf(header##64##entry); }
+#define READ(header, entry) elf32 ? header##entry : header##64##entry
 u64 PPU::loadElfImage(u8* data, u64 size) {
-
   ppuElfExecution = true;
 
-  // Setup HRMOR for elf binaries.
+  // Setup HRMOR for elf binaries
   ppuState->SPR.CTRL = 0x800000; // CTRL[TE0] = 1;
   ppuState->SPR.HRMOR = 0x0000000000000000;
 
-  // Loaded ELF Header type (elf32/elf64).
-  bool elf32 = true; // Assume little endian file.
+  // Loaded ELF Header type (elf32/elf64)
+  bool elf32 = true; // Assume little endian file
 
-  // We assume elf32 header unless specified otherwise.
+  // We assume elf32 header unless specified otherwise
   elf32_hdr* header{ reinterpret_cast<decltype(header)>(data) };
-  // Also declare elf64 header if that happens to be the case.
   elf64_hdr* header64{ reinterpret_cast<decltype(header64)>(data) };
 
   // Check header:
@@ -470,43 +469,23 @@ u64 PPU::loadElfImage(u8* data, u64 size) {
   }
 
   // Byteswap required.
-  SWAP(header->e_type, u16);    // Offsett 0x10.
-  SWAP(header->e_machine, u16); // Offsett 0x12.
-  SWAP(header->e_version, u32); // Offsett 0x14.
+  bswap_elf(header->e_type);    // Offsett 0x10.
+  bswap_elf(header->e_machine); // Offsett 0x12.
+  bswap_elf(header->e_version); // Offsett 0x14.
 
-  std::string elfType = "";
-  switch (header->e_type)
-  {
-  case 0x0:
-    elfType = "ET_NONE: Unknown";
-    break;
-  case 0x1:
-    elfType = "ET_REL: Relocatable file.";
-    break;
-  case 0x2:
-    elfType = "ET_EXEC: Executable file.";
-    break;
-  case 0x3:
-    elfType = "ET_DYN: Shared object.";
-    break;
-  case 0x4:
-    elfType = "ET_CORE: Core file.";
-    break;
-  case 0xFE00:
-    elfType = "ET_LOOS: Operating system specific.";
-    break;
-  case 0xFEFF:
-    elfType = "ET_HIOS: Operating system specific.";
-    break;
-  case 0xFF00:
-    elfType = "ET_LOPROC: Processor specific.";
-    break;
-  case 0xFFFF:
-    elfType = "ET_HIPROC: Processor specific.";
-    break;
-  default:
-    elfType = "Unknown";
-    break;
+  std::string elfType = "Unknown";
+  #define D_TYPE(v, t, s) case t: v = #t ": " s; break
+  #define D_TYPE_L(v, t, l, s) case t: v = #l ": " s; break
+  switch (header->e_type) {
+    D_TYPE(elfType, ET_NONE, "Unknown");
+    D_TYPE(elfType, ET_REL, "Relocatable file");
+    D_TYPE(elfType, ET_EXEC, "Executable file");
+    D_TYPE(elfType, ET_DYN, "Shared object");
+    D_TYPE(elfType, ET_CORE, "Core file");
+    D_TYPE_L(elfType, 0xFE00, ET_LOOS, "Operating system specific");
+    D_TYPE_L(elfType, 0xFEFF, ET_HIOS, "Operating system specific");
+    D_TYPE(elfType, ET_LOPROC, "Processor specific");
+    D_TYPE(elfType, ET_HIPROC, "Processor specific");
   }
   LOG_INFO(Xenon, "ELF Type: {}", elfType);
 
@@ -525,43 +504,27 @@ u64 PPU::loadElfImage(u8* data, u64 size) {
   }
 
   // Header-specific offsets:
-  if (elf32) {
-    // ELF32
-    SWAP(header->e_entry, u32);
-    SWAP(header->e_phoff, u32);
-    SWAP(header->e_shoff, u32);
-    SWAP(header->e_flags, u32);
-    SWAP(header->e_ehsize, u16);
-    SWAP(header->e_phentsize, u16);
-    SWAP(header->e_phnum, u16);
-    SWAP(header->e_shentsize, u16);
-    SWAP(header->e_shnum, u16);
-    SWAP(header->e_shstrndx, u16);
-  }
-  else {
-    // ELF64
-    SWAP(header64->e_entry, u64);
-    SWAP(header64->e_phoff, u64);
-    SWAP(header64->e_shoff, u64);
-    SWAP(header64->e_flags, u32);
-    SWAP(header64->e_ehsize, u16);
-    SWAP(header64->e_phentsize, u16);
-    SWAP(header64->e_phnum, u16);
-    SWAP(header64->e_shentsize, u16);
-    SWAP(header64->e_shnum, u16);
-    SWAP(header64->e_shstrndx, u16);
-  }
+  SWAP(header, ->e_entry);
+  SWAP(header, ->e_phoff);
+  SWAP(header, ->e_shoff);
+  SWAP(header, ->e_flags);
+  SWAP(header, ->e_ehsize);
+  SWAP(header, ->e_phentsize);
+  SWAP(header, ->e_phnum);
+  SWAP(header, ->e_shentsize);
+  SWAP(header, ->e_shnum);
+  SWAP(header, ->e_shstrndx);
 
   // ELF Entry point.
-  u64 entryPoint = (elf32 ? header->e_entry : header64->e_entry);
+  const auto entryPoint = READ(header, ->e_entry);
   LOG_INFO(Xenon, "ELF Entry Point: {:#x}", entryPoint);
 
   // Get the number of entries in the program header table.
-  const auto progHeaderNumSections = (elf32 ? header->e_phnum : header64->e_phnum);
+  const auto progHeaderNumSections = READ(header, ->e_phnum);
   LOG_INFO(Xenon, "Number of entries in Program HT: {}", progHeaderNumSections);
 
   // Get the number of entries in the section header table.
-  const auto sectHeaderNumSections = (elf32 ? header->e_shnum : header64->e_shnum);
+  const auto sectHeaderNumSections = READ(header, ->e_shnum);
   LOG_INFO(Xenon, "Number of entries in Section HT: {}", sectHeaderNumSections);
 
   // Get the program header table data at specified offset.
@@ -569,63 +532,30 @@ u64 PPU::loadElfImage(u8* data, u64 size) {
   elf64_phdr* progHeaderTableData64 = reinterpret_cast<elf64_phdr*>(data + header64->e_phoff);
 
   // Load Segments from Program segment table.
-  if (elf32) {
-    // ELF32
-    for (size_t idx = 0; idx < progHeaderNumSections; idx++) {
-      SWAP(progHeaderTableData[idx].p_type, u32);
-      SWAP(progHeaderTableData[idx].p_offset, u32);
-      SWAP(progHeaderTableData[idx].p_vaddr, u32);
-      SWAP(progHeaderTableData[idx].p_paddr, u32);
-      SWAP(progHeaderTableData[idx].p_filesz, u32);
-      SWAP(progHeaderTableData[idx].p_memsz, u32);
-      SWAP(progHeaderTableData[idx].p_flags, u32);
-      SWAP(progHeaderTableData[idx].p_align, u32);
+  for (size_t idx = 0; idx < progHeaderNumSections; idx++) {
+    SWAP(progHeaderTableData, [idx].p_type);
+    SWAP(progHeaderTableData, [idx].p_offset);
+    SWAP(progHeaderTableData, [idx].p_vaddr);
+    SWAP(progHeaderTableData, [idx].p_paddr);
+    SWAP(progHeaderTableData, [idx].p_filesz);
+    SWAP(progHeaderTableData, [idx].p_memsz);
+    SWAP(progHeaderTableData, [idx].p_flags);
+    SWAP(progHeaderTableData, [idx].p_align);
 
-      if (progHeaderTableData[idx].p_type == PT_LOAD) {
-        u64 vaddr = progHeaderTableData[idx].p_vaddr;
-        u64 paddr = progHeaderTableData[idx].p_paddr;
-        u64 filesize = progHeaderTableData[idx].p_filesz;
-        u64 memsize = progHeaderTableData[idx].p_memsz;
-        u64 file_offset = progHeaderTableData[idx].p_offset;
-        bool physical_load = true;
-        u64 target_addr = physical_load ? paddr : vaddr;
-        LOG_INFO(Xenon, "Loading {:#x} bytes from offset {:#x} in the ELF to address {:#x}",
-          filesize, file_offset, target_addr);
-        PPCInterpreter::MMUMemCpyFromHost(ppuState.get(), target_addr, data + file_offset, filesize);
-        if (memsize > filesize) { // Memory size greater than file, zero out remainder
-          u64 remainder = memsize - filesize;
-          PPCInterpreter::MMUWrite(xenonContext, ppuState.get(), 0, target_addr + filesize, remainder);
-        }
-      }
-    }
-  }
-  else {
-    // ELF64
-    for (size_t idx = 0; idx < progHeaderNumSections; idx++) {
-      SWAP(progHeaderTableData64[idx].p_type, u32);
-      SWAP(progHeaderTableData64[idx].p_offset, u64);
-      SWAP(progHeaderTableData64[idx].p_vaddr, u64);
-      SWAP(progHeaderTableData64[idx].p_paddr, u64);
-      SWAP(progHeaderTableData64[idx].p_filesz, u64);
-      SWAP(progHeaderTableData64[idx].p_memsz, u64);
-      SWAP(progHeaderTableData64[idx].p_flags, u32);
-      SWAP(progHeaderTableData64[idx].p_align, u64);
-
-      if (progHeaderTableData64[idx].p_type == PT_LOAD) {
-        u64 vaddr = progHeaderTableData64[idx].p_vaddr;
-        u64 paddr = progHeaderTableData64[idx].p_paddr;
-        u64 filesize = progHeaderTableData64[idx].p_filesz;
-        u64 memsize = progHeaderTableData64[idx].p_memsz;
-        u64 file_offset = progHeaderTableData64[idx].p_offset;
-        bool physical_load = true;
-        u64 target_addr = physical_load ? paddr : vaddr;
-        LOG_INFO(Xenon, "Loading {:#x} bytes from offset {:#x} in the ELF to address {:#x}",
-          filesize, file_offset, target_addr);
-        PPCInterpreter::MMUMemCpyFromHost(ppuState.get(), target_addr, data + file_offset, filesize);
-        if (memsize > filesize) { // Memory size greater than file, zero out remainder
-          u64 remainder = memsize - filesize;
-          PPCInterpreter::MMUWrite(xenonContext, ppuState.get(), 0, target_addr + filesize, remainder);
-        }
+    if (progHeaderTableData[idx].p_type == PT_LOAD) {
+      u64 vaddr = READ(progHeaderTableData, [idx].p_vaddr);
+      u64 paddr = READ(progHeaderTableData, [idx].p_paddr);
+      u64 filesize = READ(progHeaderTableData, [idx].p_filesz);
+      u64 memsize = READ(progHeaderTableData, [idx].p_memsz);
+      u64 file_offset = READ(progHeaderTableData, [idx].p_offset);
+      bool physical_load = true;
+      u64 target_addr = physical_load ? paddr : vaddr;
+      LOG_INFO(Xenon, "Loading {:#x} bytes from offset {:#x} in the ELF to address {:#x}",
+        filesize, file_offset, target_addr);
+      PPCInterpreter::MMUMemCpyFromHost(ppuState.get(), target_addr, data + file_offset, filesize);
+      if (memsize > filesize) { // Memory size greater than file, zero out remainder
+        u64 remainder = memsize - filesize;
+        PPCInterpreter::MMUWrite(xenonContext, ppuState.get(), 0, target_addr + filesize, remainder);
       }
     }
   }
