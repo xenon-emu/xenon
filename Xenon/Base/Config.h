@@ -105,11 +105,11 @@ inline struct _debug {
 inline struct _smc {
   // SMC Detected AV Pack. Tells the system what kind of video output it is connected to
   // This is used to detect the current resolution
-  int avPackType = 31; // Set to HDMI_NO_AUDIO. See SMC.cpp for a list of values.
+  s32 avPackType = 31; // Set to HDMI_NO_AUDIO. See SMC.cpp for a list of values.
   // SMC Power On type (Power button, eject button, controller, etc...)
-  int powerOnReason = 0x11; // SMC_PWR_REAS_EJECT
+  s32 powerOnReason = 0x11; // SMC_PWR_REAS_EJECT
   // Selected vCOM Port
-  int comPort = 2;
+  s32 comPort = 2;
   // Backup UART, kicks on when a vCOM is not present
   bool useBackupUart = false;
   std::string COMPort() {
@@ -126,6 +126,10 @@ inline struct _smc {
 // XCPU
 //
 inline struct _xcpu {
+  // Loads an elf from the ElfBinary path
+  bool elfLoader = false;
+  // CPI for your system, do not modify
+  s32 clocksPerInstruction = 0;
   // HW_INIT_SKIP
   u64 HW_INIT_SKIP_1 = 0;
   u64 HW_INIT_SKIP_2 = 0;
@@ -140,7 +144,7 @@ inline struct _xcpu {
 // XGPU
 //
 inline struct _xgpu {
-  // Internal Resolution | The resolution XeLL uses
+  // s32ernal Resolution | The resolution XeLL uses
   _resolution internal{ 1280, 720 };
 
   // TOML Conversion
@@ -198,8 +202,7 @@ inline struct _log {
 // Highly experimental (things that can either break the emulator or drastically increase performance)
 //
 inline struct _highlyExperimental {
-  int clocksPerInstruction = 0;
-  bool elfLoader = false;
+  s32 clocksPerInstructionBypass = 0;
 
   // TOML Conversion
   void to_toml(toml::value &value);

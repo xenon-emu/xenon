@@ -3,6 +3,7 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
 
 #include "Base/LRUCache.h"
 #include "Core/XCPU/IIC/IIC.h"
@@ -419,11 +420,11 @@ struct PPU_STATE_SPRS {
 };
 
 // Thread ID's for ease of handling.
-enum PPU_THREAD {
-  PPU_THREAD_0,
-  PPU_THREAD_1,
-  PPU_THREAD_BOTH,
-  PPU_THREAD_NONE
+enum class ePPUThread : u8 {
+  Zero = 0,
+  One,
+  Both,
+  None
 };
 
 //
@@ -596,9 +597,9 @@ struct PPU_THREAD_REGISTERS {
 
 struct PPU_STATE {
   // Thread Specific State.
-  PPU_THREAD_REGISTERS ppuThread[2]{};
+  std::unordered_map<ePPUThread, PPU_THREAD_REGISTERS> ppuThread{};
   // Current executing thread.
-  PPU_THREAD currentThread = PPU_THREAD_0;
+  ePPUThread currentThread = ePPUThread::Zero;
   // Shared Special Purpose Registers.
   PPU_STATE_SPRS SPR{};
   // Translation Lookaside Buffer

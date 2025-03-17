@@ -210,8 +210,8 @@ void Render::GUI::Tooltip(const std::string& contents, ImGuiHoveredFlags delay) 
   }
 }
 
-void PPUThread(Render::GUI *gui, PPU_STATE *PPUState, u32 threadID) {
-  gui->Node(fmt::format("[{}]", threadID), [&] {
+void PPUThread(Render::GUI *gui, PPU_STATE *PPUState, ePPUThread threadID) {
+  gui->Node(fmt::format("[{}]", static_cast<u8>(threadID)), [&] {
     PPU_THREAD_REGISTERS &ppuRegisters = PPUState->ppuThread[threadID];
     gui->Node("SPR", [&] {
       PPU_THREAD_SPRS &SPR = ppuRegisters.SPR;
@@ -442,8 +442,8 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
     RenderInstr(gui, curThread.CIA, curInstr);
     RenderInstr(gui, curThread.NIA, nextInstr);
     gui->Node("ppuThread", [&] {
-      PPUThread(gui, PPUStatePtr, 0);
-      PPUThread(gui, PPUStatePtr, 1);
+      PPUThread(gui, PPUStatePtr, ePPUThread::Zero);
+      PPUThread(gui, PPUStatePtr, ePPUThread::One);
     });
     gui->U8Dec(PPUState, currentThread);
     gui->Node("SPR", [&] {
@@ -605,7 +605,7 @@ void CodeflowSettings(Render::GUI *gui) {
     Config::xcpu.HW_INIT_SKIP_1 = RGH2 ? 0x3003DC0 : initSkip1;
     Config::xcpu.HW_INIT_SKIP_2 = RGH2 ? 0x3003E54 : initSkip2;
   });
-  gui->Toggle("Load Elf", &Config::highlyExperimental.elfLoader);
+  gui->Toggle("Load Elf", &Config::xcpu.elfLoader);
 }
 
 void PathSettings(Render::GUI *gui) {
@@ -663,6 +663,18 @@ void Render::GUI::OnSwap(Texture *texture) {
           Button("Dump FB", [&] {
             const auto UserDir = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
             Xe_Main->xenos->DumpFB(UserDir / "fbmem.bin", Xe_Main->renderer->pitch);
+          });
+        });
+        TabItem("CPU", [&] {
+          Button("Test", [&] {
+            Xe_Main->xenonCPU->Halt();
+          });
+          Button("Re-run CPI Test", [&] {
+            Xe_Main->xenonCPU->Halt();
+            PPU *PPU = Xe_Main->xenonCPU->GetPPU(0);
+            PPU->CalculateCPI();
+            PPU->GetCPI();
+            Xe_Main->xenonCPU->Continue();
           });
         });
         TabItem("Settings", [&] {
