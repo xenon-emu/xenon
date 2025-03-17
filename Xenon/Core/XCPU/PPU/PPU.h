@@ -8,6 +8,16 @@
 
 #include "Core/RootBus/RootBus.h"
 
+enum class eThreadState : u8 {
+  None,        // Not created
+  Unused,      // Should we create a handle? (Only really used in elf loading and single-core testing)
+  Sleeping,    // Waiting for wakeup
+  Halted,      // Halted, but ready for execution
+  Running,     // Running
+  Executing,   // Actively running opcodes
+  Reseting,    // Recreating handle, same as halted but will resume afterwards
+  Quiting      // Currently in a shutdown
+};
 class PPU {
 public:
   PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PVR,
@@ -28,14 +38,17 @@ public:
   void Continue();
   void Step(int amount = 1);
 
+  // Thread state machine
+  void ThreadStateMachine();
+
   // Thread function
-  void Thread();
+  void ThreadLoop();
 
   // Returns a pointer to a thread
   PPU_THREAD_REGISTERS *GetPPUThread(u8 thrdID);
 
-  // Returns if the PPU is halted
-  bool IsHalted() { return ppuHalt; }
+  // Runs a specified number of instructions
+  void ppuRunInstructions(u64 &numInstrs, bool enableHalt = true);
 
   // Sets the clocks per instruction
   void SetCPI(u32 CPI) { clocksPerInstruction = CPI; }
@@ -43,7 +56,18 @@ public:
   u32 GetCPI() { return clocksPerInstruction; }
 
   // Checks if the thread is active
-  bool ThreadRunning() { return ppuRunning; }
+  bool ThreadActive() {
+    return ppuThreadState == eThreadState::Executing
+      || ppuThreadState == eThreadState::Running;
+  }
+
+  // Checks if the thread is halted
+  bool IsHalted() {
+    return ppuThreadState == eThreadState::Halted;
+  }
+
+  // Returns the thread state
+  eThreadState ThreadState() { return ppuThreadState; }
 
   // Get ppuState
   PPU_STATE *GetPPUState() { return ppuState.get(); }
@@ -56,31 +80,16 @@ private:
   std::thread ppuThread;
 
   // PPU running?
-  bool ppuRunning = false;
+  eThreadState ppuThreadState = eThreadState::None;
 
-  // Can we quit?
-  bool ppuExecutionDone = true;
+  // PPU thread state before halting
+  eThreadState ppuThreadPreviousState = eThreadState::None;
 
-  // Are we running a elf? Should we early exit?
-  bool ppuElfExecution = false;
-
-  // Halt thread
-  bool ppuHalt = false;
-  // Halt on startup
-  bool ppuStartHalted = false;
   // If this is set to a non-zero value, it will halt on that address then clear it
   u64 ppuHaltOn = 0;
 
-  // Should we single step?
-  bool ppuStep = false;
   // Amount of instructions to step
-  int ppuStepAmount = 1;
-  // How many times we have stepped since activating it
-  // Counter ticks up until step amount is reached
-  int ppuStepCounter = 0;
-
-  // Reset ocurred or signaled?
-  bool systemReset = false;
+  u64 ppuStepAmount = 0;
 
   // Execution threads inside this PPU.
   std::shared_ptr<PPU_STATE> ppuState;
@@ -99,13 +108,15 @@ private:
   // Returns the number of instructions per second the current
   // host computer can process.
   u32 getIPS();
-  // Read next intruction from memory,
+  // Read next intruction from memory
   bool ppuReadNextInstruction();
-  // Check for pending exceptions.
+  // Checks for pending exceptions
   void ppuCheckExceptions();
+  // Checks if it should update the time base
+  void checkTimeBaseStatus();
   // Updates the current PPU's time base and decrementer based on
   // the amount of ticks per instr we should perform.
   void updateTimeBase();
   // Gets the current running threads.
-  PPU_THREAD getCurrentRunningThreads();
+  ePPUThread getCurrentRunningThreads();
 };

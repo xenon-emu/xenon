@@ -1132,7 +1132,7 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   if (EA != 0 && EA == Config::debug.haltOnReadAddress) {
     Xenon *CPU = Xe_Main->getCPU();
     PPU *PPU = Xe_Main->getCPU()->GetPPU(ppuState->ppuID);
-    if (PPU->ThreadRunning()) {
+    if (PPU->ThreadActive()) {
       CPU->Halt();
     }
     Config::imgui.debugWindow = true; // Open debugger after halting
@@ -1311,7 +1311,7 @@ u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   }
 
   if (socRead && nand != true && pciBridge != true && pciConfigSpace != true && xGPU != true) {
-      LOG_WARNING(Xenon_MMU, "SoC Read from {:#x}, returning 0.", EA);
+    LOG_WARNING(Xenon_MMU, "SoC Read from {:#x}, returning 0.", EA);
     data = 0;
     return data;
   }
