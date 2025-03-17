@@ -69,7 +69,7 @@ public:
 
   template <typename... Tx>
   Flags(T f, Tx... fx) {
-    this->set(f, fx...);
+    set(f, fx...);
   }
 
   template <typename... Tx>
@@ -102,7 +102,7 @@ public:
   }
 
   bool test(T f) const {
-    return this->any(f);
+    return any(f);
   }
 
   bool isClear() const {
