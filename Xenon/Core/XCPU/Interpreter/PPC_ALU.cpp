@@ -19,7 +19,8 @@ struct addResult {
 
   // Straighforward ADD with flags
   addResult(T a, T b) :
-    result(a + b), carry(result < a)
+    result(a + b), carry(result < a || 
+      static_cast<u32>(result) < static_cast<u32>(a)) // Also refelct 32 bit carry on 64 bit operations.
   {}
 
   // Straighforward ADC with flags
@@ -65,6 +66,20 @@ void PPCInterpreter::PPCInterpreter_addx(PPU_STATE *ppuState) {
   const u64 RB = GPRi(rb);
 
   GPRi(rd) = RA + RB;
+
+  if (_instr.rc) {
+    u32 CR = CRCompS(ppuState, GPRi(rd), 0);
+    ppcUpdateCR(ppuState, 0, CR);
+  }
+}
+
+void PPCInterpreter::PPCInterpreter_addcx(PPU_STATE* ppuState) {
+  const u64 RA = GPRi(ra);
+  const u64 RB = GPRi(rb);
+
+  const auto add = addResult<u64>(RA, RB);
+  GPRi(rd) = add.result;
+  XER_SET_CA(add.carry);
 
   if (_instr.rc) {
     u32 CR = CRCompS(ppuState, GPRi(rd), 0);
