@@ -60,6 +60,23 @@ inline s64 mulh64(s64 x, s64 y) {
 #endif
 }
 
+// Set XER[OV] bit. Overflow enable.
+inline void ppuSetXerOv(PPU_STATE *ppuState, bool inbit)
+{
+  XERegister xer = curThread.SPR.XER;
+  // Set register as intended.
+  curThread.SPR.XER.XER_Hex = 0;
+  // Mantain ByteCount.
+  curThread.SPR.XER.ByteCount = xer.ByteCount; 
+  // Should mantain SO and CA bits.
+  if (xer.CA)
+    curThread.SPR.XER.CA = 1;
+  if (xer.SO || inbit)
+    curThread.SPR.XER.SO = 1;
+  // Set OV based on input.
+  curThread.SPR.XER.OV = inbit;
+}
+
 //
 // Instruction definitions.
 //
@@ -70,10 +87,19 @@ void PPCInterpreter::PPCInterpreter_addx(PPU_STATE *ppuState) {
 
   GPRi(rd) = RA + RB;
 
+  if (_instr.oe) {
+    ppuSetXerOv(ppuState, (RA >> 63 == RB >> 63) && (RA >> 63 != GPRi(rd) >> 63));
+  }
+
   if (_instr.rc) {
     u32 CR = CRCompS(ppuState, GPRi(rd), 0);
     ppcUpdateCR(ppuState, 0, CR);
   }
+}
+
+void PPCInterpreter::PPCInterpreter_addox(PPU_STATE* ppuState)
+{
+  PPCInterpreter_addx(ppuState);
 }
 
 void PPCInterpreter::PPCInterpreter_addcx(PPU_STATE* ppuState) {
@@ -84,10 +110,19 @@ void PPCInterpreter::PPCInterpreter_addcx(PPU_STATE* ppuState) {
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
 
+  if (_instr.oe) {
+    ppuSetXerOv(ppuState, (RA >> 63 == RB >> 63) && (RA >> 63 != GPRi(rd) >> 63));
+  }
+
   if (_instr.rc) {
     u32 CR = CRCompS(ppuState, GPRi(rd), 0);
     ppcUpdateCR(ppuState, 0, CR);
   }
+}
+
+void PPCInterpreter::PPCInterpreter_addcox(PPU_STATE* ppuState)
+{
+  PPCInterpreter_addcx(ppuState);
 }
 
 void PPCInterpreter::PPCInterpreter_addex(PPU_STATE *ppuState) {
@@ -98,10 +133,19 @@ void PPCInterpreter::PPCInterpreter_addex(PPU_STATE *ppuState) {
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
 
+  if (_instr.oe) {
+    ppuSetXerOv(ppuState, (RA >> 63 == RB >> 63) && (RA >> 63 != GPRi(rd) >> 63));
+  }
+
   if (_instr.rc) {
     u32 CR = CRCompS(ppuState, add.result, 0);
     ppcUpdateCR(ppuState, 0, CR);
   }
+}
+
+void PPCInterpreter::PPCInterpreter_addeox(PPU_STATE* ppuState)
+{
+  PPCInterpreter_addex(ppuState);
 }
 
 void PPCInterpreter::PPCInterpreter_addi(PPU_STATE *ppuState) {
@@ -127,6 +171,30 @@ void PPCInterpreter::PPCInterpreter_addis(PPU_STATE *ppuState) {
   GPRi(rd) = _instr.ra ? GPRi(ra) + (_instr.simm16 * 65536) : (_instr.simm16 * 65536);
 }
 
+void PPCInterpreter::PPCInterpreter_addmex(PPU_STATE* ppuState)
+{
+  const s64 RA = GPRi(ra);
+
+  const auto add = addResult<u64>(RA, ~0ull, XER_GET_CA, curThread.SPR.MSR.SF);
+  GPRi(rd) = add.result;
+  XER_SET_CA(add.carry);
+
+  if (_instr.oe) {
+    ppuSetXerOv(ppuState, (u64(RA) >> 63 == 1) && (u64(RA) >> 63 != GPRi(rd) >> 63));
+  }
+
+  // _rc
+  if (_instr.rc) {
+    u32 CR = CRCompS(ppuState, add.result, 0);
+    ppcUpdateCR(ppuState, 0, CR);
+  }
+}
+
+void PPCInterpreter::PPCInterpreter_addmeox(PPU_STATE* ppuState)
+{
+  PPCInterpreter_addmex(ppuState);
+}
+
 void PPCInterpreter::PPCInterpreter_addzex(PPU_STATE *ppuState) {
   const u64 ra = GPRi(ra);
 
@@ -134,10 +202,19 @@ void PPCInterpreter::PPCInterpreter_addzex(PPU_STATE *ppuState) {
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
 
+  if (_instr.oe) {
+    ppuSetXerOv(ppuState, (ra >> 63 == 0) && (ra >> 63 != GPRi(rd) >> 63));
+  }
+
   if (_instr.rc) {
     u32 CR = CRCompS(ppuState, add.result, 0);
     ppcUpdateCR(ppuState, 0, CR);
   }
+}
+
+void PPCInterpreter::PPCInterpreter_addzeox(PPU_STATE* ppuState)
+{
+  PPCInterpreter_addzex(ppuState);
 }
 
 void PPCInterpreter::PPCInterpreter_andx(PPU_STATE *ppuState) {

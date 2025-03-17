@@ -17,12 +17,6 @@ namespace PPCInterpreter {
 extern void PPCInterpreter_invalid(PPU_STATE *ppuState);
 extern void PPCInterpreter_known_unimplemented(const char* name, PPU_STATE *ppuState);
 
-D_STUBRC(addco)
-D_STUBRC(addo)
-D_STUBRC(addeo)
-D_STUBRC(addzeo)
-D_STUBRC(addme)
-D_STUBRC(addmeo)
 D_STUBRC(subfco)
 D_STUBRC(subfeo)
 D_STUBRC(subfo)
@@ -287,12 +281,18 @@ D_STUB(vsumsws)
 
 // ALU
 extern void PPCInterpreter_addx(PPU_STATE *ppuState);
+extern void PPCInterpreter_addox(PPU_STATE *ppuState);
 extern void PPCInterpreter_addcx(PPU_STATE *ppuState);
+extern void PPCInterpreter_addcox(PPU_STATE *ppuState);
 extern void PPCInterpreter_addex(PPU_STATE *ppuState);
+extern void PPCInterpreter_addeox(PPU_STATE *ppuState);
 extern void PPCInterpreter_addi(PPU_STATE *ppuState);
 extern void PPCInterpreter_addic(PPU_STATE *ppuState);
 extern void PPCInterpreter_addis(PPU_STATE *ppuState);
+extern void PPCInterpreter_addmex(PPU_STATE *ppuState);
+extern void PPCInterpreter_addmeox(PPU_STATE *ppuState);
 extern void PPCInterpreter_addzex(PPU_STATE *ppuState);
+extern void PPCInterpreter_addzeox(PPU_STATE *ppuState);
 extern void PPCInterpreter_andx(PPU_STATE *ppuState);
 extern void PPCInterpreter_andcx(PPU_STATE *ppuState);
 extern void PPCInterpreter_andi(PPU_STATE *ppuState);
