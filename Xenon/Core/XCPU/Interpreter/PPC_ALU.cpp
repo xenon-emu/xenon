@@ -17,26 +17,29 @@ struct addResult {
 
   addResult() = default;
 
-  // Straighforward ADD with flags
-  addResult(T a, T b) :
-    result(a + b), carry(result < a || 
-      static_cast<u32>(result) < static_cast<u32>(a)) // Also refelct 32 bit carry on 64 bit operations.
+  // Straighforward ADD with flags.
+  // The integer arithmetic instructions, always set the XER bit [CA], 
+  // to reflect the carry out of bit [0] in the default 64-bit mode 
+  // and out of bit[32] in 32 bit mode(of 64 bit implementations).
+  addResult(T a, T b, bool sfBitMode) :
+    result(a + b), carry(sfBitMode ? (result < a) :
+      (static_cast<u32>(result) < static_cast<u32>(a)))
   {}
 
   // Straighforward ADC with flags
-  addResult(T a, T b, bool c) :
-    addResult(a, b)
+  addResult(T a, T b, bool c, bool sfBitMode) :
+    addResult(a, b, sfBitMode)
   {
-    addResult r(result, c);
+    addResult r(result, c, sfBitMode);
     result = r.result;
     carry |= r.carry;
   }
-  static addResult<T> addBits(T a, T b) {
-    return { a, b };
+  static addResult<T> addBits(T a, T b, bool sfBitMode) {
+    return { a, b, sfBitMode };
   }
 
-  static addResult<T> addBits(T a, T b, bool c) {
-    return { a, b, c };
+  static addResult<T> addBits(T a, T b, bool c, bool sfBitMode) {
+    return { a, b, c, sfBitMode };
   }
 };
 
@@ -77,7 +80,7 @@ void PPCInterpreter::PPCInterpreter_addcx(PPU_STATE* ppuState) {
   const u64 RA = GPRi(ra);
   const u64 RB = GPRi(rb);
 
-  const auto add = addResult<u64>(RA, RB);
+  const auto add = addResult<u64>(RA, RB, curThread.SPR.MSR.SF);
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
 
@@ -91,7 +94,7 @@ void PPCInterpreter::PPCInterpreter_addex(PPU_STATE *ppuState) {
   const u64 RA = GPRi(ra);
   const u64 RB = GPRi(rb);
 
-  const auto add = addResult<u64>::addBits(RA, RB, XER_GET_CA);
+  const auto add = addResult<u64>::addBits(RA, RB, XER_GET_CA, curThread.SPR.MSR.SF);
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
 
@@ -109,7 +112,7 @@ void PPCInterpreter::PPCInterpreter_addic(PPU_STATE *ppuState) {
   const s64 ra = GPRi(ra);
   const s64 i = _instr.simm16;
 
-  const auto add = addResult<u64>::addBits(ra, i);
+  const auto add = addResult<u64>::addBits(ra, i, curThread.SPR.MSR.SF);
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
 
@@ -127,7 +130,7 @@ void PPCInterpreter::PPCInterpreter_addis(PPU_STATE *ppuState) {
 void PPCInterpreter::PPCInterpreter_addzex(PPU_STATE *ppuState) {
   const u64 ra = GPRi(ra);
 
-  const auto add = addResult<u64>::addBits(ra, 0, XER_GET_CA);
+  const auto add = addResult<u64>::addBits(ra, 0, XER_GET_CA, curThread.SPR.MSR.SF);
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
 
@@ -840,7 +843,7 @@ void PPCInterpreter::PPCInterpreter_subfcx(PPU_STATE *ppuState) {
   const u64 RA = GPRi(ra);
   const u64 RB = GPRi(rb);
 
-  const auto add = addResult<u64>::addBits(~RA, RB, 1);
+  const auto add = addResult<u64>::addBits(~RA, RB, 1, curThread.SPR.MSR.SF);
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
 
@@ -866,7 +869,7 @@ void PPCInterpreter::PPCInterpreter_subfex(PPU_STATE *ppuState) {
   const u64 RA = GPRi(ra);
   const u64 RB = GPRi(rb);
 
-  const auto add = addResult<u64>::addBits(~RA, RB, XER_GET_CA);
+  const auto add = addResult<u64>::addBits(~RA, RB, XER_GET_CA, curThread.SPR.MSR.SF);
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
 
@@ -879,7 +882,7 @@ void PPCInterpreter::PPCInterpreter_subfex(PPU_STATE *ppuState) {
 void PPCInterpreter::PPCInterpreter_subfzex(PPU_STATE *ppuState) {
   const u64 RA = GPRi(ra);
 
-  const auto add = addResult<u64>::addBits(~RA, 0, XER_GET_CA);
+  const auto add = addResult<u64>::addBits(~RA, 0, XER_GET_CA, curThread.SPR.MSR.SF);
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
 
@@ -893,7 +896,7 @@ void PPCInterpreter::PPCInterpreter_subfic(PPU_STATE *ppuState) {
   const u64 RA = GPRi(ra);
   const s64 i = _instr.simm16;
 
-  const auto add = addResult<u64>::addBits(~RA, i, 1);
+  const auto add = addResult<u64>::addBits(~RA, i, 1, curThread.SPR.MSR.SF);
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
 }
