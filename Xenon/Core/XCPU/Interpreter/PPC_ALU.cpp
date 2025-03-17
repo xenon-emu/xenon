@@ -404,6 +404,15 @@ void PPCInterpreter::PPCInterpreter_divwux(PPU_STATE *ppuState) {
   }
 }
 
+void PPCInterpreter::PPCInterpreter_eqvx(PPU_STATE* ppuState) {
+  GPRi(ra) = ~(GPRi(rs) ^ GPRi(rb));
+
+  if (_instr.rc) {
+    u32 CR = CRCompS(ppuState, GPRi(ra), 0);
+    ppcUpdateCR(ppuState, 0, CR);
+  }
+}
+
 void PPCInterpreter::PPCInterpreter_extsbx(PPU_STATE *ppuState) {
   GPRi(ra) = static_cast<s8>(GPRi(rs));
 

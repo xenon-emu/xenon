@@ -74,7 +74,6 @@ D_STUBRC(fnabs)
 D_STUBRC(fsqrt)
 D_STUBRC(fsqrts)
 D_STUBRC(frsqrte)
-D_STUBRC(eqv)
 D_STUB(td)
 D_STUB(dst)
 D_STUB(dss)
@@ -318,6 +317,7 @@ extern void PPCInterpreter_divdux(PPU_STATE *ppuState);
 extern void PPCInterpreter_divwx(PPU_STATE *ppuState);
 extern void PPCInterpreter_divwux(PPU_STATE *ppuState);
 extern void PPCInterpreter_isync(PPU_STATE *ppuState);
+extern void PPCInterpreter_eqvx(PPU_STATE *ppuState);
 extern void PPCInterpreter_extsbx(PPU_STATE *ppuState);
 extern void PPCInterpreter_extshx(PPU_STATE *ppuState);
 extern void PPCInterpreter_extswx(PPU_STATE *ppuState);
