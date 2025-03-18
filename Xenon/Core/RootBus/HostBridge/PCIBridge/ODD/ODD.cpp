@@ -23,29 +23,69 @@ void ODD::atapiReset() {
   atapiState.mountedCDImage = std::make_unique<STRIP_UNIQUE(atapiState.mountedCDImage)>(Config::filepaths.oddImage);
 }
 
-void ODD::atapiIdentifyPacketDeviceCommand() {
+void ODD::atapiIdentifyPacketDeviceCommand()
+{
   // This command is only for ATAPI devices.
 
-  // TODO(bitsh1ft3r): Fill out the struct with data from an actual drive.
+  LOG_DEBUG(ODD, "ATAPI_IDENTIFY_PACKET_DEVICE_COMMAND");
 
-  if (!atapiState.dataReadBuffer.Initialize(ATAPI_CDROM_SECTOR_SIZE, true)) {
+  if (!atapiState.dataReadBuffer.Initialize(sizeof(XE_ATA_IDENTIFY_DATA), true)) {
     LOG_ERROR(ODD, "Failed to initialize data buffer for atapiIdentifyPacketDeviceCommand");
   }
 
-  // Set the struct.
-  atapiState.atapiIdentifyData.generalConfiguration = 0x8000; // ATAPI device.
+  XE_ATA_IDENTIFY_DATA* identifyData;
 
   // Reset the pointer.
   atapiState.dataReadBuffer.ResetPtr();
-  // Copy the data.
-  memcpy(atapiState.dataReadBuffer.Ptr(), &atapiState.atapiIdentifyData, sizeof(XE_ATA_IDENTIFY_DATA));
+  identifyData = (XE_ATA_IDENTIFY_DATA*)atapiState.dataReadBuffer.Ptr();
+
+  // Note: The data is stored in little endian.
+  u8 serialNumber[] = { 0x38, 0x44, 0x33, 0x31, 0x42, 0x42, 0x34, 0x32,
+    0x36, 0x36, 0x32, 0x31, 0x30, 0x30, 0x48, 0x36, 0x20, 0x4a, 0x20, 0x20 };
+
+  u8 firmwareRevision[] = { 0x35, 0x31, 0x32, 0x33, 0x20, 0x20, 0x20, 0x20 };
+
+  u8 modelNumber[] = { 0x4c, 0x50, 0x53, 0x44, 0x20 ,0x20, 0x20, 0x20,
+    0x47, 0x44, 0x31, 0x2d, 0x44, 0x36, 0x53, 0x35,
+    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20 };
+
+  // Set the data.
+  identifyData->generalConfiguration = 0x85C0;
+  memcpy(&identifyData->serialNumber, &serialNumber, sizeof(serialNumber));
+  memcpy(&identifyData->firmwareRevision, &firmwareRevision, sizeof(firmwareRevision));
+  memcpy(&identifyData->modelNumber, &modelNumber, sizeof(modelNumber));
+
+
+  identifyData->capabilities = 0x0F00;
+  identifyData->reserved7 = 0x4000;
+  identifyData->reserved8 = 0x0400;
+  identifyData->reserved9 = 0x0200;
+  identifyData->translationFieldsValid = 0x6;
+  identifyData->advancedPIOModes = 0x3;
+  identifyData->minimumMWXferCycleTime = 0x78;
+  identifyData->recommendedMWXferCycleTime = 0x78;
+  identifyData->minimumPIOCycleTime = 0x78;
+  identifyData->minimumPIOCycleTimeIORDY = 0x78;
+  identifyData->majorRevision = 0xf8;
+  identifyData->minorRevision = 0x210;
+  identifyData->ultraDMASupport = 0x203f;
+
+
+  // Set the transfer size:
+  // bytecount = LBA High << 8 | LBA Mid.
+  size_t dataSize = sizeof(XE_ATA_IDENTIFY_DATA);
+
+  atapiState.atapiRegs.lbaLowReg = 1;
+  atapiState.atapiRegs.byteCountLowReg = dataSize & 0xFF;
+  atapiState.atapiRegs.byteCountHighReg = (dataSize >> 8) & 0xFF;
+
   // Set the drive status.
-  atapiState.atapiRegs.statusReg |= ATA_STATUS_DRQ;
-  // Request an interrupt.
-  parentBus->RouteInterrupt(PRIO_SATA_ODD);
-  // Set interrupt reason.
-  atapiState.atapiRegs.interruptReasonReg = IDE_INTERRUPT_REASON_IO;
+  atapiState.atapiRegs.statusReg = ATA_STATUS_DRDY | ATA_STATUS_DRQ | ATA_STATUS_DF;
+
+  // Request interrupt.
+  parentBus->RouteInterrupt(PRIO_SATA_CDROM);
 }
+
 
 void ODD::atapiIdentifyCommand() {
   // Used by software to decide whether the device is an ATA or ATAPI device.
@@ -246,6 +286,8 @@ void ODD::Read(u64 readAddress, u8 *data, u8 byteCount) {
       return;
     case ATAPI_REG_ERROR:
       memcpy(data, &atapiState.atapiRegs.errorReg, byteCount);
+      // Clear the error status on the status register.
+      atapiState.atapiRegs.statusReg &= ~ATA_STATUS_ERR_CHK;
       return;
     case ATAPI_REG_INT_REAS:
       memcpy(data, &atapiState.atapiRegs.interruptReasonReg, byteCount);
@@ -263,10 +305,14 @@ void ODD::Read(u64 readAddress, u8 *data, u8 byteCount) {
       memcpy(data, &atapiState.atapiRegs.deviceReg, byteCount);
       return;
     case ATAPI_REG_STATUS:
+      // TODO(bitsh1ft3r): Reading to the status reg should cancel any pending interrupts.
       memcpy(data, &atapiState.atapiRegs.statusReg, byteCount);
       return;
     case ATAPI_REG_ALTERNATE_STATUS:
-      memcpy(data, &atapiState.atapiRegs.altStatusReg, byteCount);
+      // Reading to the alternate status register returns the contents of the Status register, 
+      // but it does not clean pending interrupts. Also wastes 100ns.
+      std::this_thread::sleep_for(std::chrono::nanoseconds(100));
+      memcpy(data, &atapiState.atapiRegs.statusReg, byteCount);
       return;
     default:
       LOG_ERROR(ODD, "Unknown Command Register Block register being read, command code = {:#x}", atapiCommandReg);
@@ -326,8 +372,6 @@ void ODD::Write(u64 writeAddress, u8 *data, u8 byteCount) {
         atapiState.dataWriteBuffer.ResetPtr();
         // Request an Interrupt.
         parentBus->RouteInterrupt(PRIO_SATA_ODD);
-        // Clear our Command Register.
-        atapiState.atapiRegs.commandReg = 0;
       }
       return;
     case ATAPI_REG_FEATURES:
