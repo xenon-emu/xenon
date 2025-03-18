@@ -17,28 +17,10 @@ namespace PPCInterpreter {
 extern void PPCInterpreter_invalid(PPU_STATE *ppuState);
 extern void PPCInterpreter_known_unimplemented(const char* name, PPU_STATE *ppuState);
 
-D_STUBRC(addc)
-D_STUBRC(addco)
-D_STUBRC(addo)
-D_STUBRC(addeo)
-D_STUBRC(addzeo)
-D_STUBRC(addme)
-D_STUBRC(addmeo)
-D_STUBRC(subfco)
-D_STUBRC(subfeo)
-D_STUBRC(subfo)
-D_STUBRC(subfzeo)
-D_STUBRC(subfme)
-D_STUBRC(subfmeo)
 D_STUBRC(divduo)
 D_STUBRC(divdo)
-D_STUBRC(divwo)
-D_STUBRC(divwuo)
 D_STUBRC(mulhd)
 D_STUBRC(mulldo)
-D_STUBRC(mulhw)
-D_STUBRC(mullwo)
-D_STUBRC(nego)
 D_STUBRC(rldcl)
 D_STUBRC(mcrfs)
 D_STUBRC(mtfsb1)
@@ -75,7 +57,6 @@ D_STUBRC(fnabs)
 D_STUBRC(fsqrt)
 D_STUBRC(fsqrts)
 D_STUBRC(frsqrte)
-D_STUBRC(eqv)
 D_STUB(td)
 D_STUB(dst)
 D_STUB(dss)
@@ -290,11 +271,18 @@ D_STUB(vsumsws)
 
 // ALU
 extern void PPCInterpreter_addx(PPU_STATE *ppuState);
+extern void PPCInterpreter_addox(PPU_STATE *ppuState);
+extern void PPCInterpreter_addcx(PPU_STATE *ppuState);
+extern void PPCInterpreter_addcox(PPU_STATE *ppuState);
 extern void PPCInterpreter_addex(PPU_STATE *ppuState);
+extern void PPCInterpreter_addeox(PPU_STATE *ppuState);
 extern void PPCInterpreter_addi(PPU_STATE *ppuState);
 extern void PPCInterpreter_addic(PPU_STATE *ppuState);
 extern void PPCInterpreter_addis(PPU_STATE *ppuState);
+extern void PPCInterpreter_addmex(PPU_STATE *ppuState);
+extern void PPCInterpreter_addmeox(PPU_STATE *ppuState);
 extern void PPCInterpreter_addzex(PPU_STATE *ppuState);
+extern void PPCInterpreter_addzeox(PPU_STATE *ppuState);
 extern void PPCInterpreter_andx(PPU_STATE *ppuState);
 extern void PPCInterpreter_andcx(PPU_STATE *ppuState);
 extern void PPCInterpreter_andi(PPU_STATE *ppuState);
@@ -316,8 +304,11 @@ extern void PPCInterpreter_crxor(PPU_STATE *ppuState);
 extern void PPCInterpreter_divdx(PPU_STATE *ppuState);
 extern void PPCInterpreter_divdux(PPU_STATE *ppuState);
 extern void PPCInterpreter_divwx(PPU_STATE *ppuState);
+extern void PPCInterpreter_divwox(PPU_STATE *ppuState);
 extern void PPCInterpreter_divwux(PPU_STATE *ppuState);
+extern void PPCInterpreter_divwuox(PPU_STATE *ppuState);
 extern void PPCInterpreter_isync(PPU_STATE *ppuState);
+extern void PPCInterpreter_eqvx(PPU_STATE *ppuState);
 extern void PPCInterpreter_extsbx(PPU_STATE *ppuState);
 extern void PPCInterpreter_extshx(PPU_STATE *ppuState);
 extern void PPCInterpreter_extswx(PPU_STATE *ppuState);
@@ -328,10 +319,13 @@ extern void PPCInterpreter_mtocrf(PPU_STATE *ppuState);
 extern void PPCInterpreter_mulli(PPU_STATE *ppuState);
 extern void PPCInterpreter_mulldx(PPU_STATE *ppuState);
 extern void PPCInterpreter_mullwx(PPU_STATE *ppuState);
+extern void PPCInterpreter_mullwox(PPU_STATE *ppuState);
+extern void PPCInterpreter_mulhwx(PPU_STATE *ppuState);
 extern void PPCInterpreter_mulhwux(PPU_STATE *ppuState);
 extern void PPCInterpreter_mulhdux(PPU_STATE *ppuState);
 extern void PPCInterpreter_nandx(PPU_STATE *ppuState);
 extern void PPCInterpreter_negx(PPU_STATE *ppuState);
+extern void PPCInterpreter_negox(PPU_STATE *ppuState);
 extern void PPCInterpreter_norx(PPU_STATE *ppuState);
 extern void PPCInterpreter_orcx(PPU_STATE *ppuState);
 extern void PPCInterpreter_ori(PPU_STATE *ppuState);
@@ -354,9 +348,15 @@ extern void PPCInterpreter_srawix(PPU_STATE *ppuState);
 extern void PPCInterpreter_srdx(PPU_STATE *ppuState);
 extern void PPCInterpreter_srwx(PPU_STATE *ppuState);
 extern void PPCInterpreter_subfcx(PPU_STATE *ppuState);
+extern void PPCInterpreter_subfcox(PPU_STATE *ppuState);
 extern void PPCInterpreter_subfx(PPU_STATE *ppuState);
+extern void PPCInterpreter_subfox(PPU_STATE *ppuState);
 extern void PPCInterpreter_subfex(PPU_STATE *ppuState);
+extern void PPCInterpreter_subfeox(PPU_STATE *ppuState);
+extern void PPCInterpreter_subfmex(PPU_STATE *ppuState);
+extern void PPCInterpreter_subfmeox(PPU_STATE *ppuState);
 extern void PPCInterpreter_subfzex(PPU_STATE *ppuState);
+extern void PPCInterpreter_subfzeox(PPU_STATE *ppuState);
 extern void PPCInterpreter_subfic(PPU_STATE *ppuState);
 extern void PPCInterpreter_xori(PPU_STATE *ppuState);
 extern void PPCInterpreter_xoris(PPU_STATE *ppuState);

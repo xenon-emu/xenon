@@ -17,25 +17,29 @@ struct addResult {
 
   addResult() = default;
 
-  // Straighforward ADD with flags
-  addResult(T a, T b) :
-    result(a + b), carry(result < a)
+  // Straighforward ADD with flags.
+  // The integer arithmetic instructions, always set the XER bit [CA], 
+  // to reflect the carry out of bit [0] in the default 64-bit mode 
+  // and out of bit[32] in 32 bit mode(of 64 bit implementations).
+  addResult(T a, T b, bool sfBitMode) :
+    result(a + b), carry(sfBitMode ? (result < a) :
+      (static_cast<u32>(result) < static_cast<u32>(a)))
   {}
 
   // Straighforward ADC with flags
-  addResult(T a, T b, bool c) :
-    addResult(a, b)
+  addResult(T a, T b, bool c, bool sfBitMode) :
+    addResult(a, b, sfBitMode)
   {
-    addResult r(result, c);
+    addResult r(result, c, sfBitMode);
     result = r.result;
     carry |= r.carry;
   }
-  static addResult<T> addBits(T a, T b) {
-    return { a, b };
+  static addResult<T> addBits(T a, T b, bool sfBitMode) {
+    return { a, b, sfBitMode };
   }
 
-  static addResult<T> addBits(T a, T b, bool c) {
-    return { a, b, c };
+  static addResult<T> addBits(T a, T b, bool c, bool sfBitMode) {
+    return { a, b, c, sfBitMode };
   }
 };
 
@@ -56,6 +60,23 @@ inline s64 mulh64(s64 x, s64 y) {
 #endif
 }
 
+// Set XER[OV] bit. Overflow enable.
+inline void ppuSetXerOv(PPU_STATE *ppuState, bool inbit)
+{
+  XERegister xer = curThread.SPR.XER;
+  // Set register as intended.
+  curThread.SPR.XER.XER_Hex = 0;
+  // Mantain ByteCount.
+  curThread.SPR.XER.ByteCount = xer.ByteCount; 
+  // Should mantain SO and CA bits.
+  if (xer.CA)
+    curThread.SPR.XER.CA = 1;
+  if (xer.SO || inbit)
+    curThread.SPR.XER.SO = 1;
+  // Set OV based on input.
+  curThread.SPR.XER.OV = inbit;
+}
+
 //
 // Instruction definitions.
 //
@@ -66,24 +87,92 @@ void PPCInterpreter::PPCInterpreter_addx(PPU_STATE *ppuState) {
 
   GPRi(rd) = RA + RB;
 
+  // The setting of the affected bits in the XER is mode-dependent, 
+  // and reflects overflow of the 64-bit result in 64 bit mode and 
+  // overflow of the low-order 32 bit result in 32 bit mode.
+  if (_instr.oe) {
+    bool ovSet = false;
+    if (curThread.SPR.MSR.SF) {
+      ovSet = (RA >> 63 == RB >> 63) && (RA >> 63 != GPRi(rd) >> 63);
+    }
+    else {
+      ovSet = (static_cast<u32>(RA) >> 31 == static_cast<u32>(RB) >> 31)
+        && (static_cast<u32>(RA) >> 31 != static_cast<u32>(GPRi(rd)) >> 31);
+    }
+    ppuSetXerOv(ppuState, ovSet);
+  }
+
   if (_instr.rc) {
     u32 CR = CRCompS(ppuState, GPRi(rd), 0);
     ppcUpdateCR(ppuState, 0, CR);
   }
 }
 
+void PPCInterpreter::PPCInterpreter_addox(PPU_STATE* ppuState)
+{
+  PPCInterpreter_addx(ppuState);
+}
+
+void PPCInterpreter::PPCInterpreter_addcx(PPU_STATE* ppuState) {
+  const u64 RA = GPRi(ra);
+  const u64 RB = GPRi(rb);
+
+  const auto add = addResult<u64>(RA, RB, curThread.SPR.MSR.SF);
+  GPRi(rd) = add.result;
+  XER_SET_CA(add.carry);
+
+  if (_instr.oe) { // Mode dependent.
+    bool ovSet = false;
+    if (curThread.SPR.MSR.SF) {
+      ovSet = (RA >> 63 == RB >> 63) && (RA >> 63 != GPRi(rd) >> 63);
+    }
+    else {
+      ovSet = (static_cast<u32>(RA) >> 31 == static_cast<u32>(RB) >> 31) 
+        && (static_cast<u32>(RA) >> 31 != static_cast<u32>(GPRi(rd)) >> 31);
+    }
+    ppuSetXerOv(ppuState, ovSet);
+  }
+
+  if (_instr.rc) {
+    u32 CR = CRCompS(ppuState, GPRi(rd), 0);
+    ppcUpdateCR(ppuState, 0, CR);
+  }
+}
+
+void PPCInterpreter::PPCInterpreter_addcox(PPU_STATE* ppuState)
+{
+  PPCInterpreter_addcx(ppuState);
+}
+
 void PPCInterpreter::PPCInterpreter_addex(PPU_STATE *ppuState) {
   const u64 RA = GPRi(ra);
   const u64 RB = GPRi(rb);
 
-  const auto add = addResult<u64>::addBits(RA, RB, XER_GET_CA);
+  const auto add = addResult<u64>::addBits(RA, RB, XER_GET_CA, curThread.SPR.MSR.SF);
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
+
+  if (_instr.oe) { // Mode dependent.
+    bool ovSet = false;
+    if (curThread.SPR.MSR.SF) {
+      ovSet = (RA >> 63 == RB >> 63) && (RA >> 63 != GPRi(rd) >> 63);
+    }
+    else {
+      ovSet = (static_cast<u32>(RA) >> 31 == static_cast<u32>(RB) >> 31)
+        && (static_cast<u32>(RA) >> 31 != static_cast<u32>(GPRi(rd)) >> 31);
+    }
+    ppuSetXerOv(ppuState, ovSet);
+  }
 
   if (_instr.rc) {
     u32 CR = CRCompS(ppuState, add.result, 0);
     ppcUpdateCR(ppuState, 0, CR);
   }
+}
+
+void PPCInterpreter::PPCInterpreter_addeox(PPU_STATE* ppuState)
+{
+  PPCInterpreter_addex(ppuState);
 }
 
 void PPCInterpreter::PPCInterpreter_addi(PPU_STATE *ppuState) {
@@ -94,7 +183,7 @@ void PPCInterpreter::PPCInterpreter_addic(PPU_STATE *ppuState) {
   const s64 ra = GPRi(ra);
   const s64 i = _instr.simm16;
 
-  const auto add = addResult<u64>::addBits(ra, i);
+  const auto add = addResult<u64>::addBits(ra, i, curThread.SPR.MSR.SF);
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
 
@@ -109,17 +198,68 @@ void PPCInterpreter::PPCInterpreter_addis(PPU_STATE *ppuState) {
   GPRi(rd) = _instr.ra ? GPRi(ra) + (_instr.simm16 * 65536) : (_instr.simm16 * 65536);
 }
 
-void PPCInterpreter::PPCInterpreter_addzex(PPU_STATE *ppuState) {
-  const u64 ra = GPRi(ra);
+void PPCInterpreter::PPCInterpreter_addmex(PPU_STATE* ppuState)
+{
+  const s64 RA = GPRi(ra);
 
-  const auto add = addResult<u64>::addBits(ra, 0, XER_GET_CA);
+  const auto add = addResult<u64>(RA, ~0ull, XER_GET_CA, curThread.SPR.MSR.SF);
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
+
+  if (_instr.oe) { // Mode dependent.
+    bool ovSet = false;
+    if (curThread.SPR.MSR.SF) {
+      ovSet = (static_cast<u64>(RA) >> 63 == 1) && 
+        (static_cast<u64>(RA) >> 63 != GPRi(rd) >> 63);
+    }
+    else {
+      ovSet = (static_cast<u32>(RA) >> 31 == 1) &&
+        (static_cast<u32>(RA) >> 31 != static_cast<u32>(GPRi(rd)) >> 31);
+    }
+    ppuSetXerOv(ppuState, ovSet);
+  }
+
+  // _rc
+  if (_instr.rc) {
+    u32 CR = CRCompS(ppuState, add.result, 0);
+    ppcUpdateCR(ppuState, 0, CR);
+  }
+}
+
+void PPCInterpreter::PPCInterpreter_addmeox(PPU_STATE* ppuState)
+{
+  PPCInterpreter_addmex(ppuState);
+}
+
+void PPCInterpreter::PPCInterpreter_addzex(PPU_STATE *ppuState) {
+  const u64 RA = GPRi(ra);
+
+  const auto add = addResult<u64>::addBits(RA, 0, XER_GET_CA, 
+    curThread.SPR.MSR.SF);
+  GPRi(rd) = add.result;
+  XER_SET_CA(add.carry);
+
+  if (_instr.oe) { // Mode dependent.
+    bool ovSet = false;
+    if (curThread.SPR.MSR.SF) {
+      ovSet = (RA >> 63 == 0) && (RA >> 63 != GPRi(rd) >> 63);
+    }
+    else {
+      ovSet = (static_cast<u32>(RA) >> 31 == 0) &&
+        (static_cast<u32>(RA) >> 31 != static_cast<u32>(GPRi(rd)) >> 31);
+    }
+    ppuSetXerOv(ppuState, ovSet);
+  }
 
   if (_instr.rc) {
     u32 CR = CRCompS(ppuState, add.result, 0);
     ppcUpdateCR(ppuState, 0, CR);
   }
+}
+
+void PPCInterpreter::PPCInterpreter_addzeox(PPU_STATE* ppuState)
+{
+  PPCInterpreter_addzex(ppuState);
 }
 
 void PPCInterpreter::PPCInterpreter_andx(PPU_STATE *ppuState) {
@@ -369,10 +509,20 @@ void PPCInterpreter::PPCInterpreter_divwx(PPU_STATE *ppuState) {
   const bool o = RB == 0 || (RA == INT32_MIN && RB == -1);
   GPRi(rd) = o ? 0 : static_cast<u32>(RA / RB);
 
+  // If OE = 1 and RB = 0, then OV is set.
+  if (_instr.oe) {
+    ppuSetXerOv(ppuState, o);
+  }
+
   if (_instr.rc) {
     u32 CR = CRCompS(ppuState, GPRi(rd), 0);
     ppcUpdateCR(ppuState, 0, CR);
   }
+}
+
+void PPCInterpreter::PPCInterpreter_divwox(PPU_STATE* ppuState)
+{
+  PPCInterpreter_divwx(ppuState);
 }
 
 void PPCInterpreter::PPCInterpreter_divwux(PPU_STATE *ppuState) {
@@ -380,8 +530,26 @@ void PPCInterpreter::PPCInterpreter_divwux(PPU_STATE *ppuState) {
   const u32 RB = static_cast<u32>(GPRi(rb));
   GPRi(rd) = RB == 0 ? 0 : RA / RB;
 
+  if (_instr.oe) {
+    ppuSetXerOv(ppuState, RB == 0);
+  }
+
   if (_instr.rc) {
     u32 CR = CRCompS(ppuState, GPRi(rd), 0);
+    ppcUpdateCR(ppuState, 0, CR);
+  }
+}
+
+void PPCInterpreter::PPCInterpreter_divwuox(PPU_STATE* ppuState)
+{
+  PPCInterpreter_divwux(ppuState);
+}
+
+void PPCInterpreter::PPCInterpreter_eqvx(PPU_STATE* ppuState) {
+  GPRi(ra) = ~(GPRi(rs) ^ GPRi(rb));
+
+  if (_instr.rc) {
+    u32 CR = CRCompS(ppuState, GPRi(ra), 0);
     ppcUpdateCR(ppuState, 0, CR);
   }
 }
@@ -478,6 +646,28 @@ void PPCInterpreter::PPCInterpreter_mulldx(PPU_STATE *ppuState) {
 void PPCInterpreter::PPCInterpreter_mullwx(PPU_STATE *ppuState) {
   GPRi(rd) = s64{ static_cast<s32>(GPRi(ra)) } *static_cast<s32>(GPRi(rb));
 
+  if (_instr.oe) {
+    ppuSetXerOv(ppuState, s64(GPRi(rd)) < INT32_MIN 
+      || s64(GPRi(rd)) > INT32_MAX);
+  }
+
+  if (_instr.rc) {
+    u32 CR = CRCompS(ppuState, GPRi(rd), 0);
+    ppcUpdateCR(ppuState, 0, CR);
+  }
+}
+
+void PPCInterpreter::PPCInterpreter_mullwox(PPU_STATE* ppuState)
+{
+  PPCInterpreter_mullwx(ppuState);
+}
+
+void PPCInterpreter::PPCInterpreter_mulhwx(PPU_STATE* ppuState)
+{
+  s32 a = static_cast<s32>(GPRi(ra));
+  s32 b = static_cast<s32>(GPRi(rb));
+  GPRi(rd) = (s64{ a } * b) >> 32;
+
   if (_instr.rc) {
     u32 CR = CRCompS(ppuState, GPRi(rd), 0);
     ppcUpdateCR(ppuState, 0, CR);
@@ -517,10 +707,26 @@ void PPCInterpreter::PPCInterpreter_negx(PPU_STATE *ppuState) {
   const u64 RA = GPRi(ra);
   GPRi(rd) = 0 - RA;
 
+  if (_instr.oe) { // Mode dependent.
+    bool ovSet = false;
+    if (curThread.SPR.MSR.SF) {
+      ovSet = RA == (1ull << 63);
+    }
+    else {
+      ovSet = static_cast<u32>(RA) == (1ull << 31);
+    }
+    ppuSetXerOv(ppuState, ovSet);
+  }
+
   if (_instr.rc) {
     u32 CR = CRCompS(ppuState, GPRi(rd), 0);
     ppcUpdateCR(ppuState, 0, CR);
   }
+}
+
+void PPCInterpreter::PPCInterpreter_negox(PPU_STATE* ppuState)
+{
+  PPCInterpreter_negx(ppuState);
 }
 
 void PPCInterpreter::PPCInterpreter_norx(PPU_STATE *ppuState) {
@@ -554,7 +760,7 @@ void PPCInterpreter::PPCInterpreter_orx(PPU_STATE *ppuState) {
   GPRi(ra) = GPRi(rs) | GPRi(rb);
 
   if (_instr.rc) {
-    u32 CR = CRCompU(ppuState, GPRi(ra), 0);
+    u32 CR = CRCompS(ppuState, GPRi(ra), 0);
     ppcUpdateCR(ppuState, 0, CR);
   }
 }
@@ -825,14 +1031,32 @@ void PPCInterpreter::PPCInterpreter_subfcx(PPU_STATE *ppuState) {
   const u64 RA = GPRi(ra);
   const u64 RB = GPRi(rb);
 
-  const auto add = addResult<u64>::addBits(~RA, RB, 1);
+  const auto add = addResult<u64>::addBits(~RA, RB, 1, 
+    curThread.SPR.MSR.SF);
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
+
+  if (_instr.oe) { // Mode dependent.
+    bool ovSet = false;
+    if (curThread.SPR.MSR.SF) {
+      ovSet = (~RA >> 63 == RB >> 63) && (~RA >> 63 != GPRi(rd) >> 63);
+    }
+    else {
+      ovSet = (static_cast<u32>(~RA) >> 31 == static_cast<u32>(RB) >> 31) &&
+        (static_cast<u32>(~RA) >> 31 != static_cast<u32>(GPRi(rd)) >> 31);
+    }
+    ppuSetXerOv(ppuState, ovSet);
+  }
 
   if (_instr.rc) {
     u32 CR = CRCompS(ppuState, GPRi(rd), 0);
     ppcUpdateCR(ppuState, 0, CR);
   }
+}
+
+void PPCInterpreter::PPCInterpreter_subfcox(PPU_STATE* ppuState)
+{
+  PPCInterpreter_subfcx(ppuState);
 }
 
 void PPCInterpreter::PPCInterpreter_subfx(PPU_STATE *ppuState) {
@@ -841,44 +1065,130 @@ void PPCInterpreter::PPCInterpreter_subfx(PPU_STATE *ppuState) {
 
   GPRi(rd) = RB - RA;
 
+  if (_instr.oe) { // Mode dependent.
+    bool ovSet = false;
+    if (curThread.SPR.MSR.SF) {
+      ovSet = (~RA >> 63 == RB >> 63) && (~RA >> 63 != GPRi(rd) >> 63);
+    }
+    else {
+      ovSet = (static_cast<u32>(~RA) >> 31 == static_cast<u32>(RB) >> 31) &&
+        (static_cast<u32>(~RA) >> 31 != static_cast<u32>(GPRi(rd)) >> 31);
+    }
+    ppuSetXerOv(ppuState, ovSet);
+  }
+
   if (_instr.rc) {
     u32 CR = CRCompS(ppuState, GPRi(rd), 0);
     ppcUpdateCR(ppuState, 0, CR);
   }
 }
 
+void PPCInterpreter::PPCInterpreter_subfox(PPU_STATE* ppuState)
+{
+  PPCInterpreter_subfx(ppuState);
+}
+
 void PPCInterpreter::PPCInterpreter_subfex(PPU_STATE *ppuState) {
   const u64 RA = GPRi(ra);
   const u64 RB = GPRi(rb);
 
-  const auto add = addResult<u64>::addBits(~RA, RB, XER_GET_CA);
+  const auto add = addResult<u64>::addBits(~RA, RB, XER_GET_CA, 
+    curThread.SPR.MSR.SF);
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
 
-  if (_instr.ra) {
+  if (_instr.oe) { // Mode dependent.
+    bool ovSet = false;
+    if (curThread.SPR.MSR.SF) {
+      ovSet = (~RA >> 63 == RB >> 63) && (~RA >> 63 != GPRi(rd) >> 63);
+    }
+    else {
+      ovSet = (static_cast<u32>(~RA) >> 31 == static_cast<u32>(RB) >> 31) &&
+        (static_cast<u32>(~RA) >> 31 != static_cast<u32>(GPRi(rd)) >> 31);
+    }
+    ppuSetXerOv(ppuState, ovSet);
+  }
+
+  if (_instr.rc) {
     u32 CR = CRCompS(ppuState, add.result, 0);
     ppcUpdateCR(ppuState, 0, CR);
   }
 }
 
-void PPCInterpreter::PPCInterpreter_subfzex(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_subfeox(PPU_STATE* ppuState)
+{
+  PPCInterpreter_subfex(ppuState);
+}
+
+void PPCInterpreter::PPCInterpreter_subfmex(PPU_STATE* ppuState)
+{
   const u64 RA = GPRi(ra);
 
-  const auto add = addResult<u64>::addBits(~RA, 0, XER_GET_CA);
+  const auto add = addResult<u64>(~RA, ~0ull, XER_GET_CA, 
+    curThread.SPR.MSR.SF);
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
 
-  if (_instr.ra) {
+  if (_instr.oe) { // Mode dependent.
+    bool ovSet = false;
+    if (curThread.SPR.MSR.SF) {
+      ovSet = (~RA >> 63 == 1) && (~RA >> 63 != GPRi(rd) >> 63);
+    }
+    else {
+      ovSet = (static_cast<u32>(~RA) >> 31 == 1) &&
+        (static_cast<u32>(~RA) >> 31 != static_cast<u32>(GPRi(rd)) >> 31);
+    }
+    ppuSetXerOv(ppuState, ovSet);
+  }
+
+  if (_instr.rc) {
     u32 CR = CRCompS(ppuState, add.result, 0);
     ppcUpdateCR(ppuState, 0, CR);
   }
+}
+
+void PPCInterpreter::PPCInterpreter_subfmeox(PPU_STATE* ppuState)
+{
+  PPCInterpreter_subfmex(ppuState);
+}
+
+void PPCInterpreter::PPCInterpreter_subfzex(PPU_STATE *ppuState) {
+  const u64 RA = GPRi(ra);
+
+  const auto add = addResult<u64>::addBits(~RA, 0, XER_GET_CA, 
+    curThread.SPR.MSR.SF);
+  GPRi(rd) = add.result;
+  XER_SET_CA(add.carry);
+
+  if (_instr.oe) { // Mode dependent.
+    bool ovSet = false;
+    if (curThread.SPR.MSR.SF) {
+      ovSet = (~RA >> 63 == 0) && (~RA >> 63 != GPRi(rd) >> 63);
+    }
+    else {
+      ovSet = (static_cast<u32>(~RA) >> 31 == 0) &&
+        (static_cast<u32>(~RA) >> 31 != static_cast<u32>(GPRi(rd)) >> 31);
+    }
+    ppuSetXerOv(ppuState, ovSet);
+  }
+
+  if (_instr.rc) {
+    u32 CR = CRCompS(ppuState, add.result, 0);
+    ppcUpdateCR(ppuState, 0, CR);
+  }
+}
+
+void PPCInterpreter::PPCInterpreter_subfzeox(PPU_STATE* ppuState)
+{
+  PPCInterpreter_subfzex(ppuState);
 }
 
 void PPCInterpreter::PPCInterpreter_subfic(PPU_STATE *ppuState) {
   const u64 RA = GPRi(ra);
   const s64 i = _instr.simm16;
 
-  const auto add = addResult<u64>::addBits(~RA, i, 1);
+  const auto add = addResult<u64>::addBits(~RA, i, 1, 
+    curThread.SPR.MSR.SF);
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
 }

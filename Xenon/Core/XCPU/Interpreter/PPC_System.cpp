@@ -405,6 +405,8 @@ void PPCInterpreter::PPCInterpreter_mtspr(PPU_STATE *ppuState) {
     break;
   case SPR_XER:
     curThread.SPR.XER.XER_Hex = static_cast<u32>(GPR(rD));
+    // Clear the unused bits in XER (35:56).
+    curThread.SPR.XER.XER_Hex &= 0xE000007F;
     break;
   case SPR_TBL_WO:
     ppuState->SPR.TB = GPR(rD);

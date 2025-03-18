@@ -743,16 +743,26 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
       }
     }
 
+    // Measure elapsed time.
+    std::chrono::steady_clock::time_point timerNow =
+      std::chrono::steady_clock::now();
+
     // Check for SMC Clock interrupt register.
     // 
     // Clock Int Enabled.
     if (smcPCIState.clockIntEnabledReg == CLCK_INT_ENABLED) {
       // Clock Interrupt Not Taken.
       if (smcPCIState.clockIntStatusReg == CLCK_INT_READY) {
-        mutex.lock();
-        smcPCIState.clockIntStatusReg = CLCK_INT_TAKEN;
-        pciBridge->RouteInterrupt(PRIO_CLOCK);
-        mutex.unlock();
+        // Wait X time before next clock interrupt. TODO: Find the correct
+        // delay.
+        if (timerNow >= timerStart + std::chrono::milliseconds(1000)) {
+          // Update internal timer.
+          timerStart = std::chrono::steady_clock::now();
+          mutex.lock();
+          smcPCIState.clockIntStatusReg = CLCK_INT_TAKEN;
+          pciBridge->RouteInterrupt(PRIO_CLOCK);
+          mutex.unlock();
+        }
       }
     }
   }
