@@ -396,7 +396,7 @@ void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
 
   // Open COM# port using the CreateFile function.
   smcCoreState->comPortHandle =
-      CreateFileA(smcCoreState->currentCOMPort, GENERIC_READ | GENERIC_WRITE, 0, nullptr,
+      CreateFileA(smcCoreState->currentCOMPort.data(), GENERIC_READ | GENERIC_WRITE, 0, nullptr,
                  OPEN_EXISTING, 0, nullptr);
 
   bool useBackup = false;
