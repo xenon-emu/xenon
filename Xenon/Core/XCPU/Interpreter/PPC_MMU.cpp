@@ -1379,7 +1379,7 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
     if (dataByteswapped == 0) {
       intXCPUContext->timeBaseActive = false;
       return;
-    } else if (dataByteswapped == 0x1FF || dataByteswapped == 0x1) {
+    } else if (dataByteswapped == 0x1FF || dataByteswapped == 0x100) {
       intXCPUContext->timeBaseActive = true;
       return;
     }
