@@ -108,23 +108,19 @@ union CRegister {
   };
 };
 
-union alignas(16) CRBits
-{
+union alignas(16) CR_Reg {
   u8 bits[32];
   u32 fields[8];
 
-  u8& operator [](size_t i)
-  {
+  u8& operator [](size_t i) {
     return bits[i];
   }
 
   // Pack CR bits
-  u32 pack() const
-  {
+  u32 pack() const {
     u32 result{};
 
-    for (u32 bit : bits)
-    {
+    for (u32 bit : bits) {
       result <<= 1;
       result |= bit;
     }
@@ -133,10 +129,8 @@ union alignas(16) CRBits
   }
 
   // Unpack CR bits
-  void unpack(u32 value)
-  {
-    for (u8& b : bits)
-    {
+  void unpack(u32 value) {
+    for (u8& b : bits) {
       b = !!(value & (1u << 31));
       value <<= 1;
     }
@@ -569,7 +563,7 @@ struct PPU_THREAD_REGISTERS {
   FPRegister FPR[32]{};
   // Condition Register
   CRegister CR;
-  CRBits CRBits;
+  CR_Reg CRBits;
 
   // Floating-Point Status Control Register
   FPSCRegister FPSCR;

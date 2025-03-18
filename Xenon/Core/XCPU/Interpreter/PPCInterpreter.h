@@ -53,6 +53,22 @@ void ppcDebugUnloadImageSymbols(PPU_STATE *ppuState, u64 moduleNameAddress,
 // Condition Register
 //
 
+// Write values to CR field.
+inline void ppuSetCR(PPU_STATE* ppuState, u32 crField, bool le, bool gt, bool eq, bool so)
+{
+  curThread.CRBits[crField * 4 + 0] = le;
+  curThread.CRBits[crField * 4 + 1] = gt;
+  curThread.CRBits[crField * 4 + 2] = eq;
+  curThread.CRBits[crField * 4 + 3] = so;
+}
+
+// Perform a comparison and write results to the specified CR field.
+template<typename T>
+inline void ppuSetCR(PPU_STATE* ppuState, u32 crField, const T& a, const T& b)
+{
+  ppuSetCR(ppuState, crField, a < b, a > b, a == b, curThread.SPR.XER.SO);
+}
+
 // Compare Unsigned
 u32 CRCompU(PPU_STATE *ppuState, u64 num1, u64 num2);
 // Compare Signed 32 bits
