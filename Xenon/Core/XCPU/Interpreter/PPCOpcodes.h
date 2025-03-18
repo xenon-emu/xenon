@@ -17,20 +17,10 @@ namespace PPCInterpreter {
 extern void PPCInterpreter_invalid(PPU_STATE *ppuState);
 extern void PPCInterpreter_known_unimplemented(const char* name, PPU_STATE *ppuState);
 
-D_STUBRC(subfco)
-D_STUBRC(subfeo)
-D_STUBRC(subfo)
-D_STUBRC(subfzeo)
-D_STUBRC(subfme)
-D_STUBRC(subfmeo)
 D_STUBRC(divduo)
 D_STUBRC(divdo)
-D_STUBRC(divwo)
-D_STUBRC(divwuo)
 D_STUBRC(mulhd)
 D_STUBRC(mulldo)
-D_STUBRC(mullwo)
-D_STUBRC(nego)
 D_STUBRC(rldcl)
 D_STUBRC(mcrfs)
 D_STUBRC(mtfsb1)
@@ -314,7 +304,9 @@ extern void PPCInterpreter_crxor(PPU_STATE *ppuState);
 extern void PPCInterpreter_divdx(PPU_STATE *ppuState);
 extern void PPCInterpreter_divdux(PPU_STATE *ppuState);
 extern void PPCInterpreter_divwx(PPU_STATE *ppuState);
+extern void PPCInterpreter_divwox(PPU_STATE *ppuState);
 extern void PPCInterpreter_divwux(PPU_STATE *ppuState);
+extern void PPCInterpreter_divwuox(PPU_STATE *ppuState);
 extern void PPCInterpreter_isync(PPU_STATE *ppuState);
 extern void PPCInterpreter_eqvx(PPU_STATE *ppuState);
 extern void PPCInterpreter_extsbx(PPU_STATE *ppuState);
@@ -327,11 +319,13 @@ extern void PPCInterpreter_mtocrf(PPU_STATE *ppuState);
 extern void PPCInterpreter_mulli(PPU_STATE *ppuState);
 extern void PPCInterpreter_mulldx(PPU_STATE *ppuState);
 extern void PPCInterpreter_mullwx(PPU_STATE *ppuState);
+extern void PPCInterpreter_mullwox(PPU_STATE *ppuState);
 extern void PPCInterpreter_mulhwx(PPU_STATE *ppuState);
 extern void PPCInterpreter_mulhwux(PPU_STATE *ppuState);
 extern void PPCInterpreter_mulhdux(PPU_STATE *ppuState);
 extern void PPCInterpreter_nandx(PPU_STATE *ppuState);
 extern void PPCInterpreter_negx(PPU_STATE *ppuState);
+extern void PPCInterpreter_negox(PPU_STATE *ppuState);
 extern void PPCInterpreter_norx(PPU_STATE *ppuState);
 extern void PPCInterpreter_orcx(PPU_STATE *ppuState);
 extern void PPCInterpreter_ori(PPU_STATE *ppuState);
@@ -354,9 +348,15 @@ extern void PPCInterpreter_srawix(PPU_STATE *ppuState);
 extern void PPCInterpreter_srdx(PPU_STATE *ppuState);
 extern void PPCInterpreter_srwx(PPU_STATE *ppuState);
 extern void PPCInterpreter_subfcx(PPU_STATE *ppuState);
+extern void PPCInterpreter_subfcox(PPU_STATE *ppuState);
 extern void PPCInterpreter_subfx(PPU_STATE *ppuState);
+extern void PPCInterpreter_subfox(PPU_STATE *ppuState);
 extern void PPCInterpreter_subfex(PPU_STATE *ppuState);
+extern void PPCInterpreter_subfeox(PPU_STATE *ppuState);
+extern void PPCInterpreter_subfmex(PPU_STATE *ppuState);
+extern void PPCInterpreter_subfmeox(PPU_STATE *ppuState);
 extern void PPCInterpreter_subfzex(PPU_STATE *ppuState);
+extern void PPCInterpreter_subfzeox(PPU_STATE *ppuState);
 extern void PPCInterpreter_subfic(PPU_STATE *ppuState);
 extern void PPCInterpreter_xori(PPU_STATE *ppuState);
 extern void PPCInterpreter_xoris(PPU_STATE *ppuState);
