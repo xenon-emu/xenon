@@ -12,7 +12,7 @@
 
 // PowerPC Opcode definitions
 /*
-* All original authors of the rpcs3 PPU_Decoder and PPU_Opcodes maintain their original copyright.
+* All original authors of the rpcs3 PPU_Decoder and PPU_Opcodes and cr_bits maintain their original copyright.
 * Modifed for usage in the Xenon Emulator
 * All rights reserved
 * License: GPL2
@@ -106,6 +106,41 @@ union CRegister {
     u32 CR1 : 4;
     u32 CR0 : 4;
   };
+};
+
+union alignas(16) CRBits
+{
+  u8 bits[32];
+  u32 fields[8];
+
+  u8& operator [](size_t i)
+  {
+    return bits[i];
+  }
+
+  // Pack CR bits
+  u32 pack() const
+  {
+    u32 result{};
+
+    for (u32 bit : bits)
+    {
+      result <<= 1;
+      result |= bit;
+    }
+
+    return result;
+  }
+
+  // Unpack CR bits
+  void unpack(u32 value)
+  {
+    for (u8& b : bits)
+    {
+      b = !!(value & (1u << 31));
+      value <<= 1;
+    }
+  }
 };
 
 /*
@@ -534,6 +569,8 @@ struct PPU_THREAD_REGISTERS {
   FPRegister FPR[32]{};
   // Condition Register
   CRegister CR;
+  CRBits CRBits;
+
   // Floating-Point Status Control Register
   FPSCRegister FPSCR;
   // Segment Lookaside Buffer

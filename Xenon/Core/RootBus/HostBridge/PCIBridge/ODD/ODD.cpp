@@ -57,8 +57,8 @@ void ODD::atapiIdentifyPacketDeviceCommand()
 
 
   identifyData->capabilities = 0x0F00;
-  identifyData->reserved7 = 0x4000;
-  identifyData->reserved8 = 0x0400;
+  identifyData->reserved7 = 0x40;
+  identifyData->reserved8 = 0x00;
   identifyData->reserved9 = 0x0200;
   identifyData->translationFieldsValid = 0x6;
   identifyData->advancedPIOModes = 0x3;
@@ -68,7 +68,8 @@ void ODD::atapiIdentifyPacketDeviceCommand()
   identifyData->minimumPIOCycleTimeIORDY = 0x78;
   identifyData->majorRevision = 0xf8;
   identifyData->minorRevision = 0x210;
-  identifyData->ultraDMASupport = 0x203f;
+  identifyData->ultraDMASupport = 0x20;
+  identifyData->ultraDMAActive = 0x3f;
 
 
   // Set the transfer size:
