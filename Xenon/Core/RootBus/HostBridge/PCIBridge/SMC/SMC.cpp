@@ -401,7 +401,7 @@ void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
 
   bool useBackup = false;
   if (smcCoreState->comPortHandle == INVALID_HANDLE_VALUE) {
-    LOG_ERROR(SMC, "CreateFile failed with error {:#x}. Make sure the Selected COM Port is avaliable "
+    LOG_ERROR(SMC, "CreateFile failed with error {:#x}. Make sure the Selected COM Port is available "
         "in your system.", GetLastError());
     smcCoreState->uartPresent = false;
     if (!smcCoreState->uartBackup) {

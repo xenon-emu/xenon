@@ -126,7 +126,7 @@ public:
     return *instance;
   }
 
-  static void Initialize(std::string_view log_file) {
+  static void Initialize(const std::string_view log_file) {
     if (instance) {
       LOG_WARNING(Log, "Reinitializing logging backend");
       return;

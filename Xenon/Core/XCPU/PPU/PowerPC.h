@@ -605,8 +605,8 @@ struct PPU_STATE {
   PPU_STATE_SPRS SPR{};
   // Translation Lookaside Buffer
   TLB_Reg TLB{};
-  // Address Traslation Flag
-  bool traslationInProgress = false;
+  // Address Translation Flag
+  bool translationInProgress = false;
   // Current PPU Name, for ease of debugging.
   std::string ppuName{};
   // PPU ID

@@ -528,7 +528,7 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
         }
       });
     });
-    gui->Bool(PPUState, traslationInProgress);
+    gui->Bool(PPUState, translationInProgress);
     gui->Custom(ppuName, "{}", PPUState.ppuName);
   }, ImGuiTreeNodeFlags_DefaultOpen);
 }
