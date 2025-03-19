@@ -14,9 +14,10 @@ namespace Xe {
 #define XE_IIC_BASE 0x50000
 #define XE_IIC_SIZE 0xFF // 1 IIC Ctrl Block?
 
-      //
-      // Interrupt Types
-      //
+//
+// Interrupt Types
+//
+
 #define PRIO_IPI_4 0x08
 #define PRIO_IPI_3 0x10
 #define PRIO_SMM 0x14

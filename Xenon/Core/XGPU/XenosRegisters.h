@@ -3341,8 +3341,7 @@ static const std::string GetRegisterNameById(u32 id) {
   auto it = registerMap.find(id);
   if (it != registerMap.end()) {
     return it->second;
-  }
-  else {
+  } else {
     return "Unknown register";
   }
 }
