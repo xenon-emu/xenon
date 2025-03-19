@@ -566,9 +566,30 @@ void PPCInterpreter::PPCInterpreter_mcrf(PPU_STATE *ppuState) {
 }
 
 void PPCInterpreter::PPCInterpreter_mfocrf(PPU_STATE *ppuState) {
-  XFX_FORM_rD;
+  if (_instr.l11) {
+    // MFOCRF
+    u32 crMask = 0;
+    u32 bit = 0x80;
+    u32 count = 0;
 
-  GPR(rD) = curThread.CR.CR_Hex;
+    for (; bit; bit >>= 1) {
+      crMask <<= 4;
+      if (_instr.crm & bit) {
+        crMask |= 0xF;
+        count++;
+      }
+    }
+
+    if (count == 1) {
+      GPRi(rd) = curThread.CR.CR_Hex & crMask;
+    } else { // Undefined behavior.
+      GPRi(rd) = 0;
+    }
+  }
+  else {
+    // MFCR
+    GPRi(rd) = curThread.CR.CR_Hex;
+  }
 }
 
 void PPCInterpreter::PPCInterpreter_mftb(PPU_STATE *ppuState) {
@@ -589,18 +610,17 @@ void PPCInterpreter::PPCInterpreter_mftb(PPU_STATE *ppuState) {
 }
 
 void PPCInterpreter::PPCInterpreter_mtocrf(PPU_STATE *ppuState) {
-  XFX_FORM_rS_FXM;
-  u32 Mask = 0;
-  u32 b = 0x80;
+  // MTOCRF
+  u32 crMask = 0;
+  u32 bit = 0x80;
 
-  for (; b; b >>= 1) {
-    Mask <<= 4;
-
-    if (FXM & b) {
-      Mask |= 0xF;
+  for (; bit; bit >>= 1) {
+    crMask <<= 4;
+    if (_instr.crm & bit) {
+      crMask |= 0xF;
     }
   }
-  curThread.CR.CR_Hex = (static_cast<u32>(GPR(rS)) & Mask) | (curThread.CR.CR_Hex & ~Mask);
+  curThread.CR.CR_Hex = (static_cast<u32>(GPRi(rs)) & crMask) | (curThread.CR.CR_Hex & ~crMask);
 }
 
 void PPCInterpreter::PPCInterpreter_mulli(PPU_STATE *ppuState) {
@@ -990,14 +1010,10 @@ void PPCInterpreter::PPCInterpreter_srdx(PPU_STATE *ppuState) {
 }
 
 void PPCInterpreter::PPCInterpreter_srwx(PPU_STATE *ppuState) {
-  X_FORM_rS_rA_rB_RC;
+  GPRi(ra) = (GPRi(rs) & 0xffffffff) >> (GPRi(rb) & 0x3f);
 
-  u32 n = static_cast<u32>(GPR(rB)) & 63;
-
-  GPR(rA) = (n < 32) ? (GPR(rS) >> n) : 0;
-
-  if (RC) {
-    u32 CR = CRCompS(ppuState, GPR(rA), 0);
+  if (_instr.rc) {
+    u32 CR = CRCompS(ppuState, GPRi(ra), 0);
     ppcUpdateCR(ppuState, 0, CR);
   }
 }
