@@ -295,60 +295,35 @@ void PPCInterpreter::PPCInterpreter_andis(PPU_STATE *ppuState) {
 }
 
 void PPCInterpreter::PPCInterpreter_cmp(PPU_STATE *ppuState) {
-  X_FORM_BF_L_rA_rB;
-
-  u32 CR;
-
-  if (L) {
-    CR = CRCompS64(ppuState, GPR(rA), GPR(rB));
+  if (_instr.l10) {
+    ppuSetCR<s64>(ppuState, _instr.crfd, GPRi(ra), GPRi(rb));
   } else {
-    CR = CRCompS32(ppuState, static_cast<s32>(GPR(rA)), static_cast<s32>(GPR(rB)));
+    ppuSetCR<s32>(ppuState, _instr.crfd, static_cast<u32>(GPRi(ra)), static_cast<u32>(GPRi(rb)));
   }
-
-  ppcUpdateCR(ppuState, BF, CR);
 }
 
 void PPCInterpreter::PPCInterpreter_cmpi(PPU_STATE *ppuState) {
-  D_FORM_BF_L_rA_SI;
-  SI = EXTS(SI, 16);
-
-  u32 CR;
-
-  if (L) {
-    CR = CRCompS64(ppuState, GPR(rA), SI);
+  if (_instr.l10) {
+    ppuSetCR<s64>(ppuState, _instr.crfd, GPRi(ra), _instr.simm16);
   } else {
-    CR = CRCompS32(ppuState, static_cast<s32>(GPR(rA)), static_cast<s32>(SI));
+    ppuSetCR<s32>(ppuState, _instr.crfd, static_cast<u32>(GPRi(ra)), _instr.simm16);
   }
-
-  ppcUpdateCR(ppuState, BF, CR);
 }
 
 void PPCInterpreter::PPCInterpreter_cmpl(PPU_STATE *ppuState) {
-  X_FORM_BF_L_rA_rB;
-
-  u32 CR;
-
-  if (L) {
-    CR = CRCompU(ppuState, GPR(rA), GPR(rB));
+  if (_instr.l10) {
+    ppuSetCR<u64>(ppuState, _instr.crfd, GPRi(ra), GPRi(rb));
   } else {
-    CR = CRCompU(ppuState, static_cast<u32>(GPR(rA)), static_cast<u32>(GPR(rB)));
+    ppuSetCR<u32>(ppuState, _instr.crfd, static_cast<u32>(GPRi(ra)), static_cast<u32>(GPRi(rb)));
   }
-
-  ppcUpdateCR(ppuState, BF, CR);
 }
 
 void PPCInterpreter::PPCInterpreter_cmpli(PPU_STATE *ppuState) {
-  D_FORM_BF_L_rA_UI;
-
-  u32 CR;
-
-  if (L) {
-    CR = CRCompU(ppuState, GPR(rA), UI);
+  if (_instr.l10) {
+    ppuSetCR<u64>(ppuState, _instr.crfd, GPRi(ra), _instr.uimm16);
   } else {
-    CR = CRCompU(ppuState, static_cast<u32>(GPR(rA)), UI);
+    ppuSetCR<u32>(ppuState, _instr.crfd, static_cast<u32>(GPRi(ra)), _instr.uimm16);
   }
-
-  ppcUpdateCR(ppuState, BF, CR);
 }
 
 void PPCInterpreter::PPCInterpreter_cntlzdx(PPU_STATE *ppuState) {
