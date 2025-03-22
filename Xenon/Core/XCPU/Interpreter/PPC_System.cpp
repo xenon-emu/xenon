@@ -304,122 +304,123 @@ void PPCInterpreter::PPCInterpreter_mfspr(PPU_STATE *ppuState) {
 }
 
 void PPCInterpreter::PPCInterpreter_mtspr(PPU_STATE *ppuState) {
-  XFX_FORM_rD_spr;
+  const u32 spr = (_instr.spr >> 5) | ((_instr.spr & 0x1f) << 5);
+  
   switch (spr) {
   case SPR_DEC:
-    curThread.SPR.DEC = static_cast<u32>(GPR(rD));
+    curThread.SPR.DEC = static_cast<u32>(GPRi(rd));
     break;
   case SPR_SDR1:
-    ppuState->SPR.SDR1 = GPR(rD);
+    ppuState->SPR.SDR1 = GPRi(rd);
     break;
   case SPR_DAR:
-    curThread.SPR.DAR = GPR(rD);
+    curThread.SPR.DAR = GPRi(rd);
     break;
   case SPR_DSISR:
-    curThread.SPR.DSISR = GPR(rD);
+    curThread.SPR.DSISR = GPRi(rd);
     break;
   case SPR_CTR:
-    curThread.SPR.CTR = GPR(rD);
+    curThread.SPR.CTR = GPRi(rd);
     break;
   case SPR_LR:
-    curThread.SPR.LR = GPR(rD);
+    curThread.SPR.LR = GPRi(rd);
     break;
   case SPR_CFAR:
-    curThread.SPR.CFAR = GPR(rD);
+    curThread.SPR.CFAR = GPRi(rd);
     break;
   case SPR_VRSAVE:
-    curThread.SPR.VRSAVE = static_cast<u32>(GPR(rD));
+    curThread.SPR.VRSAVE = static_cast<u32>(GPRi(rd));
     break;
   case SPR_LPCR:
-    ppuState->SPR.LPCR = GPR(rD);
+    ppuState->SPR.LPCR = GPRi(rd);
     break;
   case SPR_HID0:
-    ppuState->SPR.HID0 = GPR(rD);
+    ppuState->SPR.HID0 = GPRi(rd);
     break;
   case SPR_HID1:
-    ppuState->SPR.HID1 = GPR(rD);
+    ppuState->SPR.HID1 = GPRi(rd);
     break;
   case SPR_HID4:
-    ppuState->SPR.HID4 = GPR(rD);
+    ppuState->SPR.HID4 = GPRi(rd);
     break;
   case SPR_HID6:
-    ppuState->SPR.HID6 = GPR(rD);
+    ppuState->SPR.HID6 = GPRi(rd);
     break;
   case SPR_SRR0:
-    curThread.SPR.SRR0 = GPR(rD);
+    curThread.SPR.SRR0 = GPRi(rd);
     break;
   case SPR_SRR1:
-    curThread.SPR.SRR1 = GPR(rD);
+    curThread.SPR.SRR1 = GPRi(rd);
     break;
   case SPR_HRMOR:
-    ppuState->SPR.HRMOR = GPR(rD);
+    ppuState->SPR.HRMOR = GPRi(rd);
     break;
   case SPR_PpeTlbIndex:
-    ppuState->SPR.PPE_TLB_Index = GPR(rD);
+    ppuState->SPR.PPE_TLB_Index = GPRi(rd);
     break;
   case SPR_PpeTlbRpn:
-    ppuState->SPR.PPE_TLB_RPN = GPR(rD);
+    ppuState->SPR.PPE_TLB_RPN = GPRi(rd);
     break;
   case SPR_PpeTlbVpn:
-    ppuState->SPR.PPE_TLB_VPN = GPR(rD);
+    ppuState->SPR.PPE_TLB_VPN = GPRi(rd);
     mmuAddTlbEntry(ppuState);
     break;
   case SPR_TTR:
-    ppuState->SPR.TTR = GPR(rD);
+    ppuState->SPR.TTR = GPRi(rd);
     break;
   case SPR_TSCR:
-    ppuState->SPR.TSCR = static_cast<u32>(GPR(rD));
+    ppuState->SPR.TSCR = static_cast<u32>(GPRi(rd));
     break;
   case SPR_HSPRG0:
-    curThread.SPR.HSPRG0 = GPR(rD);
+    curThread.SPR.HSPRG0 = GPRi(rd);
     break;
   case SPR_HSPRG1:
-    curThread.SPR.HSPRG1 = GPR(rD);
+    curThread.SPR.HSPRG1 = GPRi(rd);
     break;
   case SPR_CTRLWR:
-    ppuState->SPR.CTRL = static_cast<u32>(GPR(rD));
+    ppuState->SPR.CTRL = static_cast<u32>(GPRi(rd));
     // Also do the write on SPR_CTRLRD
     break;
   case SPR_RMOR:
-    ppuState->SPR.RMOR = GPR(rD);
+    ppuState->SPR.RMOR = GPRi(rd);
     break;
   case SPR_HDEC:
-    ppuState->SPR.HDEC = static_cast<u32>(GPR(rD));
+    ppuState->SPR.HDEC = static_cast<u32>(GPRi(rd));
     break;
   case SPR_LPIDR:
-    ppuState->SPR.LPIDR = static_cast<u32>(GPR(rD));
+    ppuState->SPR.LPIDR = static_cast<u32>(GPRi(rd));
     break;
   case SPR_SPRG0:
-    curThread.SPR.SPRG0 = GPR(rD);
+    curThread.SPR.SPRG0 = GPRi(rd);
     break;
   case SPR_SPRG1:
-    curThread.SPR.SPRG1 = GPR(rD);
+    curThread.SPR.SPRG1 = GPRi(rd);
     break;
   case SPR_SPRG2:
-    curThread.SPR.SPRG2 = GPR(rD);
+    curThread.SPR.SPRG2 = GPRi(rd);
     break;
   case SPR_SPRG3:
-    curThread.SPR.SPRG3 = GPR(rD);
+    curThread.SPR.SPRG3 = GPRi(rd);
     break;
   case SPR_DABR:
-    curThread.SPR.DABR = GPR(rD);
+    curThread.SPR.DABR = GPRi(rd);
     break;
   case SPR_DABRX:
-    curThread.SPR.DABRX = GPR(rD);
+    curThread.SPR.DABRX = GPRi(rd);
     break;
   case SPR_XER:
-    curThread.SPR.XER.XER_Hex = static_cast<u32>(GPR(rD));
+    curThread.SPR.XER.XER_Hex = static_cast<u32>(GPRi(rd));
     // Clear the unused bits in XER (35:56).
     curThread.SPR.XER.XER_Hex &= 0xE000007F;
     break;
   case SPR_TBL_WO:
-    ppuState->SPR.TB = GPR(rD);
+    ppuState->SPR.TB = GPRi(rd);
     break;
   case SPR_TBU_WO:
-    ppuState->SPR.TB = ppuState->SPR.TB |= (GPR(rD) << 32);
+    ppuState->SPR.TB = ppuState->SPR.TB |= (GPRi(rd) << 32);
     break;
   default:
-    LOG_ERROR(Xenon, "{}(Thrd{:#d}) SPR {:#x} ={:#x}", ppuState->ppuName, static_cast<u8>(curThreadId), spr, GPR(rD));
+    LOG_ERROR(Xenon, "{}(Thrd{:#d}) SPR {:#x} ={:#x}", ppuState->ppuName, static_cast<u8>(curThreadId), spr, GPRi(rd));
     break;
   }
 }
