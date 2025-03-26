@@ -214,7 +214,7 @@ void Xe::PCIDev::SMC::SMCCore::ConfigRead(u64 readAddress, u8 *data, u8 byteCoun
 }
 
 // PCI Write
-void Xe::PCIDev::SMC::SMCCore::Write(u64 writeAddress, u8 *data, u8 byteCount) {
+void Xe::PCIDev::SMC::SMCCore::Write(u64 writeAddress, const u8 *data, u8 byteCount) {
   std::lock_guard lck(mutex);
   const u8 regOffset = static_cast<u8>(writeAddress);
 
@@ -224,8 +224,10 @@ void Xe::PCIDev::SMC::SMCCore::Write(u64 writeAddress, u8 *data, u8 byteCount) {
     memcpy(&smcPCIState.uartConfigReg, data, byteCount);
     // Check if UART is already initialized.
     if (!smcCoreState->uartInitialized && smcCoreState->uartPresent) {
+      u64 tmp = 0;
+      memcpy(&tmp, data, byteCount);
       // Initialize UART.
-      setupUART(*reinterpret_cast<u32*>(data));
+      setupUART(tmp);
     }
     break;
   case UART_BYTE_IN_REG: // UART Data In Register
@@ -262,17 +264,17 @@ void Xe::PCIDev::SMC::SMCCore::Write(u64 writeAddress, u8 *data, u8 byteCount) {
     memcpy(&smcPCIState.clockIntStatusReg, data, byteCount);
     break;
   case FIFO_IN_STATUS_REG: // FIFO In Status Register
-    smcPCIState.fifoInStatusReg = *reinterpret_cast<u32*>(data);
-    if (*reinterpret_cast<u64*>(data) == FIFO_STATUS_READY) { // We're about to receive a message.
+    memcpy(&smcPCIState.fifoInStatusReg, data, byteCount);
+    if (smcPCIState.fifoInStatusReg == FIFO_STATUS_READY) { // We're about to receive a message.
       // Reset our input buffer and buffer pointer.
       memset(&smcCoreState->fifoDataBuffer, 0, 16);
       smcCoreState->fifoBufferPos = 0;
     }
     break;
   case FIFO_OUT_STATUS_REG: // FIFO Out Status Register
-    smcPCIState.fifoOutStatusReg = *reinterpret_cast<u32*>(data);
+    memcpy(&smcPCIState.fifoOutStatusReg, data, byteCount);
     // We're about to send a reply.
-    if (*reinterpret_cast<u64*>(data) == FIFO_STATUS_READY) {
+    if (smcPCIState.fifoOutStatusReg == FIFO_STATUS_READY) {
       // Reset our FIFO buffer pointer.
       smcCoreState->fifoBufferPos = 0;
     }
@@ -285,39 +287,42 @@ void Xe::PCIDev::SMC::SMCCore::Write(u64 writeAddress, u8 *data, u8 byteCount) {
     smcCoreState->fifoBufferPos += 4;
     break;
   default:
+    u64 tmp = 0;
+    memcpy(&tmp, data, byteCount);
     LOG_ERROR(SMC, "Unknown register being written, offset {:#x}, data {:#x}", 
-        static_cast<u16>(regOffset), *reinterpret_cast<u64*>(data));
+        static_cast<u16>(regOffset), tmp);
     break;
   }
   mutex.unlock();
 }
 
 // PCI Config Write
-void Xe::PCIDev::SMC::SMCCore::ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount) {
-  LOG_INFO(SMC, "ConfigWrite: Address = {:#x}, Data = {:#x}, ByteCount = {:#x}.", writeAddress, *reinterpret_cast<u64*>(data), byteCount);
-
+void Xe::PCIDev::SMC::SMCCore::ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount) {  
   // Check if we're being scanned.
+  u64 tmp = 0;
+  memcpy(&tmp, data, byteCount);
+  LOG_DEBUG(SMC, "ConfigWrite: Address = {:#x}, Data = {:#x}, ByteCount = {:#x}.", writeAddress, tmp, byteCount);
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
-      if (*reinterpret_cast<u64*>(data) == 0xFFFFFFFF) { // PCI BAR Size discovery.
+      if (tmp == 0xFFFFFFFF) { // PCI BAR Size discovery.
         u64 x = 2;
         for (int idx = 2; idx < 31; idx++) {
-          *reinterpret_cast<u64*>(data) &= ~x;
+          tmp &= ~x;
           x <<= 1;
           if (x >= pciDevSizes[regOffset]) {
             break;
           }
         }
-        *reinterpret_cast<u64*>(data) &= ~0x3;
+        tmp &= ~0x3;
       }
     }
     if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address.
-      *reinterpret_cast<u64*>(data) = 0; // Register not implemented.
+      tmp = 0; // Register not implemented.
     }
   }
   
-  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], data, byteCount);
+  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &tmp, byteCount);
 }
 
 // Setups the UART Communication at a given configuration.

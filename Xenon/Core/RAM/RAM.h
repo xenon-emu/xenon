@@ -14,7 +14,7 @@ public:
     bool isSOCDevice);
   ~RAM();
   void Read(u64 readAddress, u8 *data, u8 byteCount) override;
-  void Write(u64 writeAddress, u8 *data, u8 byteCount) override;
+  void Write(u64 writeAddress, const u8 *data, u8 byteCount) override;
 
   u8 *getPointerToAddress(u32 address);
 

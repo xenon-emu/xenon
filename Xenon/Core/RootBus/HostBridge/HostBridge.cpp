@@ -87,7 +87,7 @@ bool HostBridge::Read(u64 readAddress, u8 *data, u8 byteCount) {
   return false;
 }
 
-bool HostBridge::Write(u64 writeAddress, u8 *data, u8 byteCount) {
+bool HostBridge::Write(u64 writeAddress, const u8 *data, u8 byteCount) {
   std::lock_guard lck(mutex);
 
   // Writing to host bridge registers?
@@ -95,73 +95,76 @@ bool HostBridge::Write(u64 writeAddress, u8 *data, u8 byteCount) {
     switch (writeAddress) {
     // HostBridge
     case 0xE0020000:
-      hostBridgeRegs.REG_E0020000 = *reinterpret_cast<u32*>(data);
+      memcpy(&hostBridgeRegs.REG_E0020000, data, byteCount);
       break;
     case 0xE0020004:
-      hostBridgeRegs.REG_E0020004 = *reinterpret_cast<u32*>(data);
+      memcpy(&hostBridgeRegs.REG_E0020004, data, byteCount);
       break;
     // BIU
     case 0xE1003000:
-      biuRegs.REG_E1003000 = *reinterpret_cast<u32*>(data);
+      memcpy(&biuRegs.REG_E1003000, data, byteCount);
       break;
     case 0xE1003100:
-      biuRegs.REG_E1003100 = *reinterpret_cast<u32*>(data);
+      memcpy(&biuRegs.REG_E1003100, data, byteCount);
       break;
     case 0xE1003200:
-      biuRegs.REG_E1003200 = *reinterpret_cast<u32*>(data);
+      memcpy(&biuRegs.REG_E1003200, data, byteCount);
       break;
     case 0xE1003300:
-      biuRegs.REG_E1003300 = *reinterpret_cast<u32*>(data);
+      memcpy(&biuRegs.REG_E1003300, data, byteCount);
       break;
     case 0xE1010000:
-      biuRegs.REG_E1010000 = *reinterpret_cast<u32*>(data);
-      biuRegs.REG_E1010010 =
-        *reinterpret_cast<u32*>(data); // Reading to this addr on a retail returns
-                                       // the same data on this address.
+      memcpy(&biuRegs.REG_E1010000, data, byteCount);
+      // Reading to this addr on a retail returns
+      // the same data on this address
+      memcpy(&biuRegs.REG_E1010010, data, byteCount);
       break;
     case 0xE1010010:
-      biuRegs.REG_E1010010 = *reinterpret_cast<u32*>(data);
+      memcpy(&biuRegs.REG_E1010010, data, byteCount);
       break;
     case 0xE1010020:
-      biuRegs.REG_E1010020 = *reinterpret_cast<u32*>(data);
+      memcpy(&biuRegs.REG_E1010020, data, byteCount);
       break;
     case 0xE1013000:
-      biuRegs.REG_E1013000 = *reinterpret_cast<u32*>(data);
+      memcpy(&biuRegs.REG_E1013000, data, byteCount);
       break;
     case 0xE1013100:
-      biuRegs.REG_E1013100 = *reinterpret_cast<u32*>(data);
+      memcpy(&biuRegs.REG_E1013100, data, byteCount);
       break;
     case 0xE1013200:
-      biuRegs.REG_E1013200 = *reinterpret_cast<u32*>(data);
+      memcpy(&biuRegs.REG_E1013200, data, byteCount);
       break;
     case 0xE1013300:
-      biuRegs.REG_E1013300 = *reinterpret_cast<u32*>(data);
+      memcpy(&biuRegs.REG_E1013300, data, byteCount);
       break;
     case 0xE1018020:
-      biuRegs.REG_E1018000 = *reinterpret_cast<u32*>(data); // Same as above.
-      biuRegs.REG_E1018020 = *reinterpret_cast<u32*>(data);
+      // Read the comment on E1010000
+      memcpy(&biuRegs.REG_E1018000, data, byteCount);
+      memcpy(&biuRegs.REG_E1018020, data, byteCount);
       break;
     case 0xE1020000:
-      biuRegs.REG_E1020000 = *reinterpret_cast<u32*>(data);
+      memcpy(&biuRegs.REG_E1020000, data, byteCount);
       break;
     case 0xE1020004:
-      biuRegs.REG_E1020004 = *reinterpret_cast<u32*>(data);
+      memcpy(&biuRegs.REG_E1020004, data, byteCount);
       break;
     case 0xE1020008:
-      biuRegs.REG_E1020008 = *reinterpret_cast<u32*>(data);
+      memcpy(&biuRegs.REG_E1020008, data, byteCount);
       break;
     case 0xE1040000:
-      biuRegs.REG_E1040000 = *reinterpret_cast<u32*>(data);
+      memcpy(&biuRegs.REG_E1040000, data, byteCount);
       break;
     case 0xE1040074:
-      biuRegs.REG_E1040074 = *reinterpret_cast<u32*>(data);
+      memcpy(&biuRegs.REG_E1040074, data, byteCount);
       break;
     case 0xE1040078:
-      biuRegs.REG_E1040078 = *reinterpret_cast<u32*>(data);
+      memcpy(&biuRegs.REG_E1040078, data, byteCount);
       break;
     default:
-        LOG_ERROR(HostBridge, "Unknown register being written at address: {:#x}, data: {:#x}.",
-            writeAddress, *reinterpret_cast<u64*>(data));
+      u64 tmp{};
+      memcpy(&tmp, data, byteCount);
+      LOG_ERROR(HostBridge, "Unknown register being written at address: {:#x}, data: {:#x}",
+                writeAddress, tmp);
       break;
     }
     return true;
@@ -214,7 +217,7 @@ void HostBridge::ConfigRead(u64 readAddress, u8 *data, u8 byteCount) {
   pciBridge->ConfigRead(readAddress, data, byteCount);
 }
 
-void HostBridge::ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount) {
+void HostBridge::ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount) {
   std::lock_guard lck(mutex);
 
   PCIE_CONFIG_ADDR configAddress = {};
@@ -226,15 +229,16 @@ void HostBridge::ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount) {
       pciBridge->ConfigWrite(writeAddress, data, byteCount);
       break;
     case 0x1: // Host Bridge
-      memcpy(&hostBridgeConfigSpace.data[configAddress.regOffset], &data,
-             byteCount);
+      memcpy(&hostBridgeConfigSpace.data[configAddress.regOffset], data, byteCount);
       break;
     case 0x2: // GPU/Memory Controller
       xGPU->ConfigWrite(writeAddress, data, byteCount);
       break;
     default:
-        LOG_ERROR(HostBridge, "BUS0: Configuration Write to inexistant PCI Device at address: {:#x}, data: {:#x}.",
-            writeAddress, *reinterpret_cast<u64*>(data));
+      u64 tmp = 0;
+      memcpy(&tmp, data, byteCount);
+      LOG_ERROR(HostBridge, "BUS0: Configuration Write to inexistant PCI Device at address: {:#x}, data: {:#x}",
+                writeAddress, tmp);
       break;
     }
     return;

@@ -87,91 +87,95 @@ void Xe::PCIDev::ETHERNET::ETHERNET::ConfigRead(u64 readAddress, u8 *data, u8 by
   memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], byteCount);
 }
 
-void Xe::PCIDev::ETHERNET::ETHERNET::Write(u64 writeAddress, u8 *data, u8 byteCount) {
+void Xe::PCIDev::ETHERNET::ETHERNET::Write(u64 writeAddress, const u8 *data, u8 byteCount) {
   u8 offset = writeAddress & 0xFF;
 
   switch (offset) {
   case Xe::PCIDev::ETHERNET::TX_CONFIG:
-    ethPciState.txConfigReg = *reinterpret_cast<u32*>(data);
+    memcpy(&ethPciState.txConfigReg, data, byteCount);
     break;
   case Xe::PCIDev::ETHERNET::TX_DESCRIPTOR_BASE:
-    ethPciState.txDescriptorBaseReg = *reinterpret_cast<u32*>(data);
+    memcpy(&ethPciState.txDescriptorBaseReg, data, byteCount);
     break;
   case Xe::PCIDev::ETHERNET::TX_DESCRIPTOR_STATUS:
-    ethPciState.txDescriptorStatusReg = *reinterpret_cast<u32*>(data);
+    memcpy(&ethPciState.txDescriptorStatusReg, data, byteCount);
     break;
   case Xe::PCIDev::ETHERNET::RX_CONFIG:
-    ethPciState.rxConfigReg = *reinterpret_cast<u32*>(data);
+    memcpy(&ethPciState.rxConfigReg, data, byteCount);
     break;
   case Xe::PCIDev::ETHERNET::RX_DESCRIPTOR_BASE:
-    ethPciState.rxDescriptorBaseReg = *reinterpret_cast<u32*>(data);
+    memcpy(&ethPciState.rxDescriptorBaseReg, data, byteCount);
     break;
   case Xe::PCIDev::ETHERNET::INTERRUPT_STATUS:
-    ethPciState.interruptStatusReg = *reinterpret_cast<u32*>(data);
+    memcpy(&ethPciState.interruptStatusReg, data, byteCount);
     break;
   case Xe::PCIDev::ETHERNET::INTERRUPT_MASK:
-    ethPciState.interruptMaskReg = *reinterpret_cast<u32*>(data);
+    memcpy(&ethPciState.interruptMaskReg, data, byteCount);
     break;
   case Xe::PCIDev::ETHERNET::CONFIG_0:
-    ethPciState.config0Reg = *reinterpret_cast<u32*>(data);
+    memcpy(&ethPciState.config0Reg, data, byteCount);
     break;
   case Xe::PCIDev::ETHERNET::POWER:
-    ethPciState.powerReg = *reinterpret_cast<u32*>(data);
+    memcpy(&ethPciState.powerReg, data, byteCount);
     break;
   case Xe::PCIDev::ETHERNET::PHY_CONFIG:
-    ethPciState.phyConfigReg = *reinterpret_cast<u32*>(data);
+    memcpy(&ethPciState.phyConfigReg, data, byteCount);
     break;
   case Xe::PCIDev::ETHERNET::PHY_CONTROL:
-    ethPciState.phyControlReg = *reinterpret_cast<u32*>(data);
+    memcpy(&ethPciState.phyControlReg, data, byteCount);
     break;
   case Xe::PCIDev::ETHERNET::CONFIG_1:
-    ethPciState.config1Reg = *reinterpret_cast<u32*>(data);
+    memcpy(&ethPciState.config1Reg, data, byteCount);
     break;
   case Xe::PCIDev::ETHERNET::RETRY_COUNT:
-    ethPciState.retryCountReg = *reinterpret_cast<u32*>(data);
+    memcpy(&ethPciState.retryCountReg, data, byteCount);
     break;
   case Xe::PCIDev::ETHERNET::MULTICAST_FILTER_CONTROL:
-    ethPciState.multicastFilterControlReg = *reinterpret_cast<u32*>(data);
+    memcpy(&ethPciState.multicastFilterControlReg, data, byteCount);
     break;
   case Xe::PCIDev::ETHERNET::ADDRESS_0:
-    ethPciState.address0Reg = *reinterpret_cast<u32*>(data);
+    memcpy(&ethPciState.address0Reg, data, byteCount);
     break;
   case Xe::PCIDev::ETHERNET::MULTICAST_HASH:
-    ethPciState.multicastHashReg = *reinterpret_cast<u32*>(data);
+    memcpy(&ethPciState.multicastHashReg, data, byteCount);
     break;
   case Xe::PCIDev::ETHERNET::MAX_PACKET_SIZE:
-    ethPciState.maxPacketSizeReg = *reinterpret_cast<u32*>(data);
+    memcpy(&ethPciState.maxPacketSizeReg, data, byteCount);
     break;
   case Xe::PCIDev::ETHERNET::ADDRESS_1:
-    ethPciState.address1Reg = *reinterpret_cast<u32*>(data);
+    memcpy(&ethPciState.address1Reg, data, byteCount);
     break;
   default:
-    LOG_ERROR(ETH, "Unknown PCI Reg being written {:#x} data = {:#x}", static_cast<u16>(offset), *reinterpret_cast<u64*>(data));
+    u64 tmp = 0;
+    memcpy(&tmp, data, byteCount);
+    LOG_ERROR(ETH, "Unknown PCI Reg being written {:#x} data = {:#x}", static_cast<u16>(offset), tmp);
     break;
   }
 }
 
-void Xe::PCIDev::ETHERNET::ETHERNET::ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount) {
+void Xe::PCIDev::ETHERNET::ETHERNET::ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount) {
   // Check if we're being scanned.
+  u64 tmp = 0;
+  memcpy(&tmp, data, byteCount);
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
-      if (*reinterpret_cast<u64*>(data) == 0xFFFFFFFF) { // PCI BAR Size discovery.
+      if (tmp == 0xFFFFFFFF) { // PCI BAR Size discovery.
         u64 x = 2;
         for (int idx = 2; idx < 31; idx++) {
-          *reinterpret_cast<u64*>(data) &= ~x;
+          tmp &= ~x;
           x <<= 1;
           if (x >= pciDevSizes[regOffset]) {
             break;
           }
         }
-        *reinterpret_cast<u64*>(data) &= ~0x3;
+        tmp &= ~0x3;
       }
     }
     if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address.
-      *reinterpret_cast<u64*>(data) = 0; // Register not implemented.
+      tmp = 0; // Register not implemented.
     }
   }
 
-  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], data, byteCount);
+  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &tmp, byteCount);
 }

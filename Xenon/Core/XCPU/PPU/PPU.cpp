@@ -147,7 +147,7 @@ void PPU::StartExecution(bool setHRMOR) {
 
 void PPU::CalculateCPI() {
   // Get the instructions per second that we're able to execute.
-  u32 instrPerSecond = getIPS();
+  u32 instrPerSecond = GetIPS();
 
   // Get our CPI
   u64 cpi = get_cpi_value(instrPerSecond);
@@ -189,38 +189,34 @@ void PPU::Step(int amount) {
 }
 
 // PPU Entry Point.
-void PPU::ppuRunInstructions(u64 numInstrs, bool enableHalt) {
-  // Run for the number of instructions specified
-  for (size_t instrCount{}; instrCount < numInstrs; ++instrCount) {
-    // Read next intruction from memory
-    if (ppuReadNextInstruction()) {
-      // If we want to halt, do not run current instr, just jump to halt
-      /*if (enableHalt && (ppuHaltOn != 0 && ppuHaltOn == curThread.CIA || ppuThreadState == eThreadState::Halted)) {
+void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
+  for (size_t instrCount = 0; instrCount < numInstrs; ++instrCount) {
+    // Halt if needed before executing the instruction
+    if (enableHalt) {
+      if (ppuHaltOn && ppuHaltOn == curThread.CIA) {
         ppuThreadState = eThreadState::Halted;
+      }
+      if (ppuThreadState == eThreadState::Halted)
         break;
-      }*/
+    }
+    
+    if (PPUReadNextInstruction()) {
+      // Execute instruction
       PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
     }
 
-    // Increase Time Base Counter
-    if (xenonContext->timeBaseActive) {
-      // HID6[15]: Time-base and decrementer facility enable
-      // 0 -> TBU, TBL, DEC, HDEC, and the hang-detection logic do not
-      // update. 1 -> TBU, TBL, DEC, HDEC, and the hang-detection logic
-      // are enabled to update
-      if (ppuState->SPR.HID6 & 0x1000000000000) {
-        updateTimeBase();
-      }
+    // Increase Time Base Counter if enabled
+    if (xenonContext->timeBaseActive && (ppuState->SPR.HID6 & 0x1000000000000)) {
+      UpdateTimeBase();
     }
 
-    // Check if external interrupts are enabled and the IIC has a pending
-    // interrupt
+    // Check for external interrupts
     if (curThread.SPR.MSR.EE && xenonContext->xenonIIC.checkExtInterrupt(curThread.SPR.PIR)) {
       _ex |= PPU_EX_EXT;
     }
 
-    // Check the exceptions we have pending, then process them
-    ppuCheckExceptions();
+    // Handle pending exceptions
+    PPUCheckExceptions();
   }
 }
 
@@ -232,23 +228,23 @@ void PPU::ThreadStateMachine() {
   } break;
   case eThreadState::Running: {
     // Check our threads to see if any are running
-    u8 state = getCurrentRunningThreads();
+    u8 state = GetCurrentRunningThreads();
     if (state & ePPUThreadBit_Zero) {
       // Thread 0 is running, process instructions until we reach TTR timeout.
       curThreadId = ePPUThread_Zero;
-      ppuRunInstructions(ppuState->SPR.TTR);
+      PPURunInstructions(ppuState->SPR.TTR);
     }
     if (state & ePPUThreadBit_One) {
       // Thread 1 is running, process instructions until we reach TTR timeout.
       curThreadId = ePPUThread_One;
-      ppuRunInstructions(ppuState->SPR.TTR);
+      PPURunInstructions(ppuState->SPR.TTR);
     }
   } break;
   case eThreadState::Halted: {
     if (ppuStepAmount > 0) {
-      ppuRunInstructions(ppuStepAmount);
+      PPURunInstructions(ppuStepAmount, false);
       ppuStepAmount = 0;  // Ensure step mode doesn't continue indefinitely
-    }
+    };
   } break;
   case eThreadState::Sleeping: {
     // Waiting for an event, do nothing
@@ -260,9 +256,7 @@ void PPU::ThreadStateMachine() {
 }
 void PPU::ThreadLoop() {
   while (ppuThreadState != eThreadState::None) {
-    if (ppuThreadState == eThreadState::Running || ppuThreadState == eThreadState::Executing) {
-      ThreadStateMachine();
-    }
+    ThreadStateMachine();
 
     // Check for external interrupts that enable execution
     bool WEXT = (ppuState->SPR.TSCR & 0x100000) >> 20;
@@ -293,7 +287,7 @@ PPU_THREAD_REGISTERS *PPU::GetPPUThread(u8 thrdID) {
   return &ppuState->ppuThread[static_cast<ePPUThread>(thrdID)];
 }
 
-// This is the calibration code for the getIPS() function. It branches to the
+// This is the calibration code for the GetIPS() function. It branches to the
 // 0x4 location in memory.
 static u32 ipsCalibrationCode[] = {
     0x55726220, //  rlwinm   r18,r11,12,8,16
@@ -304,7 +298,7 @@ static u32 ipsCalibrationCode[] = {
 
 // Performs a test using a loop to check the amount of IPS we're able to
 // execute
-u32 PPU::getIPS() {
+u32 PPU::GetIPS() {
   // Instr Count: The amount of instructions to execute in order to test
 
   // Write the calibration code to main memory
@@ -324,7 +318,7 @@ u32 PPU::getIPS() {
   // Execute the amount of cycles we're requested
   while (auto timerEnd = std::chrono::steady_clock::now() <=
                          timerStart + std::chrono::seconds(1)) {
-    ppuReadNextInstruction();
+    PPUReadNextInstruction();
     PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
     instrCount++;
   }
@@ -494,7 +488,7 @@ u64 PPU::loadElfImage(u8* data, u64 size) {
 }
 
 // Reads the next instruction from memory and advances the NIP accordingly.
-bool PPU::ppuReadNextInstruction() {
+bool PPU::PPUReadNextInstruction() {
   // Update current instruction address
   curThread.CIA = curThread.NIA;
   // Increase next instruction address
@@ -516,7 +510,7 @@ bool PPU::ppuReadNextInstruction() {
 }
 
 // Checks for exceptions and process them in the correct order.
-void PPU::ppuCheckExceptions() {
+void PPU::PPUCheckExceptions() {
   // Check Exceptions pending and process them in order.
   u16 &exceptions = _ex;
   if (exceptions != PPU_EX_NONE) {
@@ -653,7 +647,7 @@ void PPU::ppuCheckExceptions() {
   }
 }
 
-void PPU::checkTimeBaseStatus() {
+void PPU::CheckTimeBaseStatus() {
   // Increase Time Base Counter
   if (xenonContext->timeBaseActive) {
     // HID6[15]: Time-base and decrementer facility enable.
@@ -661,14 +655,14 @@ void PPU::checkTimeBaseStatus() {
     // update. 1 -> TBU, TBL, DEC, HDEC, and the hang-detection logic
     // are enabled to update
     if (ppuState->SPR.HID6 & 0x1000000000000) {
-      updateTimeBase();
+      UpdateTimeBase();
     }
   }
 }
 
 // Updates the time base based on the amount of ticks and checks for decrementer
 // interrupts if enabled.
-void PPU::updateTimeBase() {
+void PPU::UpdateTimeBase() {
   // The Decrementer and the Time Base are driven by the same time frequency.
   u32 newDec = 0;
   u32 dec = 0;
@@ -688,7 +682,7 @@ void PPU::updateTimeBase() {
 }
 
 // Returns current executing thread by reading CTRL register
-u8 PPU::getCurrentRunningThreads() {
+u8 PPU::GetCurrentRunningThreads() {
   if (!ppuState)
     return ePPUThreadBit_None;
 

@@ -90,7 +90,7 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u8 byteCount) {
   return false;
 }
 
-bool Xe::Xenos::XGPU::Write(u64 writeAddress, u8 *data, u8 byteCount) {
+bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u8 byteCount) {
   std::lock_guard lck(mutex);
   if (isAddressMappedInBAR(static_cast<u32>(writeAddress))) {
     const u32 regIndex = (writeAddress & 0xFFFFF) / 4;
@@ -105,12 +105,14 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, u8 *data, u8 byteCount) {
     // Set our internal width.
 #ifndef NO_GFX
     if (reg == XeRegister::D1GRPH_X_END) {
-      Xe_Main->renderer->internalWidth = byteswap_be<u32>(*reinterpret_cast<u32*>(data));
+      memcpy(&Xe_Main->renderer->internalWidth, data, sizeof(Xe_Main->renderer->internalWidth));
+      Xe_Main->renderer->internalWidth = byteswap_be<u32>(Xe_Main->renderer->internalWidth);
       LOG_INFO(Xenos, "Setting new Internal Width: {:#x}", Xe_Main->renderer->internalWidth);
     }
     // Set our internal height.
     if (reg == XeRegister::D1GRPH_Y_END) {
-      Xe_Main->renderer->internalHeight = byteswap_be<u32>(*reinterpret_cast<u32*>(data));
+      memcpy(&Xe_Main->renderer->internalHeight, data, sizeof(Xe_Main->renderer->internalHeight));
+      Xe_Main->renderer->internalHeight = byteswap_be<u32>(Xe_Main->renderer->internalHeight);
       LOG_INFO(Xenos, "Setting new Internal Height: {:#x}", Xe_Main->renderer->internalHeight);
     }
 #endif
@@ -128,26 +130,28 @@ void Xe::Xenos::XGPU::ConfigRead(u64 readAddress, u8 *data, u8 byteCount) {
   return;
 }
 
-void Xe::Xenos::XGPU::ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount) {
+void Xe::Xenos::XGPU::ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount) {
   std::lock_guard lck(mutex);
   // Check if we're being scanned.
+  u64 tmp = 0;
+  memcpy(&tmp, data, byteCount);
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
-      if (*reinterpret_cast<u64*>(data) == 0xFFFFFFFF) { // PCI BAR Size discovery.
+      if (tmp == 0xFFFFFFFF) { // PCI BAR Size discovery.
         u64 x = 2;
         for (int idx = 2; idx < 31; idx++) {
-          *reinterpret_cast<u64*>(data) &= ~x;
+          tmp &= ~x;
           x <<= 1;
           if (x >= pciDevSizes[regOffset]) {
             break;
           }
         }
-        *reinterpret_cast<u64*>(data) &= ~0x3;
+        tmp &= ~0x3;
       }
     }
     if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address.
-      *reinterpret_cast<u64*>(data) = 0; // Register not implemented.
+      tmp = 0; // Register not implemented.
     }
   }
 

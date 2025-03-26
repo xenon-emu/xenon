@@ -48,7 +48,7 @@ public:
   PPU_THREAD_REGISTERS *GetPPUThread(u8 thrdID);
 
   // Runs a specified number of instructions
-  void ppuRunInstructions(u64 numInstrs, bool enableHalt = true);
+  void PPURunInstructions(u64 numInstrs, bool enableHalt = true);
 
   // Sets the clocks per instruction
   void SetCPI(u32 CPI) { clocksPerInstruction = CPI; }
@@ -107,16 +107,16 @@ private:
 
   // Returns the number of instructions per second the current
   // host computer can process.
-  u32 getIPS();
+  u32 GetIPS();
   // Read next intruction from memory
-  bool ppuReadNextInstruction();
+  bool PPUReadNextInstruction();
   // Checks for pending exceptions
-  void ppuCheckExceptions();
+  void PPUCheckExceptions();
   // Checks if it should update the time base
-  void checkTimeBaseStatus();
+  void CheckTimeBaseStatus();
   // Updates the current PPU's time base and decrementer based on
   // the amount of ticks per instr we should perform.
-  void updateTimeBase();
+  void UpdateTimeBase();
   // Gets the current running threads.
-  u8 getCurrentRunningThreads();
+  u8 GetCurrentRunningThreads();
 };

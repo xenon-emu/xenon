@@ -484,10 +484,10 @@ public:
   ODD(const char* deviceName, u64 size,
     PCIBridge *parentPCIBridge, RAM *ram);
 
-  void Read(u64 readAddress, u8 *data, u8 u8Count) override;
-  void ConfigRead(u64 readAddress, u8 *data, u8 u8Count) override;
-  void Write(u64 writeAddress, u8 *data, u8 u8Count) override;
-  void ConfigWrite(u64 writeAddress, u8 *data, u8 u8Count) override;
+  void Read(u64 readAddress, u8 *data, u8 byteCount) override;
+  void ConfigRead(u64 readAddress, u8 *data, u8 byteCount) override;
+  void Write(u64 writeAddress, const u8 *data, u8 byteCount) override;
+  void ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount) override;
 
 private:
   // PCI Bridge pointer. Used for Interrupts.
