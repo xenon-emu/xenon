@@ -193,7 +193,7 @@ bool _smc::verify_toml(toml::value &value) {
 
 void _xcpu::from_toml(const toml::value &value) {
   elfLoader = toml::find_or<bool>(value, "ElfLoader", elfLoader);
-  clocksPerInstruction = toml::find_or<bool>(value, "CPI", clocksPerInstruction);
+  clocksPerInstruction = toml::find_or<s32&>(value, "CPI", clocksPerInstruction);
   HW_INIT_SKIP_1 = toml::find_or<u64&>(value, "HW_INIT_SKIP1", HW_INIT_SKIP_1);
   HW_INIT_SKIP_2 = toml::find_or<u64&>(value, "HW_INIT_SKIP2", HW_INIT_SKIP_2);
 }
