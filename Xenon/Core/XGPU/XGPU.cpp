@@ -9,7 +9,6 @@
 
 #include "Base/Config.h"
 #include "Base/Path_util.h"
-#include "Base/Version.h"
 #include "Base/Logging/Log.h"
 
 //#define XE_DEBUG
