@@ -48,7 +48,7 @@ public:
   PPU_THREAD_REGISTERS *GetPPUThread(u8 thrdID);
 
   // Runs a specified number of instructions
-  void ppuRunInstructions(u64 &numInstrs, bool enableHalt = true);
+  void ppuRunInstructions(u64 numInstrs, bool enableHalt = true);
 
   // Sets the clocks per instruction
   void SetCPI(u32 CPI) { clocksPerInstruction = CPI; }
@@ -118,5 +118,5 @@ private:
   // the amount of ticks per instr we should perform.
   void updateTimeBase();
   // Gets the current running threads.
-  ePPUThread getCurrentRunningThreads();
+  u8 getCurrentRunningThreads();
 };

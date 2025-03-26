@@ -55,6 +55,9 @@ XeMain::~XeMain() {
   renderer.reset();
 #endif
 
+  // Stop the logger
+  Base::Log::Stop();
+
   // Delete the log filter
   logFilter.reset();
 }
