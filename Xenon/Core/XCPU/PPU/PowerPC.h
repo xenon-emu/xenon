@@ -656,9 +656,9 @@ struct XENON_CONTEXT {
 #define SPR_SRR0 26
 #define SPR_SRR1 27
 #define SPR_CFAR 28
+#define SPR_PID 48
 #define SPR_ESR 62
 #define SPR_IVPR 63
-#define SPR_PID 48
 #define SPR_CTRLRD 136
 #define SPR_CTRLWR 152
 #define SPR_VRSAVE 256
