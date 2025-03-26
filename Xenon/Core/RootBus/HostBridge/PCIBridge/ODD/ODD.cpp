@@ -338,7 +338,7 @@ void ODD::Read(u64 readAddress, u8 *data, u8 byteCount) {
   }
 }
 
-void ODD::Write(u64 writeAddress, u8 *data, u8 byteCount) {
+void ODD::Write(u64 writeAddress, const u8 *data, u8 byteCount) {
   // PCI BAR0 is the Primary Command Block Base Address.
   u8 atapiCommandReg =
       static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR0);
@@ -401,7 +401,7 @@ void ODD::Write(u64 writeAddress, u8 *data, u8 byteCount) {
       // Reset the Error register.
       atapiState.atapiRegs.errorReg &= ~ATA_ERROR_ABRT;
 
-      switch (*reinterpret_cast<u64*>(data)) {
+      switch (atapiState.atapiRegs.commandReg) {
       case ATA_COMMAND_PACKET:
         atapiState.atapiRegs.statusReg |= ATA_STATUS_DRQ;
         return;
@@ -412,7 +412,7 @@ void ODD::Write(u64 writeAddress, u8 *data, u8 byteCount) {
         atapiIdentifyCommand();
         return;
       default:
-        LOG_ERROR(ODD, "Unknown command, command code = {:#x}", *reinterpret_cast<u64*>(data));
+        LOG_ERROR(ODD, "Unknown command, command code = {:#x}", atapiState.atapiRegs.commandReg);
         break;
       }
       return;
@@ -420,8 +420,10 @@ void ODD::Write(u64 writeAddress, u8 *data, u8 byteCount) {
       memcpy(&atapiState.atapiRegs.devControlReg, data, byteCount);
       return;
     default:
+      u64 tmp = 0;
+      memcpy(&tmp, data, byteCount);
       LOG_ERROR(ODD, "Unknown Command Register Block register being written, command reg = {:#x}"
-        ", write address = {:#x}, data = {:#x}", atapiCommandReg, writeAddress, *reinterpret_cast<u64*>(data));
+        ", write address = {:#x}, data = {:#x}", atapiCommandReg, writeAddress, tmp);
       break;
     }
   } else {
@@ -430,7 +432,7 @@ void ODD::Write(u64 writeAddress, u8 *data, u8 byteCount) {
     case ATAPI_DMA_REG_COMMAND:
       memcpy(&atapiState.atapiRegs.dmaCmdReg, data, byteCount);
 
-      if (*reinterpret_cast<u64*>(data) & XE_ATAPI_DMA_ACTIVE) {
+      if (atapiState.atapiRegs.dmaCmdReg & XE_ATAPI_DMA_ACTIVE) {
         // Start our DMA Operation
         doDMA();
         // Change our DMA Status after completion
@@ -479,25 +481,27 @@ void ODD::ConfigRead(u64 readAddress, u8 *data, u8 byteCount) {
   LOG_DEBUG(ODD, "ConfigRead to reg {:#x}", readReg * 4);
 }
 
-void ODD::ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount) {
+void ODD::ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount) {
   // Check if we're being scanned.
+  u64 tmp = 0;
+  memcpy(&tmp, data, byteCount);
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
-      if (*reinterpret_cast<u64*>(data) == 0xFFFFFFFF) { // PCI BAR Size discovery.
+      if (tmp == 0xFFFFFFFF) { // PCI BAR Size discovery.
         u64 x = 2;
         for (int idx = 2; idx < 31; idx++) {
-          *reinterpret_cast<u64*>(data) &= ~x;
+          tmp &= ~x;
           x <<= 1;
           if (x >= pciDevSizes[regOffset]) {
             break;
           }
         }
-        *reinterpret_cast<u64*>(data) &= ~0x3;
+        tmp &= ~0x3;
       }
     }
     if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address.
-      *reinterpret_cast<u64*>(data) = 0; // Register not implemented.
+      tmp = 0; // Register not implemented.
     }
   }
 
@@ -506,25 +510,25 @@ void ODD::ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount) {
     // Confiduration write to the SATA Status and Control Registers.
     switch ((writeReg - XE_SIS_SCR_BASE) / 4) {
     case SCR_STATUS_REG:
-      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_STATUS_REG, data {:#x}", *reinterpret_cast<u64*>(data));
+      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_STATUS_REG, data {:#x}", tmp);
       break;
     case SCR_ERROR_REG:
-      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_ERROR_REG, data {:#x}", *reinterpret_cast<u32*>(data));
+      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_ERROR_REG, data {:#x}", tmp);
       break;
     case SCR_CONTROL_REG:
-      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_CONTROL_REG, data {:#x}", *reinterpret_cast<u64*>(data));
+      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_CONTROL_REG, data {:#x}", tmp);
       break;
     case SCR_ACTIVE_REG:
-      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_ACTIVE_REG, data {:#x}", *reinterpret_cast<u64*>(data));
+      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_ACTIVE_REG, data {:#x}", tmp);
       break;
     case SCR_NOTIFICATION_REG:
-      LOG_WARNING(ODD, "SCR ConfigRead to SCR_NOTIFICATION_REG, data {:#x}", *reinterpret_cast<u64*>(data));
+      LOG_WARNING(ODD, "SCR ConfigRead to SCR_NOTIFICATION_REG, data {:#x}", tmp);
       break;
     default:
-      LOG_ERROR(ODD, "SCR ConfigWrite to reg {:#x}, data {:#x}", writeReg * 4, *reinterpret_cast<u64*>(data));
+      LOG_ERROR(ODD, "SCR ConfigWrite to reg {:#x}, data {:#x}", writeReg * 4, tmp);
       break;
     }
   }
-  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], data, byteCount);
-  LOG_DEBUG(ODD, "ConfigWrite to reg {:#x}, data {:#x}", writeReg * 4, *reinterpret_cast<u64*>(data));
+  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &tmp, byteCount);
+  LOG_DEBUG(ODD, "ConfigWrite to reg {:#x}, data {:#x}", writeReg * 4, tmp);
 }

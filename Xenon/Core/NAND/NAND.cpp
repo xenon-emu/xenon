@@ -87,7 +87,7 @@ void NAND::Read(u64 readAddress, u8 *data, u8 byteCount) {
 }
 
 /************Responsible for writing the NAND************/
-void NAND::Write(u64 writeAddress, u8 *data, u8 byteCount) {
+void NAND::Write(u64 writeAddress, const u8 *data, u8 byteCount) {
   u32 offset = static_cast<u32>(writeAddress & 0xFFFFFF);
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
 #ifdef NAND_DEBUG

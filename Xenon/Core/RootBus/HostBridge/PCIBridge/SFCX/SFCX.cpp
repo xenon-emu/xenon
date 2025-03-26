@@ -181,40 +181,40 @@ void SFCX::ConfigRead(u64 readAddress, u8 *data, u8 byteCount) {
   memcpy(data, &pciConfigSpace.data[offset], byteCount);
 }
 
-void SFCX::Write(u64 writeAddress, u8 *data, u8 byteCount) {
+void SFCX::Write(u64 writeAddress, const u8 *data, u8 byteCount) {
   const u16 reg = writeAddress & 0xFF;
 
   switch (reg) {
   case SFCX_CONFIG_REG:
-    sfcxState.configReg = *reinterpret_cast<u32*>(data);
+    memcpy(&sfcxState.configReg, data, byteCount);
     break;
   case SFCX_STATUS_REG:
-    sfcxState.statusReg = *reinterpret_cast<u32*>(data);
+    memcpy(&sfcxState.statusReg, data, byteCount);
     break;
   case SFCX_COMMAND_REG:
-    sfcxState.commandReg = *reinterpret_cast<u32*>(data);
+    memcpy(&sfcxState.commandReg, data, byteCount);
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     break;
   case SFCX_ADDRESS_REG:
-    sfcxState.addressReg = *reinterpret_cast<u32*>(data);
+    memcpy(&sfcxState.addressReg, data, byteCount);
     break;
   case SFCX_DATA_REG:
-    sfcxState.dataReg = *reinterpret_cast<u32*>(data);
+    memcpy(&sfcxState.dataReg, data, byteCount);
     break;
   case SFCX_LOGICAL_REG:
-    sfcxState.logicalReg = *reinterpret_cast<u32*>(data);
+    memcpy(&sfcxState.logicalReg, data, byteCount);
     break;
   case SFCX_PHYSICAL_REG:
-    sfcxState.physicalReg = *reinterpret_cast<u32*>(data);
+    memcpy(&sfcxState.physicalReg, data, byteCount);
     break;
   case SFCX_DATAPHYADDR_REG:
-    sfcxState.dataPhysAddrReg = *reinterpret_cast<u32*>(data);
+    memcpy(&sfcxState.dataPhysAddrReg, data, byteCount);
     break;
   case SFCX_SPAREPHYADDR_REG:
-    sfcxState.sparePhysAddrReg = *reinterpret_cast<u32*>(data);
+    memcpy(&sfcxState.sparePhysAddrReg, data, byteCount);
     break;
   case SFCX_MMC_ID_REG:
-    sfcxState.mmcIDReg = *reinterpret_cast<u32*>(data);
+    memcpy(&sfcxState.mmcIDReg, data, byteCount);
     break;
   default:
     LOG_ERROR(SFCX, "Write from unknown register {:#x}", reg);
@@ -222,31 +222,33 @@ void SFCX::Write(u64 writeAddress, u8 *data, u8 byteCount) {
   }
 }
 
-void SFCX::ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount) {
+void SFCX::ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount) {
   const u8 offset = writeAddress & 0xFF;
 
   // Check if we're being scanned.
+  u64 tmp = 0;
+  memcpy(&tmp, data, byteCount);
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
-      if (*reinterpret_cast<u64*>(data) == 0xFFFFFFFF) { // PCI BAR Size discovery.
+      if (tmp == 0xFFFFFFFF) { // PCI BAR Size discovery.
         u64 x = 2;
         for (int idx = 2; idx < 31; idx++) {
-          *reinterpret_cast<u64*>(data) &= ~x;
+          tmp &= ~x;
           x <<= 1;
           if (x >= pciDevSizes[regOffset]) {
             break;
           }
         }
-        *reinterpret_cast<u64*>(data) &= ~0x3;
+        tmp &= ~0x3;
       }
     }
     if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address.
-      *reinterpret_cast<u64*>(data) = 0; // Register not implemented.
+      tmp = 0; // Register not implemented.
     }
   }
 
-  memcpy(&pciConfigSpace.data[offset], data, byteCount);
+  memcpy(&pciConfigSpace.data[offset], &tmp, byteCount);
 }
 
 void SFCX::sfcxMainLoop() {

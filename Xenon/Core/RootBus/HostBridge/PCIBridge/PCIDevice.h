@@ -18,10 +18,10 @@ public:
     deviceInfo.size = size;
   }
   virtual void Read(u64 readAddress, u8 *data, u8 byteCount) {}
-  virtual void Write(u64 writeAddress, u8 *data, u8 byteCount) {}
+  virtual void Write(u64 writeAddress, const u8 *data, u8 byteCount) {}
 
   virtual void ConfigRead(u64 readAddress, u8 *data, u8 byteCount) {}
-  virtual void ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount) {}
+  virtual void ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount) {}
 
   const char *GetDeviceName() { return deviceInfo.deviceName; }
 

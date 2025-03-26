@@ -89,10 +89,10 @@ public:
   void addPCIDevice(PCIDevice *device);
 
   bool Read(u64 readAddress, u8 *data, u8 byteCount);
-  bool Write(u64 writeAddress, u8 *data, u8 byteCount);
+  bool Write(u64 writeAddress, const u8 *data, u8 byteCount);
 
   void ConfigRead(u64 readAddress, u8 *data, u8 byteCount);
-  void ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount);
+  void ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount);
 
   void RegisterIIC(Xe::XCPU::IIC::XenonIIC *xenonIICPtr);
 

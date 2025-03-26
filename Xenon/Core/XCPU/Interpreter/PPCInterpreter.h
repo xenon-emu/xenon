@@ -120,7 +120,7 @@ void ppcExternalException(PPU_STATE *ppuState);
 // MMU
 //
 
-bool MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState, bool memWrite, bool speculativeLoad = false);
+bool MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState, bool memWrite, bool cacheStore = false);
 u8 mmuGetPageSize(PPU_STATE *ppuState, bool L, u8 LP);
 void mmuAddTlbEntry(PPU_STATE *ppuState);
 bool mmuSearchTlbEntry(PPU_STATE *ppuState, u64 *RPN, u64 VA, u8 p, bool L, bool LP);
@@ -131,20 +131,26 @@ SECENG_ADDRESS_INFO mmuGetSecEngInfoFromAddress(u64 inputAddress);
 u64 mmuContructEndAddressFromSecEngAddr(u64 inputAddress, bool *socAccess);
 
 // Main R/W Routines.
-u64 MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState, u64 EA,
-            s8 byteCount, bool speculativeLoad = false);
-void MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState, u64 data, u64 EA,
-              s8 byteCount, bool cacheStore = false);
+void MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
+            u64 EA, s8 byteCount, u8 *outData, bool cacheStore = false);
+/*u64 MMURead(XENON_CONTEXT* cpuContext, PPU_STATE* ppuState,
+              u64 EA, s8 byteCount, bool cacheStore = false); */
+void MMUWrite(XENON_CONTEXT* cpuContext, PPU_STATE* ppuState,
+              u64 data, u64 EA, s8 byteCount, bool cacheStore = false);
+/*void MMUWrite(XENON_CONTEXT* cpuContext, PPU_STATE* ppuState,
+              const u8* data, u64 EA, s8 byteCount, bool cacheStore = false);*/
 
 void MMUMemCpyFromHost(PPU_STATE* ppuState, u32 dest, const void* source, u64 size, bool cacheStore = false);
 
 void MMUMemCpy(PPU_STATE* ppuState, u32 dest, u32 source, u64 size, bool cacheStore = false);
 
+void MMUMemSet(PPU_STATE* ppuState, u32 dest, s32 data, u64 size, bool cacheStore = false);
+
 // Helper Read Routines.
-u8 MMURead8(PPU_STATE *ppuState, u64 EA, bool speculativeLoad = false);
-u16 MMURead16(PPU_STATE *ppuState, u64 EA, bool speculativeLoad = false);
-u32 MMURead32(PPU_STATE *ppuState, u64 EA, bool speculativeLoad = false);
-u64 MMURead64(PPU_STATE *ppuState, u64 EA, bool speculativeLoad = false);
+u8 MMURead8(PPU_STATE *ppuState, u64 EA, bool cacheStore = false);
+u16 MMURead16(PPU_STATE *ppuState, u64 EA, bool cacheStore = false);
+u32 MMURead32(PPU_STATE *ppuState, u64 EA, bool cacheStore = false);
+u64 MMURead64(PPU_STATE *ppuState, u64 EA, bool cacheStore = false);
 // Helper Write Routines.
 void MMUWrite8(PPU_STATE *ppuState, u64 EA, u8 data);
 void MMUWrite16(PPU_STATE *ppuState, u64 EA, u16 data);

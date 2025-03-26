@@ -25,7 +25,7 @@ public:
   }
 
   virtual void Read(u64 readAddress, u8 *data, u8 byteCount) {}
-  virtual void Write(u64 writeAddress, u8 *data, u8 byteCount) {}
+  virtual void Write(u64 writeAddress, const u8 *data, u8 byteCount) {}
 
   const char *GetDeviceName() { return info.deviceName; }
   u64 GetStartAddress() { return info.startAddr; }
