@@ -56,7 +56,7 @@ void RootBus::Read(u64 readAddress, u8 *data, u8 byteCount) {
   LOG_ERROR(RootBus, "Read failed at address {:#x}", readAddress);
 
   // Any reads to bus that dont belong to any device are always 0xFF.
-  memset(data, 0xFF, sizeof(u64));
+  memset(data, 0xFF, byteCount);
 }
 
 void RootBus::Write(u64 writeAddress, const u8 *data, u8 byteCount) {

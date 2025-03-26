@@ -28,7 +28,7 @@
 #include "Render/Renderer.h"
 
 // Global thread state
-inline volatile bool XeRunning{ true };
+inline std::atomic<bool> XeRunning{ true };
 class XeMain {
 public:
   XeMain();

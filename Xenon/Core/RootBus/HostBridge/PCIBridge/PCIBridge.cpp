@@ -239,7 +239,7 @@ bool PCIBridge::Read(u64 readAddress, u8* data, u8 byteCount) {
       return true;
     }
   }
-  memset(data, 0xFF, sizeof(u64));
+  memset(data, 0xFF, byteCount);
   return false;
 }
 
@@ -377,7 +377,7 @@ void PCIBridge::ConfigRead(u64 readAddress, u8 *data, u8 byteCount) {
   }
 
   // Current device Name
-  std::string currentDevName = "";
+  const char *currentDevName = "";
 
   switch (configAddr.devNum) {
   case XMA_DEV_NUM:
@@ -426,15 +426,15 @@ void PCIBridge::ConfigRead(u64 readAddress, u8 *data, u8 byteCount) {
   }
 
   for (auto &device : connectedPCIDevices) {
-    if (device->GetDeviceName() == currentDevName) {
+    if (currentDevName != "" && !strcmp(device->GetDeviceName(), currentDevName)) {
       // Hit!
       LOG_TRACE(PCIBridge, "Config read, device: {} offset = {:#x}", currentDevName, configAddr.regOffset);
       device->ConfigRead(readAddress, data, byteCount);
       return;
     }
   }
-  LOG_ERROR(PCIBridge, "Read to unimplemented device: {}", currentDevName.c_str());
-  memset(data, 0xFF, sizeof(u64));
+  LOG_ERROR(PCIBridge, "Read to unimplemented device: {}", currentDevName);
+  memset(data, 0xFF, byteCount);
 }
 
 void PCIBridge::ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount) {
@@ -448,7 +448,7 @@ void PCIBridge::ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount) {
   }
 
   // Current device Name
-  std::string currentDevName = "";
+  const char* currentDevName = "";
 
   switch (configAddr.devNum) {
   case XMA_DEV_NUM:
@@ -503,12 +503,12 @@ void PCIBridge::ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount) {
       // Hit!
       u64 value = 0;
       memcpy(&value, data, byteCount);
-      LOG_TRACE(PCIBridge, "Config write, device: {}, offset = {:#x} data = {:#x}", currentDevName.c_str(), configAddr.regOffset, value);
+      LOG_TRACE(PCIBridge, "Config write, device: {}, offset = {:#x} data = {:#x}", currentDevName, configAddr.regOffset, value);
       device->ConfigWrite(writeAddress, data, byteCount);
       return;
     }
   }
   u64 value = 0;
   memcpy(&value, data, byteCount);
-  LOG_ERROR(PCIBridge, "Write to unimplemented device: {} data = {:#x}", currentDevName.c_str(), value);
+  LOG_ERROR(PCIBridge, "Write to unimplemented device: {} data = {:#x}", currentDevName, value);
 }
