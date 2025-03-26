@@ -45,17 +45,16 @@ public:
     if (_data && (maxLength > _size)) {
       _data.reset();
       _size = 0;
-      _pointer = 0;
+      reset();
     }
     if (!_data) {
       _data = std::make_unique<STRIP_UNIQUE_ARR(_data)>(maxLength);
     }
-    else {
+    if (_data) {
       _size = std::max(_size, maxLength);
       _pointer = _size; // Empty()
-      if (clear) {
-        _data.reset(new u8[maxLength]);
-      }
+      if (clear)
+        memset(_data.get(), 0, maxLength);
       return true;
     }
     return false;

@@ -76,7 +76,7 @@ void RootBus::MemSet(u64 writeAddress, s32 data, u64 size) {
 
   // Device or address not found.
   if (false) {
-    LOG_ERROR(RootBus, "Write failed at address: {:#x}, data: {:#x}", writeAddress, *reinterpret_cast<const u64*>(data));
+    LOG_ERROR(RootBus, "MemSet failed at address: {:#x}, data: {:#x}", writeAddress, data);
     LOG_CRITICAL(Xenon, "Halting...");
     Xe_Main->getCPU()->Halt(); // Halt the CPU
     Config::imgui.debugWindow = true; // Open the debugger on bad fault
