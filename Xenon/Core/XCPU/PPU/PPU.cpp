@@ -75,10 +75,15 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
     LOG_INFO(Xenon, "{}: Using cached CPI from Config, got {}", ppuState->ppuName, clocksPerInstruction);
   } else {
     CalculateCPI();
-    if (!Config::highlyExperimental.clocksPerInstructionBypass)
-      LOG_INFO(Xenon, "{}: {} clocks per instruction", ppuState->ppuName, clocksPerInstruction);
-    else
-      LOG_INFO(Xenon, "{}: {} clocks per instruction (Overwritten! Actual CPI: {})", ppuState->ppuName, Config::highlyExperimental.clocksPerInstructionBypass, clocksPerInstruction);
+    if (ppuState->ppuID == 0) {
+      Config::xcpu.clocksPerInstruction = clocksPerInstruction;
+    }
+  }
+  if (!Config::highlyExperimental.clocksPerInstructionBypass) {
+    LOG_INFO(Xenon, "{}: {} clocks per instruction", ppuState->ppuName, clocksPerInstruction);
+  }
+  else {
+    LOG_INFO(Xenon, "{}: {} clocks per instruction (Overwritten! Actual CPI: {})", ppuState->ppuName, Config::highlyExperimental.clocksPerInstructionBypass, clocksPerInstruction);
     clocksPerInstruction = Config::highlyExperimental.clocksPerInstructionBypass;
   }
 
@@ -100,8 +105,8 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
 
   // Set PVR and PIR
   ppuState->SPR.PVR.PVR_Hex = PVR;
-  ppuState->ppuThread[ePPUThread::Zero].SPR.PIR = PIR;
-  ppuState->ppuThread[ePPUThread::One].SPR.PIR = PIR + 1;
+  ppuState->ppuThread[ePPUThread_Zero].SPR.PIR = PIR;
+  ppuState->ppuThread[ePPUThread_One].SPR.PIR = PIR + 1;
 }
 PPU::~PPU() {
   ppuThreadState = eThreadState::Quiting;
@@ -117,8 +122,7 @@ void PPU::StartExecution(bool setHRMOR) {
     ppuThreadState = eThreadState::Halted;
   }
   else {
-    // PPU is awaiting wakeup
-    ppuThreadState = eThreadState::Sleeping;
+    ppuThreadState = eThreadState::Running;
   }
 
   // TLB Software reload Mode?
@@ -134,7 +138,7 @@ void PPU::StartExecution(bool setHRMOR) {
   if (ppuState->ppuID == 0 && setHRMOR) {
     ppuState->SPR.CTRL = 0x800000; // CTRL[TE0] = 1;
     ppuState->SPR.HRMOR = 0x0000020000000000;
-    ppuState->ppuThread[ePPUThread::Zero].NIA = resetVector;
+    ppuState->ppuThread[ePPUThread_Zero].NIA = resetVector;
   }
 
   ppuThread = std::thread(&PPU::ThreadLoop, this);
@@ -185,94 +189,98 @@ void PPU::Step(int amount) {
 }
 
 // PPU Entry Point.
-void PPU::ppuRunInstructions(u64& numInstrs, bool enableHalt) {
+void PPU::ppuRunInstructions(u64 numInstrs, bool enableHalt) {
   // Run for the number of instructions specified
-  while (numInstrs && ppuThreadState != eThreadState::Quiting) {
-    bool nextInstr = ppuReadNextInstruction();
-    if (nextInstr) {
-      // If we want to halt, do not run current instr, just
-      // jump to halt.
-      if (enableHalt && (ppuHaltOn == curThread.CIA || ppuThreadState == eThreadState::Halted)) {
+  for (size_t instrCount{}; instrCount < numInstrs; ++instrCount) {
+    // Read next intruction from memory
+    if (ppuReadNextInstruction()) {
+      // If we want to halt, do not run current instr, just jump to halt
+      /*if (enableHalt && (ppuHaltOn != 0 && ppuHaltOn == curThread.CIA || ppuThreadState == eThreadState::Halted)) {
         ppuThreadState = eThreadState::Halted;
         break;
-      }
+      }*/
       PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
     }
-    // Increase the Time Base Counter if requested
-    checkTimeBaseStatus();
-    // Check pending exceptions
+
+    // Increase Time Base Counter
+    if (xenonContext->timeBaseActive) {
+      // HID6[15]: Time-base and decrementer facility enable
+      // 0 -> TBU, TBL, DEC, HDEC, and the hang-detection logic do not
+      // update. 1 -> TBU, TBL, DEC, HDEC, and the hang-detection logic
+      // are enabled to update
+      if (ppuState->SPR.HID6 & 0x1000000000000) {
+        updateTimeBase();
+      }
+    }
+
+    // Check if external interrupts are enabled and the IIC has a pending
+    // interrupt
+    if (curThread.SPR.MSR.EE && xenonContext->xenonIIC.checkExtInterrupt(curThread.SPR.PIR)) {
+      _ex |= PPU_EX_EXT;
+    }
+
+    // Check the exceptions we have pending, then process them
     ppuCheckExceptions();
-    --numInstrs;
   }
 }
 
 // PPU Thread state machine, handles all execution and codeflow
 void PPU::ThreadStateMachine() {
-  // Start execution if we are not halted
-  if (ppuThreadState == eThreadState::Sleeping && ppuState->ppuID == 0) {
-    ppuThreadState = eThreadState::Executing; // Set to executing
-  }
-
   switch (ppuThreadState) {
-    // If we are executing, run opcodes
-    case eThreadState::Executing: {
-      // Run until we are told not to by the thread switch
-      u64 numInstrs{ ppuState->SPR.TTR };
-      ppuRunInstructions(numInstrs);
-      ppuThreadState = eThreadState::Sleeping;
-    } break;
-    case eThreadState::Running: {
-      // If we're runnng, then we have been signaled to wakeup. Check active threads and if there are none, just go to sleep
-      switch (getCurrentRunningThreads()) {
-        case ePPUThread::None: {
-          curThreadId = ePPUThread::None;
-          ppuThreadState = eThreadState::Sleeping;
-        } break;
-        case ePPUThread::Zero: {
-          curThreadId = ePPUThread::Zero;
-          ppuThreadState = eThreadState::Executing;
-        } break;
-        case ePPUThread::One: {
-          curThreadId = ePPUThread::One;
-          ppuThreadState = eThreadState::Executing;
-        } break;
-        case ePPUThread::Both: {
-          // Run the first thread, then the second
-          if (curThreadId == ePPUThread::Zero)
-            curThreadId = ePPUThread::One;
-          else if (curThreadId == ePPUThread::One)
-            curThreadId = ePPUThread::Zero;
-          ppuThreadState = eThreadState::Executing;
-        } break;
-      }
-    } break;
-    case eThreadState::Halted: {
+  case eThreadState::Executing: {
+    ppuThreadState = eThreadState::Running;
+  } break;
+  case eThreadState::Running: {
+    // Check our threads to see if any are running
+    u8 state = getCurrentRunningThreads();
+    if (state & ePPUThreadBit_Zero) {
+      // Thread 0 is running, process instructions until we reach TTR timeout.
+      curThreadId = ePPUThread_Zero;
+      ppuRunInstructions(ppuState->SPR.TTR);
+    }
+    if (state & ePPUThreadBit_One) {
+      // Thread 1 is running, process instructions until we reach TTR timeout.
+      curThreadId = ePPUThread_One;
+      ppuRunInstructions(ppuState->SPR.TTR);
+    }
+  } break;
+  case eThreadState::Halted: {
+    if (ppuStepAmount > 0) {
       ppuRunInstructions(ppuStepAmount);
-    } break;
-    case eThreadState::Sleeping: {
-      // If we're sleeping, then we haven't been woken up yet and told to just wait for a signal
-    } break;
-    case eThreadState::Unused: {
-      // Do nothing, just exit
-      ppuThreadState = eThreadState::None;
-    } break;
+      ppuStepAmount = 0;  // Ensure step mode doesn't continue indefinitely
+    }
+  } break;
+  case eThreadState::Sleeping: {
+    // Waiting for an event, do nothing
+  } break;
+  case eThreadState::Unused: {
+    ppuThreadState = eThreadState::None;
+  } break;
   }
-}  
+}
 void PPU::ThreadLoop() {
-  // Just inf wait
   while (ppuThreadState != eThreadState::None) {
-    ThreadStateMachine();
-    // Check for external interrupts that enable a thread
-    // If TSCR[WEXT] = '1', wake up at System Reset and set SRR1[42:44] = '100'
+    if (ppuThreadState == eThreadState::Running || ppuThreadState == eThreadState::Executing) {
+      ThreadStateMachine();
+    }
+
+    // Check for external interrupts that enable execution
     bool WEXT = (ppuState->SPR.TSCR & 0x100000) >> 20;
     if (xenonContext->xenonIIC.checkExtInterrupt(curThread.SPR.PIR) && WEXT) {
-      // We were issued a thread enable, setup thrd0
+      if (ppuThreadState == eThreadState::Halted || ppuThreadState == eThreadState::Sleeping) {
+        ppuThreadState = eThreadState::Running;
+      }
+
+      // Enable thread 0 execution
       ppuState->SPR.CTRL = 0x800000;
+
       // Issue reset
-      ppuState->ppuThread[ePPUThread::Zero].exceptReg |= PPU_EX_RESET;
-      ppuState->ppuThread[ePPUThread::One].exceptReg |= PPU_EX_RESET;
-      curThread.SPR.SRR1 = 0x200000; // Set SRR1 42-44 = 100
-      // ACK and EOI the interrupt:
+      ppuState->ppuThread[ePPUThread_Zero].exceptReg |= PPU_EX_RESET;
+      ppuState->ppuThread[ePPUThread_One].exceptReg |= PPU_EX_RESET;
+
+      curThread.SPR.SRR1 = 0x200000; // Set SRR1[42:44] = 100
+
+      // ACK and EOI the interrupt
       u64 intData = 0;
       xenonContext->xenonIIC.readInterrupt(curThread.SPR.PIR * 0x1000 + 0x50050, &intData);
       xenonContext->xenonIIC.writeInterrupt(curThread.SPR.PIR * 0x1000 + 0x50060, 0);
@@ -509,14 +517,6 @@ bool PPU::ppuReadNextInstruction() {
 
 // Checks for exceptions and process them in the correct order.
 void PPU::ppuCheckExceptions() {
-  // Check if External interrupts are enabled and the IIC has a pending
-  // interrupt
-  if (curThread.SPR.MSR.EE) {
-    if (xenonContext->xenonIIC.checkExtInterrupt(curThread.SPR.PIR)) {
-      _ex |= PPU_EX_EXT;
-    }
-  }
-
   // Check Exceptions pending and process them in order.
   u16 &exceptions = _ex;
   if (exceptions != PPU_EX_NONE) {
@@ -687,22 +687,14 @@ void PPU::updateTimeBase() {
   }
 }
 
-// Returns current executing thread by reading CTRL register.
-ePPUThread PPU::getCurrentRunningThreads() {
-  // If we have shutdown before current running threads is finished, force a shutdown
-  if (!ppuState.get()) {
-    return ePPUThread::None;
-  }
-  // Check CTRL Register CTRL>TE[0,1];
-  u8 ctrlTE = (ppuState->SPR.CTRL & 0xC00000) >> 22;
-  switch (ctrlTE) {
-  case 0b10:
-    return ePPUThread::Zero;
-  case 0b01:
-    return ePPUThread::One;
-  case 0b11:
-    return ePPUThread::Both;
-  default:
-    return ePPUThread::None;
-  }
+// Returns current executing thread by reading CTRL register
+u8 PPU::getCurrentRunningThreads() {
+  if (!ppuState)
+    return ePPUThreadBit_None;
+
+  // Extract bits 22-23 in one step and directly map them to thread states
+  u8 ctrlTE = (ppuState->SPR.CTRL >> 22) & 0b11;
+
+  // Directly map ctrlTE to thread states using bit shifting
+  return (ctrlTE & 0b01) * ePPUThreadBit_One | (ctrlTE & 0b10) / 2 * ePPUThreadBit_Zero;
 }

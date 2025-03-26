@@ -442,8 +442,8 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
     RenderInstr(gui, curThread.CIA, curInstr);
     RenderInstr(gui, curThread.NIA, nextInstr);
     gui->Node("ppuThread", [&] {
-      PPUThread(gui, PPUStatePtr, ePPUThread::Zero);
-      PPUThread(gui, PPUStatePtr, ePPUThread::One);
+      PPUThread(gui, PPUStatePtr, ePPUThread_Zero);
+      PPUThread(gui, PPUStatePtr, ePPUThread_One);
     });
     gui->U8Dec(PPUState, currentThread);
     gui->Node("SPR", [&] {

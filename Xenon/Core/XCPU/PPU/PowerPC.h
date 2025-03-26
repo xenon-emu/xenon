@@ -422,11 +422,17 @@ struct PPU_STATE_SPRS {
 };
 
 // Thread ID's for ease of handling.
-enum class ePPUThread : u8 {
-  Zero = 0,
-  One,
-  Both,
-  None
+enum ePPUThread : u8 {
+  ePPUThread_Zero = 0,
+  ePPUThread_One,
+  ePPUThread_None
+};
+
+// Thread ID's for ease of handling.
+enum ePPUThreadBit : u8 {
+  ePPUThreadBit_None = 0,
+  ePPUThreadBit_Zero,
+  ePPUThreadBit_One
 };
 
 //
@@ -599,9 +605,9 @@ struct PPU_THREAD_REGISTERS {
 
 struct PPU_STATE {
   // Thread Specific State.
-  std::unordered_map<ePPUThread, PPU_THREAD_REGISTERS> ppuThread{};
+  PPU_THREAD_REGISTERS ppuThread[2]{};
   // Current executing thread.
-  ePPUThread currentThread = ePPUThread::Zero;
+  ePPUThread currentThread = ePPUThread_Zero;
   // Shared Special Purpose Registers.
   PPU_STATE_SPRS SPR{};
   // Translation Lookaside Buffer

@@ -144,7 +144,7 @@ inline struct _xcpu {
 // XGPU
 //
 inline struct _xgpu {
-  // s32ernal Resolution | The resolution XeLL uses
+  // Internal Resolution | The resolution XeLL uses
   _resolution internal{ 1280, 720 };
 
   // TOML Conversion
