@@ -108,11 +108,18 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
   ppuState->ppuThread[ePPUThread_Zero].SPR.PIR = PIR;
   ppuState->ppuThread[ePPUThread_One].SPR.PIR = PIR + 1;
 }
+int count = 0;
 PPU::~PPU() {
   ppuThreadState = eThreadState::Quiting;
-  while (ppuThreadState != eThreadState::None) {
+  while (ppuThreadState != eThreadState::None && ppuThreadActive) {
+    if (count == 20) {
+      // After 20-21ms, if the thread is still running, assume we cannot await execution, and just halt
+      break;
+    }
+    count++;
     std::this_thread::sleep_for(1ms);
   }
+  ppuThreadActive = false;
   ppuState.reset();
 }
 
@@ -120,9 +127,13 @@ void PPU::StartExecution(bool setHRMOR) {
   // If we want to start halted, then set the state
   if (Config::debug.startHalted) {
     ppuThreadState = eThreadState::Halted;
+    // If we were told to halt on startup, ensure we are able to continue, otherwise it'll deadlock
+    // We have it like this to safeguard against sleeping threads waking themselves after continuing,
+    // thus destroying the stack
+    ppuThreadPreviousState = ppuState->ppuID == 0 ? eThreadState::Running : eThreadState::Sleeping;
   }
   else {
-    ppuThreadState = eThreadState::Running;
+    ppuThreadState = ppuState->ppuID == 0 ? eThreadState::Running : eThreadState::Sleeping;
   }
 
   // TLB Software reload Mode?
@@ -173,7 +184,8 @@ void PPU::Halt(u64 haltOn) {
   if (haltOn != 0)
     LOG_DEBUG(Xenon, "Halting PPU{} on address {:#x}", ppuState->ppuID, haltOn);
   ppuHaltOn = haltOn;
-  ppuThreadPreviousState = ppuThreadState;
+  if (ppuThreadPreviousState == eThreadState::None) // If we were told to ignore it, then do so
+    ppuThreadPreviousState = ppuThreadState;
   ppuThreadState = eThreadState::Halted;
 }
 void PPU::Continue() {
@@ -248,6 +260,7 @@ void PPU::ThreadStateMachine() {
   } break;
   case eThreadState::Sleeping: {
     // Waiting for an event, do nothing
+    std::this_thread::sleep_for(1ms); // Don't burn the CPU
   } break;
   case eThreadState::Unused: {
     ppuThreadState = eThreadState::None;
@@ -263,7 +276,9 @@ void PPU::ThreadStateMachine() {
   }
 }
 void PPU::ThreadLoop() {
-  while (ppuThreadState != eThreadState::None) {
+  while (ppuThreadActive) {
+    // Check if we should exit or not
+    ppuThreadActive = ppuThreadState != eThreadState::None && ppuThreadState != eThreadState::Quiting;
     ThreadStateMachine();
 
     // Check for external interrupts that enable execution
@@ -289,6 +304,8 @@ void PPU::ThreadLoop() {
       xenonContext->xenonIIC.writeInterrupt(curThread.SPR.PIR * 0x1000 + 0x50060, reinterpret_cast<u8*>(&intData), sizeof(intData));
     }
   }
+  // Thread is done executing, just tell it to exit
+  ppuThreadActive = false;
 }
 
 // Returns a pointer to the specified thread.
@@ -472,7 +489,7 @@ u64 PPU::loadElfImage(u8* data, u64 size) {
     SWAP(progHeaderTableData, [idx].p_flags);
     SWAP(progHeaderTableData, [idx].p_align);
 
-    if (progHeaderTableData[idx].p_type == PT_LOAD) {
+    if (READ(progHeaderTableData, [idx].p_type) == PT_LOAD) {
       u64 vaddr = READ(progHeaderTableData, [idx].p_vaddr);
       u64 paddr = READ(progHeaderTableData, [idx].p_paddr);
       u64 filesize = READ(progHeaderTableData, [idx].p_filesz);
@@ -485,7 +502,7 @@ u64 PPU::loadElfImage(u8* data, u64 size) {
       PPCInterpreter::MMUMemCpyFromHost(ppuState.get(), target_addr, data + file_offset, filesize);
       if (memsize > filesize) { // Memory size greater than file, zero out remainder
         u64 remainder = memsize - filesize;
-        PPCInterpreter::MMUWrite(xenonContext, ppuState.get(), 0, target_addr + filesize, remainder);
+        PPCInterpreter::MMUMemSet(ppuState.get(), target_addr + filesize, 0, remainder);
       }
     }
   }

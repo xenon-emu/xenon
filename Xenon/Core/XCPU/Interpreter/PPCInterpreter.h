@@ -138,11 +138,11 @@ void MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
 void MMUWrite(XENON_CONTEXT* cpuContext, PPU_STATE* ppuState,
               const u8* data, u64 EA, u64 byteCount, bool cacheStore = false);
 
-void MMUMemCpyFromHost(PPU_STATE* ppuState, u32 dest, const void* source, u64 size, bool cacheStore = false);
+void MMUMemCpyFromHost(PPU_STATE* ppuState, u64 EA, const void* source, u64 size, bool cacheStore = false);
 
-void MMUMemCpy(PPU_STATE* ppuState, u32 dest, u32 source, u64 size, bool cacheStore = false);
+void MMUMemCpy(PPU_STATE* ppuState, u64 EA, u32 source, u64 size, bool cacheStore = false);
 
-void MMUMemSet(PPU_STATE* ppuState, u32 dest, s32 data, u64 size, bool cacheStore = false);
+void MMUMemSet(PPU_STATE* ppuState, u64 EA, s32 data, u64 size, bool cacheStore = false);
 
 // Helper Read Routines.
 u8 MMURead8(PPU_STATE *ppuState, u64 EA, bool cacheStore = false);

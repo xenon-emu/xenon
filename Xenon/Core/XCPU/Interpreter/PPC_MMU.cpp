@@ -1320,7 +1320,7 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
       // Check if writing to internal SRAM
       else if (EA >= XE_SRAM_ADDR && EA < XE_SRAM_ADDR + XE_SRAM_SIZE) {
         u32 sramAddr = static_cast<u32>(EA - XE_SRAM_ADDR);
-        memcpy(&cpuContext->SRAM[sramAddr], data, byteCount);
+        memcpy(&intXCPUContext->SRAM[sramAddr], data, byteCount);
         return;
       }
       // Check if writing to Security Engine Config Block
@@ -1365,24 +1365,65 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
 }
 
 void PPCInterpreter::MMUMemCpyFromHost(PPU_STATE *ppuState,
-                                       u32 dest, const void* source, u64 size, bool cacheStore) {
-  MMUWrite(intXCPUContext, ppuState, reinterpret_cast<const u8*>(source), dest, size, cacheStore);
+                                       u64 EA, const void* source, u64 size, bool cacheStore) {
+  MMUWrite(intXCPUContext, ppuState, reinterpret_cast<const u8*>(source), EA, size, cacheStore);
 }
 
 void PPCInterpreter::MMUMemCpy(PPU_STATE *ppuState,
-                               u32 dest, u32 source, u64 size, bool cacheStore) {
+                               u64 EA, u32 source, u64 size, bool cacheStore) {
   std::unique_ptr<u8[]> data = std::make_unique<STRIP_UNIQUE_ARR(data)>(size);
   MMURead(intXCPUContext, ppuState, source, size, data.get(), cacheStore);
-  MMUWrite(intXCPUContext, ppuState, data.get(), dest, size, cacheStore);
+  MMUWrite(intXCPUContext, ppuState, data.get(), EA, size, cacheStore);
   data.reset();
 }
 
 void PPCInterpreter::MMUMemSet(PPU_STATE *ppuState,
-                               u32 dest, s32 data, u64 size, bool cacheStore) {
-  std::unique_ptr<u8[]> dataPtr = std::make_unique<STRIP_UNIQUE_ARR(dataPtr)>(size);
-  memset(dataPtr.get(), data, size);
-  MMUWrite(intXCPUContext, ppuState, dataPtr.get(), dest, size, cacheStore);
-  dataPtr.reset();
+                               u64 EA, s32 data, u64 size, bool cacheStore) {
+  u64 oldEA = EA;
+
+  if (MMUTranslateAddress(&EA, ppuState, true) == false)
+    return;
+
+  if (oldEA >= 0x9E000000 && oldEA <= 0x9EFFFFFF) {
+    u8 a = 0;
+  }
+
+  bool socWrite = false;
+
+  EA = mmuContructEndAddressFromSecEngAddr(EA, &socWrite);
+  // When the xboxkrnl writes to address 0x7FFFxxxx is writing to the IIC
+  // so we use that address here to validate its an soc write.
+  if (((oldEA & 0x000000007FFFF0000ULL) >> 16) == 0x7FFF)
+    socWrite = true;
+  if (socWrite) {
+    switch (EA) {
+    default: {
+      // Check if writing to bootloader section
+      if (EA >= XE_SROM_ADDR && EA < XE_SROM_ADDR + XE_SROM_SIZE) {
+        LOG_ERROR(Xenon_MMU, "Tried to write to XCPU SROM!");
+        return;
+      }
+      // Check if writing to internal SRAM
+      else if (EA >= XE_SRAM_ADDR && EA < XE_SRAM_ADDR + XE_SRAM_SIZE) {
+        u32 sramAddr = static_cast<u32>(EA - XE_SRAM_ADDR);
+        memset(&intXCPUContext->SRAM[sramAddr], data, size);
+        return;
+      }
+      // Check if writing to Security Engine Config Block
+      else if (EA >= XE_SECENG_ADDR && EA < XE_SECENG_ADDR + XE_SECENG_SIZE) {
+        u32 secAddr = static_cast<u32>(EA - XE_SECENG_ADDR);
+        memset(&intXCPUContext->secEngData[secAddr], data, size);
+        return;
+      }
+    } break;
+    }
+  }
+
+  // External MemSet
+  sysBus->MemSet(EA, data, size);
+
+  // Check if it's reserved
+  intXCPUContext->xenonRes.Check(EA);
 }
 
 // Reads 1 Byte of memory.

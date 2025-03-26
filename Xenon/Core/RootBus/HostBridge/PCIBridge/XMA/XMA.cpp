@@ -10,20 +10,23 @@ XMA::XMA(const char *deviceName, u64 size) : PCIDevice(deviceName, size) {
   pciDevSizes[0] = 0x400; // BAR0
 }
 
-void XMA::Read(u64 readAddress, u8 *data, u8 byteCount)
+void XMA::Read(u64 readAddress, u8 *data, u64 size)
 {}
 
-void XMA::Write(u64 writeAddress, const u8 *data, u8 byteCount)
+void XMA::Write(u64 writeAddress, const u8 *data, u64 size)
 {}
 
-void XMA::ConfigRead(u64 readAddress, u8 *data, u8 byteCount) {
-  memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], byteCount);
+void XMA::MemSet(u64 writeAddress, s32 data, u64 size)
+{}
+
+void XMA::ConfigRead(u64 readAddress, u8 *data, u64 size) {
+  memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], size);
 }
 
-void XMA::ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount) {
+void XMA::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   // Check if we're being scanned.
   u64 tmp = 0;
-  memcpy(&tmp, data, byteCount);
+  memcpy(&tmp, data, size);
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
@@ -44,5 +47,5 @@ void XMA::ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount) {
     }
   }
 
-  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &tmp, byteCount);
+  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &tmp, size);
 }

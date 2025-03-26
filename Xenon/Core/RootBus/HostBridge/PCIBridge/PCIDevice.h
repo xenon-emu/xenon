@@ -17,11 +17,12 @@ public:
     deviceInfo.deviceName = deviceName;
     deviceInfo.size = size;
   }
-  virtual void Read(u64 readAddress, u8 *data, u8 byteCount) {}
-  virtual void Write(u64 writeAddress, const u8 *data, u8 byteCount) {}
+  virtual void Read(u64 readAddress, u8 *data, u64 size) {}
+  virtual void Write(u64 writeAddress, const u8 *data, u64 size) {}
+  virtual void MemSet(u64 writeAddress, s32 data, u64 size) {}
 
-  virtual void ConfigRead(u64 readAddress, u8 *data, u8 byteCount) {}
-  virtual void ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount) {}
+  virtual void ConfigRead(u64 readAddress, u8 *data, u64 size) {}
+  virtual void ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {}
 
   const char *GetDeviceName() { return deviceInfo.deviceName; }
 
