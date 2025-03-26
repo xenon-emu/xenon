@@ -13,20 +13,23 @@ Xe::PCIDev::OHCI1::OHCI1::OHCI1(const char *deviceName, u64 size) : PCIDevice(de
   pciDevSizes[0] = 0x1000; // BAR0
 }
 
-void Xe::PCIDev::OHCI1::OHCI1::Read(u64 readAddress, u8 *data, u8 byteCount)
+void Xe::PCIDev::OHCI1::OHCI1::Read(u64 readAddress, u8 *data, u64 size)
 {}
 
-void Xe::PCIDev::OHCI1::OHCI1::ConfigRead(u64 readAddress, u8 *data, u8 byteCount) {
-  memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], byteCount);
+void Xe::PCIDev::OHCI1::OHCI1::ConfigRead(u64 readAddress, u8 *data, u64 size) {
+  memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], size);
 }
 
-void Xe::PCIDev::OHCI1::OHCI1::Write(u64 writeAddress, const u8 *data, u8 byteCount)
+void Xe::PCIDev::OHCI1::OHCI1::Write(u64 writeAddress, const u8 *data, u64 size)
 {}
 
-void Xe::PCIDev::OHCI1::OHCI1::ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount) {
+void Xe::PCIDev::OHCI1::OHCI1::MemSet(u64 writeAddress, s32 data, u64 size)
+{}
+
+void Xe::PCIDev::OHCI1::OHCI1::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   // Check if we're being scanned.
   u64 tmp = 0;
-  memcpy(&tmp, data, byteCount);
+  memcpy(&tmp, data, size);
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
@@ -47,5 +50,5 @@ void Xe::PCIDev::OHCI1::OHCI1::ConfigWrite(u64 writeAddress, const u8 *data, u8 
     }
   }
 
-  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &tmp, byteCount);
+  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &tmp, size);
 }

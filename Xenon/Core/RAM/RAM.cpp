@@ -20,7 +20,7 @@ RAM::~RAM() {
 }
 
 /*****************Responsible for RAM reading*****************/
-void RAM::Read(u64 readAddress, u8 *data, u8 byteCount) {
+void RAM::Read(u64 readAddress, u8 *data, u64 size) {
   const u64 offset = static_cast<u32>(readAddress - RAM_START_ADDR);
   if (false)
     LOG_INFO(Xenon, "Reading from address {:#08x} in RAM: byteCount={:#02x}", readAddress, static_cast<u32>(byteCount));
@@ -28,7 +28,16 @@ void RAM::Read(u64 readAddress, u8 *data, u8 byteCount) {
 }
 
 /******************Responsible for RAM writing*****************/
-void RAM::Write(u64 writeAddress, const u8 *data, u8 byteCount) {
+void RAM::Write(u64 writeAddress, const u8 *data, u64 size) {
+  const u32 offset = static_cast<u32>(writeAddress - RAM_START_ADDR);
+  if (false) {
+    LOG_INFO(Xenon, "RAM: Setting {:#08x} for {:#02x} bytes", writeAddress, (u32)size);
+  }
+  memcpy(RAMData.get() + offset, data, size);
+}
+
+/******************Responsible for RAM writing*****************/
+void RAM::MemSet(u64 writeAddress, s32 data, u64 size) {
   const u32 offset = static_cast<u32>(writeAddress - RAM_START_ADDR);
   if (false)
     LOG_INFO(Xenon, "Writing to address {:#08x} in RAM: data={:#08x},byteCount={:#02x}", writeAddress, reinterpret_cast<u64>(data), static_cast<u32>(byteCount));

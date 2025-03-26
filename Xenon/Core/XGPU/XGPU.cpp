@@ -44,7 +44,7 @@ Xe::Xenos::XGPU::~XGPU() {
   xenosState.Regs.reset();
 }
 
-bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u8 byteCount) {
+bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
   std::lock_guard lck(mutex);
   if (isAddressMappedInBAR(static_cast<u32>(readAddress))) {
     const u32 regIndex = (readAddress & 0xFFFFF) / 4;
@@ -61,7 +61,7 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u8 byteCount) {
     memcpy(&regData, &xenosState.Regs[regIndex * 4], 4);
 
     // Switch for properly return the requested amount of data.
-    switch (byteCount) {
+    switch (size) {
       case 2:
         regData = regData >> 16;
         break;
@@ -89,7 +89,7 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u8 byteCount) {
   return false;
 }
 
-bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u8 byteCount) {
+bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
   std::lock_guard lck(mutex);
   if (isAddressMappedInBAR(static_cast<u32>(writeAddress))) {
     const u32 regIndex = (writeAddress & 0xFFFFF) / 4;
@@ -116,24 +116,58 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u8 byteCount) {
     }
 #endif
 
-    memcpy(&xenosState.Regs[regIndex * 4], data, byteCount);
+    memcpy(&xenosState.Regs[regIndex * 4], data, size);
     return true;
   }
 
   return false;
 }
 
-void Xe::Xenos::XGPU::ConfigRead(u64 readAddress, u8 *data, u8 byteCount) {
+bool Xe::Xenos::XGPU::MemSet(u64 writeAddress, s32 data, u64 size) {
   std::lock_guard lck(mutex);
-  memcpy(data, &xgpuConfigSpace.data[readAddress & 0xFF], byteCount);
+  if (isAddressMappedInBAR(static_cast<u32>(writeAddress))) {
+    const u32 regIndex = (writeAddress & 0xFFFFF) / 4;
+
+#ifdef XE_DEBUG
+    LOG_DEBUG(Xenos, "Write to {} (addr: {:#x}), index {:#x}, data = {:#x}", GetRegisterNameById(regIndex), writeAddress, regIndex,
+      byteswap_be<u32>(*reinterpret_cast<u32*>(data)));
+#endif
+
+    XeRegister reg = static_cast<XeRegister>(regIndex);
+
+    // Set our internal width.
+#ifndef NO_GFX
+    if (reg == XeRegister::D1GRPH_X_END) {
+      memset(&Xe_Main->renderer->internalWidth, data, sizeof(Xe_Main->renderer->internalWidth));
+      Xe_Main->renderer->internalWidth = byteswap_be<u32>(Xe_Main->renderer->internalWidth);
+      LOG_INFO(Xenos, "Setting new Internal Width: {:#x}", Xe_Main->renderer->internalWidth);
+    }
+    // Set our internal height.
+    if (reg == XeRegister::D1GRPH_Y_END) {
+      memset(&Xe_Main->renderer->internalHeight, data, sizeof(Xe_Main->renderer->internalHeight));
+      Xe_Main->renderer->internalHeight = byteswap_be<u32>(Xe_Main->renderer->internalHeight);
+      LOG_INFO(Xenos, "Setting new Internal Height: {:#x}", Xe_Main->renderer->internalHeight);
+    }
+#endif
+
+    memset(&xenosState.Regs[regIndex * 4], data, size);
+    return true;
+  }
+
+  return false;
+}
+
+void Xe::Xenos::XGPU::ConfigRead(u64 readAddress, u8 *data, u64 size) {
+  std::lock_guard lck(mutex);
+  memcpy(data, &xgpuConfigSpace.data[readAddress & 0xFF], size);
   return;
 }
 
-void Xe::Xenos::XGPU::ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount) {
+void Xe::Xenos::XGPU::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   std::lock_guard lck(mutex);
   // Check if we're being scanned.
   u64 tmp = 0;
-  memcpy(&tmp, data, byteCount);
+  memcpy(&tmp, data, size);
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
@@ -154,7 +188,7 @@ void Xe::Xenos::XGPU::ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount
     }
   }
 
-  memcpy(&xgpuConfigSpace.data[writeAddress & 0xFF], data, byteCount);
+  memcpy(&xgpuConfigSpace.data[writeAddress & 0xFF], &tmp, size);
   return;
 }
 

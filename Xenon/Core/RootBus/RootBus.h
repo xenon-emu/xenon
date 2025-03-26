@@ -18,12 +18,13 @@ public:
 
   void AddDevice(SystemDevice *device);
 
-  void Read(u64 readAddress, u8 *data, u8 byteCount);
-  void Write(u64 writeAddress, const u8 *data, u8 byteCount);
+  void Read(u64 readAddress, u8 *data, u64 size);
+  void Write(u64 writeAddress, const u8 *data, u64 size);
+  void MemSet(u64 writeAddress, s32 data, u64 size);
 
   // Configuration Space R/W
-  void ConfigRead(u64 readAddress, u8 *data, u8 byteCount);
-  void ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount);
+  void ConfigRead(u64 readAddress, u8 *data, u64 size);
+  void ConfigWrite(u64 writeAddress, const u8 *data, u64 size);
 
 private:
   HostBridge *hostBridge{};

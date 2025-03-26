@@ -136,7 +136,7 @@ SFCX::~SFCX() {
     sfcxThread.join();
 }
 
-void SFCX::Read(u64 readAddress, u8 *data, u8 byteCount) {
+void SFCX::Read(u64 readAddress, u8 *data, u64 size) {
   const u16 reg = readAddress & 0xFF;
 
   switch (reg) {
@@ -176,45 +176,85 @@ void SFCX::Read(u64 readAddress, u8 *data, u8 byteCount) {
   }
 }
 
-void SFCX::ConfigRead(u64 readAddress, u8 *data, u8 byteCount) {
+void SFCX::ConfigRead(u64 readAddress, u8 *data, u64 size) {
   const u8 offset = readAddress & 0xFF;
-  memcpy(data, &pciConfigSpace.data[offset], byteCount);
+  memcpy(data, &pciConfigSpace.data[offset], size);
 }
 
-void SFCX::Write(u64 writeAddress, const u8 *data, u8 byteCount) {
+void SFCX::Write(u64 writeAddress, const u8 *data, u64 size) {
   const u16 reg = writeAddress & 0xFF;
 
   switch (reg) {
   case SFCX_CONFIG_REG:
-    memcpy(&sfcxState.configReg, data, byteCount);
+    memcpy(&sfcxState.configReg, data, size);
     break;
   case SFCX_STATUS_REG:
-    memcpy(&sfcxState.statusReg, data, byteCount);
+    memcpy(&sfcxState.statusReg, data, size);
     break;
   case SFCX_COMMAND_REG:
-    memcpy(&sfcxState.commandReg, data, byteCount);
+    memcpy(&sfcxState.commandReg, data, size);
     std::this_thread::sleep_for(std::chrono::milliseconds(50));
     break;
   case SFCX_ADDRESS_REG:
-    memcpy(&sfcxState.addressReg, data, byteCount);
+    memcpy(&sfcxState.addressReg, data, size);
     break;
   case SFCX_DATA_REG:
-    memcpy(&sfcxState.dataReg, data, byteCount);
+    memcpy(&sfcxState.dataReg, data, size);
     break;
   case SFCX_LOGICAL_REG:
-    memcpy(&sfcxState.logicalReg, data, byteCount);
+    memcpy(&sfcxState.logicalReg, data, size);
     break;
   case SFCX_PHYSICAL_REG:
-    memcpy(&sfcxState.physicalReg, data, byteCount);
+    memcpy(&sfcxState.physicalReg, data, size);
     break;
   case SFCX_DATAPHYADDR_REG:
-    memcpy(&sfcxState.dataPhysAddrReg, data, byteCount);
+    memcpy(&sfcxState.dataPhysAddrReg, data, size);
     break;
   case SFCX_SPAREPHYADDR_REG:
-    memcpy(&sfcxState.sparePhysAddrReg, data, byteCount);
+    memcpy(&sfcxState.sparePhysAddrReg, data, size);
     break;
   case SFCX_MMC_ID_REG:
-    memcpy(&sfcxState.mmcIDReg, data, byteCount);
+    memcpy(&sfcxState.mmcIDReg, data, size);
+    break;
+  default:
+    LOG_ERROR(SFCX, "Write from unknown register {:#x}", reg);
+    break;
+  }
+}
+void SFCX::MemSet(u64 writeAddress, s32 data, u64 size) {
+  const u16 reg = writeAddress & 0xFF;
+
+  switch (reg) {
+  case SFCX_CONFIG_REG:
+    memset(&sfcxState.configReg, data, size);
+    break;
+  case SFCX_STATUS_REG:
+    memset(&sfcxState.statusReg, data, size);
+    break;
+  case SFCX_COMMAND_REG:
+    memset(&sfcxState.commandReg, data, size);
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    break;
+  case SFCX_ADDRESS_REG:
+    memset(&sfcxState.addressReg, data, size);
+    break;
+  case SFCX_DATA_REG:
+    memset(&sfcxState.dataReg, data, size);
+    break;
+  case SFCX_LOGICAL_REG:
+    memset(&sfcxState.logicalReg, data, size);
+    break;
+  case SFCX_PHYSICAL_REG:
+    memset(&sfcxState.physicalReg, data, size);
+    break;
+  case SFCX_DATAPHYADDR_REG:
+    memset(&sfcxState.dataPhysAddrReg, data, size);
+    break;
+  case SFCX_SPAREPHYADDR_REG:
+    memset(&sfcxState.sparePhysAddrReg, data, size);
+    break;
+  case SFCX_MMC_ID_REG:
+    memset(&sfcxState.mmcIDReg, data, size);
     break;
   default:
     LOG_ERROR(SFCX, "Write from unknown register {:#x}", reg);
@@ -222,12 +262,12 @@ void SFCX::Write(u64 writeAddress, const u8 *data, u8 byteCount) {
   }
 }
 
-void SFCX::ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount) {
+void SFCX::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   const u8 offset = writeAddress & 0xFF;
 
   // Check if we're being scanned.
   u64 tmp = 0;
-  memcpy(&tmp, data, byteCount);
+  memcpy(&tmp, data, size);
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
@@ -248,7 +288,7 @@ void SFCX::ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount) {
     }
   }
 
-  memcpy(&pciConfigSpace.data[offset], &tmp, byteCount);
+  memcpy(&pciConfigSpace.data[offset], &tmp, size);
 }
 
 void SFCX::sfcxMainLoop() {

@@ -61,7 +61,7 @@ HDD::HDD(const char *deviceName, u64 size, PCIBridge *parentPCIBridge) :
   ataDeviceState.ataReadState.status = ATA_STATUS_DRDY;
 }
 
-void HDD::Read(u64 readAddress, u8 *data, u8 byteCount) {
+void HDD::Read(u64 readAddress, u8 *data, u64 size) {
   const u32 regOffset = (readAddress & 0xFF) * 4;
 
   if (regOffset < sizeof(ATA_REG_STATE)) {
@@ -74,15 +74,15 @@ void HDD::Read(u64 readAddress, u8 *data, u8 byteCount) {
         }
         // We have some data to send out.
         // Make sure we send the right amount of data.
-        byteCount = (byteCount < ataDeviceState.readBuffer.capacity()
-                         ? byteCount
+        size = (size < ataDeviceState.readBuffer.capacity()
+                         ? size
                          : ataDeviceState.readBuffer.capacity());
         // Do the actual copy of data.
-        memcpy(data, ataDeviceState.readBuffer.data(), byteCount);
+        memcpy(data, ataDeviceState.readBuffer.data(), size);
         // Remove the readed bytes of the conatiner.
         ataDeviceState.readBuffer.erase(ataDeviceState.readBuffer.begin(),
                                         ataDeviceState.readBuffer.begin() +
-                                            byteCount);
+                                            size);
         return;
       }
       break;
@@ -90,22 +90,21 @@ void HDD::Read(u64 readAddress, u8 *data, u8 byteCount) {
       break;
     }
 
-    memcpy(data, (u8*)&ataDeviceState.ataReadState + regOffset, byteCount);
+    memcpy(data, (u8*)&ataDeviceState.ataReadState + regOffset, size);
   } else {
     LOG_ERROR(HDD, "Unknown register being accessed: (Read) {:#x}", regOffset);
-    memset(data, 0, byteCount);
+    memset(data, 0, size);
   }
 }
 
-void HDD::Write(u64 writeAddress, const u8 *data, u8 byteCount) {
-
+void HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
   const u32 regOffset = (writeAddress & 0xFF) * 4;
 
   if (regOffset < sizeof(ATA_REG_STATE)) {
     switch (regOffset) {
     case ATA_REG_CMD_STATUS:
       u64 value = 0;
-      memcpy(&value, data, byteCount);
+      memcpy(&value, data, size);
       switch (value) {
       case ATA_COMMAND_DEVICE_RESET:
         break;
@@ -162,20 +161,93 @@ void HDD::Write(u64 writeAddress, const u8 *data, u8 byteCount) {
       }
     }
 
-    memcpy(reinterpret_cast<u8*>(&ataDeviceState.ataWriteState + regOffset), data, byteCount);
+    memcpy(reinterpret_cast<u8*>(&ataDeviceState.ataWriteState + regOffset), data, size);
   } else {
     LOG_ERROR(HDD, "Unknown register being accessed: (Write) {:#x}", regOffset);
   }
 }
 
-void HDD::ConfigRead(u64 readAddress, u8 *data, u8 byteCount) {
-  memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], byteCount);
+void HDD::MemSet(u64 writeAddress, s32 data, u64 size) {
+  const u32 regOffset = (writeAddress & 0xFF) * 4;
+
+  if (regOffset < sizeof(ATA_REG_STATE)) {
+    switch (regOffset) {
+    case ATA_REG_CMD_STATUS:
+      u64 value = 0;
+      memset(&value, data, size);
+      switch (value) {
+      case ATA_COMMAND_DEVICE_RESET:
+        break;
+      case ATA_COMMAND_READ_SECTORS:
+        break;
+      case ATA_COMMAND_READ_DMA_EXT:
+        break;
+      case ATA_COMMAND_WRITE_SECTORS:
+        break;
+      case ATA_COMMAND_WRITE_DMA_EXT:
+        break;
+      case ATA_COMMAND_VERIFY:
+        break;
+      case ATA_COMMAND_VERIFY_EXT:
+        break;
+      case ATA_COMMAND_SET_DEVICE_PARAMETERS:
+        break;
+      case ATA_COMMAND_PACKET:
+        break;
+      case ATA_COMMAND_IDENTIFY_PACKET_DEVICE:
+        break;
+      case ATA_COMMAND_READ_MULTIPLE:
+        break;
+      case ATA_COMMAND_WRITE_MULTIPLE:
+        break;
+      case ATA_COMMAND_SET_MULTIPLE_MODE:
+        break;
+      case ATA_COMMAND_READ_DMA:
+        break;
+      case ATA_COMMAND_WRITE_DMA:
+        break;
+      case ATA_COMMAND_STANDBY_IMMEDIATE:
+        break;
+      case ATA_COMMAND_FLUSH_CACHE:
+        break;
+      case ATA_COMMAND_IDENTIFY_DEVICE:
+        // Copy the device indetification data to our read buffer.
+        if (!ataDeviceState.readBuffer.empty())
+          LOG_ERROR(HDD, "Read Buffer not empty!");
+        ataDeviceState.readBuffer.resize(sizeof(ATA_IDENTIFY_DATA));
+        memset(ataDeviceState.readBuffer.data(), data, sizeof(ATA_IDENTIFY_DATA));
+        // Set data ready flag.
+        ataDeviceState.ataReadState.status |= ATA_STATUS_DRQ;
+        // Raise an interrupt.
+        parentBus->RouteInterrupt(PRIO_SATA_HDD);
+        break;
+      case ATA_COMMAND_SET_FEATURES:
+        break;
+      case ATA_COMMAND_SECURITY_SET_PASSWORD:
+        break;
+      case ATA_COMMAND_SECURITY_UNLOCK:
+        break;
+      case ATA_COMMAND_SECURITY_DISABLE_PASSWORD:
+        break;
+      default:
+        break;
+      }
+    }
+
+    memset(reinterpret_cast<u8*>(&ataDeviceState.ataWriteState + regOffset), data, size);
+  } else {
+    LOG_ERROR(HDD, "Unknown register being accessed: (Write) {:#x}", regOffset);
+  }
 }
 
-void HDD::ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount) {
+void HDD::ConfigRead(u64 readAddress, u8 *data, u64 size) {
+  memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], size);
+}
+
+void HDD::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   // Check if we're being scanned.
   u64 tmp = 0;
-  memcpy(&tmp, data, byteCount);
+  memcpy(&tmp, data, size);
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
@@ -195,7 +267,7 @@ void HDD::ConfigWrite(u64 writeAddress, const u8 *data, u8 byteCount) {
       tmp = 0; // Register not implemented.
     }
   }
-  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &tmp, byteCount);
+  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &tmp, size);
 }
 
 void HDD::ataCopyIdentifyDeviceData() {
@@ -203,9 +275,5 @@ void HDD::ataCopyIdentifyDeviceData() {
     LOG_ERROR(HDD, "Read Buffer not empty!");
 
   ataDeviceState.readBuffer.resize(sizeof(ATA_IDENTIFY_DATA));
-
-  for (size_t buffPos = 0; buffPos <= sizeof(ATA_IDENTIFY_DATA); buffPos++) {
-    memcpy(ataDeviceState.readBuffer.data() + buffPos,
-           (u8*)&ataDeviceState.ataIdentifyData + buffPos, 1);
-  }
+  memcpy(ataDeviceState.readBuffer.data(), &ataDeviceState.ataIdentifyData, sizeof(ATA_IDENTIFY_DATA));
 }
