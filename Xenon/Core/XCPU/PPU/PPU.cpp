@@ -190,7 +190,7 @@ void PPU::Step(int amount) {
 
 // PPU Entry Point.
 void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
-  for (size_t instrCount = 0; instrCount < numInstrs; ++instrCount) {
+  for (size_t instrCount = 0; instrCount < numInstrs && ppuThreadState != eThreadState::Quiting; ++instrCount) {
     // Halt if needed before executing the instruction
     if (enableHalt) {
       if (ppuHaltOn && ppuHaltOn == curThread.CIA) {
@@ -250,6 +250,14 @@ void PPU::ThreadStateMachine() {
     // Waiting for an event, do nothing
   } break;
   case eThreadState::Unused: {
+    ppuThreadState = eThreadState::None;
+  } break;
+  case eThreadState::Quiting: {
+    if (ppuState->ppuID == 0) {
+      // Ensure the log is flushed
+      std::cout << std::endl;
+    }
+    LOG_INFO(Xenon, "PPU{} is exiting!", ppuState->ppuID);
     ppuThreadState = eThreadState::None;
   } break;
   }
