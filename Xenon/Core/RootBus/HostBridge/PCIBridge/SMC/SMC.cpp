@@ -266,7 +266,7 @@ void Xe::PCIDev::SMC::SMCCore::Write(u64 writeAddress, const u8 *data, u64 size)
     memcpy(&smcPCIState.fifoInStatusReg, data, size);
     if (smcPCIState.fifoInStatusReg == FIFO_STATUS_READY) { // We're about to receive a message.
       // Reset our input buffer and buffer pointer.
-      memset(&smcCoreState->fifoDataBuffer, 0, 16);
+      memset(smcCoreState->fifoDataBuffer, 0, sizeof(smcCoreState->fifoDataBuffer));
       smcCoreState->fifoBufferPos = 0;
     }
     break;
