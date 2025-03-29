@@ -39,7 +39,7 @@ void _rendering::from_toml(const toml::value &value) {
   vsync = toml::find_or<bool>(value, "VSync", vsync);
   quitOnWindowClosure =
     toml::find_or<bool>(value, "QuitOnWindowClosure", quitOnWindowClosure);
-  //gpuId = toml::find_or<int&>(gpu, "GPU", gpuId);
+  //gpuId = toml::find_or<s32&>(gpu, "GPU", gpuId);
 }
 void _rendering::to_toml(toml::value &value) {
   value["Enable"].comments().clear();
@@ -150,9 +150,9 @@ bool _debug::verify_toml(toml::value &value) {
 }
 
 void _smc::from_toml(const toml::value &value) {
-  comPort = toml::find_or<int&>(value, "COMPort", comPort);
-  avPackType = toml::find_or<int&>(value, "AvPackType", avPackType);
-  powerOnReason = toml::find_or<int&>(value, "PowerOnType", powerOnReason);
+  comPort = toml::find_or<s32&>(value, "COMPort", comPort);
+  avPackType = toml::find_or<s32&>(value, "AvPackType", avPackType);
+  powerOnReason = toml::find_or<s32&>(value, "PowerOnType", powerOnReason);
   useBackupUart = toml::find_or<bool>(value, "UseBackupUART", useBackupUart);
 }
 void _smc::to_toml(toml::value &value) {
@@ -192,10 +192,22 @@ bool _smc::verify_toml(toml::value &value) {
 }
 
 void _xcpu::from_toml(const toml::value &value) {
+  elfLoader = toml::find_or<bool>(value, "ElfLoader", elfLoader);
+  clocksPerInstruction = toml::find_or<s32&>(value, "CPI", clocksPerInstruction);
   HW_INIT_SKIP_1 = toml::find_or<u64&>(value, "HW_INIT_SKIP1", HW_INIT_SKIP_1);
   HW_INIT_SKIP_2 = toml::find_or<u64&>(value, "HW_INIT_SKIP2", HW_INIT_SKIP_2);
 }
 void _xcpu::to_toml(toml::value &value) {
+  value["ElfLoader"].comments().clear();
+  value["ElfLoader"] = elfLoader;
+  value["ElfLoader"].comments().push_back("# Disables normal codeflow and loads an elf from ElfBinary");
+
+  value["CPI"].comments().clear();
+  value["CPI"] = clocksPerInstruction;
+  value["CPI"].comments().push_back("# [DO NOT MODIFY] Clocks Per Instruction [DO NOT MODIFY]");
+  value["CPI"].comments().push_back("# If your system has a lower than average CPI, use CPI Bypass in HighlyExperimental");
+  value["CPI"].comments().push_back("# Note: This will mess with execution timing, and may break time-sensitive things like XeLL");
+
   value["HW_INIT_SKIP1"].comments().clear();
   value["HW_INIT_SKIP1"] = HW_INIT_SKIP_1;
   value["HW_INIT_SKIP1"].comments().push_back("# Hardware Init Skip address 1");
@@ -206,9 +218,13 @@ void _xcpu::to_toml(toml::value &value) {
 }
 bool _xcpu::verify_toml(toml::value &value) {
   to_toml(value);
+  cache_value(elfLoader);
+  cache_value(clocksPerInstruction);
   cache_value(HW_INIT_SKIP_1);
   cache_value(HW_INIT_SKIP_2);
   from_toml(value);
+  verify_value(elfLoader);
+  verify_value(clocksPerInstruction);
   verify_value(HW_INIT_SKIP_1);
   verify_value(HW_INIT_SKIP_2);
   return true;
@@ -262,15 +278,15 @@ bool _filepaths::verify_toml(toml::value &value) {
 }
 
 void _log::from_toml(const toml::value &value) {
-  int tmpLevel = static_cast<int>(currentLevel);
-  tmpLevel = toml::find_or<int&>(value, "Level", tmpLevel);
+  s32 tmpLevel = static_cast<s32>(currentLevel);
+  tmpLevel = toml::find_or<s32&>(value, "Level", tmpLevel);
   advanced = toml::find_or<bool>(value, "Advanced", advanced);
   currentLevel = static_cast<Base::Log::Level>(tmpLevel);
 }
 void _log::to_toml(toml::value &value) {
   value.comments().clear();
   value.comments().push_back("# Controls the current output filter level");
-  int tmpLevel = static_cast<int>(currentLevel);
+  s32 tmpLevel = static_cast<s32>(currentLevel);
   value["Level"] = tmpLevel;
   value["Advanced"] = advanced;
 }
@@ -285,29 +301,21 @@ bool _log::verify_toml(toml::value &value) {
 }
 
 void _highlyExperimental::from_toml(const toml::value &value) {
-  clocksPerInstruction = toml::find_or<int&>(value, "CPI", clocksPerInstruction);
-  elfLoader = toml::find_or<bool>(value, "ElfLoader", elfLoader);
+  clocksPerInstructionBypass = toml::find_or<s32&>(value, "CPIBypass", clocksPerInstructionBypass);
 }
 void _highlyExperimental::to_toml(toml::value &value) {
   value.comments().clear();
   value.comments().push_back("# Do not touch these options unless you know what you're doing!");
   value.comments().push_back("# It can break execution! User beware");
-  value["CPI"].comments().clear();
-  value["CPI"].comments().push_back("# Clocks Per Instruction. If your system has a lower-than-average CPI, adjust accordingly");
-  value["CPI"].comments().push_back("# Note: This will mess with execution timing, and may break time-sensitive things like XeLL");
-  value["CPI"].comments().push_back("# Zero will use the estimated CPI for your system (check log for more info)");
-  value["CPI"] = clocksPerInstruction;
-  value["ElfLoader"].comments().clear();
-  value["ElfLoader"].comments().push_back("# Disables normal codeflow and loads kernel.elf");
-  value["ElfLoader"] = elfLoader;
+  value["CPIBypass"].comments().clear();
+  value["CPIBypass"].comments().push_back("# Zero will use the estimated CPI for your system (view XCPU for more info)");
+  value["CPIBypass"] = clocksPerInstructionBypass;
 }
 bool _highlyExperimental::verify_toml(toml::value &value) {
   to_toml(value);
-  cache_value(clocksPerInstruction);
-  cache_value(elfLoader);
+  cache_value(clocksPerInstructionBypass);
   from_toml(value);
-  verify_value(clocksPerInstruction);
-  verify_value(elfLoader);
+  verify_value(clocksPerInstructionBypass);
   return true;
 }
 

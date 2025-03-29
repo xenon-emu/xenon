@@ -3,6 +3,12 @@
 #include "OGLTexture.h"
 
 #ifndef NO_GFX
+#define GL_GLEXT_PROTOTYPES
+extern "C" {
+#include <KHR/khrplatform.h>
+#include <glad/glad.h>
+}
+
 #include "Base/Logging/Log.h"
 
 u32 Render::OGLTexture::GetDepthFromFlags(int flags) {

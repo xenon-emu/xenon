@@ -159,11 +159,12 @@ public:
   SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
     PCIBridge *parentPCIBridge);
   ~SFCX();
-
-  void Read(u64 readAddress, u8 *data, u8 byteCount) override;
-  void ConfigRead(u64 readAddress, u8 *data, u8 byteCount) override;
-  void Write(u64 writeAddress, u8 *data, u8 byteCount) override;
-  void ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount) override;
+  
+  void Read(u64 readAddress, u8 *data, u64 size) override;
+  void Write(u64 writeAddress, const u8 *data, u64 size) override;
+  void MemSet(u64 writeAddress, s32 data, u64 size) override;
+  void ConfigRead(u64 readAddress, u8* data, u64 size) override;
+  void ConfigWrite(u64 writeAddress, const u8* data, u64 size) override;
 
 private:
   // Secure Flash Controller for Xbox main loop.

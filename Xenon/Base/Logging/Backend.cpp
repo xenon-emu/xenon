@@ -4,6 +4,7 @@
 
 #include <fmt/format.h>
 #include <map>
+#include <functional>
 
 #ifdef _WIN32
 #include <windows.h> // For OutputDebugStringW
@@ -26,21 +27,31 @@ using namespace Base::FS;
 namespace {
 
 /*
+ * Base backend with shell functions
+ */
+class BaseBackend {
+public:
+  virtual ~BaseBackend() = default;
+  virtual void Write(const Entry& entry) = 0;
+  virtual void Flush() = 0;
+};
+
+/*
  * Backend that writes to stderr and with color
  */
-class ColorConsoleBackend {
+class ColorConsoleBackend : public BaseBackend {
 public:
   explicit ColorConsoleBackend() = default;
 
   ~ColorConsoleBackend() = default;
 
-  void Write(const Entry& entry) {
+  void Write(const Entry& entry) override {
     if (enabled.load(std::memory_order_relaxed)) {
       PrintColoredMessage(entry);
     }
   }
 
-  void Flush() {
+  void Flush() override {
     // stderr shouldn't be buffered
   }
 
@@ -55,14 +66,16 @@ private:
 /*
  * Backend that writes to a file passed into the constructor
  */
-class FileBackend {
+class FileBackend : public BaseBackend {
 public:
   explicit FileBackend(const std::filesystem::path& filename)
     : file{filename, FS::FileAccessMode::Write, FS::FileType::TextFile} {}
 
-  ~FileBackend() = default;
+  ~FileBackend() {
+    file.Close();
+  }
 
-  void Write(const Entry& entry) {
+  void Write(const Entry& entry) override {
     if (!enabled) {
       return;
     }
@@ -82,7 +95,7 @@ public:
     }
   }
 
-  void Flush() {
+  void Flush() override {
     file.Flush();
   }
 
@@ -95,21 +108,23 @@ private:
 /*
  * Backend that writes to Visual Studio's output window
  */
-class DebuggerBackend {
+class DebuggerBackend : public BaseBackend {
 public:
   explicit DebuggerBackend() = default;
 
   ~DebuggerBackend() = default;
 
-  void Write(const Entry& entry) {
+  void Write(const Entry& entry) override {
 #ifdef _WIN32
     ::OutputDebugStringW(UTF8ToUTF16W(FormatLogMessage(entry).append(1, '\n')).c_str());
 #endif
   }
 
-  void Flush() {}
+  void Flush() override
+  {}
 
-  void EnableForStacktrace() {}
+  void EnableForStacktrace()
+  {}
 };
 
 bool initialization_in_progress_suppress_logging = true;
@@ -163,7 +178,7 @@ public:
   }
 
   void SetColorConsoleBackendEnabled(bool enabled) {
-    color_console_backend.SetEnabled(enabled);
+    color_console_backend->SetEnabled(enabled);
   }
 
   void PushEntry(Class log_class, Level log_level, const char* filename, unsigned int line_num,
@@ -186,26 +201,38 @@ public:
       .function = function,
       .message = std::move(message),
     };
-//    if (Config::getLogType() == "async") {
-//      message_queue.EmplaceWait(entry);
-//    } else {
-      ForEachBackend([&entry](auto& backend) { backend.Write(entry); });
+    ForEachBackend([&entry](BaseBackend* backend) { if (backend) { backend->Write(entry); } });
+    std::fflush(stdout);
+    /*if (Config::getLogType() == "async") {
+      message_queue.EmplaceWait(entry);
+    } else {
+      ForEachBackend([&entry](BaseBackend* backend) { if (backend) { backend->Write(entry); } });
       std::fflush(stdout);
-//    }
+    }*/
   }
 
 private:
-  Impl(const std::filesystem::path& file_backend_filename, const Filter& filter_)
-    : filter{filter_}, file_backend{file_backend_filename} {}
+  Impl(const std::filesystem::path& file_backend_filename, const Filter& filter_) :
+    filter(filter_)
+  {
+    debugger_backend = std::make_unique<DebuggerBackend>();
+    color_console_backend = std::make_unique<ColorConsoleBackend>();
+    file_backend = std::make_unique<FileBackend>(file_backend_filename);
+  }
 
-  ~Impl() = default;
+  ~Impl() {
+    Stop();
+    debugger_backend.reset();
+    file_backend.reset();
+    color_console_backend.reset();
+  }
 
   void StartBackendThread() {
     backend_thread = std::jthread([this](std::stop_token stop_token) {
       Base::SetCurrentThreadName("Xenon:Log");
       Entry entry;
       const auto write_logs = [this, &entry]() {
-        ForEachBackend([&entry](auto& backend) { backend.Write(entry); });
+        ForEachBackend([&entry](BaseBackend* backend) { backend->Write(entry); });
       };
       while (!stop_token.stop_requested()) {
         message_queue.PopWait(entry, stop_token);
@@ -228,13 +255,13 @@ private:
       backend_thread.join();
     }
 
-    ForEachBackend([](auto& backend) { backend.Flush(); });
+    ForEachBackend([](BaseBackend* backend) { backend->Flush(); });
   }
 
-  void ForEachBackend(auto lambda) {
-    // lambda(debugger_backend);
-    lambda(color_console_backend);
-    lambda(file_backend);
+  void ForEachBackend(std::function<void(BaseBackend*)> lambda) {
+    //lambda(debugger_backend.get());
+    lambda(color_console_backend.get());
+    lambda(file_backend.get());
   }
 
   static void Deleter(Impl* ptr) {
@@ -244,9 +271,9 @@ private:
   static inline std::unique_ptr<Impl, decltype(&Deleter)> instance{nullptr, Deleter};
 
   Filter filter;
-  DebuggerBackend debugger_backend{};
-  ColorConsoleBackend color_console_backend{};
-  FileBackend file_backend;
+  std::unique_ptr<DebuggerBackend> debugger_backend{};
+  std::unique_ptr<ColorConsoleBackend> color_console_backend{};
+  std::unique_ptr<FileBackend> file_backend{};
 
   MPSCQueue<Entry> message_queue{};
   std::chrono::steady_clock::time_point time_origin{std::chrono::steady_clock::now()};
@@ -262,7 +289,7 @@ void DeleteOldLogs(const std::filesystem::path& path, u64 num_logs, u64 log_limi
   const time_t timeNow = std::chrono::system_clock::to_time_t(Now);
   const tm* time = std::localtime(&timeNow);
   // We want to get rid of anything that isn't that current day's date
-  std::string currentDate = fmt::format("{}-{}-{}", time->tm_mon, time->tm_mday, 1900 + time->tm_year);
+  std::string currentDate = fmt::format("{}-{}-{}", time->tm_mon + 1, time->tm_mday, 1900 + time->tm_year);
   if (filename.find(currentDate) == std::string::npos) {
     std::filesystem::remove_all(path);
     return;
@@ -302,7 +329,11 @@ void CleanupOldLogs(const std::string_view &log_file_base, const std::filesystem
     if (entry.is_regular_file()) {
       const std::filesystem::path path = entry.path();
       const std::string ext = path.extension().string();
-      if (path.has_extension() || ext != LogFile.extension()) {
+      if (!path.has_extension()) {
+        // Skip anything that isn't a log file
+        continue;
+      }
+      if (ext != LogFile.extension()) {
         // Skip anything that isn't a log file
         continue;
       }
@@ -358,15 +389,19 @@ void Initialize(const std::string_view &log_file) {
   const std::filesystem::path LogDir = Base::FS::GetUserPath(Base::FS::PathType::LogDir);
   const std::filesystem::path LogFile = LOG_FILE;
   const std::filesystem::path LogFileStem = LogFile.stem();
-  const std::string LogFileStemStr = LogFileStem.string(); // This is to make string_view happy
+  const std::filesystem::path LogFileName = LogFile.filename();
+  // This is to make string_view happy
+  const std::string LogFileStemStr = LogFileStem.string();
+  const std::string LogFileNameStr = LogFileName.string();
   // Setup filename
-  const std::string_view filenameBase = log_file.empty() ? LogFileStemStr : log_file;
+  const std::string_view filestemBase = log_file.empty() ? LogFileStemStr : log_file;
+  const std::string_view filenameBase = log_file.empty() ? LogFileNameStr : log_file;
   const std::chrono::time_point now = std::chrono::system_clock::now();
   const time_t timeNow = std::chrono::system_clock::to_time_t(now);
   const tm *time = std::localtime(&timeNow);
   std::string currentTime = fmt::format("{}-{}-{}", time->tm_hour, time->tm_min, time->tm_sec);
   std::string currentDate = fmt::format("{}-{}-{}", time->tm_mon + 1, time->tm_mday, 1900 + time->tm_year);
-  std::string filename = fmt::format("{}_{}_{}.txt", filenameBase, currentDate, currentTime);
+  std::string filename = fmt::format("{}_{}_{}.txt", filestemBase, currentDate, currentTime);
   CleanupOldLogs(filenameBase, LogDir);
   Impl::Initialize(log_file.empty() ? filename : log_file);
 }

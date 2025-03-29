@@ -79,6 +79,13 @@ Xenon::~Xenon() {
 }
 
 void Xenon::Start(u64 resetVector) {
+  //// If we already have active objects, halt cpu and kill threads
+  //if (ppu0.get()) {
+  //  Halt();
+  //  ppu0.reset();
+  //  ppu1.reset();
+  //  ppu2.reset();
+  //}
   // Create PPU elements
   ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(&xenonContext, mainBus, resetVector, XE_PVR, 0); // Threads 0-1
   ppu1 = std::make_unique<STRIP_UNIQUE(ppu1)>(&xenonContext, mainBus, resetVector, XE_PVR, 2); // Threads 2-3
@@ -96,11 +103,10 @@ void Xenon::Start(u64 resetVector) {
 void Xenon::LoadElf(const std::string path) {
   ppu0.reset();
   ppu1.reset();
-  ppu2.reset();
-  //TODO(Vali0004): Fix multi-threading
+  ppu2.reset(); 
   ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(&xenonContext, mainBus, 0, XE_PVR, 0); // Threads 0-1
-  //ppu1 = std::make_unique<STRIP_UNIQUE(ppu1)>(&xenonContext, mainBus, 0, XE_PVR, 2); // Threads 2-3
-  //ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(&xenonContext, mainBus, 0, XE_PVR, 4); // Threads 4-5
+  ppu1 = std::make_unique<STRIP_UNIQUE(ppu1)>(&xenonContext, mainBus, 0, XE_PVR, 2); // Threads 2-3
+  ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(&xenonContext, mainBus, 0, XE_PVR, 4); // Threads 4-5
   std::filesystem::path filePath{ path };
   std::ifstream file{ filePath, std::ios_base::in | std::ios_base::binary };
   u64 fileSize = 0;
@@ -122,9 +128,14 @@ void Xenon::LoadElf(const std::string path) {
   file.read(reinterpret_cast<char*>(elfBinary.get()), fileSize);
   file.close();
   ppu0->loadElfImage(elfBinary.get(), fileSize);
+  // Start execution on the main thread
   ppu0->StartExecution(false);
-  //ppu1->StartExecution(false);
-  //ppu2->StartExecution(false);
+  // Get our CPI based on the first PPU, then share it across all PPUs
+  ppu1->SetCPI(ppu0->GetCPI());
+  ppu2->SetCPI(ppu0->GetCPI());
+  // Start execution on the other threads
+  ppu1->StartExecution(false);
+  ppu2->StartExecution(false);
 }
 
 void Xenon::Halt(u64 haltOn) {

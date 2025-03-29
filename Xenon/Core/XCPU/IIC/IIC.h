@@ -86,8 +86,8 @@ namespace Xe {
       class XenonIIC {
       public:
         XenonIIC();
-        void writeInterrupt(u64 intAddress, u64 intData);
-        void readInterrupt(u64 intAddress, u64* intData);
+        void writeInterrupt(u64 intAddress, const u8 *data, u64 size);
+        void readInterrupt(u64 intAddress, u8 *data, u64 size);
         bool checkExtInterrupt(u8 ppuID);
         void genInterrupt(u8 interruptType, u8 cpusToInterrupt);
 

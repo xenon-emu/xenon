@@ -13,13 +13,13 @@ namespace Base::Log {
  * formatting on different frontends, as well as facilitating filtering and aggregation.
  */
 struct Entry {
-    std::chrono::microseconds timestamp;
-    Class log_class{};
-    Level log_level{};
-    const char* filename = nullptr;
-    u32 line_num = 0;
-    std::string function;
-    std::string message;
+  std::chrono::microseconds timestamp;
+  Class log_class{};
+  Level log_level{};
+  const char* filename = nullptr;
+  u32 line_num = 0;
+  std::string function;
+  std::string message;
 };
 
 } // namespace Base::Log

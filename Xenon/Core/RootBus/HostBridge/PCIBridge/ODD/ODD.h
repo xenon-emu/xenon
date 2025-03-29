@@ -35,34 +35,34 @@ struct READ_CAPACITY_DATA {
 
 class DataBuffer {
 public:
-  bool Empty(void) { return Pointer >= Size; }
-  u32 Space(void) { return Size - Pointer; }
-  u32 Count(void) { return Pointer; }
-  u8 *Ptr(void) { return Data + Pointer; }
-  void Increment(u32 Inc) { Pointer += Inc; }
-  void ResetPtr(void) { Pointer = 0; }
-  bool Initialize(u32 MaxLength, bool fClear) {
-    if (Data && (MaxLength > Size)) {
-      delete Data;
-      memset(this, 0, sizeof *this);
+  bool empty(void) { return _pointer >= _size; }
+  u32 count(void) { return _size - _pointer; }
+  u32 size(void) { return _pointer; }
+  u8 *get(void) { return _data.get() + _pointer; }
+  void resize(u32 v) { _pointer += v; }
+  void reset(void) { _pointer = 0; }
+  bool init(u32 maxLength, bool clear) {
+    if (_data && (maxLength > _size)) {
+      _data.reset();
+      _size = 0;
+      reset();
     }
-    if (Data == nullptr) {
-      Data = ::new u8[MaxLength];
+    if (!_data) {
+      _data = std::make_unique<STRIP_UNIQUE_ARR(_data)>(maxLength);
     }
-    if (Data) {
-      Size = std::max(Size, MaxLength);
-      Pointer = Size; // Empty()
-      if (fClear)
-        memset(Data, 0, MaxLength);
+    if (_data) {
+      _size = std::max(_size, maxLength);
+      _pointer = _size; // Empty()
+      if (clear)
+        memset(_data.get(), 0, maxLength);
       return true;
     }
     return false;
   }
-
 private:
-  u8 *Data;
-  u32 Size;
-  u32 Pointer;
+  std::unique_ptr<u8[]> _data;
+  u32 _size;
+  u32 _pointer;
 };
 
 //
@@ -483,11 +483,12 @@ class ODD : public PCIDevice {
 public:
   ODD(const char* deviceName, u64 size,
     PCIBridge *parentPCIBridge, RAM *ram);
-
-  void Read(u64 readAddress, u8 *data, u8 u8Count) override;
-  void ConfigRead(u64 readAddress, u8 *data, u8 u8Count) override;
-  void Write(u64 writeAddress, u8 *data, u8 u8Count) override;
-  void ConfigWrite(u64 writeAddress, u8 *data, u8 u8Count) override;
+  
+  void Read(u64 readAddress, u8 *data, u64 size) override;
+  void Write(u64 writeAddress, const u8 *data, u64 size) override;
+  void MemSet(u64 writeAddress, s32 data, u64 size) override;
+  void ConfigRead(u64 readAddress, u8* data, u64 size) override;
+  void ConfigWrite(u64 writeAddress, const u8* data, u64 size) override;
 
 private:
   // PCI Bridge pointer. Used for Interrupts.
