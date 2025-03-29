@@ -8,9 +8,7 @@
 #include "GUI/Implementations/OpenGL.h"
 #include "Base/CommitCount.h"
 #include "Base/Config.h"
-#include "Base/Path_util.h"
 #include "Base/Version.h"
-#include "Base/Logging/Log.h"
 
 #include "Core/XGPU/XGPU.h"
 #include "Core/Xe_Main.h"

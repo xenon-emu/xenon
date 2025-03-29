@@ -6,6 +6,7 @@
 #include "Render/Abstractions/Texture.h"
 
 #ifndef NO_GFX
+
 #define GL_GLEXT_PROTOTYPES
 extern "C" {
 #include <KHR/khrplatform.h>
@@ -14,14 +15,14 @@ extern "C" {
 
 namespace Render {
 
-enum eCreationFlags : s32 {
+enum eCreationFlags : const s32 {
   glTextureWrapS_GL_CLAMP_TO_EDGE = (1 << 0),
   glTextureWrapT_GL_CLAMP_TO_EDGE = (1 << 1),
   glTextureMinFilter_GL_NEAREST = (1 << 2),
   glTextureMagFilter_GL_NEAREST = (1 << 3)
 };
 
-enum eTextureDepth : s32 {
+enum eTextureDepth : const s32 {
   RG = (1 << 4),
   RGI = (1 << 5),
   R8 = (1 << 6),
@@ -32,7 +33,7 @@ enum eTextureDepth : s32 {
   R16I = (1 << 11),
   R16U = (1 << 12),
   R32 = (1 << 13),
-  R32F = (1 << 15),
+  R32F = (1 << 14),
   R32I = (1 << 15),
   R32U = (1 << 16)
 };
