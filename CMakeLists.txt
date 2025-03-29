@@ -31,6 +31,23 @@ function(create_target_directory_groups target_name)
   endforeach()
 endfunction()
 
+function(get_commit_count REPO_DIR RESULT_VAR)
+    execute_process(
+        COMMAND git rev-list --count HEAD
+        WORKING_DIRECTORY ${REPO_DIR}
+        OUTPUT_VARIABLE COMMIT_COUNT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    set(${RESULT_VAR} ${COMMIT_COUNT} PARENT_SCOPE)
+endfunction()
+
+set(REPO_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+get_commit_count(${REPO_DIR} COMMIT_COUNT)
+
+message(STATUS "Commits Number: ${COMMIT_COUNT}")
+
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/Xenon/Base/CommitCount.cpp.in" "${CMAKE_CURRENT_SOURCE_DIR}/Xenon/Base/CommitCount.cpp" @ONLY)
+
 find_package(fmt 10.2.1 CONFIG)
 if (GFX_ENABLED)
   find_package(SDL3 3.2.4 CONFIG)
@@ -59,6 +76,8 @@ set(Base
     Xenon/Base/Assert.cpp
     Xenon/Base/Assert.h
     Xenon/Base/Bounded_threadsafe_queue.h
+    Xenon/Base/CommitCount.cpp
+    Xenon/Base/CommitCount.h
     Xenon/Base/Concepts.h
     Xenon/Base/Config.cpp
     Xenon/Base/Config.h

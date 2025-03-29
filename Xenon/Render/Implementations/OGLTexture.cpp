@@ -3,13 +3,9 @@
 #include "OGLTexture.h"
 
 #ifndef NO_GFX
-#define GL_GLEXT_PROTOTYPES
-extern "C" {
-#include <KHR/khrplatform.h>
-#include <glad/glad.h>
-}
 
 #include "Base/Logging/Log.h"
+#include "Base/Assert.h"
 
 u32 Render::OGLTexture::GetDepthFromFlags(int flags) {
   if ((flags & Render::eTextureDepth::RG) != 0) {
@@ -43,7 +39,7 @@ u32 Render::OGLTexture::GetDepthFromFlags(int flags) {
   }
 
   if ((flags & Render::eTextureDepth::R32) != 0) {
-    return GL_R16;
+    return GL_R32I;
   }
   if ((flags & Render::eTextureDepth::R32F) != 0) {
     return GL_R32F;
@@ -55,8 +51,9 @@ u32 Render::OGLTexture::GetDepthFromFlags(int flags) {
     return GL_R32UI;
   }
 
-  return 0;
+  UNREACHABLE_MSG("Missing Depth Format flag: {}", flags);
 }
+
 u32 Render::OGLTexture::GetOGLTextureFormat(Render::eDataFormat format) {
   switch (format) {
   case Render::eDataFormat::RGB:
@@ -65,10 +62,12 @@ u32 Render::OGLTexture::GetOGLTextureFormat(Render::eDataFormat format) {
   case Render::eDataFormat::RGBA:
     return GL_RGBA;
     break;
+  default:
+    UNREACHABLE_MSG("Missing Format: {}", std::to_string(format));
+    break;
   }
-
-  return 0;
 }
+
 void Render::OGLTexture::SetupTextureFlags(int flags) {
   if ((flags & glTextureWrapS_GL_CLAMP_TO_EDGE) != 0) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -97,6 +96,7 @@ void Render::OGLTexture::CreateTextureHandle(u32 width, u32 height, int flags) {
   glBindImageTexture(0, TextureHandle, 0, GL_FALSE, 0, GL_READ_WRITE, depth);
   Unbind();
 }
+
 void Render::OGLTexture::CreateTextureWithData(u32 width, u32 height, eDataFormat format, u8* data, u32 dataSize, int flags) {
   SetTexture(&TextureHandle);
   SetWidth(width);
@@ -114,6 +114,7 @@ void Render::OGLTexture::CreateTextureWithData(u32 width, u32 height, eDataForma
   glTexImage2D(GL_TEXTURE_2D, 0, textureFormat, GetWidth(), GetHeight(), 0, internalTextureFormat, GL_UNSIGNED_BYTE, data);
   Unbind();
 }
+
 void Render::OGLTexture::ResizeTexture(u32 width, u32 height) {
   Bind();
   glTexStorage2D(GL_TEXTURE_2D, 1, GetDepth(), width, height);
@@ -129,6 +130,7 @@ void Render::OGLTexture::ResizeTexture(u32 width, u32 height) {
 void Render::OGLTexture::Bind() {
   glBindTexture(GL_TEXTURE_2D, TextureHandle);
 }
+
 void Render::OGLTexture::Unbind() {
   glBindTexture(GL_TEXTURE_2D, 0);
 }
