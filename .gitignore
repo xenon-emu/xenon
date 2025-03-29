@@ -427,5 +427,6 @@ Xenon.dir/
 Xenon.dir/*
 /Xenon/x64/*
 /Xenon/Debug/*
+/Xenon/Base/CommitCount.cpp
 /enc_temp_folder/619a1d34cec9f4ba9f9d74313f867f/PPC_MMU.cpp
 /enc_temp_folder/64f566682068ff61e483a023a729d37b/SFCX.cpp
