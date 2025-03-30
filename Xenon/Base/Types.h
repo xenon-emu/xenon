@@ -29,10 +29,10 @@
 
 // Signed
 using s8 = signed char;
-using s16 = short;
-using s32 = int;
-using sl32 = long;
-using s64 = long long;
+using s16 = signed short;
+using s32 = signed int;
+using sl32 = signed long;
+using s64 = signed long long;
 
 // Unsigned
 using u8 = unsigned char;

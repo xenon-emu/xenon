@@ -368,21 +368,21 @@ void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
   smcCoreState->comPortDCB.DCBlength = sizeof(DCB);
 
   switch (uartConfig) {
-  case 0x1e6:
+  case 0x1E6:
     LOG_INFO(SMC, " * BaudRate: 115200bps, DataSize: 8, Parity: N, StopBits: 1.");
     smcCoreState->comPortDCB.BaudRate = CBR_115200;
     smcCoreState->comPortDCB.ByteSize = 8;
     smcCoreState->comPortDCB.Parity = NOPARITY;
     smcCoreState->comPortDCB.StopBits = ONESTOPBIT;
     break;
-  case 0x1bb2:
+  case 0x1BB2:
     LOG_INFO(SMC, " * BaudRate: 38400bps, DataSize: 8, Parity: N, StopBits: 1.");
     smcCoreState->comPortDCB.BaudRate = CBR_38400;
     smcCoreState->comPortDCB.ByteSize = 8;
     smcCoreState->comPortDCB.Parity = NOPARITY;
     smcCoreState->comPortDCB.StopBits = ONESTOPBIT;
     break;
-  case 0x163:
+  case 0x0163:
     LOG_INFO(SMC, " * BaudRate: 19200bps, DataSize: 8, Parity: N, StopBits: 1.");
     smcCoreState->comPortDCB.BaudRate = CBR_19200;
     smcCoreState->comPortDCB.ByteSize = 8;

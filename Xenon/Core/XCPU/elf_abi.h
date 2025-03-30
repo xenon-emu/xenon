@@ -1,32 +1,26 @@
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
-#ifndef _UAPI_LINUX_ELF_H
-#define _UAPI_LINUX_ELF_H
+// Copyright 2025 Xenon Emulator Project
 
-typedef unsigned int _u32;
-typedef unsigned short _u16;
+#pragma once
 
-typedef signed int _s32;
-typedef signed short _s16;
-
-typedef unsigned long long _u64;
-typedef signed long long _s64;
+#include "Base/Types.h"
 
 /* 32-bit ELF base types. */
-typedef _u32  Elf32_Addr;
-typedef _u16  Elf32_Half;
-typedef _u32  Elf32_Off;
-typedef _s32  Elf32_Sword;
-typedef _u32  Elf32_Word;
+typedef u32 Elf32_Addr;
+typedef u16 Elf32_Half;
+typedef u32 Elf32_Off;
+typedef s32 Elf32_Sword;
+typedef u32 Elf32_Word;
 
 /* 64-bit ELF base types. */
-typedef _u64  Elf64_Addr;
-typedef _u16  Elf64_Half;
-typedef _s16  Elf64_SHalf;
-typedef _u64  Elf64_Off;
-typedef _s32  Elf64_Sword;
-typedef _u32  Elf64_Word;
-typedef _u64  Elf64_Xword;
-typedef _s64  Elf64_Sxword;
+typedef u64 Elf64_Addr;
+typedef u16 Elf64_Half;
+typedef s16 Elf64_SHalf;
+typedef u64 Elf64_Off;
+typedef s32 Elf64_Sword;
+typedef u32 Elf64_Word;
+typedef u64 Elf64_Xword;
+typedef s64 Elf64_Sxword;
 
 /* These constants are for the segment types stored in the image headers */
 #define PT_NULL    0
@@ -146,15 +140,15 @@ typedef _s64  Elf64_Sxword;
 #define ELF64_ST_BIND(x)  ELF_ST_BIND(x)
 #define ELF64_ST_TYPE(x)  ELF_ST_TYPE(x)
 
-typedef struct {
+typedef const struct {
     Elf32_Sword d_tag;
     union {
-        Elf32_Sword  d_val;
-        Elf32_Addr   d_ptr;
+        Elf32_Sword d_val;
+        Elf32_Addr  d_ptr;
     } d_un;
 } Elf32_Dyn;
 
-typedef struct {
+typedef const struct {
     Elf64_Sxword d_tag;    /* entry tag value */
     union {
         Elf64_Xword d_val;
@@ -169,68 +163,68 @@ typedef struct {
 #define ELF64_R_SYM(i)  ((i) >> 32)
 #define ELF64_R_TYPE(i) ((i) & 0xFFFFFFFF)
 
-typedef struct elf32_rel {
-    Elf32_Addr  r_offset;
-    Elf32_Word  r_info;
+typedef const struct elf32_rel {
+    Elf32_Addr r_offset;
+    Elf32_Word r_info;
 } Elf32_Rel;
 
-typedef struct elf64_rel {
-    Elf64_Addr  r_offset;  /* Location at which to apply the action */
+typedef const struct elf64_rel {
+    Elf64_Addr  r_offset; /* Location at which to apply the action */
     Elf64_Xword r_info;   /* index and type of relocation */
 } Elf64_Rel;
 
-typedef struct elf32_rela {
-    Elf32_Addr   r_offset;
-    Elf32_Word   r_info;
-    Elf32_Sword  r_addend;
+typedef const struct elf32_rela {
+    Elf32_Addr  r_offset;
+    Elf32_Word  r_info;
+    Elf32_Sword r_addend;
 } Elf32_Rela;
 
-typedef struct elf64_rela {
+typedef const struct elf64_rela {
     Elf64_Addr   r_offset;  /* Location at which to apply the action */
     Elf64_Xword  r_info;    /* index and type of relocation */
     Elf64_Sxword r_addend;  /* Constant addend used to compute value */
 } Elf64_Rela;
 
-typedef struct elf32_sym {
-    Elf32_Word     st_name;
-    Elf32_Addr     st_value;
-    Elf32_Word     st_size;
-    unsigned char  st_info;
-    unsigned char  st_other;
-    Elf32_Half     st_shndx;
+typedef const struct elf32_sym {
+    Elf32_Word st_name;
+    Elf32_Addr st_value;
+    Elf32_Word st_size;
+    u8         st_info;
+    u8         st_other;
+    Elf32_Half st_shndx;
 } Elf32_Sym;
 
-typedef struct elf64_sym {
-    Elf64_Word     st_name;     /* Symbol name, index in string tbl */
-    unsigned char  st_info;     /* Type and binding attributes */
-    unsigned char  st_other;    /* No defined meaning, 0 */
-    Elf64_Half     st_shndx;    /* Associated section index */
-    Elf64_Addr     st_value;    /* Value of the symbol */
-    Elf64_Xword    st_size;     /* Associated symbol size */
+typedef const struct elf64_sym {
+    Elf64_Word  st_name;     /* Symbol name, index in string tbl */
+    u8          st_info;     /* Type and binding attributes */
+    u8          st_other;    /* No defined meaning, 0 */
+    Elf64_Half  st_shndx;    /* Associated section index */
+    Elf64_Addr  st_value;    /* Value of the symbol */
+    Elf64_Xword st_size;     /* Associated symbol size */
 } Elf64_Sym;
 
 
 #define EI_NIDENT  16
 
-typedef struct elf32_hdr {
-    unsigned char e_ident[EI_NIDENT];
-    Elf32_Half  e_type;
-    Elf32_Half  e_machine;
-    Elf32_Word  e_version;
-    Elf32_Addr  e_entry;  /* Entry point */
-    Elf32_Off   e_phoff;
-    Elf32_Off   e_shoff;
-    Elf32_Word  e_flags;
-    Elf32_Half  e_ehsize;
-    Elf32_Half  e_phentsize;
-    Elf32_Half  e_phnum;
-    Elf32_Half  e_shentsize;
-    Elf32_Half  e_shnum;
-    Elf32_Half  e_shstrndx;
+typedef const struct elf32_hdr {
+    u8         e_ident[EI_NIDENT];
+    Elf32_Half e_type;
+    Elf32_Half e_machine;
+    Elf32_Word e_version;
+    Elf32_Addr e_entry;  /* Entry point */
+    Elf32_Off  e_phoff;
+    Elf32_Off  e_shoff;
+    Elf32_Word e_flags;
+    Elf32_Half e_ehsize;
+    Elf32_Half e_phentsize;
+    Elf32_Half e_phnum;
+    Elf32_Half e_shentsize;
+    Elf32_Half e_shnum;
+    Elf32_Half e_shstrndx;
 } Elf32_Ehdr;
 
-typedef struct elf64_hdr {
-    unsigned char e_ident[EI_NIDENT];  /* ELF "magic number" */
+typedef const struct elf64_hdr {
+    u8         e_ident[EI_NIDENT];  /* ELF "magic number" */
     Elf64_Half e_type;
     Elf64_Half e_machine;
     Elf64_Word e_version;
@@ -252,18 +246,18 @@ typedef struct elf64_hdr {
 #define PF_W    0x2
 #define PF_X    0x1
 
-typedef struct elf32_phdr {
-    Elf32_Word  p_type;
-    Elf32_Off   p_offset;
-    Elf32_Addr  p_vaddr;
-    Elf32_Addr  p_paddr;
-    Elf32_Word  p_filesz;
-    Elf32_Word  p_memsz;
-    Elf32_Word  p_flags;
-    Elf32_Word  p_align;
+typedef const struct elf32_phdr {
+    Elf32_Word p_type;
+    Elf32_Off  p_offset;
+    Elf32_Addr p_vaddr;
+    Elf32_Addr p_paddr;
+    Elf32_Word p_filesz;
+    Elf32_Word p_memsz;
+    Elf32_Word p_flags;
+    Elf32_Word p_align;
 } Elf32_Phdr;
 
-typedef struct elf64_phdr {
+typedef const struct elf64_phdr {
     Elf64_Word  p_type;
     Elf64_Word  p_flags;
     Elf64_Off   p_offset;   /* Segment file offset */
@@ -311,20 +305,20 @@ typedef struct elf64_phdr {
 #define SHN_COMMON     0xFFF2
 #define SHN_HIRESERVE  0xFFFF
 
-typedef struct elf32_shdr {
-    Elf32_Word  sh_name;
-    Elf32_Word  sh_type;
-    Elf32_Word  sh_flags;
-    Elf32_Addr  sh_addr;
-    Elf32_Off   sh_offset;
-    Elf32_Word  sh_size;
-    Elf32_Word  sh_link;
-    Elf32_Word  sh_info;
-    Elf32_Word  sh_addralign;
-    Elf32_Word  sh_entsize;
+typedef const struct elf32_shdr {
+    Elf32_Word sh_name;
+    Elf32_Word sh_type;
+    Elf32_Word sh_flags;
+    Elf32_Addr sh_addr;
+    Elf32_Off  sh_offset;
+    Elf32_Word sh_size;
+    Elf32_Word sh_link;
+    Elf32_Word sh_info;
+    Elf32_Word sh_addralign;
+    Elf32_Word sh_entsize;
 } Elf32_Shdr;
 
-typedef struct elf64_shdr {
+typedef const struct elf64_shdr {
     Elf64_Word  sh_name;      /* Section name, index in string tbl */
     Elf64_Word  sh_type;      /* Type of section */
     Elf64_Xword sh_flags;     /* Miscellaneous section attributes */
@@ -466,14 +460,14 @@ typedef struct elf64_shdr {
 #define NT_GNU_PROPERTY_TYPE_0  5
 
 /* Note header in a PT_NOTE section */
-typedef struct elf32_note {
-    Elf32_Word  n_namesz;  /* Name size */
-    Elf32_Word  n_descsz;  /* Content size */
-    Elf32_Word  n_type;    /* Content type */
+typedef const struct elf32_note {
+    Elf32_Word n_namesz;  /* Name size */
+    Elf32_Word n_descsz;  /* Content size */
+    Elf32_Word n_type;    /* Content type */
 } Elf32_Nhdr;
 
 /* Note header in a PT_NOTE section */
-typedef struct elf64_note {
+typedef const struct elf64_note {
     Elf64_Word n_namesz;  /* Name size */
     Elf64_Word n_descsz;  /* Content size */
     Elf64_Word n_type;    /* Content type */
@@ -484,5 +478,3 @@ typedef struct elf64_note {
 
 /* Bits for GNU_PROPERTY_AARCH64_FEATURE_1_BTI */
 #define GNU_PROPERTY_AARCH64_FEATURE_1_BTI  (1U << 0)
-
-#endif /* _UAPI_LINUX_ELF_H */
