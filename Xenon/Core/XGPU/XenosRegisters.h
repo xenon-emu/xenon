@@ -8,7 +8,9 @@
 #include "Base/Assert.h"
 
 // A major part of the registers were taken from:
-// https://github.com/xenia-canary/xenia-canary/blob/canary_experimental/src/xenia/gpu/register_table.inc
+// 1 -> https://github.com/xenia-canary/xenia-canary/blob/canary_experimental/src/xenia/gpu/register_table.inc
+// 2 -> https://github.com/freedreno/freedreno/blob/master/includes/a2xx.xml.h
+// 3 -> https://github.com/freedreno/amd-gpu/blob/master/include/reg/yamato/22/yamato_offset.h
 
 static const std::string GetRegisterNameById(u32 id) {
   static const std::unordered_map<u32, const std::string> registerMap = {
@@ -773,8 +775,18 @@ static const std::string GetRegisterNameById(u32 id) {
       {0x0F0D, "BC_PERFCOUNTER2_HI"},
       {0x0F0E, "BC_PERFCOUNTER3_LOW"},
       {0x0F0F, "BC_PERFCOUNTER3_HI"},
+      {0x0F10, "RB_ZPASS_SAMPLES"},
+      {0x0F11, "RB_ZFAIL_SAMPLES"},
+      {0x0F12, "RB_SFAIL_SAMPLES"},
+      {0x0F15, "BC_DUMMY_CRAYRB_ENUMS"},
+      {0x0F16, "BC_DUMMY_CRAYRB_MOREENUMS"},
       {0x0F26, "RB_DEBUG_CNTL"},
       {0x0F27, "RB_DEBUG_DATA"},
+      {0x0F28, "RB_DEBUG_0"},
+      {0x0F29, "RB_DEBUG_1"},
+      {0x0F2A, "RB_DEBUG_2"},
+      {0x0F2B, "RB_FLAG_CONTROL"},
+      {0x0F2C, "RB_BC_SPARES"},
       {0x1004, "HZ_PERFCOUNTER0_SELECT"},
       {0x1005, "HZ_PERFCOUNTER0_HI"},
       {0x1006, "HZ_PERFCOUNTER0_LOW"},
@@ -4267,8 +4279,20 @@ enum class XeRegister {
   BC_PERFCOUNTER3_LOW = 0x0F0E,
   BC_PERFCOUNTER3_HI = 0x0F0F,
 
+  RB_ZPASS_SAMPLES = 0x0F10,
+  RB_ZFAIL_SAMPLES = 0x0F11,
+  RB_SFAIL_SAMPLES = 0x0F12,
+
+  BC_DUMMY_CRAYRB_ENUMS = 0x0F15,
+  BC_DUMMY_CRAYRB_MOREENUMS = 0x0F16,
+
   RB_DEBUG_CNTL = 0x0F26,
   RB_DEBUG_DATA = 0x0F27,
+  RB_DEBUG_0 = 0x0F28,
+  RB_DEBUG_1 = 0x0F29,
+  RB_DEBUG_2 = 0x0F2A,
+  RB_FLAG_CONTROL = 0x0F2B,
+  RB_BC_SPARES = 0x0F2C,
 
   HZ_PERFCOUNTER0_SELECT = 0x1004,
   HZ_PERFCOUNTER0_HI = 0x1005,
