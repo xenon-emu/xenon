@@ -705,10 +705,10 @@ void PPCInterpreter::PPCInterpreter_negx(PPU_STATE *ppuState) {
   if (_instr.oe) { // Mode dependent.
     bool ovSet = false;
     if (curThread.SPR.MSR.SF) {
-      ovSet = RA == (1ull << 63);
+      ovSet = RA == (1ULL << 63);
     }
     else {
-      ovSet = static_cast<u32>(RA) == (1ull << 31);
+      ovSet = static_cast<u32>(RA) == (1ULL << 31);
     }
     ppuSetXerOv(ppuState, ovSet);
   }
@@ -1115,7 +1115,7 @@ void PPCInterpreter::PPCInterpreter_subfmex(PPU_STATE* ppuState)
 {
   const u64 RA = GPRi(ra);
 
-  const auto add = addResult<u64>(~RA, ~0ull, XER_GET_CA, 
+  const auto add = addResult<u64>(~RA, ~0ULL, XER_GET_CA, 
     curThread.SPR.MSR.SF);
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);

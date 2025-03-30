@@ -120,7 +120,7 @@ void Render::Renderer::Start() {
     LOG_ERROR(System, "Failed to initialize OpenGL Loader");
   }
   // Set VSYNC
-  SDL_GL_SetSwapInterval((int)VSYNC);
+  SDL_GL_SetSwapInterval(VSYNC);
   // Set if we are in fullscreen mode or not
   SDL_SetWindowFullscreen(mainWindow, fullscreen);
   // Get current window ID

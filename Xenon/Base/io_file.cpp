@@ -237,7 +237,7 @@ void IOFile::Unlink() {
   const int fd = fileno(file);
   HANDLE hfile = reinterpret_cast<HANDLE>(_get_osfhandle(fd));
 
-  disposition.DeleteFile = TRUE;
+  disposition.DeleteFile = true;
   NtSetInformationFile(hfile, &iosb, &disposition, sizeof(disposition),
                        FileDispositionInformation);
 #else

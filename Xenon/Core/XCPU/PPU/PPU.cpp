@@ -15,12 +15,12 @@
 #include "Core/XCPU/elf_abi.h"
 
 // Clocks per instruction / Ticks per instruction
-static constexpr f64 cpi_base_freq = 50000000ull; // 50Mhz
-static constexpr f64 cpi_scale = 1.00; // Scale of how many clocks to speed up in percentage of speed
+static constexpr f64 cpi_base_freq = 50000000ULL; // 50Mhz
+static constexpr f64 cpi_scale = 1.0f; // Scale of how many clocks to speed up in percentage of speed
 static constexpr u64 get_cpi_value(u64 instrPerSecond) {
   u64 tpi = 0;
   // Use floating point for a more percise CPI
-  f64 cpi_value = (instrPerSecond / 100000ull) / ((cpi_base_freq / 1000000ull) * cpi_scale);
+  const f64 cpi_value = (instrPerSecond / 100000ULL) / ((cpi_base_freq / 1000000ULL) * cpi_scale);
   tpi = static_cast<u64>(cpi_value);
   // Round up
   if ((cpi_value - static_cast<f64>(tpi)) >= 0.5 || tpi == 0)

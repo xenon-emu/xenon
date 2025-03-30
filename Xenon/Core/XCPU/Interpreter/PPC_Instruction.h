@@ -17,7 +17,7 @@
 #include "Core/XCPU/Interpreter/PPCOpcodes.h"
 
 constexpr u64 PPCRotateMask(u32 mb, u32 me) {
-  const u64 mask = ~0ull << (~(me - mb) & 63);
+  const u64 mask = ~0ULL << (~(me - mb) & 63);
   return (mask >> (mb & 63)) | (mask << ((64 - mb) & 63));
 }
 

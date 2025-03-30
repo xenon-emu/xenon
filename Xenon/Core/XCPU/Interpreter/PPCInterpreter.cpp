@@ -16,32 +16,32 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
   PPU_THREAD_REGISTERS& thread = curThread;
 
   // RGH 2 for CB_A 9188 in a JRunner XDKBuild.
-  if (thread.CIA == 0x000000000200C870) {
+  if (thread.CIA == 0x0200C870) {
     // GPR(5) = 0;
   }
 
   // RGH 2 for CB_A 9188 in a JRunner Normal Build.
-  if (thread.CIA == 0x000000000200C820) {
+  if (thread.CIA == 0x0200C820) {
     GPR(3) = 0;
   }
 
   // RGH 2 17489 in a JRunner Corona XDKBuild.
-  if (thread.CIA == 0x000000000200C7F0) {
+  if (thread.CIA == 0x0200C7F0) {
     GPR(3) = 0;
   }
 
   // 3BL Check Bypass Devkit 2.0.1838.1
-  if (thread.CIA == 0x0000000003004994) {
+  if (thread.CIA == 0x03004994) {
     // GPR(3) = 1;
   }
 
   // 4BL Check Bypass Devkit 2.0.1838.1
-  if (thread.CIA == 0x0000000003004BF0) {
+  if (thread.CIA == 0x03004BF0) {
     // GPR(3) = 1;
   }
 
   // 3BL Signature Check Bypass Devkit 2.0.2853.0
-  if (thread.CIA == 0x0000000003006488) {
+  if (thread.CIA == 0x03006488) {
     // GPR(3) = 0;
   }
 
