@@ -308,14 +308,12 @@ struct SLBEntry {
   u64 esidReg;
 };
 
-// Traslation lookaside buffer
+// Traslation lookaside buffer.
+// Holds a cache of the recently used PTE's.
 struct TLBEntry {
-  bool V;  // Entry valid.
-  u8 p;    // Page Size
-  u64 RPN; // Real page Number
-  u64 VPN; // Virtual Page Number
-  bool L;  // Large pages
-  bool LP; // Large page selector
+  bool V;   // Entry valid.
+  u64 pte0; // Holds the valid bit, as well as the AVPN. 
+  u64 pte1; // Contains the RPN.
 };
 struct TLB_Reg {
   TLBEntry tlbSet0[256];

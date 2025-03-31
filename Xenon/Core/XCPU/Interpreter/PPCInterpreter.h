@@ -123,10 +123,8 @@ void ppcExternalException(PPU_STATE *ppuState);
 bool MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState, bool memWrite, bool speculativeLoad = false);
 u8 mmuGetPageSize(PPU_STATE *ppuState, bool L, u8 LP);
 void mmuAddTlbEntry(PPU_STATE *ppuState);
-bool mmuSearchTlbEntry(PPU_STATE *ppuState, u64 *RPN, u64 VA, u64 VPN, u8 p,
-                       bool LP);
-void mmuReadString(PPU_STATE *ppuState, u64 stringAddress, char *string,
-                   u32 maxLenght);
+bool mmuSearchTlbEntry(PPU_STATE *ppuState, u64 *RPN, u64 VA, u8 p, bool L, bool LP);
+void mmuReadString(PPU_STATE *ppuState, u64 stringAddress, char *string, u32 maxLenght);
 
 // Security Engine Related
 SECENG_ADDRESS_INFO mmuGetSecEngInfoFromAddress(u64 inputAddress);

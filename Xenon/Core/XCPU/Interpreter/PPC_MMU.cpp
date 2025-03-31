@@ -87,6 +87,65 @@ struct PPC_HPTE64 {
   u64 pte1;
 };
 
+inline bool mmuComparePTE(u64 VA, u64 pte0, u64 pte1, u8 p, bool L, bool LP, u64 *RPN) {
+  // Requirements:
+  // PTE[H] = 0 for the primary PTEG, 1 for the secondary PTEG
+  // PTE[V] = 1
+  // PTE[AVPN][0:51] = VA[0:51]
+  // if p < 28, PTEAVPN[52:51 + q] = VA[52 : 51 + q]
+  // PTE[LP] = SLBE[LP] whenever PTE[L] = ‘1’.
+
+  // Valid
+  bool pteV = (pte0 & PPC_HPTE64_VALID);
+  // L
+  bool pteL = (pte0 & PPC_HPTE64_LARGE) >> 2;
+  // LP
+  bool pteLP = (pte1 & PPC_HPTE64_LP) >> 12;
+  // AVPN 0:51
+  u64 pteAVPN_0_51 = (pte0 & PPC_HPTE64_AVPN_0_51) << 16;
+  // q = minimum(5, 28-p).
+  u8 q = std::min(5, 28 - p);
+
+  if (!pteV) {
+    return false;
+  }
+
+  if (pteAVPN_0_51 != (VA & 0xFFFFFFFFF0000000)) {
+    return false;
+  }
+
+  if (L != pteL) {
+    return false;
+  }
+
+  if (L && pteLP != LP) {
+    return false;
+  }
+
+  // if p < 28, PTEAVPN[52:51 + q] = VA[52 : 51 + q]
+  if (p < 28) {
+    u64 pteAVPNMask = (PPCRotateMask(52, 51 + q) & pte0);
+    u64 vaMask = ((PPCRotateMask(36, 35 + q) & VA) >> 16);
+    if (pteAVPNMask == vaMask) {
+      // Match
+      if (L) {
+        // RPN is PTE[86:114].
+        *RPN = pte1 & PPC_HPTE64_RPN_LP;
+        return true;
+      } else {
+        // RPN is PTE[86:115].
+        *RPN = pte1 & PPC_HPTE64_RPN_NO_LP;
+        return true;
+      }
+    } else {
+      return false;
+    }
+  }  else {
+    LOG_ERROR(Xenon_MMU, "P > 28. Vali what did you messed up?");
+    return false;
+  }
+}
+
 void PPCInterpreter::PPCInterpreter_slbia(PPU_STATE *ppuState) {
   for (auto &slbEntry : curThread.SLB) {
     slbEntry.V = 0;
@@ -97,48 +156,45 @@ void PPCInterpreter::PPCInterpreter_slbia(PPU_STATE *ppuState) {
 }
 
 void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
-  // The PPU adds two new fields to this instruction, them being LP abd IS.
+  // The PPU adds two new fields to this instruction, them being LP and IS.
 
   bool LP = (GPRi(rb) & 0x1000) >> 12;
   bool invalSelector = (GPRi(rb) & 0x800) >> 11;
   u8 p = mmuGetPageSize(ppuState, _instr.l10, LP);
-  u64 VA, VPN = 0;
 
   if (invalSelector == 0) {
     // The TLB is as selective as possible when invalidating TLB entries.The
     // invalidation match criteria is VPN[38:79 - p], L, LP, and LPID.
 
-    VA = GPRi(rb);
-
-    if (VA > 0x7FFFFFFF) {
-      VPN = (VA >> 16) & ~0x7F;
-    } else if (VA > 0x20000000) {
-      if (p == 0x18)
-        VPN = (VA >> 16) & ~0xFF;
-      else
-        VPN = (VA >> 16) & ~0x7F;
-    } else {
-      VPN = (VA >> 16) & ~0xF;
-    }
+    u64 mask = PPCRotateMask(22, 63 - p);
+    u64 rbMasked = (mask & GPRi(rb)) >> p;
 
     for (auto &tlbEntry : ppuState->TLB.tlbSet0) {
-      if (tlbEntry.V && tlbEntry.VPN == VPN && tlbEntry.p == p) {
-        tlbEntry.V = 0;
+      if (tlbEntry.V && (tlbEntry.pte0 & PPC_HPTE64_AVPN) == rbMasked) {
+        tlbEntry.V = false;
+        tlbEntry.pte0 = 0;
+        tlbEntry.pte1 = 0;
       }
     }
     for (auto &tlbEntry : ppuState->TLB.tlbSet1) {
-      if (tlbEntry.V && tlbEntry.VPN == VPN && tlbEntry.p == p) {
-        tlbEntry.V = 0;
+      if (tlbEntry.V && (tlbEntry.pte0 & PPC_HPTE64_AVPN) == rbMasked) {
+        tlbEntry.V = false;
+        tlbEntry.pte0 = 0;
+        tlbEntry.pte1 = 0;
       }
     }
     for (auto &tlbEntry : ppuState->TLB.tlbSet2) {
-      if (tlbEntry.V && tlbEntry.VPN == VPN && tlbEntry.p == p) {
-        tlbEntry.V = 0;
+      if (tlbEntry.V && (tlbEntry.pte0 & PPC_HPTE64_AVPN) == rbMasked) {
+        tlbEntry.V = false;
+        tlbEntry.pte0 = 0;
+        tlbEntry.pte1 = 0;
       }
     }
     for (auto &tlbEntry : ppuState->TLB.tlbSet3) {
-      if (tlbEntry.V && tlbEntry.VPN == VPN && tlbEntry.p == p) {
-        tlbEntry.V = 0;
+      if (tlbEntry.V && (tlbEntry.pte0 & PPC_HPTE64_AVPN) == rbMasked) {
+        tlbEntry.V = false;
+        tlbEntry.pte0 = 0;
+        tlbEntry.pte1 = 0;
       }
     }
   } else {
@@ -148,32 +204,20 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
     u64 rb_44_51 = (GPRi(rb) & 0xFF000) >> 12;
 
     ppuState->TLB.tlbSet0[rb_44_51].V = false;
-    ppuState->TLB.tlbSet0[rb_44_51].VPN = 0;
-    ppuState->TLB.tlbSet0[rb_44_51].RPN = 0;
-    ppuState->TLB.tlbSet0[rb_44_51].L = false;
-    ppuState->TLB.tlbSet0[rb_44_51].LP = 0;
-    ppuState->TLB.tlbSet0[rb_44_51].p = 0;
+    ppuState->TLB.tlbSet0[rb_44_51].pte0 = 0;
+    ppuState->TLB.tlbSet0[rb_44_51].pte1 = 0;
 
     ppuState->TLB.tlbSet1[rb_44_51].V = false;
-    ppuState->TLB.tlbSet1[rb_44_51].VPN = 0;
-    ppuState->TLB.tlbSet1[rb_44_51].RPN = 0;
-    ppuState->TLB.tlbSet1[rb_44_51].L = false;
-    ppuState->TLB.tlbSet1[rb_44_51].LP = 0;
-    ppuState->TLB.tlbSet1[rb_44_51].p = 0;
+    ppuState->TLB.tlbSet1[rb_44_51].pte0 = 0;
+    ppuState->TLB.tlbSet1[rb_44_51].pte1 = 0;
 
     ppuState->TLB.tlbSet2[rb_44_51].V = false;
-    ppuState->TLB.tlbSet2[rb_44_51].VPN = 0;
-    ppuState->TLB.tlbSet2[rb_44_51].RPN = 0;
-    ppuState->TLB.tlbSet2[rb_44_51].L = false;
-    ppuState->TLB.tlbSet2[rb_44_51].LP = 0;
-    ppuState->TLB.tlbSet2[rb_44_51].p = 0;
+    ppuState->TLB.tlbSet2[rb_44_51].pte0 = 0;
+    ppuState->TLB.tlbSet2[rb_44_51].pte1 = 0;
 
     ppuState->TLB.tlbSet3[rb_44_51].V = false;
-    ppuState->TLB.tlbSet3[rb_44_51].VPN = 0;
-    ppuState->TLB.tlbSet3[rb_44_51].RPN = 0;
-    ppuState->TLB.tlbSet3[rb_44_51].L = false;
-    ppuState->TLB.tlbSet3[rb_44_51].LP = 0;
-    ppuState->TLB.tlbSet3[rb_44_51].p = 0;
+    ppuState->TLB.tlbSet3[rb_44_51].pte0 = 0;
+    ppuState->TLB.tlbSet3[rb_44_51].pte1 = 0;
   }
 
   // Should only invalidate entries for a specific set of addresses.
@@ -258,120 +302,48 @@ u8 PPCInterpreter::mmuGetPageSize(PPU_STATE *ppuState, bool L, u8 LP) {
 
 // This is done when TLB Reload is in software-controlled mode.
 void PPCInterpreter::mmuAddTlbEntry(PPU_STATE *ppuState) {
-#define PPE_TLB_INDEX_LVPN_MASK 0xE00000000000
+  // In said mode, software makes use of special registers of the CPU to directly reload the TLB
+  // with PTE's, thus eliminating the need of a hardware page table and tablewalk.
+
 #define MMU_GET_TLB_INDEX_TI(x) (static_cast<u16>((x & 0xFF0) >> 4))
 #define MMU_GET_TLB_INDEX_TS(x) (static_cast<u16>(x & 0xF))
 
-#define PPE_TLB_VPN_V_MASK 0x1
-#define PPE_TLB_VPN_L_MASK 0x4
-#define PPE_TLB_VPN_AVPN_MASK 0x1FFFFFFFFFF80
-#define PPE_TLB_VPN_AVPN_16MB_MASK 0x1FFFFFFFFFF00
-
-#define PPE_TLB_RPN_ARPN_MASK 0x3FFFFFFE000
-#define PPE_TLB_RPN_ARPN_AND_LP_MASK 0x3FFFFFFF000
-#define PPE_TLB_RPN_LP_MASK 0x1000
-
-  u64 tlbIndex = ppuState->SPR.PPE_TLB_Index;
-  u64 tlbVpn = ppuState->SPR.PPE_TLB_VPN;
-  u64 tlbRpn = ppuState->SPR.PPE_TLB_RPN;
-
-  // Valid entry.
-  bool vpnValid = tlbVpn & PPE_TLB_VPN_V_MASK;
-  // Large pages.
-  bool L = (tlbVpn & PPE_TLB_VPN_L_MASK) >> 2;
-  // Large pages selector
-  u32 LP = (tlbRpn & PPE_TLB_RPN_LP_MASK) >> 12;
-
-  // Get Page Size
-  u8 p = mmuGetPageSize(ppuState, L, LP);
-
-  // AVPN
-  u64 AVPN = 0;
-
-  // VPN = AVPN concatenated with LVPN
-  // The AVPN corresponds to VPN[15:56].
-  // When reading a 16 MB TLB entry, bit [56] of the AVPN is undefined.
-  if (p == MMU_PAGE_SIZE_16MB) // 16 Mb entry
-  {
-    AVPN = tlbVpn & PPE_TLB_VPN_AVPN_16MB_MASK;
-  } else {
-    AVPN = tlbVpn & PPE_TLB_VPN_AVPN_MASK;
-  }
-
-  u64 ARPN = 0;
-
-  if (L) {
-    ARPN = tlbRpn & PPE_TLB_RPN_ARPN_MASK;
-  } else {
-    ARPN = tlbRpn & PPE_TLB_RPN_ARPN_AND_LP_MASK;
-  }
-
-  // LVPN[0:2] corresponds to VPN[57:59].
-  u64 LVPN = (tlbIndex & PPE_TLB_INDEX_LVPN_MASK) >> 41;
-
-  // Virtual page number
-  u64 VPN = AVPN | LVPN;
-
-  // Real Page Number
-  // The ARPN corresponds to RPN[22:50].
-  // To obtain the full 30 - bit RPN, the ARPN is combined with the LP field.
-  // We already did that.
-  u64 RPN = ARPN;
+  const u64 tlbIndex = ppuState->SPR.PPE_TLB_Index;
+  const u64 tlbVpn = ppuState->SPR.PPE_TLB_VPN;
+  const u64 tlbRpn = ppuState->SPR.PPE_TLB_RPN;
 
   // Tlb Index (0 - 255) of current tlb set.
   u16 TI = MMU_GET_TLB_INDEX_TI(tlbIndex);
   u16 TS = MMU_GET_TLB_INDEX_TS(tlbIndex);
-
-  // std::cout << "XCPU[" << ppuState->ppuName << "(Thrd"<< curThreadId
-  //     << ")](MMU) : Adding tlb entry : (" << TI * TS << ")" << std::endl;
-  // std::cout << " *** RPN:         0x" << RPN << std::endl;
-  // std::cout << " *** VPN:         0x" << VPN << std::endl;
-  // std::cout << "  *  TLB Set:     " << std::dec << TS << std::endl;
-  // std::cout << "  *  TLB Index:   " << std::hex << TI << std::endl;
-  // std::cout << "  *  p Size:      " << (static_cast<u16>(p) << std::endl;
-  // std::cout << std::hex << std::endl;
 
   // TLB set to choose from
   // There are 4 sets of 256 entries each:
   switch (TS) {
   case 0b1000:
     ppuState->TLB.tlbSet0[TI].V = true;
-    ppuState->TLB.tlbSet0[TI].RPN = RPN;
-    ppuState->TLB.tlbSet0[TI].VPN = VPN;
-    ppuState->TLB.tlbSet0[TI].p = p;
-    ppuState->TLB.tlbSet0[TI].L = L;
-    ppuState->TLB.tlbSet0[TI].LP = LP;
+    ppuState->TLB.tlbSet0[TI].pte0 = tlbVpn;
+    ppuState->TLB.tlbSet0[TI].pte1 = tlbRpn;
     break;
   case 0b0100:
     ppuState->TLB.tlbSet1[TI].V = true;
-    ppuState->TLB.tlbSet1[TI].RPN = RPN;
-    ppuState->TLB.tlbSet1[TI].VPN = VPN;
-    ppuState->TLB.tlbSet1[TI].p = p;
-    ppuState->TLB.tlbSet1[TI].L = L;
-    ppuState->TLB.tlbSet1[TI].LP = LP;
+    ppuState->TLB.tlbSet1[TI].pte0 = tlbVpn;
+    ppuState->TLB.tlbSet1[TI].pte1 = tlbRpn;
     break;
   case 0b0010:
     ppuState->TLB.tlbSet2[TI].V = true;
-    ppuState->TLB.tlbSet2[TI].RPN = RPN;
-    ppuState->TLB.tlbSet2[TI].VPN = VPN;
-    ppuState->TLB.tlbSet2[TI].p = p;
-    ppuState->TLB.tlbSet2[TI].L = L;
-    ppuState->TLB.tlbSet2[TI].LP = LP;
+    ppuState->TLB.tlbSet2[TI].pte0 = tlbVpn;
+    ppuState->TLB.tlbSet2[TI].pte1 = tlbRpn;
     break;
   case 0b0001:
     ppuState->TLB.tlbSet3[TI].V = true;
-    ppuState->TLB.tlbSet3[TI].RPN = RPN;
-    ppuState->TLB.tlbSet3[TI].VPN = VPN;
-    ppuState->TLB.tlbSet3[TI].p = p;
-    ppuState->TLB.tlbSet3[TI].L = L;
-    ppuState->TLB.tlbSet3[TI].LP = LP;
+    ppuState->TLB.tlbSet3[TI].pte0 = tlbVpn;
+    ppuState->TLB.tlbSet3[TI].pte1 = tlbRpn;
     break;
   }
 }
 
 // Translation Lookaside Buffer Search
-bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *ppuState, u64 *RPN, u64 VA,
-                                       u64 VPN, u8 p, bool LP) {
+bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *ppuState, u64 *RPN, u64 VA, u8 p, bool L, bool LP) {
   // Index to choose from the 256 ways of the TLB
   u16 tlbIndex = 0;
   // Tlb Set that was least Recently used for replacement.
@@ -411,89 +383,36 @@ bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *ppuState, u64 *RPN, u64 VA,
     break;
   }
 
+  //
+  // Compare each valid entry at specified index in the TLB with the VA.
+  //
   if (ppuState->TLB.tlbSet0[tlbIndex].V) {
-    if (static_cast<u16>(ppuState->TLB.tlbSet0[tlbIndex].VPN) == static_cast<u16>(VPN)) {
-      // Check to see if its this entry!
-      // Need to have a tag
-      if (ppuState->TLB.tlbSet0[tlbIndex].p == p) {
-        if (ppuState->TLB.tlbSet0[tlbIndex].L) {
-          if (ppuState->TLB.tlbSet0[tlbIndex].LP == LP) {
-            // Probably It!
-            *RPN = ppuState->TLB.tlbSet0[tlbIndex].RPN;
-            return true;
-          }
-        } else {
-          // Probably It!
-          *RPN = ppuState->TLB.tlbSet0[tlbIndex].RPN;
-          return true;
-        }
-      }
+    if (mmuComparePTE(VA, ppuState->TLB.tlbSet0[tlbIndex].pte0, ppuState->TLB.tlbSet0[tlbIndex].pte1, p, L, LP, RPN)) {
+      return true;
     }
   } else {
     // Entry was invalid, make this set the a candidate for refill.
     tlbSet = 0b1000;
   }
   if (ppuState->TLB.tlbSet1[tlbIndex].V) {
-    if (static_cast<u16>(ppuState->TLB.tlbSet1[tlbIndex].VPN) == static_cast<u16>(VPN)) {
-      // Check to see if its this entry!
-      // Need to have a tag
-      if (ppuState->TLB.tlbSet1[tlbIndex].p == p) {
-        if (ppuState->TLB.tlbSet1[tlbIndex].L) {
-          if (ppuState->TLB.tlbSet1[tlbIndex].LP == LP) {
-            // Probably It!
-            *RPN = ppuState->TLB.tlbSet1[tlbIndex].RPN;
-            return true;
-          }
-        } else {
-          // Probably It!
-          *RPN = ppuState->TLB.tlbSet1[tlbIndex].RPN;
-          return true;
-        }
-      }
+    if (mmuComparePTE(VA, ppuState->TLB.tlbSet1[tlbIndex].pte0, ppuState->TLB.tlbSet1[tlbIndex].pte1, p, L, LP, RPN)) {
+      return true;
     }
   } else {
     // Entry was invalid, make this set the a candidate for refill.
     tlbSet = 0b0100;
   }
   if (ppuState->TLB.tlbSet2[tlbIndex].V) {
-    if (static_cast<u16>(ppuState->TLB.tlbSet2[tlbIndex].VPN) == static_cast<u16>(VPN)) {
-      // Check to see if its this entry!
-      // Need to have a tag
-      if (ppuState->TLB.tlbSet2[tlbIndex].p == p) {
-        if (ppuState->TLB.tlbSet2[tlbIndex].L) {
-          if (ppuState->TLB.tlbSet2[tlbIndex].LP == LP) {
-            // Probably It!
-            *RPN = ppuState->TLB.tlbSet2[tlbIndex].RPN;
-            return true;
-          }
-        } else {
-          // Probably It!
-          *RPN = ppuState->TLB.tlbSet2[tlbIndex].RPN;
-          return true;
-        }
-      }
+    if (mmuComparePTE(VA, ppuState->TLB.tlbSet2[tlbIndex].pte0, ppuState->TLB.tlbSet2[tlbIndex].pte1, p, L, LP, RPN)) {
+      return true;
     }
   } else {
     // Entry was invalid, make this set the a candidate for refill.
     tlbSet = 0b0010;
   }
   if (ppuState->TLB.tlbSet3[tlbIndex].V) {
-    if (static_cast<u16>(ppuState->TLB.tlbSet3[tlbIndex].VPN) == static_cast<u16>(VPN)) {
-      // Check to see if its this entry!
-      // Need to have a tag
-      if (ppuState->TLB.tlbSet3[tlbIndex].p == p) {
-        if (ppuState->TLB.tlbSet3[tlbIndex].L) {
-          if (ppuState->TLB.tlbSet3[tlbIndex].LP == LP) {
-            // Probably It!
-            *RPN = ppuState->TLB.tlbSet3[tlbIndex].RPN;
-            return true;
-          }
-        } else {
-          // Probably It!
-          *RPN = ppuState->TLB.tlbSet3[tlbIndex].RPN;
-          return true;
-        }
-      }
+    if (mmuComparePTE(VA, ppuState->TLB.tlbSet3[tlbIndex].pte0, ppuState->TLB.tlbSet3[tlbIndex].pte1, p, L, LP, RPN)) {
+      return true;
     }
   } else {
     // Entry was invalid, make this set the a candidate for refill.
@@ -510,26 +429,26 @@ bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *ppuState, u64 *RPN, u64 VA,
   bool tlbSoftwareManaged = ((ppuState->SPR.LPCR & 0x400) >> 10);
 
   if (tlbSoftwareManaged) {
-    u64 tlbIndexHint =
-        curThread.SPR.PPE_TLB_Index_Hint;
-    u8 currentTlbSet = tlbIndexHint & 0xF;
-    u8 currentTlbIndex = static_cast<u8>(tlbIndexHint & 0xFF0) >> 4;
-    currentTlbSet = tlbSet;
-    if (currentTlbIndex == 0xFF) {
-      if (currentTlbSet == 8) {
-        currentTlbSet = 1;
-      } else {
-        currentTlbSet = currentTlbSet << 1;
-      }
-    }
-
-    if (currentTlbSet == 0)
+  u64 tlbIndexHint =
+    curThread.SPR.PPE_TLB_Index_Hint;
+  u8 currentTlbSet = tlbIndexHint & 0xF;
+  u8 currentTlbIndex = static_cast<u8>(tlbIndexHint & 0xFF0) >> 4;
+  currentTlbSet = tlbSet;
+  if (currentTlbIndex == 0xFF) {
+    if (currentTlbSet == 8) {
       currentTlbSet = 1;
+    } else {
+      currentTlbSet = currentTlbSet << 1;
+    }
+  }
 
-    tlbIndex = tlbIndex << 4;
-    tlbIndexHint = tlbIndex |= currentTlbSet;
-    curThread.SPR.PPE_TLB_Index_Hint =
-        tlbIndexHint;
+  if (currentTlbSet == 0)
+    currentTlbSet = 1;
+
+  tlbIndex = tlbIndex << 4;
+  tlbIndexHint = tlbIndex |= currentTlbSet;
+  curThread.SPR.PPE_TLB_Index_Hint =
+    tlbIndexHint;
   }
   return false;
 }
@@ -783,8 +702,6 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
       }
     }
 
-    // Virtual Page Number
-    u64 VPN = 0;
     // Real Page Number
     u64 RPN = 0;
     // Page
@@ -794,6 +711,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 
     // We hit the SLB, get the VA
     if (slbHit) {
+
       //
       // Virtual Addresss Generation
       //
@@ -807,40 +725,27 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
       // Page Offset.
       u64 PAGE = (QGET(*EA, 36, 63 - p) << p);
 
-      if (VA > 0x7FFFFFFF) {
-        VPN = (VA >> 16) & ~0x7F;
-      } else if (VA > 0x20000000) {
-        if (p == 0x18)
-          VPN = (VA >> 16) & ~0xFF;
-        else
-          VPN = (VA >> 16) & ~0x7F;
-      } else {
-        VPN = (VA >> 16) & ~0xF;
-      }
-
-      if (mmuSearchTlbEntry(ppuState, &RPN, VA, VPN, p, LP)) {
+      // Search the tlb for an entry.
+      if (mmuSearchTlbEntry(ppuState, &RPN, VA, p, L, LP)) {
         // TLB Hit, proceed.
         goto end;
       } else {
         // TLB miss, if we are in software managed mode, generate an
         // interrupt, else do page table search.
         if (tlbSoftwareManaged) {
-          bool hv = curThread.SPR.MSR.HV;
-          bool sfMode = curThread.SPR.MSR.SF;
-          u64 CIA = curThread.CIA;
-
           if (curThread.iFetch) {
             _ex |= PPU_EX_INSSTOR;
           } else {
             _ex |= PPU_EX_DATASTOR;
             curThread.SPR.DAR = *EA;
-            curThread.SPR.DSISR =
-                DSISR_NOPTE;
+            curThread.SPR.DSISR = DSISR_NOPTE;
           }
           return false;
         } else {
           // Page Table Lookup:
           // Walk the Page table to find a Page that translates our current VA.
+
+          // TODO(bitsh1ft3r): Add TLB Reloading code.
 
           // Save MSR DR & IR Bits. When an exception occurs they must be reset
           // to whatever they where.
@@ -913,37 +818,12 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
               continue;
             }
 
-            // V?
-            if ((pteg0[i].pte0 & PPC_HPTE64_VALID) != true) {
+            // Perform the compare.
+            if (!mmuComparePTE(VA, pteg0[i].pte0, pteg0[i].pte1, p, L, LP, &RPN)) {
               continue;
             }
 
-            u64 pteAVPN = pteg0[i].pte0 & PPC_HPTE64_AVPN;
-
-            // PTE:AVPN[0:51] = VA[0:51]?
-            if (((pteAVPN & PPC_HPTE64_AVPN_0_51) >> 12) != (VA >> 28)) {
-              continue;
-            }
-
-            /*
-                The PPE also requires that PTE[LP] = SLBE[LP] whenever PTE[L] =
-               '1'. In other words, the PTE page size must match the SLBE page
-               size exactly for a page-table match to occur.
-            */
-
-            // L?
-            if (static_cast<u8>((pteg0[i].pte0 & PPC_HPTE64_LARGE) >> 2) != static_cast<u8>(L)) {
-              continue;
-            }
-
-            // L & LP?
-            if (L && (((pteg0[i].pte1 & PPC_HPTE64_LP) >> 12) != LP)) {
-              continue;
-            }
-
-            // Match found. Extract the RPN from the page table.
-
-            // Set relocation back to whatever it was.
+            // Match found. Set relocation back to whatever it was.
             curThread.SPR.MSR.DR = msrDR;
             curThread.SPR.MSR.IR = msrIR;
 
@@ -960,14 +840,6 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
                 MMUWrite64(ppuState, pteg0Addr + i * 16 + 8,
                            (pteg0[i].pte1 | 0x80));
               }
-            }
-
-            if (L) {
-              // RPN is PTE[86:114].
-              RPN = pteg0[i].pte1 & PPC_HPTE64_RPN_LP;
-            } else {
-              // RPN is PTE[86:115].
-              RPN = pteg0[i].pte1 & PPC_HPTE64_RPN_NO_LP;
             }
 
             goto end;
@@ -999,37 +871,12 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
               continue;
             }
 
-            // V?
-            if ((pteg1[i].pte0 & PPC_HPTE64_VALID) != true) {
+            // Perform the compare.
+            if (!mmuComparePTE(VA, pteg0[i].pte0, pteg0[i].pte1, p, L, LP, &RPN)) {
               continue;
             }
 
-            u64 pteAVPN = pteg1[i].pte0 & PPC_HPTE64_AVPN;
-
-            // PTE:AVPN[0:51] = VA[0:51]?
-            if (((pteAVPN & PPC_HPTE64_AVPN_0_51) >> 12) != (VA >> 28)) {
-              continue;
-            }
-
-            /*
-                The PPE also requires that PTE[LP] = SLBE[LP] whenever PTE[L] =
-               '1'. In other words, the PTE page size must match the SLBE page
-               size exactly for a page-table match to occur.
-            */
-
-            // L?
-            if (static_cast<u8>((pteg1[i].pte0 & PPC_HPTE64_LARGE) >> 2) != static_cast<u8>(L)) {
-              continue;
-            }
-
-            // L & LP?
-            if (L && static_cast<u8>((pteg1[i].pte1 & PPC_HPTE64_LP) >> 12) != LP) {
-              continue;
-            }
-
-            // Match found. Extract the RPN from the page table.
-
-            // Set relocation back to whatever it was.
+            // Match found. Set relocation back to whatever it was.
             curThread.SPR.MSR.DR = msrDR;
             curThread.SPR.MSR.IR = msrIR;
 

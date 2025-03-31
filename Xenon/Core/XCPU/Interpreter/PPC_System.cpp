@@ -138,6 +138,10 @@ void PPCInterpreter::PPCInterpreter_rfid(PPU_STATE *ppuState) {
   curThread.SPR.MSR.MSR_Hex = new_msr;
   curThread.NIA = curThread.SPR.SRR0 & ~3;
 
+  // Check for 32-bit mode of operation.
+  if (!curThread.SPR.MSR.SF)
+    curThread.NIA = static_cast<u32>(curThread.NIA);
+
   // Clear exception taken flag.
   curThread.exceptionTaken = false;
 }
@@ -429,6 +433,10 @@ void PPCInterpreter::PPCInterpreter_mtmsr(PPU_STATE *ppuState) {
   X_FORM_rS;
 
   curThread.SPR.MSR.MSR_Hex = GPR(rS);
+
+  // Check for 32-bit mode of operation.
+  if (!curThread.SPR.MSR.SF)
+    curThread.NIA = static_cast<u32>(curThread.NIA);
 }
 
 void PPCInterpreter::PPCInterpreter_mtmsrd(PPU_STATE *ppuState) {
@@ -468,6 +476,10 @@ void PPCInterpreter::PPCInterpreter_mtmsrd(PPU_STATE *ppuState) {
     // MSR59 = (RS)59 | (RS)49
     curThread.SPR.MSR.DR = (regRS & 0x10) || (regRS & 0x4000) ? 1 : 0;
   }
+
+  // Check for 32-bit mode of operation.
+  if (!curThread.SPR.MSR.SF)
+    curThread.NIA = static_cast<u32>(curThread.NIA);
 }
 
 void PPCInterpreter::PPCInterpreter_sync(PPU_STATE *ppuState) {

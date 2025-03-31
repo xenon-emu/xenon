@@ -480,11 +480,8 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
           TLBEntry& TLBEntry = TLB.tlbSet0[i];
           gui->Node(fmt::format("[{}]", i), [&] {
             gui->Bool(TLBEntry, V);
-            gui->U8Hex(TLBEntry, p);
-            gui->Hex(TLBEntry, RPN);
-            gui->Hex(TLBEntry, VPN);
-            gui->Bool(TLBEntry, L);
-            gui->Bool(TLBEntry, LP);
+            gui->Hex(TLBEntry, pte0);
+            gui->Hex(TLBEntry, pte1);
           });
         }
       });
@@ -493,11 +490,8 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
           TLBEntry& TLBEntry = TLB.tlbSet1[i];
           gui->Node(fmt::format("[{}]", i), [&] {
             gui->Bool(TLBEntry, V);
-            gui->U8Hex(TLBEntry, p);
-            gui->Hex(TLBEntry, RPN);
-            gui->Hex(TLBEntry, VPN);
-            gui->Bool(TLBEntry, L);
-            gui->Bool(TLBEntry, LP);
+            gui->Hex(TLBEntry, pte0);
+            gui->Hex(TLBEntry, pte1);
           });
         }
       });
@@ -506,11 +500,8 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
           TLBEntry& TLBEntry = TLB.tlbSet2[i];
           gui->Node(fmt::format("[{}]", i), [&] {
             gui->Bool(TLBEntry, V);
-            gui->U8Hex(TLBEntry, p);
-            gui->Hex(TLBEntry, RPN);
-            gui->Hex(TLBEntry, VPN);
-            gui->Bool(TLBEntry, L);
-            gui->Bool(TLBEntry, LP);
+            gui->Hex(TLBEntry, pte0);
+            gui->Hex(TLBEntry, pte1);
           });
         }
       });
@@ -519,11 +510,8 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
           TLBEntry& TLBEntry = TLB.tlbSet3[i];
           gui->Node(fmt::format("[{}]", i), [&] {
             gui->Bool(TLBEntry, V);
-            gui->U8Hex(TLBEntry, p);
-            gui->Hex(TLBEntry, RPN);
-            gui->Hex(TLBEntry, VPN);
-            gui->Bool(TLBEntry, L);
-            gui->Bool(TLBEntry, LP);
+            gui->Hex(TLBEntry, pte0);
+            gui->Hex(TLBEntry, pte1);
           });
         }
       });
