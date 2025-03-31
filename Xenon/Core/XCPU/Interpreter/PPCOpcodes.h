@@ -19,7 +19,6 @@ extern void PPCInterpreter_known_unimplemented(const char* name, PPU_STATE *ppuS
 
 D_STUBRC(divduo)
 D_STUBRC(divdo)
-D_STUBRC(mulhd)
 D_STUBRC(mulldo)
 D_STUBRC(mcrfs)
 D_STUBRC(mtfsb1)
@@ -321,6 +320,7 @@ extern void PPCInterpreter_mullwx(PPU_STATE *ppuState);
 extern void PPCInterpreter_mullwox(PPU_STATE *ppuState);
 extern void PPCInterpreter_mulhwx(PPU_STATE *ppuState);
 extern void PPCInterpreter_mulhwux(PPU_STATE *ppuState);
+extern void PPCInterpreter_mulhdx(PPU_STATE *ppuState);
 extern void PPCInterpreter_mulhdux(PPU_STATE *ppuState);
 extern void PPCInterpreter_nandx(PPU_STATE *ppuState);
 extern void PPCInterpreter_negx(PPU_STATE *ppuState);

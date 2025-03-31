@@ -24,6 +24,9 @@ extern XENON_CONTEXT *intXCPUContext;
 #define _ex           curThread.exceptReg
 #define GPR(x)        curThread.GPR[x]
 #define GPRi(x)       GPR(_instr.x)
+#define CRBi(x)       curThread.CRBits[_instr.x]
+#define CRF(x)        curThread.CRBits.fields[x]
+#define CRFi(x)        curThread.CRBits.fields[_instr.x]
 #define XER_SET_CA(v) curThread.SPR.XER.CA = v
 #define XER_GET_CA    curThread.SPR.XER.CA
 //
@@ -53,45 +56,19 @@ void ppcDebugUnloadImageSymbols(PPU_STATE *ppuState, u64 moduleNameAddress,
 // Condition Register
 //
 
-#define CR_CASE(x) case x: curThread.CR.CR##x = crValue; break
 // Write values to CR field.
-inline void ppuSetCR(PPU_STATE* ppuState, u32 crField, bool le, bool gt, bool eq, bool so)
-{
-  u32 crValue = 0;
-  le ? BSET(crValue, 4, CR_BIT_LT) : BCLR(crValue, 4, CR_BIT_LT);
-  gt ? BSET(crValue, 4, CR_BIT_GT) : BCLR(crValue, 4, CR_BIT_GT);
-  eq ? BSET(crValue, 4, CR_BIT_EQ) : BCLR(crValue, 4, CR_BIT_EQ);
-  so ? BSET(crValue, 4, CR_BIT_SO) : BCLR(crValue, 4, CR_BIT_SO);
-
-  switch (crField) {
-    CR_CASE(0);
-    CR_CASE(1);
-    CR_CASE(2);
-    CR_CASE(3);
-    CR_CASE(4);
-    CR_CASE(5);
-    CR_CASE(6);
-    CR_CASE(7);
-  }
+inline void ppuSetCR(PPU_STATE* ppuState, u32 crField, bool le, bool gt, bool eq, bool so) {
+  curThread.CRBits[crField * 4 + 0] = le;
+  curThread.CRBits[crField * 4 + 1] = gt;
+  curThread.CRBits[crField * 4 + 2] = eq;
+  curThread.CRBits[crField * 4 + 3] = so;
 }
 
 // Perform a comparison and write results to the specified CR field.
 template<typename T>
-inline void ppuSetCR(PPU_STATE* ppuState, u32 crField, const T& a, const T& b)
-{
+inline void ppuSetCR(PPU_STATE* ppuState, u32 crField, const T& a, const T& b) {
   ppuSetCR(ppuState, crField, a < b, a > b, a == b, curThread.SPR.XER.SO);
 }
-
-// Compare Unsigned
-u32 CRCompU(PPU_STATE *ppuState, u64 num1, u64 num2);
-// Compare Signed 32 bits
-u32 CRCompS32(PPU_STATE *ppuState, u32 num1, u32 num2);
-// Compare Signed 64 bits
-u32 CRCompS64(PPU_STATE *ppuState, u64 num1, u64 num2);
-// Compare Unsigned
-u32 CRCompS(PPU_STATE *ppuState, u64 num1, u64 num2);
-// Condition register Update
-void ppcUpdateCR(PPU_STATE *ppuState, s8 crNum, u32 crValue);
 
 // Single instruction execution
 void ppcExecuteSingleInstruction(PPU_STATE *ppuState);

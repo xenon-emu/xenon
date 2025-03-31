@@ -290,7 +290,7 @@ void PPCInterpreter::PPCInterpreter_stwcx(PPU_STATE *ppuState) {
         RA = mmuContructEndAddressFromSecEngAddr(RA, &soc);
         sysBus->Write(RA, (u8*)&data, 4);
         intXCPUContext->xenonRes.Check(RA);
-        BSET(CR, 4, CR_BIT_EQ);
+        ppuSetCR(ppuState, 0, 0, 0, 1, curThread.SPR.XER.SO);
       } else {
         intXCPUContext->xenonRes.Decrement();
         curThread.ppuRes->V = false;
@@ -298,8 +298,6 @@ void PPCInterpreter::PPCInterpreter_stwcx(PPU_STATE *ppuState) {
     }
     intXCPUContext->xenonRes.ReleaseLock();
   }
-
-  ppcUpdateCR(ppuState, 0, CR);
 }
 
 // Store Word with Update (x'9400 0000')
@@ -402,7 +400,7 @@ void PPCInterpreter::PPCInterpreter_stdcx(PPU_STATE *ppuState) {
         bool soc = false;
         RA = mmuContructEndAddressFromSecEngAddr(RA, &soc);
         sysBus->Write(RA, (u8*)&data, 8);
-        BSET(CR, 4, CR_BIT_EQ);
+        ppuSetCR(ppuState, 0, 0, 0, 1, curThread.SPR.XER.SO);
       } else {
         intXCPUContext->xenonRes.Decrement();
         curThread.ppuRes->V = false;
@@ -410,8 +408,6 @@ void PPCInterpreter::PPCInterpreter_stdcx(PPU_STATE *ppuState) {
     }
     intXCPUContext->xenonRes.ReleaseLock();
   }
-
-  ppcUpdateCR(ppuState, 0, CR);
 }
 
 // Store Double Word with Update (x'F800 0001')
