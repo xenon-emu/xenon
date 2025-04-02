@@ -31,13 +31,13 @@ Xe::Xenos::XGPU::XGPU(RAM *ram) {
 
   // Set Clocks speeds.
   u32 reg = 0x09000000;
-  memcpy(&xenosState.Regs[REG_GPU_CLK], &reg, 4);
+  memcpy(&xenosState.Regs[(u32)XeRegister::SPLL_CNTL_REG * 4], &reg, 4);
   reg = 0x11000C00;
-  memcpy(&xenosState.Regs[REG_EDRAM_CLK], &reg, 4);
+  memcpy(&xenosState.Regs[(u32)XeRegister::RPLL_CNTL_REG * 4], &reg, 4);
   reg = 0x1A000001;
-  memcpy(&xenosState.Regs[REG_FSB_CLK], &reg, 4);
+  memcpy(&xenosState.Regs[(u32)XeRegister::FPLL_CNTL_REG * 4], &reg, 4);
   reg = 0x19100000;
-  memcpy(&xenosState.Regs[REG_MEM_CLK], &reg, 4);
+  memcpy(&xenosState.Regs[(u32)XeRegister::MPLL_CNTL_REG * 4], &reg, 4);
 }
 
 Xe::Xenos::XGPU::~XGPU() {
