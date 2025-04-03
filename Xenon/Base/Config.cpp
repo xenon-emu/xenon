@@ -211,14 +211,14 @@ void _xcpu::to_toml(toml::value &value) {
   value["HW_INIT_SKIP1"].comments().clear();
   value["HW_INIT_SKIP1"] = HW_INIT_SKIP_1;
   value["HW_INIT_SKIP1"].comments().push_back("# Hardware Init Skip address 1");
-  value["HW_INIT_SKIP1"].comments().push_back("# Possible HW1 Addresses:");
-  value["HW_INIT_SKIP1"].comments().push_back("# Corona: 0x3003DC0");
+  value["HW_INIT_SKIP1"].comments().push_back("# RGH3 Trinity: 0x3003F48");
+  value["HW_INIT_SKIP1"].comments().push_back("# RGH3 Corona:  0x3003DC0");
 
   value["HW_INIT_SKIP2"].comments().clear();
   value["HW_INIT_SKIP2"] = HW_INIT_SKIP_2;
   value["HW_INIT_SKIP2"].comments().push_back("# Hardware Init Skip address 2");
-  value["HW_INIT_SKIP2"].comments().push_back("# Possible HW2 Addresses:");
-  value["HW_INIT_SKIP2"].comments().push_back("# Corona: 0x3003E54");
+  value["HW_INIT_SKIP2"].comments().push_back("# RGH3 Trinity: 0x3003FDC");
+  value["HW_INIT_SKIP2"].comments().push_back("# RGH3 Corona:  0x3003E54");
 }
 bool _xcpu::verify_toml(toml::value &value) {
   to_toml(value);
