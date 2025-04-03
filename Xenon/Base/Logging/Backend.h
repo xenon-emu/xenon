@@ -11,7 +11,7 @@ namespace Base::Log {
 class Filter;
 
 /// Cleans up logs from previous days, and any logs within the desired limit
-void CleanupOldLogs(const std::string_view &log_file_base, const std::filesystem::path &log_dir, u64 log_limit = 100);
+void CleanupOldLogs(const std::string_view &log_file_base, const std::filesystem::path &log_dir, u64 log_limit = 50);
 
 /// Initializes the logging system
 void Initialize(const std::string_view &log_file = {});

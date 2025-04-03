@@ -30,11 +30,11 @@ void RootBus::AddDevice(SystemDevice *device) {
   conectedDevices.push_back(device);
 }
 
-void RootBus::Read(u64 readAddress, u8 *data, u8 byteCount) {
+void RootBus::Read(u64 readAddress, u8 *data, u64 size) {
   // Configuration Read?
   if (readAddress >= PCI_CONFIG_REGION_ADDRESS &&
       readAddress <= PCI_CONFIG_REGION_ADDRESS + PCI_CONFIG_REGION_SIZE) {
-    ConfigRead(readAddress, data, byteCount);
+    ConfigRead(readAddress, data, size);
     return;
   }
 
@@ -42,13 +42,13 @@ void RootBus::Read(u64 readAddress, u8 *data, u8 byteCount) {
     if (readAddress >= device->GetStartAddress() &&
         readAddress <= device->GetEndAddress()) {
       // Hit
-      device->Read(readAddress, data, byteCount);
+      device->Read(readAddress, data, size);
       return;
     }
   }
 
   // Check on the other Busses.
-  if (hostBridge->Read(readAddress, data, byteCount)) {
+  if (hostBridge->Read(readAddress, data, size)) {
     return;
   }
 
@@ -56,14 +56,38 @@ void RootBus::Read(u64 readAddress, u8 *data, u8 byteCount) {
   LOG_ERROR(RootBus, "Read failed at address {:#x}", readAddress);
 
   // Any reads to bus that dont belong to any device are always 0xFF.
-  *reinterpret_cast<u64*>(data) = 0xFFFFFFFFFFFFFFFF;
+  memset(data, 0xFF, size);
 }
 
-void RootBus::Write(u64 writeAddress, u8 *data, u8 byteCount) {
+void RootBus::MemSet(u64 writeAddress, s32 data, u64 size) {
+  for (auto &device : conectedDevices) {
+    if (writeAddress >= device->GetStartAddress() &&
+        writeAddress <= device->GetEndAddress()) {
+      // Hit
+      device->MemSet(writeAddress, data, size);
+      return;
+    }
+  }
+
+  // Check on the other Busses.
+  if (hostBridge->MemSet(writeAddress, data, size)) {
+    return;
+  }
+
+  // Device or address not found.
+  if (false) {
+    LOG_ERROR(RootBus, "MemSet failed at address: {:#x}, data: {:#x}", writeAddress, data);
+    LOG_CRITICAL(Xenon, "Halting...");
+    Xe_Main->getCPU()->Halt(); // Halt the CPU
+    Config::imgui.debugWindow = true; // Open the debugger on bad fault
+  }
+}
+
+void RootBus::Write(u64 writeAddress, const u8 *data, u64 size) {
   // PCI Configuration Write?
   if (writeAddress >= PCI_CONFIG_REGION_ADDRESS &&
       writeAddress <= PCI_CONFIG_REGION_ADDRESS + PCI_CONFIG_REGION_SIZE) {
-    ConfigWrite(writeAddress, data, byteCount);
+    ConfigWrite(writeAddress, data, size);
     return;
   }
 
@@ -71,19 +95,19 @@ void RootBus::Write(u64 writeAddress, u8 *data, u8 byteCount) {
     if (writeAddress >= device->GetStartAddress() &&
         writeAddress <= device->GetEndAddress()) {
       // Hit
-      device->Write(writeAddress, data, byteCount);
+      device->Write(writeAddress, data, size);
       return;
     }
   }
 
   // Check on the other Busses.
-  if (hostBridge->Write(writeAddress, data, byteCount)) {
+  if (hostBridge->Write(writeAddress, data, size)) {
     return;
   }
 
   // Device or address not found.
   if (false) {
-    LOG_ERROR(RootBus, "Write failed at address: {:#x}, data: {:#x}", writeAddress, *reinterpret_cast<u64*>(data));
+    LOG_ERROR(RootBus, "Write failed at address: {:#x}, data: {:#x}", writeAddress, *reinterpret_cast<const u64*>(data));
     LOG_CRITICAL(Xenon, "Halting...");
     Xe_Main->getCPU()->Halt(); // Halt the CPU
     Config::imgui.debugWindow = true; // Open the debugger on bad fault
@@ -94,10 +118,10 @@ void RootBus::Write(u64 writeAddress, u8 *data, u8 byteCount) {
 // Configuration R/W.
 //
 
-void RootBus::ConfigRead(u64 readAddress, u8*data, u8 byteCount) {
-  hostBridge->ConfigRead(readAddress, data, byteCount);
+void RootBus::ConfigRead(u64 readAddress, u8 *data, u64 size) {
+  hostBridge->ConfigRead(readAddress, data, size);
 }
 
-void RootBus::ConfigWrite(u64 writeAddress, u8 *data, u8 byteCount) {
-  hostBridge->ConfigWrite(writeAddress, data, byteCount);
+void RootBus::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
+  hostBridge->ConfigWrite(writeAddress, data, size);
 }

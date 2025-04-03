@@ -55,6 +55,9 @@ XeMain::~XeMain() {
   renderer.reset();
 #endif
 
+  // Stop the logger
+  Base::Log::Stop();
+
   // Delete the log filter
   logFilter.reset();
 }
@@ -79,7 +82,7 @@ void XeMain::start() {
 #endif
     return;
   }
-  if (Config::highlyExperimental.elfLoader) {
+  if (Config::xcpu.elfLoader) {
     // Load the elf
     xenonCPU->LoadElf(Config::filepaths.elfBinary);
   } else {

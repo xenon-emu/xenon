@@ -3,6 +3,7 @@
 #pragma once
 
 #include <memory>
+#include <unordered_map>
 
 #include "Base/LRUCache.h"
 #include "Core/XCPU/IIC/IIC.h"
@@ -419,11 +420,17 @@ struct PPU_STATE_SPRS {
 };
 
 // Thread ID's for ease of handling.
-enum PPU_THREAD {
-  PPU_THREAD_0,
-  PPU_THREAD_1,
-  PPU_THREAD_BOTH,
-  PPU_THREAD_NONE
+enum ePPUThread : u8 {
+  ePPUThread_Zero = 0,
+  ePPUThread_One,
+  ePPUThread_None
+};
+
+// Thread ID's for ease of handling.
+enum ePPUThreadBit : u8 {
+  ePPUThreadBit_None = 0,
+  ePPUThreadBit_Zero,
+  ePPUThreadBit_One
 };
 
 //
@@ -598,7 +605,7 @@ struct PPU_STATE {
   // Thread Specific State.
   PPU_THREAD_REGISTERS ppuThread[2]{};
   // Current executing thread.
-  PPU_THREAD currentThread = PPU_THREAD_0;
+  ePPUThread currentThread = ePPUThread_Zero;
   // Shared Special Purpose Registers.
   PPU_STATE_SPRS SPR{};
   // Translation Lookaside Buffer
@@ -647,9 +654,9 @@ struct XENON_CONTEXT {
 #define SPR_SRR0 26
 #define SPR_SRR1 27
 #define SPR_CFAR 28
+#define SPR_PID 48
 #define SPR_ESR 62
 #define SPR_IVPR 63
-#define SPR_PID 48
 #define SPR_CTRLRD 136
 #define SPR_CTRLWR 152
 #define SPR_VRSAVE 256

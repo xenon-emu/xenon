@@ -10,37 +10,42 @@ XMA::XMA(const char *deviceName, u64 size) : PCIDevice(deviceName, size) {
   pciDevSizes[0] = 0x400; // BAR0
 }
 
-void XMA::Read(u64 readAddress, u8 *data, u8 byteCount)
+void XMA::Read(u64 readAddress, u8 *data, u64 size)
 {}
 
-void XMA::Write(u64 writeAddress, u8 *data, u8 byteCount)
+void XMA::Write(u64 writeAddress, const u8 *data, u64 size)
 {}
 
-void XMA::ConfigRead(u64 readAddress, u8 *data, u8 byteCount) {
-  memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], byteCount);
+void XMA::MemSet(u64 writeAddress, s32 data, u64 size)
+{}
+
+void XMA::ConfigRead(u64 readAddress, u8 *data, u64 size) {
+  memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], size);
 }
 
-void XMA::ConfigWrite(u64 writeAddress, u8*data, u8 byteCount) {
+void XMA::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   // Check if we're being scanned.
+  u64 tmp = 0;
+  memcpy(&tmp, data, size);
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
-      if (*reinterpret_cast<u64*>(data) == 0xFFFFFFFF) { // PCI BAR Size discovery.
+      if (tmp == 0xFFFFFFFF) { // PCI BAR Size discovery.
         u64 x = 2;
         for (int idx = 2; idx < 31; idx++) {
-          *reinterpret_cast<u64*>(data) &= ~x;
+          tmp &= ~x;
           x <<= 1;
           if (x >= pciDevSizes[regOffset]) {
             break;
           }
         }
-        *reinterpret_cast<u64*>(data) &= ~0x3;
+        tmp &= ~0x3;
       }
     }
     if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address.
-      *reinterpret_cast<u64*>(data) = 0; // Register not implemented.
+      tmp = 0; // Register not implemented.
     }
   }
 
-  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], data, byteCount);
+  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &tmp, size);
 }

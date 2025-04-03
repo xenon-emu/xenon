@@ -93,7 +93,7 @@ inline bool mmuComparePTE(u64 VA, u64 pte0, u64 pte1, u8 p, bool L, bool LP, u64
   // PTE[V] = 1
   // PTE[AVPN][0:51] = VA[0:51]
   // if p < 28, PTEAVPN[52:51 + q] = VA[52 : 51 + q]
-  // PTE[LP] = SLBE[LP] whenever PTE[L] = ‘1’.
+  // PTE[LP] = SLBE[LP] whenever PTE[L] = 1
 
   // Valid
   bool pteV = (pte0 & PPC_HPTE64_VALID);
@@ -544,7 +544,7 @@ u64 PPCInterpreter::mmuContructEndAddressFromSecEngAddr(u64 inputAddress,
 
 // Main address translation mechanism used on the XCPU.
 bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
-                                         bool memWrite, bool speculativeLoad) {
+                                         bool memWrite, bool cacheStore) {
   // Every time the CPU does a load or store, it goes trough the MMU.
   // The MMU decides based on MSR, and some other regs if address translation
   // for Instr/Data is in Real Mode (EA = RA) or in Virtual Mode (Page
@@ -601,7 +601,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
   // See IBM_CBE_Handbook_v1.1 Page 82.
   
   // Search ERAT's
-  if (!speculativeLoad) {
+  if (!cacheStore) {
     if (curThread.iFetch) {
       // iERAT
       RA = curThread.iERAT.getElement((*EA & ~0xFFF));
@@ -797,9 +797,9 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
           // Get the pteg data from memory while relocation is off.
           for (size_t i = 0; i < PPC_HPTES_PER_GROUP; i++) {
             pteg0[i].pte0 =
-                PPCInterpreter::MMURead64(ppuState, pteg0Addr + i * 16);
+                PPCInterpreter::MMURead64(ppuState, pteg0Addr + i * 16, cacheStore);
             pteg0[i].pte1 =
-                PPCInterpreter::MMURead64(ppuState, pteg0Addr + i * 16 + 8);
+                PPCInterpreter::MMURead64(ppuState, pteg0Addr + i * 16 + 8, cacheStore);
           }
 
           // We compare all pte's in order for simplicity.
@@ -850,9 +850,9 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 
           for (size_t i = 0; i < PPC_HPTES_PER_GROUP; i++) {
             pteg1[i].pte0 =
-                PPCInterpreter::MMURead64(ppuState, pteg1Addr + i * 16);
+                PPCInterpreter::MMURead64(ppuState, pteg1Addr + i * 16, cacheStore);
             pteg1[i].pte1 =
-                PPCInterpreter::MMURead64(ppuState, pteg1Addr + i * 16 + 8);
+                PPCInterpreter::MMURead64(ppuState, pteg1Addr + i * 16 + 8, cacheStore);
           }
 
           // We compare all pte's in order for simplicity.
@@ -951,7 +951,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
   }
 
   // Save in ERAT's
-  if (!speculativeLoad) {
+  if (!cacheStore) {
     if (curThread.iFetch) {
       // iERAT
       curThread.iERAT.putElement((*EA & ~0xFFF), (RA & ~0xFFF));
@@ -967,220 +967,152 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 }
 
 // MMU Read Routine, used by the CPU
-u64 PPCInterpreter::MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
-                            u64 EA, s8 byteCount, bool speculativeLoad) {
-  u64 data = 0;
+void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE* ppuState,
+                             u64 EA, u64 byteCount, u8 *outData, bool cacheStore) {
   u64 oldEA = EA;
-
-  if (EA == 0xc000000000022794) {
-    u8 a = 0;
+  if (!MMUTranslateAddress(&EA, ppuState, false, cacheStore)) {
+    memset(outData, 0, byteCount);
+    return;
   }
-
-  if (EA != 0 && EA == Config::debug.haltOnReadAddress) {
-    Xenon *CPU = Xe_Main->getCPU();
-    PPU *PPU = Xe_Main->getCPU()->GetPPU(ppuState->ppuID);
-    if (PPU->ThreadRunning()) {
-      CPU->Halt();
-    }
-    Config::imgui.debugWindow = true; // Open debugger after halting
+  // Debugger halt
+  if (EA && EA == Config::debug.haltOnReadAddress) {
+    Xe_Main->getCPU()->Halt(); // Halt the CPU
+    Config::imgui.debugWindow = true; // Open the debugger after halting
   }
-
-  // Exception ocurred?
-  if (MMUTranslateAddress(&EA, ppuState, false, speculativeLoad) == false)
-    return 0;
-
   bool socRead = false;
-
   EA = mmuContructEndAddressFromSecEngAddr(EA, &socRead);
-
   // When the xboxkrnl writes to address 0x7FFFxxxx is writing to the IIC
   // so we use that address here to validate its an soc write.
-  if (((oldEA & 0x000000007fff0000) >> 16) == 0x7FFF) {
+  if (((oldEA & 0x000000007FFF0000ULL) >> 16) == 0x7FFF)
     socRead = true;
-  }
-
-  // TODO: Investigate this values FSB_CONFIG_RX_STATE - Needed to Work!
-  if (curThread.CIA == 0x1003598) {
+  // TODO: Investigate why FSB_CONFIG_RX_STATE needs these values to work
+  switch (curThread.CIA) {
+  case 0x1003598ULL: {
     GPR(11) = 0x0E;
-  }
-
-  if (curThread.CIA == 0x1003644) {
+  } break;
+  case 0x1003644ULL: {
     GPR(11) = 0x02;
+  } break;
   }
-
-  // Hack Needed for CB to work, seems like it reads from some SoC this value
-  // and checks againts the fuses.
-  if (socRead && EA == 0x00061000) {
-    data = 0x0000000000000020;
-    return data;
-  }
-
-  // Hack Needed for CB to work, reading ram size to this address, further
-  // research required. Free60.org shows this belongs to BIU address range.
-  if (socRead && EA == 0xE1040000) {
-    data = 0x0000000020000000;
-    return data;
-  }
-
-  // Hardware register address
-  if (socRead && EA == 0x00061008) {
-    data = 0;
-    return data;
-  }
-
-  // SECENG address, CB compares this to 0.
-  // Further research required!
-  if ((socRead && EA == 0x26000) || (socRead && EA == 0x26008)) {
-    data = 0;
-    return data;
-  }
-
-  // Check if reading from Security Engine config block
-  if (socRead && EA >= XE_SECENG_ADDR && EA < XE_SECENG_ADDR + XE_SECENG_SIZE) {
-    u32 secAddr = static_cast<u32>(EA - XE_SECENG_ADDR);
-    memcpy(&data, &intXCPUContext->secEngData[secAddr], byteCount);
-    return data;
-  }
-
-  // Random Number Generator
-  if (socRead && EA == 0x00060000) {
-    u64 generatedRandomNumber = rand();
-    memcpy(&data, &generatedRandomNumber, byteCount);
-    return data;
-  }
-
-  // Read is from SROM area:
-  if (socRead && EA >= XE_SROM_ADDR && EA < XE_SROM_ADDR + XE_SROM_SIZE) {
-    u32 sromAddr = static_cast<u32>(EA) - static_cast<u32>(XE_SROM_ADDR);
-    memcpy(&data, &cpuContext->SROM[sromAddr], byteCount);
-    return data;
-  }
-
-  // Read is from SRAM area
-  if (socRead && EA >= XE_SRAM_ADDR && EA < XE_SRAM_ADDR + XE_SRAM_SIZE) {
-    u32 sramAddr = static_cast<u32>(EA) - static_cast<u32>(XE_SRAM_ADDR);
-    memcpy(&data, &cpuContext->SRAM[sramAddr], byteCount);
-    return data;
-  }
-
-  // Check if reading from eFuses section
-  if (socRead && EA >= XE_FUSESET_LOC &&
-      EA <= (XE_FUSESET_LOC + XE_FUSESET_SIZE)) {
-    switch (static_cast<u32>(EA)) {
-    case 0x20000:
-      data = cpuContext->fuseSet.fuseLine00;
-      break;
-    case 0x20200:
-      data = cpuContext->fuseSet.fuseLine01;
-      break;
-    case 0x20400:
-      data = cpuContext->fuseSet.fuseLine02;
-      break;
-    case 0x20600:
-      data = cpuContext->fuseSet.fuseLine03;
-      break;
-    case 0x20800:
-      data = cpuContext->fuseSet.fuseLine04;
-      break;
-    case 0x20a00:
-      data = cpuContext->fuseSet.fuseLine05;
-      break;
-    case 0x20c00:
-      data = cpuContext->fuseSet.fuseLine06;
-      break;
-    case 0x20e00:
-      data = cpuContext->fuseSet.fuseLine07;
-      break;
-    case 0x21000:
-      data = cpuContext->fuseSet.fuseLine08;
-      break;
-    case 0x21200:
-      data = cpuContext->fuseSet.fuseLine09;
-      break;
-    case 0x21400:
-      data = cpuContext->fuseSet.fuseLine10;
-      break;
-    case 0x21600:
-      data = cpuContext->fuseSet.fuseLine11;
-      break;
-    default:
-      LOG_ERROR(Xenon_MMU, "Reading to unknown fuse at address {:#x}", EA);
-      break;
+  // Handle SoC reads
+  if (socRead) {
+    switch (EA) {
+    // Hack to get the CB to work, seems like it reads the value from some SoC and checks said value against the fuses
+    case 0x00061000ULL: {
+      u64 val = 0x20;
+      memcpy(outData, &val, byteCount);
+      return;
+    } break;
+    // Hack to get the CB to work, seems to be writing ram size to this address, further
+    // research required. Free60.org shows this belongs to BIU address range
+    case 0xE1040000ULL: {
+      u64 val = 0x20000000;
+      memcpy(outData, &val, byteCount);
+      return;
+    } break;
+    // Hardware register address
+    case 0x00061008ULL: {
+      u64 val = 0;
+      memcpy(outData, &val, byteCount);
+      return;
+    } break;
+    // SECENG address, CB compares this to zero
+    // Further research required!
+    case 0x00026000ULL:
+    case 0x00026008ULL: {
+      u64 val = 0;
+      memcpy(outData, &val, byteCount);
+      return;
+    } break;
+    // Random Number Generator
+    case 0x00060000ULL: {
+      u64 generatedRandomNumber = rand();
+      memcpy(outData, &generatedRandomNumber, byteCount);
+      return;
+    } break;
+    // Time Base register. Writing here starts/stops the RTC supposedly
+    case 0x000611A0ULL: {
+      u64 val = (!intXCPUContext->timeBaseActive) ? 0ULL : 0x0001000000000000ULL;
+      memcpy(outData, &val, byteCount);
+      return;
+    } break;
+    // CPU VID Register
+    case 0x00061188ULL: {
+      u64 val = 0x382C00000000B001ULL;
+      val = byteswap_be<u64>(val);
+      memcpy(outData, &val, byteCount);
+      return;
+    } break;
+    default: {
+      // Check if the read is from the security engine config
+      if (EA >= XE_SECENG_ADDR && EA < XE_SECENG_ADDR + XE_SECENG_SIZE) {
+        u32 secAddr = static_cast<u32>(EA - XE_SECENG_ADDR);
+        memcpy(outData, &intXCPUContext->secEngData[secAddr], byteCount);
+        return;
+      }
+      // Check if the read is from the SROM
+      else if (EA >= XE_SROM_ADDR && EA < XE_SROM_ADDR + XE_SROM_SIZE) {
+        u32 sromAddr = static_cast<u32>(EA - XE_SROM_ADDR);
+        memcpy(outData, &cpuContext->SROM[sromAddr], byteCount);
+        return;
+      }
+      // Check if the read is from SRAM
+      else if (EA >= XE_SRAM_ADDR && EA < XE_SRAM_ADDR + XE_SRAM_SIZE) {
+        u32 sramAddr = static_cast<u32>(EA - XE_SRAM_ADDR);
+        memcpy(outData, &cpuContext->SRAM[sramAddr], byteCount);
+        return;
+      }
+      // Check if we're reading from fuses
+      else if (EA >= XE_FUSESET_LOC && EA <= (XE_FUSESET_LOC + XE_FUSESET_SIZE)) {
+        u64 val = 0;
+        switch (static_cast<u32>(EA)) {
+        case 0x20000: val = cpuContext->fuseSet.fuseLine00; break;
+        case 0x20200: val = cpuContext->fuseSet.fuseLine01; break;
+        case 0x20400: val = cpuContext->fuseSet.fuseLine02; break;
+        case 0x20600: val = cpuContext->fuseSet.fuseLine03; break;
+        case 0x20800: val = cpuContext->fuseSet.fuseLine04; break;
+        case 0x20A00: val = cpuContext->fuseSet.fuseLine05; break;
+        case 0x20C00: val = cpuContext->fuseSet.fuseLine06; break;
+        case 0x20E00: val = cpuContext->fuseSet.fuseLine07; break;
+        case 0x21000: val = cpuContext->fuseSet.fuseLine08; break;
+        case 0x21200: val = cpuContext->fuseSet.fuseLine09; break;
+        case 0x21400: val = cpuContext->fuseSet.fuseLine10; break;
+        case 0x21600: val = cpuContext->fuseSet.fuseLine11; break;
+        default:
+          LOG_ERROR(Xenon_MMU, "Reading to unknown fuse at address {:#x}", EA);
+          break;
+        }
+        val = byteswap_be<u64>(val);
+        memcpy(outData, &val, byteCount);
+        return;
+      }
+      // Integrated Interrupt Controller in real mode, used when the HV wants to
+      // start a CPUs IC
+      else if ((EA & ~0xF000ULL) >= XE_IIC_BASE &&
+          (EA & ~0xF000ULL) < XE_IIC_BASE + XE_IIC_SIZE &&
+          (EA & 0xFFFFF) < 0x56000) {
+        intXCPUContext->xenonIIC.readInterrupt(EA, outData, byteCount);
+        return;
+      }
+    } break;
     }
-
-    return byteswap_be<u64>(data);
-  }
-
-  // Integrated Interrupt Controller in real mode, used when the HV wants to
-  // start a CPUs IC.
-  if (socRead && (EA & ~0xF000) >= XE_IIC_BASE &&
-      (EA & ~0xF000) < XE_IIC_BASE + XE_IIC_SIZE && (EA & 0xFFFFF) < 0x56000) {
-    intXCPUContext->xenonIIC.readInterrupt(EA, &data);
-    return data;
-  }
-
-  // Time Base register. Writing here starts or stops the RTC apparently.
-  if (socRead && EA == 0x611A0) {
-    if (!intXCPUContext->timeBaseActive) {
-      data = 0;
-      return data;
-    } else {
-      data = 0x0001000000000000;
-      return data;
-    }
-  }
-
-  // CPU VID Register
-  if (socRead && EA == 0x61188) {
-    data = 0x382C00000000b001;
-    return byteswap_be<u64>(data);
-  }
-
-  bool nand = false;
-  bool pciConfigSpace = false;
-  bool pciBridge = false;
-  bool xGPU = false;
-
-  if (EA >= 0xC8000000 && EA <= 0xCC000000) {
-    nand = true;
-  }
-
-  if (EA >= 0xD0000000 && EA <= 0xD1000000) {
-    pciConfigSpace = true;
-  }
-
-  if (EA >= 0xEA000000 && EA <= 0xEA010000) {
-    pciBridge = true;
-  }
-
-  if (EA >= 0xEC800000 && EA <= 0xEC810000) {
-      xGPU = true;
-  }
-
-  if (socRead && nand != true && pciBridge != true && pciConfigSpace != true && xGPU != true) {
+    bool nand{ EA >= 0xC8000000 && EA <= 0xCC000000 },
+      pciConfigSpace{ EA >= 0xD0000000 && EA <= 0xD1000000 },
+      pciBridge{ EA >= 0xEA000000 && EA <= 0xEA010000 },
+      xGPU{ EA >= 0xEC800000 && EA <= 0xEC810000 };
+    if (!nand && !pciBridge && !pciConfigSpace && !xGPU) {
       LOG_WARNING(Xenon_MMU, "SoC Read from {:#x}, returning 0.", EA);
-    data = 0;
-    return data;
+      memset(outData, 0, byteCount);
+      return;
+    }
   }
-
-  if (EA == 0x22794) {
-    u8 a = 0;
-  }
-
-  // External Read
-  sysBus->Read(EA, (u8*)&data, byteCount);
-  return data;
+  // External read
+  sysBus->Read(EA, outData, byteCount);
 }
-
-#define TEST_HALT_ADDR 0x69690
-
 // MMU Write Routine, used by the CPU
 void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
-                              u64 data, u64 EA, s8 byteCount, bool cacheStore) {
+                              const u8 *data, u64 EA, u64 byteCount, bool cacheStore) {
   u64 oldEA = EA;
-  if (false) {
-    LOG_INFO(Xenon_MMU, "context, state, data=0x{:08x}, EA=0x{:08x}, byteCount={:d}", data, EA, byteCount);
-  }
 
   if (MMUTranslateAddress(&EA, ppuState, true) == false)
     return;
@@ -1189,177 +1121,198 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
     u8 a = 0;
   }
 
-  if (false) {
-    LOG_INFO(Xenon_MMU, "EA after MMUTranslateAddress: 0x{:08x}", EA);
-  }
-
   bool socWrite = false;
 
   EA = mmuContructEndAddressFromSecEngAddr(EA, &socWrite);
-  
-  if (false) {
-    LOG_INFO(Xenon_MMU, "EA after mmuContructEndAddressFromSecEngAddr: 0x{:08x}", EA);
-  }
-
   // When the xboxkrnl writes to address 0x7FFFxxxx is writing to the IIC
   // so we use that address here to validate its an soc write.
-  if (((oldEA & 0x000000007FFFF0000) >> 16) == 0x7FFF) {
+  if (((oldEA & 0x000000007FFFF0000ULL) >> 16) == 0x7FFF)
     socWrite = true;
-  }
-
-  // CPU POST Bus
-  if (socWrite && EA == POST_BUS_ADDR) {
-    Xe::XCPU::POSTBUS::POST(data);
-    return;
-  }
-
-  // Halting in the debugger
-  if (socWrite && EA == TEST_HALT_ADDR) {
-    u64 dataByteswapped = byteswap_be<u64>(data);
-    Xe_Main->getCPU()->Halt(dataByteswapped);
-    return;
-  }
-
-  // Time Base register. Writing here starts or stops the RTC apparently.
-  if (socWrite && EA == 0x611A0) {
-    u64 dataByteswapped = byteswap_be<u64>(data);
-    if (dataByteswapped == 0) {
-      intXCPUContext->timeBaseActive = false;
-      return;
-    } else if (dataByteswapped == 0x1FF || dataByteswapped == 0x100) {
-      intXCPUContext->timeBaseActive = true;
+  if (socWrite) {
+    switch (EA) {
+    // CPU POST Bus
+    case POST_BUS_ADDR: {
+      u64 tmp = 0;
+      memcpy(&tmp, data, sizeof(tmp));
+      return Xe::XCPU::POSTBUS::POST(tmp);
+    } break;
+    // Time Base register. Writing here starts or stops the RTC apparently
+    case 0x611A0ULL: {
+      u64 tmp = 0;
+      memcpy(&tmp, data, sizeof(tmp));
+      u64 dataByteswapped = byteswap_be<u64>(tmp);
+      if (dataByteswapped == 0) {
+        intXCPUContext->timeBaseActive = false;
+        return;
+      }
+      else if (dataByteswapped == 0x1FF || dataByteswapped == 0x100) {
+        intXCPUContext->timeBaseActive = true;
+        return;
+      }
+    } break;
+    // CPU VID Register
+    case 0x61188ULL: {
+      u64 tmp;
+      memcpy(&tmp, data, sizeof(tmp));
+      if (tmp != 0) {
+        LOG_WARNING(Xenon, "(SOC): New VID value being set: {:#x}", tmp);
+      }
+    } break;
+    default: {
+      // Check if writing to bootloader section
+      if (EA >= XE_SROM_ADDR && EA < XE_SROM_ADDR + XE_SROM_SIZE) {
+        LOG_ERROR(Xenon_MMU, "Tried to write to XCPU SROM!");
+        return;
+      }
+      // Check if writing to internal SRAM
+      else if (EA >= XE_SRAM_ADDR && EA < XE_SRAM_ADDR + XE_SRAM_SIZE) {
+        u32 sramAddr = static_cast<u32>(EA - XE_SRAM_ADDR);
+        memcpy(&intXCPUContext->SRAM[sramAddr], data, byteCount);
+        return;
+      }
+      // Check if writing to Security Engine Config Block
+      else if (EA >= XE_SECENG_ADDR && EA < XE_SECENG_ADDR + XE_SECENG_SIZE) {
+        u32 secAddr = static_cast<u32>(EA - XE_SECENG_ADDR);
+        memcpy(&intXCPUContext->secEngData[secAddr], data, byteCount);
+        return;
+      }
+      // Integrated Interrupt Controller in real mode, used when the HV wants to
+      // start a CPUs IC.
+      else if ((EA & ~0xF000) >= XE_IIC_BASE &&
+          (EA & ~0xF000) < XE_IIC_BASE + XE_IIC_SIZE &&
+          (EA & 0xFFFFF) < 0x560FF) {
+        intXCPUContext->xenonIIC.writeInterrupt(EA, data, byteCount);
+        return;
+      }
+    } break;
+    }
+    bool nand{ EA >= 0xC8000000 && EA <= 0xCC000000 },
+      pciConfigSpace{ EA >= 0xD0000000 && EA <= 0xD1000000 },
+      pciBridge{ EA >= 0xEA000000 && EA <= 0xEA010000 },
+      xGPU{ EA >= 0xEC800000 && EA <= 0xEC810000 };
+    if (!nand && !pciBridge && !pciConfigSpace && !xGPU) {
+      u64 tmp = 0;
+      memcpy(&tmp, data, byteCount);
+      LOG_WARNING(Xenon_MMU, "Invalid SoC Write to {:#x} (data:{:#x})", EA, tmp);
       return;
     }
-  }
-
-  // CPU VID Register
-  if (socWrite && EA == 0x61188) {
-    if (data != 0) {
-      LOG_WARNING(Xenon, "(SOC): New VID value being set: {:#x}", data);
-    }
-    return;
-  }
-
-  // Check if writing to bootloader section
-  if (socWrite && EA >= XE_SROM_ADDR && EA < XE_SROM_ADDR + XE_SROM_SIZE) {
-    LOG_ERROR(Xenon_MMU, "Tried to write to XCPU SROM!");
-    return;
-  }
-
-  // Check if writing to internal SRAM
-  if (socWrite && EA >= XE_SRAM_ADDR && EA < XE_SRAM_ADDR + XE_SRAM_SIZE) {
-    u32 sramAddr = static_cast<u32>(EA - XE_SRAM_ADDR);
-    memcpy(&cpuContext->SRAM[sramAddr], &data, byteCount);
-    return;
-  }
-
-  // Check if writing to Security Engine Config Block
-  if (socWrite && EA >= XE_SECENG_ADDR &&
-      EA < XE_SECENG_ADDR + XE_SECENG_SIZE) {
-    u32 secAddr = static_cast<u32>(EA - XE_SECENG_ADDR);
-    memcpy(&intXCPUContext->secEngData[secAddr], &data, byteCount);
-    return;
-  }
-
-  // Integrated Interrupt Controller in real mode, used when the HV wants to
-  // start a CPUs IC.
-  if (socWrite && (EA & ~0xF000) >= XE_IIC_BASE &&
-      (EA & ~0xF000) < XE_IIC_BASE + XE_IIC_SIZE && (EA & 0xFFFFF) < 0x560FF) {
-    intXCPUContext->xenonIIC.writeInterrupt(EA, data);
-    return;
-  }
-
-  bool nand = false;
-  bool pciConfigSpace = false;
-  bool pciBridge = false;
-  bool xGPU = false;
-
-  if (EA >= 0xC8000000 && EA <= 0xCC000000) {
-    nand = true;
-  }
-
-  if (EA >= 0xD0000000 && EA <= 0xD1000000) {
-    pciConfigSpace = true;
-  }
-
-  if (EA >= 0xEA000000 && EA <= 0xEA010000) {
-    pciBridge = true;
-  }
-
-  if (EA >= 0xEC800000 && EA <= 0xEC810000) {
-      xGPU = true;
-  }
-
-  if (socWrite && nand != true && pciBridge != true && pciConfigSpace != true && xGPU != true) {
-    LOG_WARNING(Xenon_MMU, "SoC Write to {:#x}, data = {:#x}, invalidating.", EA, data);
-    return;
   }
 
   // External Write
-  sysBus->Write(EA, (u8*)&data, byteCount);
+  sysBus->Write(EA, data, byteCount);
 
+  // Check if it's reserved
   intXCPUContext->xenonRes.Check(EA);
 
-  if (EA != 0 && EA == Config::debug.haltOnWriteAddress) {
+  // Debugger halt
+  if (EA && EA == Config::debug.haltOnWriteAddress) {
     Xe_Main->getCPU()->Halt(); // Halt the CPU
     Config::imgui.debugWindow = true; // Open the debugger after halting
   }
 }
 
 void PPCInterpreter::MMUMemCpyFromHost(PPU_STATE *ppuState,
-                                       u32 dest, const void* source, u64 size, bool cacheStore) {
-  for (u64 i = 0; i != size; ++i) {
-    MMUWrite(intXCPUContext, ppuState, reinterpret_cast<const u8*>(source)[i], dest + i, 1, cacheStore);
-  }
+                                       u64 EA, const void* source, u64 size, bool cacheStore) {
+  MMUWrite(intXCPUContext, ppuState, reinterpret_cast<const u8*>(source), EA, size, cacheStore);
 }
 
 void PPCInterpreter::MMUMemCpy(PPU_STATE *ppuState,
-                               u32 dest, u32 source, u64 size, bool cacheStore) {
-  for (u64 i = 0; i != size; ++i) {
-    MMUWrite(intXCPUContext, ppuState, MMURead(intXCPUContext, ppuState, source + i, 1), dest + i, 1, cacheStore);
+                               u64 EA, u32 source, u64 size, bool cacheStore) {
+  std::unique_ptr<u8[]> data = std::make_unique<STRIP_UNIQUE_ARR(data)>(size);
+  MMURead(intXCPUContext, ppuState, source, size, data.get(), cacheStore);
+  MMUWrite(intXCPUContext, ppuState, data.get(), EA, size, cacheStore);
+  data.reset();
+}
+
+void PPCInterpreter::MMUMemSet(PPU_STATE *ppuState,
+                               u64 EA, s32 data, u64 size, bool cacheStore) {
+  u64 oldEA = EA;
+
+  if (MMUTranslateAddress(&EA, ppuState, true) == false)
+    return;
+
+  if (oldEA >= 0x9E000000 && oldEA <= 0x9EFFFFFF) {
+    u8 a = 0;
   }
+
+  bool socWrite = false;
+
+  EA = mmuContructEndAddressFromSecEngAddr(EA, &socWrite);
+  // When the xboxkrnl writes to address 0x7FFFxxxx is writing to the IIC
+  // so we use that address here to validate its an soc write.
+  if (((oldEA & 0x000000007FFFF0000ULL) >> 16) == 0x7FFF)
+    socWrite = true;
+  if (socWrite) {
+    switch (EA) {
+    default: {
+      // Check if writing to bootloader section
+      if (EA >= XE_SROM_ADDR && EA < XE_SROM_ADDR + XE_SROM_SIZE) {
+        LOG_ERROR(Xenon_MMU, "Tried to write to XCPU SROM!");
+        return;
+      }
+      // Check if writing to internal SRAM
+      else if (EA >= XE_SRAM_ADDR && EA < XE_SRAM_ADDR + XE_SRAM_SIZE) {
+        u32 sramAddr = static_cast<u32>(EA - XE_SRAM_ADDR);
+        memset(&intXCPUContext->SRAM[sramAddr], data, size);
+        return;
+      }
+      // Check if writing to Security Engine Config Block
+      else if (EA >= XE_SECENG_ADDR && EA < XE_SECENG_ADDR + XE_SECENG_SIZE) {
+        u32 secAddr = static_cast<u32>(EA - XE_SECENG_ADDR);
+        memset(&intXCPUContext->secEngData[secAddr], data, size);
+        return;
+      }
+    } break;
+    }
+  }
+
+  // External MemSet
+  sysBus->MemSet(EA, data, size);
+
+  // Check if it's reserved
+  intXCPUContext->xenonRes.Check(EA);
 }
 
 // Reads 1 Byte of memory.
-u8 PPCInterpreter::MMURead8(PPU_STATE *ppuState, u64 EA, bool speculativeLoad) {
+u8 PPCInterpreter::MMURead8(PPU_STATE *ppuState, u64 EA, bool cacheStore) {
   u8 data = 0;
-  data = static_cast<u8>(MMURead(intXCPUContext, ppuState, EA, 1, speculativeLoad));
+  MMURead(intXCPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data), cacheStore);
   return data;
 }
 // Reads 2 Bytes of memory.
-u16 PPCInterpreter::MMURead16(PPU_STATE *ppuState, u64 EA, bool speculativeLoad) {
+u16 PPCInterpreter::MMURead16(PPU_STATE *ppuState, u64 EA, bool cacheStore) {
   u16 data = 0;
-  data = static_cast<u16>(MMURead(intXCPUContext, ppuState, EA, 2, speculativeLoad));
+  MMURead(intXCPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data), cacheStore);
   return byteswap_be<u16>(data);
 }
 // Reads 4 Bytes of memory.
-u32 PPCInterpreter::MMURead32(PPU_STATE *ppuState, u64 EA, bool speculativeLoad) {
+u32 PPCInterpreter::MMURead32(PPU_STATE *ppuState, u64 EA, bool cacheStore) {
   u32 data = 0;
-  data = static_cast<u32>(MMURead(intXCPUContext, ppuState, EA, 4, speculativeLoad));
+  MMURead(intXCPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data), cacheStore);
   return byteswap_be<u32>(data);
 }
 // Reads 8 Bytes of memory.
-u64 PPCInterpreter::MMURead64(PPU_STATE *ppuState, u64 EA, bool speculativeLoad) {
+u64 PPCInterpreter::MMURead64(PPU_STATE *ppuState, u64 EA, bool cacheStore) {
   u64 data = 0;
-  data = MMURead(intXCPUContext, ppuState, EA, 8, speculativeLoad);
+  MMURead(intXCPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data), cacheStore);
   return byteswap_be<u64>(data);
 }
 // Writes 1 Byte to memory.
 void PPCInterpreter::MMUWrite8(PPU_STATE *ppuState, u64 EA, u8 data) {
-  MMUWrite(intXCPUContext, ppuState, data, EA, 1);
+  MMUWrite(intXCPUContext, ppuState, reinterpret_cast<const u8*>(&data), EA, sizeof(data));
 }
 // Writes 2 Bytes to memory.
 void PPCInterpreter::MMUWrite16(PPU_STATE *ppuState, u64 EA, u16 data) {
   u16 dataBS = byteswap_be<u16>(data);
-  MMUWrite(intXCPUContext, ppuState, dataBS, EA, 2);
+  MMUWrite(intXCPUContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data));
 }
 // Writes 4 Bytes to memory.
 void PPCInterpreter::MMUWrite32(PPU_STATE *ppuState, u64 EA, u32 data) {
   u32 dataBS = byteswap_be<u32>(data);
-  MMUWrite(intXCPUContext, ppuState, dataBS, EA, 4);
+  MMUWrite(intXCPUContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data));
 }
 // Writes 8 Bytes to memory.
 void PPCInterpreter::MMUWrite64(PPU_STATE *ppuState, u64 EA, u64 data) {
   u64 dataBS = byteswap_be<u64>(data);
-  MMUWrite(intXCPUContext, ppuState, dataBS, EA, 8);
+  MMUWrite(intXCPUContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data));
 }
