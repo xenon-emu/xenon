@@ -438,9 +438,9 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
   PPU_STATE &PPUState = *PPUStatePtr;
   gui->Node(PPUState.ppuName, [&] {
     u32 curInstr = _instr.opcode;
-    u32 nextInstr = PPCInterpreter::MMURead32(ppuState, curThread.NIA, true);
+    //u32 nextInstr = PPCInterpreter::MMURead32(ppuState, curThread.NIA, true);
     RenderInstr(gui, curThread.CIA, curInstr);
-    RenderInstr(gui, curThread.NIA, nextInstr);
+    //RenderInstr(gui, curThread.NIA, nextInstr);
     gui->Node("ppuThread", [&] {
       PPUThread(gui, PPUStatePtr, ePPUThread_Zero);
       PPUThread(gui, PPUStatePtr, ePPUThread_One);
