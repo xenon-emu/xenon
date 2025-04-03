@@ -53,7 +53,7 @@ inline struct _rendering {
   // Is VSync is present or not?
   bool vsync = true;
   // Should we quit when our rendering window is closed?
-  bool quitOnWindowClosure = false;
+  bool quitOnWindowClosure = true;
   // GPU ID Selection (Only for Vulkan/DirectX)
   //s32 gpuId = -1;
 

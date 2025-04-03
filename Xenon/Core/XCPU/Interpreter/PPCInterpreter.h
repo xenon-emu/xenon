@@ -124,7 +124,7 @@ bool MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState, bool memWrite, bool cache
 u8 mmuGetPageSize(PPU_STATE *ppuState, bool L, u8 LP);
 void mmuAddTlbEntry(PPU_STATE *ppuState);
 bool mmuSearchTlbEntry(PPU_STATE *ppuState, u64 *RPN, u64 VA, u8 p, bool L, bool LP);
-void mmuReadString(PPU_STATE *ppuState, u64 stringAddress, char *string, u32 maxLenght);
+void mmuReadString(PPU_STATE *ppuState, u64 stringAddress, char *string, u32 maxLength);
 
 // Security Engine Related
 SECENG_ADDRESS_INFO mmuGetSecEngInfoFromAddress(u64 inputAddress);
