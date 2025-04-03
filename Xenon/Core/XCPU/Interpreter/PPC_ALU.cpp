@@ -56,7 +56,7 @@ inline s64 mulh64(s64 x, s64 y) {
 #ifdef _MSC_VER
   return __mulh(x, y);
 #else
-  return static_cast<s64>(s128{ x } *s128{ y }) >> 64;
+  return static_cast<s64>((s128{ x } *s128{ y }) >> 64);
 #endif
 }
 
