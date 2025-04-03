@@ -550,7 +550,7 @@ void PCIBridge::ConfigRead(u64 readAddress, u8 *data, u64 size) {
   }
 
   for (auto &device : connectedPCIDevices) {
-    if (currentDevName != "" && !strcmp(device->GetDeviceName(), currentDevName)) {
+    if (currentDevName && !strcmp(device->GetDeviceName(), currentDevName)) {
       // Hit!
       LOG_TRACE(PCIBridge, "Config read, device: {} offset = {:#x}", currentDevName, configAddr.regOffset);
       device->ConfigRead(readAddress, data, size);

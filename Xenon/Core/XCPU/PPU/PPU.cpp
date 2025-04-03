@@ -273,6 +273,9 @@ void PPU::ThreadStateMachine() {
     LOG_INFO(Xenon, "PPU{} is exiting!", ppuState->ppuID);
     ppuThreadState = eThreadState::None;
   } break;
+  default: {
+
+  } break;
   }
 }
 void PPU::ThreadLoop() {
