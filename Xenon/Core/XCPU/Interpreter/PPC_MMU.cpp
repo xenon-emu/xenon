@@ -93,7 +93,7 @@ inline bool mmuComparePTE(u64 VA, u64 pte0, u64 pte1, u8 p, bool L, bool LP, u64
   // PTE[V] = 1
   // PTE[AVPN][0:51] = VA[0:51]
   // if p < 28, PTEAVPN[52:51 + q] = VA[52 : 51 + q]
-  // PTE[LP] = SLBE[LP] whenever PTE[L] = ‘1’.
+  // PTE[LP] = SLBE[LP] whenever PTE[L] = 1
 
   // Valid
   bool pteV = (pte0 & PPC_HPTE64_VALID);
