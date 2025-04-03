@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <bit>
 #include <format>
 #include <type_traits>
@@ -10,10 +11,11 @@
 #define STRIP_UNIQUE(x) std::remove_pointer_t<decltype(x.get())>
 #define STRIP_UNIQUE_ARR(x) std::remove_pointer_t<decltype(x.get())>[]
 
+namespace Base { extern std::atomic<bool> gSafeTerm; }
 #ifdef _WIN32
-#define SYSTEM_PAUSE() system("PAUSE")
+#define SYSTEM_PAUSE() { Base::gSafeTerm = false; system("PAUSE"); }
 #else
-#define SYSTEM_PAUSE() printf("Press Enter to continue..."); (void)getchar()
+#define SYSTEM_PAUSE() { Base::gSafeTerm = false; printf("Press Enter to continue..."); (void)getchar(); }
 #endif
 
 // Compile time macros to get endianess
