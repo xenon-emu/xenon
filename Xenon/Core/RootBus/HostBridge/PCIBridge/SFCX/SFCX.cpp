@@ -3,10 +3,11 @@
 #include "SFCX.h"
 
 #include "Base/Logging/Log.h"
+#include "Base/Config.h"
 
 // There are two SFCX Versions, pre-Jasper and post-Jasper
 SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
-  PCIBridge *parentPCIBridge) : PCIDevice(deviceName, size) {
+  PCIBridge* parentPCIBridge) : PCIDevice(deviceName, size) {
   // Asign parent PCI Bridge pointer.
   parentBus = parentPCIBridge;
 
@@ -32,7 +33,7 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
   // 0x000043000
 
   sfcxState.configReg = 0x00043000; // Config Reg is VERY Important. Tells info
-                                    // about Meta/NAND Type.
+  // about Meta/NAND Type.
   sfcxState.statusReg = 0x00000600;
   sfcxState.statusReg = 0x00000600;
   sfcxState.addressReg = 0x00F70030;
@@ -42,10 +43,10 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
 
   // Load the NAND dump.
   LOG_INFO(SFCX, "Loading NAND from path: {}", nandLoadPath);
- 
+
   // Check Image size
   u64 imageSize = 0;
-  
+
   // fs::file_size can cause a exception if it is not a valid file
   try {
     std::error_code ec;
@@ -62,7 +63,7 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
   }
 
   nandFile.open(nandLoadPath, std::ios_base::in | std::ios_base::binary);
-                  
+
   if (!nandFile.is_open()) {
     LOG_CRITICAL(SFCX, "Fatal error! Please make sure your NAND (or NAND path) is valid!");
     SYSTEM_PAUSE();
@@ -115,7 +116,7 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
   sfcxState.nandHeader.sysUpdateSize = byteswap_be<u32>(sfcxState.nandHeader.sysUpdateSize);
   LOG_INFO(SFCX, " * System Update Size: {:#x}", sfcxState.nandHeader.sysUpdateSize);
 
-  sfcxState.nandHeader.smcConfigAddr = byteswap_be<u32>(sfcxState.nandHeader.smcConfigAddr);  
+  sfcxState.nandHeader.smcConfigAddr = byteswap_be<u32>(sfcxState.nandHeader.smcConfigAddr);
   LOG_INFO(SFCX, " * SMC Config Addr: {:#x}", sfcxState.nandHeader.smcConfigAddr);
 
   sfcxState.nandHeader.smcBootSize = byteswap_be<u32>(sfcxState.nandHeader.smcBootSize);
@@ -124,22 +125,94 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
   sfcxState.nandHeader.smcBootAddr = byteswap_be<u32>(sfcxState.nandHeader.smcBootAddr);
   LOG_INFO(SFCX, " * SMC Boot Addr: {:#x}", sfcxState.nandHeader.smcBootAddr);
 
-  // Get CB Info, position is at 0x8 offset in NAND header, 4 bytes long.
-  BL_HEADER cbHeader;
-  u32 cbOffset = sfcxState.nandHeader.entry;
-  cbOffset = 1 ? ((cbOffset / 0x200) * 0x210) + cbOffset % 0x200 : cbOffset;
-  nandFile.seekg(cbOffset, std::ios::beg);
-  nandFile.read(reinterpret_cast<char*>(&cbHeader), sizeof(cbHeader));
+  // Get CB_A and CB_B headers.
+  BL_HEADER cbaHeader;
+  BL_HEADER cbbHeader;
+
+  // Get CB_A offset.
+  u32 cbaOffset = sfcxState.nandHeader.entry;
+  cbaOffset = 1 ? ((cbaOffset / 0x200) * 0x210) + cbaOffset % 0x200 : cbaOffset;
+
+  // Read CB_A Header.
+  nandFile.seekg(cbaOffset, std::ios::beg);
+  nandFile.read(reinterpret_cast<char*>(&cbaHeader), sizeof(cbaHeader));
+
+  // Byteswap CB_A info from header.
+  cbaHeader.buildNumber = byteswap_be<u16>(cbaHeader.buildNumber);
+  cbaHeader.lenght = byteswap_be<u32>(cbaHeader.lenght);
+  cbaHeader.entryPoint = byteswap_be<u32>(cbaHeader.entryPoint);
+
+  // Get CB_B offset.
+  u32 cbbOffset = sfcxState.nandHeader.entry + cbaHeader.lenght;
+  cbbOffset = 1 ? ((cbbOffset / 0x200) * 0x210) + cbbOffset % 0x200 : cbbOffset;
+
+  // Read CB_B Header.
+  nandFile.seekg(cbbOffset, std::ios::beg);
+  nandFile.read(reinterpret_cast<char*>(&cbbHeader), sizeof(cbbHeader));
+
+  // Byteswap CB_B info from header.
+  cbbHeader.buildNumber = byteswap_be<u16>(cbbHeader.buildNumber);
+  cbbHeader.lenght = byteswap_be<u32>(cbbHeader.lenght);
+  cbbHeader.entryPoint = byteswap_be<u32>(cbbHeader.entryPoint);
+
+  // Close NAND I/O stream.
   nandFile.close();
 
-  // Check for CB Magic
-  if (cbHeader.name[0] == 'C' && cbHeader.name[1] == 'B') {
-    LOG_INFO(SFCX, "Found CB Header @ LBA: {:#x}", cbOffset);
-    LOG_INFO(SFCX, " * CB Version: {:#d}", byteswap_be<u16>(cbHeader.buildNumber));
-    LOG_INFO(SFCX, " * CB Entry: {:#x}", byteswap_be<u32>(cbHeader.entryPoint));
-    LOG_INFO(SFCX, " * CB Lenght: {:#x}", byteswap_be<u32>(cbHeader.lenght));
+  // Check for CB(_A) Magic
+  if (cbaHeader.name[0] == 'C' && cbaHeader.name[1] == 'B') {
+    LOG_INFO(SFCX, "Found CB(_A) Header: Physical: {:#x}, LBA: {:#x}", sfcxState.nandHeader.entry, cbaOffset);
+    LOG_INFO(SFCX, " * CB Entry: {:#x}", cbaHeader.entryPoint);
+    LOG_INFO(SFCX, " * CB Lenght: {:#x}", cbaHeader.lenght);
   }
 
+  // Check for CB(_B) Magic
+  if (cbbHeader.name[0] == 'C' && cbbHeader.name[1] == 'B') {
+    LOG_INFO(SFCX, "Found CB(_B) Header: Physical: {:#x}, LBA: {:#x}", sfcxState.nandHeader.entry + cbaHeader.lenght, cbbOffset);
+    LOG_INFO(SFCX, " * CB Entry: {:#x}", cbbHeader.entryPoint);
+    LOG_INFO(SFCX, " * CB Lenght: {:#x}", cbbHeader.lenght);
+  }
+
+  u32 cbVersion = (cbaHeader.buildNumber == cbbHeader.buildNumber) ? cbaHeader.buildNumber : cbbHeader.buildNumber;
+
+  if (cbaHeader.buildNumber == cbbHeader.buildNumber) {
+    LOG_INFO(SFCX, "Detected Unified CB: ");
+    LOG_INFO(SFCX, "   * CB Version: {:#d}", cbVersion);
+  } else {
+    LOG_INFO(SFCX, "Detected Split CB:");
+    LOG_INFO(SFCX, " * CB_A Version: {:#d}", cbaHeader.buildNumber);
+    LOG_INFO(SFCX, " * CB_B Version: {:#d}", cbbHeader.buildNumber);
+  }
+
+  if (Config::xcpu.SKIP_HW_INIT) {
+    LOG_INFO(SFCX, "CB/SB Hardware Init stage skip enabled.");
+    if (Config::xcpu.HW_INIT_SKIP_1 == 0 && Config::xcpu.HW_INIT_SKIP_2 == 0) {
+      LOG_INFO(SFCX, "Auto-detecting Hardware Init stage skip addresses:");
+      switch (cbVersion) {
+        // CB_B 9188
+        case 9188:
+          Config::xcpu.HW_INIT_SKIP_1 = 0x03003DC0;
+          LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_1);
+          Config::xcpu.HW_INIT_SKIP_2 = 0x03003E54;
+          LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_2);
+        break;
+        // CB_B 14352
+        case 14352:
+          Config::xcpu.HW_INIT_SKIP_1 = 0x03003F48;
+          LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_1);
+          Config::xcpu.HW_INIT_SKIP_2 = 0x03003FDC;
+          LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_2);
+        break;
+        default:
+          LOG_ERROR(SFCX, "Auto detection failed. Unimplemented CB found, version {:#d}. Please report to Xenon Devs.", cbVersion);
+          break;
+      }
+    }
+    else {
+      LOG_INFO(SFCX, "Manual Hardware Init stage skip addresses set:");
+      LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_1);
+      LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_2);
+    }
+  }
   // Enter SFCX Thread.
   sfcxThreadRunning = true;
   sfcxThread = std::thread(&SFCX::sfcxMainLoop, this);

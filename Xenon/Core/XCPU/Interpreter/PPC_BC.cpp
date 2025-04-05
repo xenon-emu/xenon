@@ -56,15 +56,8 @@ void PPCInterpreter::PPCInterpreter_bclr(PPU_STATE *ppuState) {
   bool ctrOk = BO_GET(2) | ((curThread.SPR.CTR != 0) ^ BO_GET(3));
   bool condOk = BO_GET(0) || (CR_GET(BI) == BO_GET(1));
 
-  // Jrunner XDK build offsets are 0x3003F48 AND 0x3003FDC
-  // XeLL offsets are 0x3003DC0 AND 0x3003E54
-  if ((Config::xcpu.HW_INIT_SKIP_1 && Config::xcpu.HW_INIT_SKIP_2) == 0) {
-    if (curThread.CIA == 0x3003F48)
-      condOk = false;
-
-    if (curThread.CIA == 0x3003FDC)
-      condOk = true;
-  } else {
+  // CB/SB Hardware Init step skip (Hack).
+  if (Config::xcpu.SKIP_HW_INIT) {
     if (curThread.CIA == Config::xcpu.HW_INIT_SKIP_1)
       condOk = false;
 

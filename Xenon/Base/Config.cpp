@@ -194,6 +194,7 @@ bool _smc::verify_toml(toml::value &value) {
 void _xcpu::from_toml(const toml::value &value) {
   elfLoader = toml::find_or<bool>(value, "ElfLoader", elfLoader);
   clocksPerInstruction = toml::find_or<s32&>(value, "CPI", clocksPerInstruction);
+  SKIP_HW_INIT = toml::find_or<bool>(value, "SKIP_HW_INIT", SKIP_HW_INIT);
   HW_INIT_SKIP_1 = toml::find_or<u64&>(value, "HW_INIT_SKIP1", HW_INIT_SKIP_1);
   HW_INIT_SKIP_2 = toml::find_or<u64&>(value, "HW_INIT_SKIP2", HW_INIT_SKIP_2);
 }
@@ -209,14 +210,17 @@ void _xcpu::to_toml(toml::value &value) {
   value["CPI"].comments().push_back("# Note: This will mess with execution timing, and may break time-sensitive things like XeLL");
 
   value["HW_INIT_SKIP1"].comments().clear();
+  value["HW_INIT_SKIP1"].comments().push_back("Enable CB/SB HW_INIT stage skip (Hack)");
+  value["HW_INIT_SKIP1"] = SKIP_HW_INIT;
+
   value["HW_INIT_SKIP1"] = HW_INIT_SKIP_1;
-  value["HW_INIT_SKIP1"].comments().push_back("# Hardware Init Skip address 1");
+  value["HW_INIT_SKIP1"].comments().push_back("# Manual Hardware Init Skip address 1 override");
   value["HW_INIT_SKIP1"].comments().push_back("# RGH3 Trinity: 0x3003F48");
   value["HW_INIT_SKIP1"].comments().push_back("# RGH3 Corona:  0x3003DC0");
 
   value["HW_INIT_SKIP2"].comments().clear();
   value["HW_INIT_SKIP2"] = HW_INIT_SKIP_2;
-  value["HW_INIT_SKIP2"].comments().push_back("# Hardware Init Skip address 2");
+  value["HW_INIT_SKIP2"].comments().push_back("# Manual Hardware Init Skip address 2 override");
   value["HW_INIT_SKIP2"].comments().push_back("# RGH3 Trinity: 0x3003FDC");
   value["HW_INIT_SKIP2"].comments().push_back("# RGH3 Corona:  0x3003E54");
 }
@@ -224,11 +228,13 @@ bool _xcpu::verify_toml(toml::value &value) {
   to_toml(value);
   cache_value(elfLoader);
   cache_value(clocksPerInstruction);
+  cache_value(SKIP_HW_INIT);
   cache_value(HW_INIT_SKIP_1);
   cache_value(HW_INIT_SKIP_2);
   from_toml(value);
   verify_value(elfLoader);
   verify_value(clocksPerInstruction);
+  verify_value(SKIP_HW_INIT);
   verify_value(HW_INIT_SKIP_1);
   verify_value(HW_INIT_SKIP_2);
   return true;
