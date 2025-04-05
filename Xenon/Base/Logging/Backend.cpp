@@ -181,7 +181,7 @@ public:
     color_console_backend->SetEnabled(enabled);
   }
 
-  void PushEntry(Class log_class, Level log_level, const char* filename, unsigned int line_num,
+  void PushEntry(Class log_class, Level log_level, const char* filename, u32 line_num,
            const char* function, std::string message) {
 
     if (!filter.CheckMessage(log_class, log_level)) {
@@ -283,7 +283,7 @@ private:
 
 std::vector<std::filesystem::path> filepaths{};
 
-void DeleteOldLogs(const std::filesystem::path& path, u64 num_logs, u64 log_limit) {
+void DeleteOldLogs(const std::filesystem::path& path, u64 num_logs, const u16 log_limit) {
   const std::string filename = path.filename().string();
   const std::chrono::time_point Now = std::chrono::system_clock::now();
   const time_t timeNow = std::chrono::system_clock::to_time_t(Now);
@@ -321,7 +321,7 @@ u64 CreateIntegralTimestamp(const std::string &date) {
   return std::stoull(timestamp);
 }
 
-void CleanupOldLogs(const std::string_view &log_file_base, const std::filesystem::path &log_dir, u64 log_limit) {
+void CleanupOldLogs(const std::string_view &log_file_base, const std::filesystem::path &log_dir, const u16 log_limit) {
   const std::filesystem::path LogFile = log_file_base;
   // Track how many logs we have
   size_t numLogs = 0;
@@ -427,7 +427,7 @@ void SetColorConsoleBackendEnabled(bool enabled) {
 }
 
 void FmtLogMessageImpl(Class log_class, Level log_level, const char* filename,
-             unsigned int line_num, const char* function, const char* format,
+             u32 line_num, const char* function, const char* format,
              const fmt::format_args& args) {
   if (!initialization_in_progress_suppress_logging) [[likely]] {
     Impl::Instance().PushEntry(log_class, log_level, filename, line_num, function,

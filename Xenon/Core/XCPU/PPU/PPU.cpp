@@ -171,7 +171,7 @@ void PPU::CalculateCPI() {
 
 void PPU::Reset() {
   // Zero out the memory
-  PPCInterpreter::MMUWrite(xenonContext, ppuState.get(), 0, 4, 32);
+  PPCInterpreter::MMUWrite(xenonContext, ppuState.get(), nullptr, 4, 32);
 
   // Set the NIP back to default
   curThread.NIA = 0x100;

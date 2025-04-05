@@ -2,8 +2,13 @@
 
 #pragma once
 
+#include <fmt/format.h>
+
+#include "CommitCount.h"
+
 namespace Base {
 
-constexpr char VERSION[] = "Experimental v0.0.1";
+// Disable version display on Github artifacts because it's broken
+const std::string Version = fmt::format("Experimental v0.0.1{}", Base::commit_number != 1 ? fmt::format("-{}", Base::commit_number) : "");
 
 }

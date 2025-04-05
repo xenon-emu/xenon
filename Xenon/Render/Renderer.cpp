@@ -6,7 +6,6 @@
 
 #include "Render/Implementations/OGLTexture.h" 
 #include "GUI/Implementations/OpenGL.h"
-#include "Base/CommitCount.h"
 #include "Base/Config.h"
 #include "Base/Version.h"
 
@@ -71,7 +70,8 @@ void Render::Renderer::Start() {
     LOG_ERROR(System, "Failed to initialize SDL: {}", SDL_GetError());
   }
 
-  const std::string title = fmt::format("Xenon {}-{}", Base::VERSION, Base::commit_number);
+  const std::string title = fmt::format("Xenon {}", Base::Version);
+
   // SDL3 window properties.
   SDL_PropertiesID props = SDL_CreateProperties();
   SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, title.c_str());

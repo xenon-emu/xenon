@@ -39,6 +39,9 @@ function(get_commit_count REPO_DIR RESULT_VAR)
         OUTPUT_STRIP_TRAILING_WHITESPACE
     )
     set(${RESULT_VAR} ${COMMIT_COUNT} PARENT_SCOPE)
+    if (NOT DEFINED ${COMMIT_COUNT})
+        set(${COMMIT_COUNT} 1)
+    endif()
 endfunction()
 
 set(REPO_DIR ${CMAKE_CURRENT_SOURCE_DIR})
@@ -251,12 +254,6 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
 	set(gcc TRUE)
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 	set(clang TRUE)
-endif()
-
-if (WIN32)
-	set(FONT_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/Xenon/fonts") # Windows Output
-else()
-	set(FONT_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/fonts")       # Linux Output
 endif()
 
 # Copy fonts to build directory

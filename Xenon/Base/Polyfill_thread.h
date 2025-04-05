@@ -308,7 +308,7 @@ public:
   bool request_stop() noexcept {
     return get_stop_source().request_stop();
   }
-  [[nodiscard]] static unsigned int hardware_concurrency() noexcept {
+  [[nodiscard]] static u32 hardware_concurrency() noexcept {
     return thread::hardware_concurrency();
   }
 

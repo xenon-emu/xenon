@@ -4,6 +4,6 @@
 
 namespace Base {
 
-extern const char commit_number[];
+extern const int commit_number;
 
 } // namespace Base

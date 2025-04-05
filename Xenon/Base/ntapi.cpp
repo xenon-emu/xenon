@@ -13,7 +13,7 @@ NtQueueApcThreadEx_t NtQueueApcThreadEx = nullptr;
 namespace Base::NtApi {
 
 void Initialize() {
-  HMODULE nt_handle = GetModuleHandleA("ntdll.dll");
+  const HMODULE nt_handle = GetModuleHandleA("ntdll.dll");
 
   // http://stackoverflow.com/a/31411628/4725495
   NtClose = (NtClose_t)GetProcAddress(nt_handle, "NtClose");

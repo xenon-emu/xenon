@@ -17,7 +17,7 @@ enum XE_XMA_REGISTERS {
   KICK = 0x0650,
   UNKNOWN_660 = 0x0660,
   LOCK = 0x0690,
-  CLEAR = 0x06A0,
+  CLEAR = 0x06A0
 };
 
 class XMA : public PCIDevice {

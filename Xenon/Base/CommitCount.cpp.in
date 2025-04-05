@@ -2,10 +2,10 @@
 
 #include "Base/CommitCount.h"
 
-#define COMMIT_COUNT "@COMMIT_COUNT@"
+#define COMMIT_COUNT @COMMIT_COUNT@
 
 namespace Base {
 
-const char commit_number[] = COMMIT_COUNT;
+const int commit_number = COMMIT_COUNT;
 
 } // namespace Base
