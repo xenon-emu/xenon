@@ -60,6 +60,33 @@ inline s64 mulh64(s64 x, s64 y) {
 #endif
 }
 
+// Platform agnostic 32/64 bit Rotate-left.
+u32 rotl32(u32 x, u32 n)
+{
+#ifdef _MSC_VER
+  return _rotl(x, n);
+#elif defined(__clang__)
+  return __builtin_rotateleft32(x, n);
+#else
+  return (x << (n & 31)) | (x >> (((0 - n) & 31)));
+#endif
+}
+
+u64 rotl64(u64 x, u64 n)
+{
+#ifdef _MSC_VER
+  return _rotl64(x, static_cast<int>(n));
+#elif defined(__clang__)
+  return __builtin_rotateleft64(x, n);
+#else
+  return (x << (n & 63)) | (x >> (((0 - n) & 63)));
+#endif
+}
+
+// Duplicates a u32 value left, used in rotate instructions that duplicate the 
+// lower 32 bits.
+inline u64 duplicate32(u32 x) { return x | static_cast<u64>(x) << 32; }
+
 // Set XER[OV] bit. Overflow enable.
 inline void ppuSetXerOv(PPU_STATE *ppuState, bool inbit)
 {
@@ -76,6 +103,15 @@ inline void ppuSetXerOv(PPU_STATE *ppuState, bool inbit)
   // Set OV based on input.
   curThread.SPR.XER.OV = inbit;
 }
+
+// Vali004 loves macros, and i'm getting used to them also!
+
+// Compares and records the input value taking into account computation mode.
+#define RECORD_CR0(x) if (curThread.SPR.MSR.SF) { \
+                      ppuSetCR<s64>(ppuState, 0, x, 0); \
+                      } else { \
+                      ppuSetCR<s32>(ppuState, 0, static_cast<s32>(x), 0); \
+                      }
 
 //
 // Instruction definitions.
@@ -760,261 +796,351 @@ void PPCInterpreter::PPCInterpreter_orx(PPU_STATE *ppuState) {
   }
 }
 
-void PPCInterpreter::PPCInterpreter_rldicx(PPU_STATE *ppuState) {
-  MD_FORM_rS_rA_sh_mb_RC;
+// Rotate Left Double Word Immediate then Clear (x’7800 0008’)
+void PPCInterpreter::PPCInterpreter_rldicx(PPU_STATE* ppuState) {
+  /*
+    n <- sh[5] || sh[0-4]
+    r <- ROTL[64](rS, n)
+    b <- mb[5] || mb[0-4]
+    m <- MASK(b, ~ n)
+    rA <- r & m
+  */
 
-  const u64 r = std::rotl<u64>(GPR(rS), sh);
-  const u32 e = 63 - sh;
-  const u64 m = QMASK(mb, e);
+  GPRi(ra) = rotl64(GPRi(rs), _instr.sh64) & PPCRotateMask(_instr.mbe64, _instr.sh64 ^ 63);
 
-  GPR(rA) = r & m;
-
-  if (RC) {
-    u32 CR = CRCompS(ppuState, GPR(rA), 0);
-    ppcUpdateCR(ppuState, 0, CR);
+  // _rc
+  if (_instr.rc) {
+    RECORD_CR0(GPRi(ra));
   }
 }
 
-void PPCInterpreter::PPCInterpreter_rldcrx(PPU_STATE *ppuState) {
-  MDS_FORM_rS_rA_rB_me_RC;
+// Rotate Left Double Word then Clear Right (x’7800 0012’)
+void PPCInterpreter::PPCInterpreter_rldcrx(PPU_STATE* ppuState) {
+  /*
+    n <- rB[58-63]
+    r <- ROTL[64](rS, n)
+    e <- me[5] || me[0-4]
+    m <- MASK(0, e)
+    rA <- r & m
+  */
 
-  const u64 qwRb = GPR(rB);
-  const u32 n = static_cast<u32>(QGET(qwRb, 58, 63));
-  const u64 r = std::rotl<u64>(GPR(rS), n);
-  const u64 m = QMASK(0, me);
+  GPRi(ra) = rotl64(GPRi(rs), GPRi(rb) & 0x3f) & (~0ull << (_instr.mbe64 ^ 63));
 
-  GPR(rA) = r & m;
-
-  if (RC) {
-    u32 CR = CRCompS(ppuState, GPR(rA), 0);
-    ppcUpdateCR(ppuState, 0, CR);
+  // _rc
+  if (_instr.rc) {
+    RECORD_CR0(GPRi(ra));
   }
 }
 
-void PPCInterpreter::PPCInterpreter_rldiclx(PPU_STATE *ppuState) {
-  MD_FORM_rS_rA_sh_mb_RC;
+// Rotate Left Double Word then Clear Left (x’7800 0010’)
+void PPCInterpreter::PPCInterpreter_rldclx(PPU_STATE* ppuState) {
+  /*
+    n <- rB[58-63]
+    r <- ROTL[64](rS, n)
+    b <- mb[5] || mb[0-4]
+    m <- MASK(b, 63)
+    rA <- r & m
+  */
 
-  const u64 r = std::rotl<u64>(GPR(rS), sh);
-  const u64 m = QMASK(mb, 63);
+  GPRi(ra) = rotl64(GPRi(rs), GPRi(rb) & 0x3f) & (~0ull >> _instr.mbe64);
 
-  GPR(rA) = r & m;
-
-  if (RC) {
-    u32 CR = CRCompS(ppuState, GPR(rA), 0);
-    ppcUpdateCR(ppuState, 0, CR);
+  // _rc
+  if (_instr.rc) {
+    RECORD_CR0(GPRi(ra));
   }
 }
 
-void PPCInterpreter::PPCInterpreter_rldicrx(PPU_STATE *ppuState) {
-  MD_FORM_rS_rA_sh_me_RC;
+// Rotate Left Double Word Immediate then Clear Left (x’7800 0000’)
+void PPCInterpreter::PPCInterpreter_rldiclx(PPU_STATE* ppuState) {
+  /*
+    n <- sh[5] || sh[0-4]
+    r <- ROTL[64](rS, n)
+    b <- mb[5] || mb[0-4]
+    m <- MASK(b, 63)
+    rA <- r & m
+  */
 
-  const u64 r = std::rotl<u64>(GPR(rS), sh);
-  const u64 m = QMASK(0, me);
-  GPR(rA) = r & m;
+  GPRi(ra) = rotl64(GPRi(rs), _instr.sh64) & (~0ull >> _instr.mbe64);
 
-  if (RC) {
-    u32 CR = CRCompS(ppuState, GPR(rA), 0);
-    ppcUpdateCR(ppuState, 0, CR);
+  // _rc
+  if (_instr.rc) {
+    RECORD_CR0(GPRi(ra));
   }
 }
 
-void PPCInterpreter::PPCInterpreter_rldimix(PPU_STATE *ppuState) {
-  MD_FORM_rS_rA_sh_mb_RC;
+// Rotate Left Double Word Immediate then Clear Right (x’7800 0004’)
+void PPCInterpreter::PPCInterpreter_rldicrx(PPU_STATE* ppuState) {
+  /*
+    n <- sh[5] || sh[0-4]
+    r <- ROTL[64](rS, n)
+    e <- me[5] || me[0-4]
+    m <- MASK(0, e)
+    rA <- r & m
+  */
 
-  const u64 r = std::rotl<u64>(GPR(rS), sh);
-  const u32 e = 63 - sh;
-  const u64 m = QMASK(mb, e);
+  GPRi(ra) = rotl64(GPRi(rs), _instr.sh64) & (~0ull << (_instr.mbe64 ^ 63));
 
-  GPR(rA) = (r & m) | (GPR(rA) & ~m);
-
-  if (RC) {
-    u32 CR = CRCompS(ppuState, GPR(rA), 0);
-    ppcUpdateCR(ppuState, 0, CR);
+  // _rc
+  if (_instr.rc) {
+    RECORD_CR0(GPRi(ra));
   }
 }
 
-void PPCInterpreter::PPCInterpreter_rlwimix(PPU_STATE *ppuState) {
-  M_FORM_rS_rA_SH_MB_ME_RC;
+// Rotate Left Double Word Immediate then Mask Insert (x’7800 000C’)
+void PPCInterpreter::PPCInterpreter_rldimix(PPU_STATE* ppuState) {
+  /*
+    n <- sh[5] || sh[0-4]
+    r <- ROTL[64](rS, n)
+    b <- mb[5] || mb[0-4]
+    m <- MASK(b, ~n)
+    rA <- (r & m) | (rA & ~m)
+  */
 
-  const u32 r = std::rotl<u32>(static_cast<u32>(GPR(rS)), SH);
-  u32 m = (MB <= ME) ? DMASK(MB, ME) : (DMASK(0, ME) | DMASK(MB, 31));
+  const u64 mask = PPCRotateMask(_instr.mbe64, _instr.sh64 ^ 63);
+  GPRi(ra) = (GPRi(ra) & ~mask) | (rotl64(GPRi(rs), _instr.sh64) & mask);
 
-  GPR(rA) = (r & m) | (static_cast<u32>(GPR(rA)) & ~m);
-
-  if (RC) {
-    u32 CR = CRCompS(ppuState, GPR(rA), 0);
-    ppcUpdateCR(ppuState, 0, CR);
+  // _rc
+  if (_instr.rc) {
+    RECORD_CR0(GPRi(ra));
   }
 }
 
-void PPCInterpreter::PPCInterpreter_rlwnmx(PPU_STATE *ppuState) {
-  M_FORM_rS_rA_rB_MB_ME_RC;
+// Rotate Left Word Immediate then Mask Insert (x’5000 0000’)
+void PPCInterpreter::PPCInterpreter_rlwimix(PPU_STATE* ppuState) {
+  /*
+    n <- SH
+    r <- ROTL[32](rS[32-63], n)
+    m <- MASK(MB + 32, ME + 32)
+    rA <- (r & m) | (rA & ~m)
+  */
 
-  u32 m = (MB <= ME) ? DMASK(MB, ME) : (DMASK(0, ME) | DMASK(MB, 31));
+  const u64 mask = PPCRotateMask(32 + _instr.mb32, 32 + _instr.me32);
+  GPRi(ra) = (GPRi(ra) & ~mask) | (duplicate32(rotl32(static_cast<u32>(GPRi(rs)), _instr.sh32)) & mask);
 
-  GPR(rA) = std::rotl<u32>(static_cast<u32>(GPR(rS)), (static_cast<u32>(GPR(rB))) & 31) & m;
-
-  if (RC) {
-    u32 CR = CRCompS(ppuState, GPR(rA), 0);
-    ppcUpdateCR(ppuState, 0, CR);
+  // _rc
+  if (_instr.rc) {
+    RECORD_CR0(GPRi(ra));
   }
 }
 
-void PPCInterpreter::PPCInterpreter_rlwinmx(PPU_STATE *ppuState) {
-  M_FORM_rS_rA_SH_MB_ME_RC;
+// Rotate Left Word then AND with Mask (x’5C00 0000’)
+void PPCInterpreter::PPCInterpreter_rlwnmx(PPU_STATE* ppuState) {
+  /*
+    n <- rB[59-6327-31]
+    r <- ROTL[32](rS[32-63], n)
+    m <- MASK(MB + 32, ME + 32)
+    rA <- r & m
+  */
 
-  u32 m = (MB <= ME) ? DMASK(MB, ME) : (DMASK(0, ME) | DMASK(MB, 31));
+  GPRi(ra) = duplicate32(rotl32(static_cast<u32>(GPRi(rs)), GPRi(rb) & 0x1f))
+    & PPCRotateMask(32 + _instr.mb32, 32 + _instr.me32);
 
-  GPR(rA) = std::rotl<u32>(static_cast<u32>(GPR(rS)), SH) & m;
-
-  if (RC) {
-    u32 CR = CRCompS(ppuState, GPR(rA), 0);
-    ppcUpdateCR(ppuState, 0, CR);
+  // _rc
+  if (_instr.rc) {
+    RECORD_CR0(GPRi(ra));
   }
 }
 
-void PPCInterpreter::PPCInterpreter_sldx(PPU_STATE *ppuState) {
-  X_FORM_rS_rA_rB_RC;
+// Rotate Left Word Immediate then AND with Mask (x’5400 0000’)
+void PPCInterpreter::PPCInterpreter_rlwinmx(PPU_STATE* ppuState) {
+  /*
+    n <- SH
+    r <- ROTL[32](rS[32-63], n)
+    m <- MASK(MB + 32, ME + 32)
+    rA <- (r & m)
+  */
 
-  const u64 regB = GPR(rB);
-  const u32 n = static_cast<u32>(QGET(regB, 58, 63));
-  const u64 r = std::rotl<u64>(GPR(rS), n);
-  u64 m = QGET(regB, 57, 57) ? 0 : QMASK(0, 63 - n);
+  GPRi(ra) = duplicate32(rotl32(static_cast<u32>(GPRi(rs)), _instr.sh32))
+    & PPCRotateMask(32 + _instr.mb32, 32 + _instr.me32);
 
-  GPR(rA) = r & m;
-
-  if (RC) {
-    u32 CR = CRCompS(ppuState, GPR(rA), 0);
-    ppcUpdateCR(ppuState, 0, CR);
+  // _rc
+  if (_instr.rc) {
+    RECORD_CR0(GPRi(ra));
   }
 }
 
-void PPCInterpreter::PPCInterpreter_slwx(PPU_STATE *ppuState) {
-  X_FORM_rS_rA_rB_RC;
+// Shift Left Double Word (x’7C00 0036’)
+void PPCInterpreter::PPCInterpreter_sldx(PPU_STATE* ppuState) {
+  /*
+    n <- rB[58-63]
+    r <- ROTL[64](rS, n)
+    if rB[57] = 0 then
+      m <- MASK(0, 63 - n)
+    else m <- (64)0
+    rA <- r & m
+  */
 
-  const u32 n = static_cast<u32>(GPR(rB)) & 63;
+  const u32 n = GPRi(rb) & 0x7f;
+  GPRi(ra) = n & 0x40 ? 0 : GPRi(rs) << n;
 
-  GPR(rA) = (n < 32) ? (static_cast<u32>(GPR(rS)) << n) : 0;
-
-  if (RC) {
-    u32 CR = CRCompS(ppuState, GPR(rA), 0);
-    ppcUpdateCR(ppuState, 0, CR);
+  // _rc
+  if (_instr.rc) {
+    RECORD_CR0(GPRi(ra));
   }
 }
 
-void PPCInterpreter::PPCInterpreter_sradx(PPU_STATE *ppuState) {
-  X_FORM_rS_rA_rB_RC;
+// Shift Left Word (x’7C00 0030’)
+void PPCInterpreter::PPCInterpreter_slwx(PPU_STATE* ppuState) {
+  /*
+    n <- rB[59-63]
+    r <- ROTL[32](rS[32–63], n)
+    if rB[58] = 0 then m <- MASK(32, 63 – n)
+    else m <- (64)0
+    rA <- r & m
+  */
 
-  const u64 regRS = GPR(rS);
-  const u32 n = static_cast<u32>(GPR(rB)) & 127;
-  const u64 r = std::rotl<u64>(regRS, 64 - (n & 63));
-  u64 m = (n & 0x40) ? 0 : QMASK(n, 63);
-  u64 s = BGET(regRS, 64, 0) ? QMASK(0, 63) : 0;
+  GPRi(ra) = static_cast<u32>(GPRi(rs) << (GPRi(rb) & 0x3f));
 
-  GPR(rA) = (r & m) | (s & ~m);
+  // _rc
+  if (_instr.rc) {
+    RECORD_CR0(GPRi(ra));
+  }
+}
 
-  if (s && ((r & ~m) != 0))
-    curThread.SPR.XER.CA = 1;
+// Shift Right Algebraic Double Word (x’7C00 0634’)
+void PPCInterpreter::PPCInterpreter_sradx(PPU_STATE* ppuState) {
+  /*
+    n <- rB[58-63]
+    r <- ROTL[64](rS, 64 - n)
+    if rB[57] = 0 then
+      m <- MASK(n, 63)
+    else m <- (64)0
+    S <- rS[0]
+    rA <- (r & m) | (((64)S) & ~m)
+    XER[CA] <- S & ((r & ~ m) ¦ 0)
+  */
+
+  s64 RS = GPRi(rs);
+  u8 shift = GPRi(rb) & 127;
+  if (shift > 63)
+  {
+    GPRi(ra) = 0 - (RS < 0);
+    XER_SET_CA((RS < 0));
+  }
   else
-    curThread.SPR.XER.CA = 0;
+  {
+    GPRi(ra) = RS >> shift;
+    XER_SET_CA((RS < 0) && ((GPRi(ra) << shift) != static_cast<u64>(RS)));
+  }
 
-  if (RC) {
-    u32 CR = CRCompS(ppuState, GPR(rA), 0);
-    ppcUpdateCR(ppuState, 0, CR);
+  // _rc
+  if (_instr.rc) {
+    RECORD_CR0(GPRi(ra));
   }
 }
 
-void PPCInterpreter::PPCInterpreter_sradix(PPU_STATE *ppuState) {
-  X_FORM_rS_rA_SH_XO_RC;
+// Shift Right Algebraic Double Word Immediate (x’7C00 0674’)
+void PPCInterpreter::PPCInterpreter_sradix(PPU_STATE* ppuState) {
+  /*
+    n <- sh[5] || sh[0-4]
+    r <- ROTL[64](rS, 64 - n)
+    m <- MASK(n, 63)
+    S <- rS[0]
+    rA <- (r & m) | (((64)S) & ~m)
+    XER[CA] <- S & ((r & ~m) != 0)
+  */
 
-  SH |= (XO & 1) << 5;
+  auto sh = _instr.sh64;
+  s64 RS = GPRi(rs);
+  GPRi(ra) = RS >> sh;
+  XER_SET_CA((RS < 0) && ((GPRi(ra) << sh) != static_cast<u64>(RS)));
 
-  if (SH == 0) {
-    GPR(rA) = GPR(rS);
-    curThread.SPR.XER.CA = 0;
-  } else {
-    const u64 r = std::rotl<u64>(GPR(rS), 64 - SH);
-    const u64 m = QMASK(SH, 63);
-    const u64 s = BGET(GPR(rS), 64, 0);
-
-    GPR(rA) = (r & m) | ((static_cast<u64>(-static_cast<s64>(s))) & ~m);
-
-    if (s && (r & ~m) != 0)
-      curThread.SPR.XER.CA = 1;
-    else
-      curThread.SPR.XER.CA = 0;
-  }
-
-  if (RC) {
-    u32 CR = CRCompS(ppuState, GPR(rA), 0);
-    ppcUpdateCR(ppuState, 0, CR);
+  // _rc
+  if (_instr.rc) {
+    RECORD_CR0(GPRi(ra));
   }
 }
 
-void PPCInterpreter::PPCInterpreter_srawx(PPU_STATE *ppuState) {
-  X_FORM_rS_rA_rB_RC;
+// Shift Right Algebraic Word (x’7C00 0630’)
+void PPCInterpreter::PPCInterpreter_srawx(PPU_STATE* ppuState) {
+  /*
+    n <- rB[59-63]
+    r <- ROTL[32](rS[32–63], 64 – n)
+    if rB[5826] = 0 then
+    m <- MASK(n + 32, 63)
+    else m <- (64)0
+    S <- rS[32]
+    rA <- r & m | (64)S & ~m
+    XER[CA] <- S & (r & ~m[32-63] != 0
+  */
 
-  const u64 regRs = GPR(rS);
-  const u64 n = static_cast<u32>(GPR(rB)) & 63;
-  const u64 r = std::rotl<u32>(static_cast<u32>(regRs), 64 - (n & 31));
-  u64 m = (n & 0x20) ? 0 : QMASK(n + 32, 63);
-  u64 s = BGET(regRs, 32, 0) ? QMASK(0, 63) : 0;
-  GPR(rA) = (r & m) | (s & ~m);
-
-  if (s && ((static_cast<u32>(r & ~m)) != 0))
-    XER_SET_CA(1);
+  s32 RS = static_cast<s32>(GPRi(rs));
+  u8 shift = GPRi(rb) & 63;
+  if (shift > 31)
+  {
+    GPRi(ra) = 0 - (RS < 0);
+    XER_SET_CA((RS < 0));
+  }
   else
-    XER_SET_CA(0);
+  {
+    GPRi(ra) = RS >> shift;
+    XER_SET_CA((RS < 0) && ((GPRi(ra) << shift) != static_cast<u64>(RS)));
+  }
 
-  if (RC) {
-    u32 CR = CRCompS(ppuState, GPR(rA), 0);
-    ppcUpdateCR(ppuState, 0, CR);
+  // _rc
+  if (_instr.rc) {
+    RECORD_CR0(GPRi(ra));
   }
 }
 
-void PPCInterpreter::PPCInterpreter_srawix(PPU_STATE *ppuState) {
-  X_FORM_rS_rA_SH_RC;
+// Shift Right Algebraic Word Immediate (x’7C00 0670’)
+void PPCInterpreter::PPCInterpreter_srawix(PPU_STATE* ppuState) {
+  /*
+    n <- SH
+    r <- ROTL[32](rS[32-63], 64 - n)
+    m<- MASK(n + 32, 63)
+    S <- rS[32]
+    rA <- r & m | (64)S & ~m
+    XER[CA] <- S & ((r & ~m)[32-63] != 0)
+  */
 
-  const u64 rSReg = GPR(rS);
-  const u64 r = std::rotl<u32>(static_cast<u32>(rSReg), 64 - SH);
-  const u64 m = QMASK(SH + 32, 63);
-  u64 s = BGET(rSReg, 32, 0) ? QMASK(0, 63) : 0;
+  s32 RS = static_cast<u32>(GPRi(rs));
+  GPRi(ra) = RS >> _instr.sh32;
+  XER_SET_CA((RS < 0) && (static_cast<u32>(GPRi(ra) << _instr.sh32)
+    != static_cast<u32>(RS)));
 
-  GPR(rA) = (r & m) | (s & ~m);
-
-  if (s && ((static_cast<u32>(r & ~m)) != 0))
-    XER_SET_CA(1);
-  else
-    XER_SET_CA(0);
-
-  if (RC) {
-    u32 CR = CRCompS(ppuState, GPR(rA), 0);
-    ppcUpdateCR(ppuState, 0, CR);
+  // _rc
+  if (_instr.rc) {
+    RECORD_CR0(GPRi(ra));
   }
 }
 
-void PPCInterpreter::PPCInterpreter_srdx(PPU_STATE *ppuState) {
-  X_FORM_rS_rA_rB_RC;
+// Shift Right Double Word (x’7C00 0436’)
+void PPCInterpreter::PPCInterpreter_srdx(PPU_STATE* ppuState) {
+  /*
+    n <- rB[58-63]
+    r <- ROTL[64](rS, 64 - n)
+    if rB[57] = 0 then
+      m <- MASK(n, 63)
+    else m <- (64)0
+    rA <- r & m
+  */
 
-  const u64 regS = GPR(rS);
-  const u32 n = static_cast<u32>(GPR(rB)) & 127;
-  const u64 r = std::rotl<u64>(regS, 64 - (n & 63));
-  u64 m = (n & 0x40) ? 0 : QMASK(n, 63);
+  const u32 n = GPRi(rb) & 0x7f;
+  GPRi(ra) = n & 0x40 ? 0 : GPRi(rs) >> n;
 
-  GPR(rA) = r & m;
-
-  if (RC) {
-    u32 CR = CRCompS(ppuState, GPR(rA), 0);
-    ppcUpdateCR(ppuState, 0, CR);
+  // _rc
+  if (_instr.rc) {
+    RECORD_CR0(GPRi(ra));
   }
 }
 
-void PPCInterpreter::PPCInterpreter_srwx(PPU_STATE *ppuState) {
+// Shift Right Word (x’7C00 0430’)
+void PPCInterpreter::PPCInterpreter_srwx(PPU_STATE* ppuState) {
+  /*
+    n <- rB[58-63]
+    r <- ROTL[32](rS[32-63], 64 - n)
+    if rB[58] = 0 then
+      m <- MASK(n + 32, 63)
+    else m <- (64)0
+    rA <- r & m
+  */
+
   GPRi(ra) = (GPRi(rs) & 0xffffffff) >> (GPRi(rb) & 0x3f);
 
+  // _rc
   if (_instr.rc) {
-    u32 CR = CRCompS(ppuState, GPRi(ra), 0);
-    ppcUpdateCR(ppuState, 0, CR);
+    RECORD_CR0(GPRi(ra));
   }
 }
 

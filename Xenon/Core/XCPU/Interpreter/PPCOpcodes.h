@@ -21,7 +21,6 @@ D_STUBRC(divduo)
 D_STUBRC(divdo)
 D_STUBRC(mulhd)
 D_STUBRC(mulldo)
-D_STUBRC(rldcl)
 D_STUBRC(mcrfs)
 D_STUBRC(mtfsb1)
 D_STUBRC(mtfsb0)
@@ -332,6 +331,7 @@ extern void PPCInterpreter_ori(PPU_STATE *ppuState);
 extern void PPCInterpreter_oris(PPU_STATE *ppuState);
 extern void PPCInterpreter_orx(PPU_STATE *ppuState);
 extern void PPCInterpreter_rldicx(PPU_STATE *ppuState);
+extern void PPCInterpreter_rldclx(PPU_STATE *ppuState);
 extern void PPCInterpreter_rldcrx(PPU_STATE *ppuState);
 extern void PPCInterpreter_rldiclx(PPU_STATE *ppuState);
 extern void PPCInterpreter_rldicrx(PPU_STATE *ppuState);
