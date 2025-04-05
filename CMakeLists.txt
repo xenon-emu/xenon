@@ -39,17 +39,19 @@ function(get_commit_count REPO_DIR RESULT_VAR)
         OUTPUT_STRIP_TRAILING_WHITESPACE
     )
     set(${RESULT_VAR} ${COMMIT_COUNT} PARENT_SCOPE)
-    if (NOT DEFINED ${COMMIT_COUNT})
-        set(${COMMIT_COUNT} 1)
-    endif()
 endfunction()
 
 set(REPO_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 get_commit_count(${REPO_DIR} COMMIT_COUNT)
 
+string(COMPARE EQUAL "${COMMIT_COUNT}" "" resulta)
+string(COMPARE EQUAL "x${COMMIT_COUNT}" "x1" resultb)
+if (NOT resulta AND NOT resultb)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCOMMIT_COUNT=\\\"${COMMIT_COUNT}\\\"")
+endif()
+
 message(STATUS "Commits Number: ${COMMIT_COUNT}")
 
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/Xenon/Base/CommitCount.cpp.in" "${CMAKE_CURRENT_SOURCE_DIR}/Xenon/Base/CommitCount.cpp" @ONLY)
 
 find_package(fmt 10.2.1 CONFIG)
 if (GFX_ENABLED)
@@ -79,8 +81,6 @@ set(Base
     Xenon/Base/Assert.cpp
     Xenon/Base/Assert.h
     Xenon/Base/Bounded_threadsafe_queue.h
-    Xenon/Base/CommitCount.cpp
-    Xenon/Base/CommitCount.h
     Xenon/Base/Concepts.h
     Xenon/Base/Config.cpp
     Xenon/Base/Config.h
