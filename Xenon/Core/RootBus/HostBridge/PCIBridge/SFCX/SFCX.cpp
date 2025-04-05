@@ -77,7 +77,6 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
   // Load NAND header and display info about it.
   nandFile.seekg(0, std::ios::beg);
   nandFile.read(reinterpret_cast<char*>(&sfcxState.nandHeader), sizeof(sfcxState.nandHeader));
-  nandFile.close();
 
   // Fix Endiannes
   sfcxState.nandHeader.nandMagic = byteswap_be<u16>(sfcxState.nandHeader.nandMagic);
@@ -124,6 +123,22 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
 
   sfcxState.nandHeader.smcBootAddr = byteswap_be<u32>(sfcxState.nandHeader.smcBootAddr);
   LOG_INFO(SFCX, " * SMC Boot Addr: {:#x}", sfcxState.nandHeader.smcBootAddr);
+
+  // Get CB Info, position is at 0x8 offset in NAND header, 4 bytes long.
+  BL_HEADER cbHeader;
+  u32 cbOffset = sfcxState.nandHeader.entry;
+  cbOffset = 1 ? ((cbOffset / 0x200) * 0x210) + cbOffset % 0x200 : cbOffset;
+  nandFile.seekg(cbOffset, std::ios::beg);
+  nandFile.read(reinterpret_cast<char*>(&cbHeader), sizeof(cbHeader));
+  nandFile.close();
+
+  // Check for CB Magic
+  if (cbHeader.name[0] == 'C' && cbHeader.name[1] == 'B') {
+    LOG_INFO(SFCX, "Found CB Header @ LBA: {:#x}", cbOffset);
+    LOG_INFO(SFCX, " * CB Version: {:#d}", byteswap_be<u16>(cbHeader.buildNumber));
+    LOG_INFO(SFCX, " * CB Entry: {:#x}", byteswap_be<u32>(cbHeader.entryPoint));
+    LOG_INFO(SFCX, " * CB Lenght: {:#x}", byteswap_be<u32>(cbHeader.lenght));
+  }
 
   // Enter SFCX Thread.
   sfcxThreadRunning = true;

@@ -128,6 +128,16 @@ struct NAND_HEADER {
   u32 smcBootAddr;
 };
 
+// Bootloader Header
+struct BL_HEADER {
+  u8 name[2];
+  u16 buildNumber;
+  u16 pairingData;
+  u16 flags;
+  u32 entryPoint;
+  u32 lenght;
+};
+
 struct SFCX_STATE {
   // Original SFCX Registers
   u32 configReg;
