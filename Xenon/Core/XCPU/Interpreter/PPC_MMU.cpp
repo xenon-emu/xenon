@@ -166,7 +166,7 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
     // The TLB is as selective as possible when invalidating TLB entries.The
     // invalidation match criteria is VPN[38:79 - p], L, LP, and LPID.
 
-    u64 rb = GPRi(rb);
+    const u64 rb = GPRi(rb);
     u64 rpn = 0;
 
     for (auto &tlbEntry : ppuState->TLB.tlbSet0) {
