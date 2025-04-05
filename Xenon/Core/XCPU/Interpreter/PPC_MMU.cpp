@@ -140,7 +140,7 @@ inline bool mmuComparePTE(u64 VA, u64 pte0, u64 pte1, u8 p, bool L, bool LP, u64
     } else {
       return false;
     }
-  }  else {
+  } else {
     LOG_ERROR(Xenon_MMU, "P > 28. Vali what did you messed up?");
     return false;
   }
@@ -166,8 +166,8 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
     // The TLB is as selective as possible when invalidating TLB entries.The
     // invalidation match criteria is VPN[38:79 - p], L, LP, and LPID.
 
-    u64 mask = PPCRotateMask(22, 63 - p);
-    u64 rbMasked = (mask & GPRi(rb)) >> p;
+    const u64 mask = PPCRotateMask(22, 63 - p);
+    const u64 rbMasked = (mask & GPRi(rb)) >> p;
 
     for (auto &tlbEntry : ppuState->TLB.tlbSet0) {
       if (tlbEntry.V && (tlbEntry.pte0 & PPC_HPTE64_AVPN) == rbMasked) {
@@ -201,7 +201,7 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
     // Index to one of the 256 rows of the tlb. Possible entire tlb
     // invalidation.
     u8 tlbCongruenceClass = 0;
-    u64 rb_44_51 = (GPRi(rb) & 0xFF000) >> 12;
+    const u64 rb_44_51 = (GPRi(rb) & 0xFF000) >> 12;
 
     ppuState->TLB.tlbSet0[rb_44_51].V = false;
     ppuState->TLB.tlbSet0[rb_44_51].pte0 = 0;
@@ -254,8 +254,8 @@ u8 PPCInterpreter::mmuGetPageSize(PPU_STATE *ppuState, bool L, u8 LP) {
 
   // HID6 16-17 bits select Large Page size 1.
   // HID6 18-19 bits select Large Page size 2.
-  u8 LB_16_17 = static_cast<u8>(QGET(ppuState->SPR.HID6, 16, 17));
-  u8 LB_18_19 = static_cast<u8>(QGET(ppuState->SPR.HID6, 18, 19));
+  const u8 LB_16_17 = static_cast<u8>(QGET(ppuState->SPR.HID6, 16, 17));
+  const u8 LB_18_19 = static_cast<u8>(QGET(ppuState->SPR.HID6, 18, 19));
 
   // Final p size.
   u8 p = 0;
@@ -354,15 +354,15 @@ bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *ppuState, u64 *RPN, u64 VA, u8
   // 16MB - VA[48:55]
 
   // 52-55 bits of 80 VA
-  u16 bits36_39 = static_cast<u16>(QGET(VA, 36, 39));
+  const u16 bits36_39 = static_cast<u16>(QGET(VA, 36, 39));
   // 56-59 bits of 80 VA
-  u16 bits40_43 = static_cast<u16>(QGET(VA, 40, 43));
+  const u16 bits40_43 = static_cast<u16>(QGET(VA, 40, 43));
   // 60-63 bits of 80 VA
-  u16 bits44_47 = static_cast<u16>(QGET(VA, 44, 47));
+  const u16 bits44_47 = static_cast<u16>(QGET(VA, 44, 47));
   // 64-67 bits of 80 VA
-  u16 bits48_51 = static_cast<u16>(QGET(VA, 48, 51));
+  const u16 bits48_51 = static_cast<u16>(QGET(VA, 48, 51));
   // 48-55 bits of 80 VA
-  u16 bits32_39 = static_cast<u16>(QGET(VA, 32, 39));
+  const u16 bits32_39 = static_cast<u16>(QGET(VA, 32, 39));
 
   switch (p) {
   case MMU_PAGE_SIZE_64KB:
@@ -1226,7 +1226,7 @@ void PPCInterpreter::MMUMemCpy(PPU_STATE *ppuState,
 
 void PPCInterpreter::MMUMemSet(PPU_STATE *ppuState,
                                u64 EA, s32 data, u64 size, bool cacheStore) {
-  u64 oldEA = EA;
+  const u64 oldEA = EA;
 
   if (MMUTranslateAddress(&EA, ppuState, true) == false)
     return;
@@ -1303,16 +1303,16 @@ void PPCInterpreter::MMUWrite8(PPU_STATE *ppuState, u64 EA, u8 data) {
 }
 // Writes 2 Bytes to memory.
 void PPCInterpreter::MMUWrite16(PPU_STATE *ppuState, u64 EA, u16 data) {
-  u16 dataBS = byteswap_be<u16>(data);
+  const u16 dataBS = byteswap_be<u16>(data);
   MMUWrite(intXCPUContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data));
 }
 // Writes 4 Bytes to memory.
 void PPCInterpreter::MMUWrite32(PPU_STATE *ppuState, u64 EA, u32 data) {
-  u32 dataBS = byteswap_be<u32>(data);
+  const u32 dataBS = byteswap_be<u32>(data);
   MMUWrite(intXCPUContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data));
 }
 // Writes 8 Bytes to memory.
 void PPCInterpreter::MMUWrite64(PPU_STATE *ppuState, u64 EA, u64 data) {
-  u64 dataBS = byteswap_be<u64>(data);
+  const u64 dataBS = byteswap_be<u64>(data);
   MMUWrite(intXCPUContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data));
 }

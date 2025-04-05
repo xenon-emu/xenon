@@ -1,6 +1,8 @@
 // Copyright 2025 Xenon Emulator Project
 
 #include "IIC.h"
+
+#include "Base/Assert.h"
 #include "Base/Logging/Log.h"
 
 #include <unordered_map>
@@ -20,7 +22,7 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
   std::lock_guard lck(mutex);
 
   if (size < 4) {
-    LOG_CRITICAL(Xenon, "Invalid interruprt write! Expected a size of at least 4, got {} instead", size);
+    LOG_CRITICAL(Xenon, "Invalid interrupt write! Expected a size of at least 4, got {} instead", size);
     return;
   }
 
@@ -260,5 +262,5 @@ std::string Xe::XCPU::IIC::XenonIIC::getIntName(u8 intID) {
       return irq.name.data();
     }
   }
-  return "PRIO_UNK";
+  UNREACHABLE_MSG("Unknown PRIO {}", intID);
 }

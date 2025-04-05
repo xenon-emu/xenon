@@ -13,7 +13,7 @@ constexpr const char* TrimSourcePath(std::string_view source) {
   const auto rfind = [source](const std::string_view match) {
     return source.rfind(match) == source.npos ? 0 : (source.rfind(match) + match.size());
   };
-  auto idx = std::max({rfind("/"), rfind("\\")});
+  const auto idx = std::max({rfind("/"), rfind("\\")});
   return source.data() + idx;
 }
 

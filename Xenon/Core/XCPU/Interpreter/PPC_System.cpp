@@ -25,16 +25,16 @@ void PPCInterpreter::PPCInterpreter_slbmte(PPU_STATE *ppuState) {
 
   u64 VSID = QGET(GPR(rS), 0, 51);
 
-  u8 Ks = QGET(GPR(rS), 52, 52);
-  u8 Kp = QGET(GPR(rS), 53, 53);
-  u8 N = QGET(GPR(rS), 54, 54);
-  u8 L = QGET(GPR(rS), 55, 55);
-  u8 C = QGET(GPR(rS), 56, 56);
-  u8 LP = QGET(GPR(rS), 57, 59);
+  const u8 Ks = QGET(GPR(rS), 52, 52);
+  const u8 Kp = QGET(GPR(rS), 53, 53);
+  const u8 N = QGET(GPR(rS), 54, 54);
+  const u8 L = QGET(GPR(rS), 55, 55);
+  const u8 C = QGET(GPR(rS), 56, 56);
+  const u8 LP = QGET(GPR(rS), 57, 59);
 
-  u64 ESID = QGET(GPR(rB), 0, 35);
+  const u64 ESID = QGET(GPR(rB), 0, 35);
   bool V = QGET(GPR(rB), 36, 36);
-  u16 Index = QGET(GPR(rB), 52, 63);
+  const u16 Index = QGET(GPR(rB), 52, 63);
 
   // VSID is VA 0-52 bit, the remaining 28 bits are adress data
   // so whe shift 28 bits left here so we only do it once per entry.
@@ -149,8 +149,8 @@ void PPCInterpreter::PPCInterpreter_rfid(PPU_STATE *ppuState) {
 void PPCInterpreter::PPCInterpreter_tw(PPU_STATE *ppuState) {
   X_FORM_TO_rA_rB;
 
-  sl32 a = static_cast<sl32>(GPR(rA));
-  sl32 b = static_cast<sl32>(GPR(rB));
+  const sl32 a = static_cast<sl32>(GPR(rA));
+  const sl32 b = static_cast<sl32>(GPR(rB));
 
   if ((a < b && BGET(TO, 5, 0)) || (a > b && BGET(TO, 5, 1)) ||
       (a == b && BGET(TO, 5, 2)) || (static_cast<u32>(a) < static_cast<u32>(b) && BGET(TO, 5, 3)) ||
@@ -163,7 +163,7 @@ void PPCInterpreter::PPCInterpreter_twi(PPU_STATE *ppuState) {
   D_FORM_TO_rA_SI;
   SI = EXTS(SI, 16);
 
-  sl32 a = static_cast<s32>(GPR(rA));
+  const sl32 a = static_cast<s32>(GPR(rA));
 
   if ((a < static_cast<s32>(SI) && BGET(TO, 5, 0)) || (a > static_cast<s32>(SI) && BGET(TO, 5, 1)) ||
       (a == static_cast<s32>(SI) && BGET(TO, 5, 2)) || (static_cast<u32>(a) < SI && BGET(TO, 5, 3)) ||
@@ -176,7 +176,7 @@ void PPCInterpreter::PPCInterpreter_tdi(PPU_STATE *ppuState) {
   D_FORM_TO_rA_SI;
   SI = EXTS(SI, 16);
 
-  s64 rAReg = static_cast<s64>(GPR(rA));
+  const s64 rAReg = static_cast<s64>(GPR(rA));
 
   if ((rAReg < static_cast<s64>(SI) && BGET(TO, 5, 0)) ||
       (rAReg > static_cast<s64>(SI) && BGET(TO, 5, 1)) ||

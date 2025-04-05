@@ -22,7 +22,7 @@ inline constexpr bool ContainsHex(const std::string_view &str) {
     return true;
   }
   for (auto &c : str) {
-    char uC = static_cast<char>(toupper(c)) - 65;
+    const char uC = static_cast<char>(toupper(c)) - 65;
     if (uC >= 0 && uC <= 5) {
       return true;
     }

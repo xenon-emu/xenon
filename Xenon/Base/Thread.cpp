@@ -4,8 +4,6 @@
 #include "Error.h"
 #include "Logging/Log.h"
 
-#include "ntapi.h"
-
 #ifdef __APPLE__
 #include <mach/mach.h>
 #include <mach/mach_time.h>
@@ -24,6 +22,7 @@
 #endif
 #ifndef _WIN32
 #include <unistd.h>
+#include "ntapi.h"
 #endif
 #include <thread>
 #include <algorithm>
@@ -79,7 +78,7 @@ void SetCurrentThreadRealtime(const std::chrono::nanoseconds period_ns) {
 #ifdef _WIN32
 
 void SetCurrentThreadPriority(ThreadPriority new_priority) {
-  auto handle = GetCurrentThread();
+  const auto handle = GetCurrentThread();
   int windows_priority = 0;
   switch (new_priority) {
   case ThreadPriority::Low:
@@ -108,7 +107,7 @@ static void AccurateSleep(std::chrono::nanoseconds duration) {
   LARGE_INTEGER interval{
     .QuadPart = -1 * (duration.count() / 100u),
   };
-  HANDLE timer = ::CreateWaitableTimer(nullptr, TRUE, nullptr);
+  const HANDLE timer = ::CreateWaitableTimer(nullptr, TRUE, nullptr);
   SetWaitableTimer(timer, &interval, 0, nullptr, nullptr, 0);
   WaitForSingleObject(timer, INFINITE);
   ::CloseHandle(timer);
@@ -120,9 +119,9 @@ void SetCurrentThreadPriority(ThreadPriority new_priority) {
   pthread_t this_thread = pthread_self();
 
   constexpr auto scheduling_type = SCHED_OTHER;
-  s32 max_prio = sched_get_priority_max(scheduling_type);
-  s32 min_prio = sched_get_priority_min(scheduling_type);
-  u32 level = std::max(static_cast<u32>(new_priority) + 1, 4U);
+  const s32 max_prio = sched_get_priority_max(scheduling_type);
+  const s32 min_prio = sched_get_priority_min(scheduling_type);
+  const u32 level = std::max(static_cast<u32>(new_priority) + 1, 4U);
 
   struct sched_param params;
   if (max_prio > min_prio) {
@@ -200,7 +199,7 @@ AccurateTimer::AccurateTimer(std::chrono::nanoseconds target_interval) :
 {}
 
 void AccurateTimer::Start() {
-  auto begin_sleep = std::chrono::high_resolution_clock::now();
+  const auto begin_sleep = std::chrono::high_resolution_clock::now();
   if (total_wait.count() > 0) {
     AccurateSleep(total_wait);
   }
@@ -209,7 +208,7 @@ void AccurateTimer::Start() {
 }
 
 void AccurateTimer::End() {
-  auto now = std::chrono::high_resolution_clock::now();
+  const auto now = std::chrono::high_resolution_clock::now();
   total_wait +=
     target_interval - std::chrono::duration_cast<std::chrono::nanoseconds>(now - start_time);
 }

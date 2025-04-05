@@ -202,7 +202,7 @@ void PPCInterpreter::PPCInterpreter_addmex(PPU_STATE* ppuState)
 {
   const s64 RA = GPRi(ra);
 
-  const auto add = addResult<u64>(RA, ~0ull, XER_GET_CA, curThread.SPR.MSR.SF);
+  const auto add = addResult<u64>(RA, ~0ULL, XER_GET_CA, curThread.SPR.MSR.SF);
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
 
@@ -659,8 +659,8 @@ void PPCInterpreter::PPCInterpreter_mullwox(PPU_STATE* ppuState)
 
 void PPCInterpreter::PPCInterpreter_mulhwx(PPU_STATE* ppuState)
 {
-  s32 a = static_cast<s32>(GPRi(ra));
-  s32 b = static_cast<s32>(GPRi(rb));
+  const s32 a = static_cast<s32>(GPRi(ra));
+  const s32 b = static_cast<s32>(GPRi(rb));
   GPRi(rd) = (s64{ a } * b) >> 32;
 
   if (_instr.rc) {
@@ -670,8 +670,8 @@ void PPCInterpreter::PPCInterpreter_mulhwx(PPU_STATE* ppuState)
 }
 
 void PPCInterpreter::PPCInterpreter_mulhwux(PPU_STATE *ppuState) {
-  u32 a = static_cast<u32>(GPRi(ra));
-  u32 b = static_cast<u32>(GPRi(rb));
+  const u32 a = static_cast<u32>(GPRi(ra));
+  const u32 b = static_cast<u32>(GPRi(rb));
   GPRi(rd) = (u64{ a } *b) >> 32;
 
   if (_instr.rc) {
@@ -763,9 +763,9 @@ void PPCInterpreter::PPCInterpreter_orx(PPU_STATE *ppuState) {
 void PPCInterpreter::PPCInterpreter_rldicx(PPU_STATE *ppuState) {
   MD_FORM_rS_rA_sh_mb_RC;
 
-  u64 r = std::rotl<u64>(GPR(rS), sh);
-  u32 e = 63 - sh;
-  u64 m = QMASK(mb, e);
+  const u64 r = std::rotl<u64>(GPR(rS), sh);
+  const u32 e = 63 - sh;
+  const u64 m = QMASK(mb, e);
 
   GPR(rA) = r & m;
 
@@ -778,10 +778,10 @@ void PPCInterpreter::PPCInterpreter_rldicx(PPU_STATE *ppuState) {
 void PPCInterpreter::PPCInterpreter_rldcrx(PPU_STATE *ppuState) {
   MDS_FORM_rS_rA_rB_me_RC;
 
-  u64 qwRb = GPR(rB);
-  u32 n = static_cast<u32>(QGET(qwRb, 58, 63));
-  u64 r = std::rotl<u64>(GPR(rS), n);
-  u64 m = QMASK(0, me);
+  const u64 qwRb = GPR(rB);
+  const u32 n = static_cast<u32>(QGET(qwRb, 58, 63));
+  const u64 r = std::rotl<u64>(GPR(rS), n);
+  const u64 m = QMASK(0, me);
 
   GPR(rA) = r & m;
 
@@ -794,8 +794,8 @@ void PPCInterpreter::PPCInterpreter_rldcrx(PPU_STATE *ppuState) {
 void PPCInterpreter::PPCInterpreter_rldiclx(PPU_STATE *ppuState) {
   MD_FORM_rS_rA_sh_mb_RC;
 
-  u64 r = std::rotl<u64>(GPR(rS), sh);
-  u64 m = QMASK(mb, 63);
+  const u64 r = std::rotl<u64>(GPR(rS), sh);
+  const u64 m = QMASK(mb, 63);
 
   GPR(rA) = r & m;
 
@@ -808,8 +808,8 @@ void PPCInterpreter::PPCInterpreter_rldiclx(PPU_STATE *ppuState) {
 void PPCInterpreter::PPCInterpreter_rldicrx(PPU_STATE *ppuState) {
   MD_FORM_rS_rA_sh_me_RC;
 
-  u64 r = std::rotl<u64>(GPR(rS), sh);
-  u64 m = QMASK(0, me);
+  const u64 r = std::rotl<u64>(GPR(rS), sh);
+  const u64 m = QMASK(0, me);
   GPR(rA) = r & m;
 
   if (RC) {
@@ -821,9 +821,9 @@ void PPCInterpreter::PPCInterpreter_rldicrx(PPU_STATE *ppuState) {
 void PPCInterpreter::PPCInterpreter_rldimix(PPU_STATE *ppuState) {
   MD_FORM_rS_rA_sh_mb_RC;
 
-  u64 r = std::rotl<u64>(GPR(rS), sh);
-  u32 e = 63 - sh;
-  u64 m = QMASK(mb, e);
+  const u64 r = std::rotl<u64>(GPR(rS), sh);
+  const u32 e = 63 - sh;
+  const u64 m = QMASK(mb, e);
 
   GPR(rA) = (r & m) | (GPR(rA) & ~m);
 
@@ -836,7 +836,7 @@ void PPCInterpreter::PPCInterpreter_rldimix(PPU_STATE *ppuState) {
 void PPCInterpreter::PPCInterpreter_rlwimix(PPU_STATE *ppuState) {
   M_FORM_rS_rA_SH_MB_ME_RC;
 
-  u32 r = std::rotl<u32>(static_cast<u32>(GPR(rS)), SH);
+  const u32 r = std::rotl<u32>(static_cast<u32>(GPR(rS)), SH);
   u32 m = (MB <= ME) ? DMASK(MB, ME) : (DMASK(0, ME) | DMASK(MB, 31));
 
   GPR(rA) = (r & m) | (static_cast<u32>(GPR(rA)) & ~m);
@@ -876,9 +876,9 @@ void PPCInterpreter::PPCInterpreter_rlwinmx(PPU_STATE *ppuState) {
 void PPCInterpreter::PPCInterpreter_sldx(PPU_STATE *ppuState) {
   X_FORM_rS_rA_rB_RC;
 
-  u64 regB = GPR(rB);
-  u32 n = static_cast<u32>(QGET(regB, 58, 63));
-  u64 r = std::rotl<u64>(GPR(rS), n);
+  const u64 regB = GPR(rB);
+  const u32 n = static_cast<u32>(QGET(regB, 58, 63));
+  const u64 r = std::rotl<u64>(GPR(rS), n);
   u64 m = QGET(regB, 57, 57) ? 0 : QMASK(0, 63 - n);
 
   GPR(rA) = r & m;
@@ -892,7 +892,7 @@ void PPCInterpreter::PPCInterpreter_sldx(PPU_STATE *ppuState) {
 void PPCInterpreter::PPCInterpreter_slwx(PPU_STATE *ppuState) {
   X_FORM_rS_rA_rB_RC;
 
-  u32 n = static_cast<u32>(GPR(rB)) & 63;
+  const u32 n = static_cast<u32>(GPR(rB)) & 63;
 
   GPR(rA) = (n < 32) ? (static_cast<u32>(GPR(rS)) << n) : 0;
 
@@ -905,9 +905,9 @@ void PPCInterpreter::PPCInterpreter_slwx(PPU_STATE *ppuState) {
 void PPCInterpreter::PPCInterpreter_sradx(PPU_STATE *ppuState) {
   X_FORM_rS_rA_rB_RC;
 
-  u64 regRS = GPR(rS);
-  u32 n = static_cast<u32>(GPR(rB)) & 127;
-  u64 r = std::rotl<u64>(regRS, 64 - (n & 63));
+  const u64 regRS = GPR(rS);
+  const u32 n = static_cast<u32>(GPR(rB)) & 127;
+  const u64 r = std::rotl<u64>(regRS, 64 - (n & 63));
   u64 m = (n & 0x40) ? 0 : QMASK(n, 63);
   u64 s = BGET(regRS, 64, 0) ? QMASK(0, 63) : 0;
 
@@ -933,9 +933,9 @@ void PPCInterpreter::PPCInterpreter_sradix(PPU_STATE *ppuState) {
     GPR(rA) = GPR(rS);
     curThread.SPR.XER.CA = 0;
   } else {
-    u64 r = std::rotl<u64>(GPR(rS), 64 - SH);
-    u64 m = QMASK(SH, 63);
-    u64 s = BGET(GPR(rS), 64, 0);
+    const u64 r = std::rotl<u64>(GPR(rS), 64 - SH);
+    const u64 m = QMASK(SH, 63);
+    const u64 s = BGET(GPR(rS), 64, 0);
 
     GPR(rA) = (r & m) | ((static_cast<u64>(-static_cast<s64>(s))) & ~m);
 
@@ -954,9 +954,9 @@ void PPCInterpreter::PPCInterpreter_sradix(PPU_STATE *ppuState) {
 void PPCInterpreter::PPCInterpreter_srawx(PPU_STATE *ppuState) {
   X_FORM_rS_rA_rB_RC;
 
-  u64 regRs = GPR(rS);
-  u64 n = static_cast<u32>(GPR(rB)) & 63;
-  u64 r = std::rotl<u32>(static_cast<u32>(regRs), 64 - (n & 31));
+  const u64 regRs = GPR(rS);
+  const u64 n = static_cast<u32>(GPR(rB)) & 63;
+  const u64 r = std::rotl<u32>(static_cast<u32>(regRs), 64 - (n & 31));
   u64 m = (n & 0x20) ? 0 : QMASK(n + 32, 63);
   u64 s = BGET(regRs, 32, 0) ? QMASK(0, 63) : 0;
   GPR(rA) = (r & m) | (s & ~m);
@@ -975,9 +975,9 @@ void PPCInterpreter::PPCInterpreter_srawx(PPU_STATE *ppuState) {
 void PPCInterpreter::PPCInterpreter_srawix(PPU_STATE *ppuState) {
   X_FORM_rS_rA_SH_RC;
 
-  u64 rSReg = GPR(rS);
-  u64 r = std::rotl<u32>(static_cast<u32>(rSReg), 64 - SH);
-  u64 m = QMASK(SH + 32, 63);
+  const u64 rSReg = GPR(rS);
+  const u64 r = std::rotl<u32>(static_cast<u32>(rSReg), 64 - SH);
+  const u64 m = QMASK(SH + 32, 63);
   u64 s = BGET(rSReg, 32, 0) ? QMASK(0, 63) : 0;
 
   GPR(rA) = (r & m) | (s & ~m);
@@ -996,9 +996,9 @@ void PPCInterpreter::PPCInterpreter_srawix(PPU_STATE *ppuState) {
 void PPCInterpreter::PPCInterpreter_srdx(PPU_STATE *ppuState) {
   X_FORM_rS_rA_rB_RC;
 
-  u64 regS = GPR(rS);
-  u32 n = static_cast<u32>(GPR(rB)) & 127;
-  u64 r = std::rotl<u64>(regS, 64 - (n & 63));
+  const u64 regS = GPR(rS);
+  const u32 n = static_cast<u32>(GPR(rB)) & 127;
+  const u64 r = std::rotl<u64>(regS, 64 - (n & 63));
   u64 m = (n & 0x40) ? 0 : QMASK(n, 63);
 
   GPR(rA) = r & m;

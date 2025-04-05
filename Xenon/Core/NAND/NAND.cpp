@@ -48,7 +48,7 @@ NAND::NAND(const char* deviceName, const std::string filePath,
 
   u8 magic[2]{};
   if (!CheckMagic(magic)) {
-    u16 magicLE = (magic[0] << 8) | (magic[1] << 0);
+    const u16 magicLE = (magic[0] << 8) | (magic[1] << 0);
     LOG_ERROR(System, "NAND: Wrong magic found! Your nand contained {:#x} while the expected is 0xFF4F (retail) or 0x0F4F (devkit)", magicLE);
     SYSTEM_PAUSE();
   }

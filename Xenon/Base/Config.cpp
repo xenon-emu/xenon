@@ -10,7 +10,7 @@ template <typename TC, typename K>
 std::filesystem::path find_fs_path_or(const basic_value<TC> &v, const K &ky,
                                       std::filesystem::path opt) {
   try {
-    auto str = find<std::string>(v, ky);
+    const auto str = find<std::string>(v, ky);
     if (str.empty()) {
       return opt;
     }
@@ -358,7 +358,6 @@ bool verifyConfig(const std::filesystem::path &path, toml::value &data) {
 
 void loadConfig(const std::filesystem::path &path) {
   // If the configuration file does not exist, create it and return.
-  LOG_INFO(Config, "Loading configuration from: {}", path.string());
   std::ifstream configFile{ path };
   std::error_code error;
   if (!std::filesystem::exists(path, error) && !configFile.is_open()) {

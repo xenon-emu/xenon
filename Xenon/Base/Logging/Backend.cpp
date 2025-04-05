@@ -289,7 +289,7 @@ void DeleteOldLogs(const std::filesystem::path& path, u64 num_logs, const u16 lo
   const time_t timeNow = std::chrono::system_clock::to_time_t(Now);
   const tm* time = std::localtime(&timeNow);
   // We want to get rid of anything that isn't that current day's date
-  std::string currentDate = fmt::format("{}-{}-{}", time->tm_mon + 1, time->tm_mday, 1900 + time->tm_year);
+  const std::string currentDate = fmt::format("{}-{}-{}", time->tm_mon + 1, time->tm_mday, 1900 + time->tm_year);
   if (filename.find(currentDate) == std::string::npos) {
     std::filesystem::remove_all(path);
     return;
@@ -301,23 +301,23 @@ void DeleteOldLogs(const std::filesystem::path& path, u64 num_logs, const u16 lo
 }
 
 u64 CreateIntegralTimestamp(const std::string &date) {
-  u64 monthPos = date.find('-');
+  const u64 monthPos = date.find('-');
   if (monthPos == std::string::npos) {
     return 0;
   }
   const std::string month = date.substr(0, monthPos);
-  u64 dayPos = date.find('-', monthPos);
+  const u64 dayPos = date.find('-', monthPos);
   if (dayPos == std::string::npos) {
     return 0;
   }
-  u64 yearPos = date.find('-', dayPos);
+  const u64 yearPos = date.find('-', dayPos);
   const std::string day = date.substr(monthPos+1);
   if (yearPos == std::string::npos) {
     return 0;
   }
   const std::string year = date.substr(yearPos + 1);
-  u64 yearInt = std::stoull(year);
-  std::string timestamp = fmt::format("{}{}{}", month, day, yearInt - 1900);
+  const u64 yearInt = std::stoull(year);
+  const std::string timestamp = fmt::format("{}{}{}", month, day, yearInt - 1900);
   return std::stoull(timestamp);
 }
 
@@ -357,18 +357,18 @@ void CleanupOldLogs(const std::string_view &log_file_base, const std::filesystem
       numToDelete--;
       std::filesystem::remove_all(path);
     } else {
-      std::string base = stem.substr(0, basePos);
-      u64 datePos = base.find('_', basePos+1);
+      const std::string base = stem.substr(0, basePos);
+      const u64 datePos = base.find('_', basePos+1);
       const std::string date = base.substr(datePos+1);
-      u64 dateInt = CreateIntegralTimestamp(date);
+      const u64 dateInt = CreateIntegralTimestamp(date);
       if (datePos == std::string::npos) {
         // If we cannot find the date, just delete it
         numToDelete--;
         std::filesystem::remove_all(path);
       } else {
-        u64 timePos = base.find('_', datePos+1);
+        const u64 timePos = base.find('_', datePos+1);
         const std::string time = base.substr(timePos+1);
-        u64 timestamp = CreateIntegralTimestamp(time);
+        const u64 timestamp = CreateIntegralTimestamp(time);
         if (!timestamp) {
           numToDelete--;
           std::filesystem::remove_all(path);
@@ -399,9 +399,9 @@ void Initialize(const std::string_view &log_file) {
   const std::chrono::time_point now = std::chrono::system_clock::now();
   const time_t timeNow = std::chrono::system_clock::to_time_t(now);
   const tm *time = std::localtime(&timeNow);
-  std::string currentTime = fmt::format("{}-{}-{}", time->tm_hour, time->tm_min, time->tm_sec);
-  std::string currentDate = fmt::format("{}-{}-{}", time->tm_mon + 1, time->tm_mday, 1900 + time->tm_year);
-  std::string filename = fmt::format("{}_{}_{}.txt", filestemBase, currentDate, currentTime);
+  const std::string currentTime = fmt::format("{}-{}-{}", time->tm_hour, time->tm_min, time->tm_sec);
+  const std::string currentDate = fmt::format("{}-{}-{}", time->tm_mon + 1, time->tm_mday, 1900 + time->tm_year);
+  const std::string filename = fmt::format("{}_{}_{}.txt", filestemBase, currentDate, currentTime);
   CleanupOldLogs(filenameBase, LogDir);
   Impl::Initialize(log_file.empty() ? filename : log_file);
 }

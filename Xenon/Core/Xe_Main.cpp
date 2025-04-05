@@ -1,6 +1,6 @@
 // Copyright 2025 Xenon Emulator Project
 
-#include "Core/Xe_Main.h"
+#include "Xe_Main.h"
 
 XeMain::XeMain() {
   Base::Log::Initialize();

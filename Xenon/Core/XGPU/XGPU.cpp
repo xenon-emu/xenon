@@ -99,7 +99,7 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
       byteswap_be<u32>(*reinterpret_cast<u32*>(data)));
 #endif
 
-    XeRegister reg = static_cast<XeRegister>(regIndex);
+    const XeRegister reg = static_cast<XeRegister>(regIndex);
 
     // Set our internal width.
 #ifndef NO_GFX
