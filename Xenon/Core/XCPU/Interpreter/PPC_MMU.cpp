@@ -166,32 +166,37 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
     // The TLB is as selective as possible when invalidating TLB entries.The
     // invalidation match criteria is VPN[38:79 - p], L, LP, and LPID.
 
-    const u64 mask = PPCRotateMask(22, 63 - p);
-    const u64 rbMasked = (mask & GPRi(rb)) >> p;
+    u64 rb = GPRi(rb);
+    u64 rpn = 0;
 
     for (auto &tlbEntry : ppuState->TLB.tlbSet0) {
-      if (tlbEntry.V && (tlbEntry.pte0 & PPC_HPTE64_AVPN) == rbMasked) {
+      if (mmuComparePTE(rb, tlbEntry.pte0, tlbEntry.pte1, p, _instr.l10, LP, &rpn)) {
+        LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: {:#x}", rpn);
         tlbEntry.V = false;
         tlbEntry.pte0 = 0;
         tlbEntry.pte1 = 0;
       }
     }
     for (auto &tlbEntry : ppuState->TLB.tlbSet1) {
-      if (tlbEntry.V && (tlbEntry.pte0 & PPC_HPTE64_AVPN) == rbMasked) {
+      if (mmuComparePTE(rb, tlbEntry.pte0, tlbEntry.pte1, p, _instr.l10, LP, &rpn)) {
+        LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: {:#x}", rpn);
         tlbEntry.V = false;
         tlbEntry.pte0 = 0;
         tlbEntry.pte1 = 0;
       }
     }
     for (auto &tlbEntry : ppuState->TLB.tlbSet2) {
-      if (tlbEntry.V && (tlbEntry.pte0 & PPC_HPTE64_AVPN) == rbMasked) {
+      if (mmuComparePTE(rb, tlbEntry.pte0, tlbEntry.pte1, p, _instr.l10, LP, &rpn)) {
+        LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: {:#x}", rpn);
         tlbEntry.V = false;
         tlbEntry.pte0 = 0;
         tlbEntry.pte1 = 0;
       }
     }
     for (auto &tlbEntry : ppuState->TLB.tlbSet3) {
-      if (tlbEntry.V && (tlbEntry.pte0 & PPC_HPTE64_AVPN) == rbMasked) {
+      u64 pteAVPN = tlbEntry.pte0 & PPC_HPTE64_AVPN;
+      if (mmuComparePTE(rb, tlbEntry.pte0, tlbEntry.pte1, p, _instr.l10, LP, &rpn)) {
+        LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: {:#x}", rpn);
         tlbEntry.V = false;
         tlbEntry.pte0 = 0;
         tlbEntry.pte1 = 0;
