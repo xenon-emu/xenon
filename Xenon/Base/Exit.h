@@ -27,7 +27,7 @@ inline std::atomic<bool> gSafeTerm{ true };
 // Platform independent force exit (If we need to force exit, Windows handles its exit syscall differently)
 [[nodiscard]] inline s32 fexit(s32 code) {
 #ifdef _WIN32
-  HANDLE process = ::GetCurrentProcess();
+  const HANDLE process = ::GetCurrentProcess();
   if (!process) {
     return -1;
   }

@@ -108,6 +108,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@main
-      - uses: cachix/install-nix-action@v27
+      - uses: cachix/install-nix-action@master
       - name: Build Xenon
         run: nix build .#xenon -L

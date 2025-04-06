@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include <iostream>
 #include <unordered_map>
 #include <list>
 
@@ -27,7 +26,7 @@ public:
     }
   }
 
-  u64 getElement(u64 key) {
+  const u64 getElement(u64 key) {
     auto it = cache.find(key);
     if (it == cache.end()) {
       return static_cast<u64>(-1);

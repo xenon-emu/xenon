@@ -11,51 +11,59 @@ if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
+# Optimizations
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+if (WIN32)
+  add_compile_options($<$<CONFIG:Release>:/Oi>)
+  add_compile_options($<$<CONFIG:Release>:/Ot>)
+endif()
 
-project(Xenon)
+project(Xenon VERSION 0.0.1)
 
+# Options
 option(GFX_ENABLED "Enable graphics" ON)
 
 # This function should be passed a list of all files in a target. It will automatically generate file groups
 # following the directory hierarchy, so that the layout of the files in IDEs matches the one in the filesystem.
 function(create_target_directory_groups target_name)
-  # Place any files that aren't in the source list in a separate group so that they don't get in the way.
   source_group("Other Files" REGULAR_EXPRESSION ".")
   get_target_property(target_sources "${target_name}" SOURCES)
   foreach(file_name IN LISTS target_sources)
     get_filename_component(dir_name "${file_name}" PATH)
-    # Group names use '\' as a separator even though the entire rest of CMake uses '/'...
     string(REPLACE "/" "\\" group_name "${dir_name}")
     source_group("${group_name}" FILES "${file_name}")
   endforeach()
 endfunction()
 
-function(get_commit_count REPO_DIR RESULT_VAR)
-    execute_process(
-        COMMAND git rev-list --count HEAD
-        WORKING_DIRECTORY ${REPO_DIR}
-        OUTPUT_VARIABLE COMMIT_COUNT
-        OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-    set(${RESULT_VAR} ${COMMIT_COUNT} PARENT_SCOPE)
-endfunction()
+# Xenon Version with Git
+execute_process(
+  COMMAND git rev-list --count HEAD
+  WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+  OUTPUT_VARIABLE COMMIT_COUNT
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
 
-set(REPO_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-get_commit_count(${REPO_DIR} COMMIT_COUNT)
+string(COMPARE EQUAL "${COMMIT_COUNT}" "" RESULT_A)
+string(COMPARE EQUAL "x${COMMIT_COUNT}" "x1" RESULT_B)
+if (NOT RESULT_A AND NOT RESULT_B)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCOMMIT_COUNT=\\\"${COMMIT_COUNT}\\\"")
+endif()
 
 message(STATUS "Commits Number: ${COMMIT_COUNT}")
 
-configure_file("${CMAKE_CURRENT_SOURCE_DIR}/Xenon/Base/CommitCount.cpp.in" "${CMAKE_CURRENT_SOURCE_DIR}/Xenon/Base/CommitCount.cpp" @ONLY)
 
-find_package(fmt 10.2.1 CONFIG)
+# Include third_party and Packages
 if (GFX_ENABLED)
   find_package(SDL3 3.2.4 CONFIG)
 endif()
+
+find_package(fmt 10.2.1 CONFIG)
 find_package(toml11 3.7.1 CONFIG)
+include_directories(Xenon PRIVATE third_party/glad/include)
 
 add_subdirectory(third_party)
 
+# Include Files
 set(Logging
     Xenon/Base/Logging/Backend.cpp
     Xenon/Base/Logging/Backend.h
@@ -76,8 +84,6 @@ set(Base
     Xenon/Base/Assert.cpp
     Xenon/Base/Assert.h
     Xenon/Base/Bounded_threadsafe_queue.h
-    Xenon/Base/CommitCount.cpp
-    Xenon/Base/CommitCount.h
     Xenon/Base/Concepts.h
     Xenon/Base/Config.cpp
     Xenon/Base/Config.h
@@ -242,9 +248,8 @@ add_executable(Xenon
     Xenon/Main.cpp
 )
 
-create_target_directory_groups(Xenon)
 
-# Test compiler ID
+# Set compiler ID
 if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 	set(msvc TRUE)
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -253,11 +258,12 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 	set(clang TRUE)
 endif()
 
-if (WIN32)
-	set(FONT_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/Xenon/fonts") # Windows Output
+if (GFX_ENABLED)
+  add_definitions(-DGFX_ENABLED)
 else()
-	set(FONT_OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/fonts")       # Linux Output
+  add_definitions(-DNO_GFX)
 endif()
+
 
 # Copy fonts to build directory
 if (GFX_ENABLED)
@@ -266,38 +272,33 @@ if (GFX_ENABLED)
             "${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts" # Input
             "${CMAKE_CURRENT_BINARY_DIR}/fonts"      # Output
     COMMENT "Copying fonts (${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts) to build directory (${CMAKE_CURRENT_BINARY_DIR}/fonts)"
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts
-  )
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts)
 endif()
 
-# Include OPENGL Directory
-include_directories(Xenon third_party/glad/include)
 
-if (GFX_ENABLED)
-  add_dependencies(Xenon copy-fonts)
-endif()
-target_include_directories(Xenon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR} ${IMGUI_DIR})
+# Link libraries
 if (GFX_ENABLED)
   target_link_libraries(Xenon PRIVATE fmt::fmt SDL3::SDL3 toml11::toml11)
+  target_include_directories(Xenon PRIVATE ${IMGUI_DIR})
+  add_dependencies(Xenon copy-fonts)
 else()
   target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11)
 endif()
 
-add_definitions(-DNTDDI_VERSION=0x0A000006 -D_WIN32_WINNT=0x0A00 -DWINVER=0x0A00)
-add_definitions(-DNOMINMAX -DWIN32_LEAN_AND_MEAN)
-if (GFX_ENABLED)
-  add_definitions(-DGFX_ENABLED)
-else()
-  add_definitions(-DNO_GFX)
+
+# Specific to Windows
+if (WIN32)
+  add_definitions(-DNTDDI_VERSION=0x0A000006)
+  add_definitions(-DNOMINMAX -DWIN32_LEAN_AND_MEAN)
+  target_sources(Xenon PRIVATE Xenon/Xenon.rc)
 endif()
+
+
+# This removes this warning
 add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
 
 if (msvc)
   set(CMAKE_GENERATOR_PLATFORM x64)
   set(CMAKE_SYSTEM_VERSION 10.0.19041.0)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
-endif()
-
-if (WIN32)
-  target_sources(Xenon PRIVATE Xenon/Xenon.rc)
 endif()

@@ -35,7 +35,7 @@ void PrintMessage(const Entry& entry) {
 
 void PrintColoredMessage(const Entry& entry) {
 #ifdef _WIN32
-  HANDLE console_handle = GetStdHandle(STD_ERROR_HANDLE);
+  const HANDLE console_handle = GetStdHandle(STD_ERROR_HANDLE);
   if (console_handle == INVALID_HANDLE_VALUE) {
     return;
   }

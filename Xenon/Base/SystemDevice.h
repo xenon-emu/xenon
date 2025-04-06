@@ -2,8 +2,6 @@
 
 #pragma once
 
-#include <cstring>
-
 #include "Types.h"
 
 struct DeviceInfo {

@@ -8,7 +8,7 @@ s32 globalShutdownHandler() {
   // If we have been told we cannot safely terminate, just force exit without cleanup
   // The OS will need to handle it, but better than deadlocking the process
   if (!Base::gSafeTerm) {
-    s32 exitCode = Base::exit(-1);
+    const s32 exitCode = Base::exit(-1);
     return exitCode; // Avoid cleanup, as we cannot ensure it'll be done properly
   }
   XeRunning = false;

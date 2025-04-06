@@ -230,12 +230,12 @@ void IOFile::Unlink() {
 
   // Mark the file for deletion
   // TODO: Also remove the file path?
-#ifdef _WIN64
+#if defined(_WIN64) || defined(_WIN32)
   FILE_DISPOSITION_INFORMATION disposition;
   IO_STATUS_BLOCK iosb;
 
   const int fd = fileno(file);
-  HANDLE hfile = reinterpret_cast<HANDLE>(_get_osfhandle(fd));
+  const HANDLE hfile = reinterpret_cast<HANDLE>(_get_osfhandle(fd));
 
   disposition.DeleteFile = true;
   NtSetInformationFile(hfile, &iosb, &disposition, sizeof(disposition),
@@ -294,11 +294,7 @@ bool IOFile::Flush() const {
 
   errno = 0;
 
-#ifdef _WIN32
   const auto flush_result = std::fflush(file) == 0;
-#else
-  const auto flush_result = std::fflush(file) == 0;
-#endif
 
   if (!flush_result) {
     const auto ec = std::error_code{errno, std::generic_category()};

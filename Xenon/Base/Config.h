@@ -130,7 +130,8 @@ inline struct _xcpu {
   bool elfLoader = false;
   // CPI for your system, do not modify
   s32 clocksPerInstruction = 0;
-  // HW_INIT_SKIP
+  // CB/SB HW_INIT_SKIP
+  bool SKIP_HW_INIT = true;
   u64 HW_INIT_SKIP_1 = 0;
   u64 HW_INIT_SKIP_2 = 0;
 

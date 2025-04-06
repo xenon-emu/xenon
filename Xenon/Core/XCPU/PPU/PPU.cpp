@@ -18,7 +18,7 @@ using namespace std::chrono_literals;
 // Clocks per instruction / Ticks per instruction
 static constexpr f64 cpi_base_freq = 50000000ULL; // 50Mhz
 static constexpr f64 cpi_scale = 1.0f; // Scale of how many clocks to speed up in percentage of speed
-static constexpr u64 get_cpi_value(u64 instrPerSecond) {
+static constexpr u64 get_cpi_value(const u64 instrPerSecond) {
   u64 tpi = 0;
   // Use floating point for a more percise CPI
   const f64 cpi_value = (instrPerSecond / 100000ULL) / ((cpi_base_freq / 1000000ULL) * cpi_scale);
@@ -171,7 +171,7 @@ void PPU::CalculateCPI() {
 
 void PPU::Reset() {
   // Zero out the memory
-  PPCInterpreter::MMUWrite(xenonContext, ppuState.get(), 0, 4, 32);
+  PPCInterpreter::MMUWrite(xenonContext, ppuState.get(), nullptr, 4, 32);
 
   // Set the NIP back to default
   curThread.NIA = 0x100;
@@ -318,7 +318,7 @@ PPU_THREAD_REGISTERS *PPU::GetPPUThread(u8 thrdID) {
 
 // This is the calibration code for the GetIPS() function. It branches to the
 // 0x4 location in memory.
-static u32 ipsCalibrationCode[] = {
+static constexpr u32 ipsCalibrationCode[] = {
     0x55726220, //  rlwinm   r18,r11,12,8,16
     0x723D7825, //  andi.    r29,r17,0x7825
     0x65723D78, //  oris     r18,r11,0x3D78

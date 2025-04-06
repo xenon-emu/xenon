@@ -395,7 +395,7 @@ public:
         return *this;
       }
       else if (r.hi == 0 && r.lo < 128) {
-        s64 _lo = static_cast<s64>(hi) >> (r.lo - 64);
+        const s64 _lo = static_cast<s64>(hi) >> (r.lo - 64);
         lo = _lo;
         hi = _lo >> 63;
         return *this;

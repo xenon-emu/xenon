@@ -73,7 +73,7 @@ void ODD::atapiIdentifyPacketDeviceCommand() {
 
   // Set the transfer size:
   // bytecount = LBA High << 8 | LBA Mid
-  size_t dataSize = sizeof(XE_ATA_IDENTIFY_DATA);
+  constexpr size_t dataSize = sizeof(XE_ATA_IDENTIFY_DATA);
 
   atapiState.atapiRegs.lbaLowReg = 1;
   atapiState.atapiRegs.byteCountLowReg = dataSize & 0xFF;
@@ -530,7 +530,7 @@ void ODD::MemSet(u64 writeAddress, s32 data, u64 size) {
         memset(atapiState.dataReadBuffer.get(), data, size);
         // Set the transfer size:
         // bytecount = LBA High << 8 | LBA Mid
-        size_t dataSize = sizeof(XE_ATA_IDENTIFY_DATA);
+        constexpr size_t dataSize = sizeof(XE_ATA_IDENTIFY_DATA);
         atapiState.atapiRegs.lbaLowReg = 1;
         atapiState.atapiRegs.byteCountLowReg = dataSize & 0xFF;
         atapiState.atapiRegs.byteCountHighReg = (dataSize >> 8) & 0xFF;

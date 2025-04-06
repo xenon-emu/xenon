@@ -103,8 +103,7 @@ out vec2 o_texture_coord;
 void main() {
   o_texture_coord = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
   gl_Position = vec4(o_texture_coord * vec2(2.0f, -2.0f) + vec2(-1.0f, 1.0f), 0.0f, 1.0f);
-}
-)";
+})";
 
 inline constexpr const char* fragmentShaderSource = R"(
 #version 430 core
@@ -117,13 +116,12 @@ uniform usampler2D u_texture;
 void main() {
   uint pixel = texture(u_texture, o_texture_coord).r;
   // Gotta love BE vs LE (X360 works in BGRA, so we work in ARGB)
-  float a = float((pixel >> 24) & 0xFF) / 255.0;
-  float r = float((pixel >> 16) & 0xFF) / 255.0;
-  float g = float((pixel >> 8) & 0xFF) / 255.0;
-  float b = float((pixel >> 0) & 0xFF) / 255.0;
+  const float a = float((pixel >> 24) & 0xFF) / 255.0;
+  const float r = float((pixel >> 16) & 0xFF) / 255.0;
+  const float g = float((pixel >> 8) & 0xFF) / 255.0;
+  const float b = float((pixel >> 0) & 0xFF) / 255.0;
   o_color = vec4(r, g, b, a);
-}
-)";
+})";
 
 inline constexpr const char* computeShaderSource = R"(
 #version 430 core
@@ -160,16 +158,16 @@ void main() {
     return;
 
   // Precalc whatever it would be with extra sizing for 32x32 tiles
-  int tiledWidth = TILE(internalWidth);
-  int tiledHeight = TILE(internalHeight);
+  const int tiledWidth = TILE(internalWidth);
+  const int tiledHeight = TILE(internalHeight);
 
   // Scale accordingly
   float scaleX = tiledWidth / float(resWidth);
   float scaleY = tiledHeight / float(resHeight);
 
   // Map to source resolution
-  int srcX = int(float(texel_pos.x) * scaleX);
-  int srcY = int(float(texel_pos.y) * scaleY);
+  const int srcX = int(float(texel_pos.x) * scaleX);
+  const int srcY = int(float(texel_pos.y) * scaleY);
 
   // God only knows how this indexing works
   int stdIndex = (srcY * tiledWidth + srcX);
@@ -177,8 +175,7 @@ void main() {
 
   uint packedColor = pixel_data[xeIndex];
   imageStore(o_texture, texel_pos, uvec4(packedColor, 0, 0, 0));
-}
-)";
+})";
 
 } // namespace Render
 

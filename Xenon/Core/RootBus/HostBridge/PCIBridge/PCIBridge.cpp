@@ -623,7 +623,7 @@ void PCIBridge::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   }
 
   for (auto &device : connectedPCIDevices) {
-    if (device->GetDeviceName() == currentDevName) {
+    if (currentDevName && !strcmp(device->GetDeviceName(), currentDevName)) {
       // Hit!
       u64 value = 0;
       memcpy(&value, data, size);
