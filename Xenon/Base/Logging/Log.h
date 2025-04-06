@@ -2,9 +2,10 @@
 
 #pragma once
 
+#include <fmt/format.h>
+
 #include <algorithm>
 
-#include "Formatter.h"
 #include "Types.h"
 
 namespace Base::Log {

@@ -12,12 +12,10 @@ enum class Level : u8 {
   Debug,      ///< Less detailed debugging information.
   Info,       ///< Status information from important points during execution.
   Warning,    ///< Minor or potential problems found during execution of a task.
-  Error,      ///< Major problems found during execution of a task that prevent it from being
-              ///< completed.
-  Critical,   ///< Major problems during execution that threaten the stability of the entire
-              ///< application.
+  Error,      ///< Major problems found during execution of a task that prevent it from being completed.
+  Critical,   ///< Major problems during execution that threaten the stability of the entire application.
   Guest,      ///< Output from the guest system.
-  Count       ///< Total number of logging levels
+  Count       ///< Total number of logging levels.
 };
 
 /*

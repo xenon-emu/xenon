@@ -86,7 +86,6 @@ set(Logging
     Xenon/Base/Logging/Backend.h
     Xenon/Base/Logging/Filter.cpp
     Xenon/Base/Logging/Filter.h
-    Xenon/Base/Logging/Formatter.h
     Xenon/Base/Logging/Log.h
     Xenon/Base/Logging/Log_entry.h
     Xenon/Base/Logging/Text_formatter.cpp
