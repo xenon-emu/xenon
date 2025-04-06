@@ -95,7 +95,7 @@ private:
   u64 ppuStepAmount = 0;
 
   // Execution threads inside this PPU.
-  std::shared_ptr<PPU_STATE> ppuState;
+  std::unique_ptr<PPU_STATE> ppuState;
 
   // Main CPU Context.
   XENON_CONTEXT *xenonContext = nullptr;

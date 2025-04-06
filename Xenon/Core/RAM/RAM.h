@@ -13,6 +13,7 @@ public:
   RAM(const char* deviceName, u64 startAddress, u64 endAddress,
     bool isSOCDevice);
   ~RAM();
+  void Reset();
   void Read(u64 readAddress, u8 *data, u64 size) override;
   void Write(u64 writeAddress, const u8 *data, u64 size) override;
   void MemSet(u64 writeAddress, s32 data, u64 size) override;

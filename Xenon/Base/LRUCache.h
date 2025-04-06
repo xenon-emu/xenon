@@ -16,6 +16,11 @@ private:
 
 public:
   explicit LRUCache(size_t size) : capacity(size) {}
+  ~LRUCache() {
+    keys.clear();
+    cache.clear();
+    capacity = 0;
+  }
 
   void resizeCache(size_t size) {
     capacity = size;
@@ -58,7 +63,7 @@ public:
     }
 
     keys.push_front(key);
-    cache[key] = {value, keys.begin()};
+    cache[key] = { value, keys.begin() };
   }
 
   void invalidateElement(u64 key) {
@@ -70,7 +75,11 @@ public:
   }
 
   void invalidateAll() {
-    keys.clear();
-    cache.clear();
+    if (!keys.empty()) {
+      keys.clear();
+    }
+    if (!cache.empty()) {
+      cache.clear();
+    }
   }
 };

@@ -82,6 +82,10 @@ void XeMain::start() {
 #endif
     return;
   }
+  // If we have already created PPU0 and we already have RAM, then reset it
+  if (xenonCPU && xenonCPU->GetPPU(0) && ram) {
+    ram->Reset();
+  }
   if (Config::xcpu.elfLoader) {
     // Load the elf
     xenonCPU->LoadElf(Config::filepaths.elfBinary);

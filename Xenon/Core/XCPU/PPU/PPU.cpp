@@ -41,7 +41,7 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
   }
 
   // Allocate memory for our PPU state
-  ppuState = std::make_shared<STRIP_UNIQUE(ppuState)>();
+  ppuState = std::make_unique<STRIP_UNIQUE(ppuState)>();
 
   // Set PPU ID (PIR, as 0 indexed. So 0-4)
   ppuState->ppuID = PIR / 2;
@@ -266,11 +266,13 @@ void PPU::ThreadStateMachine() {
     ppuThreadState = eThreadState::None;
   } break;
   case eThreadState::Quiting: {
-    if (ppuState->ppuID == 0) {
-      // Ensure the log is flushed
-      std::cout << std::endl;
+    if (ppuState.get()) {
+      if (ppuState->ppuID == 0) {
+        // Ensure the log is flushed
+        std::cout << std::endl;
+      }
+      LOG_INFO(Xenon, "PPU{} is exiting!", ppuState->ppuID);
     }
-    LOG_INFO(Xenon, "PPU{} is exiting!", ppuState->ppuID);
     ppuThreadState = eThreadState::None;
   } break;
   default: {

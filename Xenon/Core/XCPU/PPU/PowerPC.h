@@ -602,6 +602,13 @@ struct PPU_THREAD_REGISTERS {
 };
 
 struct PPU_STATE {
+  ~PPU_STATE() {
+    for (u8 i = 0; i < 2; ++i) {
+      ppuThread[i].iERAT = LRUCache{ 0 };
+      ppuThread[i].dERAT = LRUCache{ 0 };
+      ppuThread[i].ppuRes.reset();
+    }
+  }
   // Thread Specific State.
   PPU_THREAD_REGISTERS ppuThread[2]{};
   // Current executing thread.

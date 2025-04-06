@@ -8,17 +8,20 @@
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
 
 // Helper functions for text/string formatting with the gui
-#define TextFmt(x, ...) Text(fmt::format(x, __VA_ARGS__))
-#define CustomBase(x, fmt, ...) TextFmt(x ": " fmt, __VA_ARGS__)
-#define Custom(x, fmt, ...) CustomBase(#x, fmt, __VA_ARGS__)
-#define HexBase(x, ...) CustomBase(x, "0x{:X}", __VA_ARGS__)
-#define Hex(c, x) HexBase(#x, c.x)
-#define BFHex(c, x) HexBase(#x, u32(c.x))
-#define U8Hex(c, x) HexBase(#x, static_cast<u32>(c.x))
-#define HexArr(a, i) HexBase("[{}]", i, a[i])
-#define Dec(c, x) Custom(x, "{}", c.x)
-#define U8Dec(c, x) Custom(x, "{}", static_cast<u32>(c.x))
-#define Bool(c, x) Custom(x, "{}", c.x ? "true" : "false")
+#define TextFmt(g, x, ...) g->Text(fmt::format(x, __VA_ARGS__))
+#define TextCopyFmt(g, x, v, ...) g->TextCopy(x, fmt::format(v, __VA_ARGS__))
+#define CustomBase(g, x, fmt, ...) TextFmt(g, x ": " fmt, __VA_ARGS__)
+#define CopyCustomBase(g, x, fmt, ...) TextCopyFmt(g, x, fmt, __VA_ARGS__)
+#define Custom(g, x, fmt, ...) CustomBase(g, #x, fmt, __VA_ARGS__)
+#define CopyCustom(g, x, fmt, ...) CustomBase(g, #x, fmt, __VA_ARGS__)
+#define HexBase(g, x, ...) CopyCustomBase(g, x, "0x{:X}", __VA_ARGS__)
+#define Hex(g, c, x) HexBase(g, #x, c.x)
+#define BFHex(g, c, x) HexBase(g, #x, u32(c.x));
+#define U8Hex(g, c, x) HexBase(g, #x, static_cast<u32>(c.x))
+#define HexArr(g, a, i) HexBase(g, "[{}]", i, a[i])
+#define Dec(g, c, x) CopyCustom(g, x, "{}", c.x)
+#define U8Dec(g, c, x) CopyCustom(g, x, "{}", static_cast<u32>(c.x))
+#define Bool(g, c, x) CopyCustom(g, x, "{}", c.x ? "true" : "false")
 
 void Render::GUI::Init(SDL_Window* window, void* context) {
   // Set our mainWindow handle
@@ -57,7 +60,9 @@ void Render::GUI::PostInit() {
   // It might not be a bad idea to take the Xbox 360 font and convert it to TTF
   const std::filesystem::path fontsPath{ Base::FS::GetUserPath(Base::FS::PathType::FontDir) };
   const std::string robotoRegular = (fontsPath / "Roboto-Regular.ttf").string();
+  robotRegular16 = io.Fonts->AddFontFromFileTTF(robotoRegular.c_str(), 16.f);
   robotRegular14 = io.Fonts->AddFontFromFileTTF(robotoRegular.c_str(), 14.f);
+  robotRegular18 = io.Fonts->AddFontFromFileTTF(robotoRegular.c_str(), 18.f);
   defaultFont13 = io.Fonts->AddFontDefault();
   if (Config::xcpu.HW_INIT_SKIP_1 == 0x3003DC0 && Config::xcpu.HW_INIT_SKIP_2 == 0x3003E54) {
     storedPreviousInitSkips = true; // If we already have RGH2, ignore
@@ -103,6 +108,51 @@ void Render::GUI::Node(const std::string& title, std::function<void()> callback,
 
 void Render::GUI::Text(const std::string& label) {
   ImGui::TextUnformatted(label.c_str());
+}
+
+namespace ImGui {
+  // Copies behaviour from ImGui::TextLink, then removes the line and color
+  bool TextButton(const char* label) {
+    ImGuiWindow* window = ImGui::GetCurrentWindow();
+    if (window->SkipItems)
+      return false;
+
+    const ImGuiID id = window->GetID(label);
+    const char* label_end = FindRenderedTextEnd(label);
+
+    ImVec2 pos(window->DC.CursorPos.x, window->DC.CursorPos.y + window->DC.CurrLineTextBaseOffset);
+    ImVec2 size = CalcTextSize(label, label_end, true);
+    ImRect bb(pos, pos + size);
+    ItemSize(size, 0.0f);
+    if (!ItemAdd(bb, id))
+      return false;
+
+    bool hovered, held;
+    bool pressed = ButtonBehavior(bb, id, &hovered, &held);
+    RenderNavCursor(bb, id);
+
+    if (hovered)
+      SetMouseCursor(ImGuiMouseCursor_Hand);
+
+    RenderText(bb.Min, label, label_end);
+    return pressed;
+  }
+}
+
+void Render::GUI::TextCopy(const std::string& label, const std::string& value) {
+  std::string flabel = label + ": " + value;
+  if (ImGui::TextButton(flabel.data())) {
+    LOG_INFO(Debug, "{}", flabel.data());
+  }
+  if (ImGui::BeginPopupContextItem()) {
+    MenuItem("Copy '" + flabel + "'", [&] {
+      SDL_SetClipboardText(flabel.data());
+    });
+    MenuItem("Copy '" + value + "'", [&] {
+      SDL_SetClipboardText(value.data());
+    });
+    ImGui::EndPopup();
+  }
 }
 
 void Render::GUI::SameLine(float xOffset, float spacing) {
@@ -217,205 +267,205 @@ void PPUThread(Render::GUI *gui, PPU_STATE *PPUState, ePPUThread threadID) {
       PPU_THREAD_SPRS &SPR = ppuRegisters.SPR;
       gui->Node("XER", [&] {
         XERegister &XER = SPR.XER;
-        gui->Hex(XER, XER_Hex);
-        gui->BFHex(XER, ByteCount);
-        gui->BFHex(XER, R0);
-        gui->BFHex(XER, CA);
-        gui->BFHex(XER, OV);
-        gui->BFHex(XER, SO);
+        Hex(gui, XER, XER_Hex);
+        BFHex(gui, XER, ByteCount);
+        BFHex(gui, XER, R0);
+        BFHex(gui, XER, CA);
+        BFHex(gui, XER, OV);
+        BFHex(gui, XER, SO);
       });
-      gui->Hex(SPR, LR);
-      gui->Hex(SPR, CTR);
-      gui->Hex(SPR, CFAR);
-      gui->Hex(SPR, VRSAVE);
-      gui->Hex(SPR, DSISR);
-      gui->Hex(SPR, DAR);
-      gui->Dec(SPR, DEC);
-      gui->Hex(SPR, SRR0);
-      gui->Hex(SPR, SRR1);
-      gui->Hex(SPR, ACCR);
-      gui->Hex(SPR, SPRG0);
-      gui->Hex(SPR, SPRG1);
-      gui->Hex(SPR, SPRG2);
-      gui->Hex(SPR, SPRG3);
-      gui->Hex(SPR, HSPRG0);
-      gui->Hex(SPR, HSPRG1);
-      gui->Hex(SPR, HSRR0);
-      gui->Hex(SPR, HSRR1);
-      gui->Hex(SPR, TSRL);
-      gui->Hex(SPR, TSSR);
-      gui->Hex(SPR, PPE_TLB_Index_Hint);
-      gui->Hex(SPR, DABR);
-      gui->Hex(SPR, DABRX);
+      Hex(gui, SPR, LR);
+      Hex(gui, SPR, CTR);
+      Hex(gui, SPR, CFAR);
+      Hex(gui, SPR, VRSAVE);
+      Hex(gui, SPR, DSISR);
+      Hex(gui, SPR, DAR);
+      Dec(gui, SPR, DEC);
+      Hex(gui, SPR, SRR0);
+      Hex(gui, SPR, SRR1);
+      Hex(gui, SPR, ACCR);
+      Hex(gui, SPR, SPRG0);
+      Hex(gui, SPR, SPRG1);
+      Hex(gui, SPR, SPRG2);
+      Hex(gui, SPR, SPRG3);
+      Hex(gui, SPR, HSPRG0);
+      Hex(gui, SPR, HSPRG1);
+      Hex(gui, SPR, HSRR0);
+      Hex(gui, SPR, HSRR1);
+      Hex(gui, SPR, TSRL);
+      Hex(gui, SPR, TSSR);
+      Hex(gui, SPR, PPE_TLB_Index_Hint);
+      Hex(gui, SPR, DABR);
+      Hex(gui, SPR, DABRX);
       gui->Node("MSR", [&] {
         MSRegister &MSR = SPR.MSR;
-        gui->BFHex(MSR, LE);
-        gui->BFHex(MSR, RI);
-        gui->BFHex(MSR, PMM);
-        gui->BFHex(MSR, DR);
-        gui->BFHex(MSR, IR);
-        gui->BFHex(MSR, FE1);
-        gui->BFHex(MSR, BE);
-        gui->BFHex(MSR, SE);
-        gui->BFHex(MSR, FE0);
-        gui->BFHex(MSR, ME);
-        gui->BFHex(MSR, FP);
-        gui->BFHex(MSR, PR);
-        gui->BFHex(MSR, EE);
-        gui->BFHex(MSR, ILE);
-        gui->BFHex(MSR, VXU);
-        gui->BFHex(MSR, HV);
-        gui->BFHex(MSR, TA);
-        gui->BFHex(MSR, SF);
+        BFHex(gui, MSR, LE);
+        BFHex(gui, MSR, RI);
+        BFHex(gui, MSR, PMM);
+        BFHex(gui, MSR, DR);
+        BFHex(gui, MSR, IR);
+        BFHex(gui, MSR, FE1);
+        BFHex(gui, MSR, BE);
+        BFHex(gui, MSR, SE);
+        BFHex(gui, MSR, FE0);
+        BFHex(gui, MSR, ME);
+        BFHex(gui, MSR, FP);
+        BFHex(gui, MSR, PR);
+        BFHex(gui, MSR, EE);
+        BFHex(gui, MSR, ILE);
+        BFHex(gui, MSR, VXU);
+        BFHex(gui, MSR, HV);
+        BFHex(gui, MSR, TA);
+        BFHex(gui, MSR, SF);
       });
-      gui->Hex(SPR, PIR);
+      Hex(gui, SPR, PIR);
     });
-    gui->Hex(ppuRegisters, CIA);
-    gui->Hex(ppuRegisters, NIA);
+    Hex(gui, ppuRegisters, CIA);
+    Hex(gui, ppuRegisters, NIA);
     gui->Node("CI", [&] {
       PPCOpcode &CI = ppuRegisters.CI;
-      gui->Hex(CI, opcode);
-      gui->BFHex(CI, main);
-      gui->BFHex(CI, sh64);
-      gui->BFHex(CI, mbe64);
-      gui->BFHex(CI, vuimm);
-      gui->BFHex(CI, vs);
-      gui->BFHex(CI, vsh);
-      gui->BFHex(CI, oe);
-      gui->BFHex(CI, spr);
-      gui->BFHex(CI, vc);
-      gui->BFHex(CI, vb);
-      gui->BFHex(CI, va);
-      gui->BFHex(CI, vd);
-      gui->BFHex(CI, lk);
-      gui->BFHex(CI, aa);
-      gui->BFHex(CI, rb);
-      gui->BFHex(CI, ra);
-      gui->BFHex(CI, rd);
-      gui->BFHex(CI, uimm16);
-      gui->BFHex(CI, l11);
-      gui->BFHex(CI, rs);
-      gui->BFHex(CI, simm16);
-      gui->BFHex(CI, ds);
-      gui->BFHex(CI, vsimm);
-      gui->BFHex(CI, ll);
-      gui->BFHex(CI, li);
-      gui->BFHex(CI, lev);
-      gui->BFHex(CI, i);
-      gui->BFHex(CI, crfs);
-      gui->BFHex(CI, l10);
-      gui->BFHex(CI, crfd);
-      gui->BFHex(CI, crbb);
-      gui->BFHex(CI, crba);
-      gui->BFHex(CI, crbd);
-      gui->BFHex(CI, rc);
-      gui->BFHex(CI, me32);
-      gui->BFHex(CI, mb32);
-      gui->BFHex(CI, sh32);
-      gui->BFHex(CI, bi);
-      gui->BFHex(CI, bo);
-      gui->BFHex(CI, bh);
-      gui->BFHex(CI, frc);
-      gui->BFHex(CI, frb);
-      gui->BFHex(CI, fra);
-      gui->BFHex(CI, frd);
-      gui->BFHex(CI, crm);
-      gui->BFHex(CI, frs);
-      gui->BFHex(CI, flm);
-      gui->BFHex(CI, l6);
-      gui->BFHex(CI, l15);
-      gui->BFHex(CI, bt14);
-      gui->BFHex(CI, bt24);
+      Hex(gui, CI, opcode);
+      BFHex(gui, CI, main);
+      BFHex(gui, CI, sh64);
+      BFHex(gui, CI, mbe64);
+      BFHex(gui, CI, vuimm);
+      BFHex(gui, CI, vs);
+      BFHex(gui, CI, vsh);
+      BFHex(gui, CI, oe);
+      BFHex(gui, CI, spr);
+      BFHex(gui, CI, vc);
+      BFHex(gui, CI, vb);
+      BFHex(gui, CI, va);
+      BFHex(gui, CI, vd);
+      BFHex(gui, CI, lk);
+      BFHex(gui, CI, aa);
+      BFHex(gui, CI, rb);
+      BFHex(gui, CI, ra);
+      BFHex(gui, CI, rd);
+      BFHex(gui, CI, uimm16);
+      BFHex(gui, CI, l11);
+      BFHex(gui, CI, rs);
+      BFHex(gui, CI, simm16);
+      BFHex(gui, CI, ds);
+      BFHex(gui, CI, vsimm);
+      BFHex(gui, CI, ll);
+      BFHex(gui, CI, li);
+      BFHex(gui, CI, lev);
+      BFHex(gui, CI, i);
+      BFHex(gui, CI, crfs);
+      BFHex(gui, CI, l10);
+      BFHex(gui, CI, crfd);
+      BFHex(gui, CI, crbb);
+      BFHex(gui, CI, crba);
+      BFHex(gui, CI, crbd);
+      BFHex(gui, CI, rc);
+      BFHex(gui, CI, me32);
+      BFHex(gui, CI, mb32);
+      BFHex(gui, CI, sh32);
+      BFHex(gui, CI, bi);
+      BFHex(gui, CI, bo);
+      BFHex(gui, CI, bh);
+      BFHex(gui, CI, frc);
+      BFHex(gui, CI, frb);
+      BFHex(gui, CI, fra);
+      BFHex(gui, CI, frd);
+      BFHex(gui, CI, crm);
+      BFHex(gui, CI, frs);
+      BFHex(gui, CI, flm);
+      BFHex(gui, CI, l6);
+      BFHex(gui, CI, l15);
+      BFHex(gui, CI, bt14);
+      BFHex(gui, CI, bt24);
     });
-    gui->Bool(ppuRegisters, iFetch);
+    Bool(gui, ppuRegisters, iFetch);
     gui->Node("GPRs", [&] {
       for (u64 i = 0; i != 32; ++i) {
-        gui->HexArr(ppuRegisters.GPR, i);
+        HexArr(gui, ppuRegisters.GPR, i);
       }
     });
     gui->Node("FPRs", [&] {
       for (u64 i = 0; i != 32; ++i) {
         FPRegister &FPR = ppuRegisters.FPR[i];
         gui->Node(fmt::format("[{}]", i), [&] {
-          gui->Custom(valueAsDouble, "{}", FPR.valueAsDouble);
-          gui->Custom(valueAsU64, "0x{:X}",FPR.valueAsU64);
+          Custom(gui, valueAsDouble, "{}", FPR.valueAsDouble);
+          Custom(gui, valueAsU64, "0x{:X}",FPR.valueAsU64);
         });
       }
     });
     gui->Node("CR", [&] {
       CRegister &CR = ppuRegisters.CR;
-      gui->Hex(CR, CR_Hex);
-      gui->BFHex(CR, CR0);
-      gui->BFHex(CR, CR1);
-      gui->BFHex(CR, CR2);
-      gui->BFHex(CR, CR3);
-      gui->BFHex(CR, CR4);
-      gui->BFHex(CR, CR5);
-      gui->BFHex(CR, CR6);
-      gui->BFHex(CR, CR7);
+      Hex(gui, CR, CR_Hex);
+      BFHex(gui, CR, CR0);
+      BFHex(gui, CR, CR1);
+      BFHex(gui, CR, CR2);
+      BFHex(gui, CR, CR3);
+      BFHex(gui, CR, CR4);
+      BFHex(gui, CR, CR5);
+      BFHex(gui, CR, CR6);
+      BFHex(gui, CR, CR7);
     });
     gui->Node("FPSCR", [&] {
       FPSCRegister &FPSCR = ppuRegisters.FPSCR;
-      gui->Hex(FPSCR, FPSCR_Hex);
-      gui->BFHex(FPSCR, RN);
-      gui->BFHex(FPSCR, NI);
-      gui->BFHex(FPSCR, XE);
-      gui->BFHex(FPSCR, ZE);
-      gui->BFHex(FPSCR, UE);
-      gui->BFHex(FPSCR, OE);
-      gui->BFHex(FPSCR, VE);
-      gui->BFHex(FPSCR, VXCVI);
-      gui->BFHex(FPSCR, VXSQRT);
-      gui->BFHex(FPSCR, VXSOFT);
-      gui->BFHex(FPSCR, R0);
-      gui->BFHex(FPSCR, FPRF);
-      gui->BFHex(FPSCR, FI);
-      gui->BFHex(FPSCR, FR);
-      gui->BFHex(FPSCR, VXVC);
-      gui->BFHex(FPSCR, VXIMZ);
-      gui->BFHex(FPSCR, VXZDZ);
-      gui->BFHex(FPSCR, VXIDI);
-      gui->BFHex(FPSCR, VXISI);
-      gui->BFHex(FPSCR, VXSNAN);
-      gui->BFHex(FPSCR, XX);
-      gui->BFHex(FPSCR, ZX);
-      gui->BFHex(FPSCR, UX);
-      gui->BFHex(FPSCR, OX);
-      gui->BFHex(FPSCR, VX);
-      gui->BFHex(FPSCR, FEX);
-      gui->BFHex(FPSCR, FX);
+      Hex(gui, FPSCR, FPSCR_Hex);
+      BFHex(gui, FPSCR, RN);
+      BFHex(gui, FPSCR, NI);
+      BFHex(gui, FPSCR, XE);
+      BFHex(gui, FPSCR, ZE);
+      BFHex(gui, FPSCR, UE);
+      BFHex(gui, FPSCR, OE);
+      BFHex(gui, FPSCR, VE);
+      BFHex(gui, FPSCR, VXCVI);
+      BFHex(gui, FPSCR, VXSQRT);
+      BFHex(gui, FPSCR, VXSOFT);
+      BFHex(gui, FPSCR, R0);
+      BFHex(gui, FPSCR, FPRF);
+      BFHex(gui, FPSCR, FI);
+      BFHex(gui, FPSCR, FR);
+      BFHex(gui, FPSCR, VXVC);
+      BFHex(gui, FPSCR, VXIMZ);
+      BFHex(gui, FPSCR, VXZDZ);
+      BFHex(gui, FPSCR, VXIDI);
+      BFHex(gui, FPSCR, VXISI);
+      BFHex(gui, FPSCR, VXSNAN);
+      BFHex(gui, FPSCR, XX);
+      BFHex(gui, FPSCR, ZX);
+      BFHex(gui, FPSCR, UX);
+      BFHex(gui, FPSCR, OX);
+      BFHex(gui, FPSCR, VX);
+      BFHex(gui, FPSCR, FEX);
+      BFHex(gui, FPSCR, FX);
     });
     gui->Node("SLBs", [&] {
       for (u64 i = 0; i != 64; ++i) {
         SLBEntry &SLB = ppuRegisters.SLB[i];
         gui->Node(fmt::format("[{}]", i), [&] {
-          gui->U8Hex(SLB, V);
-          gui->U8Hex(SLB, LP);
-          gui->U8Hex(SLB, C);
-          gui->U8Hex(SLB, L);
-          gui->U8Hex(SLB, N);
-          gui->U8Hex(SLB, Kp);
-          gui->U8Hex(SLB, Ks);
-          gui->Hex(SLB, VSID);
-          gui->Hex(SLB, ESID);
-          gui->Hex(SLB, vsidReg);
-          gui->Hex(SLB, esidReg);
+          U8Hex(gui, SLB, V);
+          U8Hex(gui, SLB, LP);
+          U8Hex(gui, SLB, C);
+          U8Hex(gui, SLB, L);
+          U8Hex(gui, SLB, N);
+          U8Hex(gui, SLB, Kp);
+          U8Hex(gui, SLB, Ks);
+          Hex(gui, SLB, VSID);
+          Hex(gui, SLB, ESID);
+          Hex(gui, SLB, vsidReg);
+          Hex(gui, SLB, esidReg);
         });
       }
     });
-    gui->Hex(ppuRegisters, exceptReg);
-    gui->Bool(ppuRegisters, exceptionTaken);
-    gui->Hex(ppuRegisters, exceptEA);
-    gui->Hex(ppuRegisters, exceptTrapType);
-    gui->Bool(ppuRegisters, exceptHVSysCall);
-    gui->Hex(ppuRegisters, intEA);
-    gui->Hex(ppuRegisters, lastWriteAddress);
-    gui->Hex(ppuRegisters, lastRegValue);
+    Hex(gui, ppuRegisters, exceptReg);
+    Bool(gui, ppuRegisters, exceptionTaken);
+    Hex(gui, ppuRegisters, exceptEA);
+    Hex(gui, ppuRegisters, exceptTrapType);
+    Bool(gui, ppuRegisters, exceptHVSysCall);
+    Hex(gui, ppuRegisters, intEA);
+    Hex(gui, ppuRegisters, lastWriteAddress);
+    Hex(gui, ppuRegisters, lastRegValue);
     gui->Node("ppuRes", [&] {
         PPU_RES &ppuRes = *(ppuRegisters.ppuRes.get());
-        gui->U8Hex(ppuRes, ppuID);
-        gui->Bool(ppuRes, V);
-        gui->Hex(ppuRes, resAddr);
+        U8Hex(gui, ppuRes, ppuID);
+        Bool(gui, ppuRes, V);
+        Hex(gui, ppuRes, resAddr);
     });
   });
 }
@@ -426,7 +476,7 @@ void RenderInstr(Render::GUI *gui, u32 addr, u32 instr) {
   const u32 b1 = static_cast<u8>((instr >> 16) & 0xFF);
   const u32 b2 = static_cast<u8>((instr >> 8) & 0xFF);
   const u32 b3 = static_cast<u8>((instr >> 0) & 0xFF);
-  gui->TextFmt("{:08X} {:02X} {:02X} {:02X} {:02X}                             {}", addr, b0, b1, b2, b3, instrName);
+  TextFmt(gui, "{:08X} {:02X} {:02X} {:02X} {:02X}                             {}", addr, b0, b1, b2, b3, instrName);
 }
 
 void PPC_PPU(Render::GUI *gui, PPU *PPU) {
@@ -445,33 +495,33 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
       PPUThread(gui, PPUStatePtr, ePPUThread_Zero);
       PPUThread(gui, PPUStatePtr, ePPUThread_One);
     });
-    gui->U8Dec(PPUState, currentThread);
+    U8Dec(gui, PPUState, currentThread);
     gui->Node("SPR", [&] {
       PPU_STATE_SPRS &SPR = PPUState.SPR;
-      gui->Hex(SPR, SDR1);
-      gui->Hex(SPR, CTRL);
-      gui->Hex(SPR, TB);
+      Hex(gui, SPR, SDR1);
+      Hex(gui, SPR, CTRL);
+      Hex(gui, SPR, TB);
       gui->Node("PVR", [&] {
         PVRegister &PVR = SPR.PVR;
-        gui->Hex(PVR, PVR_Hex);
-        gui->U8Hex(PVR, Revision);
-        gui->U8Hex(PVR, Version);
+        Hex(gui, PVR, PVR_Hex);
+        U8Hex(gui, PVR, Revision);
+        U8Hex(gui, PVR, Version);
       });
-      gui->Hex(SPR, HDEC);
-      gui->Hex(SPR, RMOR);
-      gui->Hex(SPR, HRMOR);
-      gui->Hex(SPR, LPCR);
-      gui->Hex(SPR, LPIDR);
-      gui->Hex(SPR, TSCR);
-      gui->Hex(SPR, TTR);
-      gui->Hex(SPR, PPE_TLB_Index);
-      gui->Hex(SPR, PPE_TLB_VPN);
-      gui->Hex(SPR, PPE_TLB_RPN);
-      gui->Hex(SPR, PPE_TLB_RMT);
-      gui->Hex(SPR, HID0);
-      gui->Hex(SPR, HID1);
-      gui->Hex(SPR, HID4);
-      gui->Hex(SPR, HID6);
+      Hex(gui, SPR, HDEC);
+      Hex(gui, SPR, RMOR);
+      Hex(gui, SPR, HRMOR);
+      Hex(gui, SPR, LPCR);
+      Hex(gui, SPR, LPIDR);
+      Hex(gui, SPR, TSCR);
+      Hex(gui, SPR, TTR);
+      Hex(gui, SPR, PPE_TLB_Index);
+      Hex(gui, SPR, PPE_TLB_VPN);
+      Hex(gui, SPR, PPE_TLB_RPN);
+      Hex(gui, SPR, PPE_TLB_RMT);
+      Hex(gui, SPR, HID0);
+      Hex(gui, SPR, HID1);
+      Hex(gui, SPR, HID4);
+      Hex(gui, SPR, HID6);
     });
     gui->Node("TLB", [&] {
       TLB_Reg &TLB = PPUState.TLB;
@@ -479,9 +529,9 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
         for (u64 i = 0; i != 256; ++i) {
           TLBEntry& TLBEntry = TLB.tlbSet0[i];
           gui->Node(fmt::format("[{}]", i), [&] {
-            gui->Bool(TLBEntry, V);
-            gui->Hex(TLBEntry, pte0);
-            gui->Hex(TLBEntry, pte1);
+            Bool(gui, TLBEntry, V);
+            Hex(gui, TLBEntry, pte0);
+            Hex(gui, TLBEntry, pte1);
           });
         }
       });
@@ -489,9 +539,9 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
         for (u64 i = 0; i != 256; ++i) {
           TLBEntry& TLBEntry = TLB.tlbSet1[i];
           gui->Node(fmt::format("[{}]", i), [&] {
-            gui->Bool(TLBEntry, V);
-            gui->Hex(TLBEntry, pte0);
-            gui->Hex(TLBEntry, pte1);
+            Bool(gui, TLBEntry, V);
+            Hex(gui, TLBEntry, pte0);
+            Hex(gui, TLBEntry, pte1);
           });
         }
       });
@@ -499,9 +549,9 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
         for (u64 i = 0; i != 256; ++i) {
           TLBEntry& TLBEntry = TLB.tlbSet2[i];
           gui->Node(fmt::format("[{}]", i), [&] {
-            gui->Bool(TLBEntry, V);
-            gui->Hex(TLBEntry, pte0);
-            gui->Hex(TLBEntry, pte1);
+            Bool(gui, TLBEntry, V);
+            Hex(gui, TLBEntry, pte0);
+            Hex(gui, TLBEntry, pte1);
           });
         }
       });
@@ -509,15 +559,15 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
         for (u64 i = 0; i != 256; ++i) {
           TLBEntry& TLBEntry = TLB.tlbSet3[i];
           gui->Node(fmt::format("[{}]", i), [&] {
-            gui->Bool(TLBEntry, V);
-            gui->Hex(TLBEntry, pte0);
-            gui->Hex(TLBEntry, pte1);
+            Bool(gui, TLBEntry, V);
+            Hex(gui, TLBEntry, pte0);
+            Hex(gui, TLBEntry, pte1);
           });
         }
       });
     });
-    gui->Bool(PPUState, translationInProgress);
-    gui->Custom(ppuName, "{}", PPUState.ppuName);
+    Bool(gui, PPUState, translationInProgress);
+    Custom(gui, ppuName, "{}", PPUState.ppuName);
   }, ImGuiTreeNodeFlags_DefaultOpen);
 }
 void PPCDebugger(Render::GUI *gui) {
@@ -665,18 +715,20 @@ void Render::GUI::OnSwap(Texture *texture) {
             Xe_Main->xenos->DumpFB(UserDir / "fbmem.bin", Xe_Main->renderer->pitch);
           });
         });
-        TabItem("CPU", [&] {
-          Button("Test", [&] {
-            Xe_Main->xenonCPU->Halt();
+        // This whole section is broken
+        /*TabItem("CPU", [&] {
+          Button("Re-start execution", [&] {
+            //Xe_Main->xenonCPU->Halt();
+            Xe_Main->start();
           });
           Button("Re-run CPI Test", [&] {
             Xe_Main->xenonCPU->Halt();
             PPU *PPU = Xe_Main->xenonCPU->GetPPU(0);
             PPU->CalculateCPI();
-            PPU->GetCPI();
+            LOG_INFO(Xenon, "PPU0: {} clocks per instruction", PPU->GetCPI());
             Xe_Main->xenonCPU->Continue();
           });
-        });
+        });*/
         TabItem("Settings", [&] {
           TabBar("##settings", [&] {
             TabItem("General", [&] {

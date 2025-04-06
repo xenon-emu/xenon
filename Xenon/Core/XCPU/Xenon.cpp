@@ -79,13 +79,13 @@ Xenon::~Xenon() {
 }
 
 void Xenon::Start(u64 resetVector) {
-  //// If we already have active objects, halt cpu and kill threads
-  //if (ppu0.get()) {
-  //  Halt();
-  //  ppu0.reset();
-  //  ppu1.reset();
-  //  ppu2.reset();
-  //}
+  // If we already have active objects, halt cpu and kill threads
+  if (ppu0.get()) {
+    Halt();
+    ppu0.reset();
+    ppu1.reset();
+    ppu2.reset();
+  }
   // Create PPU elements
   ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(&xenonContext, mainBus, resetVector, XE_PVR, 0); // Threads 0-1
   ppu1 = std::make_unique<STRIP_UNIQUE(ppu1)>(&xenonContext, mainBus, resetVector, XE_PVR, 2); // Threads 2-3

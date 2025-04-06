@@ -48,6 +48,7 @@ public:
   void Child(const std::string &title, std::function<void()> callback = {}, const ImVec2 &size = {}, ImGuiChildFlags flags = 0, ImGuiWindowFlags windowFlags = 0);
   void Node(const std::string &title, std::function<void()> callback = {}, ImGuiTreeNodeFlags flags = 0);
   void Text(const std::string &label);
+  void TextCopy(const std::string &label, const std::string &value);
   void SameLine(float xOffset = 0.f, float spacing = -1.f);
   void MenuBar(std::function<void()> callback = {});
   void MenuItem(const std::string &title, std::function<void()> callback = {}, bool enabled = true, bool selected = false, const std::string &shortcut = {});
@@ -65,6 +66,8 @@ public:
 
   ImFont *defaultFont13 = nullptr;
   ImFont *robotRegular14 = nullptr;
+  ImFont *robotRegular16 = nullptr;
+  ImFont *robotRegular18 = nullptr;
   SDL_Window *mainWindow = nullptr;
   bool styleEditor = false;
   bool demoWindow = false;

@@ -20,6 +20,17 @@ RAM::~RAM() {
 }
 
 /*****************Responsible for RAM reading*****************/
+void RAM::Reset() {
+  if (!RAMData.get()) {
+    RAMData = std::make_unique<STRIP_UNIQUE_ARR(RAMData)>(RAM_SIZE);
+    memset(RAMData.get(), 0xCD, RAM_SIZE);
+  }
+  else {
+    memset(RAMData.get(), 0xCD, RAM_SIZE);
+  }
+}
+
+/*****************Responsible for RAM reading*****************/
 void RAM::Read(u64 readAddress, u8 *data, u64 size) {
   const u64 offset = static_cast<u32>(readAddress - RAM_START_ADDR);
   if (false)
