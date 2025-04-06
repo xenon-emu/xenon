@@ -796,7 +796,7 @@ void PPCInterpreter::PPCInterpreter_orx(PPU_STATE *ppuState) {
   }
 }
 
-// Rotate Left Double Word Immediate then Clear (x’7800 0008’)
+// Rotate Left Double Word Immediate then Clear (x'7800 0008')
 void PPCInterpreter::PPCInterpreter_rldicx(PPU_STATE* ppuState) {
   /*
     n <- sh[5] || sh[0-4]
@@ -814,7 +814,7 @@ void PPCInterpreter::PPCInterpreter_rldicx(PPU_STATE* ppuState) {
   }
 }
 
-// Rotate Left Double Word then Clear Right (x’7800 0012’)
+// Rotate Left Double Word then Clear Right (x'7800 0012')
 void PPCInterpreter::PPCInterpreter_rldcrx(PPU_STATE* ppuState) {
   /*
     n <- rB[58-63]
@@ -832,7 +832,7 @@ void PPCInterpreter::PPCInterpreter_rldcrx(PPU_STATE* ppuState) {
   }
 }
 
-// Rotate Left Double Word then Clear Left (x’7800 0010’)
+// Rotate Left Double Word then Clear Left (x'7800 0010')
 void PPCInterpreter::PPCInterpreter_rldclx(PPU_STATE* ppuState) {
   /*
     n <- rB[58-63]
@@ -850,7 +850,7 @@ void PPCInterpreter::PPCInterpreter_rldclx(PPU_STATE* ppuState) {
   }
 }
 
-// Rotate Left Double Word Immediate then Clear Left (x’7800 0000’)
+// Rotate Left Double Word Immediate then Clear Left (x'7800 0000')
 void PPCInterpreter::PPCInterpreter_rldiclx(PPU_STATE* ppuState) {
   /*
     n <- sh[5] || sh[0-4]
@@ -868,7 +868,7 @@ void PPCInterpreter::PPCInterpreter_rldiclx(PPU_STATE* ppuState) {
   }
 }
 
-// Rotate Left Double Word Immediate then Clear Right (x’7800 0004’)
+// Rotate Left Double Word Immediate then Clear Right (x'7800 0004')
 void PPCInterpreter::PPCInterpreter_rldicrx(PPU_STATE* ppuState) {
   /*
     n <- sh[5] || sh[0-4]
@@ -886,7 +886,7 @@ void PPCInterpreter::PPCInterpreter_rldicrx(PPU_STATE* ppuState) {
   }
 }
 
-// Rotate Left Double Word Immediate then Mask Insert (x’7800 000C’)
+// Rotate Left Double Word Immediate then Mask Insert (x'7800 000C')
 void PPCInterpreter::PPCInterpreter_rldimix(PPU_STATE* ppuState) {
   /*
     n <- sh[5] || sh[0-4]
@@ -905,7 +905,7 @@ void PPCInterpreter::PPCInterpreter_rldimix(PPU_STATE* ppuState) {
   }
 }
 
-// Rotate Left Word Immediate then Mask Insert (x’5000 0000’)
+// Rotate Left Word Immediate then Mask Insert (x'5000 0000')
 void PPCInterpreter::PPCInterpreter_rlwimix(PPU_STATE* ppuState) {
   /*
     n <- SH
@@ -923,7 +923,7 @@ void PPCInterpreter::PPCInterpreter_rlwimix(PPU_STATE* ppuState) {
   }
 }
 
-// Rotate Left Word then AND with Mask (x’5C00 0000’)
+// Rotate Left Word then AND with Mask (x'5C00 0000')
 void PPCInterpreter::PPCInterpreter_rlwnmx(PPU_STATE* ppuState) {
   /*
     n <- rB[59-6327-31]
@@ -941,7 +941,7 @@ void PPCInterpreter::PPCInterpreter_rlwnmx(PPU_STATE* ppuState) {
   }
 }
 
-// Rotate Left Word Immediate then AND with Mask (x’5400 0000’)
+// Rotate Left Word Immediate then AND with Mask (x'5400 0000')
 void PPCInterpreter::PPCInterpreter_rlwinmx(PPU_STATE* ppuState) {
   /*
     n <- SH
@@ -959,7 +959,7 @@ void PPCInterpreter::PPCInterpreter_rlwinmx(PPU_STATE* ppuState) {
   }
 }
 
-// Shift Left Double Word (x’7C00 0036’)
+// Shift Left Double Word (x'7C00 0036')
 void PPCInterpreter::PPCInterpreter_sldx(PPU_STATE* ppuState) {
   /*
     n <- rB[58-63]
@@ -979,12 +979,12 @@ void PPCInterpreter::PPCInterpreter_sldx(PPU_STATE* ppuState) {
   }
 }
 
-// Shift Left Word (x’7C00 0030’)
+// Shift Left Word (x'7C00 0030')
 void PPCInterpreter::PPCInterpreter_slwx(PPU_STATE* ppuState) {
   /*
     n <- rB[59-63]
-    r <- ROTL[32](rS[32–63], n)
-    if rB[58] = 0 then m <- MASK(32, 63 – n)
+    r <- ROTL[32](rS[32â€“63], n)
+    if rB[58] = 0 then m <- MASK(32, 63 â€“ n)
     else m <- (64)0
     rA <- r & m
   */
@@ -997,7 +997,7 @@ void PPCInterpreter::PPCInterpreter_slwx(PPU_STATE* ppuState) {
   }
 }
 
-// Shift Right Algebraic Double Word (x’7C00 0634’)
+// Shift Right Algebraic Double Word (x'7C00 0634')
 void PPCInterpreter::PPCInterpreter_sradx(PPU_STATE* ppuState) {
   /*
     n <- rB[58-63]
@@ -1007,7 +1007,7 @@ void PPCInterpreter::PPCInterpreter_sradx(PPU_STATE* ppuState) {
     else m <- (64)0
     S <- rS[0]
     rA <- (r & m) | (((64)S) & ~m)
-    XER[CA] <- S & ((r & ~ m) ¦ 0)
+    XER[CA] <- S & ((r & ~ m) Â¦ 0)
   */
 
   s64 RS = GPRi(rs);
@@ -1029,7 +1029,7 @@ void PPCInterpreter::PPCInterpreter_sradx(PPU_STATE* ppuState) {
   }
 }
 
-// Shift Right Algebraic Double Word Immediate (x’7C00 0674’)
+// Shift Right Algebraic Double Word Immediate (x'7C00 0674')
 void PPCInterpreter::PPCInterpreter_sradix(PPU_STATE* ppuState) {
   /*
     n <- sh[5] || sh[0-4]
@@ -1051,11 +1051,11 @@ void PPCInterpreter::PPCInterpreter_sradix(PPU_STATE* ppuState) {
   }
 }
 
-// Shift Right Algebraic Word (x’7C00 0630’)
+// Shift Right Algebraic Word (x'7C00 0630')
 void PPCInterpreter::PPCInterpreter_srawx(PPU_STATE* ppuState) {
   /*
     n <- rB[59-63]
-    r <- ROTL[32](rS[32–63], 64 – n)
+    r <- ROTL[32](rS[32â€“63], 64 â€“ n)
     if rB[5826] = 0 then
     m <- MASK(n + 32, 63)
     else m <- (64)0
@@ -1083,7 +1083,7 @@ void PPCInterpreter::PPCInterpreter_srawx(PPU_STATE* ppuState) {
   }
 }
 
-// Shift Right Algebraic Word Immediate (x’7C00 0670’)
+// Shift Right Algebraic Word Immediate (x'7C00 0670')
 void PPCInterpreter::PPCInterpreter_srawix(PPU_STATE* ppuState) {
   /*
     n <- SH
@@ -1105,7 +1105,7 @@ void PPCInterpreter::PPCInterpreter_srawix(PPU_STATE* ppuState) {
   }
 }
 
-// Shift Right Double Word (x’7C00 0436’)
+// Shift Right Double Word (x'7C00 0436')
 void PPCInterpreter::PPCInterpreter_srdx(PPU_STATE* ppuState) {
   /*
     n <- rB[58-63]
@@ -1125,7 +1125,7 @@ void PPCInterpreter::PPCInterpreter_srdx(PPU_STATE* ppuState) {
   }
 }
 
-// Shift Right Word (x’7C00 0430’)
+// Shift Right Word (x'7C00 0430')
 void PPCInterpreter::PPCInterpreter_srwx(PPU_STATE* ppuState) {
   /*
     n <- rB[58-63]
