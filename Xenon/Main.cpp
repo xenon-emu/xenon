@@ -84,7 +84,6 @@ s32 main(s32 argc, char *argv[]) {
     LOG_CRITICAL(System, "Failed to install signal handler. Clean shutdown is not possible through console");
   }
   LOG_INFO(System, "Starting Xenon.");
-  SYSTEM_PAUSE();
   Xe_Main->start();
   while (XeRunning) {
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
