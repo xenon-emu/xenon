@@ -296,6 +296,7 @@ void _log::from_toml(const toml::value &value) {
 void _log::to_toml(toml::value &value) {
   value.comments().clear();
   value.comments().push_back("# Controls the current output filter level");
+  value.comments().push_back("# 0: Trace | 1: Debug | 2: Info | 3: Warning | 4: Error | 5: Critical | 6: Guest | 7: Count");
   s32 tmpLevel = static_cast<s32>(currentLevel);
   value["Level"] = tmpLevel;
   value["Advanced"] = advanced;
