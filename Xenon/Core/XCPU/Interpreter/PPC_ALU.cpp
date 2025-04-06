@@ -45,7 +45,7 @@ struct addResult {
 
 // Multiply High Sign/Unsigned.
 inline u64 umulh64(u64 x, u64 y) {
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && defined(_WIN64)
   return __umulh(x, y);
 #else
   return static_cast<u64>((u128{ x } *u128{ y }) >> 64);
@@ -53,7 +53,7 @@ inline u64 umulh64(u64 x, u64 y) {
 }
 
 inline s64 mulh64(s64 x, s64 y) {
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && defined(_WIN64)
   return __mulh(x, y);
 #else
   return static_cast<s64>((s128{ x } *s128{ y }) >> 64);

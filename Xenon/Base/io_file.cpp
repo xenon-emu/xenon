@@ -230,7 +230,7 @@ void IOFile::Unlink() {
 
   // Mark the file for deletion
   // TODO: Also remove the file path?
-#ifdef _WIN64
+#if defined(_WIN64) || defined(_WIN32)
   FILE_DISPOSITION_INFORMATION disposition;
   IO_STATUS_BLOCK iosb;
 
