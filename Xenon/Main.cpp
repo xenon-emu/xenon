@@ -2,7 +2,9 @@
 
 #include "Core/Xe_Main.h"
 #include "Base/Exit.h"
+#include <iostream>
 
+volatile int hupflag = 0;
 // Clean shutdown when we are sent by the OS to shutdown
 s32 globalShutdownHandler() {
   // If we have been told we cannot safely terminate, just force exit without cleanup
@@ -11,6 +13,20 @@ s32 globalShutdownHandler() {
     const s32 exitCode = Base::exit(-1);
     return exitCode; // Avoid cleanup, as we cannot ensure it'll be done properly
   }
+  // If we tried to exit gracefully the first time and failed,
+  // use fexit to forcefully send a SIGTERM
+  if (!hupflag) {
+    std::cout << std::endl <<
+      "Attempting to clean shutdown..." << std::endl;
+    hupflag = 1;
+  } else {
+    std::cout << std::endl <<
+      "Unable to clean shutdown!" << std::endl <<
+      "Press Crtl+C again to forcefully exit..." << std::endl;
+    const s32 exitCode = Base::fexit(-1);
+    return exitCode;
+  }
+  // Cleanly shutdown without the exit syscall
   XeRunning = false;
   Xe_Main.reset();
   return 0;
@@ -33,9 +49,7 @@ s32 removeHangup() {
 }
 #elif defined(__linux__)
 #include <signal.h>
-volatile sig_atomic_t hupflag = 0;
 extern "C" void hangup(s32) {
-  hupflag = 1;
   // Should this be handled here, if we deadlock our main thread?
   (void)globalShutdownHandler();
 }
@@ -70,14 +84,9 @@ s32 main(s32 argc, char *argv[]) {
     LOG_CRITICAL(System, "Failed to install signal handler. Clean shutdown is not possible through console");
   }
   LOG_INFO(System, "Starting Xenon.");
+  SYSTEM_PAUSE();
   Xe_Main->start();
   while (XeRunning) {
-#ifdef __linux__
-    if (hupflag) {
-      globalShutdownHandler();
-      return 0;
-    }
-#endif
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   Xe_Main.reset();

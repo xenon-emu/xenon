@@ -8,8 +8,7 @@ namespace Base::Log {
 
 /// Specifies the severity or level of detail of the log message.
 enum class Level : u8 {
-  Trace, ///< Extremely detailed and repetitive debugging information that is likely to
-  ///< pollute logs.
+  Trace,      ///< Extremely detailed and repetitive debugging information that is likely to pollute logs.
   Debug,      ///< Less detailed debugging information.
   Info,       ///< Status information from important points during execution.
   Warning,    ///< Minor or potential problems found during execution of a task.
