@@ -2,13 +2,14 @@
 
 #pragma once
 
-#include <fmt/format.h>
-
 namespace Base {
 
 const std::string Version = "Experimental v0.0.1"
 #ifdef COMMIT_COUNT
 "-" COMMIT_COUNT
+#endif
+#ifdef BRANCH
+" - " BRANCH
 #endif
 ;
 

@@ -51,6 +51,23 @@ endif()
 
 message(STATUS "Commits Number: ${COMMIT_COUNT}")
 
+# Xenon Branch with Git
+execute_process(
+  COMMAND git rev-parse --abbrev-ref HEAD
+  WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
+  OUTPUT_VARIABLE BRANCH
+  OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+string(COMPARE EQUAL "${BRANCH}" "" RESULT_C)
+string(COMPARE EQUAL "x${BRANCH}" "x1" RESULT_D)
+if (NOT RESULT_C AND NOT RESULT_D)
+  if (NOT ${BRANCH} STREQUAL "main")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBRANCH=\\\"${BRANCH}\\\"")
+  endif()
+endif()
+
+message(STATUS "Actual Branch: ${BRANCH}")
 
 # Include third_party and Packages
 if (GFX_ENABLED)
