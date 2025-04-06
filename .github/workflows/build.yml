@@ -18,13 +18,14 @@ jobs:
     - uses: actions/checkout@main
       with:
         submodules: recursive
+        fetch-depth: 0
 
     - name: Cache CMake Configuration
       uses: actions/cache@main
       env:
           cache-name: ${{ runner.os }}-xenon-cache-config-windows
       with:
-          path: | 
+          path: |
             ${{github.workspace}}/build
           key: ${{ env.cache-name }}-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
           restore-keys: |
@@ -55,13 +56,13 @@ jobs:
         name: Xenon-win64
         path: ${{github.workspace}}/build/Xenon.exe
 
-
   Linux:
     runs-on: ubuntu-24.04
     steps:
     - uses: actions/checkout@main
       with:
         submodules: recursive
+        fetch-depth: 0
 
     - name: Install Dependencies
       run: |
@@ -76,7 +77,7 @@ jobs:
       env:
           cache-name: ${{ runner.os }}-xenon-cache-config-linux
       with:
-          path: | 
+          path: |
             ${{github.workspace}}/build
           key: ${{ env.cache-name }}-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
           restore-keys: |
