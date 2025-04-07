@@ -549,7 +549,7 @@ u64 PPCInterpreter::mmuContructEndAddressFromSecEngAddr(u64 inputAddress,
 
 // Main address translation mechanism used on the XCPU.
 bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
-                                         bool memWrite, bool cacheStore) {
+                                         bool memWrite) {
   // Every time the CPU does a load or store, it goes trough the MMU.
   // The MMU decides based on MSR, and some other regs if address translation
   // for Instr/Data is in Real Mode (EA = RA) or in Virtual Mode (Page
@@ -557,7 +557,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 
   // Xbox 360 MMU contains a very similar to the CELL-BE MMU.
   // Has two ERAT's (64 entry, 2 way), one for Instructions (I-ERAT) and Data
-  // (D-ERAT), this caches Effective to Physical adress translations done
+  // (D-ERAT), this  Effective to Physical adress translations done
   // recently.
   // It also contains a 1024 entry 4 * 256 columns TLB array, wich caches
   // recent Page tables. TLB on the Xbox 360 can be Software/Hardware managed.
@@ -606,24 +606,22 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
   // See IBM_CBE_Handbook_v1.1 Page 82.
   
   // Search ERAT's
-  if (!cacheStore) {
-    if (curThread.iFetch) {
-      // iERAT
-      RA = curThread.iERAT.getElement((*EA & ~0xFFF));
-      if (RA != -1) {
-        RA |= (*EA & 0xFFF);
-        *EA = RA;
-        return true;
-      }
+  if (curThread.iFetch) {
+    // iERAT
+    RA = curThread.iERAT.getElement((*EA & ~0xFFF));
+    if (RA != -1) {
+      RA |= (*EA & 0xFFF);
+      *EA = RA;
+      return true;
     }
-    else {
-      // dERAT
-      RA = curThread.dERAT.getElement((*EA & ~0xFFF));
-      if (RA != -1) {
-        RA |= (*EA & 0xFFF);
-        *EA = RA;
-        return true;
-      }
+  }
+  else {
+    // dERAT
+    RA = curThread.dERAT.getElement((*EA & ~0xFFF));
+    if (RA != -1) {
+      RA |= (*EA & 0xFFF);
+      *EA = RA;
+      return true;
     }
   }
 
@@ -808,9 +806,9 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
           // Get the pteg data from memory while relocation is off.
           for (size_t i = 0; i < PPC_HPTES_PER_GROUP; i++) {
             pteg0[i].pte0 =
-                PPCInterpreter::MMURead64(ppuState, pteg0Addr + i * 16, cacheStore);
+                PPCInterpreter::MMURead64(ppuState, pteg0Addr + i * 16);
             pteg0[i].pte1 =
-                PPCInterpreter::MMURead64(ppuState, pteg0Addr + i * 16 + 8, cacheStore);
+                PPCInterpreter::MMURead64(ppuState, pteg0Addr + i * 16 + 8);
           }
 
           // We compare all pte's in order for simplicity.
@@ -861,9 +859,9 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 
           for (size_t i = 0; i < PPC_HPTES_PER_GROUP; i++) {
             pteg1[i].pte0 =
-                PPCInterpreter::MMURead64(ppuState, pteg1Addr + i * 16, cacheStore);
+                PPCInterpreter::MMURead64(ppuState, pteg1Addr + i * 16);
             pteg1[i].pte1 =
-                PPCInterpreter::MMURead64(ppuState, pteg1Addr + i * 16 + 8, cacheStore);
+                PPCInterpreter::MMURead64(ppuState, pteg1Addr + i * 16 + 8);
           }
 
           // We compare all pte's in order for simplicity.
@@ -966,15 +964,13 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
   }
 
   // Save in ERAT's
-  if (!cacheStore) {
-    if (curThread.iFetch) {
-      // iERAT
-      curThread.iERAT.putElement((*EA & ~0xFFF), (RA & ~0xFFF));
-    }
-    else {
-      // dERAT
-      curThread.dERAT.putElement((*EA & ~0xFFF), (RA & ~0xFFF));
-    }
+  if (curThread.iFetch) {
+    // iERAT
+    curThread.iERAT.putElement((*EA & ~0xFFF), (RA & ~0xFFF));
+  }
+  else {
+    // dERAT
+    curThread.dERAT.putElement((*EA & ~0xFFF), (RA & ~0xFFF));
   }
 
   *EA = RA;
@@ -983,9 +979,9 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 
 // MMU Read Routine, used by the CPU
 void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE* ppuState,
-                             u64 EA, u64 byteCount, u8 *outData, bool cacheStore) {
+                             u64 EA, u64 byteCount, u8 *outData) {
   u64 oldEA = EA;
-  if (!MMUTranslateAddress(&EA, ppuState, false, cacheStore)) {
+  if (!MMUTranslateAddress(&EA, ppuState, false)) {
     memset(outData, 0, byteCount);
     return;
   }
@@ -1126,7 +1122,7 @@ void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE* ppuState,
 }
 // MMU Write Routine, used by the CPU
 void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
-                              const u8 *data, u64 EA, u64 byteCount, bool cacheStore) {
+                              const u8 *data, u64 EA, u64 byteCount) {
   u64 oldEA = EA;
 
   if (MMUTranslateAddress(&EA, ppuState, true) == false)
@@ -1227,20 +1223,20 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
 }
 
 void PPCInterpreter::MMUMemCpyFromHost(PPU_STATE *ppuState,
-                                       u64 EA, const void* source, u64 size, bool cacheStore) {
-  MMUWrite(intXCPUContext, ppuState, reinterpret_cast<const u8*>(source), EA, size, cacheStore);
+                                       u64 EA, const void* source, u64 size) {
+  MMUWrite(intXCPUContext, ppuState, reinterpret_cast<const u8*>(source), EA, size);
 }
 
 void PPCInterpreter::MMUMemCpy(PPU_STATE *ppuState,
-                               u64 EA, u32 source, u64 size, bool cacheStore) {
+                               u64 EA, u32 source, u64 size) {
   std::unique_ptr<u8[]> data = std::make_unique<STRIP_UNIQUE_ARR(data)>(size);
-  MMURead(intXCPUContext, ppuState, source, size, data.get(), cacheStore);
-  MMUWrite(intXCPUContext, ppuState, data.get(), EA, size, cacheStore);
+  MMURead(intXCPUContext, ppuState, source, size, data.get());
+  MMUWrite(intXCPUContext, ppuState, data.get(), EA, size);
   data.reset();
 }
 
 void PPCInterpreter::MMUMemSet(PPU_STATE *ppuState,
-                               u64 EA, s32 data, u64 size, bool cacheStore) {
+                               u64 EA, s32 data, u64 size) {
   const u64 oldEA = EA;
 
   if (MMUTranslateAddress(&EA, ppuState, true) == false)
@@ -1289,27 +1285,27 @@ void PPCInterpreter::MMUMemSet(PPU_STATE *ppuState,
 }
 
 // Reads 1 Byte of memory.
-u8 PPCInterpreter::MMURead8(PPU_STATE *ppuState, u64 EA, bool cacheStore) {
+u8 PPCInterpreter::MMURead8(PPU_STATE *ppuState, u64 EA) {
   u8 data = 0;
-  MMURead(intXCPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data), cacheStore);
+  MMURead(intXCPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data));
   return data;
 }
 // Reads 2 Bytes of memory.
-u16 PPCInterpreter::MMURead16(PPU_STATE *ppuState, u64 EA, bool cacheStore) {
+u16 PPCInterpreter::MMURead16(PPU_STATE *ppuState, u64 EA) {
   u16 data = 0;
-  MMURead(intXCPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data), cacheStore);
+  MMURead(intXCPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data));
   return byteswap_be<u16>(data);
 }
 // Reads 4 Bytes of memory.
-u32 PPCInterpreter::MMURead32(PPU_STATE *ppuState, u64 EA, bool cacheStore) {
+u32 PPCInterpreter::MMURead32(PPU_STATE *ppuState, u64 EA) {
   u32 data = 0;
-  MMURead(intXCPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data), cacheStore);
+  MMURead(intXCPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data));
   return byteswap_be<u32>(data);
 }
 // Reads 8 Bytes of memory.
-u64 PPCInterpreter::MMURead64(PPU_STATE *ppuState, u64 EA, bool cacheStore) {
+u64 PPCInterpreter::MMURead64(PPU_STATE *ppuState, u64 EA) {
   u64 data = 0;
-  MMURead(intXCPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data), cacheStore);
+  MMURead(intXCPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data));
   return byteswap_be<u64>(data);
 }
 // Writes 1 Byte to memory.

@@ -121,7 +121,7 @@ void ppcExternalException(PPU_STATE *ppuState);
 // MMU
 //
 
-bool MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState, bool memWrite, bool cacheStore = false);
+bool MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState, bool memWrite);
 u8 mmuGetPageSize(PPU_STATE *ppuState, bool L, u8 LP);
 void mmuAddTlbEntry(PPU_STATE *ppuState);
 bool mmuSearchTlbEntry(PPU_STATE *ppuState, u64 *RPN, u64 VA, u8 p, bool L, bool LP);
@@ -133,21 +133,21 @@ u64 mmuContructEndAddressFromSecEngAddr(u64 inputAddress, bool *socAccess);
 
 // Main R/W Routines.
 void MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
-            u64 EA, u64 byteCount, u8 *outData, bool cacheStore = false);
+            u64 EA, u64 byteCount, u8 *outData);
 void MMUWrite(XENON_CONTEXT* cpuContext, PPU_STATE* ppuState,
-              const u8* data, u64 EA, u64 byteCount, bool cacheStore = false);
+              const u8* data, u64 EA, u64 byteCount);
 
-void MMUMemCpyFromHost(PPU_STATE* ppuState, u64 EA, const void* source, u64 size, bool cacheStore = false);
+void MMUMemCpyFromHost(PPU_STATE* ppuState, u64 EA, const void* source, u64 size);
 
-void MMUMemCpy(PPU_STATE* ppuState, u64 EA, u32 source, u64 size, bool cacheStore = false);
+void MMUMemCpy(PPU_STATE* ppuState, u64 EA, u32 source, u64 size);
 
-void MMUMemSet(PPU_STATE* ppuState, u64 EA, s32 data, u64 size, bool cacheStore = false);
+void MMUMemSet(PPU_STATE* ppuState, u64 EA, s32 data, u64 size);
 
 // Helper Read Routines.
-u8 MMURead8(PPU_STATE *ppuState, u64 EA, bool cacheStore = false);
-u16 MMURead16(PPU_STATE *ppuState, u64 EA, bool cacheStore = false);
-u32 MMURead32(PPU_STATE *ppuState, u64 EA, bool cacheStore = false);
-u64 MMURead64(PPU_STATE *ppuState, u64 EA, bool cacheStore = false);
+u8 MMURead8(PPU_STATE *ppuState, u64 EA);
+u16 MMURead16(PPU_STATE *ppuState, u64 EA);
+u32 MMURead32(PPU_STATE *ppuState, u64 EA);
+u64 MMURead64(PPU_STATE *ppuState, u64 EA);
 // Helper Write Routines.
 void MMUWrite8(PPU_STATE *ppuState, u64 EA, u8 data);
 void MMUWrite16(PPU_STATE *ppuState, u64 EA, u16 data);
