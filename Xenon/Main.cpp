@@ -2,6 +2,7 @@
 
 #include "Core/Xe_Main.h"
 #include "Base/Exit.h"
+#include "Base/Thread.h"
 #include <iostream>
 
 volatile int hupflag = 0;
@@ -79,15 +80,22 @@ s32 removeHangup() {
 #endif
 
 s32 main(s32 argc, char *argv[]) {
+  // Create all handles
   Xe_Main = std::make_unique<STRIP_UNIQUE(Xe_Main)>();
+  // Setup hangup
   if (installHangup() != 0) {
     LOG_CRITICAL(System, "Failed to install signal handler. Clean shutdown is not possible through console");
   }
+  // Set thread name
+  Base::SetCurrentThreadName("[Xe] Main");
   LOG_INFO(System, "Starting Xenon.");
+  // Start execution of the emulator
   Xe_Main->start();
+  // Inf wait until told otherwis
   while (XeRunning) {
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
+  // Shutdown
   Xe_Main.reset();
   return 0;
 }

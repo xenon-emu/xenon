@@ -11,7 +11,7 @@
 #include "Core/RootBus/HostBridge/PCIBridge/PCIBridge.h"
 #include "Core/RootBus/HostBridge/PCIBridge/PCIDevice.h"
 
-//#define SOCKET_UART
+#define SOCKET_UART
 
 #ifdef SOCKET_UART
 #ifdef _WIN32

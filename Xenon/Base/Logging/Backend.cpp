@@ -229,7 +229,7 @@ private:
 
   void StartBackendThread() {
     backend_thread = std::jthread([this](std::stop_token stop_token) {
-      Base::SetCurrentThreadName("Xenon:Log");
+      Base::SetCurrentThreadName("[Xe] Log");
       Entry entry;
       const auto write_logs = [this, &entry]() {
         ForEachBackend([&entry](BaseBackend* backend) { backend->Write(entry); });

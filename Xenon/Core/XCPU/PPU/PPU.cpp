@@ -49,9 +49,6 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
   // Set PPU Name
   ppuState->ppuName = fmt::format("PPU{}", ppuState->ppuID);
 
-  // Set thread name
-  Base::SetCurrentThreadName(ppuState->ppuName.data());
-
   // Initialize Both threads as in a Reset
   for (u8 thrdNum = 0; thrdNum < 2; thrdNum++) {
     // Set Reset vector for both threads
@@ -295,6 +292,8 @@ void PPU::ThreadStateMachine() {
   }
 }
 void PPU::ThreadLoop() {
+  // Set thread name
+  Base::SetCurrentThreadName("[Xe] " + ppuState->ppuName);
   while (ppuThreadActive) {
     // Check if we should exit or not
     ppuThreadActive = ppuThreadState != eThreadState::None && ppuThreadState != eThreadState::Quiting;
