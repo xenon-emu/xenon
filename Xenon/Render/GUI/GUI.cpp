@@ -18,7 +18,7 @@
 #define Hex(g, c, x) HexBase(g, #x, c.x)
 #define BFHex(g, c, x) HexBase(g, #x, u32(c.x));
 #define U8Hex(g, c, x) HexBase(g, #x, static_cast<u32>(c.x))
-#define HexArr(g, a, i) HexBase(g, "[{}]", i, a[i])
+#define HexArr(g, a, i) HexBase(g, fmt::format("[{}]", i), a[i])
 #define Dec(g, c, x) CopyCustom(g, x, "{}", c.x)
 #define U8Dec(g, c, x) CopyCustom(g, x, "{}", static_cast<u32>(c.x))
 #define Bool(g, c, x) CopyCustom(g, x, "{}", c.x ? "true" : "false")
