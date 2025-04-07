@@ -43,7 +43,7 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
   // Allocate memory for our PPU state
   ppuState = std::make_unique<STRIP_UNIQUE(ppuState)>();
 
-  // Set PPU ID (PIR, as 0 indexed. So 0-4)
+  // Set PPU ID (PIR, as 0 indexed. So 0-6)
   ppuState->ppuID = PIR / 2;
 
   // Set PPU Name
@@ -131,8 +131,10 @@ void PPU::StartExecution(bool setHRMOR) {
     // We have it like this to safeguard against sleeping threads waking themselves after continuing,
     // thus destroying the stack
     ppuThreadPreviousState = ppuState->ppuID == 0 ? eThreadState::Running : eThreadState::Sleeping;
+    LOG_DEBUG(Xenon, "{} was set to be halted, setting previous state to {}", ppuState->ppuName, ppuState->ppuID == 0 ? "Running" : "Sleeping");
   }
   else {
+    LOG_DEBUG(Xenon, "{} setting to {}", ppuState->ppuName, ppuState->ppuID == 0 ? "Running" : "Sleeping");
     ppuThreadState = ppuState->ppuID == 0 ? eThreadState::Running : eThreadState::Sleeping;
   }
 
@@ -302,6 +304,7 @@ void PPU::ThreadLoop() {
     bool WEXT = (ppuState->SPR.TSCR & 0x100000) >> 20;
     if (xenonContext->xenonIIC.checkExtInterrupt(curThread.SPR.PIR) && WEXT) {
       if (ppuThreadState == eThreadState::Halted || ppuThreadState == eThreadState::Sleeping) {
+        LOG_DEBUG(Xenon, "{} was previously halted or sleeping, bringing online", ppuState->ppuName);
         ppuThreadState = eThreadState::Running;
       }
 

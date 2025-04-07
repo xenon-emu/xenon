@@ -4,6 +4,7 @@
 #include "Arch.h"
 
 #include "Logging/Backend.h"
+#include "Core/Xe_Main.h"
 
 #ifdef  _MSC_VER
 #define Crash() __debugbreak()
@@ -24,11 +25,18 @@
 #endif
 #endif // _MSVC_VER
 
+#ifdef _DEBUG
 void assert_fail_impl() {
   Base::Log::Stop();
   std::fflush(stdout);
   Crash();
 }
+#else
+void assert_fail_impl() {
+  Xe_Main->getCPU()->Halt();
+  LOG_CRITICAL(Debug, "Assertion Failed! Soft halting emulator...");
+}
+#endif
 
 [[noreturn]] void unreachable_impl() {
   Base::Log::Stop();
