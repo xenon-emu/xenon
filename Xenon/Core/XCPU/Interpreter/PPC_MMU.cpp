@@ -1132,10 +1132,6 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   if (!MMUTranslateAddress(&EA, ppuState, true))
     return;
 
-  if (oldEA >= 0x9E000000 && oldEA <= 0x9EFFFFFF) {
-    u8 a = 0;
-  }
-
   bool socWrite = false;
 
   EA = mmuContructEndAddressFromSecEngAddr(EA, &socWrite);
@@ -1245,10 +1241,6 @@ void PPCInterpreter::MMUMemSet(PPU_STATE *ppuState,
 
   if (MMUTranslateAddress(&EA, ppuState, true) == false)
     return;
-
-  if (oldEA >= 0x9E000000 && oldEA <= 0x9EFFFFFF) {
-    u8 a = 0;
-  }
 
   bool socWrite = false;
 
