@@ -4,7 +4,7 @@
 
 namespace Base {
 
-const std::string Version = "Experimental v0.0.1"
+const std::string Version = "Experimental " APP_VERSION
 #ifdef COMMIT_COUNT
 "-" COMMIT_COUNT
 #endif

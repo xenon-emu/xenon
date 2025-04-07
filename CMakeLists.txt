@@ -18,7 +18,7 @@ if (WIN32)
   add_compile_options($<$<CONFIG:Release>:/Ot>)
 endif()
 
-project(Xenon VERSION 0.0.1)
+project(Xenon)
 
 # Options
 option(GFX_ENABLED "Enable graphics" ON)
@@ -35,7 +35,11 @@ function(create_target_directory_groups target_name)
   endforeach()
 endfunction()
 
-# Xenon Version with Git
+# Actual Version
+set(APP_VERSION "0.0.1")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DAPP_VERSION=\\\"${APP_VERSION}\\\"")
+
+# COMMIT_COUNT on Xenon (with Git)
 execute_process(
   COMMAND git rev-list --count HEAD
   WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
@@ -51,7 +55,7 @@ endif()
 
 message(STATUS "Commits Number: ${COMMIT_COUNT}")
 
-# Xenon Branch with Git
+# Xenon BRANCH (with Git)
 execute_process(
   COMMAND git rev-parse --abbrev-ref HEAD
   WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}
