@@ -133,6 +133,7 @@ void PPU::StartExecution(bool setHRMOR) {
   else {
     LOG_DEBUG(Xenon, "{} setting to {}", ppuState->ppuName, ppuState->ppuID == 0 ? "Running" : "Sleeping");
     ppuThreadState = ppuState->ppuID == 0 ? eThreadState::Running : eThreadState::Sleeping;
+    ppuThreadPreviousState = ppuThreadState;
   }
 
   // TLB Software reload Mode?
@@ -250,6 +251,7 @@ void PPU::ThreadStateMachine() {
     }
   } break;
   case eThreadState::Halted: {
+    // Handle stepping
     u8 state = GetCurrentRunningThreads();
     if (state & ePPUThreadBit_Zero) {
       curThreadId = ePPUThread_Zero;
@@ -259,7 +261,6 @@ void PPU::ThreadStateMachine() {
       }
     }
     if (state & ePPUThreadBit_One) {
-      // Thread 1 is running, process instructions until we reach TTR timeout.
       curThreadId = ePPUThread_One;
       if (ppuStepAmount > 0) {
         PPURunInstructions(ppuStepAmount, false);
