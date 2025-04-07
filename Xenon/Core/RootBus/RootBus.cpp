@@ -55,7 +55,7 @@ void RootBus::Read(u64 readAddress, u8 *data, u64 size) {
   // Device not found.
   LOG_ERROR(RootBus, "Read failed at address {:#x}", readAddress);
 
-  // Any reads to bus that dont belong to any device are always 0xFF.
+  // Any reads to bus that don't belong to any device are always 0xFF.
   memset(data, 0xFF, size);
 }
 

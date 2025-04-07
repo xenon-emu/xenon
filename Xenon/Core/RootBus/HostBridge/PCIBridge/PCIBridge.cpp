@@ -632,6 +632,7 @@ void PCIBridge::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
       return;
     }
   }
+
   u64 value = 0;
   memcpy(&value, data, size);
   LOG_ERROR(PCIBridge, "Write to unimplemented device: {} data = {:#x}", currentDevName, value);

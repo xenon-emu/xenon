@@ -36,7 +36,7 @@
    Clock, DVD tray state, Tilt Status, IR Receiver, Temps, etc...
 
         Since emulating an 8051 core is just adding overhead to the emulator as
-   of now i'm chosing just to do HLE for this.
+   of now I'm chosing just to do HLE for this.
 */
 
 #define SMC_DEV_SIZE 0x100

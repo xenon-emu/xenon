@@ -141,7 +141,7 @@ inline bool mmuComparePTE(u64 VA, u64 pte0, u64 pte1, u8 p, bool L, bool LP, u64
       return false;
     }
   } else {
-    LOG_ERROR(Xenon_MMU, "P > 28. Vali what did you messed up?");
+    LOG_ERROR(Xenon_MMU, "P > 28. Vali, what did you do?");
     return false;
   }
 }
@@ -294,7 +294,7 @@ u8 PPCInterpreter::mmuGetPageSize(PPU_STATE *ppuState, bool L, u8 LP) {
         pSize = 1048576; // 1 Mb page size
         break;
       case 0b0010:
-        pSize = 65536; // 16 Mb page size
+        pSize = 65536; // 64 Kb page size
         break;
       }
     }
@@ -695,11 +695,13 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
     // Search the SLB to get the VSID
     for (auto &slbEntry : curThread.SLB) {
       if (slbEntry.V) {
-        /*LOG_TRACE(Xenon, "Checking valid SLB (V:0x{:X},LP:0x{:X},C:0x{:X},L:0x{:X},N:0x{:X},Kp:0x{:X},Ks:0x{:X},VSID:0x{:X},ESID:0x{:X},vsidReg:0x{:X},esidReg:0x{:X})", (u32)slbEntry.V, (u32)slbEntry.LP, (u32)slbEntry.C, (u32)slbEntry.L,
-          (u32)slbEntry.N, (u32)slbEntry.Kp, (u32)slbEntry.Ks,
-          slbEntry.VSID, slbEntry.ESID, slbEntry.vsidReg, slbEntry.esidReg);*/
+        if (false)
+          LOG_TRACE(Xenon_MMU, "Checking valid SLB (V:0x{:X},LP:0x{:X},C:0x{:X},L:0x{:X},N:0x{:X},Kp:0x{:X},Ks:0x{:X},VSID:0x{:X},ESID:0x{:X},vsidReg:0x{:X},esidReg:0x{:X})", (u32)slbEntry.V, (u32)slbEntry.LP, (u32)slbEntry.C, (u32)slbEntry.L,
+                                (u32)slbEntry.N, (u32)slbEntry.Kp, (u32)slbEntry.Ks,
+                                slbEntry.VSID, slbEntry.ESID, slbEntry.vsidReg, slbEntry.esidReg);
         if (slbEntry.ESID == ESID) {
-          //LOG_TRACE(Xenon, "Match!");
+          if (false)
+            LOG_TRACE(Xenon_MMU, "Match!");
           // Entry valid & SLB->ESID = EA->VSID
           currslbEntry = slbEntry;
           VSID = slbEntry.VSID;
@@ -720,7 +722,6 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 
     // We hit the SLB, get the VA
     if (slbHit) {
-
       //
       // Virtual Addresss Generation
       //
@@ -960,7 +961,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
   end:
     RA = (RPN | QGET(*EA, 64 - p, 63));
     // Real Address 0 - 21 bits are not implemented;
-    QSET(RA, 0, 21, 0)
+    QSET(RA, 0, 21, 0);
   }
 
   // Save in ERAT's
@@ -972,6 +973,9 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
     // dERAT
     curThread.dERAT.putElement((*EA & ~0xFFF), (RA & ~0xFFF));
   }
+
+  if (false)
+    LOG_TRACE(Xenon_MMU, "Final translation, 0x{:X} -> 0x{:X} | RPN: 0x{:X}", *EA, RA, RPN);
 
   *EA = RA;
   return true;
@@ -1125,7 +1129,7 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
                               const u8 *data, u64 EA, u64 byteCount) {
   u64 oldEA = EA;
 
-  if (MMUTranslateAddress(&EA, ppuState, true) == false)
+  if (!MMUTranslateAddress(&EA, ppuState, true))
     return;
 
   if (oldEA >= 0x9E000000 && oldEA <= 0x9EFFFFFF) {

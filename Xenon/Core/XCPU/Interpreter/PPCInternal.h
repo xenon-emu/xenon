@@ -113,7 +113,7 @@ static constexpr u64 ExtractBits64(u32 input, u32 begin, u32 end) {
 #define QGET(qw, b, e) ((static_cast<u64>(qw) & QMASK((b), (e))) >> (63 - (e)))
 #define QSET(qw, b, e, qwSet)                                                  \
   (qw) &= ~QMASK(b, e);                                                        \
-  (qw) |= (static_cast<u64>(qwSet) << (63 - (e))) & QMASK(b, e);
+  (qw) |= (static_cast<u64>(qwSet) << (63 - (e))) & QMASK(b, e)
 
 #define DMASK(b, e) (((0xFFFFFFFF << ((31 + (b)) - (e))) >> (b)))
 #define DGET(dw, b, e) (((dw) & DMASK((b), (e))) >> (31 - (e)))
