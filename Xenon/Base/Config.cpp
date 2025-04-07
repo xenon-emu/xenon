@@ -118,6 +118,8 @@ void _debug::from_toml(const toml::value &value) {
   haltOnReadAddress = toml::find_or<u64&>(value, "HaltOnRead", haltOnReadAddress);
   haltOnWriteAddress = toml::find_or<u64&>(value, "HaltOnWrite", haltOnWriteAddress);
   haltOnAddress = toml::find_or<u64&>(value, "HaltOnAddress", haltOnWriteAddress);
+  haltOnSlbMiss = toml::find_or<bool>(value, "HaltOnSLBMiss", haltOnSlbMiss);
+  haltOnExceptions = toml::find_or<bool>(value, "HaltOnExceptions", haltOnExceptions);
   startHalted = toml::find_or<bool>(value, "StartHalted", startHalted);
 }
 void _debug::to_toml(toml::value &value) {
@@ -127,10 +129,15 @@ void _debug::to_toml(toml::value &value) {
   value["HaltOnWrite"].comments().clear();
   value["HaltOnWrite"] = haltOnWriteAddress;
   value["HaltOnWrite"].comments().push_back("# Address to halt on when the MMU writes to this address");
-  value["HaltOnWrite"].comments().clear();
-  value["HaltOn"].comments().push_back("# Address to halt on when the CPU executes this address");
-  value["HaltOn"] = haltOnAddress;
   value["HaltOn"].comments().clear();
+  value["HaltOn"] = haltOnAddress;
+  value["HaltOn"].comments().push_back("# Address to halt on when the CPU executes this address");
+  value["HaltOnExceptions"].comments().clear();
+  value["HaltOnExceptions"] = haltOnExceptions;
+  value["HaltOnExceptions"].comments().push_back("# Halts on every exception (TODO: Separate toggles)");
+  value["HaltOnSLBMiss"].comments().clear();
+  value["HaltOnSLBMiss"] = haltOnSlbMiss;
+  value["HaltOnSLBMiss"].comments().push_back("# Halts when a SLB cache misses");
   value["StartHalted"].comments().clear();
   value["StartHalted"] = startHalted;
   value["StartHalted"].comments().push_back("# Starts with the CPU halted");
@@ -140,11 +147,15 @@ bool _debug::verify_toml(toml::value &value) {
   cache_value(haltOnReadAddress);
   cache_value(haltOnWriteAddress);
   cache_value(haltOnAddress);
+  cache_value(haltOnExceptions);
+  cache_value(haltOnSlbMiss);
   cache_value(startHalted);
   from_toml(value);
   verify_value(haltOnReadAddress);
   verify_value(haltOnWriteAddress);
   verify_value(haltOnAddress);
+  verify_value(haltOnExceptions);
+  verify_value(haltOnSlbMiss);
   verify_value(startHalted);
   return true;
 }
@@ -291,23 +302,31 @@ void _log::from_toml(const toml::value &value) {
   s32 tmpLevel = static_cast<s32>(currentLevel);
   tmpLevel = toml::find_or<s32&>(value, "Level", tmpLevel);
   advanced = toml::find_or<bool>(value, "Advanced", advanced);
+  debugOnly = toml::find_or<bool>(value, "EnableDebugOnly", debugOnly);
   currentLevel = static_cast<Base::Log::Level>(tmpLevel);
 }
 void _log::to_toml(toml::value &value) {
-  value.comments().clear();
-  value.comments().push_back("# Controls the current output filter level");
-  value.comments().push_back("# 0: Trace | 1: Debug | 2: Info | 3: Warning | 4: Error | 5: Critical | 6: Guest | 7: Count");
   s32 tmpLevel = static_cast<s32>(currentLevel);
+  value["Level"].comments().clear();
   value["Level"] = tmpLevel;
+  value["Level"].comments().push_back("# Controls the current output filter level");
+  value["Level"].comments().push_back("# 0: Trace | 1: Debug | 2: Info | 3: Warning | 4: Error | 5: Critical | 6: Guest | 7: Count");
+  value["Advanced"].comments().clear();
   value["Advanced"] = advanced;
+  value["Advanced"].comments().push_back("# Show more details on the log (ex, debug symbols)");
+  value["EnableDebugOnly"].comments().clear();
+  value["EnableDebugOnly"] = debugOnly;
+  value["EnableDebugOnly"].comments().push_back("# Debug-only log options (Note: Floods the log and shows trace log options)");
 }
 bool _log::verify_toml(toml::value &value) {
   to_toml(value);
   cache_value(currentLevel);
   cache_value(advanced);
+  cache_value(debugOnly);
   from_toml(value);
   verify_value(currentLevel);
   verify_value(advanced);
+  verify_value(debugOnly);
   return true;
 }
 

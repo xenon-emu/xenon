@@ -557,6 +557,10 @@ void PPU::PPUCheckExceptions() {
   // Check Exceptions pending and process them in order.
   u16 &exceptions = _ex;
   if (exceptions != PPU_EX_NONE) {
+    // Halt on any exception
+    if (Config::debug.haltOnExceptions) {
+      Xe_Main->xenonCPU->Halt(); // Halt all cores
+    }
     // Non Maskable:
     //
     // 1. System Reset

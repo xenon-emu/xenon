@@ -696,14 +696,20 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
     bool slbHit = false;
     // Search the SLB to get the VSID
     for (auto &slbEntry : curThread.SLB) {
-      if (slbEntry.V && (slbEntry.ESID == ESID)) {
-        // Entry valid & SLB->ESID = EA->VSID
-        currslbEntry = slbEntry;
-        VSID = slbEntry.VSID;
-        L = slbEntry.L;
-        LP = slbEntry.LP;
-        slbHit = true;
-        break;
+      if (slbEntry.V) {
+        LOG_TRACE(Xenon, "Checking valid SLB (V:0x{:X},LP:0x{:X},C:0x{:X},L:0x{:X},N:0x{:X},Kp:0x{:X},Ks:0x{:X},VSID:0x{:X},ESID:0x{:X},vsidReg:0x{:X},esidReg:0x{:X})", (u32)slbEntry.V, (u32)slbEntry.LP, (u32)slbEntry.C, (u32)slbEntry.L,
+          (u32)slbEntry.N, (u32)slbEntry.Kp, (u32)slbEntry.Ks,
+          slbEntry.VSID, slbEntry.ESID, slbEntry.vsidReg, slbEntry.esidReg);
+        if (slbEntry.ESID == ESID) {
+          LOG_TRACE(Xenon, "Match!");
+          // Entry valid & SLB->ESID = EA->VSID
+          currslbEntry = slbEntry;
+          VSID = slbEntry.VSID;
+          L = slbEntry.L;
+          LP = slbEntry.LP;
+          slbHit = true;
+          break;
+        }
       }
     }
 
@@ -938,6 +944,10 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
         }
       }
     } else {
+      // Debug tools
+      if (Config::debug.haltOnSlbMiss) {
+        Xe_Main->xenonCPU->Halt();
+      }
       // SLB Miss
       // Data or Inst Segment Exception
       if (curThread.iFetch) {

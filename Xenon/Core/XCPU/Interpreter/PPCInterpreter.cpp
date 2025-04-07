@@ -13,7 +13,7 @@ PPCInterpreter::PPCDecoder PPCInterpreter::ppcDecoder{};
 
 // Interpreter Single Instruction Processing.
 void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
-  PPU_THREAD_REGISTERS& thread = curThread;
+  PPU_THREAD_REGISTERS &thread = curThread;
 
   // RGH 2 for CB_A 9188 in a JRunner XDKBuild.
   if (thread.CIA == 0x0200C870) {
@@ -75,7 +75,7 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
 
 // System reset Exception (0x100)
 void PPCInterpreter::ppcResetException(PPU_STATE *ppuState) {
-  PPU_THREAD_REGISTERS& thread = curThread;
+  PPU_THREAD_REGISTERS &thread = curThread;
 
   LOG_INFO(Xenon, "[{}](Thrd{:#d}): Reset exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.NIA;
@@ -88,7 +88,7 @@ void PPCInterpreter::ppcResetException(PPU_STATE *ppuState) {
 }
 // Data Storage Exception (0x300)
 void PPCInterpreter::ppcDataStorageException(PPU_STATE *ppuState) {
-  PPU_THREAD_REGISTERS& thread = curThread;
+  PPU_THREAD_REGISTERS &thread = curThread;
 
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Data Storage exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA;
@@ -101,7 +101,7 @@ void PPCInterpreter::ppcDataStorageException(PPU_STATE *ppuState) {
 }
 // Data Segment Exception (0x380)
 void PPCInterpreter::ppcDataSegmentException(PPU_STATE *ppuState) {
-  PPU_THREAD_REGISTERS& thread = curThread;
+  PPU_THREAD_REGISTERS &thread = curThread;
 
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Data Segment exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA;
@@ -114,7 +114,7 @@ void PPCInterpreter::ppcDataSegmentException(PPU_STATE *ppuState) {
 }
 // Instruction Storage Exception (0x400)
 void PPCInterpreter::ppcInstStorageException(PPU_STATE *ppuState) {
-  PPU_THREAD_REGISTERS& thread = curThread;
+  PPU_THREAD_REGISTERS &thread = curThread;
 
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Instruction Storage exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA;
@@ -128,7 +128,7 @@ void PPCInterpreter::ppcInstStorageException(PPU_STATE *ppuState) {
 }
 // Instruction Segment Exception (0x480)
 void PPCInterpreter::ppcInstSegmentException(PPU_STATE *ppuState) {
-  PPU_THREAD_REGISTERS& thread = curThread;
+  PPU_THREAD_REGISTERS &thread = curThread;
 
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Instruction Segment exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA;
@@ -141,7 +141,7 @@ void PPCInterpreter::ppcInstSegmentException(PPU_STATE *ppuState) {
 }
 // External Exception (0x500)
 void PPCInterpreter::ppcExternalException(PPU_STATE *ppuState) {
-  PPU_THREAD_REGISTERS& thread = curThread;
+  PPU_THREAD_REGISTERS &thread = curThread;
 
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): External exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.NIA;
@@ -154,7 +154,7 @@ void PPCInterpreter::ppcExternalException(PPU_STATE *ppuState) {
 }
 // Program Exception (0x700)
 void PPCInterpreter::ppcProgramException(PPU_STATE *ppuState) {
-  PPU_THREAD_REGISTERS& thread = curThread;
+  PPU_THREAD_REGISTERS &thread = curThread;
 
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Program exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA;
@@ -168,7 +168,7 @@ void PPCInterpreter::ppcProgramException(PPU_STATE *ppuState) {
 }
 
 void PPCInterpreter::ppcDecrementerException(PPU_STATE *ppuState) {
-  PPU_THREAD_REGISTERS& thread = curThread;
+  PPU_THREAD_REGISTERS &thread = curThread;
 
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Decrementer exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.NIA;
@@ -182,7 +182,7 @@ void PPCInterpreter::ppcDecrementerException(PPU_STATE *ppuState) {
 
 // System Call Exception (0xC00)
 void PPCInterpreter::ppcSystemCallException(PPU_STATE *ppuState) {
-  PPU_THREAD_REGISTERS& thread = curThread;
+  PPU_THREAD_REGISTERS &thread = curThread;
 
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): System Call exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.NIA;
@@ -195,7 +195,7 @@ void PPCInterpreter::ppcSystemCallException(PPU_STATE *ppuState) {
 }
 
 void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
-  PPU_THREAD_REGISTERS& thread = curThread;
+  PPU_THREAD_REGISTERS &thread = curThread;
 
   // DbgPrint, r3 = PCSTR stringAddress, r4 = int String Size.
   if (trapNumber == 0x14) {

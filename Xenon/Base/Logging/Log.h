@@ -6,6 +6,7 @@
 #include <fmt/format.h>
 
 #include "Types.h"
+#include "Base/Config.h"
 
 namespace Base::Log {
 
@@ -36,14 +37,11 @@ void FmtLogMessage(Class log_class, Level log_level, const char* filename, u32 l
   Base::Log::FmtLogMessage(log_class, log_level, Base::Log::TrimSourcePath(__FILE__),      \
                              __LINE__, __func__, __VA_ARGS__)
 
-#ifdef _DEBUG
 #define LOG_TRACE(log_class, ...)                                                          \
+if (Config::log.debugOnly)                                                                 \
   Base::Log::FmtLogMessage(Base::Log::Class::log_class, Base::Log::Level::Trace,           \
                            Base::Log::TrimSourcePath(__FILE__), __LINE__, __func__,        \
                            __VA_ARGS__)
-#else
-#define LOG_TRACE(log_class, fmt, ...) (void(0))
-#endif
 
 #define LOG_DEBUG(log_class, ...)                                                          \
   Base::Log::FmtLogMessage(Base::Log::Class::log_class, Base::Log::Level::Debug,           \

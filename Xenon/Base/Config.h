@@ -90,6 +90,10 @@ inline struct _debug {
   u64 haltOnWriteAddress = 0;
   // Halt on execution of this address
   u64 haltOnAddress = 0;
+  // Halt on an exception
+  bool haltOnExceptions = false;
+  // Halt on a SLB Miss
+  bool haltOnSlbMiss = false;
   // Start the CPU halted
   bool startHalted = false;
 
@@ -192,6 +196,12 @@ inline struct _log {
   Base::Log::Level currentLevel = Base::Log::Level::Warning;
   // Show more details on log
   bool advanced = false;
+  // Show debug-only log statements
+#ifdef _DEBUG
+  bool debugOnly = true;
+#else
+  bool debugOnly = false;
+#endif
 
   // TOML Conversion
   void to_toml(toml::value &value);
