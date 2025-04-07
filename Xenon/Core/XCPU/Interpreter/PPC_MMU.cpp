@@ -975,7 +975,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
   }
 
   if (false)
-    LOG_TRACE(Xenon_MMU, "Final translation, 0x{:X} -> 0x{:X} | RPN: 0x{:X}", *EA, RA, RPN);
+    LOG_TRACE(Xenon_MMU, "Final translation, 0x{:X} -> 0x{:X}", *EA, RA);
 
   *EA = RA;
   return true;
