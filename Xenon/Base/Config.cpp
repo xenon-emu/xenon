@@ -117,7 +117,7 @@ bool _imgui::verify_toml(toml::value &value) {
 void _debug::from_toml(const toml::value &value) {
   haltOnReadAddress = toml::find_or<u64&>(value, "HaltOnRead", haltOnReadAddress);
   haltOnWriteAddress = toml::find_or<u64&>(value, "HaltOnWrite", haltOnWriteAddress);
-  haltOnAddress = toml::find_or<u64&>(value, "HaltOnAddress", haltOnWriteAddress);
+  haltOnAddress = toml::find_or<u64&>(value, "HaltOnAddress", haltOnAddress);
   haltOnSlbMiss = toml::find_or<bool>(value, "HaltOnSLBMiss", haltOnSlbMiss);
   haltOnExceptions = toml::find_or<bool>(value, "HaltOnExceptions", haltOnExceptions);
   startHalted = toml::find_or<bool>(value, "StartHalted", startHalted);
@@ -129,9 +129,9 @@ void _debug::to_toml(toml::value &value) {
   value["HaltOnWrite"].comments().clear();
   value["HaltOnWrite"] = haltOnWriteAddress;
   value["HaltOnWrite"].comments().push_back("# Address to halt on when the MMU writes to this address");
-  value["HaltOn"].comments().clear();
-  value["HaltOn"] = haltOnAddress;
-  value["HaltOn"].comments().push_back("# Address to halt on when the CPU executes this address");
+  value["HaltOnAddress"].comments().clear();
+  value["HaltOnAddress"] = haltOnAddress;
+  value["HaltOnAddress"].comments().push_back("# Address to halt on when the CPU executes this address");
   value["HaltOnExceptions"].comments().clear();
   value["HaltOnExceptions"] = haltOnExceptions;
   value["HaltOnExceptions"].comments().push_back("# Halts on every exception (TODO: Separate toggles)");

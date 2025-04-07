@@ -136,18 +136,18 @@ void PPU::StartExecution(bool setHRMOR) {
   }
 
   // TLB Software reload Mode?
-  ppuState->SPR.LPCR = 0x0000000000000402;
+  ppuState->SPR.LPCR = 0x402ULL;
 
   // HID6?
-  ppuState->SPR.HID6 = 0x0001803800000000;
+  ppuState->SPR.HID6 = 0x1803800000000ULL;
 
   // TSCR[WEXT] = 1??
-  ppuState->SPR.TSCR = 0x100000;
+  ppuState->SPR.TSCR = 0x100000UL;
 
   // If we're PPU0,thread0 then enable THRD 0 and set Reset Vector.
   if (ppuState->ppuID == 0 && setHRMOR) {
-    ppuState->SPR.CTRL = 0x800000; // CTRL[TE0] = 1;
-    ppuState->SPR.HRMOR = 0x0000020000000000;
+    ppuState->SPR.CTRL = 0x800000UL; // CTRL[TE0] = 1;
+    ppuState->SPR.HRMOR = 0x20000000000ULL;
     ppuState->ppuThread[ePPUThread_Zero].NIA = resetVector;
   }
 
