@@ -99,12 +99,10 @@ set(Logging
 
 set(Base
     ${Logging}
-    Xenon/Base/Alignment.h
     Xenon/Base/Arch.h
     Xenon/Base/Assert.cpp
     Xenon/Base/Assert.h
     Xenon/Base/Bounded_threadsafe_queue.h
-    Xenon/Base/Concepts.h
     Xenon/Base/Config.cpp
     Xenon/Base/Config.h
     Xenon/Base/Error.cpp

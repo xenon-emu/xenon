@@ -2,9 +2,8 @@
 
 #pragma once
 
-#include <fmt/format.h>
-
 #include <algorithm>
+#include <fmt/format.h>
 
 #include "Types.h"
 

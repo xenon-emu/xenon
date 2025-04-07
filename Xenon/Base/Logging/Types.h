@@ -7,7 +7,7 @@
 namespace Base::Log {
 
 /// Specifies the severity or level of detail of the log message.
-enum class Level : u8 {
+enum class Level : const u8 {
   Trace,      ///< Extremely detailed and repetitive debugging information that is likely to pollute logs.
   Debug,      ///< Less detailed debugging information.
   Info,       ///< Status information from important points during execution.
@@ -24,7 +24,7 @@ enum class Level : u8 {
  * @note If you add a new entry here, also add a corresponding one to `ALL_LOG_CLASSES` in
  * filter.cpp.
  */
-enum class Class : u8 {
+enum class Class : const u8 {
   Log,                    // Messages about the log system itself.
   Base,                   // System base routines: FS, logging, etc.
   Base_Filesystem,        // Filesystem Messages.

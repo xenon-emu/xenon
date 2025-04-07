@@ -3,17 +3,12 @@
 #include "Backend.h"
 
 #include <fmt/format.h>
-#include <map>
 #include <functional>
-
-#ifdef _WIN32
-#include <windows.h> // For OutputDebugStringW
-#endif
+#include <map>
 
 #include "Base/Bounded_threadsafe_queue.h"
 #include "Base/io_file.h"
 #include "Base/Path_util.h"
-#include "Base/String_util.h"
 #include "Base/Thread.h"
 
 #include "Log.h"
@@ -26,9 +21,7 @@ using namespace Base::FS;
 
 namespace {
 
-/*
- * Base backend with shell functions
- */
+// Base backend with shell functions
 class BaseBackend {
 public:
   virtual ~BaseBackend() = default;
@@ -36,9 +29,8 @@ public:
   virtual void Flush() = 0;
 };
 
-/*
- * Backend that writes to stderr and with color
- */
+
+// Backend that writes to stderr and with color
 class ColorConsoleBackend : public BaseBackend {
 public:
   explicit ColorConsoleBackend() = default;
@@ -63,9 +55,7 @@ private:
   std::atomic_bool enabled{true};
 };
 
-/*
- * Backend that writes to a file passed into the constructor
- */
+// Backend that writes to a file passed into the constructor
 class FileBackend : public BaseBackend {
 public:
   explicit FileBackend(const std::filesystem::path& filename)
@@ -105,20 +95,14 @@ private:
   size_t bytes_written = 0;
 };
 
-/*
- * Backend that writes to Visual Studio's output window
- */
+// Backend that writes to Visual Studio's output window
 class DebuggerBackend : public BaseBackend {
 public:
   explicit DebuggerBackend() = default;
 
   ~DebuggerBackend() = default;
 
-  void Write(const Entry& entry) override {
-#ifdef _WIN32
-    ::OutputDebugStringW(UTF8ToUTF16W(FormatLogMessage(entry).append(1, '\n')).c_str());
-#endif
-  }
+  void Write(const Entry& entry) override {}
 
   void Flush() override
   {}
@@ -129,9 +113,7 @@ public:
 
 bool initialization_in_progress_suppress_logging = true;
 
-/*
- * Static state as a singleton.
- */
+// Static state as a singleton.
 class Impl {
 public:
   static Impl& Instance() {
@@ -146,10 +128,9 @@ public:
       LOG_WARNING(Log, "Reinitializing logging backend");
       return;
     }
-    const auto& log_dir = GetUserPath(PathType::LogDir);
-    std::filesystem::create_directory(log_dir);
+    const auto log_dir = GetUserPath(PathType::LogDir);
     Filter filter;
-    // filter.ParseFilterString(/*Config::getLogFilter()*/);
+    // filter.ParseFilterString(Config::getLogFilter());
     instance = std::unique_ptr<Impl, decltype(&Deleter)>(new Impl(log_dir / log_file, filter),
                                Deleter);
     initialization_in_progress_suppress_logging = false;
@@ -386,7 +367,7 @@ void CleanupOldLogs(const std::string_view &log_file_base, const std::filesystem
 
 void Initialize(const std::string_view &log_file) {
   // Create directory vars to so we can use std::filesystem::path::stem
-  const std::filesystem::path LogDir = Base::FS::GetUserPath(Base::FS::PathType::LogDir);
+  const std::filesystem::path LogDir = GetUserPath(PathType::LogDir);
   const std::filesystem::path LogFile = LOG_FILE;
   const std::filesystem::path LogFileStem = LogFile.stem();
   const std::filesystem::path LogFileName = LogFile.filename();

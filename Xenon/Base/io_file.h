@@ -5,7 +5,6 @@
 #include <filesystem>
 #include <span>
 
-#include "Concepts.h"
 #include "Types.h"
 #include "Enum.h"
 
@@ -119,7 +118,7 @@ public:
 
   template <typename T>
   size_t Read(T& data) const {
-    if constexpr (IsContiguousContainer<T>) {
+    if constexpr (std::contiguous_iterator<typename T::iterator>) {
       using ContiguousType = typename T::value_type;
       static_assert(std::is_trivially_copyable_v<ContiguousType>,
               "Data type must be trivially copyable.");
@@ -131,7 +130,7 @@ public:
 
   template <typename T>
   size_t Write(const T& data) const {
-    if constexpr (IsContiguousContainer<T>) {
+    if constexpr (std::contiguous_iterator<typename T::iterator>) {
       using ContiguousType = typename T::value_type;
       static_assert(std::is_trivially_copyable_v<ContiguousType>,
               "Data type must be trivially copyable.");

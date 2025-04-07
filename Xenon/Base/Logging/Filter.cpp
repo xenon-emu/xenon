@@ -29,7 +29,7 @@ Class GetClassByName(const It begin, const It end) {
 
 template <typename Iterator>
 bool ParseFilterRule(Filter& instance, Iterator begin, Iterator end) {
-  auto level_separator = std::find(begin, end, ':');
+  const auto level_separator = std::find(begin, end, ':');
   if (level_separator == end) {
     LOG_ERROR(Log, "Invalid log filter. Must specify a log level after `:`: {}", std::string_view(begin, end));
     return false;
