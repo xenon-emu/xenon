@@ -180,7 +180,7 @@ void PPU::Reset() {
 }
 
 void PPU::Halt(u64 haltOn) {
-  if (haltOn != 0)
+  if (haltOn)
     LOG_DEBUG(Xenon, "Halting PPU{} on address {:#x}", ppuState->ppuID, haltOn);
   ppuHaltOn = haltOn;
   if (ppuThreadPreviousState == eThreadState::None) // If we were told to ignore it, then do so
@@ -189,13 +189,11 @@ void PPU::Halt(u64 haltOn) {
 }
 void PPU::Continue() {
   LOG_DEBUG(Xenon, "Continuing execution on PPU{}", ppuState->ppuID);
-  ppuHaltOn = 0;
   ppuThreadState = ppuThreadPreviousState;
   ppuThreadPreviousState = eThreadState::None;
 }
 void PPU::Step(int amount) {
   LOG_DEBUG(Xenon, "Continuing PPU{} for {} Instructions", ppuState->ppuID, amount);
-  ppuHaltOn = 0;
   ppuStepAmount = amount;
 }
 
