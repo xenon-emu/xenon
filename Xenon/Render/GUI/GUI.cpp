@@ -31,7 +31,7 @@ void Render::GUI::Init(SDL_Window* window, void* context) {
   IMGUI_CHECKVERSION();
   // Create ImGui Context
   ImGui::CreateContext();
-  ImGuiIO& io = ImGui::GetIO();
+  ImGuiIO &io = ImGui::GetIO();
   // We don't want to create a ini because it stores positions.
   // Because we initialize with a 1280x720 window, then resize to whatever,
   // this will break the window positions, causing them to render off screen
@@ -56,7 +56,7 @@ bool RGH2{};
 bool storedPreviousInitSkips{};
 int initSkip1{}, initSkip2{};
 void Render::GUI::PostInit() {
-  ImGuiIO& io = ImGui::GetIO();
+  ImGuiIO &io = ImGui::GetIO();
   // It might not be a bad idea to take the Xbox 360 font and convert it to TTF
   const std::filesystem::path fontsPath{ Base::FS::GetUserPath(Base::FS::PathType::FontDir) };
   const std::string robotoRegular = (fontsPath / "Roboto-Regular.ttf").string();
@@ -76,7 +76,7 @@ void Render::GUI::Shutdown() {
 }
 
 //TODO(Vali0004): Make Windows into callbacks, so we can create a window from a different thread.
-void Render::GUI::Window(const std::string& title, std::function<void()> callback, const ImVec2& size, ImGuiWindowFlags flags, bool* conditon, const ImVec2& position, ImGuiCond cond) {
+void Render::GUI::Window(const std::string &title, std::function<void()> callback, const ImVec2 &size, ImGuiWindowFlags flags, bool* conditon, const ImVec2 &position, ImGuiCond cond) {
   ImGui::SetNextWindowPos(position, cond);
   ImGui::SetNextWindowSize(size, cond);
 
@@ -88,7 +88,7 @@ void Render::GUI::Window(const std::string& title, std::function<void()> callbac
   ImGui::End();
 }
 
-void Render::GUI::Child(const std::string& title, std::function<void()> callback, const ImVec2& size, ImGuiChildFlags flags, ImGuiWindowFlags windowFlags) {
+void Render::GUI::Child(const std::string &title, std::function<void()> callback, const ImVec2 &size, ImGuiChildFlags flags, ImGuiWindowFlags windowFlags) {
   if (ImGui::BeginChild(title.c_str(), size, flags, windowFlags)) {
     if (callback) {
       callback();
@@ -97,7 +97,7 @@ void Render::GUI::Child(const std::string& title, std::function<void()> callback
   ImGui::EndChild();
 }
 
-void Render::GUI::Node(const std::string& title, std::function<void()> callback, ImGuiTreeNodeFlags flags) {
+void Render::GUI::Node(const std::string &title, std::function<void()> callback, ImGuiTreeNodeFlags flags) {
   if (ImGui::TreeNodeEx(title.c_str(), flags)) {
     if (callback) {
       callback();
@@ -106,7 +106,7 @@ void Render::GUI::Node(const std::string& title, std::function<void()> callback,
   }
 }
 
-void Render::GUI::Text(const std::string& label) {
+void Render::GUI::Text(const std::string &label) {
   ImGui::TextUnformatted(label.c_str());
 }
 
@@ -139,7 +139,7 @@ namespace ImGui {
   }
 }
 
-void Render::GUI::TextCopy(const std::string& label, const std::string& value) {
+void Render::GUI::TextCopy(const std::string &label, const std::string &value) {
   std::string flabel = label + ": " + value;
   if (ImGui::TextButton(flabel.data())) {
     LOG_INFO(Debug, "{}", flabel.data());
@@ -168,7 +168,7 @@ void Render::GUI::MenuBar(std::function<void()> callback) {
   }
 }
 
-void Render::GUI::Menu(const std::string& title, std::function<void()> callback) {
+void Render::GUI::Menu(const std::string &title, std::function<void()> callback) {
   if (ImGui::BeginMenu(title.c_str())) {
     if (callback) {
       callback();
@@ -177,7 +177,7 @@ void Render::GUI::Menu(const std::string& title, std::function<void()> callback)
   }
 }
 
-void Render::GUI::MenuItem(const std::string& title, std::function<void()> callback, bool enabled, bool selected, const std::string& shortcut) {
+void Render::GUI::MenuItem(const std::string &title, std::function<void()> callback, bool enabled, bool selected, const std::string &shortcut) {
   if (ImGui::MenuItem(title.c_str(), shortcut.c_str(), selected, enabled)) {
     if (callback) {
       callback();
@@ -185,7 +185,7 @@ void Render::GUI::MenuItem(const std::string& title, std::function<void()> callb
   }
 }
 
-void Render::GUI::TabBar(const std::string& title, std::function<void()> callback, ImGuiTabBarFlags flags) {
+void Render::GUI::TabBar(const std::string &title, std::function<void()> callback, ImGuiTabBarFlags flags) {
   if (ImGui::BeginTabBar(title.c_str(), flags)) {
     if (callback) {
       callback();
@@ -194,7 +194,7 @@ void Render::GUI::TabBar(const std::string& title, std::function<void()> callbac
   }
 }
 
-void Render::GUI::TabItem(const std::string& title, std::function<void()> callback, bool* conditon, ImGuiTabItemFlags flags) {
+void Render::GUI::TabItem(const std::string &title, std::function<void()> callback, bool* conditon, ImGuiTabItemFlags flags) {
   if (ImGui::BeginTabItem(title.c_str(), conditon, flags)) {
     if (callback) {
       callback();
@@ -203,7 +203,7 @@ void Render::GUI::TabItem(const std::string& title, std::function<void()> callba
   }
 }
 
-bool Render::GUI::Button(const std::string& label, std::function<void()> callback, const ImVec2& size) {
+bool Render::GUI::Button(const std::string &label, std::function<void()> callback, const ImVec2 &size) {
   if (ImGui::Button(label.c_str(), size)) {
     if (callback) {
       callback();
@@ -213,7 +213,7 @@ bool Render::GUI::Button(const std::string& label, std::function<void()> callbac
   return false;
 }
 
-bool Render::GUI::Toggle(const std::string& label, bool* conditon, std::function<void()> callback) {
+bool Render::GUI::Toggle(const std::string &label, bool* conditon, std::function<void()> callback) {
   bool dummy{};
   if (!conditon) {
     conditon = &dummy;
@@ -227,8 +227,8 @@ bool Render::GUI::Toggle(const std::string& label, bool* conditon, std::function
   return false;
 }
 
-std::string Render::GUI::InputText(const std::string& title, std::string initValue, size_t maxCharacters,
-  const std::string& textHint, ImGuiInputTextFlags flags, ImVec2 size)
+std::string Render::GUI::InputText(const std::string &title, std::string initValue, size_t maxCharacters,
+  const std::string &textHint, ImGuiInputTextFlags flags, ImVec2 size)
 {
   std::vector<char> buf(maxCharacters, '\0');
   if (buf[0] == '\0' && !initValue.empty()) {
@@ -248,7 +248,11 @@ std::string Render::GUI::InputText(const std::string& title, std::string initVal
   return buf.data();
 }
 
-void Render::GUI::Tooltip(const std::string& contents, ImGuiHoveredFlags delay) {
+void Render::GUI::InputInt(const std::string &label, u32 *value, u32 step, u32 stepFast) {
+  ImGui::InputScalar(label.c_str(), ImGuiDataType_U32, (void*)value, (void*)(step > 0 ? &step : NULL), (void*)(stepFast > 0 ? &stepFast : NULL), "%d");
+}
+
+void Render::GUI::Tooltip(const std::string &contents, ImGuiHoveredFlags delay) {
   if (delay != ImGuiHoveredFlags_DelayNone)
     delay |= ImGuiHoveredFlags_NoSharedDelay;
 
@@ -472,10 +476,10 @@ void PPUThread(Render::GUI *gui, PPU_STATE *PPUState, ePPUThread threadID) {
 
 void RenderInstr(Render::GUI *gui, u32 addr, u32 instr) {
   const std::string instrName = PPCInterpreter::ppcDecoder.decodeName(instr);
-  const u32 b0 = static_cast<u8>((instr >> 24) & 0xFF);
-  const u32 b1 = static_cast<u8>((instr >> 16) & 0xFF);
-  const u32 b2 = static_cast<u8>((instr >> 8) & 0xFF);
-  const u32 b3 = static_cast<u8>((instr >> 0) & 0xFF);
+  const u32 b0 = static_cast<u8>((instr >> 24)  &0xFF);
+  const u32 b1 = static_cast<u8>((instr >> 16)  &0xFF);
+  const u32 b2 = static_cast<u8>((instr >> 8)  &0xFF);
+  const u32 b3 = static_cast<u8>((instr >> 0)  &0xFF);
   TextFmt(gui, "{:08X} {:02X} {:02X} {:02X} {:02X}                             {}", addr, b0, b1, b2, b3, instrName);
 }
 
@@ -527,7 +531,7 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
       TLB_Reg &TLB = PPUState.TLB;
       gui->Node("tlbSet0", [&] {
         for (u64 i = 0; i != 256; ++i) {
-          TLBEntry& TLBEntry = TLB.tlbSet0[i];
+          TLBEntry &TLBEntry = TLB.tlbSet0[i];
           gui->Node(fmt::format("[{}]", i), [&] {
             Bool(gui, TLBEntry, V);
             Hex(gui, TLBEntry, pte0);
@@ -537,7 +541,7 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
       });
       gui->Node("tlbSet1", [&] {
         for (u64 i = 0; i != 256; ++i) {
-          TLBEntry& TLBEntry = TLB.tlbSet1[i];
+          TLBEntry &TLBEntry = TLB.tlbSet1[i];
           gui->Node(fmt::format("[{}]", i), [&] {
             Bool(gui, TLBEntry, V);
             Hex(gui, TLBEntry, pte0);
@@ -547,7 +551,7 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
       });
       gui->Node("tlbSet2", [&] {
         for (u64 i = 0; i != 256; ++i) {
-          TLBEntry& TLBEntry = TLB.tlbSet2[i];
+          TLBEntry &TLBEntry = TLB.tlbSet2[i];
           gui->Node(fmt::format("[{}]", i), [&] {
             Bool(gui, TLBEntry, V);
             Hex(gui, TLBEntry, pte0);
@@ -557,7 +561,7 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
       });
       gui->Node("tlbSet3", [&] {
         for (u64 i = 0; i != 256; ++i) {
-          TLBEntry& TLBEntry = TLB.tlbSet3[i];
+          TLBEntry &TLBEntry = TLB.tlbSet3[i];
           gui->Node(fmt::format("[{}]", i), [&] {
             Bool(gui, TLBEntry, V);
             Hex(gui, TLBEntry, pte0);
@@ -607,14 +611,15 @@ void PPCDebugger(Render::GUI *gui) {
           gui->MenuItem("Continue", [&gui] {
             Xe_Main->getCPU()->Continue();
           });
+          gui->InputInt("Amount", &gui->stepAmount);
           gui->MenuItem("Step (F10)", [&gui] {
-            Xe_Main->getCPU()->Step();
+            Xe_Main->getCPU()->Step(gui->stepAmount);
           });
         }
       });
     });
     if (ImGui::IsKeyPressed(ImGuiKey_F10)) {
-      Xe_Main->getCPU()->Step();
+      Xe_Main->getCPU()->Step(gui->stepAmount);
     }
     Xenon *CPU = Xe_Main->getCPU();
     PPC_PPU(gui, CPU->GetPPU(0));
@@ -670,7 +675,7 @@ void ImGuiSettings(Render::GUI *gui) {
   gui->Toggle("Style Editor", &gui->styleEditor);
   gui->Toggle("Demo", &gui->demoWindow);
   gui->Toggle("Viewports", &Config::imgui.viewports, [&] {
-    ImGuiIO& io = ImGui::GetIO();
+    ImGuiIO &io = ImGui::GetIO();
     if (Config::imgui.viewports)
       io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
     else
@@ -873,7 +878,7 @@ void Render::GUI::SetStyle() {
   style.DisplaySafeAreaPadding = { 3.f, 22.f };
   style.MouseCursorScale = 0.7f;
   // Change some style vars for Viewports
-  if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+  if (io.ConfigFlags  &ImGuiConfigFlags_ViewportsEnable) {
     style.WindowRounding = 0.0f;
     style.Colors[ImGuiCol_WindowBg].w = 1.0f;
   }

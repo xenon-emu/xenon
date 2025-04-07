@@ -253,10 +253,22 @@ void PPU::ThreadStateMachine() {
     }
   } break;
   case eThreadState::Halted: {
-    if (ppuStepAmount > 0) {
-      PPURunInstructions(ppuStepAmount, false);
-      ppuStepAmount = 0;  // Ensure step mode doesn't continue indefinitely
-    };
+    u8 state = GetCurrentRunningThreads();
+    if (state & ePPUThreadBit_Zero) {
+      curThreadId = ePPUThread_Zero;
+      if (ppuStepAmount > 0) {
+        PPURunInstructions(ppuStepAmount, false);
+        ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
+      }
+    }
+    if (state & ePPUThreadBit_One) {
+      // Thread 1 is running, process instructions until we reach TTR timeout.
+      curThreadId = ePPUThread_One;
+      if (ppuStepAmount > 0) {
+        PPURunInstructions(ppuStepAmount, false);
+        ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
+      }
+    }
   } break;
   case eThreadState::Sleeping: {
     // Waiting for an event, do nothing

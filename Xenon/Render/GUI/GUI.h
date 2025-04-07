@@ -59,6 +59,7 @@ public:
   bool Toggle(const std::string &label, bool *conditon = nullptr, std::function<void()> callback = {});
   std::string InputText(const std::string &title, std::string initValue = {}, size_t maxCharacters = 256,
     const std::string &textHint = {}, ImGuiInputTextFlags flags = ImGuiInputTextFlags_None, ImVec2 size = {});
+  void InputInt(const std::string &label, u32 *value, u32 step = 1, u32 stepFast = 100);
   void Tooltip(const std::string &contents, ImGuiHoveredFlags delay = ImGuiHoveredFlags_DelayNone);
 
   void Render(Texture *texture);
@@ -71,6 +72,7 @@ public:
   SDL_Window *mainWindow = nullptr;
   bool styleEditor = false;
   bool demoWindow = false;
+  u32 stepAmount = 1;
   bool ppcDebuggerActive = false;
   bool ppcDebuggerAttached = true;
 };
