@@ -21,6 +21,7 @@ extern XENON_CONTEXT *intXCPUContext;
 #define curThreadId   ppuState->currentThread
 #define curThread     ppuState->ppuThread[curThreadId]
 #define _instr        curThread.CI
+#define _nextinstr    curThread.NI
 #define _ex           curThread.exceptReg
 #define GPR(x)        curThread.GPR[x]
 #define GPRi(x)       GPR(_instr.x)

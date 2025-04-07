@@ -545,6 +545,7 @@ bool PPU::PPUReadNextInstruction() {
   curThread.iFetch = true;
   // Fetch the instruction from memory
   _instr.opcode = PPCInterpreter::MMURead32(ppuState.get(), curThread.CIA);
+  _nextinstr.opcode = PPCInterpreter::MMURead32(ppuState.get(), curThread.NIA);
   if (_instr.opcode == 0xFFFFFFFF) {
     LOG_CRITICAL(Xenon, "PPU{} returned a invalid opcode! Halting...", ppuState->ppuID);
     Xe_Main->getCPU()->Halt(); // Halt CPU

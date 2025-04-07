@@ -560,6 +560,8 @@ struct PPU_THREAD_REGISTERS {
   u64 NIA;
   // Current instruction data
   PPCOpcode CI;
+  // Next instruction data
+  PPCOpcode NI;
   // Instruction fetch flag
   bool iFetch = false;
   // General-Purpose Registers (32)
