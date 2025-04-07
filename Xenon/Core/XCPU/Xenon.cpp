@@ -157,11 +157,16 @@ void Xenon::Step(int amount) {
 }
 
 bool Xenon::IsHalted() {
-  bool halted = false;
-  if (ppu0.get()) halted = ppu0->IsHalted();
-  if (ppu1.get()) halted = ppu1->IsHalted();
-  if (ppu2.get()) halted = ppu2->IsHalted();
-  return halted;
+  if (ppu0.get() && ppu0->IsHalted()) {
+    return true;
+  }
+  if (ppu1.get() && ppu1->IsHalted()) {
+    return true;
+  }
+  if (ppu2.get() && ppu2->IsHalted()) {
+    return true;
+  }
+  return false;
 }
 
 PPU *Xenon::GetPPU(u8 ppuID) {

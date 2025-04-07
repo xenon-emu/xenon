@@ -181,20 +181,23 @@ void PPU::Reset() {
 }
 
 void PPU::Halt(u64 haltOn) {
-  if (haltOn)
+  if (haltOn) {
     LOG_DEBUG(Xenon, "Halting PPU{} on address {:#x}", ppuState->ppuID, haltOn);
-  ppuHaltOn = haltOn;
+    ppuHaltOn = haltOn;
+  }
   if (ppuThreadPreviousState == eThreadState::None) // If we were told to ignore it, then do so
     ppuThreadPreviousState = ppuThreadState;
   ppuThreadState = eThreadState::Halted;
 }
 void PPU::Continue() {
-  LOG_DEBUG(Xenon, "Continuing execution on PPU{}", ppuState->ppuID);
+  if (ppuThreadPreviousState == eThreadState::Running)
+    LOG_DEBUG(Xenon, "Continuing execution on PPU{}", ppuState->ppuID);
   ppuThreadState = ppuThreadPreviousState;
   ppuThreadPreviousState = eThreadState::None;
 }
 void PPU::Step(int amount) {
-  LOG_DEBUG(Xenon, "Continuing PPU{} for {} Instructions", ppuState->ppuID, amount);
+  if (ppuThreadPreviousState == eThreadState::Running)
+    LOG_DEBUG(Xenon, "Continuing PPU{} for {} Instructions", ppuState->ppuID, amount);
   ppuStepAmount = amount;
 }
 
@@ -202,12 +205,10 @@ void PPU::Step(int amount) {
 void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
   for (size_t instrCount = 0; instrCount < numInstrs && ppuThreadState != eThreadState::Quiting; ++instrCount) {
     // Halt if needed before executing the instruction
-    if (enableHalt) {
-      if (ppuHaltOn && ppuHaltOn == curThread.CIA) {
-        ppuThreadState = eThreadState::Halted;
-      }
-      if (ppuThreadState == eThreadState::Halted)
-        break;
+    if (enableHalt && (ppuHaltOn && ppuHaltOn == curThread.CIA)) {
+      // Halt all cores
+      // TODO(Vali0004): Change halt to be per-core or change halt continuing to be per-core
+      Xe_Main->getCPU()->Halt();
     }
     
     if (PPUReadNextInstruction()) {
@@ -227,6 +228,10 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
 
     // Handle pending exceptions
     PPUCheckExceptions();
+
+    // Break after exec and if it's halted
+    if (enableHalt && ppuThreadState == eThreadState::Halted)
+      break;
   }
 }
 
