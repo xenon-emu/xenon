@@ -818,7 +818,7 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
       if (smcPCIState.clockIntStatusReg == CLCK_INT_READY) {
         // Wait X time before next clock interrupt. TODO: Find the correct
         // delay.
-        if (timerNow >= timerStart + std::chrono::milliseconds(1000)) {
+        if (timerNow >= timerStart + std::chrono::milliseconds(500)) {
           // Update internal timer.
           timerStart = std::chrono::steady_clock::now();
           mutex.lock();
