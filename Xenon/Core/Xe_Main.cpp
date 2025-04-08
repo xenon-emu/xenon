@@ -133,7 +133,7 @@ void XeMain::createPCIDevices() {
   ehci1 = std::make_unique<STRIP_UNIQUE(ehci1)>("EHCI1", EHCI1_DEV_SIZE);
 
   ram = std::make_unique<STRIP_UNIQUE(ram)>("RAM", RAM_START_ADDR, RAM_START_ADDR + RAM_SIZE, false);
-  sfcx = std::make_unique<STRIP_UNIQUE(sfcx)>("SFCX", Config::filepaths.nand, SFCX_DEV_SIZE, pciBridge.get());
+  sfcx = std::make_unique<STRIP_UNIQUE(sfcx)>("SFCX", Config::filepaths.nand, SFCX_DEV_SIZE, pciBridge.get(), ram.get());
   xma = std::make_unique<STRIP_UNIQUE(xma)>("XMA", XMA_DEV_SIZE);
   odd = std::make_unique<STRIP_UNIQUE(odd)>("CDROM", ODD_DEV_SIZE, pciBridge.get(), ram.get());
   hdd = std::make_unique<STRIP_UNIQUE(hdd)>("HDD", HDD_DEV_SIZE, pciBridge.get());
