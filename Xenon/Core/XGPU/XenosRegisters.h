@@ -3444,7 +3444,8 @@ static const std::string GetRegisterNameById(u32 id) {
   if (it != registerMap.end()) {
     return it->second;
   } else {
-    UNREACHABLE_MSG("Unknown register!");
+    LOG_ERROR(Xenos, "Unknown register: {:#x}", id);
+    return "Unknown register:";
   }
 }
 

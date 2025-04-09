@@ -184,7 +184,7 @@ void Xe::XCPU::POSTBUS::POST(u64 postCode) {
       LOG_XBOX(Xenon_PostBus, "CB > HWINIT - Hardware initialization.");
       break;
     case 0x2F:
-      //LOG_XBOX(Xenon_PostBus, "CB > RELOCATE - Setup TLB entries, relocate to RAM.");
+      LOG_XBOX(Xenon_PostBus, "CB > RELOCATE - Setup TLB entries, relocate to RAM.");
       break;
     case 0x30:
       LOG_XBOX(Xenon_PostBus, "CB > VERIFY_OFFSET_4BL_CD - Verify CD offset.");

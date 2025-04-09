@@ -6,6 +6,7 @@
 #include <fstream>
 #include <filesystem>
 
+#include "Core/RAM/RAM.h"
 #include "Core/RootBus/HostBridge/PCIBridge/PCIBridge.h"
 #include "Core/RootBus/HostBridge/PCIBridge/PCIDevice.h"
 
@@ -154,8 +155,8 @@ struct SFCX_STATE {
   // Helpers
   u8 metaType = 0;
   u16 pageSize = 0x200;
-  u8 metaSize = 0x10;
-  u16 pageSizePhys = static_cast<u16>(pageSize + metaSize);
+  u8 spareSize = 0x10;
+  u16 pageSizePhys = static_cast<u16>(pageSize + spareSize);
   u8 pageBuffer[0x210] = {};
   u16 currentPageBufferPos = 0;
   u8 currentDataReadPos = 0;
@@ -167,11 +168,11 @@ struct SFCX_STATE {
 class SFCX : public PCIDevice {
 public:
   SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
-    PCIBridge *parentPCIBridge);
+    PCIBridge* parentPCIBridge, RAM* ram);
   ~SFCX();
-  
-  void Read(u64 readAddress, u8 *data, u64 size) override;
-  void Write(u64 writeAddress, const u8 *data, u64 size) override;
+
+  void Read(u64 readAddress, u8* data, u64 size) override;
+  void Write(u64 writeAddress, const u8* data, u64 size) override;
   void MemSet(u64 writeAddress, s32 data, u64 size) override;
   void ConfigRead(u64 readAddress, u8* data, u64 size) override;
   void ConfigWrite(u64 writeAddress, const u8* data, u64 size) override;
@@ -190,5 +191,13 @@ private:
   // I/O File stream.
   std::ifstream nandFile;
   // PCI Bridge pointer. Used for Interrupts.
-  PCIBridge *parentBus = nullptr;
+  PCIBridge* parentBus = nullptr;
+  // Mutex for thread-safe behavior.
+  std::recursive_mutex mutex;
+  // RAM pointer. Used for DMA.
+  RAM* mainMemory;
+  // Read a page from memory to page buffer.
+  void sfcxReadPageFromNAND(bool physical);
+  // Does a DMA operation from NAND to physical memory.
+  void sfcxDoDMAfromNAND(bool physical);
 };
