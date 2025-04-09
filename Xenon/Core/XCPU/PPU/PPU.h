@@ -75,6 +75,8 @@ public:
   // Load a elf image from host memory. Copies into RAM
   // Returns entrypoint
   u64 loadElfImage(u8 *data, u64 size);
+
+  FILE *traceFile;
 private:
   // Thread handle
   std::thread ppuThread;

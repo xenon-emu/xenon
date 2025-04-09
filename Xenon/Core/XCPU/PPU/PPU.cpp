@@ -29,9 +29,20 @@ static constexpr u64 get_cpi_value(const u64 instrPerSecond) {
   return tpi;
 }
 
+//#define TODO_RELEASE_BUILD
+
 PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PVR,
                   u32 PIR) :
   resetVector(resetVector) {
+
+  traceFile = NULL;
+#ifdef TODO_RELEASE_BUILD
+  // TODO, config file
+  char path[128];
+  snprintf(path, 127, "trace_%d.log", PIR);
+  traceFile = fopen(path, "w");
+#endif
+
   //
   // Set evrything as in POR. See CELL-BE Programming Handbook.
   //
@@ -212,6 +223,12 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
     }
     
     if (PPUReadNextInstruction()) {
+#ifdef TODO_RELEASE_BUILD
+      if (traceFile) {
+        const std::string instrName = PPCInterpreter::ppcDecoder.decodeName(_instr.opcode);
+        fprintf(traceFile, "%llx: 0x%x %s\n", curThread.CIA, _instr.opcode, instrName.c_str());
+      }
+#endif
       // Execute instruction
       PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
     }
