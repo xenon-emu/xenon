@@ -15,8 +15,7 @@ void PPCInterpreter::PPCInterpreter_dcbst(PPU_STATE *ppuState) {
 }
 
 void PPCInterpreter::PPCInterpreter_dcbz(PPU_STATE *ppuState) {
-  u64 EA = (_instr.ra ? GPR(_instr.ra) : 0) +
-           GPR(_instr.rb);
+  u64 EA = (_instr.ra ? GPRi(ra) : 0) + GPRi(rb);
   EA = EA & ~(128 - 1); // Cache line size
 
   // Temporarely diasable caching.

@@ -62,7 +62,7 @@ public:
   // Render in ImGui
   bool imguiRender = false;
   // Thread Running
-  bool threadRunning = true;
+  volatile bool threadRunning = true;
   
   // FB Pitch
   int pitch = 0;

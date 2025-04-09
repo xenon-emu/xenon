@@ -162,7 +162,33 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
   bool invalSelector = (GPRi(rb) & 0x800) >> 11;
   u8 p = mmuGetPageSize(ppuState, _instr.l10, LP);
 
-  if (invalSelector == 0) {
+  if (invalSelector) {
+    // Index to one of the 256 rows of the tlb. Possible entire tlb
+    // invalidation.
+    u8 tlbCongruenceClass = 0;
+    const u64 rb_44_51 = (GPRi(rb) & 0xFF000) >> 12;
+
+    ppuState->TLB.tlbSet0[rb_44_51].V = false;
+    ppuState->TLB.tlbSet0[rb_44_51].pte0 = 0;
+    ppuState->TLB.tlbSet0[rb_44_51].pte1 = 0;
+
+    ppuState->TLB.tlbSet1[rb_44_51].V = false;
+    ppuState->TLB.tlbSet1[rb_44_51].pte0 = 0;
+    ppuState->TLB.tlbSet1[rb_44_51].pte1 = 0;
+
+    ppuState->TLB.tlbSet2[rb_44_51].V = false;
+    ppuState->TLB.tlbSet2[rb_44_51].pte0 = 0;
+    ppuState->TLB.tlbSet2[rb_44_51].pte1 = 0;
+
+    ppuState->TLB.tlbSet3[rb_44_51].V = false;
+    ppuState->TLB.tlbSet3[rb_44_51].pte0 = 0;
+    ppuState->TLB.tlbSet3[rb_44_51].pte1 = 0;
+
+    // Should only invalidate entries for a specific set of addresses.
+    // Invalidate both ERAT's *** BUG *** !!!
+    curThread.iERAT.invalidateAll();
+    curThread.dERAT.invalidateAll();
+  } else {
     // The TLB is as selective as possible when invalidating TLB entries.The
     // invalidation match criteria is VPN[38:79 - p], L, LP, and LPID.
 
@@ -202,50 +228,40 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
         tlbEntry.pte1 = 0;
       }
     }
-  } else {
-    // Index to one of the 256 rows of the tlb. Possible entire tlb
-    // invalidation.
-    u8 tlbCongruenceClass = 0;
-    const u64 rb_44_51 = (GPRi(rb) & 0xFF000) >> 12;
-
-    ppuState->TLB.tlbSet0[rb_44_51].V = false;
-    ppuState->TLB.tlbSet0[rb_44_51].pte0 = 0;
-    ppuState->TLB.tlbSet0[rb_44_51].pte1 = 0;
-
-    ppuState->TLB.tlbSet1[rb_44_51].V = false;
-    ppuState->TLB.tlbSet1[rb_44_51].pte0 = 0;
-    ppuState->TLB.tlbSet1[rb_44_51].pte1 = 0;
-
-    ppuState->TLB.tlbSet2[rb_44_51].V = false;
-    ppuState->TLB.tlbSet2[rb_44_51].pte0 = 0;
-    ppuState->TLB.tlbSet2[rb_44_51].pte1 = 0;
-
-    ppuState->TLB.tlbSet3[rb_44_51].V = false;
-    ppuState->TLB.tlbSet3[rb_44_51].pte0 = 0;
-    ppuState->TLB.tlbSet3[rb_44_51].pte1 = 0;
+    // Invalidate everything on a specific page
+    u64 fullPageSize = pow(2, p);
+    for (u64 i{}; i != fullPageSize; ++i) {
+      curThread.iERAT.invalidateElement(rb+i);
+      curThread.dERAT.invalidateElement(rb+i);
+    }
   }
-
-  // Should only invalidate entries for a specific set of addresses.
-  // Invalidate both ERAT's *** BUG *** !!!
-  curThread.iERAT.invalidateAll();
-  curThread.dERAT.invalidateAll();
 }
 
-void PPCInterpreter::PPCInterpreter_tlbie(PPU_STATE* ppuState)
-{
-    // Do nothing.
-    LOG_INFO(Xenon, "tlbie");
-
-    // Should only invalidate entries for a specific set of addresses.
-    // Invalidate both ERAT's *** BUG *** !!!
-    curThread.iERAT.invalidateAll();
-    curThread.dERAT.invalidateAll();
+/*
+  The PowerPC instruction tlbie searches the Translation Look-Aside Buffer (TLB) for an entry corresponding to the effective address (EA).
+  The search is done regardless of the setting of Machine State Register (MSR) Instruction Relocate bit or the MSR Data Relocate bit.
+  The search uses a portion of the EA including the least significant bits, and ignores the content of the Segment Registers.
+  Entries that satisfy the search criteria are made invalid so will not be used to translate subsequent storage accesses.
+*/
+// rB is the GPR containing the EA for the search
+// L is the page size
+void PPCInterpreter::PPCInterpreter_tlbie(PPU_STATE* ppuState) {
+  const u64 EA = GPRi(rb);
+  bool LP = (GPRi(rb) & 0x1000) >> 12;
+  u8 p = mmuGetPageSize(ppuState, _instr.l10, LP);
+  // Inverse of log2, as log2 is 2^? (finding ?)
+  // Example: the Log2 of 4096 is 12, because 2^12 is 4096
+  u64 fullPageSize = pow(2, p);
+  LOG_INFO(Xenon, "tlbie, EA:0x{:X} | PageSize:{} | Full:0x{:X},{} | LP:{}", EA, p, fullPageSize, fullPageSize, LP ? "true" : "false");
+  for (u64 i{}; i != fullPageSize; ++i) {
+    curThread.iERAT.invalidateElement(EA+i);
+    curThread.dERAT.invalidateElement(EA+i);
+  }
 }
 
-void PPCInterpreter::PPCInterpreter_tlbsync(PPU_STATE* ppuState)
-{
-    // Do nothing.
-    LOG_INFO(Xenon, "tlbsync");
+void PPCInterpreter::PPCInterpreter_tlbsync(PPU_STATE* ppuState) {
+  // Do nothing.
+  LOG_INFO(Xenon, "tlbsync");
 }
 
 // Helper function for getting Page Size (p bit).

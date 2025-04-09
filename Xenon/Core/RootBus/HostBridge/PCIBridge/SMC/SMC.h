@@ -11,7 +11,7 @@
 #include "Core/RootBus/HostBridge/PCIBridge/PCIBridge.h"
 #include "Core/RootBus/HostBridge/PCIBridge/PCIDevice.h"
 
-//#define SOCKET_UART
+#define SOCKET_UART
 
 #ifdef SOCKET_UART
 #ifdef _WIN32
@@ -323,7 +323,7 @@ private:
   std::thread smcThread;
 
   // Is SMC Thread Running?
-  bool smcThreadRunning = true;
+  volatile bool smcThreadRunning = true;
 
   // UART Thread object
   std::thread uartThread;

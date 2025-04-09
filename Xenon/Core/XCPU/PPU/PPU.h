@@ -83,7 +83,7 @@ private:
   eThreadState ppuThreadState = eThreadState::None;
 
   // Thread active?
-  bool ppuThreadActive = true;
+  volatile bool ppuThreadActive = true;
 
   // PPU thread state before halting
   eThreadState ppuThreadPreviousState = eThreadState::None;
