@@ -337,6 +337,11 @@ void PPCInterpreter::mmuAddTlbEntry(PPU_STATE *ppuState) {
   u16 TI = MMU_GET_TLB_INDEX_TI(tlbIndex);
   u16 TS = MMU_GET_TLB_INDEX_TS(tlbIndex);
 
+  PPU *ppu = Xe_Main->xenonCPU->GetPPU(ppuState->ppuID);
+  if (ppu->traceFile) {
+    fprintf(ppu->traceFile, "TLB[%d:%d] map 0x%llx -> 0x%llx\n", TS, TI, tlbVpn, tlbRpn);
+  }
+
   // TLB set to choose from
   // There are 4 sets of 256 entries each:
   switch (TS) {
@@ -1161,6 +1166,10 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
     case POST_BUS_ADDR: {
       u64 tmp = 0;
       memcpy(&tmp, data, sizeof(tmp));
+      PPU *ppu = Xe_Main->xenonCPU->GetPPU(ppuState->ppuID);
+      if (ppu->traceFile) {
+        fprintf(ppu->traceFile, "POST(0x%llx)\n", tmp);
+      }
       return Xe::XCPU::POSTBUS::POST(tmp);
     } break;
     // Time Base register. Writing here starts or stops the RTC apparently
