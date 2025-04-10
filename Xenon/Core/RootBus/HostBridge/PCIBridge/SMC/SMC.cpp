@@ -500,7 +500,7 @@ void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
 
 #else
   smcCoreState->uartBackup = true;
-  LOG_ERROR(SMC, "UART Initialization is fully supported on this platform! User beware.");
+  LOG_ERROR(SMC, "UART Initialization is fully unsupported on this platform! User beware.");
 #endif // _WIN32
 #endif // SOCKET_UART
   if (smcCoreState->uartBackup && !smcCoreState->uartInitialized) {
