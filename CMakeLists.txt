@@ -47,13 +47,10 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-string(COMPARE EQUAL "${COMMIT_COUNT}" "" RESULT_A)
-string(COMPARE EQUAL "x${COMMIT_COUNT}" "x1" RESULT_B)
-if (NOT RESULT_A AND NOT RESULT_B)
+if (NOT "${COMMIT_COUNT}" STREQUAL "")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCOMMIT_COUNT=\\\"${COMMIT_COUNT}\\\"")
+  message(STATUS "Commits Number: ${COMMIT_COUNT}")
 endif()
-
-message(STATUS "Commits Number: ${COMMIT_COUNT}")
 
 # Xenon BRANCH (with Git)
 execute_process(
@@ -63,15 +60,11 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-string(COMPARE EQUAL "${BRANCH}" "" RESULT_C)
-string(COMPARE EQUAL "x${BRANCH}" "x1" RESULT_D)
-if (NOT RESULT_C AND NOT RESULT_D)
-  if (NOT ${BRANCH} STREQUAL "main")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBRANCH=\\\"${BRANCH}\\\"")
-  endif()
+if (NOT "${BRANCH}" STREQUAL "" AND NOT ${BRANCH} STREQUAL "main")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBRANCH=\\\"${BRANCH}\\\"")
+  message(STATUS "Actual Branch: ${BRANCH}")
 endif()
 
-message(STATUS "Actual Branch: ${BRANCH}")
 
 # Include third_party and Packages
 if (GFX_ENABLED)

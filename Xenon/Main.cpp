@@ -91,7 +91,7 @@ s32 main(s32 argc, char *argv[]) {
   LOG_INFO(System, "Starting Xenon.");
   // Start execution of the emulator
   Xe_Main->start();
-  // Inf wait until told otherwis
+  // Inf wait until told otherwise
   while (XeRunning) {
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
