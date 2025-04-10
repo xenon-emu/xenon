@@ -82,7 +82,7 @@ void PPCInterpreter::ppcResetException(PPU_STATE *ppuState) {
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & (QMASK(0, 32) | QMASK(37, 41) | QMASK(48, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | (QMASK(0, 0) | QMASK(3, 3));
-  thread.NIA = ppuState->SPR.HRMOR + 0x100;
+  thread.NIA = 0x100;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
@@ -90,12 +90,12 @@ void PPCInterpreter::ppcResetException(PPU_STATE *ppuState) {
 void PPCInterpreter::ppcDataStorageException(PPU_STATE *ppuState) {
   PPU_THREAD_REGISTERS &thread = curThread;
 
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Data Storage exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Data Storage exception. EA: {:#x}.", ppuState->ppuName, static_cast<s8>(curThreadId), thread.SPR.DAR);
   thread.SPR.SRR0 = thread.CIA;
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & (QMASK(0, 32) | QMASK(37, 41) | QMASK(48, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | (QMASK(0, 0) | QMASK(3, 3));
-  thread.NIA = ppuState->SPR.HRMOR + 0x300;
+  thread.NIA = 0x300;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
@@ -108,7 +108,7 @@ void PPCInterpreter::ppcDataSegmentException(PPU_STATE *ppuState) {
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & (QMASK(0, 32) | QMASK(37, 41) | QMASK(48, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | (QMASK(0, 0) | QMASK(3, 3));
-  thread.NIA = ppuState->SPR.HRMOR + 0x380;
+  thread.NIA = 0x380;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
@@ -116,13 +116,13 @@ void PPCInterpreter::ppcDataSegmentException(PPU_STATE *ppuState) {
 void PPCInterpreter::ppcInstStorageException(PPU_STATE *ppuState) {
   PPU_THREAD_REGISTERS &thread = curThread;
 
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Instruction Storage exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Instruction Storage exception. EA = {:#x}", ppuState->ppuName, static_cast<s8>(curThreadId), thread.CIA);
   thread.SPR.SRR0 = thread.CIA;
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & (QMASK(0, 32) | QMASK(37, 41) | QMASK(48, 63));
   thread.SPR.SRR1 |= QMASK(33, 33);
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | (QMASK(0, 0) | QMASK(3, 3));
-  thread.NIA = ppuState->SPR.HRMOR + 0x400;
+  thread.NIA = 0x400;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
@@ -135,7 +135,7 @@ void PPCInterpreter::ppcInstSegmentException(PPU_STATE *ppuState) {
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & (QMASK(0, 32) | QMASK(37, 41) | QMASK(48, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | (QMASK(0, 0) | QMASK(3, 3));
-  thread.NIA = ppuState->SPR.HRMOR + 0x480;
+  thread.NIA = 0x480;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
@@ -148,7 +148,7 @@ void PPCInterpreter::ppcExternalException(PPU_STATE *ppuState) {
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & (QMASK(0, 32) | QMASK(37, 41) | QMASK(48, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | (QMASK(0, 0) | QMASK(3, 3));
-  thread.NIA = ppuState->SPR.HRMOR + 0x500;
+  thread.NIA = 0x500;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
@@ -162,7 +162,7 @@ void PPCInterpreter::ppcProgramException(PPU_STATE *ppuState) {
   BSET(thread.SPR.SRR1, 64, thread.exceptTrapType);
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | (QMASK(0, 0) | QMASK(3, 3));
-  thread.NIA = ppuState->SPR.HRMOR + 0x700;
+  thread.NIA = 0x700;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
@@ -175,7 +175,7 @@ void PPCInterpreter::ppcDecrementerException(PPU_STATE *ppuState) {
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & (QMASK(0, 32) | QMASK(37, 41) | QMASK(48, 63));
   thread.SPR.MSR.MSR_Hex =  thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | QMASK(0, 0) | (QMASK(3, 3));
-  thread.NIA = ppuState->SPR.HRMOR + 0x900;
+  thread.NIA = 0x900;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
@@ -184,12 +184,12 @@ void PPCInterpreter::ppcDecrementerException(PPU_STATE *ppuState) {
 void PPCInterpreter::ppcSystemCallException(PPU_STATE *ppuState) {
   PPU_THREAD_REGISTERS &thread = curThread;
 
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): System Call exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): System Call exception. Syscall ID: {:#x}", ppuState->ppuName, static_cast<s8>(curThreadId), GPR(0));
   thread.SPR.SRR0 = thread.NIA;
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & (QMASK(0, 32) | QMASK(37, 41) | QMASK(48, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | QMASK(0, 0) | (thread.exceptHVSysCall ? 0 : QMASK(3, 3));
-  thread.NIA = ppuState->SPR.HRMOR + 0xC00;
+  thread.NIA = 0xC00;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
