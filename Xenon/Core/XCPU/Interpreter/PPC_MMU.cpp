@@ -228,12 +228,10 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
         tlbEntry.pte1 = 0;
       }
     }
-    // Invalidate everything on a specific page
-    u64 fullPageSize = pow(2, p);
-    for (u64 i{}; i != fullPageSize; ++i) {
-      curThread.iERAT.invalidateElement(rb+i);
-      curThread.dERAT.invalidateElement(rb+i);
-    }
+    // Should only invalidate entries for a specific set of addresses.
+    // Invalidate both ERAT's *** BUG *** !!!
+    curThread.iERAT.invalidateAll();
+    curThread.dERAT.invalidateAll();
   }
 }
 
