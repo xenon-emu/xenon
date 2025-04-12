@@ -5,7 +5,7 @@
 #include "Base/Logging/Log.h"
 #include "Base/Config.h"
 
-//#define SFCX_DEBUG
+#define SFCX_DEBUG
 
 // There are two SFCX Versions, pre-Jasper and post-Jasper
 SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
@@ -21,7 +21,6 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
 
   // Set our PCI Dev Sizes.
   pciDevSizes[0] = 0x400; // BAR0
-  pciDevSizes[1] = 0x1000000; // BAR1
 
   LOG_INFO(SFCX, "Xenon Secure Flash Controller for Xbox.");
 
@@ -81,11 +80,25 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
     SYSTEM_PAUSE();
   }
 
-  // Load NAND header and display info about it.
+  // Read NAND Image data.
   nandFile.seekg(0, std::ios::beg);
-  nandFile.read(reinterpret_cast<char*>(&sfcxState.nandHeader), sizeof(sfcxState.nandHeader));
+  rawImageData.resize(imageSize);
+  constexpr u32 blockSize = 0x4000;
+  for (int currentBlock = 0; currentBlock < imageSize;
+    currentBlock += blockSize) {
+    nandFile.read(reinterpret_cast<char*>(rawImageData.data() + currentBlock), blockSize);
+  }
+  // Close the file.
+  nandFile.close();
 
-  // Fix Endiannes
+  // Set our device BAR register based on the image size.
+  pciDevSizes[1] = imageSize; // BAR1
+
+  // Read NAND header.
+  memcpy(&sfcxState.nandHeader, reinterpret_cast<char*>(rawImageData.data()), 
+    sizeof(sfcxState.nandHeader));
+
+  // Display info about the loaded image header.
   sfcxState.nandHeader.nandMagic = byteswap_be<u16>(sfcxState.nandHeader.nandMagic);
   LOG_INFO(SFCX, " * NAND Magic: {:#x}", sfcxState.nandHeader.nandMagic);
 
@@ -135,26 +148,22 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
   BL_HEADER cbaHeader;
   BL_HEADER cbbHeader;
 
-  // Get CB_A offset.
+  // Get CB_A header data from image data.
   u32 cbaOffset = sfcxState.nandHeader.entry;
   cbaOffset = 1 ? ((cbaOffset / 0x200) * 0x210) + cbaOffset % 0x200 : cbaOffset;
-
-  // Read CB_A Header.
-  nandFile.seekg(cbaOffset, std::ios::beg);
-  nandFile.read(reinterpret_cast<char*>(&cbaHeader), sizeof(cbaHeader));
+  memcpy(&cbaHeader, reinterpret_cast<char*>(rawImageData.data() + cbaOffset), 
+    sizeof(cbaHeader));
 
   // Byteswap CB_A info from header.
   cbaHeader.buildNumber = byteswap_be<u16>(cbaHeader.buildNumber);
   cbaHeader.lenght = byteswap_be<u32>(cbaHeader.lenght);
   cbaHeader.entryPoint = byteswap_be<u32>(cbaHeader.entryPoint);
 
-  // Get CB_B offset.
+  // Get CB_A header data from image data.
   u32 cbbOffset = sfcxState.nandHeader.entry + cbaHeader.lenght;
   cbbOffset = 1 ? ((cbbOffset / 0x200) * 0x210) + cbbOffset % 0x200 : cbbOffset;
-
-  // Read CB_B Header.
-  nandFile.seekg(cbbOffset, std::ios::beg);
-  nandFile.read(reinterpret_cast<char*>(&cbbHeader), sizeof(cbbHeader));
+  memcpy(&cbbHeader, reinterpret_cast<char*>(rawImageData.data() + cbbOffset),
+    sizeof(cbbHeader));
 
   // Byteswap CB_B info from header.
   cbbHeader.buildNumber = byteswap_be<u16>(cbbHeader.buildNumber);
@@ -231,8 +240,8 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
 }
 
 SFCX::~SFCX() {
-  // Close NAND I/O stream.
-  nandFile.close();
+  // Clear NAND image data.
+  rawImageData.clear();
   // Terminate thread.
   sfcxThreadRunning = false;
   if (sfcxThread.joinable())
@@ -402,6 +411,36 @@ void SFCX::MemSet(u64 writeAddress, s32 data, u64 size) {
   }
 }
 
+void SFCX::ReadRaw(u64 readAddress, u8* data, u64 size)
+{
+  u32 offset = static_cast<u32>(readAddress & 0xFFFFFF);
+  offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
+#ifdef NAND_DEBUG
+  LOG_DEBUG(SFCX, "Reading RAW data at {:#x} (offset {:#x}) for {:#x} bytes", readAddress, offset, size);
+#endif // NAND_DEBUG
+  memcpy(data, rawImageData.data() + offset, size);
+}
+
+void SFCX::WriteRaw(u64 writeAddress, const u8* data, u64 size)
+{
+  u32 offset = static_cast<u32>(writeAddress & 0xFFFFFF);
+  offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
+#ifdef NAND_DEBUG
+  LOG_DEBUG(SFCX, "Writing RAW data at {:#x} (offset {:#x}) for {:#x} bytes", writeAddress, offset, size);
+#endif // NAND_DEBUG
+  memcpy(rawImageData.data() + offset, data, size);
+}
+
+void SFCX::MemSetRaw(u64 writeAddress, s32 data, u64 size)
+{
+  u32 offset = static_cast<u32>(writeAddress & 0xFFFFFF);
+  offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
+#ifdef NAND_DEBUG
+  LOG_DEBUG(SFCX, "Setting RAW data at {:#x} to {:#x} (offset {:#x}) for {:#x} bytes", writeAddress, data, offset, size);
+#endif // NAND_DEBUG
+  memset(rawImageData.data() + offset, data, size);
+}
+
 void SFCX::ConfigWrite(u64 writeAddress, const u8* data, u64 size) {
   const u8 offset = writeAddress & 0xFF;
 
@@ -497,8 +536,8 @@ void SFCX::sfcxReadPageFromNAND(bool physical) {
   memset(reinterpret_cast<void*>(sfcxState.pageBuffer), 0, sizeof(sfcxState.pageBuffer));
 
   // Perform the Read.
-  nandFile.seekg(nandOffset, std::ios::beg);
-  nandFile.read(reinterpret_cast<char*>(sfcxState.pageBuffer), physical ? sfcxState.pageSizePhys : sfcxState.pageSize);
+  memcpy(reinterpret_cast<char*>(sfcxState.pageBuffer), reinterpret_cast<char*>(rawImageData.data() + nandOffset),
+    physical ? sfcxState.pageSizePhys : sfcxState.pageSize);
 
   // Issue Interrupt if interrupts are enabled in flash config.
   if (sfcxState.configReg & CONFIG_INT_EN) {
@@ -535,8 +574,8 @@ void SFCX::sfcxDoDMAfromNAND(bool physical) {
     memset(reinterpret_cast<void*>(sfcxState.pageBuffer), 0, sizeof(sfcxState.pageBuffer));
 
     // Get page data.
-    nandFile.seekg(physAddr, std::ios::beg);
-    nandFile.read(reinterpret_cast<char*>(sfcxState.pageBuffer), sizeof(sfcxState.pageBuffer));
+    memcpy(reinterpret_cast<char*>(sfcxState.pageBuffer), reinterpret_cast<char*>(rawImageData.data() + physAddr),
+      sfcxState.pageSizePhys);
 
     // Write page and spare to RAM.
     // On DMA, physical pages are split into Page data and Spare Data, and stored at different locations in memory. 

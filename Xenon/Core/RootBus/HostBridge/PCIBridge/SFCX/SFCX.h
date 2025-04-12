@@ -165,15 +165,24 @@ struct SFCX_STATE {
   NAND_HEADER nandHeader = {};
 };
 
+// Secure Flash Controller for Xbox Device.
 class SFCX : public PCIDevice {
 public:
   SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
     PCIBridge* parentPCIBridge, RAM* ram);
   ~SFCX();
 
+  // PCI Read/Write methods to the SFCX device.
   void Read(u64 readAddress, u8* data, u64 size) override;
   void Write(u64 writeAddress, const u8* data, u64 size) override;
   void MemSet(u64 writeAddress, s32 data, u64 size) override;
+
+  // RAW NAND data R/W. Used by Memory-Mapped 1:1 access.
+  void ReadRaw(u64 readAddress, u8* data, u64 size);
+  void WriteRaw(u64 writeAddress, const u8* data, u64 size);
+  void MemSetRaw(u64 writeAddress, s32 data, u64 size);
+
+  // Config space read/write.
   void ConfigRead(u64 readAddress, u8* data, u64 size) override;
   void ConfigWrite(u64 writeAddress, const u8* data, u64 size) override;
 
@@ -200,4 +209,6 @@ private:
   void sfcxReadPageFromNAND(bool physical);
   // Does a DMA operation from NAND to physical memory.
   void sfcxDoDMAfromNAND(bool physical);
+  // RAW NAND Data from loaded image.
+  std::vector<u8> rawImageData{};
 };

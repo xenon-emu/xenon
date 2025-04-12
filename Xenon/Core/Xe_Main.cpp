@@ -138,7 +138,7 @@ void XeMain::createPCIDevices() {
   odd = std::make_unique<STRIP_UNIQUE(odd)>("CDROM", ODD_DEV_SIZE, pciBridge.get(), ram.get());
   hdd = std::make_unique<STRIP_UNIQUE(hdd)>("HDD", HDD_DEV_SIZE, pciBridge.get());
   smcCore = std::make_unique<STRIP_UNIQUE(smcCore)>("SMC", SMC_DEV_SIZE, pciBridge.get(), smcCoreState.get());
-  nandDevice = std::make_unique<STRIP_UNIQUE(nandDevice)>("NAND", Config::filepaths.nand, NAND_START_ADDR, NAND_END_ADDR, true);
+  nandDevice = std::make_unique<STRIP_UNIQUE(nandDevice)>("NAND", sfcx.get(), NAND_START_ADDR, NAND_END_ADDR, true);
 }
 
 void XeMain::createSMCState() {
