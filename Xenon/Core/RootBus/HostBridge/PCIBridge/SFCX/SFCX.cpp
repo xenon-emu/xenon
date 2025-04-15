@@ -159,7 +159,7 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
   cbaHeader.lenght = byteswap_be<u32>(cbaHeader.lenght);
   cbaHeader.entryPoint = byteswap_be<u32>(cbaHeader.entryPoint);
 
-  // Get CB_A header data from image data.
+  // Get CB_B header data from image data.
   u32 cbbOffset = sfcxState.nandHeader.entry + cbaHeader.lenght;
   cbbOffset = 1 ? ((cbbOffset / 0x200) * 0x210) + cbbOffset % 0x200 : cbbOffset;
   memcpy(&cbbHeader, reinterpret_cast<char*>(rawImageData.data() + cbbOffset),
@@ -208,16 +208,16 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
         Config::xcpu.HW_INIT_SKIP_2 = 0x03009BA4;
         LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_2);
         break;
-        // CB_B 9188
+        // CB_B 9188, 15432
       case 9188:
+      case 15432:
         Config::xcpu.HW_INIT_SKIP_1 = 0x03003DC0;
         LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_1);
         Config::xcpu.HW_INIT_SKIP_2 = 0x03003E54;
         LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_2);
         break;
-        // CB_B 14352, 15432
+        // CB_B 14352
       case 14352:
-      case 15432:
         Config::xcpu.HW_INIT_SKIP_1 = 0x03003F48;
         LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_1);
         Config::xcpu.HW_INIT_SKIP_2 = 0x03003FDC;
