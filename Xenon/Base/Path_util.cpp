@@ -6,6 +6,10 @@
 
 #include <unordered_map>
 #include <fstream>
+#ifdef _WIN32
+#include <Windows.h>
+#endif // _WIN32
+
 
 namespace Base::FS {
 
