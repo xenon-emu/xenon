@@ -2,13 +2,32 @@
 
 #include "Path_util.h"
 
+#include <fmt/format.h>
+
 #include <unordered_map>
 #include <fstream>
 
 namespace Base::FS {
 
+const fs::path GetBinaryDirectory() {
+  fs::path fspath = {};
+#ifdef _WIN32
+  char path[256];
+  GetModuleFileNameA(NULL, path, sizeof(path));
+  fspath = path;
+#elif __linux__
+  fspath = fs::canonical("/proc/self/exe");
+#else
+  // Unknown, just return rootdir
+  fspath = fs::current_path() / "Xenon";
+#endif
+  return fs::weakly_canonical(fmt::format("{}/..", fspath.string()));
+}
+
 static auto UserPaths = [] {
   auto currentDir = fs::current_path();
+  auto binaryDir = GetBinaryDirectory();
+  bool nixos = false;
 
   std::unordered_map<PathType, fs::path> paths;
 
@@ -19,14 +38,32 @@ static auto UserPaths = [] {
     paths.insert_or_assign(xenon_path, new_path);
   };
 
-  insert_path(PathType::RootDir, currentDir, false);
-  insert_path(PathType::ConsoleDir, currentDir / CONSOLE_DIR);
-  insert_path(PathType::LogDir, currentDir / LOG_DIR);
-  fs::path fontDir = currentDir / FONT_DIR;
+  insert_path(PathType::BinaryDir, binaryDir, false);
+  // If we are in the nix store, it's read-only. Change to currentDir if needed
+  if (binaryDir.string().find("/nix/store/") != std::string::npos) {
+    nixos = true;
+  }
+  if (nixos) {
+    currentDir /= "files";
+    insert_path(PathType::RootDir, currentDir);
+    insert_path(PathType::ConsoleDir, currentDir / CONSOLE_DIR);
+    insert_path(PathType::LogDir, currentDir / LOG_DIR);
+  }
+  else {
+    insert_path(PathType::RootDir, currentDir, false);
+    insert_path(PathType::ConsoleDir, binaryDir / CONSOLE_DIR);
+    insert_path(PathType::LogDir, binaryDir / LOG_DIR);
+  }
+  fs::path fontDir = binaryDir / FONT_DIR;
+  // Check if fonts are in ../share/FONT_DIR
   bool createFontsDir = true;
-  if (!fs::exists(fontDir) && fs::exists(currentDir / ".." / "share" / FONT_DIR)) {
+  if (!fs::exists(fontDir) && fs::exists(binaryDir / ".." / "share" / FONT_DIR)) {
     createFontsDir = false;
-    fontDir = currentDir / ".." / "share" / FONT_DIR / "truetype";
+    fontDir = binaryDir / ".." / "share" / FONT_DIR / "truetype";
+  }
+  if (createFontsDir && nixos) {
+    // We cannot create a directory in the nix-store. Change font dir to currentDir / files
+    fontDir = currentDir / FONT_DIR;
   }
   insert_path(PathType::FontDir, fontDir, createFontsDir);
 

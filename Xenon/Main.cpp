@@ -59,7 +59,7 @@ s32 installHangup() {
   act.sa_handler = hangup;
   sigemptyset(&act.sa_mask);
   act.sa_flags = 0;
-  
+
   if (sigaction(SIGHUP, &act, nullptr) < 0) {
     return -1;
   }

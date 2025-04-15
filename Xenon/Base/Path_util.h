@@ -9,6 +9,7 @@ namespace Base::FS {
 namespace fs = std::filesystem;
 
 enum class PathType {
+  BinaryDir,  // Binary Path
   RootDir,    // Execution Path
   ConsoleDir, // Where Xenon gets the console files
   LogDir,     // Where log files are stored
