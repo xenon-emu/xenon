@@ -8,6 +8,8 @@
 #include "HANA_State.h"
 #include "SMC_Config.h"
 
+#include "Core/Xe_Main.h"
+
 //
 // Registers Offsets
 //
@@ -516,6 +518,15 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_READ_8E_INT");
         break;
       case Xe::PCIDev::SMC::SMC_SET_STANDBY:
+        smcCoreState->fifoDataBuffer[0] = SMC_SET_STANDBY;
+        if (smcCoreState->fifoDataBuffer[1] == 0x01) {
+          LOG_INFO(SMC, "[Standby] Requested shutdown");
+          Xe_Main->shutdown();
+        }
+        else if (smcCoreState->fifoDataBuffer[1] == 0x04) {
+          LOG_INFO(SMC, "[Standby] Requested reboot");
+          Xe_Main->reboot(static_cast<Xe::PCIDev::SMC::SMC_PWR_REASON>(smcCoreState->fifoDataBuffer[2]));
+        }
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_SET_STANDBY");
         break;
       case Xe::PCIDev::SMC::SMC_SET_TIME:

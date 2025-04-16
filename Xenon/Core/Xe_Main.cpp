@@ -69,7 +69,6 @@ void XeMain::loadConfig() {
   Config::loadConfig(rootDirectory / "config.toml");
 }
 
-
 void XeMain::start() {
   if (!xenonCPU.get()) {
 #ifndef NO_GFX
@@ -93,6 +92,42 @@ void XeMain::start() {
     // CPU Start routine and entry point.
     xenonCPU->Start(0x20000000100);
   }
+}
+
+void XeMain::reboot(Xe::PCIDev::SMC::SMC_PWR_REASON type) {
+#ifndef NO_GFX
+  renderHalt = true;
+#endif
+  // Halt the CPU
+  xenonCPU->Halt();
+  // Reset RAM
+  ram->Reset();
+  // Ensure GPU registers are reset
+  xenos.reset();
+  xenos = std::make_unique<STRIP_UNIQUE(xenos)>(ram.get());
+#ifndef NO_GFX
+  // Reinit RAM handles for rendering (should be valid, mainly safety)
+  renderer->ramPointer = ram.get();
+  renderer->fbPointer = renderer->ramPointer->getPointerToAddress(XE_FB_BASE);
+#endif
+  // Reset the CPU
+  xenonCPU.reset();
+  xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses);
+  // Ensure the IIC pointer in the PCI bridge is correct
+  pciBridge->RegisterIIC(xenonCPU->GetIICPointer());
+  // Set poweron type
+  smcCoreState->currPowerOnReason = type;
+  // Setup CPU
+  if (Config::xcpu.elfLoader) {
+    // Load the elf
+    xenonCPU->LoadElf(Config::filepaths.elfBinary);
+  } else {
+    // CPU Start routine and entry point.
+    xenonCPU->Start(0x20000000100);
+  }
+#ifndef NO_GFX
+  renderHalt = false;
+#endif
 }
 
 void XeMain::addPCIDevices() {

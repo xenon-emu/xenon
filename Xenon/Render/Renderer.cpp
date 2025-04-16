@@ -283,7 +283,7 @@ void Render::Renderer::Thread() {
     }
 
     // Render the GUI
-    if (Config::rendering.enableGui && gui.get()) {
+    if (Config::rendering.enableGui && gui.get() && !Xe_Main->renderHalt) {
       gui->Render(backbuffer.get());
     }
 

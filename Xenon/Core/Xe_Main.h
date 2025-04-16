@@ -36,6 +36,8 @@ public:
 
   void start();
 
+  void reboot(Xe::PCIDev::SMC::SMC_PWR_REASON type);
+
   void saveConfig();
   void loadConfig();
 
