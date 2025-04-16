@@ -115,7 +115,7 @@ inline struct _smc {
   // UART System
   // vcom is vCOM, only present on Windows
   // socket is Socket, avaliable via Netcat/socat
-  // log is Printf, directly to log
+  // print is Printf, directly to log
 #ifdef _WIN32
   std::string uartSystem = "vcom";
 #else

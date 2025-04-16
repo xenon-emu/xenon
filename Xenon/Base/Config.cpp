@@ -189,7 +189,7 @@ void _smc::to_toml(toml::value &value) {
   value["UARTSystem"].comments().push_back("# UART System");
   value["UARTSystem"].comments().push_back("# vcom is vCOM, only present on Windows");
   value["UARTSystem"].comments().push_back("# socket is Socket, avaliable via Netcat/Socat");
-  value["UARTSystem"].comments().push_back("# log is Printf, directly to log");
+  value["UARTSystem"].comments().push_back("# print is Printf, directly to log");
 #ifdef _WIN32
   value["COMPort"].comments().clear();
   value["COMPort"] = comPort;

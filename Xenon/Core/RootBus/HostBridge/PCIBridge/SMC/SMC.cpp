@@ -78,6 +78,20 @@ Xe::PCIDev::SMC::SMCCore::SMCCore(const char *deviceName, u64 size,
   // Set our PCI Dev Sizes.
   pciDevSizes[0] = 0x100; // BAR0
 
+  // Create UART handle
+  bool socket = smcCoreState->currentUARTSytem == "vcom" ? false : true;
+  if (socket) {
+    smcCoreState->uartHandle = std::make_unique<HW_UART_SOCK>();
+  }
+  else {
+#ifdef _WIN32
+    smcCoreState->uartHandle = std::make_unique<HW_UART_VCOM>();
+#else
+    LOG_CRITICAL(SMC, "[UART] Invalid UART type! Defaulting to print");
+    smcCoreState->uartHandle = std::make_unique<HW_UART_SOCK>();
+#endif
+  }
+
   // Enter main execution thread.
   smcThread = std::thread(&SMCCore::smcMainThread, this);
 }
@@ -162,7 +176,7 @@ void Xe::PCIDev::SMC::SMCCore::Write(u64 writeAddress, const u8 *data, u64 size)
   case UART_CONFIG_REG: // UART Config Register
     memcpy(&smcPCIState.uartConfigReg, data, size);
     // Check if UART is already initialized.
-    if (!smcCoreState->uartHandle.get()) {
+    if (!smcCoreState->uartHandle->SetupNeeded()) {
       u64 tmp = 0;
       memcpy(&tmp, data, size);
       // Initialize UART.
@@ -314,32 +328,26 @@ void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
   LOG_INFO(SMC, "[UART] Initializing...");
   bool socket = smcCoreState->currentUARTSytem == "vcom" ? false : true;
   if (socket) {
-    smcCoreState->uartHandle = std::make_unique<HW_UART_SOCK>();
     HW_UART_SOCK_CONFIG *config = new HW_UART_SOCK_CONFIG();
     strncpy(config->ip, smcCoreState->socketIp.c_str(), sizeof(config->ip));
     config->port = smcCoreState->socketPort;
     config->usePrint = smcCoreState->currentUARTSytem == "print";
     smcCoreState->uartHandle->Init(config);
-  }
+  } else {
 #ifdef _WIN32
-  else {
-    smcCoreState->uartHandle = std::make_unique<HW_UART_VCOM>();
     HW_UART_VCOM_CONFIG *config = new HW_UART_VCOM_CONFIG();
     strncpy(config->selectedComPort, smcCoreState->currentCOMPort.c_str(), sizeof(config->selectedComPort));
     config->config = uartConfig;
     smcCoreState->uartHandle->Init(config);
-  }
 #else
-  else {
     LOG_CRITICAL(SMC, "[UART] Invalid UART type! Defaulting to print");
-    smcCoreState->uartHandle = std::make_unique<HW_UART_SOCK>();
     HW_UART_SOCK_CONFIG *config = new HW_UART_SOCK_CONFIG();
     strncpy(config->ip, smcCoreState->socketIp.c_str(), sizeof(config->ip));
     config->port = smcCoreState->socketPort;
     config->usePrint = true;
     smcCoreState->uartHandle->Init(config);
-  }
 #endif
+  }
 }
 
 // SMC Main Thread
