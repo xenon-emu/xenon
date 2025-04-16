@@ -41,9 +41,9 @@ enum class FileAccessMode {
 };
 DECLARE_ENUM_FLAG_OPERATORS(FileAccessMode)
 
-enum class FileType {
-  BinaryFile,
-  TextFile,
+enum class FileMode {
+  BinaryMode,
+  TextMode,
 };
 
 enum class FileShareFlag {
@@ -64,14 +64,14 @@ public:
   IOFile();
 
   explicit IOFile(const std::string& path, FileAccessMode mode,
-          FileType type = FileType::BinaryFile,
+          FileMode type = FileMode::BinaryMode,
           FileShareFlag flag = FileShareFlag::ShareReadOnly);
 
   explicit IOFile(std::string_view path, FileAccessMode mode,
-          FileType type = FileType::BinaryFile,
+          FileMode type = FileMode::BinaryMode,
           FileShareFlag flag = FileShareFlag::ShareReadOnly);
   explicit IOFile(const std::filesystem::path& path, FileAccessMode mode,
-          FileType type = FileType::BinaryFile,
+          FileMode type = FileMode::BinaryMode,
           FileShareFlag flag = FileShareFlag::ShareReadOnly);
 
   ~IOFile();
@@ -90,7 +90,7 @@ public:
     return file_access_mode;
   }
 
-  FileType GetType() const {
+  FileMode GetType() const {
     return file_type;
   }
 
@@ -101,7 +101,7 @@ public:
   uintptr_t GetFileMapping();
 
   int Open(const std::filesystem::path& path, FileAccessMode mode,
-       FileType type = FileType::BinaryFile,
+       FileMode type = FileMode::BinaryMode,
        FileShareFlag flag = FileShareFlag::ShareReadOnly);
   void Close();
 
@@ -211,7 +211,7 @@ public:
 private:
   std::filesystem::path file_path;
   FileAccessMode file_access_mode{};
-  FileType file_type{};
+  FileMode file_type{};
 
   std::FILE* file = nullptr;
   uintptr_t file_mapping = 0;

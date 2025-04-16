@@ -87,47 +87,26 @@ std::string GetUserPathString(PathType xenon_path) {
   return PathToUTF8String(GetUserPath(xenon_path));
 }
 
-std::vector<FileInfo> ListFilesFromPath(const std::filesystem::path& path)
-{
+std::vector<FileInfo> ListFilesFromPath(const fs::path &path) {
   std::vector<FileInfo> fileList;
 
-#ifdef _WIN32 // _WIN32
-  // WIN32 Find Data structure.
-  WIN32_FIND_DATAW findData;
+  fs::path _path = fs::weakly_canonical(path);
 
-  // Create a handle to the first file found in the specified path.
-  HANDLE fileHandle = FindFirstFileW((path / "*").c_str(), &findData);
-
-  if (fileHandle == INVALID_HANDLE_VALUE) {
-    return fileList; // No files in path or bad directory.
-  }
-
-  do {
-    if (std::wcscmp(findData.cFileName, L".") == 0 || std::wcscmp(findData.cFileName, L"..") == 0) {
-      continue;
-    }
-    //  New file info.
+  for (auto &entry : fs::directory_iterator{ _path }) {
     FileInfo fileInfo;
-    if (findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) { // Directory?
+    if (entry.is_directory()) {
       fileInfo.fileSize = 0;
       fileInfo.fileType = FileType::Directory;
-    }
-    else {
-      fileInfo.fileSize = (findData.nFileSizeHigh * (size_t(MAXDWORD) + 1)) + findData.nFileSizeLow;
+    } else {
+      fileInfo.fileSize = fs::file_size(_path);
       fileInfo.fileType = FileType::File;
     }
 
-    fileInfo.filePath = path;
-    fileInfo.fileName = findData.cFileName;
+    fileInfo.filePath = entry.path();
+    fileInfo.fileName = entry.path().filename();
     fileList.push_back(fileInfo);
-  } while (FindNextFileW(fileHandle, &findData) != 0);
+  }
 
-  // Close the file handle.
-  FindClose(fileHandle);
-
-#else // _LINUX/MACOS
-  LOG_ERROR(Base_Filesystem, "ListFilesFromPath is unimplemented on this platform.");
-#endif
     return fileList;
 }
 

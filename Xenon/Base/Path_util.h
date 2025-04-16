@@ -47,7 +47,7 @@ constexpr auto LOG_FILE = "xenon_log.txt";
 [[nodiscard]] std::string GetUserPathString(PathType user_path);
 
 // Returns a container with a list of the files inside the specified path.
-[[nodiscard]] std::vector<FileInfo> ListFilesFromPath(const std::filesystem::path& path);
+[[nodiscard]] std::vector<FileInfo> ListFilesFromPath(const fs::path &path);
 
 // Sets the current Path for a given PathType.
 void SetUserPath(PathType user_path, const fs::path &new_path);

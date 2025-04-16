@@ -33,9 +33,9 @@ namespace {
 
 #ifdef _WIN32
 
-[[nodiscard]] constexpr const wchar_t* AccessModeToWStr(FileAccessMode mode, FileType type) {
+[[nodiscard]] constexpr const wchar_t* AccessModeToWStr(FileAccessMode mode, FileMode type) {
   switch (type) {
-  case FileType::BinaryFile:
+  case FileMode::BinaryMode:
     switch (mode) {
     case FileAccessMode::Read:
       return L"rb";
@@ -49,7 +49,7 @@ namespace {
       return L"a+b";
     }
     break;
-  case FileType::TextFile:
+  case FileMode::TextMode:
     switch (mode) {
     case FileAccessMode::Read:
       return L"r";
@@ -84,9 +84,9 @@ namespace {
 
 #else
 
-[[nodiscard]] constexpr const char* AccessModeToStr(FileAccessMode mode, FileType type) {
+[[nodiscard]] constexpr const char* AccessModeToStr(FileAccessMode mode, FileMode type) {
   switch (type) {
-  case FileType::BinaryFile:
+  case FileMode::BinaryMode:
     switch (mode) {
     case FileAccessMode::Read:
       return "rb";
@@ -100,7 +100,7 @@ namespace {
       return "a+b";
     }
     break;
-  case FileType::TextFile:
+  case FileMode::TextMode:
     switch (mode) {
     case FileAccessMode::Read:
       return "r";
@@ -137,15 +137,15 @@ namespace {
 
 IOFile::IOFile() = default;
 
-IOFile::IOFile(const std::string& path, FileAccessMode mode, FileType type, FileShareFlag flag) {
+IOFile::IOFile(const std::string& path, FileAccessMode mode, FileMode type, FileShareFlag flag) {
   Open(path, mode, type, flag);
 }
 
-IOFile::IOFile(std::string_view path, FileAccessMode mode, FileType type, FileShareFlag flag) {
+IOFile::IOFile(std::string_view path, FileAccessMode mode, FileMode type, FileShareFlag flag) {
   Open(path, mode, type, flag);
 }
 
-IOFile::IOFile(const fs::path& path, FileAccessMode mode, FileType type, FileShareFlag flag) {
+IOFile::IOFile(const fs::path& path, FileAccessMode mode, FileMode type, FileShareFlag flag) {
   Open(path, mode, type, flag);
 }
 
@@ -168,7 +168,7 @@ IOFile& IOFile::operator=(IOFile&& other) noexcept {
   return *this;
 }
 
-int IOFile::Open(const fs::path& path, FileAccessMode mode, FileType type, FileShareFlag flag) {
+int IOFile::Open(const fs::path& path, FileAccessMode mode, FileMode type, FileShareFlag flag) {
   Close();
 
   file_path = path;

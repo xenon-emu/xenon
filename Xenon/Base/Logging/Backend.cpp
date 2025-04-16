@@ -59,7 +59,7 @@ private:
 class FileBackend : public BaseBackend {
 public:
   explicit FileBackend(const std::filesystem::path& filename)
-    : file{filename, FS::FileAccessMode::Write, FS::FileType::TextFile} {}
+    : file{filename, FS::FileAccessMode::Write, FS::FileMode::TextMode} {}
 
   ~FileBackend() {
     file.Close();
