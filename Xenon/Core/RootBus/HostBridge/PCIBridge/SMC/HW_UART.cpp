@@ -115,7 +115,6 @@ void HW_UART_SOCK::Shutdown() {
 void HW_UART_SOCK::Write(const u8 data) {
   std::lock_guard<std::mutex> lock(uartMutex);
   uartTxBuffer.push(data);
-  uartConditionVar.notify_one();
   retVal = true;
 }
 
@@ -199,17 +198,19 @@ void HW_UART_VCOM::Shutdown() {
 }
 
 void HW_UART_VCOM::Write(const u8 data) {
-  retVal = WriteFile(comPortHandle, &data, 1, &currentBytesWrittenCount, nullptr);
+  if (comPortHandle)
+    retVal = WriteFile(comPortHandle, &data, 1, &currentBytesWrittenCount, nullptr);
 }
 
 u8 HW_UART_VCOM::Read() {
   u8 data = 0;
-  retVal = ReadFile(comPortHandle, &data, 1, &currentBytesReadCount, nullptr);
+  if (comPortHandle)
+    retVal = ReadFile(comPortHandle, &data, 1, &currentBytesReadCount, nullptr);
   return data;
 }
 
 u32 HW_UART_VCOM::ReadStatus() {
-  u32 status = 0;  
+  u32 status = 0;
   if (uartInitialized) {
     // Get current COM Port Status
     ClearCommError(comPortHandle, &comPortError,
@@ -222,6 +223,8 @@ u32 HW_UART_VCOM::ReadStatus() {
       // The input queue is empty.
       status |= UART_STATUS_EMPTY;
     }
+  } else {
+    status |= UART_STATUS_EMPTY;
   }
   return status;
 }
@@ -245,6 +248,6 @@ u8 HW_UART_VCOM::Read() {
 
 u32 HW_UART_VCOM::ReadStatus() {
   UNIMPLEMENTED_MSG("Override for HW_UART_VCOM::ReadStatus failed!");
-  return 0;
+  return UART_STATUS_EMPTY;
 }
 #endif // _WIN32

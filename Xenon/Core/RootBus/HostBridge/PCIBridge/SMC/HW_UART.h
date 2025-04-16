@@ -89,8 +89,6 @@ public:
   std::queue<u8> uartRxBuffer = {};
   // Mutex, to avoid race conitions
   std::mutex uartMutex = {};
-  // Check if there is data
-  std::condition_variable uartConditionVar = {};
   // Socket Address
   struct sockaddr_in sockAddr = {};
   // Socket Handles

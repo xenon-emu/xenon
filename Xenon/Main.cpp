@@ -1,6 +1,7 @@
 // Copyright 2025 Xenon Emulator Project
 
 #include "Core/Xe_Main.h"
+#include "Base/Param.h"
 #include "Base/Exit.h"
 #include "Base/Thread.h"
 #include <iostream>
@@ -79,7 +80,16 @@ s32 removeHangup() {
 }
 #endif
 
+PARAM(help, "Prints this message", false);
+
 s32 main(s32 argc, char *argv[]) {
+  // Init params
+  Base::Param::Init(argc, argv);
+  // Handle help param
+  if (PARAM_help.IsSet()) {
+    ::Base::Param::Help();
+    return 0;
+  }
   // Create all handles
   Xe_Main = std::make_unique<STRIP_UNIQUE(Xe_Main)>();
   // Setup hangup

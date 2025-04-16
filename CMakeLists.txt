@@ -107,6 +107,7 @@ set(Base
     Xenon/Base/LRUCache.h
     Xenon/Base/ntapi.cpp
     Xenon/Base/ntapi.h
+    Xenon/Base/Param.h
     Xenon/Base/Path_util.cpp
     Xenon/Base/Path_util.h
     Xenon/Base/Polyfill_thread.h
