@@ -224,7 +224,7 @@ void Render::Renderer::Thread() {
   while (threadRunning && XeRunning) {
     // Process events.
     while (SDL_PollEvent(&windowEvent)) {
-      if (!Config::rendering.enableGui) {
+      if (Config::rendering.enableGui) {
         ImGui_ImplSDL3_ProcessEvent(&windowEvent);
       }
       switch (windowEvent.type) {
