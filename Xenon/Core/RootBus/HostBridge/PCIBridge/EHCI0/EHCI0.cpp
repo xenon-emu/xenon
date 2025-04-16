@@ -2,7 +2,7 @@
 
 #include "EHCI0.h"
 
-Xe::PCIDev::EHCI0::EHCI0::EHCI0(const char *deviceName, u64 size) :
+Xe::PCIDev::EHCI0::EHCI0::EHCI0(const std::string &deviceName, u64 size) :
   PCIDevice(deviceName, size) {
   // Set PCI Properties.
   pciConfigSpace.configSpaceHeader.reg0.hexData = 0x58051414;

@@ -651,6 +651,18 @@ void GraphicsSettings(Render::GUI *gui) {
 }
 
 void CodeflowSettings(Render::GUI *gui) {
+  if (Xe_Main->CPUStarted) {
+    gui->Button("Shutdown", [] {
+      Xe_Main->shutdownCPU();
+    });
+  } else {
+    gui->Button("Start", [] {
+      Xe_Main->start();
+    });
+  }
+  gui->Button("Reboot", [] {
+    Xe_Main->reboot(Xe_Main->smcCoreState->currPowerOnReason);
+  });
   gui->Toggle("RGH2 Init Skip", &RGH2, [] {
     if (!storedPreviousInitSkips && !RGH2) {
       initSkip1 = Config::xcpu.HW_INIT_SKIP_1;
@@ -669,6 +681,12 @@ void PathSettings(Render::GUI *gui) {
   Config::filepaths.nand = gui->InputText("NAND", Config::filepaths.nand);
   Config::filepaths.elfBinary = gui->InputText("ELF Binary", Config::filepaths.elfBinary);
   Config::filepaths.oddImage = gui->InputText("ODD Image File (iso)", Config::filepaths.oddImage);
+  gui->Button("Reload files", [] {
+    Xe_Main->reloadFiles();
+    if (!Xe_Main->CPUStarted) {
+    }
+  });
+  gui->Tooltip("Warning: It is *highly* recommended you shutdown the CPU before reloading files");
 }
 
 void ImGuiSettings(Render::GUI *gui) {

@@ -61,7 +61,7 @@ struct XE_PCI_STATE {
 
 class ETHERNET : public PCIDevice {
 public:
-  ETHERNET(const char *deviceName, u64 size);
+  ETHERNET(const std::string &deviceName, u64 size);
   void Read(u64 readAddress, u8 *data, u64 size) override;
   void Write(u64 writeAddress, const u8 *data, u64 size) override;
   void MemSet(u64 writeAddress, s32 data, u64 size) override;

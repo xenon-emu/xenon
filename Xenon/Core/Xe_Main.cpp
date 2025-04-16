@@ -81,10 +81,7 @@ void XeMain::start() {
 #endif
     return;
   }
-  // If we have already created PPU0 and we already have RAM, then reset it
-  if (xenonCPU && xenonCPU->GetPPU(0) && ram) {
-    ram->Reset();
-  }
+  CPUStarted = true;
   if (Config::xcpu.elfLoader) {
     // Load the elf
     xenonCPU->LoadElf(Config::filepaths.elfBinary);
@@ -94,7 +91,8 @@ void XeMain::start() {
   }
 }
 
-void XeMain::reboot(Xe::PCIDev::SMC::SMC_PWR_REASON type) {
+void XeMain::shutdownCPU() {
+  // Halt rendering (prevent debugger from segfaulting)
 #ifndef NO_GFX
   renderHalt = true;
 #endif
@@ -115,19 +113,42 @@ void XeMain::reboot(Xe::PCIDev::SMC::SMC_PWR_REASON type) {
   xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses);
   // Ensure the IIC pointer in the PCI bridge is correct
   pciBridge->RegisterIIC(xenonCPU->GetIICPointer());
-  // Set poweron type
-  smcCoreState->currPowerOnReason = type;
-  // Setup CPU
-  if (Config::xcpu.elfLoader) {
-    // Load the elf
-    xenonCPU->LoadElf(Config::filepaths.elfBinary);
-  } else {
-    // CPU Start routine and entry point.
-    xenonCPU->Start(0x20000000100);
-  }
+  // Continue rendering
 #ifndef NO_GFX
   renderHalt = false;
 #endif
+  // Set the CPU as inactive
+  CPUStarted = false;
+}
+
+void XeMain::reboot(Xe::PCIDev::SMC::SMC_PWR_REASON type) {
+  // Check if the CPU is active
+  if (CPUStarted) {
+    // Shutdown the CPU
+    shutdownCPU();
+  }
+  // Set poweron type
+  smcCoreState->currPowerOnReason = type;
+  // Setup CPU
+  start();
+}
+
+void XeMain::reloadFiles() {
+  getCPU()->Halt();
+  sfcx.reset();
+  sfcx = std::make_unique<STRIP_UNIQUE(sfcx)>("SFCX", Config::filepaths.nand, SFCX_DEV_SIZE, pciBridge.get(), ram.get());
+  pciBridge->resetPCIDevice(sfcx.get());
+  nandDevice.reset();
+  nandDevice = std::make_unique<STRIP_UNIQUE(nandDevice)>("NAND", sfcx.get(), NAND_START_ADDR, NAND_END_ADDR, true);
+  rootBus->ResetDevice(nandDevice.get());
+  if (!CPUStarted) {
+    // Reset the CPU again to reload files
+    xenonCPU.reset();
+    xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses);
+    // Ensure the IIC pointer in the PCI bridge is correct
+    pciBridge->RegisterIIC(xenonCPU->GetIICPointer());
+  }
+  getCPU()->Continue();
 }
 
 void XeMain::addPCIDevices() {

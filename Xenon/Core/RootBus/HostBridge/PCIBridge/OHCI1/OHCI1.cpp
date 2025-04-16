@@ -2,7 +2,7 @@
 
 #include "OHCI1.h"
 
-Xe::PCIDev::OHCI1::OHCI1::OHCI1(const char *deviceName, u64 size) : PCIDevice(deviceName, size) {
+Xe::PCIDev::OHCI1::OHCI1::OHCI1(const std::string &deviceName, u64 size) : PCIDevice(deviceName, size) {
   // TODO(bitsh1ft3r): Implement PCIe Capabilities.
   // Set PCI Properties.
   pciConfigSpace.configSpaceHeader.reg0.hexData = 0x58061414;

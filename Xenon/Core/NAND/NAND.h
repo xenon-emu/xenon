@@ -14,7 +14,7 @@
 
 class NAND : public SystemDevice {
 public:
-  NAND(const char *deviceName, SFCX* sfcxDevicePtr,
+  NAND(const std::string &deviceName, SFCX* sfcxDevicePtr,
     u64 startAddress, u64 endAddress,
     bool isSOCDevice);
   ~NAND();

@@ -6,7 +6,7 @@
 //#define NAND_DEBUG
 
 /********************Responsible for loading the NAND file********************/
-NAND::NAND(const char* deviceName, SFCX* sfcxDevicePtr,
+NAND::NAND(const std::string &deviceName, SFCX* sfcxDevicePtr,
   u64 startAddress, u64 endAddress,
   bool isSOCDevice) : SystemDevice(deviceName, startAddress, endAddress, isSOCDevice) {
   // Set the SFCX device pointer.

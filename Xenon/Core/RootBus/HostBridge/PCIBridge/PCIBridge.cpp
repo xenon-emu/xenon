@@ -174,6 +174,19 @@ void PCIBridge::addPCIDevice(PCIDevice *device) {
   connectedPCIDevices.push_back(device);
 }
 
+void PCIBridge::resetPCIDevice(PCIDevice *device) {
+  LOG_INFO(PCIBridge, "Resetting: {}", device->GetDeviceName());
+
+  for (u64 i = 0; i != connectedPCIDevices.size(); ++i) {
+    PCIDevice* dev = connectedPCIDevices[i];
+    if (dev->GetDeviceName() == device->GetDeviceName()) {
+      connectedPCIDevices.erase(connectedPCIDevices.begin() + i);
+    }
+  }
+
+  connectedPCIDevices.push_back(device);
+}
+
 bool PCIBridge::Read(u64 readAddress, u8* data, u64 size) {
   // Reading to our own space?
   if (readAddress >= PCI_BRIDGE_BASE_ADDRESS &&
@@ -501,7 +514,7 @@ void PCIBridge::ConfigRead(u64 readAddress, u8 *data, u64 size) {
   }
 
   // Current device Name
-  const char *currentDevName = "";
+  std::string currentDevName = {};
 
   switch (configAddr.devNum) {
   case XMA_DEV_NUM:
@@ -550,13 +563,14 @@ void PCIBridge::ConfigRead(u64 readAddress, u8 *data, u64 size) {
   }
 
   for (auto &device : connectedPCIDevices) {
-    if (currentDevName && !strcmp(device->GetDeviceName(), currentDevName)) {
+    if (device->GetDeviceName() == currentDevName) {
       // Hit!
       LOG_TRACE(PCIBridge, "Config read, device: {} offset = {:#x}", currentDevName, configAddr.regOffset);
       device->ConfigRead(readAddress, data, size);
       return;
     }
   }
+
   LOG_ERROR(PCIBridge, "Read to unimplemented device: {}", currentDevName);
   memset(data, 0xFF, size);
 }
@@ -572,7 +586,7 @@ void PCIBridge::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   }
 
   // Current device Name
-  const char* currentDevName = "";
+  std::string currentDevName = {};
 
   switch (configAddr.devNum) {
   case XMA_DEV_NUM:
@@ -623,7 +637,7 @@ void PCIBridge::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   }
 
   for (auto &device : connectedPCIDevices) {
-    if (currentDevName && !strcmp(device->GetDeviceName(), currentDevName)) {
+    if (device->GetDeviceName() == currentDevName) {
       // Hit!
       u64 value = 0;
       memcpy(&value, data, size);

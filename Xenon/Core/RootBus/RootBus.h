@@ -18,6 +18,8 @@ public:
 
   void AddDevice(SystemDevice *device);
 
+  void ResetDevice(SystemDevice *device);
+
   void Read(u64 readAddress, u8 *data, u64 size);
   void Write(u64 writeAddress, const u8 *data, u64 size);
   void MemSet(u64 writeAddress, s32 data, u64 size);

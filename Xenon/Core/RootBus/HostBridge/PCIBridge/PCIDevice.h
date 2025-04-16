@@ -7,13 +7,13 @@
 #include "Core/RootBus/HostBridge/PCIe.h"
 
 struct PCIDeviceInfo {
-  const char *deviceName = "";
+  std::string deviceName{};
   u64 size = 0;
 };
 
 class PCIDevice {
 public:
-  PCIDevice(const char *deviceName, u64 size) {
+  PCIDevice(std::string deviceName, u64 size) {
     deviceInfo.deviceName = deviceName;
     deviceInfo.size = size;
   }
@@ -24,7 +24,7 @@ public:
   virtual void ConfigRead(u64 readAddress, u8 *data, u64 size) {}
   virtual void ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {}
 
-  const char *GetDeviceName() { return deviceInfo.deviceName; }
+  std::string GetDeviceName() { return deviceInfo.deviceName; }
 
   // Checks wether a given address is mapped in the device's BAR's
   bool isAddressMappedInBAR(u32 address) {

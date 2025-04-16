@@ -88,6 +88,8 @@ public:
 
   void addPCIDevice(PCIDevice *device);
 
+  void resetPCIDevice(PCIDevice *device);
+
   bool Read(u64 readAddress, u8 *data, u64 size);
   bool Write(u64 writeAddress, const u8 *data, u64 size);
   bool MemSet(u64 writeAddress, s32 data, u64 size);

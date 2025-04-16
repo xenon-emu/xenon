@@ -6,7 +6,7 @@
 
 #define XE_NET_STATUS_INT 0x0000004C
 
-Xe::PCIDev::ETHERNET::ETHERNET::ETHERNET(const char *deviceName, u64 size) :
+Xe::PCIDev::ETHERNET::ETHERNET::ETHERNET(const std::string &deviceName, u64 size) :
   PCIDevice(deviceName, size) {
   // Set PCI Properties.
   pciConfigSpace.configSpaceHeader.reg0.hexData = 0x580A1414;

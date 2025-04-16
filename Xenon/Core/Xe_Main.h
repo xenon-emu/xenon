@@ -36,7 +36,11 @@ public:
 
   void start();
 
+  void shutdownCPU();
+
   void reboot(Xe::PCIDev::SMC::SMC_PWR_REASON type);
+
+  void reloadFiles();
 
   void saveConfig();
   void loadConfig();
@@ -57,7 +61,7 @@ public:
 private:
   // Main objects
   //  Base path
-  std::filesystem::path rootDirectory{};
+  std::filesystem::path rootDirectory = {};
   //  Log level
   std::unique_ptr<Base::Log::Filter> logFilter{};
 
@@ -70,13 +74,15 @@ public:
 #ifndef NO_GFX
   // Render thread
   std::unique_ptr<Render::Renderer> renderer{};
-  bool renderHalt{};
+  bool renderHalt = false;
 #endif
+  // CPU started flag
+  bool CPUStarted = false;
 
   // PCI Devices
   //  SMC
-  std::unique_ptr<Xe::PCIDev::SMC::SMC_CORE_STATE> smcCoreState; // SMCCore State for setting diffrent SMC settings.
-  std::unique_ptr<Xe::PCIDev::SMC::SMCCore> smcCore; // SMCCore Object
+  std::unique_ptr<Xe::PCIDev::SMC::SMC_CORE_STATE> smcCoreState{}; // SMCCore State for setting diffrent SMC settings.
+  std::unique_ptr<Xe::PCIDev::SMC::SMCCore> smcCore{}; // SMCCore Object
   //  Ethernet
   std::unique_ptr<Xe::PCIDev::ETHERNET::ETHERNET> ethernet{};
   //  Audio

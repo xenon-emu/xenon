@@ -4,7 +4,7 @@
 #include "Base/Logging/Log.h"
 
 /***Sets the destination, value (205) and size (RAMData)***/
-RAM::RAM(const char *deviceName, u64 startAddress, u64 endAddress, bool isSOCDevice) :
+RAM::RAM(const std::string &deviceName, u64 startAddress, u64 endAddress, bool isSOCDevice) :
   SystemDevice(deviceName, startAddress, endAddress, isSOCDevice) {
   RAMData = std::make_unique<STRIP_UNIQUE_ARR(RAMData)>(RAM_SIZE);
   if (!RAMData.get()) {

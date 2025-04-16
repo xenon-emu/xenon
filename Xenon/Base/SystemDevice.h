@@ -5,7 +5,7 @@
 #include "Types.h"
 
 struct DeviceInfo {
-  const char *deviceName = ""; // Device Name
+  std::string deviceName = ""; // Device Name
   u64 startAddr = 0; // Start Address
   u64 endAddr = 0; // End Address
   bool socDevice = false; // SOC Device
@@ -13,7 +13,7 @@ struct DeviceInfo {
 
 class SystemDevice {
 public:
-  SystemDevice(const char *deviceName, u64 startAddress, u64 endAddress,
+  SystemDevice(const std::string &deviceName, u64 startAddress, u64 endAddress,
                bool isSOCDevice)
   {
     info.deviceName = deviceName;
@@ -26,7 +26,7 @@ public:
   virtual void Write(u64 writeAddress, const u8 *data, u64 byteCount) {}
   virtual void MemSet(u64 writeAddress, s32 data, u64 byteCount) {}
 
-  const char *GetDeviceName() { return info.deviceName; }
+  std::string GetDeviceName() { return info.deviceName; }
   u64 GetStartAddress() { return info.startAddr; }
   u64 GetEndAddress() { return info.endAddr; }
   bool IsSOCDevice() { return info.socDevice; }

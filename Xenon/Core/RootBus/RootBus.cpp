@@ -30,6 +30,19 @@ void RootBus::AddDevice(SystemDevice *device) {
   conectedDevices.push_back(device);
 }
 
+void RootBus::ResetDevice(SystemDevice *device) {
+  LOG_INFO(RootBus, "Resetting device: {}", device->GetDeviceName());
+
+  for (u64 i = 0; i != conectedDevices.size(); ++i) {
+    SystemDevice *dev = conectedDevices[i];
+    if (dev->GetDeviceName() == device->GetDeviceName()) {
+      conectedDevices.erase(conectedDevices.begin() + i);
+    }
+  }
+
+  conectedDevices.push_back(device);
+}
+
 void RootBus::Read(u64 readAddress, u8 *data, u64 size) {
   // Configuration Read?
   if (readAddress >= PCI_CONFIG_REGION_ADDRESS &&

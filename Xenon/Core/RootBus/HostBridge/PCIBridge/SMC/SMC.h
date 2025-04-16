@@ -245,7 +245,7 @@ struct SMC_CORE_STATE {
 // SMC Core Object.
 class SMCCore : public PCIDevice {
 public:
-  SMCCore(const char* deviceName, u64 size,
+  SMCCore(const std::string &deviceName, u64 size,
     PCIBridge* parentPCIBridge, SMC_CORE_STATE* newSMCCoreState);
   ~SMCCore();
 

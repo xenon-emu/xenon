@@ -2,7 +2,7 @@
 
 #include "AudioController.h"
 
-Xe::PCIDev::AUDIOCTRLR::AUDIOCTRLR::AUDIOCTRLR(const char *deviceName, u64 size) :
+Xe::PCIDev::AUDIOCTRLR::AUDIOCTRLR::AUDIOCTRLR(const std::string &deviceName, u64 size) :
   PCIDevice(deviceName, size) {
   // Set PCI Properties.
   pciConfigSpace.configSpaceHeader.reg0.hexData = 0x580C1414;
