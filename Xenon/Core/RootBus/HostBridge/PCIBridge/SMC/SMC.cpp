@@ -34,12 +34,6 @@
 #define FIFO_OUT_STATUS_REG 0x94
 
 //
-// UART Definitions
-//
-#define UART_STATUS_EMPTY 0x2
-#define UART_STATUS_DATA_PRES 0x1
-
-//
 // FIFO Definitions
 //
 #define FIFO_STATUS_READY 0x4
@@ -84,9 +78,6 @@ Xe::PCIDev::SMC::SMCCore::SMCCore(const char *deviceName, u64 size,
   // Set our PCI Dev Sizes.
   pciDevSizes[0] = 0x100; // BAR0
 
-  // Set UART Presence.
-  smcCoreState->uartPresent = true;
-
   // Enter main execution thread.
   smcThread = std::thread(&SMCCore::smcMainThread, this);
 }
@@ -97,21 +88,8 @@ Xe::PCIDev::SMC::SMCCore::~SMCCore() {
   smcThreadRunning = false;
   if (smcThread.joinable())
     smcThread.join();
-  // If we are on Linux, or the backup system is running, 
-  // kill it.
-  smcCoreState->uartThreadRunning = false;
-#ifdef SOCKET_UART
-  // Shutdown receive thread
-  if (uartSecondaryThread.joinable())
-    uartSecondaryThread.join();
-  // Shutdown socket
-  if (smcCoreState->socketCreated) {
-#ifdef _WIN32
-    shutdown(smcCoreState->sockHandle, SD_BOTH);
-#endif // _WIN32
-    socketclose(smcCoreState->sockHandle);
-  }
-#endif // SOCKET_UART
+  smcCoreState->uartHandle->Shutdown();
+  smcCoreState->uartHandle.reset();
 }
 
 // PCI Read
@@ -124,55 +102,17 @@ void Xe::PCIDev::SMC::SMCCore::Read(u64 readAddress, u8 *data, u64 size) {
     memcpy(data, &smcPCIState.uartConfigReg, size);
     break;
   case UART_BYTE_OUT_REG: // UART Data Out Register  
-#if defined(_WIN32) && !defined(SOCKET_UART)
-    smcCoreState->retVal =
-        ReadFile(smcCoreState->comPortHandle, &smcPCIState.uartOutReg, 1,
-                 &smcCoreState->currentBytesReadCount, nullptr);
-#endif // _WIN32 && !SOCKET_UART
-    if (smcCoreState->uartBackup) {
-      smcCoreState->retVal = false;
-      {
-        // We love mutexes
-        std::lock_guard<std::mutex> lock(smcCoreState->uartMutex);
-        if (!smcCoreState->uartRxBuffer.empty()) {
-          smcPCIState.uartOutReg = smcCoreState->uartRxBuffer.front();
-          smcCoreState->uartRxBuffer.pop();
-          smcCoreState->retVal = true;
-        }
-      }     
-    }
-    if (smcCoreState->retVal) {
+    smcPCIState.uartOutReg = smcCoreState->uartHandle->Read();
+    if (smcCoreState->uartHandle->retVal) {
       memcpy(data, &smcPCIState.uartOutReg, size);
     }
     break;
   case UART_STATUS_REG: // UART Status Register
     // First lets check if the UART has already been setup, if so, proceed to do
-    // the TX/RX.                   
-#if defined(_WIN32) && !defined(SOCKET_UART)
-    if (smcCoreState->uartInitialized) {
-      // Get current COM Port Status
-      ClearCommError(smcCoreState->comPortHandle, &smcCoreState->comPortError,
-                     &smcCoreState->comPortStat);
-      if (smcCoreState->comPortStat.cbInQue >
-          0) // The queue has any bytes remaining?
-      {
-        // Got something to read in the input queue.
-        smcPCIState.uartStatusReg = UART_STATUS_DATA_PRES;
-      } else {
-        // The input queue is empty.
-        smcPCIState.uartStatusReg = UART_STATUS_EMPTY;
-      }
-    }
-#endif // _WIN32 && !SOCKET_UART
-    if (smcCoreState->uartBackup) {
-      if (smcCoreState->uartInitialized) {
-        smcPCIState.uartStatusReg = 0;
-        smcPCIState.uartStatusReg |= smcCoreState->uartTxBuffer.size() <= 16 ? UART_STATUS_EMPTY : 0;
-        smcPCIState.uartStatusReg |= smcCoreState->uartRxBuffer.empty() ? 0 : UART_STATUS_DATA_PRES;
-      }
-    }
+    // the TX/RX.
+    smcPCIState.uartStatusReg = smcCoreState->uartHandle->ReadStatus();
     // Check if UART is already initialized.
-    if (!smcCoreState->uartInitialized && smcCoreState->uartPresent) {
+    if (!smcCoreState->uartHandle.get()) {
       // XeLL doesn't initialize UART before sending data trough it. Initialize
       // it first then.
       setupUART(0x1E6); // 115200,8,N,1.
@@ -222,7 +162,7 @@ void Xe::PCIDev::SMC::SMCCore::Write(u64 writeAddress, const u8 *data, u64 size)
   case UART_CONFIG_REG: // UART Config Register
     memcpy(&smcPCIState.uartConfigReg, data, size);
     // Check if UART is already initialized.
-    if (!smcCoreState->uartInitialized && smcCoreState->uartPresent) {
+    if (!smcCoreState->uartHandle.get()) {
       u64 tmp = 0;
       memcpy(&tmp, data, size);
       // Initialize UART.
@@ -231,21 +171,7 @@ void Xe::PCIDev::SMC::SMCCore::Write(u64 writeAddress, const u8 *data, u64 size)
     break;
   case UART_BYTE_IN_REG: // UART Data In Register
     memcpy(&smcPCIState.uartInReg, data, size);
-#if defined(_WIN32) && !defined(SOCKET_UART)
-    // Write the data out.
-    smcCoreState->retVal =
-        WriteFile(smcCoreState->comPortHandle, data, 1,
-                  &smcCoreState->currentBytesWrittenCount, nullptr);
-#endif // _WIN32
-    if (smcCoreState->uartBackup) {
-      {
-        // We love mutexes
-        std::lock_guard<std::mutex> lock(smcCoreState->uartMutex);
-        smcCoreState->uartTxBuffer.push(*data);
-        smcCoreState->uartConditionVar.notify_one();
-      }
-      smcCoreState->retVal = true;
-    }
+    smcCoreState->uartHandle->Write(*data);
     break;
   case SMI_INT_STATUS_REG: // SMI INT Status Register
     memcpy(&smcPCIState.smiIntPendingReg, data, size);
@@ -385,186 +311,36 @@ void Xe::PCIDev::SMC::SMCCore::ConfigWrite(u64 writeAddress, const u8 *data, u64
 
 // Setups the UART Communication at a given configuration.
 void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
-#ifdef SOCKET_UART
-  smcCoreState->uartBackup = true;
-  smcCoreState->socketCreated = true;
-  constexpr int port = 7000;
-  constexpr const char* ip = "127.0.0.1";
-  //constexpr const char* ip = "10.0.0.201";
-
-  smcCoreState->sockAddr.sin_family = AF_INET;
-  smcCoreState->sockAddr.sin_port = htons(port);
-  smcCoreState->sockAddr.sin_addr.s_addr = inet_addr(ip);
-  smcCoreState->socketCreated = true;
+  LOG_INFO(SMC, "[UART] Initializing...");
+  bool socket = smcCoreState->currentUARTSytem == "vcom" ? false : true;
+  if (socket) {
+    smcCoreState->uartHandle = std::make_unique<HW_UART_SOCK>();
+    HW_UART_SOCK_CONFIG *config = new HW_UART_SOCK_CONFIG();
+    strncpy(config->ip, smcCoreState->socketIp.c_str(), sizeof(config->ip));
+    config->port = smcCoreState->socketPort;
+    config->usePrint = smcCoreState->currentUARTSytem == "print";
+    smcCoreState->uartHandle->Init(config);
+  }
 #ifdef _WIN32
-  int start = WSAStartup(MAKEWORD(2, 2), &smcCoreState->wsaData);
-  if (start != 0) {
-    LOG_CRITICAL(SMC, "SOCKET_UART failed! WSAStartup returned a non-zero value. Error: {}", start);
-    smcCoreState->socketCreated = false;
-    SYSTEM_PAUSE();
-  }
-#endif // _WIN32
-  smcCoreState->sockHandle = socket(AF_INET, SOCK_STREAM, 0);
-  int sockert_connect = connect(smcCoreState->sockHandle, (struct sockaddr*)&smcCoreState->sockAddr, sizeof(smcCoreState->sockAddr));
-  if (sockert_connect != 0) {
-    LOG_CRITICAL(SMC, "SOCKET_UART failed! Failed to connect to socket. Error: {}", Base::GetLastErrorMsg());
-    smcCoreState->socketCreated = false;
-    SYSTEM_PAUSE();
-  }
-  if (!smcCoreState->socketCreated) {
-    sockert_connect = connect(smcCoreState->sockHandle, (struct sockaddr*)&smcCoreState->sockAddr, sizeof(smcCoreState->sockAddr));
-    if (sockert_connect != 0) {
-      LOG_CRITICAL(SMC, "SOCKET_UART failed! Failed to connect to socket. (x2) Error: {}", Base::GetLastErrorMsg());
-      socketclose(smcCoreState->sockHandle);
-      SYSTEM_PAUSE();
-    } else {
-      smcCoreState->socketCreated = true;
-    }
+  else {
+    smcCoreState->uartHandle = std::make_unique<HW_UART_VCOM>();
+    HW_UART_VCOM_CONFIG *config = new HW_UART_VCOM_CONFIG();
+    strncpy(config->selectedComPort, smcCoreState->currentCOMPort.c_str(), sizeof(config->selectedComPort));
+    config->config = uartConfig;
+    smcCoreState->uartHandle->Init(config);
   }
 #else
-#ifdef _WIN32
-  // Windows Init Code.
-  LOG_INFO(SMC, "Initializing UART:");
-
-  //  Initialize the DCB structure.
-  SecureZeroMemory(&smcCoreState->comPortDCB, sizeof(DCB));
-  smcCoreState->comPortDCB.DCBlength = sizeof(DCB);
-
-  switch (uartConfig) {
-  case 0x1E6:
-    LOG_INFO(SMC, " * BaudRate: 115200bps, DataSize: 8, Parity: N, StopBits: 1.");
-    smcCoreState->comPortDCB.BaudRate = CBR_115200;
-    smcCoreState->comPortDCB.ByteSize = 8;
-    smcCoreState->comPortDCB.Parity = NOPARITY;
-    smcCoreState->comPortDCB.StopBits = ONESTOPBIT;
-    break;
-  case 0x1BB2:
-    LOG_INFO(SMC, " * BaudRate: 38400bps, DataSize: 8, Parity: N, StopBits: 1.");
-    smcCoreState->comPortDCB.BaudRate = CBR_38400;
-    smcCoreState->comPortDCB.ByteSize = 8;
-    smcCoreState->comPortDCB.Parity = NOPARITY;
-    smcCoreState->comPortDCB.StopBits = ONESTOPBIT;
-    break;
-  case 0x0163:
-    LOG_INFO(SMC, " * BaudRate: 19200bps, DataSize: 8, Parity: N, StopBits: 1.");
-    smcCoreState->comPortDCB.BaudRate = CBR_19200;
-    smcCoreState->comPortDCB.ByteSize = 8;
-    smcCoreState->comPortDCB.Parity = NOPARITY;
-    smcCoreState->comPortDCB.StopBits = ONESTOPBIT;
-    break;
-  default:
-    LOG_WARNING(SMC, "SMCCore: Unknown UART config being set: ConfigValue = {:#x}", uartConfig);
-    break;
+  else {
+    LOG_CRITICAL(smc, "[UART] Invalid UART type! Defaulting to print");
+    smcCoreState->uartHandle = std::make_unique<HW_UART_SOCK>();
+    HW_UART_SOCK_CONFIG *config = new HW_UART_SOCK_CONFIG();
+    strncpy(config->ip, smcCoreState->socketIp.c_str(), sizeof(config->ip));
+    config->port = smcCoreState->socketPort;
+    config->usePrint = true;
+    smcCoreState->uartHandle->Init(config);
   }
-
-  // Open COM# port using the CreateFile function.
-  smcCoreState->comPortHandle =
-      CreateFileA(smcCoreState->currentCOMPort.data(), GENERIC_READ | GENERIC_WRITE, 0, nullptr,
-                 OPEN_EXISTING, 0, nullptr);
-
-  bool useBackup = false;
-  if (smcCoreState->comPortHandle == INVALID_HANDLE_VALUE) {
-    LOG_ERROR(SMC, "CreateFile failed with error {:#x}. Make sure the Selected COM Port is available "
-        "in your system.", GetLastError());
-    smcCoreState->uartPresent = false;
-    if (!smcCoreState->uartBackup) {
-      printf("[SMC] <Info> Use backup UART system? (Y/N) ");
-      char opt = std::tolower(getchar());
-      smcCoreState->uartBackup = opt == 'y';     
-      if (!smcCoreState->uartBackup) {
-        return;
-      }
-    }
-    else {
-      LOG_INFO(SMC, "Using backup UART. Logging UART to Console");
-    }
-    useBackup = true;
-  }
-
-  // Set The COM Port State as per config value.
-  if (!useBackup) {
-    if (!SetCommState(smcCoreState->comPortHandle, &smcCoreState->comPortDCB)) {
-      LOG_ERROR(SMC, "UART: SetCommState failed with error {:#x}.", GetLastError());
-    }
-  }
-
-  // Everything OK.
-  smcCoreState->uartInitialized = true;
-
-  if (useBackup) {
-    smcCoreState->uartInitialized = false;
-  } else {
-    smcCoreState->uartBackup = false;
-    LOG_INFO(SMC, "UART Initialized Successfully!");
-  }
-
-#else
-  smcCoreState->uartBackup = true;
-  LOG_ERROR(SMC, "UART Initialization is fully unsupported on this platform! User beware.");
-#endif // _WIN32
-#endif // SOCKET_UART
-  if (smcCoreState->uartBackup && !smcCoreState->uartInitialized) {
-#ifdef SOCKET_UART
-    smcCoreState->uartThreadRunning = smcCoreState->socketCreated;
-#else
-    smcCoreState->uartThreadRunning = true;
-#endif // SOCKET_UART
-    smcCoreState->uartInitialized = true;
-    smcCoreState->uartPresent = true;
-    uartThread = std::thread(&SMCCore::uartMainThread, this);
-    uartThread.detach();
-#ifdef SOCKET_UART
-    uartSecondaryThread = std::thread(&SMCCore::uartReceiveThread, this);
-#endif // SOCKET_UART
-  }
-}
-
-// UART Thread
-void Xe::PCIDev::SMC::SMCCore::uartMainThread() {
-#ifdef SOCKET_UART
-  smcCoreState->uartInitialized = smcCoreState->socketCreated;
-#else
-  smcCoreState->uartInitialized = true;
-#endif // SOCKET_UART
-  if (smcCoreState->uartInitialized) {
-    LOG_INFO(SMC, "Backup UART Initialized Successfully!");
-  }
-  while (smcCoreState->uartThreadRunning) {
-    std::unique_lock<std::mutex> lock(smcCoreState->uartMutex);
-    if (!smcCoreState->uartTxBuffer.empty()) {
-#ifdef SOCKET_UART
-      char c = smcCoreState->uartTxBuffer.front();
-      send(smcCoreState->sockHandle, &c, 1, 0);
-#else
-      printf("%c", smcCoreState->uartTxBuffer.front());
-#endif // SOCKET_UART
-      smcCoreState->uartTxBuffer.pop();
-    }
-    lock.unlock();
-  }
-}
-
-#ifdef SOCKET_UART
-// UART Receive Thread
-void Xe::PCIDev::SMC::SMCCore::uartReceiveThread() {
-  while (smcCoreState->uartThreadRunning) {
-    std::unique_lock<std::mutex> lock(smcCoreState->uartMutex);
-    char c = -1;
-    u64 bytesReceived = 0;
-#ifdef _WIN32
-    u_long mode = 1;
-    ioctlsocket(smcCoreState->sockHandle, FIONBIO, &mode);
-    bytesReceived = recv(smcCoreState->sockHandle, &c, 1, 0);
-#else
-    bytesReceived = recv(smcCoreState->sockHandle, &c, 1, 0 | MSG_DONTWAIT);
 #endif
-    if (c != -1 && bytesReceived != 0) {
-      smcCoreState->uartRxBuffer.push(c);
-    }
-    lock.unlock();
-  }
 }
-#endif
 
 // SMC Main Thread
 void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
@@ -660,7 +436,7 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
         // Zero out the buffer
         memset(&smcCoreState->fifoDataBuffer, 0, 16);
         smcCoreState->fifoDataBuffer[0] = SMC_PWRON_TYPE;
-        smcCoreState->fifoDataBuffer[1] = smcCoreState->currPowerOnReas;
+        smcCoreState->fifoDataBuffer[1] = smcCoreState->currPowerOnReason;
         break;
       case Xe::PCIDev::SMC::SMC_QUERY_RTC:
         // Zero out the buffer

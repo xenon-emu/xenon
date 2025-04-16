@@ -25,18 +25,16 @@
 #endif
 #endif // _MSVC_VER
 
-#ifdef _DEBUG
-void assert_fail_impl() {
+void throw_fail_impl() {
   Base::Log::Stop();
   std::fflush(stdout);
   Crash();
 }
-#else
+
 void assert_fail_impl() {
   Xe_Main->getCPU()->Halt();
   LOG_CRITICAL(Debug, "Assertion Failed! Soft halting emulator...");
 }
-#endif
 
 [[noreturn]] void unreachable_impl() {
   Base::Log::Stop();
@@ -48,4 +46,9 @@ void assert_fail_impl() {
 void assert_fail_debug_msg(const std::string& msg) {
   LOG_CRITICAL(Debug, "Assertion Failed!\n{}", msg.data());
   assert_fail_impl();
+}
+
+void throw_fail_debug_msg(const std::string& msg) {
+  LOG_CRITICAL(Debug, "Assertion Failed!\n{}", msg.data());
+  throw_fail_impl();
 }

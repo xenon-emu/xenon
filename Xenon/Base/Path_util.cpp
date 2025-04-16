@@ -10,7 +10,6 @@
 #include <Windows.h>
 #endif // _WIN32
 
-
 namespace Base::FS {
 
 const fs::path GetBinaryDirectory() {

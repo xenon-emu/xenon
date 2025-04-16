@@ -111,14 +111,29 @@ inline struct _smc {
   // This is used to detect the current resolution
   s32 avPackType = 31; // Set to HDMI_NO_AUDIO. See SMC.cpp for a list of values.
   // SMC Power On type (Power button, eject button, controller, etc...)
-  s32 powerOnReason = 0x11; // SMC_PWR_REAS_EJECT
+  s32 powerOnReason = 0x11; // SMC_PWR_REASON_EJECT
+  // UART System
+  // vcom is vCOM, only present on Windows
+  // socket is Socket, avaliable via Netcat/socat
+  // log is Printf, directly to log
+#ifdef _WIN32
+  std::string uartSystem = "vcom";
+#else
+  std::string uartSystem = "socket";
+#endif // _WIN32
+#ifdef _WIN32
   // Selected vCOM Port
   s32 comPort = 2;
-  // Backup UART, kicks on when a vCOM is not present
-  bool useBackupUart = false;
+#endif
+  // Socket IP to listen on, default is localhost
+  std::string socketIp = "127.0.0.1";
+  // Socket Port to listen on, default is 7000
+  u16 socketPort = 7000;
+#ifdef _WIN32
   std::string COMPort() {
     return "\\\\.\\COM" + std::to_string(comPort);
   }
+#endif
 
   // TOML Conversion
   void to_toml(toml::value &value);

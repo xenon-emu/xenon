@@ -144,11 +144,15 @@ void XeMain::createPCIDevices() {
 void XeMain::createSMCState() {
   // Initialize several settings from the struct.
   smcCoreState = std::make_unique<STRIP_UNIQUE(smcCoreState)>();
+  smcCoreState->currentUARTSytem = Config::smc.uartSystem;
+#ifdef _WIN32
   smcCoreState->currentCOMPort = Config::smc.COMPort().data();
-  smcCoreState->uartBackup = Config::smc.useBackupUart;
+#endif
+  smcCoreState->socketIp = Config::smc.socketIp;
+  smcCoreState->socketPort = Config::smc.socketPort;
   smcCoreState->currAVPackType =
     (Xe::PCIDev::SMC::SMC_AVPACK_TYPE)Config::smc.avPackType;
-  smcCoreState->currPowerOnReas =
-    (Xe::PCIDev::SMC::SMC_PWR_REAS)Config::smc.powerOnReason;
+  smcCoreState->currPowerOnReason =
+    (Xe::PCIDev::SMC::SMC_PWR_REASON)Config::smc.powerOnReason;
   smcCoreState->currTrayState = Xe::PCIDev::SMC::SMC_TRAY_STATE::SMC_TRAY_CLOSED;
 }

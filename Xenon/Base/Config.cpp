@@ -161,10 +161,14 @@ bool _debug::verify_toml(toml::value &value) {
 }
 
 void _smc::from_toml(const toml::value &value) {
-  comPort = toml::find_or<s32&>(value, "COMPort", comPort);
   avPackType = toml::find_or<s32&>(value, "AvPackType", avPackType);
   powerOnReason = toml::find_or<s32&>(value, "PowerOnType", powerOnReason);
-  useBackupUart = toml::find_or<bool>(value, "UseBackupUART", useBackupUart);
+  uartSystem = toml::find_or<std::string>(value, "UARTSystem", uartSystem);
+#ifdef _WIN32
+  comPort = toml::find_or<s32&>(value, "COMPort", comPort);
+#endif
+  socketIp = toml::find_or<std::string>(value, "SocketIP", socketIp);
+  socketPort = toml::find_or<u16&>(value, "SocketPort", socketPort);
 }
 void _smc::to_toml(toml::value &value) {
   value["AvPackType"].comments().clear();
@@ -180,25 +184,38 @@ void _smc::to_toml(toml::value &value) {
   value["PowerOnType"].comments().push_back("# 17: Console is being powered by a Power button press");
   value["PowerOnType"].comments().push_back("# 18: Console is being powered by an Eject button press");
   value["PowerOnType"].comments().push_back("# Note: When trying to boot Linux/XeLL Reloaded this must be set to 18");
+  value["UARTSystem"].comments().clear();
+  value["UARTSystem"] = uartSystem;
+  value["UARTSystem"].comments().push_back("# UART System");
+  value["UARTSystem"].comments().push_back("# vcom is vCOM, only present on Windows");
+  value["UARTSystem"].comments().push_back("# socket is Socket, avaliable via Netcat/Socat");
+  value["UARTSystem"].comments().push_back("# log is Printf, directly to log");
+#ifdef _WIN32
   value["COMPort"].comments().clear();
-
   value["COMPort"] = comPort;
   value["COMPort"].comments().push_back("# Current vCOM Port used for communication between Xenon and your PC");
-  value["UseBackupUART"].comments().clear();
-  value["UseBackupUART"] = useBackupUart;
-  value["UseBackupUART"].comments().push_back("# If the selected vCOM port is unavailable, use printf instead");
+#endif
+  value["SocketIP"].comments().clear();
+  value["SocketIP"] = socketIp;
+  value["SocketIP"].comments().push_back("# Socket IP, which IP the UART netcat/socat implementation listens for");
+  value["SocketPort"].comments().clear();
+  value["SocketPort"] = socketPort;
+  value["SocketPort"].comments().push_back("# Socket Port, which port the UART netcat/socat implementation listens for");
 }
 bool _smc::verify_toml(toml::value &value) {
   to_toml(value);
-  cache_value(comPort);
   cache_value(avPackType);
   cache_value(powerOnReason);
-  cache_value(useBackupUart);
+  cache_value(uartSystem);
+  cache_value(comPort);
+  cache_value(socketIp);
+  cache_value(socketPort);
   from_toml(value);
-  verify_value(comPort);
   verify_value(avPackType);
   verify_value(powerOnReason);
-  verify_value(useBackupUart);
+  verify_value(comPort);
+  verify_value(socketIp);
+  verify_value(socketPort);
   return true;
 }
 

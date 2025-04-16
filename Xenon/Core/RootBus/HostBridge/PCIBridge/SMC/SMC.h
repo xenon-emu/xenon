@@ -11,22 +11,7 @@
 #include "Core/RootBus/HostBridge/PCIBridge/PCIBridge.h"
 #include "Core/RootBus/HostBridge/PCIBridge/PCIDevice.h"
 
-//#define SOCKET_UART
-
-#ifdef SOCKET_UART
-#ifdef _WIN32
-#pragma comment(lib, "Ws2_32.lib")
-#include <winsock2.h>
-#define socketclose closesocket
-#else
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <sys/ioctl.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#define socketclose close
-#endif // _WIN32
-#endif // SOCKET_UART
+#include "HW_UART.h"
 
 /*
         Xenon System Management Controller (SMC) Emulation.
@@ -90,32 +75,32 @@ enum SMC_TRAY_STATE {
 };
 
 // SMC Power On Reason
-enum SMC_PWR_REAS {
-  SMC_PWR_REAS_PWRBTN = 0x11, // XSS 5 Power Button Pressed.
-  SMC_PWR_REAS_EJECT = 0x12,  // XSS 6 eject button pushed
-  SMC_PWR_REAS_ALARM = 0x15,  // XSS guess ~ should be the wake alarm ~
-  SMC_PWR_REAS_REMOPWR =
+enum SMC_PWR_REASON {
+  SMC_PWR_REASON_PWRBTN = 0x11, // XSS 5 Power Button Pressed.
+  SMC_PWR_REASON_EJECT = 0x12,  // XSS 6 eject button pushed
+  SMC_PWR_REASON_ALARM = 0x15,  // XSS guess ~ should be the wake alarm ~
+  SMC_PWR_REASON_REMOPWR =
       0x20, // XSS 2 power button on 3rd party remote/xbox universal remote
-  SMC_PWR_REAS_REMOEJC = 0x21, // Eject button on xbox universal remote
-  SMC_PWR_REAS_REMOX = 0x22,   // XSS 3 Xbox universal media remote X button
-  SMC_PWR_REAS_WINBTN = 0x24,  // XSS 4 Windows button pushed IR remote
-  SMC_PWR_REAS_RESET =
+  SMC_PWR_REASON_REMOEJC = 0x21, // Eject button on xbox universal remote
+  SMC_PWR_REASON_REMOX = 0x22,   // XSS 3 Xbox universal media remote X button
+  SMC_PWR_REASON_WINBTN = 0x24,  // XSS 4 Windows button pushed IR remote
+  SMC_PWR_REASON_RESET =
       0x30, // XSS HalReturnToFirmware(1 or 2 or 3) = hard reset by smc
-  SMC_PWR_REAS_RECHARGE_RESET =
+  SMC_PWR_REASON_RECHARGE_RESET =
       0x31,                  // After leaving pnc charge mode via power button
-  SMC_PWR_REAS_KIOSK = 0x41, // XSS 7 console powered on by kiosk pin
-  SMC_PWR_REAS_WIRELESS =
+  SMC_PWR_REASON_KIOSK = 0x41, // XSS 7 console powered on by kiosk pin
+  SMC_PWR_REASON_WIRELESS =
       0x55, // XSS 8 wireless controller middle button/start button pushed to
             // power on controller and console
-  SMC_PWR_REAS_WIRED_F1 = 0x56, // XSS 9 wired guide button; fat front top USB
+  SMC_PWR_REASON_WIRED_F1 = 0x56, // XSS 9 wired guide button; fat front top USB
                                 // port, slim front left USB port
-  SMC_PWR_REAS_WIRED_F2 = 0x57, // XSS A wired guide button; fat front botton
+  SMC_PWR_REASON_WIRED_F2 = 0x57, // XSS A wired guide button; fat front botton
                                 // USB port, slim front right USB port
-  SMC_PWR_REAS_WIRED_R2 =
+  SMC_PWR_REASON_WIRED_R2 =
       0x58, // XSS B wired guide button; slim back middle USB port
-  SMC_PWR_REAS_WIRED_R3 =
+  SMC_PWR_REASON_WIRED_R3 =
       0x59, // XSS C wired guide button; slim back top USB port
-  SMC_PWR_REAS_WIRED_R1 = 0x5A // XSS D wired guide button; fat back USB port,
+  SMC_PWR_REASON_WIRED_R1 = 0x5A // XSS D wired guide button; fat back USB port,
                                // slim back bottom USB port
                                //
   // Possibles/reboot reasons  0x23, 0x2A, 0x42, 0x61, 0x64.
@@ -237,59 +222,24 @@ struct SMC_PCI_STATE {
 
 // SMC Core State, tracks current state of the system as per view from the SMC.
 struct SMC_CORE_STATE {
-  SMC_TRAY_STATE currTrayState;
-  SMC_PWR_REAS currPowerOnReas;
-  SMC_AVPACK_TYPE currAVPackType;
+  SMC_TRAY_STATE currTrayState = {};
+  SMC_PWR_REASON currPowerOnReason = {};
+  SMC_AVPACK_TYPE currAVPackType = {};
 
   // FIFO Data Queue (16 Bytes transmitted in 4 32 Bit words)
-  u8 fifoDataBuffer[16];
+  u8 fifoDataBuffer[16] = {};
   u8 fifoBufferPos = 0;
 
-  // Default COM Port for opening.
-  std::string currentCOMPort;
-  // UART Initialized.
-  bool uartInitialized;
-  // UART Present. Used to do a one time check on UART COM Port on the host
-  // system.
-  bool uartPresent;
-  // Use backup UART. If we are on Windows, and it doesn't have the proper COM port,
-  // use this instead
-  bool uartBackup;
-#ifdef SOCKET_UART
-  bool socketCreated;
-  struct sockaddr_in sockAddr;
-#ifdef _WIN32
-  WSADATA wsaData;
-  SOCKET sockHandle;
-#else
-  int sockHandle;
-#endif // _WIN32
-#else
-#ifdef _WIN32
-  // Current COM Port Device Control Block.
-  // See
-  // https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-dcb
-  DCB comPortDCB;
-  // Current COM Port Handle.
-  HANDLE comPortHandle;
-  // Current COM Port Status.
-  COMSTAT comPortStat = {};
-  // Current COM Port error register used by ClearCommErr().
-  DWORD comPortError = 0;
-  // Bytes Written to the COM Port.
-  DWORD currentBytesWrittenCount = 0;
-  // Bytes Read from the COM Port.
-  DWORD currentBytesReadCount = 0;
-#endif // _WIN32
-#endif // SOCKET_UART
-  // Backup UART system
-  std::queue<u8> uartTxBuffer;
-  std::queue<u8> uartRxBuffer;
-  std::mutex uartMutex;
-  std::condition_variable uartConditionVar;
-  bool uartThreadRunning;
-  // Read/Write Return Status Values
-  bool retVal = false;
+  // UART system
+  std::string currentUARTSytem = {};
+  // vCOM Port
+  std::string currentCOMPort = {};
+  // Socket IP
+  std::string socketIp = {};
+  // Socket Port
+  u16 socketPort = 0;
+  // UART handle
+  std::unique_ptr<HW_UART> uartHandle = {};
 };
 
 // SMC Core Object.
@@ -328,10 +278,8 @@ private:
   // UART Thread object
   std::thread uartThread;
 
-#ifdef SOCKET_UART
   // UART Receive Thread object
   std::thread uartSecondaryThread;
-#endif
 
   // SMC Main Thread
   void smcMainThread();
@@ -339,10 +287,8 @@ private:
   // UART Thread
   void uartMainThread();
 
-#ifdef SOCKET_UART
   // UART Receive Thread
   void uartReceiveThread();
-#endif
 
   // UART/COM Port Setup
   void setupUART(u32 uartConfig);

@@ -37,7 +37,7 @@ endfunction()
 
 # Actual Version
 set(APP_VERSION "0.0.1")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DAPP_VERSION=\\\"${APP_VERSION}\\\"")
+add_compile_definitions(APP_VERSION="${APP_VERSION}")
 
 # COMMIT_COUNT on Xenon (with Git)
 execute_process(
@@ -48,7 +48,7 @@ execute_process(
 )
 
 if (NOT "${COMMIT_COUNT}" STREQUAL "")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCOMMIT_COUNT=\\\"${COMMIT_COUNT}\\\"")
+  add_compile_definitions(COMMIT_COUNT="${COMMIT_COUNT}")
   message(STATUS "Commits Number: ${COMMIT_COUNT}")
 endif()
 
@@ -160,6 +160,8 @@ set(RootBus
     Xenon/Core/RootBus/HostBridge/PCIBridge/SATA.h
     Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/SMC.cpp
     Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/SMC.h
+    Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/HW_UART.cpp
+    Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/HW_UART.h
     Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/HANA_State.h
     Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/SMC_Config.h
     Xenon/Core/RootBus/HostBridge/PCIBridge/XMA/XMA.cpp

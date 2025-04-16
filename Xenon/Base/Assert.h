@@ -18,11 +18,27 @@ void assert_fail_debug_msg(const std::string& msg);
 #define XENON_NO_INLINE __attribute__((noinline))
 #endif
 
+#define THROW(_a_)                                                                           \
+  ([&]() XENON_NO_INLINE {                                                                   \
+    if (!(_a_)) [[unlikely]] {                                                               \
+      LOG_CRITICAL(Debug, "Assertion Failed!");                                              \
+      throw_fail_impl();                                                                     \
+    }                                                                                        \
+  }())
+
 #define ASSERT(_a_)                                                                          \
   ([&]() XENON_NO_INLINE {                                                                   \
     if (!(_a_)) [[unlikely]] {                                                               \
       LOG_CRITICAL(Debug, "Assertion Failed!");                                              \
       assert_fail_impl();                                                                    \
+    }                                                                                        \
+  }())
+
+#define THROW_MSG(_a_, ...)                                                                  \
+  ([&]() XENON_NO_INLINE {                                                                   \
+    if (!(_a_)) [[unlikely]] {                                                               \
+      LOG_CRITICAL(Debug, "Assertion Failed!\n" __VA_ARGS__);                                \
+      throw_fail_impl();                                                                     \
     }                                                                                        \
   }())
 
@@ -58,8 +74,8 @@ void assert_fail_debug_msg(const std::string& msg);
   } while (0)
 #endif
 
-#define UNIMPLEMENTED() ASSERT_MSG(false, "Unimplemented code!")
-#define UNIMPLEMENTED_MSG(...) ASSERT_MSG(false, __VA_ARGS__)
+#define UNIMPLEMENTED() THROW_MSG(false, "Unimplemented code!")
+#define UNIMPLEMENTED_MSG(...) THROW_MSG(false, __VA_ARGS__)
 
 #define UNIMPLEMENTED_IF(cond) ASSERT_MSG(!(cond), "Unimplemented code!")
 #define UNIMPLEMENTED_IF_MSG(cond, ...) ASSERT_MSG(!(cond), __VA_ARGS__)
