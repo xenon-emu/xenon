@@ -207,13 +207,17 @@ bool _smc::verify_toml(toml::value &value) {
   cache_value(avPackType);
   cache_value(powerOnReason);
   cache_value(uartSystem);
+#ifdef _WIN32
   cache_value(comPort);
+#endif
   cache_value(socketIp);
   cache_value(socketPort);
   from_toml(value);
   verify_value(avPackType);
   verify_value(powerOnReason);
+#ifdef _WIN32
   verify_value(comPort);
+#endif
   verify_value(socketIp);
   verify_value(socketPort);
   return true;
