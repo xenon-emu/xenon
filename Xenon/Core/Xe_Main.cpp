@@ -103,6 +103,8 @@ void XeMain::shutdownCPU() {
   // Ensure GPU registers are reset
   xenos.reset();
   xenos = std::make_unique<STRIP_UNIQUE(xenos)>(ram.get());
+  // Re-register the XGPU to the host bridge
+  hostBridge->RegisterXGPU(xenos.get());
 #ifndef NO_GFX
   // Reinit RAM handles for rendering (should be valid, mainly safety)
   renderer->ramPointer = ram.get();
@@ -135,14 +137,16 @@ void XeMain::reboot(Xe::PCIDev::SMC::SMC_PWR_REASON type) {
 
 void XeMain::reloadFiles() {
   getCPU()->Halt();
+  // Reset the SFCX
   sfcx.reset();
   sfcx = std::make_unique<STRIP_UNIQUE(sfcx)>("SFCX", Config::filepaths.nand, SFCX_DEV_SIZE, pciBridge.get(), ram.get());
   pciBridge->resetPCIDevice(sfcx.get());
+  // Reset the NAND
   nandDevice.reset();
   nandDevice = std::make_unique<STRIP_UNIQUE(nandDevice)>("NAND", sfcx.get(), NAND_START_ADDR, NAND_END_ADDR, true);
   rootBus->ResetDevice(nandDevice.get());
   if (!CPUStarted) {
-    // Reset the CPU again to reload files
+    // Reset the CPU again to reload 1bl and fuses
     xenonCPU.reset();
     xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses);
     // Ensure the IIC pointer in the PCI bridge is correct

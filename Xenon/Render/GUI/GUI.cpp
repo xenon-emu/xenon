@@ -683,8 +683,6 @@ void PathSettings(Render::GUI *gui) {
   Config::filepaths.oddImage = gui->InputText("ODD Image File (iso)", Config::filepaths.oddImage);
   gui->Button("Reload files", [] {
     Xe_Main->reloadFiles();
-    if (!Xe_Main->CPUStarted) {
-    }
   });
   gui->Tooltip("Warning: It is *highly* recommended you shutdown the CPU before reloading files");
 }
