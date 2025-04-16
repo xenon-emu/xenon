@@ -331,7 +331,7 @@ void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
   }
 #else
   else {
-    LOG_CRITICAL(smc, "[UART] Invalid UART type! Defaulting to print");
+    LOG_CRITICAL(SMC, "[UART] Invalid UART type! Defaulting to print");
     smcCoreState->uartHandle = std::make_unique<HW_UART_SOCK>();
     HW_UART_SOCK_CONFIG *config = new HW_UART_SOCK_CONFIG();
     strncpy(config->ip, smcCoreState->socketIp.c_str(), sizeof(config->ip));

@@ -224,7 +224,9 @@ void Render::Renderer::Thread() {
   while (threadRunning && XeRunning) {
     // Process events.
     while (SDL_PollEvent(&windowEvent)) {
-      ImGui_ImplSDL3_ProcessEvent(&windowEvent);
+      if (!Config::rendering.enableGui) {
+        ImGui_ImplSDL3_ProcessEvent(&windowEvent);
+      }
       switch (windowEvent.type) {
       case SDL_EVENT_WINDOW_RESIZED:
         if (windowEvent.window.windowID == windowID) {
@@ -281,7 +283,7 @@ void Render::Renderer::Thread() {
     }
 
     // Render the GUI
-    if (gui.get()) {
+    if (Config::rendering.enableGui && gui.get()) {
       gui->Render(backbuffer.get());
     }
 
