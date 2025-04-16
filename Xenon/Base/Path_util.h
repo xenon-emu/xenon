@@ -22,12 +22,12 @@ enum FileType {
 };
 
 // Represents a given file inside a directory.
-struct FileInfo {
+typedef struct _FileInfo {
   fs::path fileName;  // The file name and extension.
   fs::path filePath;  // The file path.
   size_t fileSize;    // File size.
   FileType fileType;  // File Type (directory/file).
-};
+} FileInfo;
 
 constexpr auto CONSOLE_DIR = "console";
 
