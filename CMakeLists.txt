@@ -52,11 +52,6 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-if (NOT "${COMMIT_COUNT}" STREQUAL "")
-  add_compile_definitions(COMMIT_COUNT="${COMMIT_COUNT}")
-  message(STATUS "Commits Number: ${COMMIT_COUNT}")
-endif()
-
 # Xenon BRANCH (with Git)
 execute_process(
   COMMAND git rev-parse --abbrev-ref HEAD
@@ -65,9 +60,14 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE
 )
 
-if (NOT "${BRANCH}" STREQUAL "" AND NOT ${BRANCH} STREQUAL "main")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DBRANCH=\\\"${BRANCH}\\\"")
-  message(STATUS "Actual Branch: ${BRANCH}")
+if (NOT "${COMMIT_COUNT}" STREQUAL "" AND NOT "${BRANCH}" STREQUAL "")
+  add_compile_definitions(COMMIT_COUNT="${COMMIT_COUNT}")
+  if (NOT "${BRANCH}" STREQUAL "main")
+    add_compile_definitions(BRANCH="${BRANCH}")
+    message(STATUS "Title: Xenon Experimental ${EMULATOR_VERSION_MAJOR}.${EMULATOR_VERSION_MINOR}.${EMULATOR_VERSION_PATCH}-${COMMIT_COUNT} - ${BRANCH}")
+  else()
+    message(STATUS "Title: Xenon Experimental ${EMULATOR_VERSION_MAJOR}.${EMULATOR_VERSION_MINOR}.${EMULATOR_VERSION_PATCH}-${COMMIT_COUNT}")
+  endif()
 endif()
 
 
