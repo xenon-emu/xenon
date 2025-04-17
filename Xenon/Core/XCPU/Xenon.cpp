@@ -3,6 +3,7 @@
 #include "Xenon.h"
 
 #include "Base/Logging/Log.h"
+#include "Interpreter/PPCInterpreter.h"
 
 Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPath) {
   // First, Initialize system bus.
@@ -90,6 +91,9 @@ void Xenon::Start(u64 resetVector) {
   ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(&xenonContext, mainBus, resetVector, XE_PVR, 0); // Threads 0-1
   ppu1 = std::make_unique<STRIP_UNIQUE(ppu1)>(&xenonContext, mainBus, resetVector, XE_PVR, 2); // Threads 2-3
   ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(&xenonContext, mainBus, resetVector, XE_PVR, 4); // Threads 4-5
+  // Asign Interpreter global variables
+  PPCInterpreter::intXCPUContext = &xenonContext;
+  PPCInterpreter::sysBus = mainBus;
   // Start execution on the main thread
   ppu0->StartExecution();
   // Get our CPI based on the first PPU, then share it across all PPUs

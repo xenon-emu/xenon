@@ -74,10 +74,6 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
   // Asign global Xenon context
   xenonContext = inXenonContext;
 
-  // Asign Interpreter global variables
-  PPCInterpreter::intXCPUContext = xenonContext;
-  PPCInterpreter::sysBus = mainBus;
-
   if (Config::xcpu.clocksPerInstruction) {
     clocksPerInstruction = Config::xcpu.clocksPerInstruction;
     LOG_INFO(Xenon, "{}: Using cached CPI from Config, got {}", ppuState->ppuName, clocksPerInstruction);

@@ -702,21 +702,6 @@ void XCPUSettings(Render::GUI *gui) {
     Config::xcpu.HW_INIT_SKIP_1 = RGH2 ? 0x3003DC0 : initSkip1;
     Config::xcpu.HW_INIT_SKIP_2 = RGH2 ? 0x3003E54 : initSkip2;
   });
-  gui->Button("Re-run CPI Test", [&] {
-    Xe_Main->getCPU()->Halt();
-    u32 previousCPI = Config::xcpu.clocksPerInstruction;
-    Config::xcpu.clocksPerInstruction = 0;
-    bool continueExec = false;
-    if (Xe_Main->CPUStarted) {
-      continueExec = true;
-      Xe_Main->shutdownCPU();
-    }
-    u32 cpi = Xe_Main->xenonCPU->RunCPITests();
-    LOG_INFO(Xenon, "PPU0: {} clocks per instruction", cpi);
-    Config::xcpu.clocksPerInstruction = cpi;
-    if (continueExec)
-      Xe_Main->start();
-  });
 }
 
 void SMCSettings(Render::GUI *gui) {
@@ -808,20 +793,6 @@ void Render::GUI::OnSwap(Texture *texture) {
             f.close();
           });
         });
-        // This whole section is broken
-        /*TabItem("CPU", [&] {
-          Button("Re-start execution", [&] {
-            //Xe_Main->xenonCPU->Halt();
-            Xe_Main->start();
-          });
-          Button("Re-run CPI Test", [&] {
-            Xe_Main->xenonCPU->Halt();
-            PPU *PPU = Xe_Main->xenonCPU->GetPPU(0);
-            PPU->CalculateCPI();
-            LOG_INFO(Xenon, "PPU0: {} clocks per instruction", PPU->GetCPI());
-            Xe_Main->xenonCPU->Continue();
-          });
-        });*/
         TabItem("Settings", [&] {
           TabBar("##settings", [&] {
             TabItem("CPU", [&] {

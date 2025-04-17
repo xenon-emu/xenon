@@ -256,7 +256,7 @@ void Render::Renderer::Thread() {
       break;
 
     // Upload buffer
-    if (fbPointer) {
+    if (fbPointer && !Xe_Main->renderHalt) {
       const u32* ui_fbPointer = reinterpret_cast<u32*>(fbPointer);
       glBindBuffer(GL_SHADER_STORAGE_BUFFER, pixelBuffer);
       glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, pitch, ui_fbPointer);
@@ -286,8 +286,10 @@ void Render::Renderer::Thread() {
     if (Config::rendering.enableGui && gui.get() && !Xe_Main->renderHalt) {
       gui->Render(backbuffer.get());
     }
-
-    SDL_GL_SwapWindow(mainWindow);
+    
+    // GL Swap
+    if (!Xe_Main->renderHalt)
+      SDL_GL_SwapWindow(mainWindow);
   }
 }
 
