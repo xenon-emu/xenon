@@ -73,9 +73,6 @@ void PCIBridge::RegisterIIC(Xe::XCPU::IIC::XenonIIC *xenonIICPtr) {
 }
 
 bool PCIBridge::RouteInterrupt(u8 prio) {
-  u64 intPacket = 0;
-  u32 address = 0;
-
   switch (prio) {
   case PRIO_CLOCK:
     if (pciBridgeState.PRIO_REG_CLCK.intEnabled) {
@@ -154,6 +151,86 @@ bool PCIBridge::RouteInterrupt(u8 prio) {
     break;
   }
   return false;
+}
+
+void PCIBridge::CancelInterrupt(u8 prio) {
+  switch (prio) {
+  case PRIO_CLOCK:
+    if (pciBridgeState.PRIO_REG_CLCK.intEnabled) {
+      xenonIIC->cancelInterrupt(PRIO_CLOCK,
+        pciBridgeState.PRIO_REG_CLCK.targetCPU);
+    }
+    break;
+  case PRIO_SATA_ODD:
+    if (pciBridgeState.PRIO_REG_ODD.intEnabled) {
+      xenonIIC->cancelInterrupt(PRIO_SATA_ODD,
+        pciBridgeState.PRIO_REG_ODD.targetCPU);
+    }
+    break;
+  case PRIO_SATA_HDD:
+    if (pciBridgeState.PRIO_REG_HDD.intEnabled) {
+      xenonIIC->cancelInterrupt(PRIO_SATA_HDD,
+        pciBridgeState.PRIO_REG_HDD.targetCPU);
+    }
+    break;
+  case PRIO_SMM:
+    if (pciBridgeState.PRIO_REG_SMM.intEnabled) {
+      xenonIIC->cancelInterrupt(PRIO_SMM,
+        pciBridgeState.PRIO_REG_SMM.targetCPU);
+    }
+    break;
+  case PRIO_OHCI_0:
+    if (pciBridgeState.PRIO_REG_OHCI0.intEnabled) {
+      xenonIIC->cancelInterrupt(PRIO_OHCI_0,
+        pciBridgeState.PRIO_REG_OHCI0.targetCPU);
+    }
+    break;
+  case PRIO_OHCI_1:
+    if (pciBridgeState.PRIO_REG_OHCI1.intEnabled) {
+      xenonIIC->cancelInterrupt(PRIO_OHCI_1,
+        pciBridgeState.PRIO_REG_OHCI1.targetCPU);
+    }
+    break;
+  case PRIO_EHCI_0:
+    if (pciBridgeState.PRIO_REG_EHCI0.intEnabled) {
+      xenonIIC->cancelInterrupt(PRIO_EHCI_0,
+        pciBridgeState.PRIO_REG_EHCI0.targetCPU);
+    }
+    break;
+  case PRIO_EHCI_1:
+    if (pciBridgeState.PRIO_REG_EHCI1.intEnabled) {
+      xenonIIC->cancelInterrupt(PRIO_EHCI_1,
+        pciBridgeState.PRIO_REG_EHCI1.targetCPU);
+    }
+    break;
+  case PRIO_ENET:
+    if (pciBridgeState.PRIO_REG_ENET.intEnabled) {
+      xenonIIC->cancelInterrupt(PRIO_ENET,
+        pciBridgeState.PRIO_REG_ENET.targetCPU);
+    }
+    break;
+  case PRIO_XMA:
+    if (pciBridgeState.PRIO_REG_XMA.intEnabled) {
+      xenonIIC->cancelInterrupt(PRIO_XMA,
+        pciBridgeState.PRIO_REG_XMA.targetCPU);
+    }
+    break;
+  case PRIO_AUDIO:
+    if (pciBridgeState.PRIO_REG_AUDIO.intEnabled) {
+      xenonIIC->cancelInterrupt(PRIO_AUDIO,
+        pciBridgeState.PRIO_REG_AUDIO.targetCPU);
+    }
+    break;
+  case PRIO_SFCX:
+    if (pciBridgeState.PRIO_REG_SFCX.intEnabled) {
+      xenonIIC->cancelInterrupt(PRIO_SFCX,
+        pciBridgeState.PRIO_REG_SFCX.targetCPU);
+    }
+    break;
+  default:
+    LOG_ERROR(PCIBridge, "Unknown interrupt being cancelled: {:#x}", prio);
+    break;
+  }
 }
 
 bool PCIBridge::isAddressMappedinBAR(u32 address) {

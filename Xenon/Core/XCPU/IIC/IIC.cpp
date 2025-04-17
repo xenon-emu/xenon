@@ -226,6 +226,37 @@ void Xe::XCPU::IIC::XenonIIC::genInterrupt(u8 interruptType,
   }
 }
 
+void Xe::XCPU::IIC::XenonIIC::cancelInterrupt(u8 interruptType, u8 cpusInterrupted)
+{
+  // Set a global lock.
+  std::lock_guard lck(mutex);
+
+  for (u8 ppuID = 0; ppuID < 6; ppuID++) {
+    if ((cpusInterrupted & 0x1) == 1) {
+
+#ifdef IIC_DEBUG
+      LOG_DEBUG(Xenon_IIC, "Cancelling interrupt: Thread {}, intType: {}", ppuID, getIntName(interruptType));
+#endif // IIC_DEBUG
+
+      // Delete the interrupt from the interrupt queue.
+      bool found = false;
+      if (!iicState.ppeIntCtrlBlck[ppuID].interrupts.empty()) {
+        u16 intIdx = 0;
+        for (auto& interrupt : iicState.ppeIntCtrlBlck[ppuID].interrupts) {
+          if (interrupt.interrupt == interruptType && !interrupt.ack) {
+            found = true;
+            break;
+          }
+          intIdx++;
+        }
+        if (found) {
+          iicState.ppeIntCtrlBlck[ppuID].interrupts.erase(iicState.ppeIntCtrlBlck[ppuID].interrupts.begin() + intIdx);
+        }
+      }
+      cpusInterrupted = cpusInterrupted >> 1;
+    }
+  }
+}
 struct IRQ_DATA {
   u8 irq = 0;
   std::string_view name = {};

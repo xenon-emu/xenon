@@ -90,6 +90,7 @@ namespace Xe {
         void readInterrupt(u64 intAddress, u8 *data, u64 size);
         bool checkExtInterrupt(u8 ppuID);
         void genInterrupt(u8 interruptType, u8 cpusToInterrupt);
+        void cancelInterrupt(u8 interruptType, u8 cpusInterrupted);
 
       private:
         IIC_State iicState;

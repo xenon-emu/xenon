@@ -100,6 +100,7 @@ public:
   void RegisterIIC(Xe::XCPU::IIC::XenonIIC *xenonIICPtr);
 
   bool RouteInterrupt(u8 prio);
+  void CancelInterrupt(u8 prio);
 
 private:
   // IIC Pointer used for interrupts.
