@@ -475,11 +475,11 @@ void PPUThread(Render::GUI *gui, PPU_STATE *PPUState, ePPUThread threadID) {
 }
 
 void RenderInstr(Render::GUI *gui, u32 addr, u32 instr) {
-  const std::string instrName = PPCInterpreter::ppcDecoder.decodeName(instr);
-  const u32 b0 = static_cast<u8>((instr >> 24)  &0xFF);
-  const u32 b1 = static_cast<u8>((instr >> 16)  &0xFF);
-  const u32 b2 = static_cast<u8>((instr >> 8)  &0xFF);
-  const u32 b3 = static_cast<u8>((instr >> 0)  &0xFF);
+  const std::string instrName = PPCInterpreter::PPCInterpreter_getFullName(instr);
+  const u32 b0 = static_cast<u8>((instr >> 24) & 0xFF);
+  const u32 b1 = static_cast<u8>((instr >> 16) & 0xFF);
+  const u32 b2 = static_cast<u8>((instr >> 8) & 0xFF);
+  const u32 b3 = static_cast<u8>((instr >> 0) & 0xFF);
   TextFmt(gui, "{:08X} {:02X} {:02X} {:02X} {:02X}                             {}", addr, b0, b1, b2, b3, instrName);
 }
 

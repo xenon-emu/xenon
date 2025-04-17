@@ -102,6 +102,7 @@ set(Base
     Xenon/Base/Error.h
     Xenon/Base/Enum.h
     Xenon/Base/Exit.h
+    Xenon/Base/Hash.h
     Xenon/Base/io_file.cpp
     Xenon/Base/io_file.h
     Xenon/Base/LRUCache.h
