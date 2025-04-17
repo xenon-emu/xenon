@@ -60,7 +60,9 @@ public:
   bool Toggle(const std::string &label, bool *conditon = nullptr, std::function<void()> callback = {});
   std::string InputText(const std::string &title, std::string initValue = {}, size_t maxCharacters = 256,
     const std::string &textHint = {}, ImGuiInputTextFlags flags = ImGuiInputTextFlags_None, ImVec2 size = {});
-  void InputInt(const std::string &label, u32 *value, u32 step = 1, u32 stepFast = 100);
+  template <typename T>
+    requires std::is_integral_v<T>
+  void InputInt(const std::string &label, T *value, T step = 1, T stepFast = 100, const char *format = "%d");
   void Tooltip(const std::string &contents, ImGuiHoveredFlags delay = ImGuiHoveredFlags_DelayNone);
 
   void Render(Texture *texture);

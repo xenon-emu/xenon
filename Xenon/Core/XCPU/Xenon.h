@@ -25,6 +25,8 @@ public:
 
   void Start(u64 resetVector = 0x100);
 
+  u32 RunCPITests(u64 resetVector = 0x100);
+
   void LoadElf(const std::string path);
 
   void Halt(u64 haltOn = 0);

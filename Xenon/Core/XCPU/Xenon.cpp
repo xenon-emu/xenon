@@ -100,6 +100,18 @@ void Xenon::Start(u64 resetVector) {
   ppu2->StartExecution();
 }
 
+u32 Xenon::RunCPITests(u64 resetVector) {
+  // Create PPU element
+  ppu0.reset();
+  ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(&xenonContext, mainBus, resetVector, XE_PVR, 0); // Threads 0-1
+  // Start execution on the main thread
+  ppu0->StartExecution();
+  // Get CPU and reset PPU
+  u32 cpi = ppu0->GetCPI();
+  ppu0.reset();
+  return cpi;
+}
+
 void Xenon::LoadElf(const std::string path) {
   ppu0.reset();
   ppu1.reset();

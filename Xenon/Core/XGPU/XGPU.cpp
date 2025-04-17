@@ -214,7 +214,7 @@ void Xe::Xenos::XGPU::DumpFB(const std::filesystem::path &path, int pitch) {
   }
   else {
     f.write(reinterpret_cast<const char*>(ramPtr->getPointerToAddress(XE_FB_BASE)), pitch);
-    LOG_INFO(Xenos, "Framebuffer dumped to Xenon/fbmem.bin");
+    LOG_INFO(Xenos, "Framebuffer dumped to '{}'", path.string());
   }
   f.close();
 }

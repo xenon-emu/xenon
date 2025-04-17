@@ -252,8 +252,28 @@ std::string Render::GUI::InputText(const std::string &title, std::string initVal
   return buf.data();
 }
 
-void Render::GUI::InputInt(const std::string &label, u32 *value, u32 step, u32 stepFast) {
-  ImGui::InputScalar(label.c_str(), ImGuiDataType_U32, (void*)value, (void*)(step > 0 ? &step : NULL), (void*)(stepFast > 0 ? &stepFast : NULL), "%d");
+template <typename T>
+  requires std::is_integral_v<T>
+void Render::GUI::InputInt(const std::string &label, T *value, T step, T stepFast, const char *format) {
+  ImGuiDataType_ dataType;
+  if constexpr (std::is_same_v<T, u64>) {
+    dataType = ImGuiDataType_U64;
+  } else if constexpr (std::is_same_v<T, s64>) {
+    dataType = ImGuiDataType_S64;
+  } else if constexpr (std::is_same_v<T, u32>) {
+    dataType = ImGuiDataType_U32;
+  } else if constexpr (std::is_same_v<T, s32>) {
+    dataType = ImGuiDataType_S32;
+  } else if constexpr (std::is_same_v<T, u16>) {
+    dataType = ImGuiDataType_U16;
+  } else if constexpr (std::is_same_v<T, s16>) {
+    dataType = ImGuiDataType_S16;
+  } else if constexpr (std::is_same_v<T, u8>) {
+    dataType = ImGuiDataType_U8;
+  } else if constexpr (std::is_same_v<T, s8>) {
+    dataType = ImGuiDataType_S8;
+  }
+  ImGui::InputScalar(label.c_str(), dataType, (void*)value, (void*)(step > 0 ? &step : NULL), (void*)(stepFast > 0 ? &stepFast : NULL), format);
 }
 
 void Render::GUI::Tooltip(const std::string &contents, ImGuiHoveredFlags delay) {
@@ -659,7 +679,7 @@ void GraphicsSettings(Render::GUI *gui) {
   gui->Toggle("Exit on window close", &Config::rendering.quitOnWindowClosure);
 }
 
-void CodeflowSettings(Render::GUI *gui) {
+void XCPUSettings(Render::GUI *gui) {
   if (Xe_Main->CPUStarted) {
     gui->Button("Shutdown", [] {
       Xe_Main->shutdownCPU();
@@ -672,7 +692,8 @@ void CodeflowSettings(Render::GUI *gui) {
   gui->Button("Reboot", [] {
     Xe_Main->reboot(Xe_Main->smcCoreState->currPowerOnReason);
   });
-  gui->Toggle("RGH2 Init Skip", &RGH2, [] {
+  gui->Toggle("Load Elf", &Config::xcpu.elfLoader);
+  gui->Toggle("RGH2 Init Skip (Corona Only)", &RGH2, [] {
     if (!storedPreviousInitSkips && !RGH2) {
       initSkip1 = Config::xcpu.HW_INIT_SKIP_1;
       initSkip2 = Config::xcpu.HW_INIT_SKIP_2;
@@ -681,7 +702,35 @@ void CodeflowSettings(Render::GUI *gui) {
     Config::xcpu.HW_INIT_SKIP_1 = RGH2 ? 0x3003DC0 : initSkip1;
     Config::xcpu.HW_INIT_SKIP_2 = RGH2 ? 0x3003E54 : initSkip2;
   });
-  gui->Toggle("Load Elf", &Config::xcpu.elfLoader);
+  gui->Button("Re-run CPI Test", [&] {
+    Xe_Main->getCPU()->Halt();
+    u32 previousCPI = Config::xcpu.clocksPerInstruction;
+    Config::xcpu.clocksPerInstruction = 0;
+    bool continueExec = false;
+    if (Xe_Main->CPUStarted) {
+      continueExec = true;
+      Xe_Main->shutdownCPU();
+    }
+    u32 cpi = Xe_Main->xenonCPU->RunCPITests();
+    LOG_INFO(Xenon, "PPU0: {} clocks per instruction", cpi);
+    Config::xcpu.clocksPerInstruction = cpi;
+    if (continueExec)
+      Xe_Main->start();
+  });
+}
+
+void SMCSettings(Render::GUI *gui) {
+  Config::smc.uartSystem = gui->InputText("UART System", Config::smc.uartSystem);
+#ifdef _WIN32
+  gui->InputInt("vCOM Port", &Config::smc.comPort);
+  gui->Tooltip("Note: a Virtual COM drier is needed, please use a different UART system if you do not have one");
+#endif
+  Config::smc.socketIp = gui->InputText("Socket IP", Config::smc.socketIp);
+  gui->Tooltip("Decides which IP the UART netcat/socat implementation listens for");
+  gui->InputInt("Socket Port", &Config::smc.socketPort);
+  gui->Tooltip("Decides which port the UART netcat/socat implementation listens for");
+  gui->InputInt("Power On Reason", &Config::smc.powerOnReason);
+  gui->Tooltip("17 is Power Button, 18 is Eject Button");
 }
 
 void PathSettings(Render::GUI *gui) {
@@ -744,6 +793,20 @@ void Render::GUI::OnSwap(Texture *texture) {
             const auto UserDir = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
             Xe_Main->xenos->DumpFB(UserDir / "fbmem.bin", Xe_Main->renderer->pitch);
           });
+          Button("Dump Memory", [&] {
+            const auto UserDir = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
+            const auto& path = UserDir / "memory.bin";
+            std::ofstream f(path, std::ios::out | std::ios::binary | std::ios::trunc);
+            if (!f) {
+              LOG_ERROR(Xenon, "Failed to open {} for writing", path.filename().string());
+            }
+            else {
+              RAM *ramPtr = Xe_Main->ram.get();
+              f.write(reinterpret_cast<const char*>(ramPtr->getPointerToAddress(0)), RAM_SIZE);
+              LOG_INFO(Xenon, "RAM dumped to '{}' (size: 0x{:08X})", path.string(), RAM_SIZE);
+            }
+            f.close();
+          });
         });
         // This whole section is broken
         /*TabItem("CPU", [&] {
@@ -761,6 +824,12 @@ void Render::GUI::OnSwap(Texture *texture) {
         });*/
         TabItem("Settings", [&] {
           TabBar("##settings", [&] {
+            TabItem("CPU", [&] {
+              XCPUSettings(this);
+            });
+            TabItem("SMC", [&] {
+              SMCSettings(this);
+            });
             TabItem("General", [&] {
               Button("Exit", [] {
                 Xe_Main->shutdown();
@@ -779,9 +848,6 @@ void Render::GUI::OnSwap(Texture *texture) {
             });
             TabItem("Log", [&] {
               LogSettings(this);
-            });
-            TabItem("Codeflow", [&] {
-              CodeflowSettings(this);
             });
             TabItem("Paths", [&] {
               PathSettings(this);
