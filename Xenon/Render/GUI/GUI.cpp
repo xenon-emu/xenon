@@ -517,7 +517,7 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
   gui->Node(PPUState.ppuName, [&] {
     PPU_THREAD_REGISTERS &thr0 = ppuState->ppuThread[ePPUThread_Zero];
     PPU_THREAD_REGISTERS &thr1 = ppuState->ppuThread[ePPUThread_One];
-    RenderInstr(gui, "Thr0", thr0.CIA, thr0.PI.opcode);
+    RenderInstr(gui, "Thr0", thr0.PIA, thr0.PI.opcode);
     RenderInstr(gui, "Thr0", thr0.CIA, thr0.CI.opcode);
     RenderInstr(gui, "Thr0", thr0.NIA, thr0.NI.opcode);
     gui->Separator();

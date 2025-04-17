@@ -63,6 +63,10 @@ public:
   bool imguiRender = false;
   // Thread Running
   volatile bool threadRunning = true;
+
+  bool DebuggerActive() {
+    return gui.get() && gui.get()->ppcDebuggerActive;
+  }
   
   // FB Pitch
   int pitch = 0;

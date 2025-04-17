@@ -551,16 +551,25 @@ u64 PPU::loadElfImage(u8* data, u64 size) {
 
 // Reads the next instruction from memory and advances the NIP accordingly.
 bool PPU::PPUReadNextInstruction() {
+  // Update previous instruction address
+#ifndef NO_GFX
+  curThread.PIA = curThread.NIA - 4;
+#endif
   // Update current instruction address
-  curThread.PIA = curThread.CIA;
   curThread.CIA = curThread.NIA;
   // Increase next instruction address
   curThread.NIA += 4;
   curThread.iFetch = true;
   // Fetch the instruction from memory
-  _previnstr.opcode = PPCInterpreter::MMURead32(ppuState.get(), curThread.PIA);
+#ifndef NO_GFX
+  if (Xe_Main->renderer->DebuggerActive())
+    _previnstr.opcode = PPCInterpreter::MMURead32(ppuState.get(), curThread.PIA);
+#endif
   _instr.opcode = PPCInterpreter::MMURead32(ppuState.get(), curThread.CIA);
-  _nextinstr.opcode = PPCInterpreter::MMURead32(ppuState.get(), curThread.NIA);
+#ifndef NO_GFX
+  if (Xe_Main->renderer->DebuggerActive())
+    _nextinstr.opcode = PPCInterpreter::MMURead32(ppuState.get(), curThread.NIA);
+#endif
   if (_instr.opcode == 0xFFFFFFFF) {
     LOG_CRITICAL(Xenon, "PPU{} returned a invalid opcode! Halting...", ppuState->ppuID);
     Xe_Main->getCPU()->Halt(); // Halt CPU
