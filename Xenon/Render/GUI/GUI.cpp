@@ -515,15 +515,15 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
   #define ppuState PPUStatePtr
   PPU_STATE &PPUState = *PPUStatePtr;
   gui->Node(PPUState.ppuName, [&] {
-    u32 curInstr = _instr.opcode;
-    u32 nextInstr = _nextinstr.opcode;
     PPU_THREAD_REGISTERS &thr0 = ppuState->ppuThread[ePPUThread_Zero];
     PPU_THREAD_REGISTERS &thr1 = ppuState->ppuThread[ePPUThread_One];
-    RenderInstr(gui, "Thr0", thr0.CIA, curInstr);
-    RenderInstr(gui, "Thr0", thr0.NIA, nextInstr);
+    RenderInstr(gui, "Thr0", thr0.CIA, thr0.PI.opcode);
+    RenderInstr(gui, "Thr0", thr0.CIA, thr0.CI.opcode);
+    RenderInstr(gui, "Thr0", thr0.NIA, thr0.NI.opcode);
     gui->Separator();
-    RenderInstr(gui, "Thr1", thr1.CIA, curInstr);
-    RenderInstr(gui, "Thr1", thr1.NIA, nextInstr);
+    RenderInstr(gui, "Thr1", thr1.PIA, thr1.PI.opcode);
+    RenderInstr(gui, "Thr1", thr1.CIA, thr1.CI.opcode);
+    RenderInstr(gui, "Thr1", thr1.NIA, thr1.NI.opcode);
     gui->Node("ppuThread", [&] {
       PPUThread(gui, PPUStatePtr, ePPUThread_Zero);
       PPUThread(gui, PPUStatePtr, ePPUThread_One);

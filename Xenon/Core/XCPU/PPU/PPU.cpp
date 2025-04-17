@@ -552,11 +552,13 @@ u64 PPU::loadElfImage(u8* data, u64 size) {
 // Reads the next instruction from memory and advances the NIP accordingly.
 bool PPU::PPUReadNextInstruction() {
   // Update current instruction address
+  curThread.PIA = curThread.CIA;
   curThread.CIA = curThread.NIA;
   // Increase next instruction address
   curThread.NIA += 4;
   curThread.iFetch = true;
   // Fetch the instruction from memory
+  _previnstr.opcode = PPCInterpreter::MMURead32(ppuState.get(), curThread.PIA);
   _instr.opcode = PPCInterpreter::MMURead32(ppuState.get(), curThread.CIA);
   _nextinstr.opcode = PPCInterpreter::MMURead32(ppuState.get(), curThread.NIA);
   if (_instr.opcode == 0xFFFFFFFF) {

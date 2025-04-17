@@ -554,10 +554,14 @@ union FPRegister { // Double Precision
 // This contains all registers that are duplicated per thread.
 struct PPU_THREAD_REGISTERS {
   PPU_THREAD_SPRS SPR;
+  // Previous Instruction Address
+  u64 PIA;
   // Current Instruction Address
   u64 CIA;
   // Next Instruction Address
   u64 NIA;
+  // Previous instruction data
+  PPCOpcode PI;
   // Current instruction data
   PPCOpcode CI;
   // Next instruction data

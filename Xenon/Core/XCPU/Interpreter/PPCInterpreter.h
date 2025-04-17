@@ -20,6 +20,7 @@ extern XENON_CONTEXT *intXCPUContext;
 //
 #define curThreadId   ppuState->currentThread
 #define curThread     ppuState->ppuThread[curThreadId]
+#define _previnstr    curThread.PI
 #define _instr        curThread.CI
 #define _nextinstr    curThread.NI
 #define _ex           curThread.exceptReg
