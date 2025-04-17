@@ -12,11 +12,7 @@
 #define STRIP_UNIQUE_ARR(x) std::remove_pointer_t<decltype(x.get())>[]
 
 namespace Base { extern std::atomic<bool> gSafeTerm; }
-#ifdef _WIN32
-#define SYSTEM_PAUSE() { Base::gSafeTerm = false; system("PAUSE"); }
-#else
 #define SYSTEM_PAUSE() { Base::gSafeTerm = false; printf("Press Enter to continue..."); (void)getchar(); }
-#endif
 
 // Compile time macros to get endianess
 #ifdef _MSC_VER

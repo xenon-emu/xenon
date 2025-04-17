@@ -47,6 +47,7 @@ public:
   void Window(const std::string &title, std::function<void()> callback = {}, const ImVec2 &size = {}, ImGuiWindowFlags flags = 0, bool *conditon = nullptr, const ImVec2 &position = {}, ImGuiCond cond = ImGuiCond_Once);
   void Child(const std::string &title, std::function<void()> callback = {}, const ImVec2 &size = {}, ImGuiChildFlags flags = 0, ImGuiWindowFlags windowFlags = 0);
   void Node(const std::string &title, std::function<void()> callback = {}, ImGuiTreeNodeFlags flags = 0);
+  void Separator();
   void Text(const std::string &label);
   void TextCopy(const std::string &label, const std::string &value);
   void SameLine(float xOffset = 0.f, float spacing = -1.f);

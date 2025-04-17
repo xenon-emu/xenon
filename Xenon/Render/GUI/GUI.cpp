@@ -106,6 +106,10 @@ void Render::GUI::Node(const std::string &title, std::function<void()> callback,
   }
 }
 
+void Render::GUI::Separator() {
+  ImGui::Separator();
+}
+
 void Render::GUI::Text(const std::string &label) {
   ImGui::TextUnformatted(label.c_str());
 }
@@ -474,13 +478,13 @@ void PPUThread(Render::GUI *gui, PPU_STATE *PPUState, ePPUThread threadID) {
   });
 }
 
-void RenderInstr(Render::GUI *gui, u32 addr, u32 instr) {
+void RenderInstr(Render::GUI *gui, const std::string &thread, u32 addr, u32 instr) {
   const std::string instrName = PPCInterpreter::PPCInterpreter_getFullName(instr);
   const u32 b0 = static_cast<u8>((instr >> 24) & 0xFF);
   const u32 b1 = static_cast<u8>((instr >> 16) & 0xFF);
   const u32 b2 = static_cast<u8>((instr >> 8) & 0xFF);
   const u32 b3 = static_cast<u8>((instr >> 0) & 0xFF);
-  TextFmt(gui, "{:08X} {:02X} {:02X} {:02X} {:02X}                             {}", addr, b0, b1, b2, b3, instrName);
+  TextFmt(gui, "[{}]  {:08X} {:02X} {:02X} {:02X} {:02X}                          {}", thread, addr, b0, b1, b2, b3, instrName);
 }
 
 void PPC_PPU(Render::GUI *gui, PPU *PPU) {
@@ -493,8 +497,13 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
   gui->Node(PPUState.ppuName, [&] {
     u32 curInstr = _instr.opcode;
     u32 nextInstr = _nextinstr.opcode;
-    RenderInstr(gui, curThread.CIA, curInstr);
-    RenderInstr(gui, curThread.NIA, nextInstr);
+    PPU_THREAD_REGISTERS &thr0 = ppuState->ppuThread[ePPUThread_Zero];
+    PPU_THREAD_REGISTERS &thr1 = ppuState->ppuThread[ePPUThread_One];
+    RenderInstr(gui, "Thr0", thr0.CIA, curInstr);
+    RenderInstr(gui, "Thr0", thr0.NIA, nextInstr);
+    gui->Separator();
+    RenderInstr(gui, "Thr1", thr1.CIA, curInstr);
+    RenderInstr(gui, "Thr1", thr1.NIA, nextInstr);
     gui->Node("ppuThread", [&] {
       PPUThread(gui, PPUStatePtr, ePPUThread_Zero);
       PPUThread(gui, PPUStatePtr, ePPUThread_One);
@@ -625,7 +634,7 @@ void PPCDebugger(Render::GUI *gui) {
     PPC_PPU(gui, CPU->GetPPU(0));
     PPC_PPU(gui, CPU->GetPPU(1));
     PPC_PPU(gui, CPU->GetPPU(2));
-  }, { window->Size.x - 27.5f, window->Size.y - 74.f }, ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_MenuBar);
+  }, { window->Size.x - 27.5f, window->Size.y - 76.f }, ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_MenuBar);
   ImGui::PopStyleVar(4);
 }
 

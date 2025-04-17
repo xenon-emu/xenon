@@ -115,3 +115,6 @@ public:
 
 // Global pointer
 inline std::unique_ptr<XeMain> Xe_Main{};
+
+// Global shutdown handler
+extern s32 globalShutdownHandler();
