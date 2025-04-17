@@ -93,6 +93,7 @@ Xe::PCIDev::SMC::SMCCore::SMCCore(const std::string &deviceName, u64 size,
     smcCoreState->uartHandle = std::make_unique<HW_UART_SOCK>();
 #endif
   }
+  smcCoreState->uartHandle->uartPresent = true;
 
   // Enter main execution thread.
   smcThread = std::thread(&SMCCore::smcMainThread, this);

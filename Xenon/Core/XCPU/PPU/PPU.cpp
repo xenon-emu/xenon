@@ -562,12 +562,12 @@ bool PPU::PPUReadNextInstruction() {
   curThread.iFetch = true;
   // Fetch the instruction from memory
 #ifndef NO_GFX
-  if (Xe_Main->renderer->DebuggerActive())
+  if (Xe_Main.get() && Xe_Main->renderer->DebuggerActive())
     _previnstr.opcode = PPCInterpreter::MMURead32(ppuState.get(), curThread.PIA);
 #endif
   _instr.opcode = PPCInterpreter::MMURead32(ppuState.get(), curThread.CIA);
 #ifndef NO_GFX
-  if (Xe_Main->renderer->DebuggerActive())
+  if (Xe_Main.get() && Xe_Main->renderer->DebuggerActive())
     _nextinstr.opcode = PPCInterpreter::MMURead32(ppuState.get(), curThread.NIA);
 #endif
   if (_instr.opcode == 0xFFFFFFFF) {
