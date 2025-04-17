@@ -23,18 +23,6 @@ project(Xenon)
 # Options
 option(GFX_ENABLED "Enable graphics" ON)
 
-# This function should be passed a list of all files in a target. It will automatically generate file groups
-# following the directory hierarchy, so that the layout of the files in IDEs matches the one in the filesystem.
-function(create_target_directory_groups target_name)
-  source_group("Other Files" REGULAR_EXPRESSION ".")
-  get_target_property(target_sources "${target_name}" SOURCES)
-  foreach(file_name IN LISTS target_sources)
-    get_filename_component(dir_name "${file_name}" PATH)
-    string(REPLACE "/" "\\" group_name "${dir_name}")
-    source_group("${group_name}" FILES "${file_name}")
-  endforeach()
-endfunction()
-
 
 # Set Version
 set(EMULATOR_VERSION_MAJOR "0")
