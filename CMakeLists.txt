@@ -35,9 +35,14 @@ function(create_target_directory_groups target_name)
   endforeach()
 endfunction()
 
-# Actual Version
-set(APP_VERSION "0.0.1")
-add_compile_definitions(APP_VERSION="${APP_VERSION}")
+
+# Set Version
+set(EMULATOR_VERSION_MAJOR "0")
+set(EMULATOR_VERSION_MINOR "0")
+set(EMULATOR_VERSION_PATCH "1")
+
+set_source_files_properties(Xenon/Xenon.rc PROPERTIES COMPILE_DEFINITIONS "EMULATOR_VERSION_MAJOR=${EMULATOR_VERSION_MAJOR};EMULATOR_VERSION_MINOR=${EMULATOR_VERSION_MINOR};EMULATOR_VERSION_PATCH=${EMULATOR_VERSION_PATCH}")
+add_compile_definitions(APP_VERSION="${EMULATOR_VERSION_MAJOR}.${EMULATOR_VERSION_MINOR}.${EMULATOR_VERSION_PATCH}")
 
 # COMMIT_COUNT on Xenon (with Git)
 execute_process(
@@ -266,11 +271,11 @@ add_executable(Xenon
 
 # Set compiler ID
 if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-	set(msvc TRUE)
+  set(msvc TRUE)
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-	set(gcc TRUE)
+  set(gcc TRUE)
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-	set(clang TRUE)
+  set(clang TRUE)
 endif()
 
 if (GFX_ENABLED)
@@ -292,12 +297,12 @@ endif()
 
 
 # Link libraries
+target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11)
+
 if (GFX_ENABLED)
-  target_link_libraries(Xenon PRIVATE fmt::fmt SDL3::SDL3 toml11::toml11)
   target_include_directories(Xenon PRIVATE ${IMGUI_DIR})
+  target_link_libraries(Xenon PRIVATE SDL3::SDL3)
   add_dependencies(Xenon copy-fonts)
-else()
-  target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11)
 endif()
 
 
