@@ -63,7 +63,7 @@ void _rendering::to_toml(toml::value &value) {
   value["QuitOnWindowClosure"] = quitOnWindowClosure;
   value["QuitOnWindowClosure"].comments().push_back("# Closes the process when the Renderer is destroyed");
   value["PauseOnFocusLoss"].comments().clear();
-  value["PauseOnFocusLoss"] = quitOnWindowClosure;
+  value["PauseOnFocusLoss"] = pauseOnFocusLoss;
   value["PauseOnFocusLoss"].comments().push_back("# Pauses XeLL and GUI rendering on window focus loss");
   //value["GPU"].comments().clear();
   //value["GPU"].comments().push_back("# Chooeses which GPU to use if there are multiple (Vulkan/DirectX only)");
