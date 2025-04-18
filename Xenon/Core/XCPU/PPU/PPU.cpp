@@ -214,8 +214,6 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
       // TODO(Vali0004): Change halt to be per-core or change halt continuing to be per-core
       Xe_Main->getCPU()->Halt();
     }
-    // Update status
-    canExec = ppuThreadState != eThreadState::Quiting && ppuThreadState != eThreadState::Reseting;
 
     // Read next instruction
     bool readNextInstr = false;
@@ -236,8 +234,6 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
       // Execute instruction
       PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
     }
-    // Update status
-    canExec = ppuThreadState != eThreadState::Quiting && ppuThreadState != eThreadState::Reseting;
 
     // Check if we should halt execution
     if (!canExec) {
@@ -249,23 +245,14 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
       CheckTimeBaseStatus();
     }
 
-    // Update status
-    canExec = ppuThreadState != eThreadState::Quiting && ppuThreadState != eThreadState::Reseting;
-
     // Check for external interrupts
     if (canExec && curThread.SPR.MSR.EE && xenonContext->xenonIIC.checkExtInterrupt(curThread.SPR.PIR)) {
       _ex |= PPU_EX_EXT;
     }
 
-    // Update status
-    canExec = ppuThreadState != eThreadState::Quiting && ppuThreadState != eThreadState::Reseting;
-
     // Handle pending exceptions
     if (canExec)
       PPUCheckExceptions();
-
-    // Update status
-    canExec = ppuThreadState != eThreadState::Quiting && ppuThreadState != eThreadState::Reseting;
 
     // Break after exec and if it's halted
     if (enableHalt && ppuThreadState == eThreadState::Halted || ppuThreadState != eThreadState::Quiting)
@@ -283,27 +270,19 @@ void PPU::ThreadStateMachine() {
   case eThreadState::Running: {
     // Get status, and break if needed
     canExec = ppuThreadState != eThreadState::Quiting && ppuThreadState != eThreadState::Reseting;
-    if (!canExec)
-      break;
     // Check our threads to see if any are running
     u8 state = GetCurrentRunningThreads();
-    if (canExec && state & ePPUThreadBit_Zero) {
+    if (canExec && (state & ePPUThreadBit_Zero)) {
       // Thread 0 is running, process instructions until we reach TTR timeout.
       curThreadId = ePPUThread_Zero;
-      {
-        PPURunInstructions(ppuState->SPR.TTR);
-      }
+      PPURunInstructions(ppuState->SPR.TTR);
     }
     // Get status, and break if needed
     canExec = ppuThreadState != eThreadState::Quiting && ppuThreadState != eThreadState::Reseting;
-    if (!canExec)
-      break;
-    if (canExec && state & ePPUThreadBit_One) {
+    if (canExec && (state & ePPUThreadBit_One)) {
       // Thread 1 is running, process instructions until we reach TTR timeout.
       curThreadId = ePPUThread_One;
-      {
-        PPURunInstructions(ppuState->SPR.TTR);
-      }
+      PPURunInstructions(ppuState->SPR.TTR);
     }
   } break;
   case eThreadState::Halted: {
@@ -357,7 +336,10 @@ void PPU::ThreadLoop() {
     MICROPROFILE_SCOPEI("[Xe::PPU]", "ThreadLoop", MP_AUTO);
     // Check if we should exit or not
     ppuThreadActive = ppuThreadState != eThreadState::None && ppuThreadState != eThreadState::Quiting && ppuThreadState != eThreadState::Reseting;
+
+    // Run state machine
     ThreadStateMachine();
+
     // If our thread is not active while running, abort early.
     // We are likely destroying the handle
     if (!ppuThreadActive) {
