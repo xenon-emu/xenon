@@ -3,7 +3,7 @@
 #pragma once
 
 #include <array>
-#include "Types.h"
+#include "Log_types.h"
 
 namespace Base::Log {
 

@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <list>
 
-#include "Base/Types.h"
+#include "Types.h"
 
 class LRUCache {
 private:

@@ -7,7 +7,7 @@
 #include <cstring>
 #include <format>
 
-#include "Base/Types.h"
+#include "Types.h"
 
 namespace Base {
 
@@ -138,7 +138,7 @@ inline bool Param::Initialized = false;
 inline s32 Param::Argc = 0;
 inline char **Param::Argv = nullptr;
 
-}
+} // namespace Base
 
 #define PARAM(x, desc, ...) ::Base::Param PARAM_##x(#x, false, desc, ##__VA_ARGS__)
 #define REQ_PARAM(x, desc, ...) ::Base::Param PARAM_##x(#x, true, desc, ##__VA_ARGS__)

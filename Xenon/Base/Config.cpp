@@ -5,23 +5,6 @@
 
 #include "Logging/Log.h"
 
-namespace toml {
-template <typename TC, typename K>
-std::filesystem::path find_fs_path_or(const basic_value<TC> &v, const K &ky,
-                                      std::filesystem::path opt) {
-  try {
-    const auto str = find<std::string>(v, ky);
-    if (str.empty()) {
-      return opt;
-    }
-    std::u8string u8str{(char8_t *)&str.front(), (char8_t *)&str.back() + 1};
-    return std::filesystem::path{u8str};
-  } catch (...) {
-    return opt;
-  }
-}
-} // namespace toml
-
 namespace Config {
 
 // Vali0004:

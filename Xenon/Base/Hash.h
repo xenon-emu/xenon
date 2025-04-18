@@ -4,14 +4,16 @@
 
 #include <string_view>
 
+#include "Types.h"
+
 namespace Base {
 
 inline constexpr char jTolower(char const c) {
   return (c >= 'A' && c <= 'Z') ? c + ('a' - 'A') : c;
 }
 
-inline constexpr uint32_t joaatStringHash(std::string_view string, bool const forceLowercase = true) {
-  uint32_t hash = 0;
+inline constexpr u32 joaatStringHash(const std::string_view string, bool const forceLowercase = true) {
+  u32 hash = 0;
 
   const char *str = string.data();
   while (*str != '\0') {
@@ -27,8 +29,8 @@ inline constexpr uint32_t joaatStringHash(std::string_view string, bool const fo
   return hash;
 }
 
-inline constexpr uint32_t joaatDataHash(const char *data, size_t size, const uint32_t initValue) {
-  uint32_t key = initValue;
+inline constexpr u32 joaatDataHash(const char *data, size_t size, const u32 initValue) {
+  u32 key = initValue;
   
   for (size_t i = 0; i != size; ++i) {
     key += data[i];
@@ -44,6 +46,6 @@ inline constexpr uint32_t joaatDataHash(const char *data, size_t size, const uin
 
 } // namespace Base
 
-inline consteval uint32_t operator ""_j(const char *data, size_t size) {
+inline consteval u32 operator ""_j(const char *data, size_t size) {
   return Base::joaatDataHash(data, size, 0);
 }

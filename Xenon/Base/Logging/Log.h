@@ -5,7 +5,7 @@
 #include <algorithm>
 #include <fmt/format.h>
 
-#include "Types.h"
+#include "Log_types.h"
 #include "Base/Config.h"
 
 namespace Base::Log {

@@ -25,11 +25,9 @@
 #define ftello _ftelli64
 #endif
 
-namespace Base::FS {
-
 namespace fs = std::filesystem;
 
-namespace {
+namespace Base::FS {
 
 #ifdef _WIN32
 
@@ -132,8 +130,6 @@ namespace {
     return SEEK_END;
   }
 }
-
-} // Anonymous namespace
 
 IOFile::IOFile() = default;
 
@@ -264,8 +260,7 @@ uintptr_t IOFile::GetFileMapping() {
                                  NULL, NULL, 0);
   } else {
     mapping = hfile;
-  }
-*/
+  }*/
 
   mapping = hfile;
 

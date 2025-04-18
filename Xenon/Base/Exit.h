@@ -15,7 +15,7 @@ namespace Base {
 inline std::atomic<bool> gSafeTerm{ true };
 
 // Platform independent exit (If we need to force exit, Windows handles its exit syscall differently)
-[[nodiscard]] inline s32 exit(s32 code) {
+[[nodiscard]] inline const s32 exit(const s32 code) {
 #ifdef _WIN32
   ::ExitProcess(code);
 #else
@@ -25,7 +25,7 @@ inline std::atomic<bool> gSafeTerm{ true };
 }
 
 // Platform independent force exit (If we need to force exit, Windows handles its exit syscall differently)
-[[nodiscard]] inline s32 fexit(s32 code) {
+[[nodiscard]] inline const s32 fexit(const s32 code) {
 #ifdef _WIN32
   const HANDLE process = ::GetCurrentProcess();
   if (!process) {

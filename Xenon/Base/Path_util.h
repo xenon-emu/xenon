@@ -5,9 +5,9 @@
 #include <filesystem>
 #include <vector>
 
-namespace Base::FS {
-
 namespace fs = std::filesystem;
+
+namespace Base::FS {
 
 enum class PathType {
   BinaryDir,  // Binary Path

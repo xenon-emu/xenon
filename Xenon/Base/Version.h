@@ -13,4 +13,4 @@ const std::string Version = "Experimental " APP_VERSION
 #endif
 ;
 
-}
+} // namespace Base
