@@ -21,6 +21,7 @@ let
     }
     else {};
   microprofile = fetchFromGitHub {
+    fetchSubmodules = true;
     owner = "jonasmr";
     repo = "microprofile";
     rev = "9ecdd59ca514ef56e95e9285c74f6bde4c6e1c97";
