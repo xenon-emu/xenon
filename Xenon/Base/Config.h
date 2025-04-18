@@ -54,6 +54,9 @@ inline struct _rendering {
   bool vsync = true;
   // Should we quit when our rendering window is closed?
   bool quitOnWindowClosure = true;
+  // Pause on focus loss
+  bool pauseOnFocusLoss = false;
+
   // GPU ID Selection (Only for Vulkan/DirectX)
   //s32 gpuId = -1;
 

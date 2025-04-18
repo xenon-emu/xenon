@@ -39,6 +39,8 @@ void _rendering::from_toml(const toml::value &value) {
   vsync = toml::find_or<bool>(value, "VSync", vsync);
   quitOnWindowClosure =
     toml::find_or<bool>(value, "QuitOnWindowClosure", quitOnWindowClosure);
+  pauseOnFocusLoss =
+    toml::find_or<bool>(value, "PauseOnFocusLoss", pauseOnFocusLoss);
   //gpuId = toml::find_or<s32&>(gpu, "GPU", gpuId);
 }
 void _rendering::to_toml(toml::value &value) {
@@ -60,6 +62,9 @@ void _rendering::to_toml(toml::value &value) {
   value["QuitOnWindowClosure"].comments().clear();
   value["QuitOnWindowClosure"] = quitOnWindowClosure;
   value["QuitOnWindowClosure"].comments().push_back("# Closes the process when the Renderer is destroyed");
+  value["PauseOnFocusLoss"].comments().clear();
+  value["PauseOnFocusLoss"] = quitOnWindowClosure;
+  value["PauseOnFocusLoss"].comments().push_back("# Pauses XeLL and GUI rendering on window focus loss");
   //value["GPU"].comments().clear();
   //value["GPU"].comments().push_back("# Chooeses which GPU to use if there are multiple (Vulkan/DirectX only)");
   //value["GPU"] = gpuId;
@@ -72,6 +77,7 @@ bool _rendering::verify_toml(toml::value &value) {
   cache_value(isFullscreen);
   cache_value(vsync);
   cache_value(quitOnWindowClosure);
+  cache_value(pauseOnFocusLoss);
   from_toml(value);
   verify_value(enable);
   verify_value(enableGui);
@@ -80,6 +86,7 @@ bool _rendering::verify_toml(toml::value &value) {
   verify_value(isFullscreen);
   verify_value(vsync);
   verify_value(quitOnWindowClosure);
+  verify_value(pauseOnFocusLoss);
   return true;
 }
 

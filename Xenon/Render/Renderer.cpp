@@ -8,6 +8,7 @@
 #include "GUI/Implementations/OpenGL.h"
 #include "Base/Config.h"
 #include "Base/Version.h"
+#include "Base/Thread.h"
 
 #include "Core/XGPU/XGPU.h"
 #include "Core/Xe_Main.h"
@@ -217,6 +218,8 @@ void Render::Renderer::Thread() {
     return;
   }
 
+  Base::SetCurrentThreadName("[Xe] Render");
+
   // Start exec
   Start();
 
@@ -254,9 +257,11 @@ void Render::Renderer::Thread() {
     // Exit early if needed
     if (!threadRunning || !XeRunning)
       break;
+    SDL_WindowFlags flag = SDL_GetWindowFlags(mainWindow);
+    bool inFocus = flag & SDL_WINDOW_INPUT_FOCUS && Config::rendering.pauseOnFocusLoss;
 
     // Upload buffer
-    if (fbPointer && !Xe_Main->renderHalt) {
+    if (fbPointer && !Xe_Main->renderHalt && inFocus) {
       const u32* ui_fbPointer = reinterpret_cast<u32*>(fbPointer);
       glBindBuffer(GL_SHADER_STORAGE_BUFFER, pixelBuffer);
       glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, pitch, ui_fbPointer);
@@ -275,7 +280,7 @@ void Render::Renderer::Thread() {
     }
 
     // Render the texture
-    if (!imguiRender) {
+    if (!imguiRender && inFocus) {
       glUseProgram(renderShaderProgram);
       backbuffer->Bind();
       glBindVertexArray(dummyVAO);
@@ -283,7 +288,7 @@ void Render::Renderer::Thread() {
     }
 
     // Render the GUI
-    if (Config::rendering.enableGui && gui.get() && !Xe_Main->renderHalt) {
+    if (Config::rendering.enableGui && gui.get() && !Xe_Main->renderHalt && inFocus) {
       gui->Render(backbuffer.get());
     }
     

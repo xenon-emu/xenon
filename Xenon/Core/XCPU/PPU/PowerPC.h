@@ -22,58 +22,58 @@ template<typename T, u32 I, u32 N>
 using PPCBitfield = bitfield<T, sizeof(T) * 8 - N - I, N>;
 union PPCOpcode {
   u32 opcode;
-	PPCBitfield<u32, 0, 6> main; // 0..5
-	ControlField<PPCBitfield<u32, 30, 1>, PPCBitfield<u32, 16, 5>> sh64; // 30 + 16..20
-	ControlField<PPCBitfield<u32, 26, 1>, PPCBitfield<u32, 21, 5>> mbe64; // 26 + 21..25
-	PPCBitfield<u32, 11, 5> vuimm; // 11..15
-	PPCBitfield<u32, 6, 5> vs; // 6..10
-	PPCBitfield<u32, 22, 4> vsh; // 22..25
-	PPCBitfield<u32, 21, 1> oe; // 21
-	PPCBitfield<u32, 11, 10> spr; // 11..20
-	PPCBitfield<u32, 21, 5> vc; // 21..25
+  PPCBitfield<u32, 0, 6> main; // 0..5
+  ControlField<PPCBitfield<u32, 30, 1>, PPCBitfield<u32, 16, 5>> sh64; // 30 + 16..20
+  ControlField<PPCBitfield<u32, 26, 1>, PPCBitfield<u32, 21, 5>> mbe64; // 26 + 21..25
+  PPCBitfield<u32, 11, 5> vuimm; // 11..15
+  PPCBitfield<u32, 6, 5> vs; // 6..10
+  PPCBitfield<u32, 22, 4> vsh; // 22..25
+  PPCBitfield<u32, 21, 1> oe; // 21
+  PPCBitfield<u32, 11, 10> spr; // 11..20
+  PPCBitfield<u32, 21, 5> vc; // 21..25
   PPCBitfield<u32, 21, 11> xo; // 21..30
-	PPCBitfield<u32, 16, 5> vb; // 16..20
-	PPCBitfield<u32, 11, 5> va; // 11..15
-	PPCBitfield<u32, 6, 5> vd; // 6..10
-	PPCBitfield<u32, 31, 1> lk; // 31
-	PPCBitfield<u32, 30, 1> aa; // 30
-	PPCBitfield<u32, 16, 5> rb; // 16..20
-	PPCBitfield<u32, 11, 5> ra; // 11..15
-	PPCBitfield<u32, 6, 5> rd; // 6..10
-	PPCBitfield<u32, 16, 16> uimm16; // 16..31
-	PPCBitfield<u32, 11, 1> l11; // 11
-	PPCBitfield<u32, 6, 5> rs; // 6..10
-	PPCBitfield<s32, 16, 16> simm16; // 16..31, signed
-	PPCBitfield<s32, 16, 14> ds; // 16..29, signed
-	PPCBitfield<s32, 11, 5> vsimm; // 11..15, signed
-	PPCBitfield<s32, 6, 26> ll; // 6..31, signed
-	PPCBitfield<s32, 6, 24> li; // 6..29, signed
-	PPCBitfield<u32, 20, 7> lev; // 20..26
-	PPCBitfield<u32, 16, 4> i; // 16..19
-	PPCBitfield<u32, 11, 3> crfs; // 11..13
-	PPCBitfield<u32, 10, 1> l10; // 10
-	PPCBitfield<u32, 6, 3> crfd; // 6..8
-	PPCBitfield<u32, 16, 5> crbb; // 16..20
-	PPCBitfield<u32, 11, 5> crba; // 11..15
-	PPCBitfield<u32, 6, 5> crbd; // 6..10
-	PPCBitfield<u32, 31, 1> rc; // 31
-	PPCBitfield<u32, 26, 5> me32; // 26..30
-	PPCBitfield<u32, 21, 5> mb32; // 21..25
-	PPCBitfield<u32, 16, 5> sh32; // 16..20
-	PPCBitfield<u32, 11, 5> bi; // 11..15
-	PPCBitfield<u32, 6, 5> bo; // 6..10
-	PPCBitfield<u32, 19, 2> bh; // 19..20
-	PPCBitfield<u32, 21, 5> frc; // 21..25
-	PPCBitfield<u32, 16, 5> frb; // 16..20
-	PPCBitfield<u32, 11, 5> fra; // 11..15
-	PPCBitfield<u32, 6, 5> frd; // 6..10
-	PPCBitfield<u32, 12, 8> crm; // 12..19
-	PPCBitfield<u32, 6, 5> frs; // 6..10
-	PPCBitfield<u32, 7, 8> flm; // 7..14
-	PPCBitfield<u32, 6, 1> l6; // 6
-	PPCBitfield<u32, 15, 1> l15; // 15
-	ControlField<PPCBitfield<s32, 16, 14>, FixedField<u32, 0, 2>> bt14;
-	ControlField<PPCBitfield<s32, 6, 24>, FixedField<u32, 0, 2>> bt24;
+  PPCBitfield<u32, 16, 5> vb; // 16..20
+  PPCBitfield<u32, 11, 5> va; // 11..15
+  PPCBitfield<u32, 6, 5> vd; // 6..10
+  PPCBitfield<u32, 31, 1> lk; // 31
+  PPCBitfield<u32, 30, 1> aa; // 30
+  PPCBitfield<u32, 16, 5> rb; // 16..20
+  PPCBitfield<u32, 11, 5> ra; // 11..15
+  PPCBitfield<u32, 6, 5> rd; // 6..10
+  PPCBitfield<u32, 16, 16> uimm16; // 16..31
+  PPCBitfield<u32, 11, 1> l11; // 11
+  PPCBitfield<u32, 6, 5> rs; // 6..10
+  PPCBitfield<s32, 16, 16> simm16; // 16..31, signed
+  PPCBitfield<s32, 16, 14> ds; // 16..29, signed
+  PPCBitfield<s32, 11, 5> vsimm; // 11..15, signed
+  PPCBitfield<s32, 6, 26> ll; // 6..31, signed
+  PPCBitfield<s32, 6, 24> li; // 6..29, signed
+  PPCBitfield<u32, 20, 7> lev; // 20..26
+  PPCBitfield<u32, 16, 4> i; // 16..19
+  PPCBitfield<u32, 11, 3> crfs; // 11..13
+  PPCBitfield<u32, 10, 1> l10; // 10
+  PPCBitfield<u32, 6, 3> crfd; // 6..8
+  PPCBitfield<u32, 16, 5> crbb; // 16..20
+  PPCBitfield<u32, 11, 5> crba; // 11..15
+  PPCBitfield<u32, 6, 5> crbd; // 6..10
+  PPCBitfield<u32, 31, 1> rc; // 31
+  PPCBitfield<u32, 26, 5> me32; // 26..30
+  PPCBitfield<u32, 21, 5> mb32; // 21..25
+  PPCBitfield<u32, 16, 5> sh32; // 16..20
+  PPCBitfield<u32, 11, 5> bi; // 11..15
+  PPCBitfield<u32, 6, 5> bo; // 6..10
+  PPCBitfield<u32, 19, 2> bh; // 19..20
+  PPCBitfield<u32, 21, 5> frc; // 21..25
+  PPCBitfield<u32, 16, 5> frb; // 16..20
+  PPCBitfield<u32, 11, 5> fra; // 11..15
+  PPCBitfield<u32, 6, 5> frd; // 6..10
+  PPCBitfield<u32, 12, 8> crm; // 12..19
+  PPCBitfield<u32, 6, 5> frs; // 6..10
+  PPCBitfield<u32, 7, 8> flm; // 7..14
+  PPCBitfield<u32, 6, 1> l6; // 6
+  PPCBitfield<u32, 15, 1> l15; // 15
+  ControlField<PPCBitfield<s32, 16, 14>, FixedField<u32, 0, 2>> bt14;
+  ControlField<PPCBitfield<s32, 6, 24>, FixedField<u32, 0, 2>> bt24;
 };
 
 //
