@@ -446,7 +446,11 @@ void PPUThread(Render::GUI *gui, PPU_STATE *PPUState, ePPUThread threadID) {
       BFHex(gui, FPSCR, VXSQRT);
       BFHex(gui, FPSCR, VXSOFT);
       BFHex(gui, FPSCR, R0);
-      BFHex(gui, FPSCR, FPRF);
+      BFHex(gui, FPSCR, C);
+      BFHex(gui, FPSCR, FG);
+      BFHex(gui, FPSCR, FL);
+      BFHex(gui, FPSCR, FE);
+      BFHex(gui, FPSCR, FU);
       BFHex(gui, FPSCR, FI);
       BFHex(gui, FPSCR, FR);
       BFHex(gui, FPSCR, VXVC);
