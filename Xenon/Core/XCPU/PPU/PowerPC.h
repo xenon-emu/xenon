@@ -155,7 +155,11 @@ union FPSCRegister {
     u32 VXSQRT : 1;
     u32 VXSOFT : 1;
     u32 R0 : 1;
-    u32 FPRF : 5;
+    u32 C : 1;  // FPRF Field.
+    u32 FL : 1;
+    u32 FG : 1;
+    u32 FE : 1;
+    u32 FU : 1;
     u32 FI : 1;
     u32 FR : 1;
     u32 VXVC : 1;

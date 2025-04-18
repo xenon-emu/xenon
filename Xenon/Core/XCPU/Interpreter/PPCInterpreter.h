@@ -32,7 +32,7 @@ extern XENON_CONTEXT *intXCPUContext;
 // Floating Point helpers
 //
 #define FPR(x)        curThread.FPR[x]
-#define FPRi(x)        curThread.FPR[_instr.x]
+#define FPRi(x)       curThread.FPR[_instr.x]
 #define GET_FPSCR     curThread.FPSCR.FPSCR_Hex
 #define SET_FPSCR(x)  curThread.FPSCR.FPSCR_Hex = x
 
@@ -83,6 +83,9 @@ inline void ppuSetCR(PPU_STATE* ppuState, u32 crField, const T& a, const T& b)
 {
   ppuSetCR(ppuState, crField, a < b, a > b, a == b, curThread.SPR.XER.SO);
 }
+
+// Update FPSCR FPCC bits and CR if requested. Default CR to be updated is 1.
+void ppuUpdateFPSCR(PPU_STATE* ppuState, f64 op0, f64 op1, bool updateCR, u8 CR = 1);
 
 // Compare Unsigned
 u32 CRCompU(PPU_STATE *ppuState, u64 num1, u64 num2);

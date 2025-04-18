@@ -28,18 +28,12 @@ D_STUBRC(fadd)
 D_STUBRC(fsub)
 D_STUBRC(fctid)
 D_STUBRC(fctidz)
-D_STUBRC(fcfid)
 D_STUBRC(fctiw)
 D_STUBRC(fctiwz)
-D_STUBRC(fadds)
-D_STUBRC(fsubs)
 D_STUBRC(fdiv)
-D_STUBRC(fdivs)
-D_STUBRC(fmr)
 D_STUBRC(fmadds)
 D_STUBRC(fmsubs)
 D_STUBRC(fmul)
-D_STUBRC(fmuls)
 D_STUBRC(fnmsub)
 D_STUBRC(fnmsubs)
 D_STUBRC(fnmadd)
@@ -49,7 +43,6 @@ D_STUBRC(fmsub)
 D_STUBRC(fneg)
 D_STUBRC(fsel)
 D_STUBRC(fres)
-D_STUBRC(frsp)
 D_STUBRC(fabs)
 D_STUBRC(fnabs)
 D_STUBRC(fsqrt)
@@ -91,7 +84,6 @@ D_STUB(stfdux)
 D_STUB(stfiwx)
 D_STUB(stvebx)
 D_STUB(fcmpo)
-D_STUB(fcmpu)
 D_STUB(stvx)
 D_STUB(stvxl)
 D_STUB(stvrx)
@@ -400,6 +392,14 @@ extern void PPCInterpreter_icbi(PPU_STATE *ppuState);
 //
 // FPU
 //
+extern void PPCInterpreter_faddsx(PPU_STATE *ppuState);
+extern void PPCInterpreter_fcmpu(PPU_STATE *ppuState);
+extern void PPCInterpreter_fcfidx(PPU_STATE *ppuState);
+extern void PPCInterpreter_fdivsx(PPU_STATE *ppuState);
+extern void PPCInterpreter_fmulsx(PPU_STATE *ppuState);
+extern void PPCInterpreter_fmrx(PPU_STATE *ppuState);
+extern void PPCInterpreter_frspx(PPU_STATE *ppuState);
+extern void PPCInterpreter_fsubsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_mffsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_mtfsfx(PPU_STATE *ppuState);
 
