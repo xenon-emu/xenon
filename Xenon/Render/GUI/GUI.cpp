@@ -670,6 +670,9 @@ void PPCDebugger(Render::GUI *gui) {
 void LogSettings(Render::GUI *gui) {
   static int logLevel = static_cast<int>(Config::log.currentLevel);
   gui->Toggle("Advanced", &Config::log.advanced);
+  gui->Tooltip("Enables more advanced logging ");
+  gui->Toggle("Debug Only", &Config::log.debugOnly);
+  gui->Tooltip("Enables heavy logging for Debug purposes. Do not enable, causes extreme preformance loss");
 }
 
 void GraphicsSettings(Render::GUI *gui) {

@@ -251,7 +251,6 @@ set(XGPU
 )
 
 set(Core
-    ${microprofile}
     ${NAND}
     ${RAM}
     ${Render}
@@ -265,6 +264,7 @@ set(Core
 add_executable(Xenon
     ${Base}
     ${Core}
+    ${microprofile}
     Xenon/Main.cpp
 )
 

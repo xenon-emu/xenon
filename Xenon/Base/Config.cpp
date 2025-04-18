@@ -41,7 +41,7 @@ void _rendering::from_toml(const toml::value &value) {
     toml::find_or<bool>(value, "QuitOnWindowClosure", quitOnWindowClosure);
   pauseOnFocusLoss =
     toml::find_or<bool>(value, "PauseOnFocusLoss", pauseOnFocusLoss);
-  //gpuId = toml::find_or<s32&>(gpu, "GPU", gpuId);
+  gpuId = toml::find_or<s32&>(value, "GPU", gpuId);
 }
 void _rendering::to_toml(toml::value &value) {
   value["Enable"].comments().clear();
@@ -65,9 +65,9 @@ void _rendering::to_toml(toml::value &value) {
   value["PauseOnFocusLoss"].comments().clear();
   value["PauseOnFocusLoss"] = pauseOnFocusLoss;
   value["PauseOnFocusLoss"].comments().push_back("# Pauses XeLL and GUI rendering on window focus loss");
-  //value["GPU"].comments().clear();
-  //value["GPU"].comments().push_back("# Chooeses which GPU to use if there are multiple (Vulkan/DirectX only)");
-  //value["GPU"] = gpuId;
+  value["GPU"].comments().clear();
+  value["GPU"].comments().push_back("# Chooeses which GPU to use if there are multiple (Vulkan/DirectX only)");
+  value["GPU"] = gpuId;
 }
 bool _rendering::verify_toml(toml::value &value) {
   to_toml(value);
@@ -195,12 +195,14 @@ void _smc::to_toml(toml::value &value) {
   value["UARTSystem"] = uartSystem;
   value["UARTSystem"].comments().push_back("# UART System");
   value["UARTSystem"].comments().push_back("# vcom is vCOM, only present on Windows");
-  value["UARTSystem"].comments().push_back("# socket is Socket, avaliable via Netcat/Socat");
+  value["UARTSystem"].comments().push_back("# socket is Socket, avaliable via Netcat/Socat (netcat -lvnp 7000)");
   value["UARTSystem"].comments().push_back("# print is Printf, directly to log");
 #ifdef _WIN32
   value["COMPort"].comments().clear();
   value["COMPort"] = comPort;
-  value["COMPort"].comments().push_back("# Current vCOM Port used for communication between Xenon and your PC");
+  value["COMPort"].comments().push_back("# Virtual COM port or Loopback COM device used for UART");
+  value["COMPort"].comments().push_back("# Do not modify if you do not have a Virtual COM driver");
+  value["COMPort"].comments().push_back("# Modify UARTSystem to use 'print' if you do not have netcat (a socket listener), otherwise use 'socket' (netcat -lvnp 7000)");
 #endif
   value["SocketIP"].comments().clear();
   value["SocketIP"] = socketIp;
