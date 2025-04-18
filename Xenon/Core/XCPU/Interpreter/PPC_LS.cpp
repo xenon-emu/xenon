@@ -1037,7 +1037,7 @@ void PPCInterpreter::PPCInterpreter_lfd(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  FPRi(frd).valueAsU64 = data;
+  FPRi(frd).valueAsDouble = static_cast<double>(data);
 }
 
 // Load Floating-Point Double-Indexed (x'C800 0000')
@@ -1057,7 +1057,7 @@ void PPCInterpreter::PPCInterpreter_lfdx(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  FPRi(frd).valueAsU64 = data;
+  FPRi(frd).valueAsDouble = static_cast<double>(data);
 }
 
 // Load Floating-Point Double with Update
@@ -1076,7 +1076,7 @@ void PPCInterpreter::PPCInterpreter_lfdu(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  FPRi(frd).valueAsU64 = data;
+  FPRi(frd).valueAsDouble = static_cast<double>(data);
   GPRi(ra) = EA;
 }
 
@@ -1096,7 +1096,7 @@ void PPCInterpreter::PPCInterpreter_lfdux(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  FPRi(frd).valueAsU64 = data;
+  FPRi(frd).valueAsDouble = static_cast<double>(data);
   GPRi(ra) = EA;
 }
 
@@ -1112,10 +1112,11 @@ void PPCInterpreter::PPCInterpreter_lfs(PPU_STATE *ppuState) {
   ASSERT(curThread.SPR.MSR.FP == 1);
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  u32 data = MMURead32(ppuState, EA);
+  SFPRegister singlePresFP;
+  singlePresFP.valueAsU32 = MMURead32(ppuState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  FPRi(frd).valueAsU64 = data;
+  FPRi(frd).valueAsDouble = static_cast<double>(singlePresFP.valueAsFloat);
 }
