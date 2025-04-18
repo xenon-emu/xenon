@@ -156,10 +156,6 @@ void main() {
   if (texel_pos.x >= resWidth || texel_pos.y >= resHeight)
     return;
 
-  // Precalc whatever it would be with extra sizing for 32x32 tiles
-  const int tiledWidth = TILE(internalWidth);
-  const int tiledHeight = TILE(internalHeight);
-
   // Scale accordingly
   float scaleX = internalWidth / float(resWidth);
   float scaleY = internalHeight / float(resHeight);
