@@ -785,7 +785,9 @@ void Render::GUI::OnSwap(Texture *texture) {
             PPCDebugger(this);
           }
         });
+#if defined(MICROPROFILE_ENABLED) && MICROPROFILE_ENABLED
         TabItem("Profiler", [&] {
+#ifdef MICROPROFILE_WEBSERVER
           Button("Open", [&] {
             std::string url = fmt::format("http://127.0.0.1:{}/", MicroProfileWebServerPort());
 #ifdef _WIN32
@@ -795,8 +797,11 @@ void Render::GUI::OnSwap(Texture *texture) {
             int result = std::system(command.c_str());
 #endif
           });
-          //TODO: Impl some system to display it in ImGui
+#else
+          //TODO: Implement some system to display it in ImGui
+#endif
         });
+#endif
         TabItem("Dump", [&] {
           Button("Dump FB", [&] {
             const auto UserDir = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
