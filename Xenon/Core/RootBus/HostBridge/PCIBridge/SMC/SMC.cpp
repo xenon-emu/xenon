@@ -4,6 +4,7 @@
 
 #include "Base/Logging/Log.h"
 #include "Base/Error.h"
+#include "Base/Thread.h"
 
 #include "HANA_State.h"
 #include "SMC_Config.h"
@@ -355,7 +356,7 @@ void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
 
 // SMC Main Thread
 void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
-  LOG_INFO(SMC, "Entered main thread.");
+  Base::SetCurrentThreadName("[Xe] SMC");
   // Set FIFO_IN_STATUS_REG to FIFO_STATUS_READY to indicate we are ready to
   // receive a message.
   smcPCIState.fifoInStatusReg = FIFO_STATUS_READY;

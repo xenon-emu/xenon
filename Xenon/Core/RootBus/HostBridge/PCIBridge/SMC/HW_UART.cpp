@@ -3,9 +3,11 @@
 #include "HW_UART.h"
 
 #include "Base/Error.h"
+#include "Base/Thread.h"
 
 // UART Thread
 void HW_UART_SOCK::uartMainThread() {
+  Base::SetCurrentThreadName("[Xe::SMC::UART] Transfer");
   if (uartInitialized) {
     LOG_INFO(SMC, "UART Initialized Successfully!");
   }
@@ -25,6 +27,7 @@ void HW_UART_SOCK::uartMainThread() {
 
 // UART Receive Thread
 void HW_UART_SOCK::uartReceiveThread() {
+  Base::SetCurrentThreadName("[Xe::SMC::UART] Receive");
   while (uartThreadRunning) {
     std::unique_lock<std::mutex> lock(uartMutex);
     char c = -1;

@@ -258,7 +258,10 @@ void Render::Renderer::Thread() {
     if (!threadRunning || !XeRunning)
       break;
     SDL_WindowFlags flag = SDL_GetWindowFlags(mainWindow);
-    bool inFocus = flag & SDL_WINDOW_INPUT_FOCUS && Config::rendering.pauseOnFocusLoss;
+    bool inFocus = flag & SDL_WINDOW_INPUT_FOCUS;
+    if (!Config::rendering.pauseOnFocusLoss) {
+      inFocus = true;
+    }
 
     // Upload buffer
     if (fbPointer && !Xe_Main->renderHalt && inFocus) {

@@ -4,6 +4,7 @@
 
 #include "Base/Logging/Log.h"
 #include "Base/Config.h"
+#include "Base/Thread.h"
 
 #define SFCX_DEBUG
 
@@ -471,6 +472,7 @@ void SFCX::ConfigWrite(u64 writeAddress, const u8* data, u64 size) {
 }
 
 void SFCX::sfcxMainLoop() {
+  Base::SetCurrentThreadName("[Xe::SFCX] Main");
   // Config register should be initialized by now.
   while (sfcxThreadRunning) {
     // Did we got a command?
