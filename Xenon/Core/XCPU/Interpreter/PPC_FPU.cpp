@@ -50,6 +50,19 @@ void PPCInterpreter::ppuUpdateFPSCR(PPU_STATE *ppuState, f64 op0, f64 op1, bool 
   }
 }
 
+// Floating Add (Double-Precision) (x'FC00 002A')
+void PPCInterpreter::PPCInterpreter_faddx(PPU_STATE* ppuState) {
+  /*
+  frD <- (frA) + (frB)
+  */
+
+  checkFpuAvailable(ppuState);
+
+  FPRi(frd).valueAsDouble = FPRi(fra).valueAsDouble + FPRi(frb).valueAsDouble;
+
+  ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
+}
+
 // Floating Add Single (x'EC00 002A')
 void PPCInterpreter::PPCInterpreter_faddsx(PPU_STATE *ppuState) {
   /*
@@ -58,7 +71,7 @@ void PPCInterpreter::PPCInterpreter_faddsx(PPU_STATE *ppuState) {
 
   checkFpuAvailable(ppuState);
 
-  FPRi(frd).valueAsDouble = FPRi(fra).valueAsDouble + FPRi(frb).valueAsDouble;
+  FPRi(frd).valueAsDouble = static_cast<f32>(FPRi(fra).valueAsDouble + FPRi(frb).valueAsDouble);
 
   ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
 }
@@ -112,6 +125,19 @@ void PPCInterpreter::PPCInterpreter_fdivsx(PPU_STATE *ppuState) {
   ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
 }
 
+// Floating Multiply (Double-Precision) (x’FC00 0032’)
+void PPCInterpreter::PPCInterpreter_fmulx(PPU_STATE* ppuState) {
+  /*
+  frD <- (frA) * (frC)
+  */
+
+  checkFpuAvailable(ppuState);
+
+  FPRi(frd).valueAsDouble = FPRi(fra).valueAsDouble * FPRi(frc).valueAsDouble;
+
+  ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
+}
+
 // Floating Multiply Single (x'EC00 0032')
 void PPCInterpreter::PPCInterpreter_fmulsx(PPU_STATE *ppuState) {
   /*
@@ -120,7 +146,7 @@ void PPCInterpreter::PPCInterpreter_fmulsx(PPU_STATE *ppuState) {
 
   checkFpuAvailable(ppuState);
 
-  FPRi(frd).valueAsDouble = FPRi(fra).valueAsDouble * FPRi(frc).valueAsDouble;
+  FPRi(frd).valueAsDouble = static_cast<f32>(FPRi(fra).valueAsDouble * FPRi(frc).valueAsDouble);
 
   ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
 }
@@ -148,7 +174,20 @@ void PPCInterpreter::PPCInterpreter_frspx(PPU_STATE *ppuState) {
 
   checkFpuAvailable(ppuState);
 
-  FPRi(frd).valueAsDouble = f32(FPRi(frb).valueAsDouble);
+  FPRi(frd).valueAsDouble = static_cast<f32>(FPRi(frb).valueAsDouble);
+
+  ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
+}
+
+// Floating Subtract (Double-Precision) (x'FC00 0028')
+void PPCInterpreter::PPCInterpreter_fsubx(PPU_STATE* ppuState) {
+  /*
+    frD <- (frA) - (frB)
+    */
+
+  checkFpuAvailable(ppuState);
+
+  FPRi(frd).valueAsDouble = FPRi(fra).valueAsDouble - FPRi(frb).valueAsDouble;
 
   ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
 }
@@ -161,7 +200,7 @@ void PPCInterpreter::PPCInterpreter_fsubsx(PPU_STATE *ppuState) {
 
   checkFpuAvailable(ppuState);
 
-  FPRi(frd).valueAsDouble = FPRi(fra).valueAsDouble - FPRi(frb).valueAsDouble;
+  FPRi(frd).valueAsDouble = static_cast<f32>(FPRi(fra).valueAsDouble - FPRi(frb).valueAsDouble);
 
   ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
 }
