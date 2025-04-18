@@ -1,6 +1,10 @@
 #pragma once
 #include <filesystem>
+
+#ifdef _DEBUG
 #define MICROPROFILE_ENABLED 1
+#endif
+
 #if defined(MICROPROFILE_ENABLED) && MICROPROFILE_ENABLED == 1
 #define MICROPROFILE_WEBSERVER 1
 #endif
