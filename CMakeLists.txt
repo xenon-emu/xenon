@@ -167,6 +167,7 @@ set(XCPU
     Xenon/Core/XCPU/Bitfield.h
     Xenon/Core/XCPU/Xenon.cpp
     Xenon/Core/XCPU/Xenon.h
+    Xenon/Core/XCPU/XenonSOC.h
     Xenon/Core/XCPU/XenonReservations.cpp
     Xenon/Core/XCPU/XenonReservations.h
     Xenon/Core/XCPU/eFuse.h
