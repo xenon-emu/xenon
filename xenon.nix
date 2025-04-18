@@ -24,7 +24,7 @@ let
     owner = "jonasmr";
     repo = "microprofile";
     rev = "9ecdd59ca514ef56e95e9285c74f6bde4c6e1c97";
-    hash = lib.fakeHash;
+    hash = "sha256-QGIOh1tjeboJ7HviX4wosd9UaY54A6N759zyj2zg05o=";
   };
 in
 stdenv.mkDerivation {
