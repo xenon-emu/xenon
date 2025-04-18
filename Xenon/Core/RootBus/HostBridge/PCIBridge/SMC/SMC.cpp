@@ -90,7 +90,7 @@ Xe::PCIDev::SMC::SMCCore::SMCCore(const std::string &deviceName, u64 size,
 #ifdef _WIN32
     smcCoreState->uartHandle = std::make_unique<HW_UART_VCOM>();
 #else
-    LOG_CRITICAL(SMC, "[UART] Invalid UART type! Defaulting to print");
+    LOG_CRITICAL(UART, "Invalid UART type! Defaulting to print");
     smcCoreState->uartHandle = std::make_unique<HW_UART_SOCK>();
 #endif
   }
@@ -329,7 +329,7 @@ void Xe::PCIDev::SMC::SMCCore::ConfigWrite(u64 writeAddress, const u8 *data, u64
 
 // Setups the UART Communication at a given configuration.
 void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
-  LOG_INFO(SMC, "[UART] Initializing...");
+  LOG_INFO(UART, "Initializing...");
   bool socket = smcCoreState->currentUARTSytem == "vcom" ? false : true;
   if (socket) {
     HW_UART_SOCK_CONFIG *config = new HW_UART_SOCK_CONFIG();
@@ -344,7 +344,7 @@ void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
     config->config = uartConfig;
     smcCoreState->uartHandle->Init(config);
 #else
-    LOG_CRITICAL(SMC, "[UART] Invalid UART type! Defaulting to print");
+    LOG_CRITICAL(UART, "Invalid UART type! Defaulting to print");
     HW_UART_SOCK_CONFIG *config = new HW_UART_SOCK_CONFIG();
     strncpy(config->ip, smcCoreState->socketIp.c_str(), sizeof(config->ip));
     config->port = smcCoreState->socketPort;
@@ -366,6 +366,7 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
       std::chrono::steady_clock::now();
 
   while (smcThreadRunning) {
+    MICROPROFILE_SCOPEI("[Xe::PCI]", "SMC::Loop", MP_AUTO);
     // The System Management Controller (SMC) does the following:
     // * Communicates over a FIFO Queue with the kernel to execute commands and
     // provide system info.

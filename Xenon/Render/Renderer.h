@@ -59,8 +59,6 @@ public:
   bool VSYNC = true;
   // Is Fullscreen
   bool fullscreen = false;
-  // Render in ImGui
-  bool imguiRender = false;
   // Thread Running
   volatile bool threadRunning = true;
 

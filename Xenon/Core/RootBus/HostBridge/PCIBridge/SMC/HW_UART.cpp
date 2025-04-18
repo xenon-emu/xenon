@@ -59,7 +59,7 @@ void HW_UART_SOCK::Init(void *uartConfig) {
 #ifdef _WIN32
     int start = WSAStartup(MAKEWORD(2, 2), &wsaData);
     if (start != 0) {
-      LOG_CRITICAL(SMC, "[UART] UART type 'socket' failed!\nWSAStartup returned a non-zero value! See error below.\n{}", start);
+      LOG_CRITICAL(UART, "UART type 'socket' failed!\nWSAStartup returned a non-zero value! See error below.\n{}", start);
       socketCreated = false;
       SYSTEM_PAUSE();
     }
@@ -67,14 +67,14 @@ void HW_UART_SOCK::Init(void *uartConfig) {
     sockHandle = socket(AF_INET, SOCK_STREAM, 0);
     int socketConnect = connect(sockHandle, (struct sockaddr*)&sockAddr, sizeof(sockAddr));
     if (socketConnect != 0) {
-      LOG_CRITICAL(SMC, "[UART] Failed to connect to socket! See error below.\n{}", Base::GetLastErrorMsg());
+      LOG_CRITICAL(UART, "Failed to connect to socket! See error below.\n{}", Base::GetLastErrorMsg());
       socketCreated = false;
       SYSTEM_PAUSE();
     }
     if (!socketCreated) {
       socketConnect = connect(sockHandle, (struct sockaddr*)&sockAddr, sizeof(sockAddr));
       if (socketConnect != 0) {
-        LOG_CRITICAL(SMC, "[UART] (x2) Failed to connect to socket! See error below. \n{}", Base::GetLastErrorMsg());
+        LOG_CRITICAL(UART, "(x2) Failed to connect to socket! See error below. \n{}", Base::GetLastErrorMsg());
         socketclose(sockHandle);
         SYSTEM_PAUSE();
       } else {
@@ -179,8 +179,8 @@ void HW_UART_VCOM::Init(void *uartConfig) {
   comPortHandle = CreateFileA(vcom->selectedComPort, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
 
   if (comPortHandle == INVALID_HANDLE_VALUE) {
-    LOG_ERROR(SMC, "[UART] CreateFile failed! See error below.\n{}", Base::GetLastErrorMsg());
-    LOG_ERROR(SMC, "[UART] Make sure you have a valid COM loopback device, or a vCOM driver with an avaliable port");
+    LOG_ERROR(UART, "CreateFile failed! See error below.\n{}", Base::GetLastErrorMsg());
+    LOG_ERROR(UART, "Make sure you have a valid COM loopback device, or a vCOM driver with an avaliable port");
     uartPresent = false;
     return;
   } else {
@@ -189,7 +189,7 @@ void HW_UART_VCOM::Init(void *uartConfig) {
 
   // Set The COM Port State as per config value
   if (!SetCommState(comPortHandle, &comPortDCB)) {
-    LOG_ERROR(SMC, "[UART] SetCommState failed with error {}", Base::GetLastErrorMsg());
+    LOG_ERROR(UART, "SetCommState failed with error {}", Base::GetLastErrorMsg());
   }
 
   // Everything init'd

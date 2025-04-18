@@ -14,3 +14,6 @@
 	path = third_party/ImGui
 	url = https://github.com/ocornut/imgui
 	branch = docking
+[submodule "third_party/microprofile"]
+	path = third_party/microprofile
+	url = https://github.com/jonasmr/microprofile.git

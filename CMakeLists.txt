@@ -58,6 +58,9 @@ if (NOT "${COMMIT_COUNT}" STREQUAL "" AND NOT "${BRANCH}" STREQUAL "")
   endif()
 endif()
 
+# Make microprofile use a custom config
+add_compile_definitions(MICROPROFILE_USE_CONFIG)
+
 
 # Include third_party and Packages
 if (GFX_ENABLED)
@@ -195,32 +198,32 @@ set(XCPU
 )
 
 if (GFX_ENABLED)
-  set(IMGUI_DIR third_party/ImGui)
-  set(IMGUI
-      ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
-      ${IMGUI_DIR}/backends/imgui_impl_opengl3.h
-      ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
-      ${IMGUI_DIR}/backends/imgui_impl_sdl3.h
-      ${IMGUI_DIR}/imconfig.h
-      ${IMGUI_DIR}/imgui.cpp
-      ${IMGUI_DIR}/imgui.h
-      ${IMGUI_DIR}/imgui_demo.cpp
-      ${IMGUI_DIR}/imgui_internal.h
-      ${IMGUI_DIR}/imgui_draw.cpp
-      ${IMGUI_DIR}/imgui_tables.cpp
-      ${IMGUI_DIR}/imgui_widgets.cpp
-      ${IMGUI_DIR}/imstb_rectpack.h
-      ${IMGUI_DIR}/imstb_textedit.h
-      ${IMGUI_DIR}/imstb_truetype.h
+  set(ImGui_Dir third_party/ImGui)
+  set(ImGui
+      ${ImGui_Dir}/backends/imgui_impl_opengl3.cpp
+      ${ImGui_Dir}/backends/imgui_impl_opengl3.h
+      ${ImGui_Dir}/backends/imgui_impl_sdl3.cpp
+      ${ImGui_Dir}/backends/imgui_impl_sdl3.h
+      ${ImGui_Dir}/imconfig.h
+      ${ImGui_Dir}/imgui.cpp
+      ${ImGui_Dir}/imgui.h
+      ${ImGui_Dir}/imgui_demo.cpp
+      ${ImGui_Dir}/imgui_internal.h
+      ${ImGui_Dir}/imgui_draw.cpp
+      ${ImGui_Dir}/imgui_tables.cpp
+      ${ImGui_Dir}/imgui_widgets.cpp
+      ${ImGui_Dir}/imstb_rectpack.h
+      ${ImGui_Dir}/imstb_textedit.h
+      ${ImGui_Dir}/imstb_truetype.h
   )
 
-  set(OPENGL
+  set(OpenGL
       third_party/glad/src/glad.c
   )
 
-  set(RENDER
-      ${OPENGL}
-      ${IMGUI}
+  set(Render
+      ${OpenGL}
+      ${ImGui}
       Xenon/Render/Abstractions/Texture.h
       Xenon/Render/Implementations/OGLTexture.cpp
       Xenon/Render/Implementations/OGLTexture.h
@@ -232,6 +235,13 @@ if (GFX_ENABLED)
       Xenon/Render/Renderer.h
   )
 endif()
+set(microprofile_dir third_party/microprofile)
+set(microprofile
+    Xenon/include/microprofile.config.h
+    ${microprofile_dir}/microprofile.cpp
+    ${microprofile_dir}/microprofile.h
+    ${microprofile_dir}/microprofile_html.h
+)
 
 set(XGPU
     Xenon/Core/XGPU/XGPU.cpp
@@ -241,9 +251,10 @@ set(XGPU
 )
 
 set(Core
+    ${microprofile}
     ${NAND}
     ${RAM}
-    ${RENDER}
+    ${Render}
     ${RootBus}
     ${XCPU}
     ${XGPU}
@@ -287,25 +298,33 @@ endif()
 
 # Link libraries
 target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11)
-
 if (GFX_ENABLED)
-  target_include_directories(Xenon PRIVATE ${IMGUI_DIR})
   target_link_libraries(Xenon PRIVATE SDL3::SDL3)
+endif()
+
+# Add includes
+target_include_directories(Xenon PRIVATE ${microprofile_dir} Xenon/include)
+if (GFX_ENABLED)
+    target_include_directories(Xenon PRIVATE ${ImGui_Dir})
+endif()
+
+# Add fonts target
+if (GFX_ENABLED)
   add_dependencies(Xenon copy-fonts)
 endif()
 
 
-# Specific to Windows
+# Add defines specific to windows
 if (WIN32)
-  add_definitions(-DNTDDI_VERSION=0x0A000006)
-  add_definitions(-DNOMINMAX -DWIN32_LEAN_AND_MEAN)
+  add_compile_definitions(NTDDI_VERSION=0x0A000006)
+  add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
+  # Add .rc file, for the app icon
   target_sources(Xenon PRIVATE Xenon/Xenon.rc)
 endif()
 
 
-# This removes this warning
-add_compile_definitions(_CRT_SECURE_NO_WARNINGS)
-
+# Specific to MSVC, forces system version so the autodetected 8.1 SDK isn't used
+# Also enables multi-processor (multithreaded) compiling on MSVC
 if (msvc)
   set(CMAKE_GENERATOR_PLATFORM x64)
   set(CMAKE_SYSTEM_VERSION 10.0.19041.0)

@@ -59,7 +59,7 @@ void PPCInterpreter::PPCInterpreter_faddsx(PPU_STATE* ppuState) {
   checkFpuAvailable(ppuState);
 
   FPRi(frd).valueAsDouble = FPRi(fra).valueAsDouble + FPRi(frb).valueAsDouble;
-  
+
   ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
 }
 
@@ -73,7 +73,7 @@ void PPCInterpreter::PPCInterpreter_fcmpu(PPU_STATE* ppuState) {
   else                        c <- 0b0010
 
   FPCC <- c
-  CR[4 * crfD–4 * crfD + 3] <- c 
+  CR[4 * crfD-4 * crfD + 3] <- c
   if (frA) is an SNaN or (frB) is an SNaN then
     VXSNAN <- 1
   */
@@ -108,7 +108,7 @@ void PPCInterpreter::PPCInterpreter_fdivsx(PPU_STATE* ppuState) {
   checkFpuAvailable(ppuState);
 
   FPRi(frd).valueAsDouble = static_cast<f32>(FPRi(fra).valueAsDouble / FPRi(frb).valueAsDouble);
-  
+
   ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
 }
 
@@ -117,11 +117,11 @@ void PPCInterpreter::PPCInterpreter_fmulsx(PPU_STATE* ppuState) {
   /*
   frD <- (frA) * (frC)
   */
-  
+
   checkFpuAvailable(ppuState);
 
   FPRi(frd).valueAsDouble = FPRi(fra).valueAsDouble * FPRi(frc).valueAsDouble;
-  
+
   ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
 }
 
@@ -153,12 +153,12 @@ void PPCInterpreter::PPCInterpreter_frspx(PPU_STATE* ppuState) {
   ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
 }
 
-// Floating Subtract Single (x’EC00 0028’)
+// Floating Subtract Single (x'EC00 0028')
 void PPCInterpreter::PPCInterpreter_fsubsx(PPU_STATE* ppuState) {
   /*
   frD <- (frA) - (frB)
   */
-  
+
   checkFpuAvailable(ppuState);
 
   FPRi(frd).valueAsDouble = FPRi(fra).valueAsDouble - FPRi(frb).valueAsDouble;

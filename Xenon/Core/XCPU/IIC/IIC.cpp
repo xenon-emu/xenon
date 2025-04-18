@@ -2,6 +2,8 @@
 
 #include "IIC.h"
 
+#include "Core/Xe_Main.h"
+
 #include "Base/Assert.h"
 #include "Base/Logging/Log.h"
 
@@ -19,6 +21,7 @@ Xe::XCPU::IIC::XenonIIC::XenonIIC() {
 }
 
 void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64 size) {
+  MICROPROFILE_SCOPEI("[Xe::IIC]", "WriteInterrupt", MP_AUTO);
   std::lock_guard lck(mutex);
 
   if (size < 4) {
@@ -114,6 +117,7 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
 }
 
 void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u8 *data, u64 size) {
+  MICROPROFILE_SCOPEI("[Xe::IIC]", "ReadInterrupt", MP_AUTO);
   std::lock_guard lck(mutex);
 
   constexpr u32 mask = 0xF000;
@@ -167,6 +171,7 @@ void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u8 *data, u64 size) 
 }
 
 bool Xe::XCPU::IIC::XenonIIC::checkExtInterrupt(u8 ppuID) {
+  MICROPROFILE_SCOPEI("[Xe::IIC]", "CheckExternalInterrupt", MP_AUTO);
   // Set the global lock.
   std::lock_guard lck(mutex);
 
@@ -202,8 +207,8 @@ bool Xe::XCPU::IIC::XenonIIC::checkExtInterrupt(u8 ppuID) {
 
 }
 
-void Xe::XCPU::IIC::XenonIIC::genInterrupt(u8 interruptType,
-  u8 cpusToInterrupt) {
+void Xe::XCPU::IIC::XenonIIC::genInterrupt(u8 interruptType, u8 cpusToInterrupt) {
+  MICROPROFILE_SCOPEI("[Xe::IIC]", "GenInterrupt", MP_AUTO);
   // Set a global lock.
   std::lock_guard lck(mutex);
 

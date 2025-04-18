@@ -82,7 +82,9 @@ s32 removeHangup() {
 
 PARAM(help, "Prints this message", false);
 
+#define AUTO_FLIP 1
 s32 main(s32 argc, char *argv[]) {
+  MicroProfileOnThreadCreate("Main");
   // Init params
   Base::Param::Init(argc, argv);
   // Handle help param
@@ -90,22 +92,41 @@ s32 main(s32 argc, char *argv[]) {
     ::Base::Param::Help();
     return 0;
   }
-  // Create all handles
-  Xe_Main = std::make_unique<STRIP_UNIQUE(Xe_Main)>();
-  // Setup hangup
-  if (installHangup() != 0) {
-    LOG_CRITICAL(System, "Failed to install signal handler. Clean shutdown is not possible through console");
-  }
+  // Enable profiling
+  MicroProfileSetEnableAllGroups(true);
+  MicroProfileSetForceMetaCounters(true);
+#if AUTO_FLIP
+  MicroProfileStartAutoFlip(30);
+#endif
   // Set thread name
   Base::SetCurrentThreadName("[Xe] Main");
-  LOG_INFO(System, "Starting Xenon.");
-  // Start execution of the emulator
-  Xe_Main->start();
+  // Define profiler
+  {
+    // Create all handles
+    Xe_Main = std::make_unique<STRIP_UNIQUE(Xe_Main)>();
+    // Setup hangup
+    if (installHangup() != 0) {
+      LOG_CRITICAL(System, "Failed to install signal handler. Clean shutdown is not possible through console");
+    }
+    LOG_INFO(System, "Starting Xenon.");
+    // Start execution of the emulator
+    Xe_Main->start();
+  }
   // Inf wait until told otherwise
   while (XeRunning) {
+#if MICROPROFILE_ENABLED == 1 && AUTO_FLIP == 0
+    MicroProfileFlip(nullptr);
+#endif
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
   }
   // Shutdown
-  Xe_Main.reset();
+  {
+    MICROPROFILE_SCOPEI("[Core]", "Shutdown", MP_AUTO);
+    Xe_Main.reset();
+  }
+#if AUTO_FLIP
+  MicroProfileStopAutoFlip();
+#endif
+  MicroProfileShutdown();
   return 0;
 }

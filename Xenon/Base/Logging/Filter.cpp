@@ -61,6 +61,7 @@ bool ParseFilterRule(Filter& instance, Iterator begin, Iterator end) {
   CLS(Log)                                                                                       \
   CLS(Base)                                                                                      \
   SUB(Base, Filesystem)                                                                          \
+  CLS(Profiler)                                                                                  \
   CLS(Config)                                                                                    \
   CLS(Debug)                                                                                     \
   CLS(System)                                                                                    \

@@ -44,6 +44,7 @@ void RootBus::ResetDevice(SystemDevice *device) {
 }
 
 void RootBus::Read(u64 readAddress, u8 *data, u64 size) {
+  MICROPROFILE_SCOPEI("[Xe::PCI]", "RootBus::Read", MP_AUTO);
   // Configuration Read?
   if (readAddress >= PCI_CONFIG_REGION_ADDRESS &&
       readAddress <= PCI_CONFIG_REGION_ADDRESS + PCI_CONFIG_REGION_SIZE) {
@@ -73,6 +74,7 @@ void RootBus::Read(u64 readAddress, u8 *data, u64 size) {
 }
 
 void RootBus::MemSet(u64 writeAddress, s32 data, u64 size) {
+  MICROPROFILE_SCOPEI("[Xe::PCI]", "RootBus::MemSet", MP_AUTO);
   for (auto &device : conectedDevices) {
     if (writeAddress >= device->GetStartAddress() &&
         writeAddress <= device->GetEndAddress()) {
@@ -97,6 +99,7 @@ void RootBus::MemSet(u64 writeAddress, s32 data, u64 size) {
 }
 
 void RootBus::Write(u64 writeAddress, const u8 *data, u64 size) {
+  MICROPROFILE_SCOPEI("[Xe::PCI]", "RootBus::Write", MP_AUTO);
   // PCI Configuration Write?
   if (writeAddress >= PCI_CONFIG_REGION_ADDRESS &&
       writeAddress <= PCI_CONFIG_REGION_ADDRESS + PCI_CONFIG_REGION_SIZE) {

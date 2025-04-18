@@ -3,26 +3,42 @@
 #include "Xe_Main.h"
 
 XeMain::XeMain() {
-  Base::Log::Initialize();
-  Base::Log::Start();
-  rootDirectory = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
-  loadConfig();
-  logFilter = std::make_unique<STRIP_UNIQUE(logFilter)>(Config::log.currentLevel);
-  Base::Log::SetGlobalFilter(*logFilter);
-  pciBridge = std::make_unique<STRIP_UNIQUE(pciBridge)>();
-  createSMCState();
-  createPCIDevices();
-  addPCIDevices();
+  MICROPROFILE_SCOPEI("[Xe::Main]", "Create", MP_AUTO);
+  {
+    Base::Log::Initialize();
+    Base::Log::Start();
+    rootDirectory = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
+    {
+      loadConfig();
+    }
+    logFilter = std::make_unique<STRIP_UNIQUE(logFilter)>(Config::log.currentLevel);
+    Base::Log::SetGlobalFilter(*logFilter);
+    pciBridge = std::make_unique<STRIP_UNIQUE(pciBridge)>();
+    {
+      createSMCState();
+    }
+    {
+      createPCIDevices();
+    }
+    {
+      addPCIDevices();
+    }
 #ifndef NO_GFX
-  renderer = std::make_unique<STRIP_UNIQUE(renderer)>(ram.get());
+    renderer = std::make_unique<STRIP_UNIQUE(renderer)>(ram.get());
 #endif
-  xenos = std::make_unique<STRIP_UNIQUE(xenos)>(ram.get());
-  createHostBridge();
-  createRootBus();
-  xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses);
-  pciBridge->RegisterIIC(xenonCPU->GetIICPointer());
+    xenos = std::make_unique<STRIP_UNIQUE(xenos)>(ram.get());
+    {
+      createHostBridge();
+    }
+    {
+      createRootBus();
+    }
+    xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses);
+    pciBridge->RegisterIIC(xenonCPU->GetIICPointer());
+  }
 }
 XeMain::~XeMain() {
+  MICROPROFILE_SCOPEI("[Xe::Main]", "Shutdown", MP_AUTO);
   saveConfig();
   // Delete the XGPU and XCPU
   xenos.reset();
@@ -63,9 +79,11 @@ XeMain::~XeMain() {
 }
 
 void XeMain::saveConfig() {
+  MICROPROFILE_SCOPEI("[Xe::Main]", "SaveConfig", MP_AUTO);
   Config::saveConfig(rootDirectory / "config.toml");
 }
 void XeMain::loadConfig() {
+  MICROPROFILE_SCOPEI("[Xe::Main]", "LoadConfig", MP_AUTO);
   Config::loadConfig(rootDirectory / "config.toml");
 }
 
@@ -84,14 +102,17 @@ void XeMain::start() {
   CPUStarted = true;
   if (Config::xcpu.elfLoader) {
     // Load the elf
+    MICROPROFILE_SCOPEI("[Xe::Main]", "LoadElf", MP_AUTO);
     xenonCPU->LoadElf(Config::filepaths.elfBinary);
   } else {
+    MICROPROFILE_SCOPEI("[Xe::Main]", "Start", MP_AUTO);
     // CPU Start routine and entry point.
     xenonCPU->Start(0x20000000100);
   }
 }
 
 void XeMain::shutdownCPU() {
+  MICROPROFILE_SCOPEI("[Xe::Main]", "ShutdownCPU", MP_AUTO);
   // Halt rendering (prevent debugger from segfaulting)
 #ifndef NO_GFX
   renderHalt = true;
@@ -121,6 +142,7 @@ void XeMain::shutdownCPU() {
 }
 
 void XeMain::reboot(Xe::PCIDev::SMC::SMC_PWR_REASON type) {
+  MICROPROFILE_SCOPEI("[Xe::Main]", "Reboot", MP_AUTO);
   // Check if the CPU is active
   if (CPUStarted) {
     // Shutdown the CPU
@@ -133,6 +155,7 @@ void XeMain::reboot(Xe::PCIDev::SMC::SMC_PWR_REASON type) {
 }
 
 void XeMain::reloadFiles() {
+  MICROPROFILE_SCOPEI("[Xe::Main]", "ReloadFiles", MP_AUTO);
   getCPU()->Halt();
   // Reset the SFCX
   sfcx.reset();
@@ -153,6 +176,7 @@ void XeMain::reloadFiles() {
 }
 
 void XeMain::addPCIDevices() {
+  MICROPROFILE_SCOPEI("[Xe::Main]", "AddPCIDevices", MP_AUTO);
   pciBridge->addPCIDevice(ohci0.get());
   pciBridge->addPCIDevice(ohci1.get());
   pciBridge->addPCIDevice(ehci0.get());
@@ -167,6 +191,7 @@ void XeMain::addPCIDevices() {
 }
 
 void XeMain::createHostBridge() {
+  MICROPROFILE_SCOPEI("[Xe::Main::PCI]", "CreateHostBridge", MP_AUTO);
   hostBridge = std::make_unique<STRIP_UNIQUE(hostBridge)>();
 
   hostBridge->RegisterXGPU(xenos.get());
@@ -174,6 +199,7 @@ void XeMain::createHostBridge() {
 }
 
 void XeMain::createRootBus() {
+  MICROPROFILE_SCOPEI("[Xe::Main::PCI]", "CreateRootBus", MP_AUTO);
   rootBus = std::make_unique<STRIP_UNIQUE(rootBus)>();
 
   rootBus->AddHostBridge(hostBridge.get());
@@ -182,23 +208,59 @@ void XeMain::createRootBus() {
 }
 
 void XeMain::createPCIDevices() {
-  ethernet = std::make_unique<STRIP_UNIQUE(ethernet)>("ETHERNET", ETHERNET_DEV_SIZE);
-  audioController = std::make_unique<STRIP_UNIQUE(audioController)>("AUDIOCTRLR", AUDIO_CTRLR_DEV_SIZE);
-  ohci0 = std::make_unique<STRIP_UNIQUE(ohci0)>("OHCI0", OHCI0_DEV_SIZE);
-  ohci1 = std::make_unique<STRIP_UNIQUE(ohci1)>("OHCI1", OHCI1_DEV_SIZE);
-  ehci0 = std::make_unique<STRIP_UNIQUE(ehci0)>("EHCI0", EHCI0_DEV_SIZE);
-  ehci1 = std::make_unique<STRIP_UNIQUE(ehci1)>("EHCI1", EHCI1_DEV_SIZE);
-
-  ram = std::make_unique<STRIP_UNIQUE(ram)>("RAM", RAM_START_ADDR, RAM_START_ADDR + RAM_SIZE, false);
-  sfcx = std::make_unique<STRIP_UNIQUE(sfcx)>("SFCX", Config::filepaths.nand, SFCX_DEV_SIZE, pciBridge.get(), ram.get());
-  xma = std::make_unique<STRIP_UNIQUE(xma)>("XMA", XMA_DEV_SIZE);
-  odd = std::make_unique<STRIP_UNIQUE(odd)>("CDROM", ODD_DEV_SIZE, pciBridge.get(), ram.get());
-  hdd = std::make_unique<STRIP_UNIQUE(hdd)>("HDD", HDD_DEV_SIZE, pciBridge.get());
-  smcCore = std::make_unique<STRIP_UNIQUE(smcCore)>("SMC", SMC_DEV_SIZE, pciBridge.get(), smcCoreState.get());
-  nandDevice = std::make_unique<STRIP_UNIQUE(nandDevice)>("NAND", sfcx.get(), NAND_START_ADDR, NAND_END_ADDR, true);
+  MICROPROFILE_SCOPEI("[Xe::Main::PCI]", "CreateDevices", MP_AUTO);
+  {
+    {
+      MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "Ethernet", MP_AUTO);
+      ethernet = std::make_unique<STRIP_UNIQUE(ethernet)>("ETHERNET", ETHERNET_DEV_SIZE);
+    }
+    {
+      MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "AudioController", MP_AUTO);
+      audioController = std::make_unique<STRIP_UNIQUE(audioController)>("AUDIOCTRLR", AUDIO_CTRLR_DEV_SIZE);
+    }
+    {
+      MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "OHCI", MP_AUTO);
+      ohci0 = std::make_unique<STRIP_UNIQUE(ohci0)>("OHCI0", OHCI0_DEV_SIZE);
+      ohci1 = std::make_unique<STRIP_UNIQUE(ohci1)>("OHCI1", OHCI1_DEV_SIZE);
+    }
+    {
+      MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "EHCI", MP_AUTO);
+      ehci0 = std::make_unique<STRIP_UNIQUE(ehci0)>("EHCI0", EHCI0_DEV_SIZE);
+      ehci1 = std::make_unique<STRIP_UNIQUE(ehci1)>("EHCI1", EHCI1_DEV_SIZE);
+    }
+    {
+      MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "RAM", MP_AUTO);
+      ram = std::make_unique<STRIP_UNIQUE(ram)>("RAM", RAM_START_ADDR, RAM_START_ADDR + RAM_SIZE, false);
+    }
+    {
+      MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "SFCX", MP_AUTO);
+      sfcx = std::make_unique<STRIP_UNIQUE(sfcx)>("SFCX", Config::filepaths.nand, SFCX_DEV_SIZE, pciBridge.get(), ram.get());
+    }
+    {
+      MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "XMA", MP_AUTO);
+      xma = std::make_unique<STRIP_UNIQUE(xma)>("XMA", XMA_DEV_SIZE);
+    }
+    {
+      MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "ODD", MP_AUTO);
+      odd = std::make_unique<STRIP_UNIQUE(odd)>("CDROM", ODD_DEV_SIZE, pciBridge.get(), ram.get());
+    }
+    {
+      MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "HDD", MP_AUTO);
+      hdd = std::make_unique<STRIP_UNIQUE(hdd)>("HDD", HDD_DEV_SIZE, pciBridge.get());
+    }
+    {
+      MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "SMC", MP_AUTO);
+      smcCore = std::make_unique<STRIP_UNIQUE(smcCore)>("SMC", SMC_DEV_SIZE, pciBridge.get(), smcCoreState.get());
+    }
+    {
+      MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "NAND", MP_AUTO);
+      nandDevice = std::make_unique<STRIP_UNIQUE(nandDevice)>("NAND", sfcx.get(), NAND_START_ADDR, NAND_END_ADDR, true);
+    }
+  }
 }
 
 void XeMain::createSMCState() {
+  MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "SMCState", MP_AUTO);
   // Initialize several settings from the struct.
   smcCoreState = std::make_unique<STRIP_UNIQUE(smcCoreState)>();
   smcCoreState->currentUARTSytem = Config::smc.uartSystem;

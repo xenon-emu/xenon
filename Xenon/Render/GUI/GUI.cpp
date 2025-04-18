@@ -7,6 +7,10 @@
 #include "Base/Exit.h"
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
 
+#ifdef _WIN32
+#include <shellapi.h>
+#endif
+
 // Helper functions for text/string formatting with the gui
 #define TextFmt(g, x, ...) g->Text(fmt::format(x, __VA_ARGS__))
 #define TextCopyFmt(g, x, v, ...) g->TextCopy(x, fmt::format(v, __VA_ARGS__))
@@ -24,6 +28,7 @@
 #define Bool(g, c, x) CopyCustom(g, x, "{}", c.x ? "true" : "false")
 
 void Render::GUI::Init(SDL_Window* window, void* context) {
+  MICROPROFILE_SCOPEI("[Xe::Render::GUI]", "Init", MP_AUTO);
   // Set our mainWindow handle
   mainWindow = window;
 
@@ -776,6 +781,18 @@ void Render::GUI::OnSwap(Texture *texture) {
           if (ppcDebuggerActive && ppcDebuggerAttached) {
             PPCDebugger(this);
           }
+        });
+        TabItem("Profiler", [&] {
+          Button("Open", [&] {
+            std::string url = fmt::format("http://127.0.0.1:{}/", MicroProfileWebServerPort());
+#ifdef _WIN32
+            ShellExecuteA(nullptr, "open", url.data(), nullptr, nullptr, SW_SHOWNORMAL);
+#elif defined(__linux__)
+            std::string command = "xdg-open " + url;
+            int result = std::system(command.c_str());
+#endif
+          });
+          //TODO: Impl some system to display it in ImGui
         });
         TabItem("Dump", [&] {
           Button("Dump FB", [&] {

@@ -1,10 +1,14 @@
 // Copyright 2025 Xenon Emulator Project
 
 #pragma once
+
+#include "Base/Path_util.h"
+#include "microprofile.h"
+#include "microprofile_html.h"
+
 #include "Base/Config.h"
 #include "Base/Logging/Backend.h"
 #include "Base/Logging/Log.h"
-#include "Base/Path_util.h"
 
 #include "Core/NAND/NAND.h"
 #include "Core/RAM/RAM.h"

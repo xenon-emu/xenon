@@ -202,6 +202,8 @@ void PPU::Step(int amount) {
 
 // PPU Entry Point.
 void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
+  // Start Profile
+  MICROPROFILE_SCOPEI("[Xe::PPU]", "PPURunInstructions", MP_AUTO);
   bool canExec = ppuThreadState != eThreadState::Quiting && ppuThreadState != eThreadState::Reseting;
   for (size_t instrCount = 0; instrCount < numInstrs && canExec; ++instrCount) {
     // Update status
@@ -214,14 +216,23 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
     }
     // Update status
     canExec = ppuThreadState != eThreadState::Quiting && ppuThreadState != eThreadState::Reseting;
-    
-    if (PPUReadNextInstruction()) {
+
+    // Read next instruction
+    bool readNextInstr = false;
+    // Profile read next instruction
+    {
+      MICROPROFILE_SCOPEI("[Xe::PPU]", "ReadNextInstruction", MP_AUTO);
+      readNextInstr = PPUReadNextInstruction();
+    }
+    if (readNextInstr) {
 #ifdef TODO_RELEASE_BUILD
       if (traceFile) {
         const std::string instrName = PPCInterpreter::ppcDecoder.decodeName(_instr.opcode);
         fprintf(traceFile, "%llx: 0x%x %s\n", curThread.CIA, _instr.opcode, instrName.c_str());
       }
 #endif
+      // Start Profile
+      MICROPROFILE_SCOPEI("[Xe::PPU]", "ExecuteSingleInstruction", MP_AUTO);
       // Execute instruction
       PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
     }
@@ -234,8 +245,8 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
     }
 
     // Increase Time Base Counter if enabled
-    if (canExec && xenonContext->timeBaseActive && (ppuState->SPR.HID6 & 0x1000000000000)) {
-      UpdateTimeBase();
+    if (canExec) {
+      CheckTimeBaseStatus();
     }
 
     // Update status
@@ -279,7 +290,9 @@ void PPU::ThreadStateMachine() {
     if (canExec && state & ePPUThreadBit_Zero) {
       // Thread 0 is running, process instructions until we reach TTR timeout.
       curThreadId = ePPUThread_Zero;
-      PPURunInstructions(ppuState->SPR.TTR);
+      {
+        PPURunInstructions(ppuState->SPR.TTR);
+      }
     }
     // Get status, and break if needed
     canExec = ppuThreadState != eThreadState::Quiting && ppuThreadState != eThreadState::Reseting;
@@ -288,7 +301,9 @@ void PPU::ThreadStateMachine() {
     if (canExec && state & ePPUThreadBit_One) {
       // Thread 1 is running, process instructions until we reach TTR timeout.
       curThreadId = ePPUThread_One;
-      PPURunInstructions(ppuState->SPR.TTR);
+      {
+        PPURunInstructions(ppuState->SPR.TTR);
+      }
     }
   } break;
   case eThreadState::Halted: {
@@ -338,6 +353,8 @@ void PPU::ThreadLoop() {
   // Set thread name
   Base::SetCurrentThreadName("[Xe] " + ppuState->ppuName);
   while (ppuThreadActive) {
+    // Start Profile
+    MICROPROFILE_SCOPEI("[Xe::PPU]", "ThreadLoop", MP_AUTO);
     // Check if we should exit or not
     ppuThreadActive = ppuThreadState != eThreadState::None && ppuThreadState != eThreadState::Quiting && ppuThreadState != eThreadState::Reseting;
     ThreadStateMachine();
@@ -616,6 +633,8 @@ bool PPU::PPUReadNextInstruction() {
 
 // Checks for exceptions and process them in the correct order.
 void PPU::PPUCheckExceptions() {
+  // Start Profile
+  MICROPROFILE_SCOPEI("[Xe::PPU]", "CheckExceptions", MP_AUTO);
   // Check Exceptions pending and process them in order.
   u16 &exceptions = _ex;
   if (exceptions != PPU_EX_NONE) {
@@ -757,6 +776,8 @@ void PPU::PPUCheckExceptions() {
 }
 
 void PPU::CheckTimeBaseStatus() {
+  // Start Profile
+  MICROPROFILE_SCOPEI("[Xe::PPU]", "CheckTimeBaseStatus", MP_AUTO);
   // Increase Time Base Counter
   if (xenonContext->timeBaseActive) {
     // HID6[15]: Time-base and decrementer facility enable.

@@ -29,6 +29,7 @@ void HostBridge::RegisterPCIBridge(PCIBridge *newPCIBridge) {
 }
 
 bool HostBridge::Read(u64 readAddress, u8 *data, u64 size) {
+  MICROPROFILE_SCOPEI("[Xe::PCI]", "HostBridge::Read", MP_AUTO);
   std::lock_guard lck(mutex);
 
   // Reading from host bridge registers?
@@ -88,6 +89,7 @@ bool HostBridge::Read(u64 readAddress, u8 *data, u64 size) {
 }
 
 bool HostBridge::Write(u64 writeAddress, const u8 *data, u64 size) {
+  MICROPROFILE_SCOPEI("[Xe::PCI]", "HostBridge::Write", MP_AUTO);
   std::lock_guard lck(mutex);
   
   // If we are not UART, send it to log
@@ -196,6 +198,7 @@ bool HostBridge::Write(u64 writeAddress, const u8 *data, u64 size) {
 }
 
 bool HostBridge::MemSet(u64 writeAddress, s32 data, u64 size) {
+  MICROPROFILE_SCOPEI("[Xe::PCI]", "HostBridge::MemSet", MP_AUTO);
   std::lock_guard lck(mutex);
 
   // Writing to host bridge registers?
@@ -295,6 +298,7 @@ bool HostBridge::MemSet(u64 writeAddress, s32 data, u64 size) {
 }
 
 void HostBridge::ConfigRead(u64 readAddress, u8 *data, u64 size) {
+  MICROPROFILE_SCOPEI("[Xe::PCI]", "HostBridge::ConfigRead", MP_AUTO);
   std::lock_guard lck(mutex);
 
   PCIE_CONFIG_ADDR configAddress = {};
@@ -324,6 +328,7 @@ void HostBridge::ConfigRead(u64 readAddress, u8 *data, u64 size) {
 }
 
 void HostBridge::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
+  MICROPROFILE_SCOPEI("[Xe::PCI]", "HostBridge::ConfigWrite", MP_AUTO);
   std::lock_guard lck(mutex);
 
   PCIE_CONFIG_ADDR configAddress = {};

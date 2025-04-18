@@ -15,6 +15,7 @@
 
 // Shaders
 void compileShaders(GLuint shader, const char* source) {
+  MICROPROFILE_SCOPEI("[Xe::Render]", "CompileShader", MP_AUTO);
   glShaderSource(shader, 1, &source, nullptr);
   glCompileShader(shader);
   // Ensure the shader built
@@ -28,6 +29,7 @@ void compileShaders(GLuint shader, const char* source) {
 }
 
 GLuint createShaderPrograms(const char* vertex, const char* fragment) {
+  MICROPROFILE_SCOPEI("[Xe::Render]", "CreateShaders", MP_AUTO);
   GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
   compileShaders(vertexShader, vertex);
   GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -66,6 +68,7 @@ Render::Renderer::~Renderer() {
 // Just why...
 
 void Render::Renderer::Start() {
+  MICROPROFILE_SCOPEI("[Xe::Render]", "Start", MP_AUTO);
   // Init SDL Events, Video, Joystick, and Gamepad
   if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
     LOG_ERROR(System, "Failed to initialize SDL: {}", SDL_GetError());
@@ -210,6 +213,8 @@ void Render::Renderer::Resize(int x, int y, bool resizeViewport) {
 }
 
 void Render::Renderer::Thread() {
+  // Set thread name
+  Base::SetCurrentThreadName("[Xe] Render");
   // Framebuffer pointer from main memory.
   fbPointer = ramPointer->getPointerToAddress(XE_FB_BASE);
   // Should we render?
@@ -218,13 +223,13 @@ void Render::Renderer::Thread() {
     return;
   }
 
-  Base::SetCurrentThreadName("[Xe] Render");
-
   // Start exec
   Start();
 
   // Main loop
   while (threadRunning && XeRunning) {
+    // Start Profile
+    MICROPROFILE_SCOPEI("[Xe::Render]", "Loop", MP_AUTO);
     // Process events.
     while (SDL_PollEvent(&windowEvent)) {
       if (Config::rendering.enableGui) {
@@ -265,25 +270,26 @@ void Render::Renderer::Thread() {
 
     // Upload buffer
     if (fbPointer && !Xe_Main->renderHalt && inFocus) {
+      // Profile
+      MICROPROFILE_SCOPEI("[Xe::Render]", "Deswizle", MP_AUTO);
       const u32* ui_fbPointer = reinterpret_cast<u32*>(fbPointer);
       glBindBuffer(GL_SHADER_STORAGE_BUFFER, pixelBuffer);
       glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, pitch, ui_fbPointer);
 
-      if (!imguiRender) {
-        // Use the compute shader
-        glUseProgram(shaderProgram);
-        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, pixelBuffer);
-        glUniform1i(glGetUniformLocation(shaderProgram, "internalWidth"), internalWidth);
-        glUniform1i(glGetUniformLocation(shaderProgram, "internalHeight"), internalHeight);
-        glUniform1i(glGetUniformLocation(shaderProgram, "resWidth"), width);
-        glUniform1i(glGetUniformLocation(shaderProgram, "resHeight"), height);
-        glDispatchCompute(width / 16, height / 16, 1);
-        glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_UPDATE_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
-      }
+      // Use the compute shader
+      glUseProgram(shaderProgram);
+      glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, pixelBuffer);
+      glUniform1i(glGetUniformLocation(shaderProgram, "internalWidth"), internalWidth);
+      glUniform1i(glGetUniformLocation(shaderProgram, "internalHeight"), internalHeight);
+      glUniform1i(glGetUniformLocation(shaderProgram, "resWidth"), width);
+      glUniform1i(glGetUniformLocation(shaderProgram, "resHeight"), height);
+      glDispatchCompute(width / 16, height / 16, 1);
+      glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_UPDATE_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
     }
 
     // Render the texture
-    if (!imguiRender && inFocus) {
+    if (inFocus) {
+      MICROPROFILE_SCOPEI("[Xe::Render]", "BindTexture", MP_AUTO);
       glUseProgram(renderShaderProgram);
       backbuffer->Bind();
       glBindVertexArray(dummyVAO);
@@ -291,13 +297,16 @@ void Render::Renderer::Thread() {
     }
 
     // Render the GUI
-    if (Config::rendering.enableGui && gui.get() && !Xe_Main->renderHalt && inFocus) {
+    if (Config::rendering.enableGui && gui.get() && Xe_Main.get() && !Xe_Main->renderHalt && inFocus) {
+      MICROPROFILE_SCOPEI("[Xe::Render::GUI]", "Render", MP_AUTO);
       gui->Render(backbuffer.get());
     }
     
     // GL Swap
-    if (!Xe_Main->renderHalt)
+    if (Xe_Main.get() && !Xe_Main->renderHalt) {
+      MICROPROFILE_SCOPEI("[Xe::Render]", "Swap", MP_AUTO);
       SDL_GL_SwapWindow(mainWindow);
+    }
   }
 }
 

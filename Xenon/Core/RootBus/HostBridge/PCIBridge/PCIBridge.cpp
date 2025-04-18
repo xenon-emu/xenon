@@ -1,5 +1,7 @@
 // Copyright 2025 Xenon Emulator Project
 
+#include "Core/Xe_Main.h"
+
 #include "PCIBridge.h"
 
 #include "Base/Logging/Log.h"
@@ -73,6 +75,7 @@ void PCIBridge::RegisterIIC(Xe::XCPU::IIC::XenonIIC *xenonIICPtr) {
 }
 
 bool PCIBridge::RouteInterrupt(u8 prio) {
+  MICROPROFILE_SCOPEI("[Xe::PCI]", "PCIBridge::RouteInterrupt", MP_AUTO);
   switch (prio) {
   case PRIO_CLOCK:
     if (pciBridgeState.PRIO_REG_CLCK.intEnabled) {

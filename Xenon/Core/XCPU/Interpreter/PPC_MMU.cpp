@@ -264,6 +264,7 @@ void PPCInterpreter::PPCInterpreter_tlbsync(PPU_STATE* ppuState) {
 
 // Helper function for getting Page Size (p bit).
 u8 PPCInterpreter::mmuGetPageSize(PPU_STATE *ppuState, bool L, u8 LP) {
+  MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUGetPageSize", MP_AUTO);
 
   // Large page selection works the following way:
   // First check if pages are large (L)
@@ -321,6 +322,7 @@ u8 PPCInterpreter::mmuGetPageSize(PPU_STATE *ppuState, bool L, u8 LP) {
 
 // This is done when TLB Reload is in software-controlled mode.
 void PPCInterpreter::mmuAddTlbEntry(PPU_STATE *ppuState) {
+  MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUAddTlbEntry", MP_AUTO);
   // In said mode, software makes use of special registers of the CPU to directly reload the TLB
   // with PTE's, thus eliminating the need of a hardware page table and tablewalk.
 
@@ -368,6 +370,7 @@ void PPCInterpreter::mmuAddTlbEntry(PPU_STATE *ppuState) {
 
 // Translation Lookaside Buffer Search
 bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *ppuState, u64 *RPN, u64 VA, u8 p, bool L, bool LP) {
+  MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUSearchTlbEntry", MP_AUTO);
   // Index to choose from the 256 ways of the TLB
   u16 tlbIndex = 0;
   // Tlb Set that was least Recently used for replacement.
@@ -480,6 +483,7 @@ bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *ppuState, u64 *RPN, u64 VA, u8
 // Routine to read a string from memory, using a PSTRNG given by the kernel.
 void PPCInterpreter::mmuReadString(PPU_STATE *ppuState, u64 stringAddress,
                                    char *string, u32 maxLenght) {
+  MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUReadString", MP_AUTO);
   u32 strIndex;
   u32 stringBufferAddress = 0;
   u16 Length = 0;
@@ -502,6 +506,7 @@ void PPCInterpreter::mmuReadString(PPU_STATE *ppuState, u64 stringAddress,
 
 SECENG_ADDRESS_INFO
 PPCInterpreter::mmuGetSecEngInfoFromAddress(u64 inputAddress) {
+  MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUGetSecEngInfoFromAddress", MP_AUTO);
   // 0x00000X**_00000000 X = region, ** = key select
   // X = 0 should be Physical
   // X = 1 should be Hashed
@@ -538,6 +543,7 @@ PPCInterpreter::mmuGetSecEngInfoFromAddress(u64 inputAddress) {
 
 u64 PPCInterpreter::mmuContructEndAddressFromSecEngAddr(u64 inputAddress,
                                                         bool *socAccess) {
+  MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUContructEndAddressFromSecEngAddr", MP_AUTO);
   SECENG_ADDRESS_INFO inputAddressInfo =
       mmuGetSecEngInfoFromAddress(inputAddress);
 
@@ -584,6 +590,8 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 
   /* TODO */
   // Implement L1 per-core data/inst cache and cache handling code.
+
+  MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUTranslateAddress", MP_AUTO);
 
   //
   // Current thread SPR's used in MMU..
@@ -1003,6 +1011,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 // MMU Read Routine, used by the CPU
 void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE* ppuState,
                              u64 EA, u64 byteCount, u8 *outData) {
+  MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMURead", MP_AUTO);
   u64 oldEA = EA;
   if (!MMUTranslateAddress(&EA, ppuState, false)) {
     memset(outData, 0, byteCount);
@@ -1146,6 +1155,7 @@ void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE* ppuState,
 // MMU Write Routine, used by the CPU
 void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
                               const u8 *data, u64 EA, u64 byteCount) {
+  MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUWrite", MP_AUTO);
   u64 oldEA = EA;
 
   if (!MMUTranslateAddress(&EA, ppuState, true))
