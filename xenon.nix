@@ -20,6 +20,12 @@ let
       hash = "sha256-VYNqqpE1bo4bjzVsPQhNlOVKemWOZeQg0JaryuAu/Tk=";
     }
     else {};
+  microprofile = fetchFromGitHub {
+    owner = "jonasmr";
+    repo = "microprofile";
+    rev = "9ecdd59ca514ef56e95e9285c74f6bde4c6e1c97";
+    hash = lib.fakeHash;
+  };
 in
 stdenv.mkDerivation {
   name = "xenon";
@@ -41,6 +47,8 @@ stdenv.mkDerivation {
       rm -rf $sourceRoot/third_party/ImGui
       cp -r ${imgui} $sourceRoot/third_party/ImGui
     ''}
+    rm -rf $sourceRoot/third_party/microprofile
+    cp -r ${microprofile} $sourceRoot/third_party/microprofile
     chmod -R +w $sourceRoot
   '';
 
