@@ -89,6 +89,15 @@ bool HostBridge::Read(u64 readAddress, u8 *data, u64 size) {
 
 bool HostBridge::Write(u64 writeAddress, const u8 *data, u64 size) {
   std::lock_guard lck(mutex);
+  
+  // If we are not UART, send it to log
+  if (false) {
+    std::stringstream ss{};
+    for (u64 i = 0; i != size; i++) {
+      ss << fmt::format("0x{:02X}{}", static_cast<u16>(data[i]), i != (size - 1) ? " " : "");
+    }
+    LOG_DEBUG(HostBridge, "Address: 0x{:X} | Data({},0x{:X}): {}", writeAddress, size, size, ss.str());
+  }
 
   // Writing to host bridge registers?
   if (isAddressMappedinBAR(static_cast<u32>(writeAddress))) {

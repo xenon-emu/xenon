@@ -155,6 +155,12 @@ void Xenon::LoadElf(const std::string path) {
   ppu2->StartExecution(false);
 }
 
+void Xenon::Reset() {
+  if (ppu0.get()) ppu0->Reset();
+  if (ppu1.get()) ppu1->Reset();
+  if (ppu2.get()) ppu2->Reset();
+}
+
 void Xenon::Halt(u64 haltOn) {
   if (ppu0.get()) ppu0->Halt(haltOn);
   if (ppu1.get()) ppu1->Halt(haltOn);

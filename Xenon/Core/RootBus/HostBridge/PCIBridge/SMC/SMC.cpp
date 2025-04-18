@@ -443,6 +443,18 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
       // 
       // Data Buffer[0] is our message ID.
       mutex.lock();
+      if (false) {
+        std::stringstream ss{};
+        ss << std::endl;
+        for (u64 i = 0; i != sizeof(smcCoreState->fifoDataBuffer); i += 4) {
+          for (u64 j = 0; j != 4; ++j) {
+            ss << fmt::format(" 0x{:02X}", static_cast<u16>(smcCoreState->fifoDataBuffer[i+j]));
+          }
+          if (i != (sizeof(smcCoreState->fifoDataBuffer) - 4))
+            ss << std::endl;
+        }
+        LOG_INFO(SMC, "FIFO Data:{}", ss.str());
+      }
       switch (smcCoreState->fifoDataBuffer[0]) {
       case Xe::PCIDev::SMC::SMC_PWRON_TYPE:
         // Zero out the buffer
@@ -521,15 +533,19 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
         break;
       case Xe::PCIDev::SMC::SMC_SET_STANDBY:
         smcCoreState->fifoDataBuffer[0] = SMC_SET_STANDBY;
+        // TODO: Fix other HAL types
         if (smcCoreState->fifoDataBuffer[1] == 0x01) {
           LOG_INFO(SMC, "[Standby] Requested shutdown");
           Xe_Main->shutdown();
         }
         else if (smcCoreState->fifoDataBuffer[1] == 0x04) {
           LOG_INFO(SMC, "[Standby] Requested reboot");
+          // Note: Real hardware only respects 0x30, but for automated testing, we will allow anything
           Xe_Main->reboot(static_cast<Xe::PCIDev::SMC::SMC_PWR_REASON>(smcCoreState->fifoDataBuffer[2]));
+        } else {
+          LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD Subtype in SMC_SET_STANDBY: 0x{:02X}",
+            static_cast<u16>(smcCoreState->fifoDataBuffer[1]));
         }
-        LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_SET_STANDBY");
         break;
       case Xe::PCIDev::SMC::SMC_SET_TIME:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_SET_TIME");

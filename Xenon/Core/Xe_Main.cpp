@@ -100,16 +100,13 @@ void XeMain::shutdownCPU() {
   xenonCPU->Halt();
   // Reset RAM
   ram->Reset();
-  // Ensure GPU registers are reset
-  xenos.reset();
-  xenos = std::make_unique<STRIP_UNIQUE(xenos)>(ram.get());
-  // Re-register the XGPU to the host bridge
-  hostBridge->RegisterXGPU(xenos.get());
 #ifndef NO_GFX
   // Reinit RAM handles for rendering (should be valid, mainly safety)
   renderer->ramPointer = ram.get();
   renderer->fbPointer = renderer->ramPointer->getPointerToAddress(XE_FB_BASE);
 #endif
+  // Set the CPU to 'Resetting' mode before killing the handle
+  xenonCPU->Reset();
   // Reset the CPU
   xenonCPU.reset();
   xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses);
