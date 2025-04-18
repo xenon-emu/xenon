@@ -151,8 +151,6 @@ int xeFbConvert(int width, int addr) {
          ((y & 8) << 2)));
 }
 
-#define TILE(x) ((x + 31) >> 5) << 5
-
 void main() {
   ivec2 texel_pos = ivec2(gl_GlobalInvocationID.xy);
   // OOB check, but shouldn't be needed
@@ -164,16 +162,16 @@ void main() {
   const int tiledHeight = TILE(internalHeight);
 
   // Scale accordingly
-  float scaleX = tiledWidth / float(resWidth);
-  float scaleY = tiledHeight / float(resHeight);
+  float scaleX = internalWidth / float(resWidth);
+  float scaleY = internalHeight / float(resHeight);
 
   // Map to source resolution
   const int srcX = int(float(texel_pos.x) * scaleX);
   const int srcY = int(float(texel_pos.y) * scaleY);
 
   // God only knows how this indexing works
-  int stdIndex = (srcY * tiledWidth + srcX);
-  int xeIndex = xeFbConvert(tiledWidth, stdIndex * 4);
+  int stdIndex = (srcY * internalWidth + srcX);
+  int xeIndex = xeFbConvert(internalWidth, stdIndex * 4);
 
   uint packedColor = pixel_data[xeIndex];
   imageStore(o_texture, texel_pos, uvec4(packedColor, 0, 0, 0));
