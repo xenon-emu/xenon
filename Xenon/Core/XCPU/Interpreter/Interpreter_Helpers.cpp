@@ -4,20 +4,6 @@
 
 #include "PPCInterpreter.h"
 
-#define CR_CASE(x) case x: curThread.CR.CR##x = crValue; break
-void PPCInterpreter::ppcUpdateCR(PPU_STATE *ppuState, s8 crNum, u32 crValue) {
-  switch (crNum) {
-  CR_CASE(0);
-  CR_CASE(1);
-  CR_CASE(2);
-  CR_CASE(3);
-  CR_CASE(4);
-  CR_CASE(5);
-  CR_CASE(6);
-  CR_CASE(7);
-  }
-}
-
 u32 PPCInterpreter::CRCompU(PPU_STATE *ppuState, u64 num1, u64 num2) {
   u32 CR = 0;
 

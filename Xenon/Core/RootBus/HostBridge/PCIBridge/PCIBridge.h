@@ -9,17 +9,16 @@
 #include "Core/RootBus/HostBridge/PCIe.h"
 #include "Core/XCPU/IIC/IIC.h"
 
-/*	Dev type			Config Address		BAR
-        PCI Host Bridge		D0008000			E0000000
-        PCI-PCI Bridge		D0000000			EA000000
-        Display Controller	D0010000			EC800000
+/*	Dev type			    Config Address		BAR
+    PCI Host Bridge		  D0008000			E0000000
+    PCI-PCI Bridge		  D0000000			EA000000
+    Display Controller	D0010000			EC800000
 
 */
 
 #define PCI_BRIDGE_BASE_ADDRESS 0xEA000000
 #define PCI_BRIDGE_BASE_SIZE 0xFFF
-#define PCI_BRIDGE_BASE_END_ADDRESS                                            \
-  PCI_BRIDGE_BASE_ADDRESS + PCI_BRIDGE_BASE_SIZE
+#define PCI_BRIDGE_BASE_END_ADDRESS  PCI_BRIDGE_BASE_ADDRESS + PCI_BRIDGE_BASE_SIZE
 
 #define PCI_BRIDGE_CONFIG_SPACE_ADDRESS_BASE 0xD0000000
 #define PCI_BRIDGE_CONFIG_SPACE_SIZE 0xFF // Mandatory 256 bytes of config space
@@ -103,13 +102,13 @@ public:
   void CancelInterrupt(u8 prio);
 
 private:
-  // IIC Pointer used for interrupts.
+  // IIC Pointer used for interrupts
   Xe::XCPU::IIC::XenonIIC *xenonIIC;
 
-  // Connected device pointers.
+  // Connected device pointers
   std::vector<PCIDevice*> connectedPCIDevices;
 
-  // Current bridge config.
+  // Current bridge config
   PCI_PCI_BRIDGE_CONFIG_SPACE pciBridgeConfig = {};
   PCI_BRIDGE_STATE pciBridgeState = {};
   u8 pciBridgeConfigSpace[256];

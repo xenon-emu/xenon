@@ -10,9 +10,9 @@ static inline void checkFpuAvailable(PPU_STATE *ppuState) {
   }
 }
 
-// Updates needed fields from FPSCR and CR1 bits if requested.
-void PPCInterpreter::ppuUpdateFPSCR(PPU_STATE* ppuState, f64 op0, f64 op1, bool updateCR, u8 CR) {
-  // TODO(bitsh1ft3r): Detect NaN's.
+// Updates needed fields from FPSCR and CR1 bits if requested
+void PPCInterpreter::ppuUpdateFPSCR(PPU_STATE *ppuState, f64 op0, f64 op1, bool updateCR, u8 CR) {
+  // TODO(bitsh1ft3r): Detect NaN's
 
   static_assert(std::endian::native == std::endian::little, "ppcUpdateFPSCR not implemented for Big-Endian arch.");
 
@@ -38,20 +38,20 @@ void PPCInterpreter::ppuUpdateFPSCR(PPU_STATE* ppuState, f64 op0, f64 op1, bool 
   // Update CRx bits if requested.
   if (updateCR) {
     switch (CR) {
-      CR_CASE(0);
-      CR_CASE(1);
-      CR_CASE(2);
-      CR_CASE(3);
-      CR_CASE(4);
-      CR_CASE(5);
-      CR_CASE(6);
-      CR_CASE(7);
+    CR_CASE(0)
+    CR_CASE(1)
+    CR_CASE(2)
+    CR_CASE(3)
+    CR_CASE(4)
+    CR_CASE(5)
+    CR_CASE(6)
+    CR_CASE(7)
     }
   }
 }
 
 // Floating Add Single (x'EC00 002A')
-void PPCInterpreter::PPCInterpreter_faddsx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_faddsx(PPU_STATE *ppuState) {
   /*
   frD <- (frA) + (frB)
   */
@@ -64,7 +64,7 @@ void PPCInterpreter::PPCInterpreter_faddsx(PPU_STATE* ppuState) {
 }
 
 // Floating Compare Unordered (x'FC00 0000')
-void PPCInterpreter::PPCInterpreter_fcmpu(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_fcmpu(PPU_STATE *ppuState) {
   /*
   if (frA) is a NaN or
      (frB) is a NaN then      c <- 0b0001
@@ -87,7 +87,7 @@ void PPCInterpreter::PPCInterpreter_fcmpu(PPU_STATE* ppuState) {
 }
 
 // Floating Convert from Integer Double Word (x'FC00 069C')
-void PPCInterpreter::PPCInterpreter_fcfidx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_fcfidx(PPU_STATE *ppuState) {
   /*
   frD <- signedInt64todouble(frB)
   */
@@ -100,7 +100,7 @@ void PPCInterpreter::PPCInterpreter_fcfidx(PPU_STATE* ppuState) {
 }
 
 // Floating Divide Single (x'EC00 0024')
-void PPCInterpreter::PPCInterpreter_fdivsx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_fdivsx(PPU_STATE *ppuState) {
   /*
   frD <- f32(frA) / (frC)
   */
@@ -113,7 +113,7 @@ void PPCInterpreter::PPCInterpreter_fdivsx(PPU_STATE* ppuState) {
 }
 
 // Floating Multiply Single (x'EC00 0032')
-void PPCInterpreter::PPCInterpreter_fmulsx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_fmulsx(PPU_STATE *ppuState) {
   /*
   frD <- (frA) * (frC)
   */
@@ -126,7 +126,7 @@ void PPCInterpreter::PPCInterpreter_fmulsx(PPU_STATE* ppuState) {
 }
 
 // Floating Move Register (Double-Precision) (x'FC00 0090')
-void PPCInterpreter::PPCInterpreter_fmrx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_fmrx(PPU_STATE *ppuState) {
   /*
   frD <- (frB)
   */
@@ -141,7 +141,7 @@ void PPCInterpreter::PPCInterpreter_fmrx(PPU_STATE* ppuState) {
 }
 
 // Floating Round to Single (x'FC00 0018')
-void PPCInterpreter::PPCInterpreter_frspx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_frspx(PPU_STATE *ppuState) {
   /*
   frD <- Round_single( frB )
   */
@@ -154,7 +154,7 @@ void PPCInterpreter::PPCInterpreter_frspx(PPU_STATE* ppuState) {
 }
 
 // Floating Subtract Single (x'EC00 0028')
-void PPCInterpreter::PPCInterpreter_fsubsx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_fsubsx(PPU_STATE *ppuState) {
   /*
   frD <- (frA) - (frB)
   */
@@ -176,7 +176,7 @@ void PPCInterpreter::PPCInterpreter_mffsx(PPU_STATE *ppuState) {
   }
 }
 
-void PPCInterpreter::PPCInterpreter_mtfsfx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_mtfsfx(PPU_STATE *ppuState) {
   checkFpuAvailable(ppuState);
 
   u32 mask = 0;

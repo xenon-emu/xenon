@@ -22,7 +22,7 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
 
   // RGH 2 for CB_A 9188 in a JRunner Normal Build.
   if (thread.CIA == 0x0200C820) {
-     GPR(3) = 0;
+    GPR(3) = 0;
   }
 
   // RGH 2 17489 in a JRunner Corona XDKBuild.
@@ -32,17 +32,17 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
 
   // 3BL Check Bypass Devkit 2.0.1838.1
   if (thread.CIA == 0x03004994) {
-    // GPR(3) = 1;
+    //GPR(3) = 1;
   }
 
   // 4BL Check Bypass Devkit 2.0.1838.1
   if (thread.CIA == 0x03004BF0) {
-    // GPR(3) = 1;
+    //GPR(3) = 1;
   }
 
   // 3BL Signature Check Bypass Devkit 2.0.2853.0
   if (thread.CIA == 0x03006488) {
-    // GPR(3) = 0;
+    //GPR(3) = 0;
   }
 
   // XDK 17.489.0 AudioChipCorder Device Detect bypass. This is not needed for

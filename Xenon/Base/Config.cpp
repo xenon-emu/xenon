@@ -462,7 +462,7 @@ void loadConfig(const std::filesystem::path &path) {
     const toml::value &debug_ = data.at("Debug");
     debug.from_toml(debug_);
   }
-  
+
   if (data.contains("Log")) {
     const toml::value &log_ = data.at("Log");
     log.from_toml(log_);

@@ -10,19 +10,19 @@
 
 // Device tree, taken from an actual system, Corona V6.
 /*
-        BUS0
-                -Dev 0, Func 0: Microsoft Corp. XMA Decoder
-                -Dev 1, Func 0: Microsoft Corp. SATA Controller - CDROM
-                -Dev 2, Func 0: Microsoft Corp. SATA Controller - HDD
-                -Dev 4, Func 0: Microsoft Corp. OHCI Controller 0
-                -Dev 4, Func 1: Microsoft Corp. EHCI Controller 0
-                -Dev 5, Func 0: Microsoft Corp. OHCI Controller 1
-                -Dev 5, Func 1: Microsoft Corp. EHCI Controller 1
-                -Dev 7, Func 0: Microsoft Corp. Fast Ethernet Adapter
-                -Dev 8, Func 0: Microsoft Corp. Secure Flash Controller
-                -Dev 9, Func 0: Microsoft Corp. 580C
-                -Dev A, Func 0: Microsoft Corp. System Management Controller
-                -Dev F, Func 0: Microsoft Corp. 5841
+      BUS0
+      -Dev 0, Func 0: Microsoft Corp. XMA Decoder
+      -Dev 1, Func 0: Microsoft Corp. SATA Controller - CDROM
+      -Dev 2, Func 0: Microsoft Corp. SATA Controller - HDD
+      -Dev 4, Func 0: Microsoft Corp. OHCI Controller 0
+      -Dev 4, Func 1: Microsoft Corp. EHCI Controller 0
+      -Dev 5, Func 0: Microsoft Corp. OHCI Controller 1
+      -Dev 5, Func 1: Microsoft Corp. EHCI Controller 1
+      -Dev 7, Func 0: Microsoft Corp. Fast Ethernet Adapter
+      -Dev 8, Func 0: Microsoft Corp. Secure Flash Controller
+      -Dev 9, Func 0: Microsoft Corp. 580C
+      -Dev A, Func 0: Microsoft Corp. System Management Controller
+      -Dev F, Func 0: Microsoft Corp. 5841
 */
 
 #define XMA_DEV_NUM 0x0
@@ -39,7 +39,7 @@
 #define _5841_DEV_NUM 0xF
 
 PCIBridge::PCIBridge() {
-  // Set config registers.
+  // Set config registers
   u8 i = 0;
   for (u16 idx = 0; idx < 256; idx += 4) {
     memcpy(&pciBridgeConfigSpace[idx], &pciBridgeConfigMap[i], 4);
@@ -67,7 +67,7 @@ PCIBridge::PCIBridge() {
   pciBridgeConfig.configSpaceHeader.regF.hexData = pciBridgeConfigMap[0xF];
 
   // PCI Bridge Config regs
-  pciBridgeState.REG_EA00000C = 0x7CFF; // Software writes here to enable interrupts (Bus IRQL).
+  pciBridgeState.REG_EA00000C = 0x7CFF; // Software writes here to enable interrupts (Bus IRQL)
 }
 
 void PCIBridge::RegisterIIC(Xe::XCPU::IIC::XenonIIC *xenonIICPtr) {
@@ -97,46 +97,46 @@ bool PCIBridge::RouteInterrupt(u8 prio) {
     break;
   case PRIO_SMM:
     if (pciBridgeState.PRIO_REG_SMM.intEnabled) {
-      xenonIIC->genInterrupt(PRIO_SMM, 
+      xenonIIC->genInterrupt(PRIO_SMM,
         pciBridgeState.PRIO_REG_SMM.targetCPU);
     }
-    break;  
+    break;
   case PRIO_OHCI_0:
     if (pciBridgeState.PRIO_REG_OHCI0.intEnabled) {
       xenonIIC->genInterrupt(PRIO_OHCI_0,
         pciBridgeState.PRIO_REG_OHCI0.targetCPU);
     }
-    break;  
+    break;
   case PRIO_OHCI_1:
     if (pciBridgeState.PRIO_REG_OHCI1.intEnabled) {
       xenonIIC->genInterrupt(PRIO_OHCI_1,
         pciBridgeState.PRIO_REG_OHCI1.targetCPU);
     }
-    break;  
+    break;
   case PRIO_EHCI_0:
     if (pciBridgeState.PRIO_REG_EHCI0.intEnabled) {
-      xenonIIC->genInterrupt(PRIO_EHCI_0, 
+      xenonIIC->genInterrupt(PRIO_EHCI_0,
         pciBridgeState.PRIO_REG_EHCI0.targetCPU);
     }
-    break;  
+    break;
   case PRIO_EHCI_1:
     if (pciBridgeState.PRIO_REG_EHCI1.intEnabled) {
-      xenonIIC->genInterrupt(PRIO_EHCI_1, 
+      xenonIIC->genInterrupt(PRIO_EHCI_1,
         pciBridgeState.PRIO_REG_EHCI1.targetCPU);
     }
-    break;  
+    break;
   case PRIO_ENET:
     if (pciBridgeState.PRIO_REG_ENET.intEnabled) {
       xenonIIC->genInterrupt(PRIO_ENET,
         pciBridgeState.PRIO_REG_ENET.targetCPU);
     }
-    break;  
+    break;
   case PRIO_XMA:
     if (pciBridgeState.PRIO_REG_XMA.intEnabled) {
       xenonIIC->genInterrupt(PRIO_XMA,
         pciBridgeState.PRIO_REG_XMA.targetCPU);
     }
-    break;  
+    break;
   case PRIO_AUDIO:
     if (pciBridgeState.PRIO_REG_AUDIO.intEnabled) {
       xenonIIC->genInterrupt(PRIO_AUDIO,
@@ -145,12 +145,12 @@ bool PCIBridge::RouteInterrupt(u8 prio) {
     break;
   case PRIO_SFCX:
     if (pciBridgeState.PRIO_REG_SFCX.intEnabled) {
-      xenonIIC->genInterrupt(PRIO_SFCX, 
+      xenonIIC->genInterrupt(PRIO_SFCX,
         pciBridgeState.PRIO_REG_SFCX.targetCPU);
     }
     break;
   default:
-      LOG_ERROR(PCIBridge, "Unknown interrupt being routed: {:#x}", prio);
+    LOG_ERROR(PCIBridge, "Unknown interrupt being routed: {:#x}", prio);
     break;
   }
   return false;
@@ -347,7 +347,6 @@ bool PCIBridge::Write(u64 writeAddress, const u8 *data, u64 size) {
   // Writing to our own space?
   if (writeAddress >= PCI_BRIDGE_BASE_ADDRESS &&
       writeAddress <= PCI_BRIDGE_BASE_END_ADDRESS) {
-    
     switch (writeAddress) {
     case 0xEA000000:
       memcpy(&pciBridgeState.REG_EA000000, data, sizeof(pciBridgeState.REG_EA000000) > size ? size : sizeof(pciBridgeState.REG_EA000000));
@@ -358,84 +357,96 @@ bool PCIBridge::Write(u64 writeAddress, const u8 *data, u64 size) {
     case 0xEA00000C:
       memcpy(&pciBridgeState.REG_EA00000C, data, sizeof(pciBridgeState.REG_EA00000C) > size ? size : sizeof(pciBridgeState.REG_EA00000C));
       break;
-    case 0xEA000010: // PRIO_CLOCK
+    // PRIO_CLOCK
+    case 0xEA000010:
       memcpy(&pciBridgeState.PRIO_REG_CLCK.hexData, data, sizeof(pciBridgeState.PRIO_REG_CLCK.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_CLCK.hexData));
       pciBridgeState.PRIO_REG_CLCK.intEnabled = enabled;
       pciBridgeState.PRIO_REG_CLCK.latched = latched;
       pciBridgeState.PRIO_REG_CLCK.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_CLCK.cpuIRQ = cpuIRQ;
-      break;    
-    case 0xEA000014: // PRIO_SATA_ODD
+      break;
+    // PRIO_SATA_ODD
+    case 0xEA000014:
       memcpy(&pciBridgeState.PRIO_REG_ODD.hexData, data, sizeof(pciBridgeState.PRIO_REG_ODD.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_ODD.hexData));
       pciBridgeState.PRIO_REG_ODD.intEnabled = enabled;
       pciBridgeState.PRIO_REG_ODD.latched = latched;
       pciBridgeState.PRIO_REG_ODD.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_ODD.cpuIRQ = cpuIRQ;
-      break;    
-    case 0xEA000018: // PRIO_SATA_HDD
+      break;
+    // PRIO_SATA_HDD
+    case 0xEA000018:
       memcpy(&pciBridgeState.PRIO_REG_HDD.hexData, data, sizeof(pciBridgeState.PRIO_REG_HDD.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_HDD.hexData));
       pciBridgeState.PRIO_REG_HDD.intEnabled = enabled;
       pciBridgeState.PRIO_REG_HDD.latched = latched;
       pciBridgeState.PRIO_REG_HDD.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_HDD.cpuIRQ = cpuIRQ;
       break;
-    case 0xEA00001C: // PRIO_SMM
+    // PRIO_SMM
+    case 0xEA00001C:
       memcpy(&pciBridgeState.PRIO_REG_SMM.hexData, data, sizeof(pciBridgeState.PRIO_REG_SMM.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_SMM.hexData));
       pciBridgeState.PRIO_REG_SMM.intEnabled = enabled;
       pciBridgeState.PRIO_REG_SMM.latched = latched;
       pciBridgeState.PRIO_REG_SMM.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_SMM.cpuIRQ = cpuIRQ;
-      break;    
-    case 0xEA000020: // PRIO_OHCI0
+      break;
+    // PRIO_OHCI0
+    case 0xEA000020:
       memcpy(&pciBridgeState.PRIO_REG_OHCI0.hexData, data, sizeof(pciBridgeState.PRIO_REG_OHCI0.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_OHCI0.hexData));
       pciBridgeState.PRIO_REG_OHCI0.intEnabled = enabled;
       pciBridgeState.PRIO_REG_OHCI0.latched = latched;
       pciBridgeState.PRIO_REG_OHCI0.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_OHCI0.cpuIRQ = cpuIRQ;
-      break;    
-    case 0xEA000024: // PRIO_OHCI1
+      break;
+    // PRIO_OHCI1
+    case 0xEA000024:
       memcpy(&pciBridgeState.PRIO_REG_OHCI1.hexData, data, sizeof(pciBridgeState.PRIO_REG_OHCI1.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_OHCI1.hexData));
       pciBridgeState.PRIO_REG_OHCI1.intEnabled = enabled;
       pciBridgeState.PRIO_REG_OHCI1.latched = latched;
       pciBridgeState.PRIO_REG_OHCI1.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_OHCI1.cpuIRQ = cpuIRQ;
-      break;    
-    case 0xEA000028: // PRIO_EHCI0
+      break;
+    // PRIO_EHCI0
+    case 0xEA000028:
       memcpy(&pciBridgeState.PRIO_REG_EHCI0.hexData, data, sizeof(pciBridgeState.PRIO_REG_EHCI0.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_EHCI0.hexData));
       pciBridgeState.PRIO_REG_EHCI0.intEnabled = enabled;
       pciBridgeState.PRIO_REG_EHCI0.latched = latched;
       pciBridgeState.PRIO_REG_EHCI0.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_EHCI0.cpuIRQ = cpuIRQ;
-      break;    
-    case 0xEA00002C: // PRIO_EHCI1
+      break;
+    // PRIO_EHCI1
+    case 0xEA00002C:
       memcpy(&pciBridgeState.PRIO_REG_EHCI1.hexData, data, sizeof(pciBridgeState.PRIO_REG_EHCI1.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_EHCI1.hexData));
       pciBridgeState.PRIO_REG_EHCI1.intEnabled = enabled;
       pciBridgeState.PRIO_REG_EHCI1.latched = latched;
       pciBridgeState.PRIO_REG_EHCI1.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_EHCI1.cpuIRQ = cpuIRQ;
-      break;    
-    case 0xEA000038: // PRIO_ENET
+      break;
+    // PRIO_ENET
+    case 0xEA000038:
       memcpy(&pciBridgeState.PRIO_REG_ENET.hexData, data, sizeof(pciBridgeState.PRIO_REG_ENET.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_ENET.hexData));
       pciBridgeState.PRIO_REG_ENET.intEnabled = enabled;
       pciBridgeState.PRIO_REG_ENET.latched = latched;
       pciBridgeState.PRIO_REG_ENET.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_ENET.cpuIRQ = cpuIRQ;
-      break;    
-    case 0xEA00003C: // PRIO_XMA
+      break;
+    // PRIO_XMA
+    case 0xEA00003C:
       memcpy(&pciBridgeState.PRIO_REG_XMA.hexData, data, sizeof(pciBridgeState.PRIO_REG_XMA.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_XMA.hexData));
       pciBridgeState.PRIO_REG_XMA.intEnabled = enabled;
       pciBridgeState.PRIO_REG_XMA.latched = latched;
       pciBridgeState.PRIO_REG_XMA.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_XMA.cpuIRQ = cpuIRQ;
-      break;    
-    case 0xEA000040: // PRIO_AUDIO
+      break;
+    // PRIO_AUDIO
+    case 0xEA000040:
       memcpy(&pciBridgeState.PRIO_REG_AUDIO.hexData, data, sizeof(pciBridgeState.PRIO_REG_AUDIO.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_AUDIO.hexData));
       pciBridgeState.PRIO_REG_AUDIO.intEnabled = enabled;
       pciBridgeState.PRIO_REG_AUDIO.latched = latched;
       pciBridgeState.PRIO_REG_AUDIO.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_AUDIO.cpuIRQ = cpuIRQ;
       break;
-    case 0xEA000044: // PRIO_SFCX Secure Flash Controller for Xbox Int.
+    // PRIO_SFCX - Secure Flash Controller for Xbox Int
+    case 0xEA000044:
       memcpy(&pciBridgeState.PRIO_REG_SFCX.hexData, data, sizeof(pciBridgeState.PRIO_REG_SFCX.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_SFCX.hexData));
       pciBridgeState.PRIO_REG_SFCX.intEnabled = enabled;
       pciBridgeState.PRIO_REG_SFCX.latched = latched;
@@ -481,84 +492,96 @@ bool PCIBridge::MemSet(u64 writeAddress, s32 data, u64 size) {
     case 0xEA00000C:
       memset(&pciBridgeState.REG_EA00000C, data, sizeof(pciBridgeState.REG_EA00000C) > size ? size : sizeof(pciBridgeState.REG_EA00000C));
       break;
-    case 0xEA000010: // PRIO_CLOCK
+    // PRIO_CLOCK
+    case 0xEA000010:
       memset(&pciBridgeState.PRIO_REG_CLCK.hexData, data, sizeof(pciBridgeState.PRIO_REG_CLCK.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_CLCK.hexData));
       pciBridgeState.PRIO_REG_CLCK.intEnabled = enabled;
       pciBridgeState.PRIO_REG_CLCK.latched = latched;
       pciBridgeState.PRIO_REG_CLCK.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_CLCK.cpuIRQ = cpuIRQ;
-      break;    
-    case 0xEA000014: // PRIO_SATA_ODD
+      break;
+    // PRIO_SATA_ODD
+    case 0xEA000014:
       memset(&pciBridgeState.PRIO_REG_ODD.hexData, data, sizeof(pciBridgeState.PRIO_REG_ODD.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_ODD.hexData));
       pciBridgeState.PRIO_REG_ODD.intEnabled = enabled;
       pciBridgeState.PRIO_REG_ODD.latched = latched;
       pciBridgeState.PRIO_REG_ODD.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_ODD.cpuIRQ = cpuIRQ;
-      break;    
-    case 0xEA000018: // PRIO_SATA_HDD
+      break;
+    // PRIO_SATA_HDD
+    case 0xEA000018:
       memset(&pciBridgeState.PRIO_REG_HDD.hexData, data, sizeof(pciBridgeState.PRIO_REG_HDD.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_HDD.hexData));
       pciBridgeState.PRIO_REG_HDD.intEnabled = enabled;
       pciBridgeState.PRIO_REG_HDD.latched = latched;
       pciBridgeState.PRIO_REG_HDD.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_HDD.cpuIRQ = cpuIRQ;
       break;
-    case 0xEA00001C: // PRIO_SMM
+    // PRIO_SMM
+    case 0xEA00001C:
       memset(&pciBridgeState.PRIO_REG_SMM.hexData, data, sizeof(pciBridgeState.PRIO_REG_SMM.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_SMM.hexData));
       pciBridgeState.PRIO_REG_SMM.intEnabled = enabled;
       pciBridgeState.PRIO_REG_SMM.latched = latched;
       pciBridgeState.PRIO_REG_SMM.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_SMM.cpuIRQ = cpuIRQ;
-      break;    
-    case 0xEA000020: // PRIO_OHCI0
+      break;
+    // PRIO_OHCI0
+    case 0xEA000020:
       memset(&pciBridgeState.PRIO_REG_OHCI0.hexData, data, sizeof(pciBridgeState.PRIO_REG_OHCI0.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_OHCI0.hexData));
       pciBridgeState.PRIO_REG_OHCI0.intEnabled = enabled;
       pciBridgeState.PRIO_REG_OHCI0.latched = latched;
       pciBridgeState.PRIO_REG_OHCI0.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_OHCI0.cpuIRQ = cpuIRQ;
-      break;    
-    case 0xEA000024: // PRIO_OHCI1
+      break;
+    // PRIO_OHCI1
+    case 0xEA000024:
       memset(&pciBridgeState.PRIO_REG_OHCI1.hexData, data, sizeof(pciBridgeState.PRIO_REG_OHCI1.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_OHCI1.hexData));
       pciBridgeState.PRIO_REG_OHCI1.intEnabled = enabled;
       pciBridgeState.PRIO_REG_OHCI1.latched = latched;
       pciBridgeState.PRIO_REG_OHCI1.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_OHCI1.cpuIRQ = cpuIRQ;
-      break;    
-    case 0xEA000028: // PRIO_EHCI0
+      break;
+    // PRIO_EHCI0
+    case 0xEA000028:
       memset(&pciBridgeState.PRIO_REG_EHCI0.hexData, data, sizeof(pciBridgeState.PRIO_REG_EHCI0.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_EHCI0.hexData));
       pciBridgeState.PRIO_REG_EHCI0.intEnabled = enabled;
       pciBridgeState.PRIO_REG_EHCI0.latched = latched;
       pciBridgeState.PRIO_REG_EHCI0.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_EHCI0.cpuIRQ = cpuIRQ;
-      break;    
-    case 0xEA00002C: // PRIO_EHCI1
+      break;
+    // PRIO_EHCI1
+    case 0xEA00002C:
       memset(&pciBridgeState.PRIO_REG_EHCI1.hexData, data, sizeof(pciBridgeState.PRIO_REG_EHCI1.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_EHCI1.hexData));
       pciBridgeState.PRIO_REG_EHCI1.intEnabled = enabled;
       pciBridgeState.PRIO_REG_EHCI1.latched = latched;
       pciBridgeState.PRIO_REG_EHCI1.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_EHCI1.cpuIRQ = cpuIRQ;
-      break;    
-    case 0xEA000038: // PRIO_ENET
+      break;
+    // PRIO_ENET
+    case 0xEA000038:
       memset(&pciBridgeState.PRIO_REG_ENET.hexData, data, sizeof(pciBridgeState.PRIO_REG_ENET.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_ENET.hexData));
       pciBridgeState.PRIO_REG_ENET.intEnabled = enabled;
       pciBridgeState.PRIO_REG_ENET.latched = latched;
       pciBridgeState.PRIO_REG_ENET.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_ENET.cpuIRQ = cpuIRQ;
-      break;    
-    case 0xEA00003C: // PRIO_XMA
+      break;
+    // PRIO_XMA
+    case 0xEA00003C:
       memset(&pciBridgeState.PRIO_REG_XMA.hexData, data, sizeof(pciBridgeState.PRIO_REG_XMA.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_XMA.hexData));
       pciBridgeState.PRIO_REG_XMA.intEnabled = enabled;
       pciBridgeState.PRIO_REG_XMA.latched = latched;
       pciBridgeState.PRIO_REG_XMA.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_XMA.cpuIRQ = cpuIRQ;
-      break;    
-    case 0xEA000040: // PRIO_AUDIO
+      break;
+    // PRIO_AUDIO
+    case 0xEA000040:
       memset(&pciBridgeState.PRIO_REG_AUDIO.hexData, data, sizeof(pciBridgeState.PRIO_REG_AUDIO.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_AUDIO.hexData));
       pciBridgeState.PRIO_REG_AUDIO.intEnabled = enabled;
       pciBridgeState.PRIO_REG_AUDIO.latched = latched;
       pciBridgeState.PRIO_REG_AUDIO.targetCPU = targetCPU;
       pciBridgeState.PRIO_REG_AUDIO.cpuIRQ = cpuIRQ;
       break;
-    case 0xEA000044: // PRIO_SFCX Secure Flash Controller for Xbox Int.
+    // PRIO_SFCX - Secure Flash Controller for Xbox Int.
+    case 0xEA000044:
       memset(&pciBridgeState.PRIO_REG_SFCX.hexData, data, sizeof(pciBridgeState.PRIO_REG_SFCX.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_SFCX.hexData));
       pciBridgeState.PRIO_REG_SFCX.intEnabled = enabled;
       pciBridgeState.PRIO_REG_SFCX.latched = latched;
@@ -572,7 +595,7 @@ bool PCIBridge::MemSet(u64 writeAddress, s32 data, u64 size) {
     return true;
   }
 
-  // Try writing to one of the attached devices.
+  // Try writing to one of the attached devices
   for (auto &device : connectedPCIDevices) {
     if (device->isAddressMappedInBAR(static_cast<u32>(writeAddress))) {
       // Hit
@@ -593,7 +616,7 @@ void PCIBridge::ConfigRead(u64 readAddress, u8 *data, u64 size) {
     return;
   }
 
-  // Current device Name
+  // Current device name
   std::string currentDevName = {};
 
   switch (configAddr.devNum) {
@@ -665,7 +688,7 @@ void PCIBridge::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
     return;
   }
 
-  // Current device Name
+  // Current device name
   std::string currentDevName = {};
 
   switch (configAddr.devNum) {

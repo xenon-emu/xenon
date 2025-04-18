@@ -11,23 +11,23 @@
 // There are two SFCX Versions, pre-Jasper and post-Jasper
 SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
   PCIBridge* parentPCIBridge, RAM* ram) : PCIDevice(deviceName, size) {
-  // Asign parent PCI Bridge and RAM pointer.
+  // Asign parent PCI Bridge and RAM pointer
   parentBus = parentPCIBridge;
   mainMemory = ram;
 
-  // Set PCI Properties.
+  // Set PCI Properties
   pciConfigSpace.configSpaceHeader.reg0.hexData = 0x580B1414;
   pciConfigSpace.configSpaceHeader.reg1.hexData = 0x02000006;
   pciConfigSpace.configSpaceHeader.reg2.hexData = 0x05010001;
 
-  // Set our PCI Dev Sizes.
+  // Set our PCI Dev Sizes
   pciDevSizes[0] = 0x400; // BAR0
 
   LOG_INFO(SFCX, "Xenon Secure Flash Controller for Xbox.");
 
   // Set the registers as a dump from my Corona 16MB. These were dumped at POR
   // via Xell before SFCX Init. These are also readable via JRunner and
-  // simple360 flasher.
+  // simple360 flasher
 
   // Xenon Dev Kit ES DD2 64 MB
   // 0x01198030
@@ -36,7 +36,7 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
   // 0x000043000
 
   sfcxState.configReg = 0x000043000; // Config Reg is VERY Important. Tells info
-  // about Meta/NAND Type.
+  // about Meta/NAND Type
   sfcxState.statusReg = 0x00000600;
   sfcxState.statusReg = 0x00000600;
   sfcxState.addressReg = 0x00F70030;
@@ -44,13 +44,13 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
   sfcxState.physicalReg = 0x0000100;
   sfcxState.commandReg = NO_CMD;
 
-  // Display Flash config.
+  // Display Flash config
   LOG_INFO(SFCX, "FlashConfig: {:#x}", sfcxState.configReg);
 
-  // Load the NAND dump.
+  // Load the NAND dump
   LOG_INFO(SFCX, "Loading NAND from path: {}", nandLoadPath);
 
-  // Check Image size.
+  // Check Image size
   u64 imageSize = 0;
 
   // fs::file_size can cause a exception if it is not a valid file
@@ -75,13 +75,13 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
     SYSTEM_PAUSE();
   }
 
-  // Check file magic.
+  // Check file magic
   if (!checkMagic()) {
     LOG_CRITICAL(SFCX, "Fatal error! The loaded 'nand.bin' doesn't correspond to a Xbox 360 NAND.");
     SYSTEM_PAUSE();
   }
 
-  // Read NAND Image data.
+  // Read NAND Image data
   nandFile.seekg(0, std::ios::beg);
   rawImageData.resize(imageSize);
   constexpr u32 blockSize = 0x4000;
@@ -89,17 +89,17 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
     currentBlock += blockSize) {
     nandFile.read(reinterpret_cast<char*>(rawImageData.data() + currentBlock), blockSize);
   }
-  // Close the file.
+  // Close the file
   nandFile.close();
 
-  // Set our device BAR register based on the image size.
+  // Set our device BAR register based on the image size
   pciDevSizes[1] = imageSize; // BAR1
 
   // Read NAND header.
-  memcpy(&sfcxState.nandHeader, reinterpret_cast<char*>(rawImageData.data()), 
+  memcpy(&sfcxState.nandHeader, reinterpret_cast<char*>(rawImageData.data()),
     sizeof(sfcxState.nandHeader));
 
-  // Display info about the loaded image header.
+  // Display info about the loaded image header
   sfcxState.nandHeader.nandMagic = byteswap_be<u16>(sfcxState.nandHeader.nandMagic);
   LOG_INFO(SFCX, " * NAND Magic: {:#x}", sfcxState.nandHeader.nandMagic);
 
@@ -145,28 +145,28 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
   sfcxState.nandHeader.smcBootAddr = byteswap_be<u32>(sfcxState.nandHeader.smcBootAddr);
   LOG_INFO(SFCX, " * SMC Boot Addr: {:#x}", sfcxState.nandHeader.smcBootAddr);
 
-  // Get CB_A and CB_B headers.
+  // Get CB_A and CB_B headers
   BL_HEADER cbaHeader;
   BL_HEADER cbbHeader;
 
   // Get CB_A header data from image data.
   u32 cbaOffset = sfcxState.nandHeader.entry;
   cbaOffset = 1 ? ((cbaOffset / 0x200) * 0x210) + cbaOffset % 0x200 : cbaOffset;
-  memcpy(&cbaHeader, reinterpret_cast<char*>(rawImageData.data() + cbaOffset), 
+  memcpy(&cbaHeader, reinterpret_cast<char*>(rawImageData.data() + cbaOffset),
     sizeof(cbaHeader));
 
-  // Byteswap CB_A info from header.
+  // Byteswap CB_A info from header
   cbaHeader.buildNumber = byteswap_be<u16>(cbaHeader.buildNumber);
   cbaHeader.lenght = byteswap_be<u32>(cbaHeader.lenght);
   cbaHeader.entryPoint = byteswap_be<u32>(cbaHeader.entryPoint);
 
-  // Get CB_B header data from image data.
+  // Get CB_B header data from image data
   u32 cbbOffset = sfcxState.nandHeader.entry + cbaHeader.lenght;
   cbbOffset = 1 ? ((cbbOffset / 0x200) * 0x210) + cbbOffset % 0x200 : cbbOffset;
   memcpy(&cbbHeader, reinterpret_cast<char*>(rawImageData.data() + cbbOffset),
     sizeof(cbbHeader));
 
-  // Byteswap CB_B info from header.
+  // Byteswap CB_B info from header
   cbbHeader.buildNumber = byteswap_be<u16>(cbbHeader.buildNumber);
   cbbHeader.lenght = byteswap_be<u32>(cbbHeader.lenght);
   cbbHeader.entryPoint = byteswap_be<u32>(cbbHeader.entryPoint);
@@ -202,14 +202,14 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
     if (Config::xcpu.HW_INIT_SKIP_1 == 0 && Config::xcpu.HW_INIT_SKIP_2 == 0) {
       LOG_INFO(SFCX, "Auto-detecting Hardware Init stage skip addresses:");
       switch (cbVersion) {
-        // CB_B 6723
+      // CB_B 6723
       case 6723:
         Config::xcpu.HW_INIT_SKIP_1 = 0x03009B10;
         LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_1);
         Config::xcpu.HW_INIT_SKIP_2 = 0x03009BA4;
         LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_2);
         break;
-        // CB_B 9188, 15432
+      // CB_B 9188, 15432
       case 9188:
       case 15432:
         Config::xcpu.HW_INIT_SKIP_1 = 0x03003DC0;
@@ -217,7 +217,7 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
         Config::xcpu.HW_INIT_SKIP_2 = 0x03003E54;
         LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_2);
         break;
-        // CB_B 14352
+      // CB_B 14352
       case 14352:
         Config::xcpu.HW_INIT_SKIP_1 = 0x03003F48;
         LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_1);
@@ -235,22 +235,22 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
       LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_2);
     }
   }
-  // Enter SFCX Thread.
+  // Enter SFCX Thread
   sfcxThreadRunning = true;
   sfcxThread = std::thread(&SFCX::sfcxMainLoop, this);
 }
 
 SFCX::~SFCX() {
-  // Clear NAND image data.
+  // Clear NAND image data
   rawImageData.clear();
-  // Terminate thread.
+  // Terminate thread
   sfcxThreadRunning = false;
   if (sfcxThread.joinable())
     sfcxThread.join();
 }
 
 void SFCX::Read(u64 readAddress, u8* data, u64 size) {
-  // Set a lock on registers.
+  // Set a lock on registers
   std::lock_guard lck(mutex);
 
   const u16 reg = readAddress & 0xFF;
@@ -298,12 +298,12 @@ void SFCX::ConfigRead(u64 readAddress, u8* data, u64 size) {
 }
 
 void SFCX::Write(u64 writeAddress, const u8* data, u64 size) {
-  // Set a lock on registers.
+  // Set a lock on registers
   std::lock_guard lck(mutex);
 
   const u16 reg = writeAddress & 0xFF;
 
-  // Command register.
+  // Command register
   u32 command = NO_CMD;
 
   switch (reg) {
@@ -312,35 +312,35 @@ void SFCX::Write(u64 writeAddress, const u8* data, u64 size) {
     break;
   case SFCX_STATUS_REG:
     memcpy(&sfcxState.statusReg, data, size);
-    // Read then write to status register resets its state.
+    // Read then write to status register resets its state
     sfcxState.statusReg = STATUS_PIN_WP_N | STATUS_PIN_BY_N;
     break;
   case SFCX_COMMAND_REG:
-    // Set status to busy.
+    // Set status to busy
     sfcxState.statusReg |= STATUS_BUSY;
 
-    // Get the command.
+    // Get the command
     memcpy(&command, data, size);
 
     // This command has high priority.
     if (command == PAGE_BUF_TO_REG) {
       // If we're reading from Data Buffer to Data reg the Address reg becomes
-      // our buffer pointer.
+      // our buffer pointer
       memcpy(&sfcxState.dataReg, &sfcxState.pageBuffer[sfcxState.addressReg], 4);
 
 #ifdef SFCX_DEBUG
       LOG_DEBUG(SFCX, "PAGE_BUF_TO_REG[{:#x}] = {:#x}", sfcxState.addressReg, sfcxState.dataReg);
 #endif // SFCX_DEBUG
 
-      // Increase buffer pointer.
+      // Increase buffer pointer
       sfcxState.addressReg += 4;
 
       command = NO_CMD;
-      // Reset status.
+      // Reset status
       sfcxState.statusReg &= ~STATUS_BUSY;
     }
 
-    // Set command register.
+    // Set command register
     sfcxState.commandReg = command;
     break;
   case SFCX_ADDRESS_REG:
@@ -370,7 +370,7 @@ void SFCX::Write(u64 writeAddress, const u8* data, u64 size) {
   }
 }
 void SFCX::MemSet(u64 writeAddress, s32 data, u64 size) {
-  // Set a lock on registers.
+  // Set a lock on registers
   std::lock_guard lck(mutex);
 
   const u16 reg = writeAddress & 0xFF;
@@ -412,8 +412,7 @@ void SFCX::MemSet(u64 writeAddress, s32 data, u64 size) {
   }
 }
 
-void SFCX::ReadRaw(u64 readAddress, u8* data, u64 size)
-{
+void SFCX::ReadRaw(u64 readAddress, u8* data, u64 size) {
   u32 offset = static_cast<u32>(readAddress & 0xFFFFFF);
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
 #ifdef NAND_DEBUG
@@ -422,8 +421,7 @@ void SFCX::ReadRaw(u64 readAddress, u8* data, u64 size)
   memcpy(data, rawImageData.data() + offset, size);
 }
 
-void SFCX::WriteRaw(u64 writeAddress, const u8* data, u64 size)
-{
+void SFCX::WriteRaw(u64 writeAddress, const u8* data, u64 size) {
   u32 offset = static_cast<u32>(writeAddress & 0xFFFFFF);
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
 #ifdef NAND_DEBUG
@@ -432,8 +430,7 @@ void SFCX::WriteRaw(u64 writeAddress, const u8* data, u64 size)
   memcpy(rawImageData.data() + offset, data, size);
 }
 
-void SFCX::MemSetRaw(u64 writeAddress, s32 data, u64 size)
-{
+void SFCX::MemSetRaw(u64 writeAddress, s32 data, u64 size) {
   u32 offset = static_cast<u32>(writeAddress & 0xFFFFFF);
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
 #ifdef NAND_DEBUG
@@ -445,13 +442,13 @@ void SFCX::MemSetRaw(u64 writeAddress, s32 data, u64 size)
 void SFCX::ConfigWrite(u64 writeAddress, const u8* data, u64 size) {
   const u8 offset = writeAddress & 0xFF;
 
-  // Check if we're being scanned.
+  // Check if we're being scanned
   u64 tmp = 0;
   memcpy(&tmp, data, size);
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
-      if (tmp == 0xFFFFFFFF) { // PCI BAR Size discovery.
+      if (tmp == 0xFFFFFFFF) { // PCI BAR Size discovery
         u64 x = 2;
         for (int idx = 2; idx < 31; idx++) {
           tmp &= ~x;
@@ -463,8 +460,8 @@ void SFCX::ConfigWrite(u64 writeAddress, const u8* data, u64 size) {
         tmp &= ~0x3;
       }
     }
-    if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address.
-      tmp = 0; // Register not implemented.
+    if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address
+      tmp = 0; // Register not implemented
     }
   }
 
@@ -473,28 +470,34 @@ void SFCX::ConfigWrite(u64 writeAddress, const u8* data, u64 size) {
 
 void SFCX::sfcxMainLoop() {
   Base::SetCurrentThreadName("[Xe::SFCX] Main");
-  // Config register should be initialized by now.
+  // Config register should be initialized by now
   while (sfcxThreadRunning) {
     // Did we got a command?
     if (sfcxState.commandReg != NO_CMD) {
 
-      // Set a lock on registers.
+      // Set a lock on registers
       std::lock_guard lck(mutex);
 
-      // Check the command reg to see what command was issued.
+      // Check the command reg to see what command was issued
       switch (sfcxState.commandReg) {
-      case PHY_PAGE_TO_BUF: sfcxReadPageFromNAND(true); break;
-      case LOG_PAGE_TO_BUF: sfcxReadPageFromNAND(false); break;
-      case DMA_PHY_TO_RAM: sfcxDoDMAfromNAND(true); break;
+      case PHY_PAGE_TO_BUF:
+        sfcxReadPageFromNAND(true);
+        break;
+      case LOG_PAGE_TO_BUF:
+        sfcxReadPageFromNAND(false);
+        break;
+      case DMA_PHY_TO_RAM:
+        sfcxDoDMAfromNAND(true);
+        break;
       default:
         LOG_ERROR(SFCX, "Unrecognized command was issued. {:#x}", sfcxState.commandReg);
         break;
       }
 
-      // Clear Command Register.
+      // Clear Command Register
       sfcxState.commandReg = NO_CMD;
 
-      // Set Status to Ready again.
+      // Set Status to Ready again
       sfcxState.statusReg &= ~STATUS_BUSY;
     }
   }
@@ -505,9 +508,9 @@ bool SFCX::checkMagic() {
 
   nandFile.read(reinterpret_cast<char*>(magic), sizeof(magic));
 
-  // Retail Nand Magic is 0xFF4F.
-  // Devkit Nand Magic is 0x0F4F.
-  // Older Devkit Nand's magic is 0x0F3F.
+  // Retail Nand Magic is 0xFF4F
+  // Devkit Nand Magic is 0x0F4F
+  // Older Devkit Nand's magic is 0x0F3F
 
   if (magic[0] == (char)0xFF && magic[1] == (char)0x4F) {
     LOG_INFO(SFCX, "Retail NAND Magic found.");
@@ -525,7 +528,7 @@ bool SFCX::checkMagic() {
 }
 
 void SFCX::sfcxReadPageFromNAND(bool physical) {
-  // Calculate NAND offset.
+  // Calculate NAND offset
   u32 nandOffset = sfcxState.addressReg;
   nandOffset = 1 ? ((nandOffset / 0x200) * 0x210) + nandOffset % 0x200 : nandOffset;
 
@@ -534,14 +537,14 @@ void SFCX::sfcxReadPageFromNAND(bool physical) {
     physical, sfcxState.addressReg, nandOffset);
 #endif // SFCX_DEBUG
 
-  // Clear the page buffer.
+  // Clear the page buffer
   memset(reinterpret_cast<void*>(sfcxState.pageBuffer), 0, sizeof(sfcxState.pageBuffer));
 
-  // Perform the Read.
+  // Perform the read
   memcpy(reinterpret_cast<char*>(sfcxState.pageBuffer), reinterpret_cast<char*>(rawImageData.data() + nandOffset),
     physical ? sfcxState.pageSizePhys : sfcxState.pageSize);
 
-  // Issue Interrupt if interrupts are enabled in flash config.
+  // Issue Interrupt if interrupts are enabled in flash config
   if (sfcxState.configReg & CONFIG_INT_EN) {
     parentBus->RouteInterrupt(PRIO_SFCX);
     sfcxState.statusReg |= STATUS_INT_CP;
@@ -549,15 +552,15 @@ void SFCX::sfcxReadPageFromNAND(bool physical) {
 }
 
 void SFCX::sfcxDoDMAfromNAND(bool physical) {
-  // Physical address when doing DMA.
+  // Physical address when doing DMA
   u32 physAddr = sfcxState.addressReg;
-  // Calculate Physical address offset for starting page.
+  // Calculate Physical address offset for starting page
   physAddr = 1 ? ((physAddr / 0x200) * 0x210) + physAddr % 0x200 : physAddr;
 
-  // Number of pages to be transfered when doing DMA.
+  // Number of pages to be transfered when doing DMA
   u32 dmaPagesNum = ((sfcxState.configReg & CONFIG_DMA_LEN) >> 6) + 1;
 
-  // Get RAM pointers for both buffers.
+  // Get RAM pointers for both buffers
   u8* dataPhysAddrPtr = mainMemory->getPointerToAddress(sfcxState.dataPhysAddrReg);
   u8* sparePhysAddrPtr = mainMemory->getPointerToAddress(sfcxState.sparePhysAddrReg);
 
@@ -566,33 +569,33 @@ void SFCX::sfcxDoDMAfromNAND(bool physical) {
     dmaPagesNum, sfcxState.addressReg, physAddr, sfcxState.dataPhysAddrReg, sfcxState.sparePhysAddrReg);
 #endif // SFCX_DEBUG
 
-  // Read Pages to SFCX_DATAPHYADDR_REG and page sapre to SFCX_SPAREPHYADDR_REG.
+  // Read Pages to SFCX_DATAPHYADDR_REG and page sapre to SFCX_SPAREPHYADDR_REG
   for (size_t pageNum = 0; pageNum < dmaPagesNum; pageNum++) {
 #ifdef SFCX_DEBUG
     LOG_DEBUG(SFCX, "DMA_PHY_TO_RAM: Reading Page {:#x}. Physical Address: {:#x}", pageNum, physAddr);
 #endif // SFCX_DEBUG
 
-    // Clear the page buffer.
+    // Clear the page buffer
     memset(reinterpret_cast<void*>(sfcxState.pageBuffer), 0, sizeof(sfcxState.pageBuffer));
 
-    // Get page data.
+    // Get page data
     memcpy(reinterpret_cast<char*>(sfcxState.pageBuffer), reinterpret_cast<char*>(rawImageData.data() + physAddr),
       sfcxState.pageSizePhys);
 
-    // Write page and spare to RAM.
-    // On DMA, physical pages are split into Page data and Spare Data, and stored at different locations in memory. 
+    // Write page and spare to RAM
+    // On DMA, physical pages are split into Page data and Spare Data, and stored at different locations in memory
     memcpy(dataPhysAddrPtr, &sfcxState.pageBuffer, sfcxState.pageSize);
     memcpy(sparePhysAddrPtr, &sfcxState.pageBuffer[sfcxState.pageSize], sfcxState.spareSize);
 
-    // Increase buffer pointers.
-    dataPhysAddrPtr += sfcxState.pageSize;    // Logical page size.
-    sparePhysAddrPtr += sfcxState.spareSize;  // Spare Size.
+    // Increase buffer pointers
+    dataPhysAddrPtr += sfcxState.pageSize;   // Logical page size
+    sparePhysAddrPtr += sfcxState.spareSize; // Spare Size
 
-    // Increase read address.
+    // Increase read address
     physAddr += sfcxState.pageSizePhys;
   }
 
-  // Issue Interrupt if interrupts are enabled in flash config.
+  // Issue Interrupt if interrupts are enabled in flash config
   if (sfcxState.configReg & CONFIG_INT_EN) {
     parentBus->RouteInterrupt(PRIO_SFCX);
     sfcxState.statusReg |= STATUS_INT_CP;

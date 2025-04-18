@@ -23,7 +23,7 @@ Xe::Xenos::XGPU::XGPU(RAM *ram) {
   // Located at config address 0xD0010000.
   memcpy(xgpuConfigSpace.data, xgpuConfigMap, sizeof(xgpuConfigSpace.data));
 
-  // Set our PCI Dev Sizes.
+  // Set our PCI Dev Sizes
   pciDevSizes[0] = 0x20000; // BAR0
 
   xenosState.Regs = std::make_unique<STRIP_UNIQUE_ARR(xenosState.Regs)>(0xFFFFF);
@@ -165,13 +165,13 @@ void Xe::Xenos::XGPU::ConfigRead(u64 readAddress, u8 *data, u64 size) {
 
 void Xe::Xenos::XGPU::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   std::lock_guard lck(mutex);
-  // Check if we're being scanned.
+  // Check if we're being scanned
   u64 tmp = 0;
   memcpy(&tmp, data, size);
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
-      if (tmp == 0xFFFFFFFF) { // PCI BAR Size discovery.
+      if (tmp == 0xFFFFFFFF) { // PCI BAR Size discovery
         u64 x = 2;
         for (int idx = 2; idx < 31; idx++) {
           tmp &= ~x;
@@ -183,8 +183,8 @@ void Xe::Xenos::XGPU::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
         tmp &= ~0x3;
       }
     }
-    if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address.
-      tmp = 0; // Register not implemented.
+    if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address
+      tmp = 0; // Register not implemented
     }
   }
 

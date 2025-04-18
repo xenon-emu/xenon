@@ -9,7 +9,7 @@
 NAND::NAND(const std::string &deviceName, SFCX* sfcxDevicePtr,
   u64 startAddress, u64 endAddress,
   bool isSOCDevice) : SystemDevice(deviceName, startAddress, endAddress, isSOCDevice) {
-  // Set the SFCX device pointer.
+  // Set the SFCX device pointer
   sfcxDevice = sfcxDevicePtr;
 }
 

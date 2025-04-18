@@ -602,7 +602,7 @@ void Xe::XCPU::POSTBUS::POST(u64 postCode) {
       LOG_XBOX(Xenon_PostBus, "LOAD_XAM - Initialize xam.xex");
       break;
     }*/
-  } 
+  }
   else {
     LOG_ERROR(Xenon_PostBus, "POST: Unrecognized post code: {:#x}", postCode);
   }

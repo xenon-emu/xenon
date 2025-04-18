@@ -84,15 +84,15 @@ union PPCOpcode {
 Condition Register
 
 The CR fields can be set in one of the following ways:
-• Specified fields of the CR can be set from a GPR by using the mtcrf and mtocrf
-instruction. • The contents of the XER[0–3] can be moved to another CR field by
-using the mcrf instruction. • A specified field of the XER can be copied to a
-specified field of the CR by using the mcrxr instruction. • A specified field of
+* Specified fields of the CR can be set from a GPR by using the mtcrf and mtocrf
+instruction. * The contents of the XER[0-3] can be moved to another CR field by
+using the mcrf instruction. * A specified field of the XER can be copied to a
+specified field of the CR by using the mcrxr instruction. * A specified field of
 the FPSCR can be copied to a specified field of the CR by using the mcrfs
-instruction. • Logical instructions of the condition register can be used to
-perform logical operations on specified bits in the condition register. • CR0
-can be the implicit result of an integer instruction. • CR1 can be the implicit
-result of a floating-point instruction. • A specified CR field can indicate the
+instruction. * Logical instructions of the condition register can be used to
+perform logical operations on specified bits in the condition register. * CR0
+can be the implicit result of an integer instruction. * CR1 can be the implicit
+result of a floating-point instruction. * A specified CR field can indicate the
 result of either an integer or floating-point compare instruction
 */
 union CRegister {
@@ -317,7 +317,7 @@ struct SLBEntry {
 // Holds a cache of the recently used PTE's.
 struct TLBEntry {
   bool V;   // Entry valid.
-  u64 pte0; // Holds the valid bit, as well as the AVPN. 
+  u64 pte0; // Holds the valid bit, as well as the AVPN
   u64 pte1; // Contains the RPN.
 };
 struct TLB_Reg {
@@ -423,14 +423,12 @@ struct PPU_STATE_SPRS {
   u64 HID6;
 };
 
-// Thread ID's for ease of handling.
+// Thread IDs for ease of handling
 enum ePPUThread : u8 {
   ePPUThread_Zero = 0,
   ePPUThread_One,
   ePPUThread_None
 };
-
-// Thread ID's for ease of handling.
 enum ePPUThreadBit : u8 {
   ePPUThreadBit_None = 0,
   ePPUThreadBit_Zero,
@@ -452,9 +450,9 @@ enum SECENG_REGION_TYPE {
 };
 
 struct SECENG_ADDRESS_INFO {
-  // Real address we're accesing on the Bus.
-  u32 accesedAddr;
-  // Region This address belongs to.
+  // Real address we're accessing on the bus
+  u32 accessedAddr;
+  // Region This address belongs to
   SECENG_REGION_TYPE regionType;
   // Key used to hash/encrypt this address.
   u8 keySelected;
@@ -496,18 +494,18 @@ typedef struct _SECENG_KEYS {
   u64 HashKey1Low;            // 0x98 sz:0x8
 } SECENG_KEYS, *PSECENG_KEYS; // size 160
 
-typedef struct SOCSECENG_BLOCK {       // Addr = 80000200_00024000
-  SECENG_KEYS WritePathKeys;           // 0x0 sz:0xA0
-  u64 TraceLogicArrayWritePathControl; // 0xA0 sz:0x8
+typedef struct SOCSECENG_BLOCK {             // Addr = 80000200_00024000
+  SECENG_KEYS WritePathKeys;                 // 0x0 sz:0xA0
+  u64 TraceLogicArrayWritePathControl;       // 0xA0 sz:0x8
   u64 qwUnkn1;
   u64 Reserved1[0x1EA];                      // 0xA8 sz:0xF58
   SECENG_KEYS ReadPathKeys;                  // 0x1000 sz:0xA0
   u64 TraceLogicArrayReadPathControl;        // 0x10A0 sz:0x8
   SECENG_FAULT_ISOLATION FaultIsolationMask; // 0x10A8 sz:0x8
-  SECENG_FAULT_ISOLATION FaultIsolation; // 0x10B0 sz:0x8 - set to zero in CB
-  u64 IntegrityViolationSignature;       // 0x10B8 sz:0x8
+  SECENG_FAULT_ISOLATION FaultIsolation;     // 0x10B0 sz:0x8 - set to zero in CB
+  u64 IntegrityViolationSignature;           // 0x10B8 sz:0x8
   u64 qwUnkn2;
-  u64 Reserved2[0x1E7];               // 0x10C0 sz:0xF40
+  u64 Reserved2[0x1E7];                      // 0x10C0 sz:0xF40
 } SOCSECENG_BLOCK, *PSOCSECENG_BLOCK; // size 8192
 
 #define XE_RESET_VECTOR 0x100
@@ -518,9 +516,11 @@ typedef struct SOCSECENG_BLOCK {       // Addr = 80000200_00024000
 #define XE_FUSESET_LOC 0x20000
 #define XE_FUSESET_SIZE 0x17FF
 #define XE_L2_CACHE_SIZE 0x100000
-#define XE_PVR 0x00710500 // Corona: 0x00710800 Jasper: 0x00710500
+// Corona: 0x00710800
+// Jasper: 0x00710500
+#define XE_PVR 0x00710500
 
-// Exception Bitmasks for Exception Register.
+// Exception Bitmasks for Exception Register
 
 #define PPU_EX_NONE 0x0
 #define PPU_EX_RESET 0x1
@@ -740,5 +740,3 @@ struct XENON_CONTEXT {
 #define SPR_L2SR 1018
 #define SPR_BPVR 1022
 #define SPR_PIR 1023
-
-// Macros for ease of coding.

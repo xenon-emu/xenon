@@ -62,23 +62,23 @@ Xe::PCIDev::SMC::SMCCore::SMCCore(const std::string &deviceName, u64 size,
   PCIDevice(deviceName, size) {
   LOG_INFO(SMC, "Core: Initializing...");
 
-  // Assign our parent PCI Bus Ptr.
+  // Assign our parent PCI Bus pointer
   pciBridge = parentPCIBridge;
 
   // Assign our core sate, this is already filled with config data regarding
-  // AVPACK, PWRON Reason and TrayState.
+  // AVPACK, PWRON Reason and TrayState
   smcCoreState = newSMCCoreState;
 
   // Create a new SMC PCI State
   memset(&smcPCIState, 0, sizeof(smcPCIState));
 
-  // Set UART Status to Empty.
+  // Set UART Status to Empty
   smcPCIState.uartStatusReg = UART_STATUS_EMPTY;
 
-  // Set PCI Config Space registers.
+  // Set PCI Config Space registers
   memcpy(pciConfigSpace.data, smcConfigSpaceMap, sizeof(smcConfigSpaceMap));
 
-  // Set our PCI Dev Sizes.
+  // Set our PCI Dev Sizes
   pciDevSizes[0] = 0x100; // BAR0
 
   // Create UART handle
@@ -119,7 +119,7 @@ void Xe::PCIDev::SMC::SMCCore::Read(u64 readAddress, u8 *data, u64 size) {
   case UART_CONFIG_REG: // UART Config Register
     memcpy(data, &smcPCIState.uartConfigReg, size);
     break;
-  case UART_BYTE_OUT_REG: // UART Data Out Register  
+  case UART_BYTE_OUT_REG: // UART Data Out Register
     smcPCIState.uartOutReg = smcCoreState->uartHandle->Read();
     if (smcCoreState->uartHandle->retVal) {
       memcpy(data, &smcPCIState.uartOutReg, size);
@@ -300,14 +300,14 @@ void Xe::PCIDev::SMC::SMCCore::MemSet(u64 writeAddress, s32 data, u64 size) {
 
 // PCI Config Write
 void Xe::PCIDev::SMC::SMCCore::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {  
-  // Check if we're being scanned.
+  // Check if we're being scanned
   u64 tmp = 0;
   memcpy(&tmp, data, size);
   LOG_DEBUG(SMC, "ConfigWrite: Address = {:#x}, Data = {:#x}, size = {:#x}.", writeAddress, tmp, size);
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
-      if (tmp == 0xFFFFFFFF) { // PCI BAR Size discovery.
+      if (tmp == 0xFFFFFFFF) { // PCI BAR Size discovery
         u64 x = 2;
         for (int idx = 2; idx < 31; idx++) {
           tmp &= ~x;
@@ -319,8 +319,8 @@ void Xe::PCIDev::SMC::SMCCore::ConfigWrite(u64 writeAddress, const u8 *data, u64
         tmp &= ~0x3;
       }
     }
-    if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address.
-      tmp = 0; // Register not implemented.
+    if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address
+      tmp = 0; // Register not implemented
     }
   }
   

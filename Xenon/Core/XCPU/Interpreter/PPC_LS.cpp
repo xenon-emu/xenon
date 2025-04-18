@@ -10,7 +10,7 @@
 //
 
 void PPCInterpreter::PPCInterpreter_dcbst(PPU_STATE *ppuState) {
-  // Temporarely disable caching.
+  // Temporarily disable caching
   return;
 }
 
@@ -18,18 +18,18 @@ void PPCInterpreter::PPCInterpreter_dcbz(PPU_STATE *ppuState) {
   u64 EA = (_instr.ra ? GPRi(ra) : 0) + GPRi(rb);
   EA = EA & ~(128 - 1); // Cache line size
 
-  // Temporarely diasable caching.
+  // Temporarily diasable caching
   for (u8 n = 0; n < 128; n += sizeof(u64))
     MMUWrite64(ppuState, EA + n, 0);
   return;
 
   // As far as I can tell, XCPU does all the crypto, scrambling of
   // data on L2 cache, and DCBZ is used for creating cache blocks
-  // and also erasing them.
+  // and also erasing them
 }
 
 void PPCInterpreter::PPCInterpreter_icbi(PPU_STATE *ppuState) {
-  // Do nothing.
+  // Do nothing
 }
 
 // Store Byte (x'9800 0000')
@@ -270,7 +270,7 @@ void PPCInterpreter::PPCInterpreter_stwcx(PPU_STATE *ppuState) {
   u64 RA = EA;
   u32 CR = 0;
 
-  // If address is not aligned by 4, then we must issue a trap.
+  // If address is not aligned by 4, then we must issue a trap
 
   if (curThread.SPR.XER.SO)
     BSET(CR, 4, CR_BIT_SO);
@@ -386,7 +386,7 @@ void PPCInterpreter::PPCInterpreter_stdcx(PPU_STATE *ppuState) {
   if (curThread.SPR.XER.SO)
     BSET(CR, 4, CR_BIT_SO);
 
-  // If address is not aligned by 4, the we must issue a trap.
+  // If address is not aligned by 4, the we must issue a trap
   if (curThread.ppuRes->V) {
     MMUTranslateAddress(&RA, ppuState, true);
 
@@ -783,8 +783,7 @@ void PPCInterpreter::PPCInterpreter_lwarx(PPU_STATE *ppuState) {
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
 
-  // TODO: If address is not aligned by 4, the we must issue a trap.
-
+  // TODO: If address is not aligned by 4, the we must issue a trap
   u64 RA = EA;
   MMUTranslateAddress(&RA, ppuState, false);
 
@@ -926,7 +925,7 @@ void PPCInterpreter::PPCInterpreter_ld(PPU_STATE *ppuState) {
 
 // Load Double Word Byte Reversed Indexed
 void PPCInterpreter::PPCInterpreter_ldbrx(PPU_STATE *ppuState) {
-  // TODO(bitsh1ft3r): Add instruction def and check for that ~7 to be correct.
+  // TODO(bitsh1ft3r): Add instruction def and check for that ~7 to be correct
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   u64 RA = EA & ~7;
   u64 data = MMURead64(ppuState, EA);
@@ -948,8 +947,7 @@ void PPCInterpreter::PPCInterpreter_ldarx(PPU_STATE *ppuState) {
   rD <- MEM(EA, 8)
   */
 
-  // TODO: if the address is not aligned by 8 issue a trap.
-
+  // TODO: if the address is not aligned by 8 issue a trap
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   u64 RA = EA & ~7;
   MMUTranslateAddress(&RA, ppuState, false);
@@ -1028,7 +1026,7 @@ void PPCInterpreter::PPCInterpreter_lfd(PPU_STATE *ppuState) {
   EA <- b + EXTS(d)
   frD <- MEM(EA, 8)
   */
-  // Check if Floating Point is available.
+  // Check if floating point is enabled
   ASSERT(curThread.SPR.MSR.FP == 1);
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
@@ -1048,7 +1046,7 @@ void PPCInterpreter::PPCInterpreter_lfdx(PPU_STATE *ppuState) {
   EA <- b + (rB)
   frD <- MEM(EA, 8)
   */
-  // Check if Floating Point is available.
+  // Check if floating point is enabled
   ASSERT(curThread.SPR.MSR.FP == 1);
 
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
@@ -1067,7 +1065,7 @@ void PPCInterpreter::PPCInterpreter_lfdu(PPU_STATE *ppuState) {
   frD <- MEM(EA, 8)
   rA <- EA
   */
-  // Check if Floating Point is available.
+  // Check if floating point is enabled
   ASSERT(curThread.SPR.MSR.FP == 1);
 
   const u64 EA = GPRi(ra) + _instr.simm16;
@@ -1087,7 +1085,7 @@ void PPCInterpreter::PPCInterpreter_lfdux(PPU_STATE *ppuState) {
   frD <- MEM(EA, 8)
   rA <- EA
   */
-  // Check if Floating Point is available.
+  // Check if floating point is enabled
   ASSERT(curThread.SPR.MSR.FP == 1);
 
   const u64 EA = GPRi(ra) + GPRi(rb);
@@ -1108,7 +1106,7 @@ void PPCInterpreter::PPCInterpreter_lfs(PPU_STATE *ppuState) {
   EA <- b + EXTS(d)
   frD <- DOUBLE(MEM(EA, 4))
   */
-  // Check if Floating Point is available.
+  // Check if Floating Point is available
   ASSERT(curThread.SPR.MSR.FP == 1);
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;

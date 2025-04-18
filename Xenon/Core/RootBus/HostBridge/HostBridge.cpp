@@ -2,13 +2,13 @@
 
 #include "HostBridge.h"
 
-#include "Base/Logging/Log.h" 
+#include "Base/Logging/Log.h"
 #include "Core/Xe_Main.h"
 
 HostBridge::HostBridge() {
   xGPU = nullptr;
   pciBridge = nullptr;
-  // Config HostBridge As Per Dump taken from a Jasper Console.
+  // Config HostBridge As Per Dump taken from a Jasper Console
   // Device/Vendor ID
   hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = 0x58301414;
   // Device Type/Revision
@@ -35,14 +35,14 @@ bool HostBridge::Read(u64 readAddress, u8 *data, u64 size) {
   // Reading from host bridge registers?
   if (isAddressMappedinBAR(static_cast<u32>(readAddress))) {
     switch (readAddress) {
-      // HostBridge
+    // HostBridge
     case 0xE0020000:
       *data = hostBridgeRegs.REG_E0020000;
       break;
     case 0xE0020004:
       *data = hostBridgeRegs.REG_E0020004;
       break;
-      // BIU
+    // BIU
     case 0xE1020004:
       *data = biuRegs.REG_E1020004;
       break;
@@ -59,8 +59,8 @@ bool HostBridge::Read(u64 readAddress, u8 *data, u64 size) {
       *data = biuRegs.REG_E1040000;
       break;
     default:
-        LOG_ERROR(HostBridge, "Unknown register being read at address: {:#x}.",
-            readAddress);
+      LOG_ERROR(HostBridge, "Unknown register being read at address: {:#x}.",
+          readAddress);
       *data = 0;
       break;
     }
@@ -84,14 +84,14 @@ bool HostBridge::Read(u64 readAddress, u8 *data, u64 size) {
     return true;
   }
 
-  // Read failed or address is not on this bus.
+  // Read failed or address is not on this bus
   return false;
 }
 
 bool HostBridge::Write(u64 writeAddress, const u8 *data, u64 size) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "HostBridge::Write", MP_AUTO);
   std::lock_guard lck(mutex);
-  
+
   // If we are not UART, send it to log
   if (false) {
     std::stringstream ss{};
@@ -193,7 +193,7 @@ bool HostBridge::Write(u64 writeAddress, const u8 *data, u64 size) {
     return true;
   }
 
-  // Write failed or address is not on this bus.
+  // Write failed or address is not on this bus
   return false;
 }
 
@@ -293,7 +293,7 @@ bool HostBridge::MemSet(u64 writeAddress, s32 data, u64 size) {
     return true;
   }
 
-  // Write failed or address is not on this bus.
+  // Write failed or address is not on this bus
   return false;
 }
 
@@ -336,13 +336,16 @@ void HostBridge::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
 
   if (configAddress.busNum == 0) {
     switch (configAddress.devNum) {
-    case 0x0: // PCI-PCI Bridge
+    // PCI-PCI Bridge
+    case 0x0:
       pciBridge->ConfigWrite(writeAddress, data, size);
       break;
-    case 0x1: // Host Bridge
+    // Host Bridge
+    case 0x1:
       memcpy(&hostBridgeConfigSpace.data[configAddress.regOffset], data, size);
       break;
-    case 0x2: // GPU/Memory Controller
+    // GPU/Memory Controller
+    case 0x2:
       xGPU->ConfigWrite(writeAddress, data, size);
       break;
     default:

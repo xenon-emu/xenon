@@ -4,7 +4,7 @@
 
 #ifndef NO_GFX
 
-#include "Render/Implementations/OGLTexture.h" 
+#include "Render/Implementations/OGLTexture.h"
 #include "GUI/Implementations/OpenGL.h"
 #include "Base/Config.h"
 #include "Base/Version.h"
@@ -301,7 +301,7 @@ void Render::Renderer::Thread() {
       MICROPROFILE_SCOPEI("[Xe::Render::GUI]", "Render", MP_AUTO);
       gui->Render(backbuffer.get());
     }
-    
+
     // GL Swap
     if (Xe_Main.get() && !Xe_Main->renderHalt) {
       MICROPROFILE_SCOPEI("[Xe::Render]", "Swap", MP_AUTO);

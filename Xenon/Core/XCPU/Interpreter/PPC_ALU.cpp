@@ -7,9 +7,9 @@
 // Helper functions.
 //
 
-// Based on the work done by the rpcs3 team.
+// Based on the work done by the rpcs3 team
 
-// Add/Add Carrying implementation.
+// Add/Add Carrying implementation
 template <typename T>
 struct addResult {
   T result;
@@ -17,10 +17,10 @@ struct addResult {
 
   addResult() = default;
 
-  // Straighforward ADD with flags.
-  // The integer arithmetic instructions, always set the XER bit [CA], 
-  // to reflect the carry out of bit [0] in the default 64-bit mode 
-  // and out of bit[32] in 32 bit mode(of 64 bit implementations).
+  // Straighforward ADD with flags
+  // The integer arithmetic instructions, always set the XER bit [CA],
+  // to reflect the carry out of bit [0] in the default 64-bit mode
+  // and out of bit[32] in 32 bit mode(of 64 bit implementations)
   addResult(T a, T b, bool sfBitMode) :
     result(a + b), carry(sfBitMode ? (result < a) :
       (static_cast<u32>(result) < static_cast<u32>(a)))
@@ -84,19 +84,19 @@ u64 rotl64(u64 x, u64 n)
 #endif
 }
 
-// Duplicates a u32 value left, used in rotate instructions that duplicate the 
-// lower 32 bits.
+// Duplicates a u32 value left, used in rotate instructions that duplicate the
+// lower 32 bits
 inline u64 duplicate32(u32 x) { return x | static_cast<u64>(x) << 32; }
 
-// Set XER[OV] bit. Overflow enable.
-inline void ppuSetXerOv(PPU_STATE* ppuState, bool inbit)
+// Set XER[OV] bit. Overflow enable
+inline void ppuSetXerOv(PPU_STATE *ppuState, bool inbit)
 {
   XERegister xer = curThread.SPR.XER;
-  // Set register as intended.
+  // Set register as intended
   curThread.SPR.XER.XER_Hex = 0;
-  // Mantain ByteCount.
+  // Maintain ByteCount
   curThread.SPR.XER.ByteCount = xer.ByteCount;
-  // Should mantain SO and CA bits.
+  // Should maintain SO and CA bits
   if (xer.CA)
     curThread.SPR.XER.CA = 1;
   if (xer.SO || inbit)
@@ -108,18 +108,19 @@ inline void ppuSetXerOv(PPU_STATE* ppuState, bool inbit)
 // Vali004 loves macros, and i'm getting used to them also!
 
 // Compares and records the input value taking into account computation mode.
-#define RECORD_CR0(x) if (curThread.SPR.MSR.SF) { \
-                      ppuSetCR<s64>(ppuState, 0, x, 0); \
-                      } else { \
-                      ppuSetCR<s32>(ppuState, 0, static_cast<s32>(x), 0); \
-                      }
+#define RECORD_CR0(x) \
+  if (curThread.SPR.MSR.SF) { \
+    ppuSetCR<s64>(ppuState, 0, x, 0); \
+  } else { \
+    ppuSetCR<s32>(ppuState, 0, static_cast<s32>(x), 0); \
+  }
 
 //
 // Instruction definitions.
 //
 
-// Add (x’7C00 0214’)
-void PPCInterpreter::PPCInterpreter_addx(PPU_STATE* ppuState) {
+// Add (x'7C00 0214')
+void PPCInterpreter::PPCInterpreter_addx(PPU_STATE *ppuState) {
   /*
     rD <- (rA) + (rB)
   */
@@ -129,9 +130,9 @@ void PPCInterpreter::PPCInterpreter_addx(PPU_STATE* ppuState) {
 
   GPRi(rd) = RA + RB;
 
-  // The setting of the affected bits in the XER is mode-dependent, 
-  // and reflects overflow of the 64-bit result in 64 bit mode and 
-  // overflow of the low-order 32 bit result in 32 bit mode.
+  // The setting of the affected bits in the XER is mode-dependent,
+  // and reflects overflow of the 64-bit result in 64 bit mode and
+  // overflow of the low-order 32 bit result in 32 bit mode
   if (_instr.oe) {
     bool ovSet = false;
     if (curThread.SPR.MSR.SF) {
@@ -144,21 +145,20 @@ void PPCInterpreter::PPCInterpreter_addx(PPU_STATE* ppuState) {
     ppuSetXerOv(ppuState, ovSet);
   }
 
-  // So basically after doing hardware tests it appears that at least in 32bit 
-  // mode of operation the setting of CR is mode-dependant.
-  // _rc
+  // So basically after doing hardware tests it appears that at least in 32bit
+  // mode of operation the setting of CR is mode-dependant
   if (_instr.rc) {
     RECORD_CR0(GPRi(rd));
   }
 }
+
 // Add + OE
-void PPCInterpreter::PPCInterpreter_addox(PPU_STATE* ppuState)
-{
+void PPCInterpreter::PPCInterpreter_addox(PPU_STATE *ppuState) {
   PPCInterpreter_addx(ppuState);
 }
 
-// Add Carrying (x’7C00 0014’)
-void PPCInterpreter::PPCInterpreter_addcx(PPU_STATE* ppuState) {
+// Add Carrying (x'7C00 0014')
+void PPCInterpreter::PPCInterpreter_addcx(PPU_STATE *ppuState) {
   /*
     rD <- (rA) + (rB)
   */
@@ -172,7 +172,7 @@ void PPCInterpreter::PPCInterpreter_addcx(PPU_STATE* ppuState) {
   XER_SET_CA(add.carry);
 
   // _oe
-  if (_instr.oe) { // Mode dependent.
+  if (_instr.oe) { // Mode dependent
     bool ovSet = false;
     if (curThread.SPR.MSR.SF) {
       ovSet = (RA >> 63 == RB >> 63) && (RA >> 63 != GPRi(rd) >> 63);
@@ -189,14 +189,14 @@ void PPCInterpreter::PPCInterpreter_addcx(PPU_STATE* ppuState) {
     RECORD_CR0(GPRi(rd));
   }
 }
+
 // Add Carrying + OE
-void PPCInterpreter::PPCInterpreter_addcox(PPU_STATE* ppuState)
-{
+void PPCInterpreter::PPCInterpreter_addcox(PPU_STATE *ppuState) {
   PPCInterpreter_addcx(ppuState);
 }
 
-// Add Extended (x’7C00 0114’)
-void PPCInterpreter::PPCInterpreter_addex(PPU_STATE* ppuState) {
+// Add Extended (x'7C00 0114')
+void PPCInterpreter::PPCInterpreter_addex(PPU_STATE *ppuState) {
   /*
     rD <- (rA) + (rB) + XER[CA]
   */
@@ -227,14 +227,14 @@ void PPCInterpreter::PPCInterpreter_addex(PPU_STATE* ppuState) {
     RECORD_CR0(add.result);
   }
 }
+
 // Add Extended + OE
-void PPCInterpreter::PPCInterpreter_addeox(PPU_STATE* ppuState)
-{
+void PPCInterpreter::PPCInterpreter_addeox(PPU_STATE *ppuState) {
   PPCInterpreter_addex(ppuState);
 }
 
-// Add Immediate (x’3800 0000’)
-void PPCInterpreter::PPCInterpreter_addi(PPU_STATE* ppuState) {
+// Add Immediate (x'3800 0000')
+void PPCInterpreter::PPCInterpreter_addi(PPU_STATE *ppuState) {
   /*
     if rA = 0 then rD <- EXTS(SIMM)
     else rD <- (rA) + EXTS(SIMM)
@@ -243,8 +243,8 @@ void PPCInterpreter::PPCInterpreter_addi(PPU_STATE* ppuState) {
   GPRi(rd) = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
 }
 
-// Add Immediate Carrying (x’3000 0000’)
-void PPCInterpreter::PPCInterpreter_addic(PPU_STATE* ppuState) {
+// Add Immediate Carrying (x'3000 0000')
+void PPCInterpreter::PPCInterpreter_addic(PPU_STATE *ppuState) {
   /*
     rD <- (rA) + EXTS(SIMM)
   */
@@ -263,8 +263,8 @@ void PPCInterpreter::PPCInterpreter_addic(PPU_STATE* ppuState) {
   }
 }
 
-// Add Immediate Shifted (x’3C00 0000’)
-void PPCInterpreter::PPCInterpreter_addis(PPU_STATE* ppuState) {
+// Add Immediate Shifted (x'3C00 0000')
+void PPCInterpreter::PPCInterpreter_addis(PPU_STATE *ppuState) {
   /*
     if rA = 0 then rD <- EXTS(SIMM || (16)0)
     else rD <- (rA) + EXTS(SIMM || (16)0)
@@ -274,11 +274,10 @@ void PPCInterpreter::PPCInterpreter_addis(PPU_STATE* ppuState) {
   GPRi(rd) = _instr.ra ? GPRi(ra) + (_instr.simm16 * 65536) : (_instr.simm16 * 65536);
 }
 
-// Add to Minus One Extended (x’7C00 01D4’)
-void PPCInterpreter::PPCInterpreter_addmex(PPU_STATE* ppuState)
-{
+// Add to Minus One Extended (x'7C00 01D4')
+void PPCInterpreter::PPCInterpreter_addmex(PPU_STATE *ppuState) {
   /*
-    rD <- (rA) + XER[CA] – 1
+    rD <- (rA) + XER[CA] - 1
   */
 
   const s64 RA = GPRi(ra);
@@ -288,8 +287,7 @@ void PPCInterpreter::PPCInterpreter_addmex(PPU_STATE* ppuState)
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
 
-  // _oe
-  if (_instr.oe) { // Mode dependent.
+  if (_instr.oe) {
     bool ovSet = false;
     if (curThread.SPR.MSR.SF) {
       ovSet = (static_cast<u64>(RA) >> 63 == 1) &&
@@ -302,19 +300,18 @@ void PPCInterpreter::PPCInterpreter_addmex(PPU_STATE* ppuState)
     ppuSetXerOv(ppuState, ovSet);
   }
 
-  // _rc
   if (_instr.rc) {
     RECORD_CR0(add.result);
   }
 }
+
 // Add to Minus One Extended + OE
-void PPCInterpreter::PPCInterpreter_addmeox(PPU_STATE* ppuState)
-{
+void PPCInterpreter::PPCInterpreter_addmeox(PPU_STATE *ppuState) {
   PPCInterpreter_addmex(ppuState);
 }
 
-// Add to Zero Extended (x’7C00 0194’)
-void PPCInterpreter::PPCInterpreter_addzex(PPU_STATE* ppuState) {
+// Add to Zero Extended (x'7C00 0194')
+void PPCInterpreter::PPCInterpreter_addzex(PPU_STATE *ppuState) {
   /*
     rD <- (rA) + XER[CA]
   */
@@ -327,8 +324,8 @@ void PPCInterpreter::PPCInterpreter_addzex(PPU_STATE* ppuState) {
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
 
-  // _oe
-  if (_instr.oe) { // Mode dependent.
+  // Mode dependent
+  if (_instr.oe) {
     bool ovSet = false;
     if (curThread.SPR.MSR.SF) {
       ovSet = (RA >> 63 == 0) && (RA >> 63 != GPRi(rd) >> 63);
@@ -345,14 +342,14 @@ void PPCInterpreter::PPCInterpreter_addzex(PPU_STATE* ppuState) {
     RECORD_CR0(add.result);
   }
 }
+
 // Add to Zero Extended + OE
-void PPCInterpreter::PPCInterpreter_addzeox(PPU_STATE* ppuState)
-{
+void PPCInterpreter::PPCInterpreter_addzeox(PPU_STATE *ppuState) {
   PPCInterpreter_addzex(ppuState);
 }
 
-// And (x’7C00 0038’)
-void PPCInterpreter::PPCInterpreter_andx(PPU_STATE* ppuState) {
+// And (x'7C00 0038')
+void PPCInterpreter::PPCInterpreter_andx(PPU_STATE *ppuState) {
   /*
     rA <- (rS) & (rB)
   */
@@ -365,8 +362,8 @@ void PPCInterpreter::PPCInterpreter_andx(PPU_STATE* ppuState) {
   }
 }
 
-// AND with Complement (x’7C00 0078’)
-void PPCInterpreter::PPCInterpreter_andcx(PPU_STATE* ppuState) {
+// AND with Complement (x'7C00 0078')
+void PPCInterpreter::PPCInterpreter_andcx(PPU_STATE *ppuState) {
   /*
     rA <- (rS) + ~(rB)
   */
@@ -379,8 +376,8 @@ void PPCInterpreter::PPCInterpreter_andcx(PPU_STATE* ppuState) {
   }
 }
 
-// And Immediate (x’7000 0000’)
-void PPCInterpreter::PPCInterpreter_andi(PPU_STATE* ppuState) {
+// And Immediate (x'7000 0000')
+void PPCInterpreter::PPCInterpreter_andi(PPU_STATE *ppuState) {
   /*
     rA <- (rS) & ((48)0 || UIMM)
   */
@@ -390,8 +387,8 @@ void PPCInterpreter::PPCInterpreter_andi(PPU_STATE* ppuState) {
   RECORD_CR0(GPRi(ra));
 }
 
-// And Immediate Shifted (x’7400 0000’)
-void PPCInterpreter::PPCInterpreter_andis(PPU_STATE* ppuState) {
+// And Immediate Shifted (x'7400 0000')
+void PPCInterpreter::PPCInterpreter_andis(PPU_STATE *ppuState) {
   /*
     rA <- (rS) + ((32)0 || UIMM || (16)0)
   */
@@ -401,7 +398,7 @@ void PPCInterpreter::PPCInterpreter_andis(PPU_STATE* ppuState) {
   RECORD_CR0(GPRi(ra))
 }
 
-void PPCInterpreter::PPCInterpreter_cmp(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_cmp(PPU_STATE *ppuState) {
   if (_instr.l10) {
     ppuSetCR<s64>(ppuState, _instr.crfd, GPRi(ra), GPRi(rb));
   }
@@ -410,7 +407,7 @@ void PPCInterpreter::PPCInterpreter_cmp(PPU_STATE* ppuState) {
   }
 }
 
-void PPCInterpreter::PPCInterpreter_cmpi(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_cmpi(PPU_STATE *ppuState) {
   if (_instr.l10) {
     ppuSetCR<s64>(ppuState, _instr.crfd, GPRi(ra), _instr.simm16);
   }
@@ -419,7 +416,7 @@ void PPCInterpreter::PPCInterpreter_cmpi(PPU_STATE* ppuState) {
   }
 }
 
-void PPCInterpreter::PPCInterpreter_cmpl(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_cmpl(PPU_STATE *ppuState) {
   if (_instr.l10) {
     ppuSetCR<u64>(ppuState, _instr.crfd, GPRi(ra), GPRi(rb));
   }
@@ -428,7 +425,7 @@ void PPCInterpreter::PPCInterpreter_cmpl(PPU_STATE* ppuState) {
   }
 }
 
-void PPCInterpreter::PPCInterpreter_cmpli(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_cmpli(PPU_STATE *ppuState) {
   if (_instr.l10) {
     ppuSetCR<u64>(ppuState, _instr.crfd, GPRi(ra), _instr.uimm16);
   }
@@ -437,8 +434,8 @@ void PPCInterpreter::PPCInterpreter_cmpli(PPU_STATE* ppuState) {
   }
 }
 
-// Count Leading Zeros Double Word (x’7C00 0074’)
-void PPCInterpreter::PPCInterpreter_cntlzdx(PPU_STATE* ppuState) {
+// Count Leading Zeros Double Word (x'7C00 0074')
+void PPCInterpreter::PPCInterpreter_cntlzdx(PPU_STATE *ppuState) {
   /*
     n <- 0
     do while n < 64
@@ -455,14 +452,14 @@ void PPCInterpreter::PPCInterpreter_cntlzdx(PPU_STATE* ppuState) {
   }
 }
 
-// Count Leading Zeros Word (x’7C00 0034’)
-void PPCInterpreter::PPCInterpreter_cntlzwx(PPU_STATE* ppuState) {
+// Count Leading Zeros Word (x'7C00 0034')
+void PPCInterpreter::PPCInterpreter_cntlzwx(PPU_STATE *ppuState) {
   /*
     n <- 32
     do while n < 64
       if rS[n] = 1 then leave
       n <- n + 1
-    rA <- n – 32
+    rA <- n - 32
   */
 
   GPRi(ra) = std::countl_zero(static_cast<u32>(GPRi(rs)));
@@ -473,7 +470,7 @@ void PPCInterpreter::PPCInterpreter_cntlzwx(PPU_STATE* ppuState) {
   }
 }
 
-void PPCInterpreter::PPCInterpreter_crand(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_crand(PPU_STATE *ppuState) {
   XL_FORM_BT_BA_BB;
 
   const u32 a = CR_GET(BA);
@@ -487,7 +484,7 @@ void PPCInterpreter::PPCInterpreter_crand(PPU_STATE* ppuState) {
     BCLR(curThread.CR.CR_Hex, 32, BT);
 }
 
-void PPCInterpreter::PPCInterpreter_crandc(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_crandc(PPU_STATE *ppuState) {
   XL_FORM_BT_BA_BB;
 
   const u32 a = CR_GET(BA);
@@ -501,7 +498,7 @@ void PPCInterpreter::PPCInterpreter_crandc(PPU_STATE* ppuState) {
     BCLR(curThread.CR.CR_Hex, 32, BT);
 }
 
-void PPCInterpreter::PPCInterpreter_creqv(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_creqv(PPU_STATE *ppuState) {
   XL_FORM_BT_BA_BB;
 
   const u32 a = CR_GET(BA);
@@ -515,7 +512,7 @@ void PPCInterpreter::PPCInterpreter_creqv(PPU_STATE* ppuState) {
     BCLR(curThread.CR.CR_Hex, 32, BT);
 }
 
-void PPCInterpreter::PPCInterpreter_crnand(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_crnand(PPU_STATE *ppuState) {
   XL_FORM_BT_BA_BB;
 
   const u32 a = CR_GET(BA);
@@ -529,7 +526,7 @@ void PPCInterpreter::PPCInterpreter_crnand(PPU_STATE* ppuState) {
     BCLR(curThread.CR.CR_Hex, 32, BT);
 }
 
-void PPCInterpreter::PPCInterpreter_crnor(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_crnor(PPU_STATE *ppuState) {
   XL_FORM_BT_BA_BB;
 
   const u32 a = CR_GET(BA);
@@ -543,7 +540,7 @@ void PPCInterpreter::PPCInterpreter_crnor(PPU_STATE* ppuState) {
     BCLR(curThread.CR.CR_Hex, 32, BT);
 }
 
-void PPCInterpreter::PPCInterpreter_cror(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_cror(PPU_STATE *ppuState) {
   XL_FORM_BT_BA_BB;
   const u32 a = CR_GET(BA);
   const u32 b = CR_GET(BB);
@@ -556,7 +553,7 @@ void PPCInterpreter::PPCInterpreter_cror(PPU_STATE* ppuState) {
     BCLR(curThread.CR.CR_Hex, 32, BT);
 }
 
-void PPCInterpreter::PPCInterpreter_crorc(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_crorc(PPU_STATE *ppuState) {
   XL_FORM_BT_BA_BB;
 
   const u32 a = CR_GET(BA);
@@ -570,7 +567,7 @@ void PPCInterpreter::PPCInterpreter_crorc(PPU_STATE* ppuState) {
     BCLR(curThread.CR.CR_Hex, 32, BT);
 }
 
-void PPCInterpreter::PPCInterpreter_crxor(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_crxor(PPU_STATE *ppuState) {
   XL_FORM_BT_BA_BB;
 
   const u32 a = CR_GET(BA);
@@ -584,11 +581,11 @@ void PPCInterpreter::PPCInterpreter_crxor(PPU_STATE* ppuState) {
     BCLR(curThread.CR.CR_Hex, 32, BT);
 }
 
-// Divide Double Word (x’7C00 03D2’)
-void PPCInterpreter::PPCInterpreter_divdx(PPU_STATE* ppuState) {
+// Divide Double Word (x'7C00 03D2')
+void PPCInterpreter::PPCInterpreter_divdx(PPU_STATE *ppuState) {
   /*
-    dividend[0–63] <- (rA)
-    divisor[0–63] <- (rB)
+    dividend[0-63] <- (rA)
+    divisor[0-63] <- (rB)
     rD <- dividend + divisor
   */
 
@@ -603,12 +600,12 @@ void PPCInterpreter::PPCInterpreter_divdx(PPU_STATE* ppuState) {
   }
 }
 
-// Divide Double Word Unsigned (x’7C00 0392’)
-void PPCInterpreter::PPCInterpreter_divdux(PPU_STATE* ppuState) {
+// Divide Double Word Unsigned (x'7C00 0392')
+void PPCInterpreter::PPCInterpreter_divdux(PPU_STATE *ppuState) {
   /*
-    dividend[0–63] <- (rA)
-    divisor[0–63] <- (rB)
-    rD <- dividend ÷ divisor
+    dividend[0-63] <- (rA)
+    divisor[0-63] <- (rB)
+    rD <- dividend / divisor
   */
 
   const u64 RA = GPRi(ra);
@@ -621,13 +618,13 @@ void PPCInterpreter::PPCInterpreter_divdux(PPU_STATE* ppuState) {
   }
 }
 
-// Divide Word (x’7C00 03D6’)
-void PPCInterpreter::PPCInterpreter_divwx(PPU_STATE* ppuState) {
+// Divide Word (x'7C00 03D6')
+void PPCInterpreter::PPCInterpreter_divwx(PPU_STATE *ppuState) {
   /*
-    dividend[0–63] <- EXTS(rA[32–63])
-    divisor[0–63] <- EXTS(rB[32–63])
-    rD[32–63] <- dividend ÷ divisor
-    rD[0–31] <- undefined
+    dividend[0-63] <- EXTS(rA[32-63])
+    divisor[0-63] <- EXTS(rB[32-63])
+    rD[32-63] <- dividend / divisor
+    rD[0-31] <- undefined
   */
 
   const s32 RA = static_cast<s32>(GPRi(ra));
@@ -647,18 +644,18 @@ void PPCInterpreter::PPCInterpreter_divwx(PPU_STATE* ppuState) {
 }
 
 // Divide Word + OE
-void PPCInterpreter::PPCInterpreter_divwox(PPU_STATE* ppuState)
+void PPCInterpreter::PPCInterpreter_divwox(PPU_STATE *ppuState)
 {
   PPCInterpreter_divwx(ppuState);
 }
 
-// Divide Word Unsigned (x’7C00 0396’)
-void PPCInterpreter::PPCInterpreter_divwux(PPU_STATE* ppuState) {
+// Divide Word Unsigned (x'7C00 0396')
+void PPCInterpreter::PPCInterpreter_divwux(PPU_STATE *ppuState) {
   /*
-    dividend[0–63] <- (32)0 || (rA)[32–63]
-    divisor[0–63] <- (32)0 || (rB)[32–63]
-    rD[32–63] <- dividend ÷ divisor
-    rD[0–31] <- undefined
+    dividend[0-63] <- (32)0 || (rA)[32-63]
+    divisor[0-63] <- (32)0 || (rB)[32-63]
+    rD[32-63] <- dividend / divisor
+    rD[0-31] <- undefined
   */
 
   const u32 RA = static_cast<u32>(GPRi(ra));
@@ -674,14 +671,14 @@ void PPCInterpreter::PPCInterpreter_divwux(PPU_STATE* ppuState) {
     RECORD_CR0(GPRi(rd));
   }
 }
+
 // Divide Word Unsigned + OE
-void PPCInterpreter::PPCInterpreter_divwuox(PPU_STATE* ppuState)
-{
+void PPCInterpreter::PPCInterpreter_divwuox(PPU_STATE *ppuState) {
   PPCInterpreter_divwux(ppuState);
 }
 
-// Equivalent (x’7C00 0238’)
-void PPCInterpreter::PPCInterpreter_eqvx(PPU_STATE* ppuState) {
+// Equivalent (x'7C00 0238')
+void PPCInterpreter::PPCInterpreter_eqvx(PPU_STATE *ppuState) {
   /*
     rA <- 1 ^ ((rS) ^ (rB))
   */
@@ -694,12 +691,12 @@ void PPCInterpreter::PPCInterpreter_eqvx(PPU_STATE* ppuState) {
   }
 }
 
-// Extend Sign Byte (x’7C00 0774’)
-void PPCInterpreter::PPCInterpreter_extsbx(PPU_STATE* ppuState) {
+// Extend Sign Byte (x'7C00 0774')
+void PPCInterpreter::PPCInterpreter_extsbx(PPU_STATE *ppuState) {
   /*
     S <- rS[56]
-    rA[56–63] <- rS[56–63]
-    rA[0–55] <- (56)S
+    rA[56-63] <- rS[56-63]
+    rA[0-55] <- (56)S
   */
 
   GPRi(ra) = static_cast<s8>(GPRi(rs));
@@ -710,12 +707,12 @@ void PPCInterpreter::PPCInterpreter_extsbx(PPU_STATE* ppuState) {
   }
 }
 
-// Extend Sign Half Word (x’7C00 0734’)
-void PPCInterpreter::PPCInterpreter_extshx(PPU_STATE* ppuState) {
+// Extend Sign Half Word (x'7C00 0734')
+void PPCInterpreter::PPCInterpreter_extshx(PPU_STATE *ppuState) {
   /*
     S <- rS[48]
-    rA[48–63] <- rS[48–63]
-    rA[0–47] <- (48)S
+    rA[48-63] <- rS[48-63]
+    rA[0-47] <- (48)S
   */
 
   GPRi(ra) = static_cast<s16>(GPRi(rs));
@@ -726,12 +723,12 @@ void PPCInterpreter::PPCInterpreter_extshx(PPU_STATE* ppuState) {
   }
 }
 
-// Extend Sign Word (x’7C00 07B4’)
-void PPCInterpreter::PPCInterpreter_extswx(PPU_STATE* ppuState) {
+// Extend Sign Word (x'7C00 07B4')
+void PPCInterpreter::PPCInterpreter_extswx(PPU_STATE *ppuState) {
   /*
     S <- rS[32]
-    rA[32–63] <- rS[32–63]
-    rA[0–31] <- (32)S
+    rA[32-63] <- rS[32-63]
+    rA[0-31] <- (32)S
   */
 
   GPRi(ra) = static_cast<s32>(GPRi(rs));
@@ -742,7 +739,7 @@ void PPCInterpreter::PPCInterpreter_extswx(PPU_STATE* ppuState) {
   }
 }
 
-void PPCInterpreter::PPCInterpreter_mcrf(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_mcrf(PPU_STATE *ppuState) {
   XL_FORM_BF_BFA;
 
   u32 CR = DGET(curThread.CR.CR_Hex, (BFA) * 4,
@@ -751,8 +748,8 @@ void PPCInterpreter::PPCInterpreter_mcrf(PPU_STATE* ppuState) {
   ppcUpdateCR(ppuState, BF, CR);
 }
 
-// Move from Time Base (x’7C00 02E6’)
-void PPCInterpreter::PPCInterpreter_mftb(PPU_STATE* ppuState) {
+// Move from Time Base (x'7C00 02E6')
+void PPCInterpreter::PPCInterpreter_mftb(PPU_STATE *ppuState) {
   /*
     n <- tbr[5-9] || tbr[0-4]
     if n = 268 then
@@ -783,7 +780,7 @@ void PPCInterpreter::PPCInterpreter_mftb(PPU_STATE* ppuState) {
   }
 }
 
-void PPCInterpreter::PPCInterpreter_mfocrf(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_mfocrf(PPU_STATE *ppuState) {
   if (_instr.l11) {
     // MFOCRF
     u32 crMask = 0;
@@ -811,7 +808,7 @@ void PPCInterpreter::PPCInterpreter_mfocrf(PPU_STATE* ppuState) {
   }
 }
 
-void PPCInterpreter::PPCInterpreter_mtocrf(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_mtocrf(PPU_STATE *ppuState) {
   // MTOCRF
   u32 crMask = 0;
   u32 bit = 0x80;
@@ -825,8 +822,8 @@ void PPCInterpreter::PPCInterpreter_mtocrf(PPU_STATE* ppuState) {
   curThread.CR.CR_Hex = (static_cast<u32>(GPRi(rs)) & crMask) | (curThread.CR.CR_Hex & ~crMask);
 }
 
-// Multiply Low Immediate (x’1C00 0000’)
-void PPCInterpreter::PPCInterpreter_mulli(PPU_STATE* ppuState) {
+// Multiply Low Immediate (x'1C00 0000')
+void PPCInterpreter::PPCInterpreter_mulli(PPU_STATE *ppuState) {
   /*
     prod[0-127] <- (rA) * EXTS(SIMM)
     rD <- prod[64-127]
@@ -835,8 +832,8 @@ void PPCInterpreter::PPCInterpreter_mulli(PPU_STATE* ppuState) {
   GPRi(rd) = static_cast<s64>(GPRi(ra)) * _instr.simm16;
 }
 
-// Multiply Low Double Word (x’7C00 01D2’)
-void PPCInterpreter::PPCInterpreter_mulldx(PPU_STATE* ppuState) {
+// Multiply Low Double Word (x'7C00 01D2')
+void PPCInterpreter::PPCInterpreter_mulldx(PPU_STATE *ppuState) {
   /*
     prod[0-127] <- (rA) * (rB)
     rD <- prod[64-127]
@@ -852,8 +849,8 @@ void PPCInterpreter::PPCInterpreter_mulldx(PPU_STATE* ppuState) {
   }
 }
 
-// Multiply Low Word (x’7C00 01D6’)
-void PPCInterpreter::PPCInterpreter_mullwx(PPU_STATE* ppuState) {
+// Multiply Low Word (x'7C00 01D6')
+void PPCInterpreter::PPCInterpreter_mullwx(PPU_STATE *ppuState) {
   /*
     rD <- rA[32-63] * rB[32-63]
   */
@@ -861,8 +858,8 @@ void PPCInterpreter::PPCInterpreter_mullwx(PPU_STATE* ppuState) {
   GPRi(rd) = s64{ static_cast<s32>(GPRi(ra)) } *static_cast<s32>(GPRi(rb));
 
   if (_instr.oe) {
-    ppuSetXerOv(ppuState, s64(GPRi(rd)) < INT32_MIN
-      || s64(GPRi(rd)) > INT32_MAX);
+    ppuSetXerOv(ppuState, s64(GPRi(rd)) < INT32_MIN ||
+                          s64(GPRi(rd)) > INT32_MAX);
   }
 
   // _rc
@@ -871,13 +868,13 @@ void PPCInterpreter::PPCInterpreter_mullwx(PPU_STATE* ppuState) {
   }
 }
 // Multiply Low Word + OE
-void PPCInterpreter::PPCInterpreter_mullwox(PPU_STATE* ppuState)
+void PPCInterpreter::PPCInterpreter_mullwox(PPU_STATE *ppuState)
 {
   PPCInterpreter_mullwx(ppuState);
 }
 
-// Multiply High Word (x’7C00 0096’)
-void PPCInterpreter::PPCInterpreter_mulhwx(PPU_STATE* ppuState)
+// Multiply High Word (x'7C00 0096')
+void PPCInterpreter::PPCInterpreter_mulhwx(PPU_STATE *ppuState)
 {
   /*
     prod[0-63] <- rA[32-63] * rB[32-63]
@@ -895,8 +892,8 @@ void PPCInterpreter::PPCInterpreter_mulhwx(PPU_STATE* ppuState)
   }
 }
 
-// Multiply High Word Unsigned (x’7C00 0016’)
-void PPCInterpreter::PPCInterpreter_mulhwux(PPU_STATE* ppuState) {
+// Multiply High Word Unsigned (x'7C00 0016')
+void PPCInterpreter::PPCInterpreter_mulhwux(PPU_STATE *ppuState) {
   /*
     prod[0-63] <- rA[32-63] * rB[32-63]
     rD[32-63] <- prod[0-31]
@@ -913,8 +910,8 @@ void PPCInterpreter::PPCInterpreter_mulhwux(PPU_STATE* ppuState) {
   }
 }
 
-// Multiply High Double Word (x’7C00 0092’)
-void PPCInterpreter::PPCInterpreter_mulhdx(PPU_STATE* ppuState)
+// Multiply High Double Word (x'7C00 0092')
+void PPCInterpreter::PPCInterpreter_mulhdx(PPU_STATE *ppuState)
 {
   /*
     prod[0-127] <- (rA) * (rB)
@@ -928,8 +925,8 @@ void PPCInterpreter::PPCInterpreter_mulhdx(PPU_STATE* ppuState)
   }
 }
 
-// Multiply High Double Word Unsigned (x’7C00 0012’)
-void PPCInterpreter::PPCInterpreter_mulhdux(PPU_STATE* ppuState) {
+// Multiply High Double Word Unsigned (x'7C00 0012')
+void PPCInterpreter::PPCInterpreter_mulhdux(PPU_STATE *ppuState) {
   /*
     prod[0-127] <- (rA) * (rB)
     rD <- prod[0-63]
@@ -944,7 +941,7 @@ void PPCInterpreter::PPCInterpreter_mulhdux(PPU_STATE* ppuState) {
 }
 
 // NAND
-void PPCInterpreter::PPCInterpreter_nandx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_nandx(PPU_STATE *ppuState) {
   /*
     rA <- ~((rS) & (rB))
   */
@@ -958,7 +955,7 @@ void PPCInterpreter::PPCInterpreter_nandx(PPU_STATE* ppuState) {
 }
 
 // Negate
-void PPCInterpreter::PPCInterpreter_negx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_negx(PPU_STATE *ppuState) {
   /*
     rD <- ~(rA) + 1
   */
@@ -982,14 +979,14 @@ void PPCInterpreter::PPCInterpreter_negx(PPU_STATE* ppuState) {
     RECORD_CR0(GPRi(rd));
   }
 }
+
 // Negate + OE
-void PPCInterpreter::PPCInterpreter_negox(PPU_STATE* ppuState)
-{
+void PPCInterpreter::PPCInterpreter_negox(PPU_STATE *ppuState) {
   PPCInterpreter_negx(ppuState);
 }
 
-// NOR (x’7C00 00F8’)
-void PPCInterpreter::PPCInterpreter_norx(PPU_STATE* ppuState) {
+// NOR (x'7C00 00F8')
+void PPCInterpreter::PPCInterpreter_norx(PPU_STATE *ppuState) {
   /*
     rA <- ~((rS) | (rB))
   */
@@ -1002,9 +999,8 @@ void PPCInterpreter::PPCInterpreter_norx(PPU_STATE* ppuState) {
   }
 }
 
-// OR with Complement (x’7C00 0338’)
-void PPCInterpreter::PPCInterpreter_orcx(PPU_STATE* ppuState)
-{
+// OR with Complement (x'7C00 0338')
+void PPCInterpreter::PPCInterpreter_orcx(PPU_STATE *ppuState) {
   /*
     rA <- (rS) | ~(rB)
   */
@@ -1017,8 +1013,8 @@ void PPCInterpreter::PPCInterpreter_orcx(PPU_STATE* ppuState)
   }
 }
 
-// OR Immediate (x’6000 0000’)
-void PPCInterpreter::PPCInterpreter_ori(PPU_STATE* ppuState) {
+// OR Immediate (x'6000 0000')
+void PPCInterpreter::PPCInterpreter_ori(PPU_STATE *ppuState) {
   /*
     rA <- (rS) | ((4816)0 || UIMM)
   */
@@ -1026,8 +1022,8 @@ void PPCInterpreter::PPCInterpreter_ori(PPU_STATE* ppuState) {
   GPRi(ra) = GPRi(rs) | _instr.uimm16;
 }
 
-// OR Immediate Shifted (x’6400 0000’)
-void PPCInterpreter::PPCInterpreter_oris(PPU_STATE* ppuState) {
+// OR Immediate Shifted (x'6400 0000')
+void PPCInterpreter::PPCInterpreter_oris(PPU_STATE *ppuState) {
   /*
     rA <- (rS) | ((32)0 || UIMM || (16)0)
   */
@@ -1035,8 +1031,8 @@ void PPCInterpreter::PPCInterpreter_oris(PPU_STATE* ppuState) {
   GPRi(ra) = GPRi(rs) | (u64{ _instr.uimm16 } << 16);
 }
 
-// OR (x’7C00 0378’)
-void PPCInterpreter::PPCInterpreter_orx(PPU_STATE* ppuState) {
+// OR (x'7C00 0378')
+void PPCInterpreter::PPCInterpreter_orx(PPU_STATE *ppuState) {
   /*
     rA <- (rS) | (rB)
   */
@@ -1049,8 +1045,8 @@ void PPCInterpreter::PPCInterpreter_orx(PPU_STATE* ppuState) {
   }
 }
 
-// Rotate Left Double Word Immediate then Clear (x’7800 0008’)
-void PPCInterpreter::PPCInterpreter_rldicx(PPU_STATE* ppuState) {
+// Rotate Left Double Word Immediate then Clear (x'7800 0008')
+void PPCInterpreter::PPCInterpreter_rldicx(PPU_STATE *ppuState) {
   /*
     n <- sh[5] || sh[0-4]
     r <- ROTL[64](rS, n)
@@ -1067,8 +1063,8 @@ void PPCInterpreter::PPCInterpreter_rldicx(PPU_STATE* ppuState) {
   }
 }
 
-// Rotate Left Double Word then Clear Right (x’7800 0012’)
-void PPCInterpreter::PPCInterpreter_rldcrx(PPU_STATE* ppuState) {
+// Rotate Left Double Word then Clear Right (x'7800 0012')
+void PPCInterpreter::PPCInterpreter_rldcrx(PPU_STATE *ppuState) {
   /*
     n <- rB[58-63]
     r <- ROTL[64](rS, n)
@@ -1085,8 +1081,8 @@ void PPCInterpreter::PPCInterpreter_rldcrx(PPU_STATE* ppuState) {
   }
 }
 
-// Rotate Left Double Word then Clear Left (x’7800 0010’)
-void PPCInterpreter::PPCInterpreter_rldclx(PPU_STATE* ppuState) {
+// Rotate Left Double Word then Clear Left (x'7800 0010')
+void PPCInterpreter::PPCInterpreter_rldclx(PPU_STATE *ppuState) {
   /*
     n <- rB[58-63]
     r <- ROTL[64](rS, n)
@@ -1103,8 +1099,8 @@ void PPCInterpreter::PPCInterpreter_rldclx(PPU_STATE* ppuState) {
   }
 }
 
-// Rotate Left Double Word Immediate then Clear Left (x’7800 0000’)
-void PPCInterpreter::PPCInterpreter_rldiclx(PPU_STATE* ppuState) {
+// Rotate Left Double Word Immediate then Clear Left (x'7800 0000')
+void PPCInterpreter::PPCInterpreter_rldiclx(PPU_STATE *ppuState) {
   /*
     n <- sh[5] || sh[0-4]
     r <- ROTL[64](rS, n)
@@ -1121,8 +1117,8 @@ void PPCInterpreter::PPCInterpreter_rldiclx(PPU_STATE* ppuState) {
   }
 }
 
-// Rotate Left Double Word Immediate then Clear Right (x’7800 0004’)
-void PPCInterpreter::PPCInterpreter_rldicrx(PPU_STATE* ppuState) {
+// Rotate Left Double Word Immediate then Clear Right (x'7800 0004')
+void PPCInterpreter::PPCInterpreter_rldicrx(PPU_STATE *ppuState) {
   /*
     n <- sh[5] || sh[0-4]
     r <- ROTL[64](rS, n)
@@ -1139,8 +1135,8 @@ void PPCInterpreter::PPCInterpreter_rldicrx(PPU_STATE* ppuState) {
   }
 }
 
-// Rotate Left Double Word Immediate then Mask Insert (x’7800 000C’)
-void PPCInterpreter::PPCInterpreter_rldimix(PPU_STATE* ppuState) {
+// Rotate Left Double Word Immediate then Mask Insert (x'7800 000C')
+void PPCInterpreter::PPCInterpreter_rldimix(PPU_STATE *ppuState) {
   /*
     n <- sh[5] || sh[0-4]
     r <- ROTL[64](rS, n)
@@ -1158,8 +1154,8 @@ void PPCInterpreter::PPCInterpreter_rldimix(PPU_STATE* ppuState) {
   }
 }
 
-// Rotate Left Word Immediate then Mask Insert (x’5000 0000’)
-void PPCInterpreter::PPCInterpreter_rlwimix(PPU_STATE* ppuState) {
+// Rotate Left Word Immediate then Mask Insert (x'5000 0000')
+void PPCInterpreter::PPCInterpreter_rlwimix(PPU_STATE *ppuState) {
   /*
     n <- SH
     r <- ROTL[32](rS[32-63], n)
@@ -1176,8 +1172,8 @@ void PPCInterpreter::PPCInterpreter_rlwimix(PPU_STATE* ppuState) {
   }
 }
 
-// Rotate Left Word then AND with Mask (x’5C00 0000’)
-void PPCInterpreter::PPCInterpreter_rlwnmx(PPU_STATE* ppuState) {
+// Rotate Left Word then AND with Mask (x'5C00 0000')
+void PPCInterpreter::PPCInterpreter_rlwnmx(PPU_STATE *ppuState) {
   /*
     n <- rB[59-6327-31]
     r <- ROTL[32](rS[32-63], n)
@@ -1194,8 +1190,8 @@ void PPCInterpreter::PPCInterpreter_rlwnmx(PPU_STATE* ppuState) {
   }
 }
 
-// Rotate Left Word Immediate then AND with Mask (x’5400 0000’)
-void PPCInterpreter::PPCInterpreter_rlwinmx(PPU_STATE* ppuState) {
+// Rotate Left Word Immediate then AND with Mask (x'5400 0000')
+void PPCInterpreter::PPCInterpreter_rlwinmx(PPU_STATE *ppuState) {
   /*
     n <- SH
     r <- ROTL[32](rS[32-63], n)
@@ -1212,8 +1208,8 @@ void PPCInterpreter::PPCInterpreter_rlwinmx(PPU_STATE* ppuState) {
   }
 }
 
-// Shift Left Double Word (x’7C00 0036’)
-void PPCInterpreter::PPCInterpreter_sldx(PPU_STATE* ppuState) {
+// Shift Left Double Word (x'7C00 0036')
+void PPCInterpreter::PPCInterpreter_sldx(PPU_STATE *ppuState) {
   /*
     n <- rB[58-63]
     r <- ROTL[64](rS, n)
@@ -1232,12 +1228,12 @@ void PPCInterpreter::PPCInterpreter_sldx(PPU_STATE* ppuState) {
   }
 }
 
-// Shift Left Word (x’7C00 0030’)
-void PPCInterpreter::PPCInterpreter_slwx(PPU_STATE* ppuState) {
+// Shift Left Word (x'7C00 0030')
+void PPCInterpreter::PPCInterpreter_slwx(PPU_STATE *ppuState) {
   /*
     n <- rB[59-63]
-    r <- ROTL[32](rS[32–63], n)
-    if rB[58] = 0 then m <- MASK(32, 63 – n)
+    r <- ROTL[32](rS[32-63], n)
+    if rB[58] = 0 then m <- MASK(32, 63 - n)
     else m <- (64)0
     rA <- r & m
   */
@@ -1250,8 +1246,8 @@ void PPCInterpreter::PPCInterpreter_slwx(PPU_STATE* ppuState) {
   }
 }
 
-// Shift Right Algebraic Double Word (x’7C00 0634’)
-void PPCInterpreter::PPCInterpreter_sradx(PPU_STATE* ppuState) {
+// Shift Right Algebraic Double Word (x'7C00 0634')
+void PPCInterpreter::PPCInterpreter_sradx(PPU_STATE *ppuState) {
   /*
     n <- rB[58-63]
     r <- ROTL[64](rS, 64 - n)
@@ -1260,7 +1256,7 @@ void PPCInterpreter::PPCInterpreter_sradx(PPU_STATE* ppuState) {
     else m <- (64)0
     S <- rS[0]
     rA <- (r & m) | (((64)S) & ~m)
-    XER[CA] <- S & ((r & ~ m) ¦ 0)
+    XER[CA] <- S & ((r & ~ m) | 0)
   */
 
   s64 RS = GPRi(rs);
@@ -1282,8 +1278,8 @@ void PPCInterpreter::PPCInterpreter_sradx(PPU_STATE* ppuState) {
   }
 }
 
-// Shift Right Algebraic Double Word Immediate (x’7C00 0674’)
-void PPCInterpreter::PPCInterpreter_sradix(PPU_STATE* ppuState) {
+// Shift Right Algebraic Double Word Immediate (x'7C00 0674')
+void PPCInterpreter::PPCInterpreter_sradix(PPU_STATE *ppuState) {
   /*
     n <- sh[5] || sh[0-4]
     r <- ROTL[64](rS, 64 - n)
@@ -1304,11 +1300,11 @@ void PPCInterpreter::PPCInterpreter_sradix(PPU_STATE* ppuState) {
   }
 }
 
-// Shift Right Algebraic Word (x’7C00 0630’)
-void PPCInterpreter::PPCInterpreter_srawx(PPU_STATE* ppuState) {
+// Shift Right Algebraic Word (x'7C00 0630')
+void PPCInterpreter::PPCInterpreter_srawx(PPU_STATE *ppuState) {
   /*
     n <- rB[59-63]
-    r <- ROTL[32](rS[32–63], 64 – n)
+    r <- ROTL[32](rS[32-63], 64 - n)
     if rB[5826] = 0 then
     m <- MASK(n + 32, 63)
     else m <- (64)0
@@ -1319,13 +1315,11 @@ void PPCInterpreter::PPCInterpreter_srawx(PPU_STATE* ppuState) {
 
   s32 RS = static_cast<s32>(GPRi(rs));
   u8 shift = GPRi(rb) & 63;
-  if (shift > 31)
-  {
+  if (shift > 31) {
     GPRi(ra) = 0 - (RS < 0);
     XER_SET_CA((RS < 0));
   }
-  else
-  {
+  else {
     GPRi(ra) = RS >> shift;
     XER_SET_CA((RS < 0) && ((GPRi(ra) << shift) != static_cast<u64>(RS)));
   }
@@ -1336,8 +1330,8 @@ void PPCInterpreter::PPCInterpreter_srawx(PPU_STATE* ppuState) {
   }
 }
 
-// Shift Right Algebraic Word Immediate (x’7C00 0670’)
-void PPCInterpreter::PPCInterpreter_srawix(PPU_STATE* ppuState) {
+// Shift Right Algebraic Word Immediate (x'7C00 0670')
+void PPCInterpreter::PPCInterpreter_srawix(PPU_STATE *ppuState) {
   /*
     n <- SH
     r <- ROTL[32](rS[32-63], 64 - n)
@@ -1358,8 +1352,8 @@ void PPCInterpreter::PPCInterpreter_srawix(PPU_STATE* ppuState) {
   }
 }
 
-// Shift Right Double Word (x’7C00 0436’)
-void PPCInterpreter::PPCInterpreter_srdx(PPU_STATE* ppuState) {
+// Shift Right Double Word (x'7C00 0436')
+void PPCInterpreter::PPCInterpreter_srdx(PPU_STATE *ppuState) {
   /*
     n <- rB[58-63]
     r <- ROTL[64](rS, 64 - n)
@@ -1378,8 +1372,8 @@ void PPCInterpreter::PPCInterpreter_srdx(PPU_STATE* ppuState) {
   }
 }
 
-// Shift Right Word (x’7C00 0430’)
-void PPCInterpreter::PPCInterpreter_srwx(PPU_STATE* ppuState) {
+// Shift Right Word (x'7C00 0430')
+void PPCInterpreter::PPCInterpreter_srwx(PPU_STATE *ppuState) {
   /*
     n <- rB[58-63]
     r <- ROTL[32](rS[32-63], 64 - n)
@@ -1397,8 +1391,8 @@ void PPCInterpreter::PPCInterpreter_srwx(PPU_STATE* ppuState) {
   }
 }
 
-// Subtract from Carrying (x’7C00 0010’)
-void PPCInterpreter::PPCInterpreter_subfcx(PPU_STATE* ppuState) {
+// Subtract from Carrying (x'7C00 0010')
+void PPCInterpreter::PPCInterpreter_subfcx(PPU_STATE *ppuState) {
   /*
     rD <- ~(rA) + (rB) + 1
   */
@@ -1428,14 +1422,14 @@ void PPCInterpreter::PPCInterpreter_subfcx(PPU_STATE* ppuState) {
     RECORD_CR0(GPRi(rd));
   }
 }
+
 // Subtract from Carrying + OE
-void PPCInterpreter::PPCInterpreter_subfcox(PPU_STATE* ppuState)
-{
+void PPCInterpreter::PPCInterpreter_subfcox(PPU_STATE *ppuState) {
   PPCInterpreter_subfcx(ppuState);
 }
 
-// Subtract From (x’7C00 0050’)
-void PPCInterpreter::PPCInterpreter_subfx(PPU_STATE* ppuState) {
+// Subtract From (x'7C00 0050')
+void PPCInterpreter::PPCInterpreter_subfx(PPU_STATE *ppuState) {
   /*
     rD <- ~(rA) + (rB) + 1
   */
@@ -1462,14 +1456,14 @@ void PPCInterpreter::PPCInterpreter_subfx(PPU_STATE* ppuState) {
     RECORD_CR0(GPRi(rd));
   }
 }
+
 // Subtract From + OE
-void PPCInterpreter::PPCInterpreter_subfox(PPU_STATE* ppuState)
-{
+void PPCInterpreter::PPCInterpreter_subfox(PPU_STATE *ppuState) {
   PPCInterpreter_subfx(ppuState);
 }
 
-// Subtract from Extended (x’7C00 0110’)
-void PPCInterpreter::PPCInterpreter_subfex(PPU_STATE* ppuState) {
+// Subtract from Extended (x'7C00 0110')
+void PPCInterpreter::PPCInterpreter_subfex(PPU_STATE *ppuState) {
   /*
     rD <- ~(rA) + (rB) + XER[CA]
   */
@@ -1499,15 +1493,14 @@ void PPCInterpreter::PPCInterpreter_subfex(PPU_STATE* ppuState) {
     RECORD_CR0(add.result);
   }
 }
+
 // Subtract from Extended + OE
-void PPCInterpreter::PPCInterpreter_subfeox(PPU_STATE* ppuState)
-{
+void PPCInterpreter::PPCInterpreter_subfeox(PPU_STATE *ppuState) {
   PPCInterpreter_subfex(ppuState);
 }
 
-// Subtract from Minus One Extended (x’7C00 01D0’)
-void PPCInterpreter::PPCInterpreter_subfmex(PPU_STATE* ppuState)
-{
+// Subtract from Minus One Extended (x'7C00 01D0')
+void PPCInterpreter::PPCInterpreter_subfmex(PPU_STATE *ppuState) {
   /*
     rD <- ~(rA) + XER[CA] - 1
   */
@@ -1518,7 +1511,8 @@ void PPCInterpreter::PPCInterpreter_subfmex(PPU_STATE* ppuState)
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
 
-  if (_instr.oe) { // Mode dependent.
+  // Mode dependent
+  if (_instr.oe) {
     bool ovSet = false;
     if (curThread.SPR.MSR.SF) {
       ovSet = (~RA >> 63 == 1) && (~RA >> 63 != GPRi(rd) >> 63);
@@ -1535,14 +1529,14 @@ void PPCInterpreter::PPCInterpreter_subfmex(PPU_STATE* ppuState)
     RECORD_CR0(add.result);
   }
 }
+
 // Subtract from Minus One Extended + OE
-void PPCInterpreter::PPCInterpreter_subfmeox(PPU_STATE* ppuState)
-{
+void PPCInterpreter::PPCInterpreter_subfmeox(PPU_STATE *ppuState) {
   PPCInterpreter_subfmex(ppuState);
 }
 
-// Subtract from Zero Extended (x’7C00 0190’)
-void PPCInterpreter::PPCInterpreter_subfzex(PPU_STATE* ppuState) {
+// Subtract from Zero Extended (x'7C00 0190')
+void PPCInterpreter::PPCInterpreter_subfzex(PPU_STATE *ppuState) {
   /*
     rD <- ~(rA) + XER[CA]
   */
@@ -1554,7 +1548,8 @@ void PPCInterpreter::PPCInterpreter_subfzex(PPU_STATE* ppuState) {
   GPRi(rd) = add.result;
   XER_SET_CA(add.carry);
 
-  if (_instr.oe) { // Mode dependent.
+  // Mode dependent
+  if (_instr.oe) {
     bool ovSet = false;
     if (curThread.SPR.MSR.SF) {
       ovSet = (~RA >> 63 == 0) && (~RA >> 63 != GPRi(rd) >> 63);
@@ -1571,14 +1566,14 @@ void PPCInterpreter::PPCInterpreter_subfzex(PPU_STATE* ppuState) {
     RECORD_CR0(add.result);
   }
 }
+
 // Subtract from Zero Extended + OE
-void PPCInterpreter::PPCInterpreter_subfzeox(PPU_STATE* ppuState)
-{
+void PPCInterpreter::PPCInterpreter_subfzeox(PPU_STATE *ppuState) {
   PPCInterpreter_subfzex(ppuState);
 }
 
-// Subtract from Immediate Carrying (x’2000 0000’)
-void PPCInterpreter::PPCInterpreter_subfic(PPU_STATE* ppuState) {
+// Subtract from Immediate Carrying (x'2000 0000')
+void PPCInterpreter::PPCInterpreter_subfic(PPU_STATE *ppuState) {
   /*
     rD <- ~(rA) + EXTS(SIMM) + 1
   */
@@ -1592,8 +1587,8 @@ void PPCInterpreter::PPCInterpreter_subfic(PPU_STATE* ppuState) {
   XER_SET_CA(add.carry);
 }
 
-// XOR (x’7C00 0278’)
-void PPCInterpreter::PPCInterpreter_xorx(PPU_STATE* ppuState) {
+// XOR (x'7C00 0278')
+void PPCInterpreter::PPCInterpreter_xorx(PPU_STATE *ppuState) {
   /*
     rA <- (rS) ^ (rB)
   */
@@ -1606,8 +1601,8 @@ void PPCInterpreter::PPCInterpreter_xorx(PPU_STATE* ppuState) {
   }
 }
 
-// XOR Immediate (x’6800 0000’)
-void PPCInterpreter::PPCInterpreter_xori(PPU_STATE* ppuState) {
+// XOR Immediate (x'6800 0000')
+void PPCInterpreter::PPCInterpreter_xori(PPU_STATE *ppuState) {
   /*
     rA <- (rS) ^ ((4816)0 || UIMM)
   */
@@ -1615,8 +1610,8 @@ void PPCInterpreter::PPCInterpreter_xori(PPU_STATE* ppuState) {
   GPRi(ra) = GPRi(rs) ^ _instr.uimm16;
 }
 
-// XOR Immediate Shifted (x’6C00 0000’)
-void PPCInterpreter::PPCInterpreter_xoris(PPU_STATE* ppuState) {
+// XOR Immediate Shifted (x'6C00 0000')
+void PPCInterpreter::PPCInterpreter_xoris(PPU_STATE *ppuState) {
   /*
     rA <- (rS) ^ ((32)0 || UIMM || (16)0)
   */

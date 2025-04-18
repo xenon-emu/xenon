@@ -4,38 +4,24 @@
 
 XeMain::XeMain() {
   MICROPROFILE_SCOPEI("[Xe::Main]", "Create", MP_AUTO);
-  {
-    Base::Log::Initialize();
-    Base::Log::Start();
-    rootDirectory = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
-    {
-      loadConfig();
-    }
-    logFilter = std::make_unique<STRIP_UNIQUE(logFilter)>(Config::log.currentLevel);
-    Base::Log::SetGlobalFilter(*logFilter);
-    pciBridge = std::make_unique<STRIP_UNIQUE(pciBridge)>();
-    {
-      createSMCState();
-    }
-    {
-      createPCIDevices();
-    }
-    {
-      addPCIDevices();
-    }
+  Base::Log::Initialize();
+  Base::Log::Start();
+  rootDirectory = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
+  loadConfig();
+  logFilter = std::make_unique<STRIP_UNIQUE(logFilter)>(Config::log.currentLevel);
+  Base::Log::SetGlobalFilter(*logFilter);
+  pciBridge = std::make_unique<STRIP_UNIQUE(pciBridge)>();
+  createSMCState();
+  createPCIDevices();
+  addPCIDevices();
 #ifndef NO_GFX
-    renderer = std::make_unique<STRIP_UNIQUE(renderer)>(ram.get());
+  renderer = std::make_unique<STRIP_UNIQUE(renderer)>(ram.get());
 #endif
-    xenos = std::make_unique<STRIP_UNIQUE(xenos)>(ram.get());
-    {
-      createHostBridge();
-    }
-    {
-      createRootBus();
-    }
-    xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses);
-    pciBridge->RegisterIIC(xenonCPU->GetIICPointer());
-  }
+  xenos = std::make_unique<STRIP_UNIQUE(xenos)>(ram.get());
+  createHostBridge();
+  createRootBus();
+  xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses);
+  pciBridge->RegisterIIC(xenonCPU->GetIICPointer());
 }
 XeMain::~XeMain() {
   MICROPROFILE_SCOPEI("[Xe::Main]", "Shutdown", MP_AUTO);

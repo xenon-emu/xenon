@@ -6,9 +6,9 @@
 
 // Taken from a Corona PCI bridge dump.
 /*
-        PCI Revision is the last byte of the third word of this map.
-        Jasper = Rev 0x60
-        Corona = Rev 0x90
+      PCI Revision is the last byte of the third word of this map
+      Jasper = Rev 0x60
+      Corona = Rev 0x90
 */
 static constexpr u32 pciBridgeConfigMap[64] = {
   0x58001414, 0x00100156, 0x06040060, 0x00010000, 0xea000000, 0x00000000,

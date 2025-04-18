@@ -46,7 +46,7 @@ public:
   bool Valid() {
     return uartPresent && uartInitialized;
   }
-  // UART Initialized.
+  // UART Initialized
   bool uartInitialized = false;
   // UART Present. Checks if it has a vCOM driver,
   // and if a socket is listening
@@ -117,19 +117,19 @@ public:
   u8 Read() override;
   u32 ReadStatus() override;
 #ifdef _WIN32
-  // Current COM Port Device Control Block.
+  // Current COM Port Device Control Block
   // See
   // https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-dcb
   DCB comPortDCB = {};
-  // Current COM Port Handle.
+  // Current COM Port Handle
   void *comPortHandle = nullptr;
-  // Current COM Port Status.
+  // Current COM Port Status
   COMSTAT comPortStat = {};
-  // Current COM Port error register used by ClearCommErr().
+  // Current COM Port error register used by ClearCommErr()
   ul32 comPortError = 0;
-  // Bytes Written to the COM Port.
+  // Bytes Written to the COM Port
   ul32 currentBytesWrittenCount = 0;
-  // Bytes Read from the COM Port.
+  // Bytes Read from the COM Port
   ul32 currentBytesReadCount = 0;
 #endif // _WIN32
 };

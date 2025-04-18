@@ -620,7 +620,7 @@ void PPCDebugger(Render::GUI *gui) {
   ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 8.f, 4.f });
   gui->Child("##instrs", [&] {
     gui->MenuBar([&gui] {
-      gui->Menu("Window", [&gui] {  
+      gui->Menu("Window", [&gui] {
         if (!gui->ppcDebuggerActive) {
           gui->MenuItem("Enable", [&] {
             gui->ppcDebuggerActive = true;

@@ -39,7 +39,7 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
   u8 cpusToInterrupt = (intData >> 40) & 0xFF;
   size_t intIndex = 0;
   u32 bsIntData = static_cast<u32>(byteswap_be<u64>(intData));
-  
+
   auto& interrupts = iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts;
   switch (ppeIntCtrlBlckReg) {
   case Xe::XCPU::IIC::CPU_WHOAMI:
@@ -72,8 +72,8 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
       }
 
 #ifdef IIC_DEBUG
-        LOG_DEBUG(Xenon_IIC, "EOI interrupt {} for thread {:#x} ", 
-          getIntName(static_cast<u8>(iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts[intIdx].interrupt)), 
+        LOG_DEBUG(Xenon_IIC, "EOI interrupt {} for thread {:#x} ",
+          getIntName(static_cast<u8>(iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts[intIdx].interrupt)),
           ppeIntCtrlBlckID);
 #endif // IIC_DEBUG
 
@@ -83,7 +83,7 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
     }
     break;
   case Xe::XCPU::IIC::EOI_SET_CPU_CURRENT_TSK_PRI:
-    // If there are interrupts stored in the queue, remove the ack'd.
+    // If there are interrupts stored in the queue, remove the ack'd
     if (!interrupts.empty()) {
       u16 intIdx = 0;
       for (auto& interrupt : iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts) {
@@ -104,7 +104,7 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
       iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].intSignaled = false;
     }
 
-    // Set new Interrupt priority.
+    // Set new Interrupt priority
     iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].REG_CPU_CURRENT_TSK_PRI = bsIntData;
     break;
   case Xe::XCPU::IIC::INT_MCACK:
@@ -131,20 +131,20 @@ void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u8 *data, u64 size) 
     memcpy(data, &intData, size <= sizeof(intData) ? size : sizeof(intData));
   } break;
   case Xe::XCPU::IIC::ACK: {
-    // Check if the queue isn't empty.
+    // Check if the queue isn't empty
     if (!interrupts.empty()) {
-      // Return the top priority pending interrupt.
+      // Return the top priority pending interrupt
 
-      // Current Interrupt position in the container.
+      // Current Interrupt position in the container
       u16 currPos = 0;
-      // Highest interrupt priority found.
+      // Highest interrupt priority found
       u8 highestPrio = 0;
-      // Highest priority interrupt position.
+      // Highest priority interrupt position
       u16 highestPrioPos = 0;
 
       for (auto& interrupt : interrupts) {
-        // Signal first the top priority interrupt. 
-        // If two of the same interrupt type exist, then signal the first that we find.
+        // Signal first the top priority interrupt
+        // If two of the same interrupt type exist, then signal the first that we find
         if (interrupt.interrupt > highestPrio) {
           highestPrio = interrupt.interrupt;
           highestPrioPos = currPos;
@@ -159,7 +159,7 @@ void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u8 *data, u64 size) 
       memcpy(data, &intData, size <= sizeof(intData) ? size : sizeof(intData));
     }
     else {
-      // If the queue is empty, return PRIO_NONE.
+      // If the queue is empty, return PRIO_NONE
       constexpr u64 intData = byteswap_be<u64>(PRIO_NONE);
       memcpy(data, &intData, size <= sizeof(intData) ? size : sizeof(intData));
     }
@@ -172,20 +172,20 @@ void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u8 *data, u64 size) 
 
 bool Xe::XCPU::IIC::XenonIIC::checkExtInterrupt(u8 ppuID) {
   MICROPROFILE_SCOPEI("[Xe::IIC]", "CheckExternalInterrupt", MP_AUTO);
-  // Set the global lock.
+  // Set the global lock
   std::lock_guard lck(mutex);
 
-  // Check for some interrupt that was already signaled.
+  // Check for some interrupt that was already signaled
   if (iicState.ppeIntCtrlBlck[ppuID].intSignaled) {
     return false;
   }
 
-  // Check if there's interrupt present.
+  // Check if there's interrupt present
   if (iicState.ppeIntCtrlBlck[ppuID].interrupts.empty()) {
     return false;
   }
 
-  // Determine if any interrupt is present thats higher or equal than current priority.
+  // Determine if any interrupt is present thats higher or equal than current priority
   bool priorityOk = false;
   for (auto& interrupt : iicState.ppeIntCtrlBlck[ppuID].interrupts) {
     if (interrupt.interrupt >= iicState.ppeIntCtrlBlck[ppuID].REG_CPU_CURRENT_TSK_PRI) {
@@ -196,7 +196,7 @@ bool Xe::XCPU::IIC::XenonIIC::checkExtInterrupt(u8 ppuID) {
 
   if (priorityOk) {
 #ifdef IIC_DEBUG
-      LOG_DEBUG(Xenon_IIC, "Signaling interrupt for thread {:#x} ", ppuID);
+    LOG_DEBUG(Xenon_IIC, "Signaling interrupt for thread {:#x} ", ppuID);
 #endif // IIC_DEBUG
     iicState.ppeIntCtrlBlck[ppuID].intSignaled = true;
     return true;
@@ -209,10 +209,10 @@ bool Xe::XCPU::IIC::XenonIIC::checkExtInterrupt(u8 ppuID) {
 
 void Xe::XCPU::IIC::XenonIIC::genInterrupt(u8 interruptType, u8 cpusToInterrupt) {
   MICROPROFILE_SCOPEI("[Xe::IIC]", "GenInterrupt", MP_AUTO);
-  // Set a global lock.
+  // Set a global lock
   std::lock_guard lck(mutex);
 
-  // Create our interrupt packet.
+  // Create our interrupt packet
   Xe_Int newInt;
   newInt.ack = false;
   newInt.interrupt = interruptType;
@@ -221,19 +221,18 @@ void Xe::XCPU::IIC::XenonIIC::genInterrupt(u8 interruptType, u8 cpusToInterrupt)
     if ((cpusToInterrupt & 0x1) == 1) {
 
 #ifdef IIC_DEBUG
-        LOG_DEBUG(Xenon_IIC, "Generating interrupt: Thread {}, intType: {}", ppuID, getIntName(interruptType));
+      LOG_DEBUG(Xenon_IIC, "Generating interrupt: Thread {}, intType: {}", ppuID, getIntName(interruptType));
 #endif // IIC_DEBUG
 
-      // Store the interrupt in the interrupt queue.
+      // Store the interrupt in the interrupt queue
       iicState.ppeIntCtrlBlck[ppuID].interrupts.push_back(newInt);
     }
     cpusToInterrupt = cpusToInterrupt >> 1;
   }
 }
 
-void Xe::XCPU::IIC::XenonIIC::cancelInterrupt(u8 interruptType, u8 cpusInterrupted)
-{
-  // Set a global lock.
+void Xe::XCPU::IIC::XenonIIC::cancelInterrupt(u8 interruptType, u8 cpusInterrupted) {
+  // Set a global lock
   std::lock_guard lck(mutex);
 
   for (u8 ppuID = 0; ppuID < 6; ppuID++) {
@@ -243,7 +242,7 @@ void Xe::XCPU::IIC::XenonIIC::cancelInterrupt(u8 interruptType, u8 cpusInterrupt
       LOG_DEBUG(Xenon_IIC, "Cancelling interrupt: Thread {}, intType: {}", ppuID, getIntName(interruptType));
 #endif // IIC_DEBUG
 
-      // Delete the interrupt from the interrupt queue.
+      // Delete the interrupt from the interrupt queue
       bool found = false;
       if (!iicState.ppeIntCtrlBlck[ppuID].interrupts.empty()) {
         u16 intIdx = 0;
@@ -262,10 +261,12 @@ void Xe::XCPU::IIC::XenonIIC::cancelInterrupt(u8 interruptType, u8 cpusInterrupt
     }
   }
 }
+
 struct IRQ_DATA {
   u8 irq = 0;
   std::string_view name = {};
 };
+
 static constexpr IRQ_DATA interruptMap[]{
   { 0x08, "PRIO_IPI_4" },
   { 0x10, "PRIO_IPI_3" },

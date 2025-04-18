@@ -11,7 +11,7 @@ HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentPCIBridge) :
    // The first is for the Command Block (Regs 0-7) + DevCtrl/AltStatus reg at offset 0xA.
    // The second is for the BMDMA (Bus Master DMA) block.
 
-   // Set PCI Properties.
+   // Set PCI Properties
   pciConfigSpace.configSpaceHeader.reg0.hexData = 0x58031414;
   pciConfigSpace.configSpaceHeader.reg1.hexData = 0x02300006;
   pciConfigSpace.configSpaceHeader.reg2.hexData = 0x01060000;
@@ -50,7 +50,7 @@ HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentPCIBridge) :
   data = 0x00000300;
   memcpy(&pciConfigSpace.data[0xC8], &data, 4); // SCONTROL_IPM_ALL_PM_DISABLED.
 
-  // Set our PCI Dev Sizes.
+  // Set our PCI Dev Sizes
   pciDevSizes[0] = 0x20; // BAR0
   pciDevSizes[1] = 0x10; // BAR1
 
@@ -245,13 +245,13 @@ void HDD::ConfigRead(u64 readAddress, u8 *data, u64 size) {
 }
 
 void HDD::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
-  // Check if we're being scanned.
+  // Check if we're being scanned
   u64 tmp = 0;
   memcpy(&tmp, data, size);
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
-      if (tmp == 0xFFFFFFFF) { // PCI BAR Size discovery.
+      if (tmp == 0xFFFFFFFF) { // PCI BAR Size discovery
         u64 x = 2;
         for (int idx = 2; idx < 31; idx++) {
           tmp &= ~x;
@@ -263,8 +263,8 @@ void HDD::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
         tmp &= ~0x3;
       }
     }
-    if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address.
-      tmp = 0; // Register not implemented.
+    if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address
+      tmp = 0; // Register not implemented
     }
   }
   memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &tmp, size);

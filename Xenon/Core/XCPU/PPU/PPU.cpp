@@ -415,8 +415,6 @@ u32 PPU::GetIPS() {
     instrCount++;
   }
 
-  // Reset our state
-  
   // Zero out the memory after execution
   for (int i = 0; i < 4; i++) {
     PPCInterpreter::MMUWrite32(ppuState.get(), 4 + (i * 4), 0x00000000);

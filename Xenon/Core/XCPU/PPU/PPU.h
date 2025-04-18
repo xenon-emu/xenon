@@ -29,7 +29,7 @@ public:
 
   // Calulate our Clocks Per Instruction
   void CalculateCPI();
-  
+
   // Reset the PPU state
   void Reset();
 
@@ -57,8 +57,8 @@ public:
 
   // Checks if the thread is active
   bool ThreadActive() {
-    return ppuThreadState == eThreadState::Executing
-      || ppuThreadState == eThreadState::Running;
+    return ppuThreadState == eThreadState::Executing ||
+           ppuThreadState == eThreadState::Running;
   }
 
   // Checks if the thread is halted

@@ -37,7 +37,7 @@ namespace PPCInterpreter {
     fillTables();
     fillNameTables();
   }
-  
+
   constexpr std::pair<const char*, char> getBCInfo(u32 bo, u32 bi) {
     std::pair<const char*, char> info{};
 
@@ -182,7 +182,7 @@ namespace PPCInterpreter {
       const u32 bi = op.bi;
       const u32 bh = op.bh;
       const u32 lk = op.lk;
-      
+
       if (bo == 0b10100) {
         return lk ? "bctrl" : "bctr";
       }

@@ -120,7 +120,7 @@ u32 Xenon::RunCPITests(u64 resetVector) {
 void Xenon::LoadElf(const std::string path) {
   ppu0.reset();
   ppu1.reset();
-  ppu2.reset(); 
+  ppu2.reset();
   ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(&xenonContext, mainBus, 0, XE_PVR, 0); // Threads 0-1
   ppu1 = std::make_unique<STRIP_UNIQUE(ppu1)>(&xenonContext, mainBus, 0, XE_PVR, 2); // Threads 2-3
   ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(&xenonContext, mainBus, 0, XE_PVR, 4); // Threads 4-5

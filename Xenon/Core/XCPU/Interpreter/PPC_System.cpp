@@ -5,11 +5,11 @@
 #include "PPCInterpreter.h"
 
 void PPCInterpreter::PPCInterpreter_isync(PPU_STATE *ppuState) {
-  // Do nothing.
+  // Do nothing
 }
 
 void PPCInterpreter::PPCInterpreter_eieio(PPU_STATE *ppuState) {
-  // Do nothing.
+  // Do nothing
 }
 
 void PPCInterpreter::PPCInterpreter_sc(PPU_STATE *ppuState) {
@@ -57,9 +57,9 @@ void PPCInterpreter::PPCInterpreter_slbmte(PPU_STATE *ppuState) {
 void PPCInterpreter::PPCInterpreter_slbie(PPU_STATE *ppuState) {
   X_FORM_rB;
 
-  // ESID.
+  // ESID
   const u64 ESID = QGET(GPR(rB), 0, 35);
-  // Class.
+  // Class
   const u8 C = QGET(GPR(rB), 36, 36);
 
   for (auto &slbEntry : curThread.SLB) {
@@ -311,7 +311,7 @@ void PPCInterpreter::PPCInterpreter_mtspr(PPU_STATE *ppuState) {
   switch (spr) {
   case SPR_XER:
     curThread.SPR.XER.XER_Hex = static_cast<u32>(GPR(rD));
-    // Clear the unused bits in XER (35:56).
+    // Clear the unused bits in XER (35:56)
     curThread.SPR.XER.XER_Hex &= 0xE000007F;
     break;
   case SPR_LR:
@@ -440,7 +440,7 @@ void PPCInterpreter::PPCInterpreter_mtmsr(PPU_STATE *ppuState) {
 
   curThread.SPR.MSR.MSR_Hex = GPR(rS);
 
-  // Check for 32-bit mode of operation.
+  // Check for 32-bit mode of operation
   if (!curThread.SPR.MSR.SF)
     curThread.NIA = static_cast<u32>(curThread.NIA);
 }
@@ -451,7 +451,7 @@ void PPCInterpreter::PPCInterpreter_mtmsrd(PPU_STATE *ppuState) {
   if (L) {
     /*
        Bits 48 and 62 of register RS are placed into the corresponding bits
-       of the MSR. The remaining bits of the MSR are unchanged.
+       of the MSR. The remaining bits of the MSR are unchanged
     */
 
     // Bit 48 = MSR[EE]
@@ -460,12 +460,12 @@ void PPCInterpreter::PPCInterpreter_mtmsrd(PPU_STATE *ppuState) {
     curThread.SPR.MSR.RI = (GPR(rS) & 0x2) == 0x2 ? 1 : 0;
   } else { // L = 0
     /*
-       The result of ORing bits 0 and 1 of register RS is placed into MSR0.
-       The result of ORing bits 48 and 49 of register RS is placed into MSR48.
-       The result of ORing bits 58 and 49 of register RS is placed into MSR58.
-       The result of ORing bits 59 and 49 of register RS is placed into MSR59.
+       The result of ORing bits 00 and 01 of register RS is placed into MSR0
+       The result of ORing bits 48 and 49 of register RS is placed into MSR48
+       The result of ORing bits 58 and 49 of register RS is placed into MSR58
+       The result of ORing bits 59 and 49 of register RS is placed into MSR59
        Bits 1:2, 4:47, 49:50, 52:57, and 60:63 of register RS are placed into
-       the corresponding bits of the MSR.
+       the corresponding bits of the MSR
     */
     u64 regRS = GPR(rS);
     curThread.SPR.MSR.MSR_Hex = regRS;
@@ -489,21 +489,21 @@ void PPCInterpreter::PPCInterpreter_mtmsrd(PPU_STATE *ppuState) {
 }
 
 void PPCInterpreter::PPCInterpreter_sync(PPU_STATE *ppuState) {
-  // Do nothing.
+  // Do nothing
 }
 
 void PPCInterpreter::PPCInterpreter_dcbf(PPU_STATE *ppuState) {
-  // Do nothing.
+  // Do nothing
 }
 
 void PPCInterpreter::PPCInterpreter_dcbi(PPU_STATE *ppuState) {
-  // Do nothing.
+  // Do nothing
 }
 
 void PPCInterpreter::PPCInterpreter_dcbt(PPU_STATE *ppuState) {
-  // Do nothing.
+  // Do nothing
 }
 
 void PPCInterpreter::PPCInterpreter_dcbtst(PPU_STATE *ppuState) {
-  // Do nothing.
+  // Do nothing
 }

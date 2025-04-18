@@ -61,15 +61,15 @@ void RootBus::Read(u64 readAddress, u8 *data, u64 size) {
     }
   }
 
-  // Check on the other Busses.
+  // Check on the other busses
   if (hostBridge->Read(readAddress, data, size)) {
     return;
   }
 
-  // Device not found.
+  // Device not found
   LOG_ERROR(RootBus, "Read failed at address {:#x}", readAddress);
 
-  // Any reads to bus that don't belong to any device are always 0xFF.
+  // Any reads to bus that don't belong to any device are always 0xFF
   memset(data, 0xFF, size);
 }
 
@@ -84,12 +84,12 @@ void RootBus::MemSet(u64 writeAddress, s32 data, u64 size) {
     }
   }
 
-  // Check on the other Busses.
+  // Check on the other busses
   if (hostBridge->MemSet(writeAddress, data, size)) {
     return;
   }
 
-  // Device or address not found.
+  // Device or address not found
   if (false) {
     LOG_ERROR(RootBus, "MemSet failed at address: {:#x}, data: {:#x}", writeAddress, data);
     LOG_CRITICAL(Xenon, "Halting...");
@@ -116,12 +116,12 @@ void RootBus::Write(u64 writeAddress, const u8 *data, u64 size) {
     }
   }
 
-  // Check on the other Busses.
+  // Check on the other busses
   if (hostBridge->Write(writeAddress, data, size)) {
     return;
   }
 
-  // Device or address not found.
+  // Device or address not found
   if (false) {
     LOG_ERROR(RootBus, "Write failed at address: {:#x}, data: {:#x}", writeAddress, *reinterpret_cast<const u64*>(data));
     LOG_CRITICAL(Xenon, "Halting...");
@@ -131,7 +131,7 @@ void RootBus::Write(u64 writeAddress, const u8 *data, u64 size) {
 }
 
 //
-// Configuration R/W.
+// Configuration R/W
 //
 
 void RootBus::ConfigRead(u64 readAddress, u8 *data, u64 size) {

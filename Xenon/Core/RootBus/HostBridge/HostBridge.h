@@ -9,15 +9,15 @@
 #include "Core/XGPU/XGPU.h"
 
 /*
-        PCI Configuration Space at Address 0xD0000000.
+        PCI Configuration Space at Address 0xD0000000
         Bus0
-                - Dev0	PCI-PCI Bridge		0xD0000000
-                - Dev1	HostBridge			0xD0008000
+        - Dev0  PCI-PCI Bridge    0xD0000000
+        - Dev1  HostBridge        0xD0008000
 */
 
 #define HOST_BRIDGE_SIZE 0x1FFFFFF // Maybe??
 
-// Host Bridge regs, these control interrupts/etc.
+// Host Bridge regs, these control interrupts/etc
 struct HOSTBRIDGE_REGS {
   u32 REG_E0020000;
   u32 REG_E0020004;
@@ -75,10 +75,10 @@ private:
 
   GENRAL_PCI_DEVICE_CONFIG_SPACE hostBridgeConfigSpace{};
 
-  // Pointer to the registered XCGPU.
+  // Pointer to the registered XCGPU
   Xe::Xenos::XGPU *xGPU{};
 
-  // Pointer to the registered PCI Bridge.
+  // Pointer to the registered PCI Bridge
   PCIBridge *pciBridge{};
 
   // Helpers

@@ -11,6 +11,7 @@
 #include "Core/XCPU/PPU/PowerPC.h"
 
 namespace PPCInterpreter {
+
 extern PPCInterpreter::PPCDecoder ppcDecoder;
 extern RootBus *sysBus;
 extern XENON_CONTEXT *intXCPUContext;
@@ -55,37 +56,43 @@ void ppcDebugUnloadImageSymbols(PPU_STATE *ppuState, u64 moduleNameAddress,
 // Condition Register
 //
 
-#define CR_CASE(x) case x: curThread.CR.CR##x = crValue; break
-// Write values to CR field.
-inline void ppuSetCR(PPU_STATE* ppuState, u32 crField, bool le, bool gt, bool eq, bool so)
-{
+#define CR_CASE(x) \
+case x: \
+  curThread.CR.CR##x = crValue; \
+  break;
+
+// Condition register Update
+inline void ppcUpdateCR(PPU_STATE *ppuState, s8 crNum, u32 crValue) {
+  switch (crNum) {
+  CR_CASE(0)
+  CR_CASE(1)
+  CR_CASE(2)
+  CR_CASE(3)
+  CR_CASE(4)
+  CR_CASE(5)
+  CR_CASE(6)
+  CR_CASE(7)
+  }
+}
+
+// Write values to CR field
+inline void ppuSetCR(PPU_STATE *ppuState, u32 crField, bool le, bool gt, bool eq, bool so) {
   u32 crValue = 0;
   le ? BSET(crValue, 4, CR_BIT_LT) : BCLR(crValue, 4, CR_BIT_LT);
   gt ? BSET(crValue, 4, CR_BIT_GT) : BCLR(crValue, 4, CR_BIT_GT);
   eq ? BSET(crValue, 4, CR_BIT_EQ) : BCLR(crValue, 4, CR_BIT_EQ);
   so ? BSET(crValue, 4, CR_BIT_SO) : BCLR(crValue, 4, CR_BIT_SO);
-
-  switch (crField) {
-    CR_CASE(0);
-    CR_CASE(1);
-    CR_CASE(2);
-    CR_CASE(3);
-    CR_CASE(4);
-    CR_CASE(5);
-    CR_CASE(6);
-    CR_CASE(7);
-  }
+  ppcUpdateCR(ppuState, crField, crValue);
 }
 
 // Perform a comparison and write results to the specified CR field.
 template<typename T>
-inline void ppuSetCR(PPU_STATE* ppuState, u32 crField, const T& a, const T& b)
-{
+inline void ppuSetCR(PPU_STATE *ppuState, u32 crField, const T& a, const T& b) {
   ppuSetCR(ppuState, crField, a < b, a > b, a == b, curThread.SPR.XER.SO);
 }
 
 // Update FPSCR FPCC bits and CR if requested. Default CR to be updated is 1.
-void ppuUpdateFPSCR(PPU_STATE* ppuState, f64 op0, f64 op1, bool updateCR, u8 CR = 1);
+void ppuUpdateFPSCR(PPU_STATE *ppuState, f64 op0, f64 op1, bool updateCR, u8 CR = 1);
 
 // Compare Unsigned
 u32 CRCompU(PPU_STATE *ppuState, u64 num1, u64 num2);
@@ -95,8 +102,6 @@ u32 CRCompS32(PPU_STATE *ppuState, u32 num1, u32 num2);
 u32 CRCompS64(PPU_STATE *ppuState, u64 num1, u64 num2);
 // Compare Unsigned
 u32 CRCompS(PPU_STATE *ppuState, u64 num1, u64 num2);
-// Condition register Update
-void ppcUpdateCR(PPU_STATE *ppuState, s8 crNum, u32 crValue);
 
 // Single instruction execution
 void ppcExecuteSingleInstruction(PPU_STATE *ppuState);
@@ -138,14 +143,14 @@ u64 mmuContructEndAddressFromSecEngAddr(u64 inputAddress, bool *socAccess);
 // Main R/W Routines.
 void MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
             u64 EA, u64 byteCount, u8 *outData);
-void MMUWrite(XENON_CONTEXT* cpuContext, PPU_STATE* ppuState,
+void MMUWrite(XENON_CONTEXT* cpuContext, PPU_STATE *ppuState,
               const u8* data, u64 EA, u64 byteCount);
 
-void MMUMemCpyFromHost(PPU_STATE* ppuState, u64 EA, const void* source, u64 size);
+void MMUMemCpyFromHost(PPU_STATE *ppuState, u64 EA, const void* source, u64 size);
 
-void MMUMemCpy(PPU_STATE* ppuState, u64 EA, u32 source, u64 size);
+void MMUMemCpy(PPU_STATE *ppuState, u64 EA, u32 source, u64 size);
 
-void MMUMemSet(PPU_STATE* ppuState, u64 EA, s32 data, u64 size);
+void MMUMemSet(PPU_STATE *ppuState, u64 EA, s32 data, u64 size);
 
 // Helper Read Routines.
 u8 MMURead8(PPU_STATE *ppuState, u64 EA);
@@ -157,4 +162,5 @@ void MMUWrite8(PPU_STATE *ppuState, u64 EA, u8 data);
 void MMUWrite16(PPU_STATE *ppuState, u64 EA, u16 data);
 void MMUWrite32(PPU_STATE *ppuState, u64 EA, u32 data);
 void MMUWrite64(PPU_STATE *ppuState, u64 EA, u64 data);
+
 } // namespace PPCInterpreter

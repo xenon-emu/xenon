@@ -144,7 +144,7 @@ u32 HW_UART_SOCK::ReadStatus() {
 #ifdef _WIN32
 void HW_UART_VCOM::Init(void *uartConfig) {
   HW_UART_VCOM_CONFIG* vcom = reinterpret_cast<decltype(vcom)>(uartConfig);
-  // Initialize the DCB structure.
+  // Initialize the DCB structure
   SecureZeroMemory(&comPortDCB, sizeof(DCB));
   comPortDCB.DCBlength = sizeof(DCB);
 
@@ -175,7 +175,7 @@ void HW_UART_VCOM::Init(void *uartConfig) {
     break;
   }
 
-  // Open COM# port using the CreateFile function.
+  // Open COM# port using the CreateFile function
   comPortHandle = CreateFileA(vcom->selectedComPort, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
 
   if (comPortHandle == INVALID_HANDLE_VALUE) {
@@ -192,7 +192,7 @@ void HW_UART_VCOM::Init(void *uartConfig) {
     LOG_ERROR(UART, "SetCommState failed with error {}", Base::GetLastErrorMsg());
   }
 
-  // Everything init'd
+  // Everything initialized
   uartInitialized = true;
 }
 
@@ -220,10 +220,10 @@ u32 HW_UART_VCOM::ReadStatus() {
       &comPortStat);
     // The queue has any bytes remaining?
     if (comPortStat.cbInQue > 0)  {
-      // Got something to read in the input queue.
+      // Got something to read in the input queue
       status |= UART_STATUS_DATA_PRES;
     } else {
-      // The input queue is empty.
+      // The input queue is empty
       status |= UART_STATUS_EMPTY;
     }
   } else {

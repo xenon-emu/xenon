@@ -65,7 +65,7 @@ public:
   bool DebuggerActive() {
     return gui.get() && gui.get()->ppcDebuggerActive;
   }
-  
+
   // FB Pitch
   int pitch = 0;
 private:
@@ -131,8 +131,7 @@ inline constexpr const char* computeShaderSource = R"(
 layout (local_size_x = 16, local_size_y = 16) in;
 
 layout (r32ui, binding = 0) uniform writeonly uimage2D o_texture;
-layout (std430, binding = 1) buffer pixel_buffer
-{
+layout (std430, binding = 1) buffer pixel_buffer {
   uint pixel_data[];
 };
 
@@ -147,7 +146,7 @@ int xeFbConvert(int width, int addr) {
   int y = addr / (width * 4);
   int x = (addr % (width * 4)) / 4;
   return ((((y & ~31) * width) + (x & ~31) * 32) +
-         (((x & 3) + ((y & 1) << 2) + ((x & 28) << 1) + ((y & 30) << 5)) ^ 
+         (((x & 3) + ((y & 1) << 2) + ((x & 28) << 1) + ((y & 30) << 5)) ^
          ((y & 8) << 2)));
 }
 
