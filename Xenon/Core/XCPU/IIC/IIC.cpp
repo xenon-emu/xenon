@@ -22,7 +22,7 @@ Xe::XCPU::IIC::XenonIIC::XenonIIC() {
 
 void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64 size) {
   MICROPROFILE_SCOPEI("[Xe::IIC]", "WriteInterrupt", MP_AUTO);
-  std::lock_guard lck(mutex);
+  mutex.lock();
 
   if (size < 4) {
     LOG_CRITICAL(Xenon, "Invalid interrupt write! Expected a size of at least 4, got {} instead", size);
@@ -54,11 +54,15 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
     break;
   case Xe::XCPU::IIC::CPU_IPI_DISPATCH_0:
     iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].REG_CPU_IPI_DISPATCH_0 = bsIntData;
+    mutex.unlock();
     genInterrupt(intType, cpusToInterrupt);
+    mutex.lock();
     break;
   case Xe::XCPU::IIC::INT_0x30:
     // Dont know what this does, lets cause an interrupt?
+    mutex.unlock();
     genInterrupt(intType, cpusToInterrupt);
+    mutex.lock();
     break;
   case Xe::XCPU::IIC::EOI:
     // If there are interrupts stored in the queue, remove the ack'd.
@@ -114,11 +118,11 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
     LOG_ERROR(Xenon_IIC, "Unknown CPU Interrupt Ctrl Blck Reg being written: {:#x}", ppeIntCtrlBlckReg);
     break;
   }
+  mutex.unlock();
 }
 
 void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u8 *data, u64 size) {
   MICROPROFILE_SCOPEI("[Xe::IIC]", "ReadInterrupt", MP_AUTO);
-  std::lock_guard lck(mutex);
 
   constexpr u32 mask = 0xF000;
   u8 ppeIntCtrlBlckID = static_cast<u8>((intAddress & mask) >> 12);
@@ -172,8 +176,6 @@ void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u8 *data, u64 size) 
 
 bool Xe::XCPU::IIC::XenonIIC::checkExtInterrupt(u8 ppuID) {
   MICROPROFILE_SCOPEI("[Xe::IIC]", "CheckExternalInterrupt", MP_AUTO);
-  // Set the global lock
-  std::lock_guard lck(mutex);
 
   // Check for some interrupt that was already signaled
   if (iicState.ppeIntCtrlBlck[ppuID].intSignaled) {
@@ -209,8 +211,6 @@ bool Xe::XCPU::IIC::XenonIIC::checkExtInterrupt(u8 ppuID) {
 
 void Xe::XCPU::IIC::XenonIIC::genInterrupt(u8 interruptType, u8 cpusToInterrupt) {
   MICROPROFILE_SCOPEI("[Xe::IIC]", "GenInterrupt", MP_AUTO);
-  // Set a global lock
-  std::lock_guard lck(mutex);
 
   // Create our interrupt packet
   Xe_Int newInt;
@@ -232,9 +232,6 @@ void Xe::XCPU::IIC::XenonIIC::genInterrupt(u8 interruptType, u8 cpusToInterrupt)
 }
 
 void Xe::XCPU::IIC::XenonIIC::cancelInterrupt(u8 interruptType, u8 cpusInterrupted) {
-  // Set a global lock
-  std::lock_guard lck(mutex);
-
   for (u8 ppuID = 0; ppuID < 6; ppuID++) {
     if ((cpusInterrupted & 0x1) == 1) {
 
