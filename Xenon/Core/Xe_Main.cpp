@@ -75,14 +75,8 @@ void XeMain::loadConfig() {
 
 void XeMain::start() {
   if (!xenonCPU.get()) {
-#ifndef NO_GFX
-    renderHalt = true;
-#endif
     LOG_CRITICAL(Xenon, "Failed to initialize Xenon's CPU!");
     SYSTEM_PAUSE();
-#ifndef NO_GFX
-    renderHalt = false;
-#endif
     return;
   }
   CPUStarted = true;
@@ -99,30 +93,20 @@ void XeMain::start() {
 
 void XeMain::shutdownCPU() {
   MICROPROFILE_SCOPEI("[Xe::Main]", "ShutdownCPU", MP_AUTO);
-  // Halt rendering (prevent debugger from segfaulting)
-#ifndef NO_GFX
-  renderHalt = true;
-#endif
-  // Halt the CPU
-  xenonCPU->Halt();
+  // Set the CPU to 'Resetting' mode before killing the handle
+  xenonCPU->Reset();
   // Reset RAM
   ram->Reset();
 #ifndef NO_GFX
   // Reinit RAM handles for rendering (should be valid, mainly safety)
   renderer->ramPointer = ram.get();
-  renderer->fbPointer = renderer->ramPointer->getPointerToAddress(XE_FB_BASE);
+  renderer->fbPointer = ram->getPointerToAddress(XE_FB_BASE);
 #endif
-  // Set the CPU to 'Resetting' mode before killing the handle
-  xenonCPU->Reset();
   // Reset the CPU
   xenonCPU.reset();
   xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses);
   // Ensure the IIC pointer in the PCI bridge is correct
   pciBridge->RegisterIIC(xenonCPU->GetIICPointer());
-  // Continue rendering
-#ifndef NO_GFX
-  renderHalt = false;
-#endif
   // Set the CPU as inactive
   CPUStarted = false;
 }

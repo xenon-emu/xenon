@@ -15,7 +15,7 @@ enum class eThreadState : u8 {
   Halted,      // Halted, but ready for execution
   Running,     // Running
   Executing,   // Actively running opcodes
-  Reseting,    // Recreating handle, same as halted but will resume afterwards
+  Resetting,   // Recreating handle, same as halted but will resume afterwards
   Quiting      // Currently in a shutdown
 };
 class PPU {
@@ -82,13 +82,16 @@ private:
   std::thread ppuThread;
 
   // PPU running?
-  eThreadState ppuThreadState = eThreadState::None;
+  std::atomic<eThreadState> ppuThreadState = eThreadState::None;
 
   // Thread active?
   volatile bool ppuThreadActive = true;
 
+  // Thread resetting?
+  volatile bool ppuThreadResetting = false;
+
   // PPU thread state before halting
-  eThreadState ppuThreadPreviousState = eThreadState::None;
+  std::atomic<eThreadState> ppuThreadPreviousState = eThreadState::None;
 
   // If this is set to a non-zero value, it will halt on that address then clear it
   u64 ppuHaltOn = 0;

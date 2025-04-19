@@ -156,27 +156,42 @@ void Xenon::LoadElf(const std::string path) {
 }
 
 void Xenon::Reset() {
-  if (ppu0.get()) ppu0->Reset();
-  if (ppu1.get()) ppu1->Reset();
-  if (ppu2.get()) ppu2->Reset();
+  if (ppu0.get())
+    ppu0->Reset();
+  std::this_thread::sleep_for(200ms);
+  if (ppu1.get())
+    ppu1->Reset();
+  std::this_thread::sleep_for(200ms);
+  if (ppu2.get())
+    ppu2->Reset();
+  std::this_thread::sleep_for(200ms);
 }
 
 void Xenon::Halt(u64 haltOn) {
-  if (ppu0.get()) ppu0->Halt(haltOn);
-  if (ppu1.get()) ppu1->Halt(haltOn);
-  if (ppu2.get()) ppu2->Halt(haltOn);
+  if (ppu0.get())
+    ppu0->Halt(haltOn);
+  if (ppu1.get())
+    ppu1->Halt(haltOn);
+  if (ppu2.get())
+    ppu2->Halt(haltOn);
 }
 
 void Xenon::Continue() {
-  if (ppu0.get()) ppu0->Continue();
-  if (ppu1.get()) ppu1->Continue();
-  if (ppu2.get()) ppu2->Continue();
+  if (ppu0.get())
+    ppu0->Continue();
+  if (ppu1.get())
+    ppu1->Continue();
+  if (ppu2.get())
+    ppu2->Continue();
 }
 
 void Xenon::Step(int amount) {
-  if (ppu0.get()) ppu0->Step(amount);
-  if (ppu1.get()) ppu1->Step(amount);
-  if (ppu2.get()) ppu2->Step(amount);
+  if (ppu0.get())
+    ppu0->Step(amount);
+  if (ppu1.get())
+    ppu1->Step(amount);
+  if (ppu2.get())
+    ppu2->Step(amount);
 }
 
 bool Xenon::IsHalted() {

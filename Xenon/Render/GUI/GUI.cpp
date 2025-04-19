@@ -521,6 +521,8 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
     return;
   }
   PPU_STATE *PPUStatePtr = PPU->GetPPUState();
+  if (!PPUStatePtr)
+    return;
   #define ppuState PPUStatePtr
   PPU_STATE &PPUState = *PPUStatePtr;
   gui->Node(PPUState.ppuName, [&] {
@@ -660,9 +662,11 @@ void PPCDebugger(Render::GUI *gui) {
       Xe_Main->getCPU()->Step(gui->stepAmount);
     }
     Xenon *CPU = Xe_Main->getCPU();
-    PPC_PPU(gui, CPU->GetPPU(0));
-    PPC_PPU(gui, CPU->GetPPU(1));
-    PPC_PPU(gui, CPU->GetPPU(2));
+    if (CPU) {
+      PPC_PPU(gui, CPU->GetPPU(0));
+      PPC_PPU(gui, CPU->GetPPU(1));
+      PPC_PPU(gui, CPU->GetPPU(2));
+    }
   }, { window->Size.x - 27.5f, window->Size.y - 76.f }, ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_MenuBar);
   ImGui::PopStyleVar(4);
 }

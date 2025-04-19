@@ -542,7 +542,9 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
         else if (smcCoreState->fifoDataBuffer[1] == 0x04) {
           LOG_INFO(SMC, "[Standby] Requested reboot");
           // Note: Real hardware only respects 0x30, but for automated testing, we will allow anything
+          mutex.unlock();
           Xe_Main->reboot(static_cast<Xe::PCIDev::SMC::SMC_PWR_REASON>(smcCoreState->fifoDataBuffer[2]));
+          mutex.lock();
         } else {
           LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD Subtype in SMC_SET_STANDBY: 0x{:02X}",
             static_cast<u16>(smcCoreState->fifoDataBuffer[1]));
@@ -632,7 +634,7 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
       if (smcPCIState.clockIntStatusReg == CLCK_INT_READY) {
         // Wait X time before next clock interrupt. TODO: Find the correct
         // delay.
-        if (timerNow >= timerStart + std::chrono::milliseconds(500)) {
+        if (timerNow >= timerStart + 500ms) {
           // Update internal timer.
           timerStart = std::chrono::steady_clock::now();
           mutex.lock();

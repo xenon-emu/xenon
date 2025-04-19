@@ -117,7 +117,7 @@ s32 main(s32 argc, char *argv[]) {
 #if MICROPROFILE_ENABLED == 1 && AUTO_FLIP == 0
     MicroProfileFlip(nullptr);
 #endif
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    std::this_thread::sleep_for(100ns);
   }
   // Shutdown
   {
