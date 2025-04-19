@@ -26,6 +26,7 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
 
   if (size < 4) {
     LOG_CRITICAL(Xenon, "Invalid interrupt write! Expected a size of at least 4, got {} instead", size);
+    mutex.unlock();
     return;
   }
 
