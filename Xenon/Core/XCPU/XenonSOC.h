@@ -516,7 +516,7 @@ namespace Xe::Xenon::SOC {
     u64 AsULONGLONG;
     } SOCINTS_VECTOR;
 
-    typedef union _SOCINTS_LIDR {
+  typedef union _SOCINTS_LIDR {
   #ifdef __LITTLE_ENDIAN__
     struct {
       u64 LogicalId : 6;
@@ -592,6 +592,20 @@ namespace Xe::Xenon::SOC {
 
   typedef union _CIU_FAULT_ISOLATION {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 53;
+      u64 NCUTimeoutICBIQ : 1;
+      u64 NCUTimeoutTLBIQ : 1;
+      u64 NCUTimeoutStore : 1;
+      u64 NCUTimeoutLoad : 1;
+      u64 MMULoadStoreHang : 1;
+      u64 MMUParityErrorTLB : 1;
+      u64 MMUParityErrorSLB : 1;
+      u64 PPUDebugCheckstop : 1;
+      u64 PPUNonrecoverableError : 1;
+      u64 PPUDataCacheParityError : 1;
+      u64 PPUInstructionCacheParityError : 1;
+#else
       u64 PPUInstructionCacheParityError : 1;
       u64 PPUDataCacheParityError : 1;
       u64 PPUNonrecoverableError : 1;
@@ -604,32 +618,65 @@ namespace Xe::Xenon::SOC {
       u64 NCUTimeoutTLBIQ : 1;
       u64 NCUTimeoutICBIQ : 1;
       u64 Reserved1 : 53;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } CIU_FAULT_ISOLATION;
 
   typedef union _CIU_RECOVERABLE_ERROR_CONTROL {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 62;
+      u64 PPUDataCacheParityErrorEnable : 1;
+      u64 PPUInstructionCacheParityErrorEnable : 1;
+#else
       u64 PPUInstructionCacheParityErrorEnable : 1;
       u64 PPUDataCacheParityErrorEnable : 1;
       u64 Reserved1 : 62;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } CIU_RECOVERABLE_ERROR_CONTROL;
 
   typedef union _CIU_MODE_SETUP {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 60;
+      u64 LimitLoadCreditsToFour : 1;
+      u64 LimitLoadCreditsToOne : 1;
+      u64 CLQAlwaysCorrectMode : 1;
+      u64 CLQInstructionHighPriorityMode : 1;
+#else
       u64 CLQInstructionHighPriorityMode : 1;
       u64 CLQAlwaysCorrectMode : 1;
       u64 LimitLoadCreditsToOne : 1;
       u64 LimitLoadCreditsToFour : 1;
       u64 Reserved1 : 60;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } CIU_MODE_SETUP;
 
   typedef union _CIU_TRACE_ENABLE {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 40;
+      u64 SelectHalfwordFor48To63 : 3;
+      u64 Reserved2 : 1;
+      u64 SelectHalfwordFor32To47 : 3;
+      u64 Reserved3 : 1;
+      u64 SelectHalfwordFor16To31 : 3;
+      u64 Reserved4 : 1;
+      u64 SelectHalfwordFor0To15 : 3;
+      u64 Reserved5 : 1;
+      u64 EnableHalfword48To63 : 1;
+      u64 EnableHalfword32To47 : 1;
+      u64 EnableHalfword16To31 : 1;
+      u64 EnableHalfword0To15 : 1;
+      u64 Reserved6 : 2;
+      u64 TraceEnable : 1;
+      u64 TraceMasterEnable : 1;
+#else
       u64 TraceMasterEnable : 1;
       u64 TraceEnable : 1;
       u64 Reserved6 : 2;
@@ -646,29 +693,42 @@ namespace Xe::Xenon::SOC {
       u64 Reserved2 : 1;
       u64 SelectHalfwordFor48To63 : 3;
       u64 Reserved1 : 40;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } CIU_TRACE_ENABLE;
 
   typedef union _CIU_TRACE_TRIGGER_ENABLE {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 28;
+      u64 TriggerCompareMask : 16;
+      u64 TriggerCompareValue : 16;
+      u64 Reserved2 : 2;
+      u64 Enable4GHzTrigger : 2;
+#else
       u64 Enable4GHzTrigger : 2;
       u64 Reserved2 : 2;
       u64 TriggerCompareValue : 16;
       u64 TriggerCompareMask : 16;
       u64 Reserved1 : 28;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } CIU_TRACE_TRIGGER_ENABLE;
 
   typedef union _CIU_RECOVERABLE_ERROR_COUNTER {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 ErrorCounter : 6; // 0x0 bfo:0x58
+      u64 Reserved1 : 58; // 0x0 bfo:0x0
+#else
       u64 Reserved1 : 58; // 0x0 bfo:0x0
       u64 ErrorCounter : 6; // 0x0 bfo:0x58
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } CIU_RECOVERABLE_ERROR_COUNTER, * PCIU_RECOVERABLE_ERROR_COUNTER; // size 8
-
 
   typedef struct _SOCCIU_BLOCK {
     CIU_FAULT_ISOLATION FaultIsolation; // 0
@@ -687,37 +747,73 @@ namespace Xe::Xenon::SOC {
     u64 Reserved2[3]; // 104
   } SOCCIU_BLOCK; // size 128 or 0x80
 
-  //
-  // Part of the PWM/BIU Block.
-
   // Noncacheable Unit (NCU) MMIO Registers
+  // Part of the PMW/BIU Block.
 
   typedef union _NCU_PM_SETUP {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 36;
+      u64 UnitBitRotate : 4;
+      u64 UnitBitEnable : 16;
+      u64 Reserved2 : 6;
+      u64 UnitEnable : 1;
+      u64 UnitMasterEnable : 1;
+#else
       u64 UnitMasterEnable : 1;
       u64 UnitEnable : 1;
       u64 Reserved2 : 6;
       u64 UnitBitEnable : 16;
       u64 UnitBitRotate : 4;
       u64 Reserved1 : 36;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } NCU_PM_SETUP;
 
   typedef union _NCU_MODE_SETUP {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 56;
+      u64 IsyncMapping : 1;
+      u64 IsyncBusOperation : 1;
+      u64 StoreGatherTimeoutDisable : 1;
+      u64 StoreGatherTimeoutCount : 4;
+      u64 StoreGatherDisable : 1;
+#else
       u64 StoreGatherDisable : 1;
       u64 StoreGatherTimeoutCount : 4;
       u64 StoreGatherTimeoutDisable : 1;
       u64 IsyncBusOperation : 1;
       u64 IsyncMapping : 1;
       u64 Reserved1 : 56;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } NCU_MODE_SETUP;
 
   typedef union _NCU_DEBUG_SETUP {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 28;
+      u64 MUXControl : 8;
+      u64 SelectHalfwordFor48To63 : 4;
+      u64 SelectHalfwordFor32To47 : 4;
+      u64 SelectHalfwordFor16To31 : 4;
+      u64 SelectHalfwordFor0To15 : 4;
+      u64 FourGHzEnableHalfword48To63 : 1;
+      u64 FourGHzEnableHalfword32To47 : 1;
+      u64 FourGHzEnableHalfword16To31 : 1;
+      u64 FourGHzEnableHalfword0To15 : 1;
+      u64 TwoGHzEnableHalfword48To63 : 1;
+      u64 TwoGHzEnableHalfword32To47 : 1;
+      u64 TwoGHzEnableHalfword16To31 : 1;
+      u64 TwoGHzEnableHalfword0To15 : 1;
+      u64 TraceEnable : 1;
+      u64 Reserved2 : 1;
+      u64 FourGHzTraceMasterEnable : 1;
+      u64 TwoGHzTraceMasterEnable : 1;
+#else
       u64 TwoGHzTraceMasterEnable : 1;
       u64 FourGHzTraceMasterEnable : 1;
       u64 TraceEnable : 1;
@@ -736,17 +832,26 @@ namespace Xe::Xenon::SOC {
       u64 SelectHalfwordFor48To63 : 4;
       u64 MUXControl : 8;
       u64 Reserved1 : 28;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } NCU_DEBUG_SETUP;
 
   typedef union _NCU_TRACE_TRIGGER_ENABLE {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 28;
+      u64 TriggerCompareMask : 16;
+      u64 TriggerCompareValue : 16;
+      u64 EnableFourGHzTrigger : 2;
+      u64 EnableTwoGHzTrigger : 2;
+#else
       u64 EnableTwoGHzTrigger : 2;
       u64 EnableFourGHzTrigger : 2;
       u64 TriggerCompareValue : 16;
       u64 TriggerCompareMask : 16;
       u64 Reserved1 : 28;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } NCU_TRACE_TRIGGER_ENABLE;
@@ -759,10 +864,20 @@ namespace Xe::Xenon::SOC {
     u64 Reserved1[12]; // 32
   } SOCNCU_BLOCK; // size 128 0x80
 
-  // Beginning of the PWM/BIU Block structures.
+  // Beginning of the PMW/BIU Block structures.
 
   typedef union _L2_RMT_SETUP {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 RMT7 : 8;
+      u64 RMT6 : 8;
+      u64 RMT5 : 8;
+      u64 RMT4 : 8;
+      u64 RMT3 : 8;
+      u64 RMT2 : 8;
+      u64 RMT1 : 8;
+      u64 RMT0 : 8;
+#else
       u64 RMT0 : 8;
       u64 RMT1 : 8;
       u64 RMT2 : 8;
@@ -771,38 +886,70 @@ namespace Xe::Xenon::SOC {
       u64 RMT5 : 8;
       u64 RMT6 : 8;
       u64 RMT7 : 8;
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } L2_RMT_SETUP; // size 8
 
   typedef union _L2_PM_SELECT {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 14;
+      u64 LowerModeSelect : 25;
+      u64 UpperModeSelect : 25;
+#else
       u64 UpperModeSelect : 25;
       u64 LowerModeSelect : 25;
       u64 Reserved1 : 14;
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } L2_PM_SELECT; // size 8
 
   typedef union _L2_PM_SETUP {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 47;
+      u64 UnitBitEnable : 16;
+      u64 UnitMasterEnable : 1;
+#else
       u64 UnitMasterEnable : 1;
       u64 UnitBitEnable : 16;
       u64 Reserved1 : 47;
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } L2_PM_SETUP; // size 8
 
   typedef union _L2_DEBUG_SELECT {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 GroupEnable : 21;
+      u64 Reserved1 : 43;
+#else
       u64 Reserved1 : 43;
       u64 GroupEnable : 21;
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } L2_DEBUG_SELECT; // size 8
 
   typedef union _L2_DEBUG_TRIGGER_CONTROL {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Quartile3TriggerSelect : 5;
+      u64 Quartile2TriggerSelect : 5;
+      u64 Quartile1TriggerSelect : 5;
+      u64 Quartile0TriggerSelect : 5;
+      u64 L2TriggerStopEnable : 1;
+      u64 L2TriggerStartEnable : 1;
+      u64 FIRTriggerEnable : 1;
+      u64 Quartile3TriggerEnable : 1;
+      u64 Quartile2TriggerEnable : 1;
+      u64 Quartile1TriggerEnable : 1;
+      u64 Quartile0TriggerEnable : 1;
+      u64 Reserved1 : 37;
+#else
       u64 Reserved1 : 37;
       u64 Quartile0TriggerEnable : 1;
       u64 Quartile1TriggerEnable : 1;
@@ -815,32 +962,56 @@ namespace Xe::Xenon::SOC {
       u64 Quartile1TriggerSelect : 5;
       u64 Quartile2TriggerSelect : 5;
       u64 Quartile3TriggerSelect : 5;
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } L2_DEBUG_TRIGGER_CONTROL; // size 8
 
   typedef union _L2_DEBUG_TRIGGER_MASK {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Quartile3Mask : 16;
+      u64 Quartile2Mask : 16;
+      u64 Quartile1Mask : 16;
+      u64 Quartile0Mask : 16;
+#else
       u64 Quartile0Mask : 16;
       u64 Quartile1Mask : 16;
       u64 Quartile2Mask : 16;
       u64 Quartile3Mask : 16;
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } L2_DEBUG_TRIGGER_MASK; // size 8
 
   typedef union _L2_DEBUG_TRIGGER_MATCH {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Quartile3Mask : 16;
+      u64 Quartile2Mask : 16;
+      u64 Quartile1Mask : 16;
+      u64 Quartile0Mask : 16;
+#else
       u64 Quartile0Mask : 16;
       u64 Quartile1Mask : 16;
       u64 Quartile2Mask : 16;
       u64 Quartile3Mask : 16;
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } L2_DEBUG_TRIGGER_MATCH; // size 8
 
   typedef union _CIU_SLICE_MODE_SETUP {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 53;
+      u64 LivelockControlSelect : 2;
+      u64 EnableLivelockBreak : 1;
+      u64 HangPulseConfig : 2;
+      u64 LoadQueueBypassDisable2 : 2;
+      u64 LoadQueueBypassDisable1 : 2;
+      u64 LoadQueueBypassDisable0 : 2;
+#else
       u64 LoadQueueBypassDisable0 : 2;
       u64 LoadQueueBypassDisable1 : 2;
       u64 LoadQueueBypassDisable2 : 2;
@@ -848,24 +1019,54 @@ namespace Xe::Xenon::SOC {
       u64 EnableLivelockBreak : 1;
       u64 LivelockControlSelect : 2;
       u64 Reserved1 : 53;
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } CIU_SLICE_MODE_SETUP; // size 8
 
   typedef union _CIU_SLICE_PM_SETUP {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 36;
+      u64 UnitBitRotate : 4;
+      u64 UnitBitEnable : 16;
+      u64 Reserved2 : 6;
+      u64 UnitEnable : 1;
+      u64 UnitMasterEnable : 1;
+#else
       u64 UnitMasterEnable : 1;
       u64 UnitEnable : 1;
       u64 Reserved2 : 6;
       u64 UnitBitEnable : 16;
       u64 UnitBitRotate : 4;
       u64 Reserved1 : 36;
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } CIU_SLICE_PM_SETUP; // size 8
 
   typedef union _CIU_SLICE_TRACE_ENABLE {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 35;
+      u64 MUXControl : 1;
+      u64 SelectHalfwordFor48To63 : 4;
+      u64 SelectHalfwordFor32To47 : 4;
+      u64 SelectHalfwordFor16To31 : 4;
+      u64 SelectHalfwordFor0To15 : 4;
+      u64 FourGHzEnableHalfword48To63 : 1;
+      u64 FourGHzEnableHalfword32To47 : 1;
+      u64 FourGHzEnableHalfword16To31 : 1;
+      u64 FourGHzEnableHalfword0To15 : 1;
+      u64 TwoGHzEnableHalfword48To63 : 1;
+      u64 TwoGHzEnableHalfword32To47 : 1;
+      u64 TwoGHzEnableHalfword16To31 : 1;
+      u64 TwoGHzEnableHalfword0To15 : 1;
+      u64 Reserved2 : 1;
+      u64 TraceEnable : 1;
+      u64 FourGHzTraceMasterEnable : 1;
+      u64 TwoGHzTraceMasterEnable : 1;
+#else
       u64 TwoGHzTraceMasterEnable : 1;
       u64 FourGHzTraceMasterEnable : 1;
       u64 TraceEnable : 1;
@@ -884,23 +1085,62 @@ namespace Xe::Xenon::SOC {
       u64 SelectHalfwordFor48To63 : 4;
       u64 MUXControl : 1;
       u64 Reserved1 : 35;
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } CIU_SLICE_TRACE_ENABLE; // size 8
 
   typedef union _CIU_SLICE_TRACE_TRIGGER_ENABLE {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 28;
+      u64 TriggerCompareMask : 16;
+      u64 TriggerCompareValue : 16;
+      u64 EnableFourGHzTrigger : 2;
+      u64 EnableTwoGHzTrigger : 2;
+#else
       u64 EnableTwoGHzTrigger : 2;
       u64 EnableFourGHzTrigger : 2;
       u64 TriggerCompareValue : 16;
       u64 TriggerCompareMask : 16;
       u64 Reserved1 : 28;
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } CIU_SLICE_TRACE_TRIGGER_ENABLE; // size 8
 
   typedef union _L2_FAULT_ISOLATION {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 A1Q3CorrectableErrorThreshhold : 1;
+      u64 A0Q3CorrectableErrorThreshhold : 1;
+      u64 A1Q2CorrectableErrorThreshhold : 1;
+      u64 A0Q2CorrectableErrorThreshhold : 1;
+      u64 A1Q1CorrectableErrorThreshhold : 1;
+      u64 A0Q1CorrectableErrorThreshhold : 1;
+      u64 A1Q0CorrectableErrorThreshhold : 1;
+      u64 A0Q0CorrectableErrorThreshhold : 1;
+      u64 MultipleDirectoryParityErrors : 1;
+      u64 MultipleCorrectableErrors : 1;
+      u64 SnoopPAAMError : 1;
+      u64 ControlErrorStoreQueue : 1;
+      u64 RCUnexpectedMERSI : 1;
+      u64 RCUnexpectedCRESP : 1;
+      u64 RCUnexpectedData : 1;
+      u64 RCOrNCCTLDataHang : 1;
+      u64 StoreQueue2DataParityError : 1;
+      u64 StoreQueue1DataParityError : 1;
+      u64 StoreQueue0DataParityError : 1;
+      u64 NCCTLHangDetect : 1;
+      u64 FSMHangDetect : 1;
+      u64 DirectoryCheckstop : 1;
+      u64 DirectoryParityError : 1;
+      u64 SpecialUncorrectableErrorNonCacheableSide : 1;
+      u64 SpecialUncorrectableErrorCacheableSide : 1;
+      u64 UncorrectableError : 1;
+      u64 CorrectableError : 1;
+      u64 Reserved1 : 37;
+#else
       u64 Reserved1 : 37;
       u64 CorrectableError : 1;
       u64 UncorrectableError : 1;
@@ -929,22 +1169,47 @@ namespace Xe::Xenon::SOC {
       u64 A1Q2CorrectableErrorThreshhold : 1;
       u64 A0Q3CorrectableErrorThreshhold : 1;
       u64 A1Q3CorrectableErrorThreshhold : 1;
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } L2_FAULT_ISOLATION; // size 8
 
   typedef union _L2_ERROR_INJECTION {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 ErrorInjectionType : 2;
+      u64 InjectCacheError : 2;
+      u64 InjectDirectoryError : 2;
+      u64 Reserved1 : 58;
+#else
       u64 Reserved1 : 58;
       u64 InjectDirectoryError : 2;
       u64 InjectCacheError : 2;
       u64 ErrorInjectionType : 2;
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } L2_ERROR_INJECTION; // size 8
 
   typedef union _L2_MODE_SETUP {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 RCsAvailableForLoads : 8;
+      u64 RCsAvailableForStores : 8;
+      u64 StoreQueue2GatherWaitCount : 4;
+      u64 StoreQueue1GatherWaitCount : 4;
+      u64 StoreQueue0GatherWaitCount : 4;
+      u64 DirectMapEnable : 1;
+      u64 LRURMTFunctionDisable : 1;
+      u64 ECCErrorCountRevertToPreset : 1;
+      u64 FSMHangPulseDividerCounter : 4;
+      u64 ConvertTouchAroundL2ToDSideDemandLoad : 1;
+      u64 LPWaitCount : 6;
+      u64 RcDispatchThrottleSelect : 2;
+      u64 RcDispatchThrottleControl : 2;
+      u64 DisableCacheRequestorArbitrationBlocking : 1;
+      u64 Reserved : 17;
+#else
       u64 Reserved : 17;
       u64 DisableCacheRequestorArbitrationBlocking : 1;
       u64 RcDispatchThrottleControl : 2;
@@ -960,12 +1225,30 @@ namespace Xe::Xenon::SOC {
       u64 StoreQueue2GatherWaitCount : 4;
       u64 RCsAvailableForStores : 8;
       u64 RCsAvailableForLoads : 8;
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } L2_MODE_SETUP; // size 8
 
   typedef union _L2_MODE_SETUP_CONTROL {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 7;
+      u64 RCsAvailableForLoadsUseMMIO : 1;
+      u64 Reserved2 : 7;
+      u64 RCsAvailableForStoresUseMMIO : 1;
+      u64 Reserved3 : 3;
+      u64 StoreQueue2GatherWaitCountUseMMIO : 1;
+      u64 Reserved4 : 3;
+      u64 StoreQueue1GatherWaitCountUseMMIO : 1;
+      u64 Reserved5 : 3;
+      u64 StoreQueue0GatherWaitCountUseMMIO : 1;
+      u64 DirectMapEnableUseMMIO : 1;
+      u64 LRURMTFunctionDisableUseMMIO : 1;
+      u64 Reserved6 : 11;
+      u64 LPWaitCountUseMMIO : 1;
+      u64 Reserved7 : 22;
+#else
       u64 Reserved7 : 22;
       u64 LPWaitCountUseMMIO : 1;
       u64 Reserved6 : 11;
@@ -981,20 +1264,44 @@ namespace Xe::Xenon::SOC {
       u64 Reserved2 : 7;
       u64 RCsAvailableForLoadsUseMMIO : 1;
       u64 Reserved1 : 7;
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } L2_MODE_SETUP_CONTROL; // size 8
 
   typedef union _L2_MACHINE_CHECK {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 MachineCheckEnable : 1;
+      u64 Reserved1 : 63;
+#else
       u64 Reserved1 : 63;
       u64 MachineCheckEnable : 1;
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } L2_MACHINE_CHECK; // size 8
 
   typedef union _L2_ECC_ERROR_COUNT {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 A1Q3ECCErrorCount : 6;
+      u64 Reserved1 : 2;
+      u64 A0Q3ECCErrorCount : 6;
+      u64 Reserved2 : 2;
+      u64 A1Q2ECCErrorCount : 6;
+      u64 Reserved3 : 2;
+      u64 A0Q2ECCErrorCount : 6;
+      u64 Reserved4 : 2;
+      u64 A1Q1ECCErrorCount : 6;
+      u64 Reserved5 : 2;
+      u64 A0Q1ECCErrorCount : 6;
+      u64 Reserved6 : 2;
+      u64 A1Q0ECCErrorCount : 6;
+      u64 Reserved7 : 2;
+      u64 A0Q0ECCErrorCount : 6;
+      u64 Reserved8 : 2;
+#else
       u64 Reserved8 : 2;
       u64 A0Q0ECCErrorCount : 6;
       u64 Reserved7 : 2;
@@ -1011,12 +1318,25 @@ namespace Xe::Xenon::SOC {
       u64 A0Q3ECCErrorCount : 6;
       u64 Reserved1 : 2;
       u64 A1Q3ECCErrorCount : 6;
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } L2_ECC_ERROR_COUNT; // size 8
 
   typedef union _BIU_FAULT_ISOLATION {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 ReceivedIllegalTSizeOnMMIOAccess : 1;
+      u64 MMIOErrorRegisterIsSet : 1;
+      u64 SentIllegalTSizeOnACommand : 1;
+      u64 SentIllegalWIMGOnACommand : 1;
+      u64 SentIllegalTTypeOnACommand : 1;
+      u64 NoAckReceivedOnCombinedResponse : 1;
+      u64 SentReflectedCommandToL2BackToBack : 1;
+      u64 InterventionOnCombinedResponseWithoutModifiedOrShared : 1;
+      u64 BusGrantedMoreCreditsThanBIUCanQueue : 1;
+      u64 Reserved1 : 55;
+#else
       u64 Reserved1 : 55;
       u64 BusGrantedMoreCreditsThanBIUCanQueue : 1;
       u64 InterventionOnCombinedResponseWithoutModifiedOrShared : 1;
@@ -1027,24 +1347,53 @@ namespace Xe::Xenon::SOC {
       u64 SentIllegalTSizeOnACommand : 1;
       u64 MMIOErrorRegisterIsSet : 1;
       u64 ReceivedIllegalTSizeOnMMIOAccess : 1;
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } BIU_FAULT_ISOLATION; // size 8
 
   typedef union _BIU_PM_SETUP {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 36;
+      u64 UnitBitRotate : 4;
+      u64 UnitBitEnable : 16;
+      u64 AlternateEventsEnable : 1;
+      u64 Reserved2 : 6;
+      u64 UnitMasterEnable : 1;
+#else
       u64 UnitMasterEnable : 1;
       u64 Reserved2 : 6;
       u64 AlternateEventsEnable : 1;
       u64 UnitBitEnable : 16;
       u64 UnitBitRotate : 4;
       u64 Reserved1 : 36;
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } BIU_PM_SETUP; // size 8
 
   typedef union _BIU_DEBUG_1 {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 5;
+      u64 b_reg : 1;
+      u64 b_rcv_snp : 5;
+      u64 b_cmd_l2 : 1;
+      u64 b_snp_reply : 1;
+      u64 b_mmio : 1;
+      u64 b_wr_darb : 1;
+      u64 b_wr_cntl : 2;
+      u64 b_cmd : 2;
+      u64 b_ad_mch : 1;
+      u64 b_arb : 12;
+      u64 Reserved2 : 16;
+      u64 DataSelectForTrace_32_63 : 4;
+      u64 DataSelectForTrace_0_31 : 4;
+      u64 TriggerSelect : 1;
+      u64 Reserved3 : 6;
+      u64 DebugBusEnable : 1;
+#else
       u64 DebugBusEnable : 1;
       u64 Reserved3 : 6;
       u64 TriggerSelect : 1;
@@ -1062,16 +1411,24 @@ namespace Xe::Xenon::SOC {
       u64 b_rcv_snp : 5;
       u64 b_reg : 1;
       u64 Reserved1 : 5;
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } BIU_DEBUG_1; // size 8
 
   typedef union _BIU_DEBUG_2 {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 TriggerCompareMask : 16;
+      u64 TriggerCompareData : 16;
+      u64 Reserved1 : 26;
+      u64 TriggerSelectBits : 6;
+#else
       u64 TriggerSelectBits : 6;
       u64 Reserved1 : 26;
       u64 TriggerCompareData : 16;
       u64 TriggerCompareMask : 16;
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } BIU_DEBUG_2; // size 8
@@ -1136,20 +1493,43 @@ namespace Xe::Xenon::SOC {
   } SOCPMW_BLOCK, * PSOCPMW_BLOCK; // size 4096
 
   //
-  // System On Chip Interrupt Register Block
+  // System On Chip Pervasive Logic Block
   // Offset: 0x80000200_00061000
   //
 
   typedef union _PRV_POST_INOUT {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 56;
+      u64 Value : 8;
+#else
       u64 Value : 8;
       u64 Reserved1 : 56;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } PRV_POST_INOUT;
 
   typedef union _PRV_POR_STATUS {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 38;
+      u64 ConfigRing2Active : 1;
+      u64 ConfigRing1Active : 1;
+      u64 LastSecurityTask : 7;
+      u64 Reserved2 : 6;
+      u64 Executing : 1;
+      u64 Phase2Active : 1;
+      u64 Checkstop : 1;
+      u64 InWaitStatePhase2 : 1;
+      u64 AtWaitInstruction : 1;
+      u64 TimeOutError : 1;
+      u64 ExternalConfigFuseBlown : 1;
+      u64 UnlockMode : 1;
+      u64 SecureMode : 1;
+      u64 NotSecureMode : 1;
+      u64 Reserved3 : 1;
+#else
       u64 Reserved3 : 1;
       u64 NotSecureMode : 1;
       u64 SecureMode : 1;
@@ -1166,12 +1546,38 @@ namespace Xe::Xenon::SOC {
       u64 ConfigRing1Active : 1;
       u64 ConfigRing2Active : 1;
       u64 Reserved1 : 38;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } PRV_POR_STATUS;
 
   typedef union _PRV_POWER_MANAGEMENT_CONTROL {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 PLLRatio : 3;
+      u64 PLLSet : 1;
+      u64 Core2PauseDisable : 1;
+      u64 Core1PauseDisable : 1;
+      u64 Core0PauseDisable : 1;
+      u64 Reserved1 : 1;
+      u64 VIDValue : 6;
+      u64 VIDSet : 1;
+      u64 PowerManagementPauseDisable : 1;
+      u64 PLLDelay : 8;
+      u64 VIDDelay : 8;
+      u64 PowerManagementInterruptFlag : 1;
+      u64 Core2Paused : 1;
+      u64 Core1Paused : 1;
+      u64 Core0Paused : 1;
+      u64 JTAGOverride : 1;
+      u64 Reserved2 : 3;
+      u64 VIDFullPower : 3;
+      u64 Reserved3 : 5;
+      u64 VIDLowPower : 6;
+      u64 Reserved4 : 2;
+      u64 VIDPowerUp : 6;
+      u64 Reserved5 : 2;
+#else
       u64 Reserved5 : 2;
       u64 VIDPowerUp : 6;
       u64 Reserved4 : 2;
@@ -1195,12 +1601,23 @@ namespace Xe::Xenon::SOC {
       u64 Core2PauseDisable : 1;
       u64 PLLSet : 1;
       u64 PLLRatio : 3;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } PRV_POWER_MANAGEMENT_CONTROL;
 
   typedef union _PRV_SPI_CONTROL {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 8;
+      u64 Address : 8;
+      u64 Command : 8;
+      u64 WriteData : 32;
+      u64 ValidBytes : 3;
+      u64 EnableAction : 1;
+      u64 ExtensionMode : 1;
+      u64 ClockRateControl : 3;
+#else
       u64 ClockRateControl : 3;
       u64 ExtensionMode : 1;
       u64 EnableAction : 1;
@@ -1209,25 +1626,47 @@ namespace Xe::Xenon::SOC {
       u64 Command : 8;
       u64 Address : 8;
       u64 Reserved1 : 8;
+#endif
     } control;
     struct {
+#ifdef __LITTLE_ENDIAN__
       u64 ReadData : 32;
       u64 Reserved2 : 32;
+#else
+#endif
     } read;
     u64 AsULONGLONG;
   } PRV_SPI_CONTROL;
 
   typedef union _PRV_TIMEBASE_CONTROL {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 TimebaseDivider : 8;
+      u64 TimebaseEnable : 1;
+      u64 Reserved1 : 55;
+#else
       u64 Reserved1 : 55;
       u64 TimebaseEnable : 1;
       u64 TimebaseDivider : 8;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } PRV_TIMEBASE_CONTROL;
 
   typedef union _PRV_THERMAL_DIODE_CALIBRATION {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 PSROCalibration : 11;
+      u64 Reserved1 : 5;
+      u64 ThermalDiodeElevated : 12;
+      u64 Reserved2 : 4;
+      u64 ThermalDiodeLow : 12;
+      u64 Reserved3 : 4;
+      u64 ElevatedTemperature : 7;
+      u64 Reserved4 : 1;
+      u64 LowTemperature : 7;
+      u64 Reserved5 : 1;
+#else
       u64 Reserved5 : 1;
       u64 LowTemperature : 7;
       u64 Reserved4 : 1;
@@ -1238,12 +1677,22 @@ namespace Xe::Xenon::SOC {
       u64 ThermalDiodeElevated : 12;
       u64 Reserved1 : 5;
       u64 PSROCalibration : 11;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } PRV_THERMAL_DIODE_CALIBRATION;
 
   typedef union _PRV_PSRO_COUNT {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 32;
+      u64 MaxCount : 11;
+      u64 Reserved2 : 4;
+      u64 Overflow : 1;
+      u64 LatestCount : 11;
+      u64 Reserved3 : 4;
+      u64 Enable : 1;
+#else
       u64 Enable : 1;
       u64 Reserved3 : 4;
       u64 LatestCount : 11;
@@ -1251,23 +1700,45 @@ namespace Xe::Xenon::SOC {
       u64 Reserved2 : 4;
       u64 MaxCount : 11;
       u64 Reserved1 : 32;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } PRV_PSRO_COUNT;
 
   typedef union _PRV_LOCAL_ERROR_COUNTER_STATUS {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 32;
+      u64 PB2 : 1;
+      u64 PB1 : 1;
+      u64 PB0 : 1;
+      u64 Reserved2 : 29;
+#else
       u64 Reserved2 : 29;
       u64 PB0 : 1;
       u64 PB1 : 1;
       u64 PB2 : 1;
       u64 Reserved1 : 32;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } PRV_LOCAL_ERROR_COUNTER_STATUS;
 
   typedef union _PRV_FAULT_ISOLATION_RECOVERABLE {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 32;
+      u64 AnyLocalRecoverableErrorCounter : 1;
+      u64 INTS : 1;
+      u64 FSB : 1;
+      u64 CBI : 1;
+      u64 BIU : 1;
+      u64 L2 : 1;
+      u64 PB2MMUNCU : 1;
+      u64 PB1MMUNCU : 1;
+      u64 PB0MMUNCU : 1;
+      u64 Reserved2 : 23;
+#else
       u64 Reserved2 : 23;
       u64 PB0MMUNCU : 1;
       u64 PB1MMUNCU : 1;
@@ -1279,12 +1750,23 @@ namespace Xe::Xenon::SOC {
       u64 INTS : 1;
       u64 AnyLocalRecoverableErrorCounter : 1;
       u64 Reserved1 : 32;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } PRV_FAULT_ISOLATION_RECOVERABLE;
 
   typedef union _PRV_FAULT_ISOLATION_MODE {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 32;
+      u64 LocalRecoverableErrorCounterCheckstopEnable : 1;
+      u64 QuiescedCheckstopEnable : 1;
+      u64 HoldRecoverableFaultIsolation : 1;
+      u64 MaskMachineCheckInterrupt : 1;
+      u64 MaskRecoverableErrorInterrupt : 1;
+      u64 GlobalFaultIsolationDebugMode : 1;
+      u64 Reserved2 : 26;
+#else
       u64 Reserved2 : 26;
       u64 GlobalFaultIsolationDebugMode : 1;
       u64 MaskRecoverableErrorInterrupt : 1;
@@ -1293,22 +1775,61 @@ namespace Xe::Xenon::SOC {
       u64 QuiescedCheckstopEnable : 1;
       u64 LocalRecoverableErrorCounterCheckstopEnable : 1;
       u64 Reserved1 : 32;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } PRV_FAULT_ISOLATION_MODE;
 
   typedef union _PRV_FAULT_ISOLATION_MACHINE_CHECK {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 32;
+      u64 L2 : 1;
+      u64 Quiesced : 1;
+      u64 Reserved2 : 30;
+#else
       u64 Reserved2 : 30;
       u64 Quiesced : 1;
       u64 L2 : 1;
       u64 Reserved1 : 32;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } PRV_FAULT_ISOLATION_MACHINE_CHECK;
 
   typedef union _PRV_FAULT_ISOLATION_ENABLE {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 32;
+      u64 MachineCheckEnable : 1;
+      u64 QuiescedEnable : 1;
+      u64 AnyLocalRecoverableErrorCounterRecoverable : 1;
+      u64 INTSRecoverable : 1;
+      u64 FSBRecoverable : 1;
+      u64 CBIRecoverable : 1;
+      u64 BIURecoverable : 1;
+      u64 L2Recoverable : 1;
+      u64 PB2MMUNCURecoverable : 1;
+      u64 PB1MMUNCURecoverable : 1;
+      u64 PB0MMUNCURecoverable : 1;
+      u64 QuiescedCheckstop : 1;
+      u64 AnyLocalRecoverableErrorCounterCheckstop : 1;
+      u64 TLACheckstop : 1;
+      u64 Reserved2 : 1;
+      u64 PORCheckstop : 1;
+      u64 SECCheckstop : 1;
+      u64 FSBCheckstop : 1;
+      u64 CBICheckstop : 1;
+      u64 BIUCheckstop : 1;
+      u64 L2Checkstop : 1;
+      u64 PB2Checkstop : 1;
+      u64 PB1Checkstop : 1;
+      u64 PB0Checkstop : 1;
+      u64 PB2NCUCheckstop : 1;
+      u64 PB1NCUCheckstop : 1;
+      u64 PB0NCUCheckstop : 1;
+      u64 Reserved3 : 5;
+#else
       u64 Reserved3 : 5;
       u64 PB0NCUCheckstop : 1;
       u64 PB1NCUCheckstop : 1;
@@ -1338,12 +1859,33 @@ namespace Xe::Xenon::SOC {
       u64 QuiescedEnable : 1;
       u64 MachineCheckEnable : 1;
       u64 Reserved1 : 32;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } PRV_FAULT_ISOLATION_ENABLE;
 
   typedef union _PRV_FAULT_ISOLATION_CHECKSTOP {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 32;
+      u64 Quiesced : 1;
+      u64 AnyLocalRecoverableErrorCounter : 1;
+      u64 TLA : 1;
+      u64 Reserved2 : 1;
+      u64 POR : 1;
+      u64 SEC : 1;
+      u64 FSB : 1;
+      u64 CBI : 1;
+      u64 BIU : 1;
+      u64 L2 : 1;
+      u64 PB2 : 1;
+      u64 PB1 : 1;
+      u64 PB0 : 1;
+      u64 PB2NCU : 1;
+      u64 PB1NCU : 1;
+      u64 PB0NCU : 1;
+      u64 Reserved3 : 16;
+#else
       u64 Reserved3 : 16;
       u64 PB0NCU : 1;
       u64 PB1NCU : 1;
@@ -1362,12 +1904,33 @@ namespace Xe::Xenon::SOC {
       u64 AnyLocalRecoverableErrorCounter : 1;
       u64 Quiesced : 1;
       u64 Reserved1 : 32;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } PRV_FAULT_ISOLATION_CHECKSTOP;
 
   typedef union _PRV_ERROR_INJECT_SELECT {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 32;
+      u64 Retry : 1;
+      u64 Checkstop : 1;
+      u64 InjectError : 1;
+      u64 INTS : 1;
+      u64 POR : 1;
+      u64 SEC : 1;
+      u64 FSB : 1;
+      u64 CBI : 1;
+      u64 BIU : 1;
+      u64 L2 : 1;
+      u64 PB2 : 1;
+      u64 PB1 : 1;
+      u64 PB0 : 1;
+      u64 PB2NCU : 1;
+      u64 PB1NCU : 1;
+      u64 PB0NCU : 1;
+      u64 Reserved2 : 16;
+#else
       u64 Reserved2 : 16;
       u64 PB0NCU : 1;
       u64 PB1NCU : 1;
@@ -1386,12 +1949,25 @@ namespace Xe::Xenon::SOC {
       u64 Checkstop : 1;
       u64 Retry : 1;
       u64 Reserved1 : 32;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } PRV_ERROR_INJECT_SELECT;
 
   typedef union _PFM_CONTROL {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 49;
+      u64 CountQualifiers : 2;
+      u64 TraceDestination : 1;
+      u64 TraceMode : 2;
+      u64 CountModePB2 : 2;
+      u64 CountModePB1 : 2;
+      u64 CountModePB0 : 2;
+      u64 Freeze : 2;
+      u64 StopAtMax : 1;
+      u64 Enable : 1;
+#else
       u64 Enable : 1;
       u64 StopAtMax : 1;
       u64 Freeze : 2;
@@ -1402,12 +1978,22 @@ namespace Xe::Xenon::SOC {
       u64 TraceDestination : 1;
       u64 CountQualifiers : 2;
       u64 Reserved1 : 49;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } PFM_CONTROL;
 
   typedef union _PFM_TRIGGER_START_STOP {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 34;
+      u64 Bank2And3StopControl : 5;
+      u64 Bank1StopControl : 5;
+      u64 Bank0StopControl : 5;
+      u64 Bank2And3StartControl : 5;
+      u64 Bank1StartControl : 5;
+      u64 Bank0StartControl : 5;
+#else
       u64 Bank0StartControl : 5;
       u64 Bank1StartControl : 5;
       u64 Bank2And3StartControl : 5;
@@ -1415,42 +2001,67 @@ namespace Xe::Xenon::SOC {
       u64 Bank1StopControl : 5;
       u64 Bank2And3StopControl : 5;
       u64 Reserved1 : 34;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } PFM_TRIGGER_START_STOP;
 
   typedef union _PFM_COUNTER {
     struct {
+#ifdef __LITTLE_ENDIAN__
       u64 Value : 32;
       u64 Reserved1 : 32;
+#else
+      u64 Reserved1 : 32;
+      u64 Value : 32;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } PFM_COUNTER;
 
   typedef union _PFM_COUNTER_CONTROL {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 56;
+      u64 CountCycles : 1;
+      u64 Polarity : 1;
+      u64 CountEnable : 1;
+      u64 InputSelect : 5;
+#else
       u64 InputSelect : 5;
       u64 CountEnable : 1;
       u64 Polarity : 1;
       u64 CountCycles : 1;
       u64 Reserved1 : 56;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } PFM_COUNTER_CONTROL;
 
   typedef union _PFM_INPUT_SELECTION {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 Reserved1 : 40;
+      u64 InputSelection : 24;
+#else
       u64 InputSelection : 24;
       u64 Reserved1 : 40;
+#endif
     } AsBITS;
     u64 AsULONGLONG;
   } PFM_INPUT_SELECTION;
 
   typedef union _FPM_STATUS {
     struct {
+#ifdef __LITTLE_ENDIAN__
+      u64 StatusAndInterruptEnableCounters : 16; // 0x0 bfo:0x48
+      u64 StatusAndInterruptEnableIntervalTimer : 1; // 0x0 bfo:0x47
+      u64 Reserved1 : 47; // 0x0 bfo:0x0
+#else
       u64 Reserved1 : 47; // 0x0 bfo:0x0
       u64 StatusAndInterruptEnableIntervalTimer : 1; // 0x0 bfo:0x47
       u64 StatusAndInterruptEnableCounters : 16; // 0x0 bfo:0x48
+#endif
     } AsBITS;
     u64 AsULONGLONG; // 0x0 sz:0x8
   } FPM_STATUS, * PFPM_STATUS; // size 8
@@ -1548,6 +2159,5 @@ namespace Xe::Xenon::SOC {
     PFM_COUNTER_CONTROL PFMCounterControl15; // 760
     u64 Reserved7[416]; // 768
   } SOCPRV_BLOCK, * PSOCPRV_BLOCK; // size 4096
-
 
 } // namespace Xe::Xenon::SOC
