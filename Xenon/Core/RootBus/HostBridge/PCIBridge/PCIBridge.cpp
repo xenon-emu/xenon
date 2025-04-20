@@ -659,7 +659,7 @@ void PCIBridge::ConfigRead(u64 readAddress, u8 *data, u64 size) {
     currentDevName = "5841";
     break;
   default:
-    LOG_ERROR(PCIBridge, "Config Space Read: Unknown device accessed: Dev {:#x}, Reg{:#x}",
+    LOG_ERROR(PCIBridge, "Config Space Read: Unknown device accessed: Dev {:#x}, Reg {:#x}",
         configAddr.devNum, configAddr.regOffset);
     return;
     break;

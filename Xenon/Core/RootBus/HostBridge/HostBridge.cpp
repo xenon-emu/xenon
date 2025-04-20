@@ -59,7 +59,7 @@ bool HostBridge::Read(u64 readAddress, u8 *data, u64 size) {
       *data = biuRegs.REG_E1040000;
       break;
     default:
-      LOG_ERROR(HostBridge, "Unknown register being read at address: {:#x}.",
+      LOG_ERROR(HostBridge, "Unknown register being read at address: {:#x}",
           readAddress);
       *data = 0;
       break;
@@ -316,7 +316,7 @@ void HostBridge::ConfigRead(u64 readAddress, u8 *data, u64 size) {
       xGPU->ConfigRead(readAddress, data, size);
       break;
     default:
-      LOG_ERROR(HostBridge, "BUS0: Configuration read to inexistant PCI Device at address: {:#x}.", readAddress);
+      LOG_ERROR(HostBridge, "BUS0: Configuration read to inexistant PCI Device at address: {:#x}", readAddress);
       break;
     }
     return;

@@ -32,6 +32,7 @@ enum class Class : const u8 {
   Config,                 // Emulator configuration (including commandline)
   Debug,                  // Debugging tools
   System,                 // Base System messages
+  Render,                 // OpenGL and Window messages
   Xenon,                  // Xenon CPU messages
   Xenon_IIC,              // Xenon Integrated Interrupt Controller
   Xenon_MMU,              // Xenon MMU debugging messages

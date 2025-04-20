@@ -14,7 +14,7 @@
 #include "Core/Xe_Main.h"
 
 // Shaders
-void compileShaders(GLuint shader, const char* source) {
+void compileShaders(const GLuint shader, const char* source) {
   MICROPROFILE_SCOPEI("[Xe::Render]", "CompileShader", MP_AUTO);
   glShaderSource(shader, 1, &source, nullptr);
   glCompileShader(shader);
@@ -25,6 +25,8 @@ void compileShaders(GLuint shader, const char* source) {
   if (!success) {
     glGetShaderInfoLog(shader, 512, nullptr, infoLog);
     LOG_ERROR(System, "Failed to initialize SDL video subsystem: {}", infoLog);
+  } else {
+    LOG_INFO(Render, "Compiling Shader {:#x}", shader);
   }
 }
 
@@ -121,7 +123,7 @@ void Render::Renderer::Start() {
   }
   // Init GLAD
   if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress)) {
-    LOG_ERROR(System, "Failed to initialize OpenGL Loader");
+    LOG_ERROR(Render, "Failed to initialize OpenGL Loader");
   }
   // Set VSYNC
   SDL_GL_SetSwapInterval(VSYNC);
@@ -132,7 +134,7 @@ void Render::Renderer::Start() {
 
   // TODO(Vali0004): Pull shaders from a file
   // Init shader handles
-  GLuint computeShader = glCreateShader(GL_COMPUTE_SHADER);
+  const GLuint computeShader = glCreateShader(GL_COMPUTE_SHADER);
   compileShaders(computeShader, computeShaderSource);
   shaderProgram = glCreateProgram();
   glAttachShader(shaderProgram, computeShader);
@@ -209,7 +211,7 @@ void Render::Renderer::Resize(int x, int y, bool resizeViewport) {
   // Recreate the buffer
   glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, pixelBuffer);
   glBufferData(GL_SHADER_STORAGE_BUFFER, pixels.size(), pixels.data(), GL_DYNAMIC_DRAW);
-  LOG_DEBUG(Xenos, "Resized window to {}x{}", width, height);
+  LOG_DEBUG(Render, "Resized window to {}x{}", width, height);
 }
 
 void Render::Renderer::Thread() {
@@ -238,13 +240,13 @@ void Render::Renderer::Thread() {
       switch (windowEvent.type) {
       case SDL_EVENT_WINDOW_RESIZED:
         if (windowEvent.window.windowID == windowID) {
-          LOG_DEBUG(Xenos, "Resizing window...");
+          LOG_DEBUG(Render, "Resizing window...");
           Resize(windowEvent.window.data1, windowEvent.window.data2);
         }
         break;
       case SDL_EVENT_QUIT:
         if (Config::rendering.quitOnWindowClosure) {
-          LOG_INFO(Xenos, "Attempting to soft shutdown...");
+          LOG_INFO(Render, "Attempting to soft shutdown...");
           globalShutdownHandler();
         }
         break;
@@ -262,7 +264,7 @@ void Render::Renderer::Thread() {
     // Exit early if needed
     if (!threadRunning || !XeRunning)
       break;
-    SDL_WindowFlags flag = SDL_GetWindowFlags(mainWindow);
+    const SDL_WindowFlags flag = SDL_GetWindowFlags(mainWindow);
     bool inFocus = flag & SDL_WINDOW_INPUT_FOCUS;
     if (!Config::rendering.pauseOnFocusLoss) {
       inFocus = true;

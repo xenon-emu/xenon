@@ -4,7 +4,6 @@
 
 #ifndef NO_GFX
 
-#include "Base/Logging/Log.h"
 #include "Base/Assert.h"
 
 u32 Render::OGLTexture::GetDepthFromFlags(int flags) {
@@ -87,7 +86,7 @@ void Render::OGLTexture::CreateTextureHandle(u32 width, u32 height, int flags) {
   SetTexture(&TextureHandle);
   SetWidth(width);
   SetHeight(height);
-  u32 depth = GetDepthFromFlags(flags);
+  const u32 depth = GetDepthFromFlags(flags);
   SetDepth(depth);
   glGenTextures(1, (u32*)GetTexture());
   Bind();
@@ -101,7 +100,7 @@ void Render::OGLTexture::CreateTextureWithData(u32 width, u32 height, eDataForma
   SetTexture(&TextureHandle);
   SetWidth(width);
   SetHeight(height);
-  u32 depth = GetDepthFromFlags(flags);
+  const u32 depth = GetDepthFromFlags(flags);
   SetDepth(depth);
   SetTexture(&TextureHandle);
   glGenTextures(1, (u32*)GetTexture());
@@ -109,8 +108,8 @@ void Render::OGLTexture::CreateTextureWithData(u32 width, u32 height, eDataForma
   glTexStorage2D(GL_TEXTURE_2D, 1, depth, GetWidth(), GetHeight());
   SetupTextureFlags(flags);
   glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-  u32 textureFormat = GetOGLTextureFormat(format);
-  u32 internalTextureFormat = GetOGLTextureFormat(format);
+  const u32 textureFormat = GetOGLTextureFormat(format);
+  const u32 internalTextureFormat = GetOGLTextureFormat(format);
   glTexImage2D(GL_TEXTURE_2D, 0, textureFormat, GetWidth(), GetHeight(), 0, internalTextureFormat, GL_UNSIGNED_BYTE, data);
   Unbind();
 }

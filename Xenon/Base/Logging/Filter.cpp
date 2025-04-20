@@ -65,6 +65,7 @@ bool ParseFilterRule(Filter& instance, Iterator begin, Iterator end) {
   CLS(Config)                                                                                    \
   CLS(Debug)                                                                                     \
   CLS(System)                                                                                    \
+  CLS(Render)                                                                                    \
   CLS(Xenon)                                                                                     \
   SUB(Xenon, IIC)                                                                                \
   SUB(Xenon, MMU)                                                                                \

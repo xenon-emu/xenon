@@ -18,7 +18,7 @@ void PPCInterpreter::PPCInterpreter_dcbz(PPU_STATE *ppuState) {
   u64 EA = (_instr.ra ? GPRi(ra) : 0) + GPRi(rb);
   EA = EA & ~(128 - 1); // Cache line size
 
-  // Temporarily diasable caching
+  // Temporarily disable caching
   for (u8 n = 0; n < 128; n += sizeof(u64))
     MMUWrite64(ppuState, EA + n, 0);
   return;

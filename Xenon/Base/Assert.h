@@ -26,7 +26,7 @@ void throw_fail_debug_msg(const std::string& msg);
       LOG_CRITICAL(Debug, "Assertion Failed!");                                              \
       throw_fail_impl();                                                                     \
     }                                                                                        \
-  }())
+  })
 
 #define ASSERT(_a_)                                                                          \
   ([&]() XENON_NO_INLINE {                                                                   \
@@ -34,7 +34,7 @@ void throw_fail_debug_msg(const std::string& msg);
       LOG_CRITICAL(Debug, "Assertion Failed!");                                              \
       assert_fail_impl();                                                                    \
     }                                                                                        \
-  }())
+  })
 
 #define THROW_MSG(_a_, ...)                                                                  \
   ([&]() XENON_NO_INLINE {                                                                   \
@@ -42,7 +42,7 @@ void throw_fail_debug_msg(const std::string& msg);
       LOG_CRITICAL(Debug, "Assertion Failed!\n" __VA_ARGS__);                                \
       throw_fail_impl();                                                                     \
     }                                                                                        \
-  }())
+  })
 
 #define ASSERT_MSG(_a_, ...)                                                                 \
   ([&]() XENON_NO_INLINE {                                                                   \
@@ -50,7 +50,7 @@ void throw_fail_debug_msg(const std::string& msg);
       LOG_CRITICAL(Debug, "Assertion Failed!\n" __VA_ARGS__);                                \
       assert_fail_impl();                                                                    \
     }                                                                                        \
-  }())
+  })
 
 #define UNREACHABLE()                                                                        \
   do {                                                                                       \

@@ -12,10 +12,8 @@
 #include <SDL3/SDL.h>
 
 #define GL_GLEXT_PROTOTYPES
-extern "C" {
 #include <KHR/khrplatform.h>
 #include <glad/glad.h>
-}
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <backends/imgui_impl_opengl3.h>
