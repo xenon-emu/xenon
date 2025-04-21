@@ -42,6 +42,11 @@ public:
   Xe::XCPU::IIC::XenonIIC *GetIICPointer() { return &xenonContext.xenonIIC; }
 
   PPU *GetPPU(u8 ppuID);
+
+  // Xenon SOC Blocks R/W methods.
+  bool HandleSOCRead(u64 readAddr, u8* data, size_t byteCount);
+  bool HandleSOCWrite(u64 writeAddr, u8* data, size_t byteCount);
+
 private:
   // System Bus
   RootBus *mainBus = nullptr;
@@ -54,4 +59,30 @@ private:
   std::unique_ptr<PPU> ppu0{};
   std::unique_ptr<PPU> ppu1{};
   std::unique_ptr<PPU> ppu2{};
+
+  // SOC Blocks R/W.
+
+  // Security Engine Block.
+  bool HandleSecEngRead(u64 readAddr, u8* data, size_t byteCount);
+  bool HandleSecEngWrite(u64 writeAddr, u8* data, size_t byteCount);
+
+  // Secure OTP Block.
+  bool HandleSecOTPRead(u64 readAddr, u8* data, size_t byteCount);
+  bool HandleSecOTPWrite(u64 writeAddr, u8* data, size_t byteCount);
+
+  // Secure RNG Block.
+  bool HandleSecRNGRead(u64 readAddr, u8* data, size_t byteCount);
+  bool HandleSecRNGWrite(u64 writeAddr, u8* data, size_t byteCount);
+
+  // CBI Block.
+  bool HandleCBIRead(u64 readAddr, u8* data, size_t byteCount);
+  bool HandleCBIWrite(u64 writeAddr, u8* data, size_t byteCount);
+
+  // PMW Block.
+  bool HandlePMWRead(u64 readAddr, u8* data, size_t byteCount);
+  bool HandlePMWWrite(u64 writeAddr, u8* data, size_t byteCount);
+
+  // Pervasive logic Block.
+  bool HandlePRVRead(u64 readAddr, u8* data, size_t byteCount);
+  bool HandlePRVWrite(u64 writeAddr, u8* data, size_t byteCount);
 };

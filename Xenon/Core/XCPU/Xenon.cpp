@@ -214,3 +214,139 @@ PPU *Xenon::GetPPU(u8 ppuID) {
 
   return nullptr;
 }
+
+bool Xenon::HandleSOCRead(u64 readAddr, u8* data, size_t byteCount) {
+  // Get target Block.
+
+  if (readAddr >= XE_SOCSECENG_BLOCK_START && readAddr 
+    < XE_SOCSECENG_BLOCK_START + XE_SOCSECENG_BLOCK_SIZE) {
+    // Security Engine.
+    return HandleSecEngRead(readAddr, data, byteCount);
+  } else if (readAddr >= XE_SOCSECOTP_BLOCK_START && readAddr 
+    < XE_SOCSECOTP_BLOCK_START + XE_SOCSECOTP_BLOCK_SIZE) {
+    // Secure OTP.
+    return HandleSecOTPRead(readAddr, data, byteCount);
+  } else if (readAddr >= XE_SOCSECRNG_BLOCK_START && readAddr 
+    < XE_SOCSECRNG_BLOCK_START + XE_SOCSECRNG_BLOCK_SIZE) {
+    // Secure RNG.
+    return HandleSecRNGRead(readAddr, data, byteCount);
+  } else if (readAddr >= XE_SOCCBI_BLOCK_START && readAddr
+    < XE_SOCCBI_BLOCK_START + XE_SOCCBI_BLOCK_SIZE) {
+    // CBI.
+    return HandleCBIRead(readAddr, data, byteCount);
+  } else if (readAddr >= XE_SOCPMW_BLOCK_START && readAddr
+    < XE_SOCPMW_BLOCK_START + XE_SOCPMW_BLOCK_SIZE) {
+    // PMW.
+    return HandlePMWRead(readAddr, data, byteCount);
+  } else if (readAddr >= XE_SOCPRV_BLOCK_START && readAddr
+    < XE_SOCPRV_BLOCK_START + XE_SOCPRV_BLOCK_SIZE) {
+    // Pervasive Logic.
+    return HandlePRVRead(readAddr, data, byteCount);
+  } else {
+    // Not an SOC address or unimplemented block.
+    LOG_ERROR(Xenon, "SOC Read to unimplemented block at address {:#x}", readAddr);
+  }
+  return false;
+}
+
+bool Xenon::HandleSOCWrite(u64 writeAddr, u8* data, size_t byteCount) {
+  // Get target Block.
+
+  if (writeAddr >= XE_SOCSECENG_BLOCK_START && writeAddr
+    < XE_SOCSECENG_BLOCK_START + XE_SOCSECENG_BLOCK_SIZE) {
+    // Security Engine.
+    return HandleSecEngWrite(writeAddr, data, byteCount);
+  }
+  else if (writeAddr >= XE_SOCSECOTP_BLOCK_START && writeAddr
+    < XE_SOCSECOTP_BLOCK_START + XE_SOCSECOTP_BLOCK_SIZE) {
+    // Secure OTP.
+    return HandleSecOTPWrite(writeAddr, data, byteCount);
+  }
+  else if (writeAddr >= XE_SOCSECRNG_BLOCK_START && writeAddr
+    < XE_SOCSECRNG_BLOCK_START + XE_SOCSECRNG_BLOCK_SIZE) {
+    // Secure RNG.
+    return HandleSecRNGWrite(writeAddr, data, byteCount);
+  }
+  else if (writeAddr >= XE_SOCCBI_BLOCK_START && writeAddr
+    < XE_SOCCBI_BLOCK_START + XE_SOCCBI_BLOCK_SIZE) {
+    // CBI.
+    return HandleCBIWrite(writeAddr, data, byteCount);
+  }
+  else if (writeAddr >= XE_SOCPMW_BLOCK_START && writeAddr
+    < XE_SOCPMW_BLOCK_START + XE_SOCPMW_BLOCK_SIZE) {
+    // PMW.
+    return HandlePMWWrite(writeAddr, data, byteCount);
+  }
+  else if (writeAddr >= XE_SOCPRV_BLOCK_START && writeAddr
+    < XE_SOCPRV_BLOCK_START + XE_SOCPRV_BLOCK_SIZE) {
+    // Pervasive Logic.
+    return HandlePRVWrite(writeAddr, data, byteCount);
+  }
+  else {
+    // Not an SOC address or unimplemented block.
+    LOG_ERROR(Xenon, "SOC Write to unimplemented block at address {:#x}", writeAddr);
+  }
+  return false;
+}
+
+// Security Engine Read.
+bool Xenon::HandleSecEngRead(u64 readAddr, u8* data, size_t byteCount) {
+  return false;
+}
+// Security Engine Write.
+bool Xenon::HandleSecEngWrite(u64 writeAddr, u8* data, size_t byteCount) {
+  return false;
+}
+
+// Secure OTP Read.
+bool Xenon::HandleSecOTPRead(u64 readAddr, u8* data, size_t byteCount) {
+  return false;
+}
+// Secure OTP Write.
+bool Xenon::HandleSecOTPWrite(u64 writeAddr, u8* data, size_t byteCount) {
+  return false;
+}
+
+// Secure RNG Read.
+bool Xenon::HandleSecRNGRead(u64 readAddr, u8* data, size_t byteCount)
+{
+  return false;
+}
+// Secure RNG Write.
+bool Xenon::HandleSecRNGWrite(u64 writeAddr, u8* data, size_t byteCount)
+{
+  return false;
+}
+
+// CBI Read.
+bool Xenon::HandleCBIRead(u64 readAddr, u8* data, size_t byteCount)
+{
+  return false;
+}
+// CBI Write.
+bool Xenon::HandleCBIWrite(u64 writeAddr, u8* data, size_t byteCount)
+{
+  return false;
+}
+
+// PMW Read.
+bool Xenon::HandlePMWRead(u64 readAddr, u8* data, size_t byteCount)
+{
+  return false;
+}
+// PMW Write.
+bool Xenon::HandlePMWWrite(u64 writeAddr, u8* data, size_t byteCount)
+{
+  return false;
+}
+
+// Pervasive logic Read.
+bool Xenon::HandlePRVRead(u64 readAddr, u8* data, size_t byteCount)
+{
+  return false;
+}
+// Pervasive logic Write.
+bool Xenon::HandlePRVWrite(u64 writeAddr, u8* data, size_t byteCount)
+{
+  return false;
+}
