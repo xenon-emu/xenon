@@ -48,7 +48,7 @@ struct addResult {
 // Multiply High Sign/Unsigned.
 #ifdef ARCH_X86
 inline u64 umulh64(u64 x, u64 y) {
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(__MINGW32__)
   u32 x_lo = static_cast<u32>(x);
   u32 x_hi = static_cast<u32>(x >> 32);
   u32 y_lo = static_cast<u32>(y);
@@ -66,7 +66,7 @@ inline u64 umulh64(u64 x, u64 y) {
 #endif
 }
 inline s64 mulh64(s64 x, s64 y) {
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(__MINGW32__)
   bool negate = (x < 0) ^ (y < 0);
   u64 ux = static_cast<u64>(x < 0 ? -x : x);
   u64 uy = static_cast<u64>(y < 0 ? -y : y);
@@ -84,14 +84,14 @@ inline s64 mulh64(s64 x, s64 y) {
 }
 #else
 inline u64 umulh64(u64 x, u64 y) {
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(__MINGW32__)
   return __umulh(x, y);
 #else
   return static_cast<u64>((u128{ x } *u128{ y }) >> 64);
 #endif
 }
 inline s64 mulh64(s64 x, s64 y) {
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(__MINGW32__)
   return __mulh(x, y);
 #else
   return static_cast<s64>((s128{ x } *s128{ y }) >> 64);

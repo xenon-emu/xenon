@@ -139,7 +139,7 @@ static void AccurateSleep(std::chrono::nanoseconds duration) {
 
 #endif
 
-#ifdef _MSC_VER
+#if defined(_MSC_VER) || defined(__MINGW32__)
 
 // Sets the debugger-visible name of the current thread.
 void SetCurrentThreadName(const std::string_view &name) {

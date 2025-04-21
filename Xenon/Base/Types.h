@@ -160,10 +160,7 @@ template <typename cT, typename T>
   return found->second;
 }
 
-#ifndef _MSC_VER
-using u128 = __uint128_t;
-using s128 = __int128_t;
-#else
+#if defined(_MSC_VER) || defined(__MINGW32__)
 #include <xmmintrin.h>
 
 extern "C" {
@@ -405,4 +402,7 @@ public:
     return *this;
   }
 };
+#else
+using u128 = __uint128_t;
+using s128 = __int128_t;
 #endif

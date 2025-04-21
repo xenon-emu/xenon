@@ -3,15 +3,8 @@
 #pragma once
 
 #ifdef _WIN32
-#include <windows.h>
-#endif
-#include <condition_variable>
-#include <thread>
-#include <queue>
-
-#ifdef _WIN32
-#pragma comment(lib, "Ws2_32.lib")
 #include <winsock2.h>
+#include <windows.h>
 #define socketclose closesocket
 #else
 #include <arpa/inet.h>
@@ -21,6 +14,10 @@
 #include <unistd.h>
 #define socketclose close
 #endif // _WIN32
+
+#include <condition_variable>
+#include <thread>
+#include <queue>
 
 #include "Base/Types.h"
 #include "Base/Assert.h"
