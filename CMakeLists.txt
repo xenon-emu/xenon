@@ -297,7 +297,7 @@ endif()
 
 
 # Link libraries
-target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11 ws2_32)
+target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11)
 if (GFX_ENABLED)
   target_link_libraries(Xenon PRIVATE SDL3::SDL3)
 endif()
@@ -316,6 +316,7 @@ endif()
 
 # Add defines specific to windows
 if (WIN32)
+target_link_libraries(Xenon PRIVATE ws2_32)
   add_compile_definitions(NTDDI_VERSION=0x0A000006)
   add_compile_definitions(_WIN32_WINNT=0x0A00)
   add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
