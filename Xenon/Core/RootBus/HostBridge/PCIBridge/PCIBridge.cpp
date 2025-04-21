@@ -240,8 +240,8 @@ bool PCIBridge::isAddressMappedinBAR(u32 address) {
   u32 bar0 = pciBridgeConfig.configSpaceHeader.BAR0;
   u32 bar1 = pciBridgeConfig.configSpaceHeader.BAR1;
 
-  if ((address >= bar0 && address <= bar0 + PCI_BRIDGE_SIZE) ||
-      (address >= bar1 && address <= bar1 + PCI_BRIDGE_SIZE)) {
+  if ((address >= bar0 && address < (bar0 + PCI_BRIDGE_SIZE)) ||
+      (address >= bar1 && address < (bar1 + PCI_BRIDGE_SIZE))) {
     return true;
   }
 
