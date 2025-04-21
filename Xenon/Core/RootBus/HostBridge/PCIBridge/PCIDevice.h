@@ -35,12 +35,12 @@ public:
     u32 bar4 = pciConfigSpace.configSpaceHeader.BAR4;
     u32 bar5 = pciConfigSpace.configSpaceHeader.BAR5;
 
-    if ((address >= bar0 && address <= bar0 + deviceInfo.size) ||
-        (address >= bar1 && address <= bar1 + deviceInfo.size) ||
-        (address >= bar2 && address <= bar2 + deviceInfo.size) ||
-        (address >= bar3 && address <= bar3 + deviceInfo.size) ||
-        (address >= bar4 && address <= bar4 + deviceInfo.size) ||
-        (address >= bar5 && address <= bar5 + deviceInfo.size)) {
+    if ((address >= bar0 && address < (bar0 + deviceInfo.size)) ||
+        (address >= bar1 && address < (bar1 + deviceInfo.size)) ||
+        (address >= bar2 && address < (bar2 + deviceInfo.size)) ||
+        (address >= bar3 && address < (bar3 + deviceInfo.size)) ||
+        (address >= bar4 && address < (bar4 + deviceInfo.size)) ||
+        (address >= bar5 && address < (bar5 + deviceInfo.size))) {
       return true;
     }
 
