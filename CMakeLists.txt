@@ -69,8 +69,8 @@ endif()
 
 find_package(fmt 10.2.1 CONFIG)
 find_package(toml11 3.7.1 CONFIG)
-include_directories(Xenon PRIVATE Deps/ThirdParty/glad/include)
 
+include_directories(Xenon)
 add_subdirectory(Deps/ThirdParty)
 
 # Include Files
@@ -217,12 +217,7 @@ if (GFX_ENABLED)
     ${ImGui_Dir}/imstb_truetype.h
   )
 
-  set(OpenGL
-    Deps/ThirdParty/glad/src/glad.c
-  )
-
   set(Render
-    ${OpenGL}
     ${ImGui}
     Xenon/Render/Abstractions/Texture.h
     Xenon/Render/Implementations/OGLTexture.cpp
@@ -299,7 +294,7 @@ endif()
 # Link libraries
 target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11)
 if (GFX_ENABLED)
-  target_link_libraries(Xenon PRIVATE SDL3::SDL3)
+  target_link_libraries(Xenon PRIVATE glad SDL3::SDL3)
 endif()
 
 # Add includes

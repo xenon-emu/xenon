@@ -12,6 +12,9 @@ if (NOT TARGET fmt::fmt)
   add_subdirectory(fmt)
 endif()
 
+# GLAD
+add_subdirectory(glad)
+
 # SDL3
 if (GFX_ENABLED)
   if (NOT TARGET SDL3::SDL3)
