@@ -12,10 +12,6 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPa
   // Set SROM to 0.
   memset(xenonContext.SROM, 0, XE_SROM_SIZE);
 
-  // Set Security Engine context to 0.
-  memset(&xenonContext.secEngBlock, 0, sizeof(SOCSECENG_BLOCK));
-  memset(xenonContext.secEngData, 0, XE_SECENG_SIZE);
-
   // Populate FuseSet
   {
     std::ifstream file(fusesPath);
@@ -80,7 +76,6 @@ Xenon::~Xenon() {
   ppu2.reset();
   delete[] xenonContext.SRAM;
   delete[] xenonContext.SROM;
-  delete[] xenonContext.secEngData;
 }
 
 void Xenon::Start(u64 resetVector) {

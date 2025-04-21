@@ -1089,9 +1089,12 @@ void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE *ppuState,
     } break;
     default: {
       // Check if the read is from the security engine config
-      if (EA >= XE_SECENG_ADDR && EA < XE_SECENG_ADDR + XE_SECENG_SIZE) {
-        u32 secAddr = static_cast<u32>(EA - XE_SECENG_ADDR);
-        memcpy(outData, &intXCPUContext->secEngData[secAddr], byteCount);
+      if (EA >= XE_SOCSECENG_BLOCK_START && EA < XE_SOCSECENG_BLOCK_START + XE_SOCSECENG_BLOCK_SIZE) {
+        u32 secEngOffset = static_cast<u32>(EA - XE_SOCSECENG_BLOCK_START);
+        u64 dataBS = 0;
+        memcpy(&dataBS, reinterpret_cast<u8*>(cpuContext->socSecEngBlock.get()) + secEngOffset, byteCount);
+        dataBS = byteswap_be<u64>(dataBS);
+        memcpy(outData, &dataBS, byteCount);
         return;
       }
       // Check if the read is from the SROM
@@ -1170,6 +1173,14 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   if (((oldEA & 0x000000007FFFF0000ULL) >> 16) == 0x7FFF)
     socWrite = true;
   if (socWrite) {
+    // Check if writing to SOC Pervasive Block
+    if (EA >= XE_SOCPRV_BLOCK_START && EA < XE_SOCPRV_BLOCK_START + XE_SOCPRV_BLOCK_SIZE) {
+      u64 dataBS = 0;
+      memcpy(&dataBS, data, byteCount);
+      u16 offset = EA - 0x61000;
+      dataBS = byteswap_be<u64>(dataBS);
+      memcpy(reinterpret_cast<u8*>(intXCPUContext->socPRVBlock.get()) + offset, &dataBS, byteCount);
+    }
     switch (EA) {
     // CPU POST Bus
     case POST_BUS_ADDR: {
@@ -1217,9 +1228,12 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
         return;
       }
       // Check if writing to Security Engine Config Block
-      else if (EA >= XE_SECENG_ADDR && EA < XE_SECENG_ADDR + XE_SECENG_SIZE) {
-        u32 secAddr = static_cast<u32>(EA - XE_SECENG_ADDR);
-        memcpy(&intXCPUContext->secEngData[secAddr], data, byteCount);
+      else if (EA >= XE_SOCSECENG_BLOCK_START && EA < XE_SOCSECENG_BLOCK_START + XE_SOCSECENG_BLOCK_SIZE) {
+        u32 secEngOffset = static_cast<u32>(EA - XE_SOCSECENG_BLOCK_START);
+        u64 dataBS = 0;
+        memcpy(&dataBS, data, byteCount);
+        dataBS = byteswap_be<u64>(dataBS);
+        memcpy(reinterpret_cast<u8*>(cpuContext->socSecEngBlock.get()) + secEngOffset, &dataBS, byteCount);
         return;
       }
       // Integrated Interrupt Controller in real mode, used when the HV wants to
@@ -1299,9 +1313,9 @@ void PPCInterpreter::MMUMemSet(PPU_STATE *ppuState,
         return;
       }
       // Check if writing to Security Engine Config Block
-      else if (EA >= XE_SECENG_ADDR && EA < XE_SECENG_ADDR + XE_SECENG_SIZE) {
-        u32 secAddr = static_cast<u32>(EA - XE_SECENG_ADDR);
-        memset(&intXCPUContext->secEngData[secAddr], data, size);
+      else if (EA >= XE_SOCSECENG_BLOCK_START && EA < XE_SOCSECENG_BLOCK_START + XE_SOCSECENG_BLOCK_SIZE) {
+        u32 secEngOffset = static_cast<u32>(EA - XE_SOCSECENG_BLOCK_START);
+        memset(reinterpret_cast<u8*>(intXCPUContext->socSecEngBlock.get()) + secEngOffset, 0, size);
         return;
       }
     } break;

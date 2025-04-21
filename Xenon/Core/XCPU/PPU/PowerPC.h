@@ -6,6 +6,7 @@
 #include <unordered_map>
 
 #include "Base/LRUCache.h"
+#include "Core/XCPU/XenonSOC.h"
 #include "Core/XCPU/IIC/IIC.h"
 #include "Core/XCPU/Bitfield.h"
 #include "Core/XCPU/XenonReservations.h"
@@ -439,9 +440,6 @@ enum ePPUThreadBit : u8 {
 // Security Engine Related Structures
 //
 
-#define XE_SECENG_ADDR 0x24000
-#define XE_SECENG_SIZE 0x2000
-
 enum SECENG_REGION_TYPE {
   SECENG_REGION_PHYS = 0,
   SECENG_REGION_HASHED = 1,
@@ -450,63 +448,13 @@ enum SECENG_REGION_TYPE {
 };
 
 struct SECENG_ADDRESS_INFO {
-  // Real address we're accessing on the bus
+  // Real address we're accessing on the bus.
   u32 accessedAddr;
-  // Region This address belongs to
+  // Region This address belongs to.
   SECENG_REGION_TYPE regionType;
   // Key used to hash/encrypt this address.
   u8 keySelected;
 };
-
-typedef union _SECENG_FAULT_ISOLATION {
-  u64 AsULONGLONG; // 0x0 sz:0x8
-  struct {
-#ifdef __LITTLE_ENDIAN__
-    u64 IntegrityViolation : 1; // 0x0 bfo:0x63
-    u64 Reserved1 : 63;         // 0x0 bfo:0x0
-#else
-    u64 Reserved1 : 63;         // 0x0 bfo:0x0
-    u64 IntegrityViolation : 1; // 0x0 bfo:0x63
-#endif
-  } AsBits;
-} SECENG_FAULT_ISOLATION, *PSECENG_FAULT_ISOLATION; // size 8
-
-typedef struct _SECENG_KEYS {
-  u64 WhiteningKey0High;      // 0x0 sz:0x8
-  u64 WhiteningKey0Low;       // 0x8 sz:0x8
-  u64 WhiteningKey1High;      // 0x10 sz:0x8
-  u64 WhiteningKey1Low;       // 0x18 sz:0x8
-  u64 WhiteningKey2High;      // 0x20 sz:0x8
-  u64 WhiteningKey2Low;       // 0x28 sz:0x8
-  u64 WhiteningKey3High;      // 0x30 sz:0x8
-  u64 WhiteningKey3Low;       // 0x38 sz:0x8
-  u64 AESKey0High;            // 0x40 sz:0x8
-  u64 AESKey0Low;             // 0x48 sz:0x8
-  u64 AESKey1High;            // 0x50 sz:0x8
-  u64 AESKey1Low;             // 0x58 sz:0x8
-  u64 AESKey2High;            // 0x60 sz:0x8
-  u64 AESKey2Low;             // 0x68 sz:0x8
-  u64 AESKey3High;            // 0x70 sz:0x8
-  u64 AESKey3Low;             // 0x78 sz:0x8
-  u64 HashKey0High;           // 0x80 sz:0x8
-  u64 HashKey0Low;            // 0x88 sz:0x8
-  u64 HashKey1High;           // 0x90 sz:0x8
-  u64 HashKey1Low;            // 0x98 sz:0x8
-} SECENG_KEYS, *PSECENG_KEYS; // size 160
-
-typedef struct SOCSECENG_BLOCK {             // Addr = 80000200_00024000
-  SECENG_KEYS WritePathKeys;                 // 0x0 sz:0xA0
-  u64 TraceLogicArrayWritePathControl;       // 0xA0 sz:0x8
-  u64 qwUnkn1;
-  u64 Reserved1[0x1EA];                      // 0xA8 sz:0xF58
-  SECENG_KEYS ReadPathKeys;                  // 0x1000 sz:0xA0
-  u64 TraceLogicArrayReadPathControl;        // 0x10A0 sz:0x8
-  SECENG_FAULT_ISOLATION FaultIsolationMask; // 0x10A8 sz:0x8
-  SECENG_FAULT_ISOLATION FaultIsolation;     // 0x10B0 sz:0x8 - set to zero in CB
-  u64 IntegrityViolationSignature;           // 0x10B8 sz:0x8
-  u64 qwUnkn2;
-  u64 Reserved2[0x1E7];                      // 0x10C0 sz:0xF40
-} SOCSECENG_BLOCK, *PSOCSECENG_BLOCK; // size 8192
 
 #define XE_RESET_VECTOR 0x100
 #define XE_SROM_ADDR 0x0
@@ -652,9 +600,27 @@ struct XENON_CONTEXT {
   // value is set.
   bool timeBaseActive = false;
 
-  // Security engine Context
-  u8 *secEngData = new u8[XE_SECENG_SIZE];
-  SOCSECENG_BLOCK secEngBlock = {};
+  //
+  // SOC Blocks.
+  // 
+
+  // Secure OTP Block.
+  std::unique_ptr<Xe::Xenon::SOC::SOCSECOTP_ARRAY> socSecOTPBlock = std::make_unique<Xe::Xenon::SOC::SOCSECOTP_ARRAY>();
+
+  // Security Engine Block.
+  std::unique_ptr<Xe::Xenon::SOC::SOCSECENG_BLOCK> socSecEngBlock = std::make_unique<Xe::Xenon::SOC::SOCSECENG_BLOCK>();
+
+  // Secure RNG Block.
+  std::unique_ptr<Xe::Xenon::SOC::SOCSECRNG_BLOCK> socSecRNGBlock = std::make_unique<Xe::Xenon::SOC::SOCSECRNG_BLOCK>();
+
+  // CBI Block.
+  std::unique_ptr<Xe::Xenon::SOC::SOCCBI_BLOCK> socCBIBlock = std::make_unique<Xe::Xenon::SOC::SOCCBI_BLOCK>();
+
+  // PMW Block.
+  std::unique_ptr<Xe::Xenon::SOC::SOCPMW_BLOCK> socPMWBlock = std::make_unique<Xe::Xenon::SOC::SOCPMW_BLOCK>();
+  
+  // Pervasive Block.
+  std::unique_ptr<Xe::Xenon::SOC::SOCPRV_BLOCK> socPRVBlock = std::make_unique<Xe::Xenon::SOC::SOCPRV_BLOCK>();
 };
 
 //
