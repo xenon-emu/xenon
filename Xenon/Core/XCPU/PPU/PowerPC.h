@@ -600,27 +600,62 @@ struct XENON_CONTEXT {
   // value is set.
   bool timeBaseActive = false;
 
+  // Xenon SOC Blocks R/W methods.
+  bool HandleSOCRead(u64 readAddr, u8* data, size_t byteCount);
+  bool HandleSOCWrite(u64 writeAddr, const u8* data, size_t byteCount);
+
   //
   // SOC Blocks.
   // 
 
   // Secure OTP Block.
-  std::unique_ptr<Xe::Xenon::SOC::SOCSECOTP_ARRAY> socSecOTPBlock = std::make_unique<Xe::Xenon::SOC::SOCSECOTP_ARRAY>();
+  std::unique_ptr<Xe::XCPU::SOC::SOCSECOTP_ARRAY> socSecOTPBlock = std::make_unique<Xe::XCPU::SOC::SOCSECOTP_ARRAY>();
 
   // Security Engine Block.
-  std::unique_ptr<Xe::Xenon::SOC::SOCSECENG_BLOCK> socSecEngBlock = std::make_unique<Xe::Xenon::SOC::SOCSECENG_BLOCK>();
+  std::unique_ptr<Xe::XCPU::SOC::SOCSECENG_BLOCK> socSecEngBlock = std::make_unique<Xe::XCPU::SOC::SOCSECENG_BLOCK>();
 
   // Secure RNG Block.
-  std::unique_ptr<Xe::Xenon::SOC::SOCSECRNG_BLOCK> socSecRNGBlock = std::make_unique<Xe::Xenon::SOC::SOCSECRNG_BLOCK>();
+  std::unique_ptr<Xe::XCPU::SOC::SOCSECRNG_BLOCK> socSecRNGBlock = std::make_unique<Xe::XCPU::SOC::SOCSECRNG_BLOCK>();
 
   // CBI Block.
-  std::unique_ptr<Xe::Xenon::SOC::SOCCBI_BLOCK> socCBIBlock = std::make_unique<Xe::Xenon::SOC::SOCCBI_BLOCK>();
+  std::unique_ptr<Xe::XCPU::SOC::SOCCBI_BLOCK> socCBIBlock = std::make_unique<Xe::XCPU::SOC::SOCCBI_BLOCK>();
 
   // PMW Block.
-  std::unique_ptr<Xe::Xenon::SOC::SOCPMW_BLOCK> socPMWBlock = std::make_unique<Xe::Xenon::SOC::SOCPMW_BLOCK>();
-  
+  std::unique_ptr<Xe::XCPU::SOC::SOCPMW_BLOCK> socPMWBlock = std::make_unique<Xe::XCPU::SOC::SOCPMW_BLOCK>();
+
   // Pervasive Block.
-  std::unique_ptr<Xe::Xenon::SOC::SOCPRV_BLOCK> socPRVBlock = std::make_unique<Xe::Xenon::SOC::SOCPRV_BLOCK>();
+  std::unique_ptr<Xe::XCPU::SOC::SOCPRV_BLOCK> socPRVBlock = std::make_unique<Xe::XCPU::SOC::SOCPRV_BLOCK>();
+
+private:
+
+  // Mutex for thread safety.
+  std::recursive_mutex mutex;
+
+  // SOC Blocks R/W.
+
+  // Security Engine Block.
+  bool HandleSecEngRead(u64 readAddr, u8* data, size_t byteCount);
+  bool HandleSecEngWrite(u64 writeAddr, const u8* data, size_t byteCount);
+
+  // Secure OTP Block.
+  bool HandleSecOTPRead(u64 readAddr, u8* data, size_t byteCount);
+  bool HandleSecOTPWrite(u64 writeAddr, const u8* data, size_t byteCount);
+
+  // Secure RNG Block.
+  bool HandleSecRNGRead(u64 readAddr, u8* data, size_t byteCount);
+  bool HandleSecRNGWrite(u64 writeAddr, const u8* data, size_t byteCount);
+
+  // CBI Block.
+  bool HandleCBIRead(u64 readAddr, u8* data, size_t byteCount);
+  bool HandleCBIWrite(u64 writeAddr, const u8* data, size_t byteCount);
+
+  // PMW Block.
+  bool HandlePMWRead(u64 readAddr, u8* data, size_t byteCount);
+  bool HandlePMWWrite(u64 writeAddr, const u8* data, size_t byteCount);
+
+  // Pervasive logic Block.
+  bool HandlePRVRead(u64 readAddr, u8* data, size_t byteCount);
+  bool HandlePRVWrite(u64 writeAddr, const u8* data, size_t byteCount);
 };
 
 //

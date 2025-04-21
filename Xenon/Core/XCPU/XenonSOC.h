@@ -17,7 +17,7 @@
 
 #include "Base/Types.h"
 
-namespace Xe::Xenon::SOC {
+namespace Xe::XCPU::SOC {
 
   //
   // Xenon CPU System On Chip structures.
@@ -132,7 +132,7 @@ namespace Xe::Xenon::SOC {
       u64 Eeprom : 2;
       u64 Unlock : 2;  // Typically only these two bits are set to 1, aside from reserved.
       u64 Secure : 2;
-      u64 NotValid    : 2;
+      u64 NotValid : 2;
     } AsBITS;
 #else
     struct {
@@ -458,25 +458,25 @@ namespace Xe::Xenon::SOC {
   //
 
   typedef union _INT_VECTOR {
-  #ifdef __LITTLE_ENDIAN__
+#ifdef __LITTLE_ENDIAN__
     u32 INT_MASK : 1;
     u32 INT_LATCHED : 1;
     u32 INT_SENT : 1;
     u32 INT_DESTID : 8;
     u32 INT_FLAGS : 2;
     u32 INT_VECTOR : 6;
-  #else
+#else
     u32 INT_VECTOR : 6;
     u32 INT_FLAGS : 2;
     u32 INT_DESTID : 8;
     u32 INT_SENT : 1;
     u32 INT_LATCHED : 1;
     u32 INT_MASK : 1;
-  #endif
+#endif
   } INT_VECTOR;
 
   typedef union _SOCINTS_IRER {
-  #ifdef __LITTLE_ENDIAN__
+#ifdef __LITTLE_ENDIAN__
     struct {
       u64 RecoverableError : 8;
       u64 RecoverableErrorCapture : 8;
@@ -484,7 +484,7 @@ namespace Xe::Xenon::SOC {
       u64 RecoverableErrorDebug : 8;
       u64 Reserved1 : 32;
     } AsBITS;
-  #else
+#else
     struct {
       u64 Reserved1 : 32;
       u64 RecoverableErrorDebug : 8;
@@ -492,12 +492,12 @@ namespace Xe::Xenon::SOC {
       u64 RecoverableErrorCapture : 8;
       u64 RecoverableError : 8;
     } AsBITS;
-  #endif
+#endif
     u64 AsULONGLONG;
   } SOCINTS_IRER;
 
   typedef union _SOCINTS_MIGR {
-  #ifdef __LITTLE_ENDIAN__
+#ifdef __LITTLE_ENDIAN__
     struct {
       u64 Reserved1 : 2;
       u64 VectorNumber : 5;
@@ -512,7 +512,7 @@ namespace Xe::Xenon::SOC {
       u64 DestinationId : 6;
       u64 Reserved4 : 42;
     } AsBITS;
-  #else
+#else
     struct {
       u64 Reserved4 : 42;
       u64 DestinationId : 6;
@@ -527,12 +527,12 @@ namespace Xe::Xenon::SOC {
       u64 VectorNumber : 5;
       u64 Reserved1 : 2;
     } AsBITS;
-  #endif
+#endif
     u64 AsULONGLONG;
   } SOCINTS_MIGR;
 
   typedef union _SOCINTS_IPIGR {
-  #ifdef __LITTLE_ENDIAN__
+#ifdef __LITTLE_ENDIAN__
     struct {
       u64 Reserved1 : 2;
       u64 VectorNumber : 5;
@@ -541,7 +541,7 @@ namespace Xe::Xenon::SOC {
       u64 DestinationId : 6;
       u64 Reserved3 : 42;
     } AsBITS;
-  #else
+#else
     struct {
       u64 Reserved3 : 42;
       u64 DestinationId : 6;
@@ -549,39 +549,39 @@ namespace Xe::Xenon::SOC {
       u64 VectorNumber : 5;
       u64 Reserved1 : 2;
     } AsBITS;
-  #endif
+#endif
     u64 AsULONGLONG;
   } SOCINTS_IPIGR;
 
   typedef union _SOCINTS_VECTOR {
-  #ifdef __LITTLE_ENDIAN__
+#ifdef __LITTLE_ENDIAN__
     struct {
       u64 Reserved1 : 2;
       u64 VectorNumber : 5;
       u64 Reserved2 : 57;
     } AsBITS;
-  #else
+#else
     struct {
       u64 Reserved2 : 57;
       u64 VectorNumber : 5;
       u64 Reserved1 : 2;
     } AsBITS;
-  #endif
+#endif
     u64 AsULONGLONG;
-    } SOCINTS_VECTOR;
+  } SOCINTS_VECTOR;
 
   typedef union _SOCINTS_LIDR {
-  #ifdef __LITTLE_ENDIAN__
+#ifdef __LITTLE_ENDIAN__
     struct {
       u64 LogicalId : 6;
       u64 Reserved1 : 58;
     } AsBITS;
-  #else
+#else
     struct {
       u64 Reserved1 : 58;
       u64 LogicalId : 6;
     } AsBITS;
-  #endif
+#endif
     u64 AsULONGLONG;
   } SOCINTS_LIDR;
 

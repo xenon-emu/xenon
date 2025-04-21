@@ -16,7 +16,7 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPa
   {
     std::ifstream file(fusesPath);
     if (!file.is_open()) {
-      xenonContext.fuseSet.fuseLine00 = { 0x9999999999999999 };
+      xenonContext.socSecOTPBlock.get()->sec->AsULONGLONG = { 0x9999999999999999 };
     } else {
       std::vector<std::string> fusesets;
       std::string fuseset;
@@ -27,13 +27,24 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPa
         fusesets.push_back(fuseset);
       }
       // Got some fuses, let's print them!
-      u64 *fuses = reinterpret_cast<u64*>(&xenonContext.fuseSet);
       LOG_INFO(System, "Current FuseSet:");
       for (int i = 0; i < 12; i++) {
         fuseset = fusesets[i];
-        fuses[i] = strtoull(fuseset.c_str(), nullptr, 16);
         LOG_INFO(System, " * FuseSet {:02}: 0x{}", i, fuseset.c_str());
       }
+
+      xenonContext.socSecOTPBlock.get()->sec[0].AsULONGLONG = strtoull(fusesets[0].c_str(), nullptr, 16);
+      xenonContext.socSecOTPBlock.get()->ConsoleType[0] = strtoull(fusesets[1].c_str(), nullptr, 16);
+      xenonContext.socSecOTPBlock.get()->ConsoleSequence[0] = strtoull(fusesets[2].c_str(), nullptr, 16);
+      xenonContext.socSecOTPBlock.get()->UniqueId1[0] = strtoull(fusesets[3].c_str(), nullptr, 16);
+      xenonContext.socSecOTPBlock.get()->UniqueId2[0] = strtoull(fusesets[4].c_str(), nullptr, 16);
+      xenonContext.socSecOTPBlock.get()->UniqueId3[0] = strtoull(fusesets[5].c_str(), nullptr, 16);
+      xenonContext.socSecOTPBlock.get()->UniqueId4[0] = strtoull(fusesets[6].c_str(), nullptr, 16);
+      xenonContext.socSecOTPBlock.get()->UpdateSequence[0] = strtoull(fusesets[7].c_str(), nullptr, 16);
+      xenonContext.socSecOTPBlock.get()->EepromKey1[0] = strtoull(fusesets[8].c_str(), nullptr, 16);
+      xenonContext.socSecOTPBlock.get()->EepromKey2[0] = strtoull(fusesets[9].c_str(), nullptr, 16);
+      xenonContext.socSecOTPBlock.get()->EepromHash1[0] = strtoull(fusesets[10].c_str(), nullptr, 16);
+      xenonContext.socSecOTPBlock.get()->EepromHash2[0] = strtoull(fusesets[11].c_str(), nullptr, 16);
     }
   }
 
@@ -68,6 +79,10 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPa
   // Asign Interpreter global variables
   PPCInterpreter::intXCPUContext = &xenonContext;
   PPCInterpreter::sysBus = mainBus;
+
+  // Setup SOC blocks.
+  xenonContext.socPRVBlock.get()->PowerOnResetStatus.AsBITS.SecureMode = 1; // CB Checks this.
+  xenonContext.socPRVBlock.get()->PowerManagementControl.AsULONGLONG = 0x382C00000000B001ULL; // Power Management Control.
 }
 
 Xenon::~Xenon() {
@@ -213,140 +228,4 @@ PPU *Xenon::GetPPU(u8 ppuID) {
   }
 
   return nullptr;
-}
-
-bool Xenon::HandleSOCRead(u64 readAddr, u8* data, size_t byteCount) {
-  // Get target Block.
-
-  if (readAddr >= XE_SOCSECENG_BLOCK_START && readAddr 
-    < XE_SOCSECENG_BLOCK_START + XE_SOCSECENG_BLOCK_SIZE) {
-    // Security Engine.
-    return HandleSecEngRead(readAddr, data, byteCount);
-  } else if (readAddr >= XE_SOCSECOTP_BLOCK_START && readAddr 
-    < XE_SOCSECOTP_BLOCK_START + XE_SOCSECOTP_BLOCK_SIZE) {
-    // Secure OTP.
-    return HandleSecOTPRead(readAddr, data, byteCount);
-  } else if (readAddr >= XE_SOCSECRNG_BLOCK_START && readAddr 
-    < XE_SOCSECRNG_BLOCK_START + XE_SOCSECRNG_BLOCK_SIZE) {
-    // Secure RNG.
-    return HandleSecRNGRead(readAddr, data, byteCount);
-  } else if (readAddr >= XE_SOCCBI_BLOCK_START && readAddr
-    < XE_SOCCBI_BLOCK_START + XE_SOCCBI_BLOCK_SIZE) {
-    // CBI.
-    return HandleCBIRead(readAddr, data, byteCount);
-  } else if (readAddr >= XE_SOCPMW_BLOCK_START && readAddr
-    < XE_SOCPMW_BLOCK_START + XE_SOCPMW_BLOCK_SIZE) {
-    // PMW.
-    return HandlePMWRead(readAddr, data, byteCount);
-  } else if (readAddr >= XE_SOCPRV_BLOCK_START && readAddr
-    < XE_SOCPRV_BLOCK_START + XE_SOCPRV_BLOCK_SIZE) {
-    // Pervasive Logic.
-    return HandlePRVRead(readAddr, data, byteCount);
-  } else {
-    // Not an SOC address or unimplemented block.
-    LOG_ERROR(Xenon, "SOC Read to unimplemented block at address {:#x}", readAddr);
-  }
-  return false;
-}
-
-bool Xenon::HandleSOCWrite(u64 writeAddr, u8* data, size_t byteCount) {
-  // Get target Block.
-
-  if (writeAddr >= XE_SOCSECENG_BLOCK_START && writeAddr
-    < XE_SOCSECENG_BLOCK_START + XE_SOCSECENG_BLOCK_SIZE) {
-    // Security Engine.
-    return HandleSecEngWrite(writeAddr, data, byteCount);
-  }
-  else if (writeAddr >= XE_SOCSECOTP_BLOCK_START && writeAddr
-    < XE_SOCSECOTP_BLOCK_START + XE_SOCSECOTP_BLOCK_SIZE) {
-    // Secure OTP.
-    return HandleSecOTPWrite(writeAddr, data, byteCount);
-  }
-  else if (writeAddr >= XE_SOCSECRNG_BLOCK_START && writeAddr
-    < XE_SOCSECRNG_BLOCK_START + XE_SOCSECRNG_BLOCK_SIZE) {
-    // Secure RNG.
-    return HandleSecRNGWrite(writeAddr, data, byteCount);
-  }
-  else if (writeAddr >= XE_SOCCBI_BLOCK_START && writeAddr
-    < XE_SOCCBI_BLOCK_START + XE_SOCCBI_BLOCK_SIZE) {
-    // CBI.
-    return HandleCBIWrite(writeAddr, data, byteCount);
-  }
-  else if (writeAddr >= XE_SOCPMW_BLOCK_START && writeAddr
-    < XE_SOCPMW_BLOCK_START + XE_SOCPMW_BLOCK_SIZE) {
-    // PMW.
-    return HandlePMWWrite(writeAddr, data, byteCount);
-  }
-  else if (writeAddr >= XE_SOCPRV_BLOCK_START && writeAddr
-    < XE_SOCPRV_BLOCK_START + XE_SOCPRV_BLOCK_SIZE) {
-    // Pervasive Logic.
-    return HandlePRVWrite(writeAddr, data, byteCount);
-  }
-  else {
-    // Not an SOC address or unimplemented block.
-    LOG_ERROR(Xenon, "SOC Write to unimplemented block at address {:#x}", writeAddr);
-  }
-  return false;
-}
-
-// Security Engine Read.
-bool Xenon::HandleSecEngRead(u64 readAddr, u8* data, size_t byteCount) {
-  return false;
-}
-// Security Engine Write.
-bool Xenon::HandleSecEngWrite(u64 writeAddr, u8* data, size_t byteCount) {
-  return false;
-}
-
-// Secure OTP Read.
-bool Xenon::HandleSecOTPRead(u64 readAddr, u8* data, size_t byteCount) {
-  return false;
-}
-// Secure OTP Write.
-bool Xenon::HandleSecOTPWrite(u64 writeAddr, u8* data, size_t byteCount) {
-  return false;
-}
-
-// Secure RNG Read.
-bool Xenon::HandleSecRNGRead(u64 readAddr, u8* data, size_t byteCount)
-{
-  return false;
-}
-// Secure RNG Write.
-bool Xenon::HandleSecRNGWrite(u64 writeAddr, u8* data, size_t byteCount)
-{
-  return false;
-}
-
-// CBI Read.
-bool Xenon::HandleCBIRead(u64 readAddr, u8* data, size_t byteCount)
-{
-  return false;
-}
-// CBI Write.
-bool Xenon::HandleCBIWrite(u64 writeAddr, u8* data, size_t byteCount)
-{
-  return false;
-}
-
-// PMW Read.
-bool Xenon::HandlePMWRead(u64 readAddr, u8* data, size_t byteCount)
-{
-  return false;
-}
-// PMW Write.
-bool Xenon::HandlePMWWrite(u64 writeAddr, u8* data, size_t byteCount)
-{
-  return false;
-}
-
-// Pervasive logic Read.
-bool Xenon::HandlePRVRead(u64 readAddr, u8* data, size_t byteCount)
-{
-  return false;
-}
-// Pervasive logic Write.
-bool Xenon::HandlePRVWrite(u64 writeAddr, u8* data, size_t byteCount)
-{
-  return false;
 }
