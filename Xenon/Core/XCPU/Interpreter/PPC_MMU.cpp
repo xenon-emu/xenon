@@ -1018,17 +1018,17 @@ void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE *ppuState,
     memset(outData, 0, byteCount);
     return;
   }
-  // Debugger halt
-  if (EA && EA == Config::debug.haltOnReadAddress) {
-    Xe_Main->getCPU()->Halt(); // Halt the CPU
-    Config::imgui.debugWindow = true; // Open the debugger after halting
-  }
   bool socRead = false;
   EA = mmuContructEndAddressFromSecEngAddr(EA, &socRead);
   // When the xboxkrnl writes to address 0x7FFFxxxx is writing to the IIC
   // so we use that address here to validate its an soc write
   if (((oldEA & 0x000000007FFF0000ULL) >> 16) == 0x7FFF)
     socRead = true;
+  // Debugger halt
+  if (EA && EA == Config::debug.haltOnReadAddress) {
+    Xe_Main->getCPU()->Halt(); // Halt the CPU
+    Config::imgui.debugWindow = true; // Open the debugger after halting
+  }
   // TODO: Investigate why FSB_CONFIG_RX_STATE needs these values to work
   switch (curThread.CIA) {
   case 0x1003598ULL: {
@@ -1172,6 +1172,13 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   // so we use that address here to validate its an soc write
   if (((oldEA & 0x000000007FFFF0000ULL) >> 16) == 0x7FFF)
     socWrite = true;
+
+  // Debugger halt
+  if (EA && EA == Config::debug.haltOnWriteAddress) {
+    Xe_Main->getCPU()->Halt(); // Halt the CPU
+    Config::imgui.debugWindow = true; // Open the debugger after halting
+  }
+
   if (socWrite) {
     // Check if writing to SOC Pervasive Block
     if (EA >= XE_SOCPRV_BLOCK_START && EA < XE_SOCPRV_BLOCK_START + XE_SOCPRV_BLOCK_SIZE) {
@@ -1263,12 +1270,6 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
 
   // Check if it's reserved
   cpuContext->xenonRes.Check(EA);
-
-  // Debugger halt
-  if (EA && EA == Config::debug.haltOnWriteAddress) {
-    Xe_Main->getCPU()->Halt(); // Halt the CPU
-    Config::imgui.debugWindow = true; // Open the debugger after halting
-  }
 }
 
 void PPCInterpreter::MMUMemCpyFromHost(PPU_STATE *ppuState,
