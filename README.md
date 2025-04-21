@@ -2,34 +2,21 @@
 
 <h1 align="center">
   <br>
-  <a href="https://discord.gg/TDvbdXRRQ6"><img src="https://github.com/xenon-emu/Xenon/blob/main/Xenon/images/Xenon.png" width="240"></a>
+  <a href="https://discord.gg/TDvbdXRRQ6"><img src="https://github.com/xenon-emu/Xenon/blob/main/Deps/Icon/Xenon.png" width="240"></a>
   <br>
   <b>Xbox 360 Low Level Emulator</b>
   <br>
-</h1>
-
-<h1 align="center">
- <a href="https://discord.gg/TDvbdXRRQ6">
-        <img src="https://img.shields.io/discord/1289565618957193217?color=5865F2&label=Xenon Discord&logo=Discord&logoColor=white" width="220">
- <a href="https://github.com/xenon-emu/Xenon/actions/workflows/build.yml">
-        <img src="https://github.com/xenon-emu/Xenon/actions/workflows/build.yml/badge.svg" width="140">
- <a href="https://github.com/xenon-emu/Xenon/stargazers">
-        <img src="https://img.shields.io/github/stars/xenon-emu/Xenon" width="110">
-</h1>
-
-<p align="center">
+  <br>
   <a href="https://discord.gg/TDvbdXRRQ6">
-  <img src="https://github.com/xenon-emu/Xenon/blob/main/Deps/Screenshots/Linux.png" width="420">
-  <img src="https://github.com/xenon-emu/Xenon/blob/main/Deps/Screenshots/Xell_Reloaded.png" width="450">
-  <img src="https://github.com/xenon-emu/Xenon/blob/main/Deps/Screenshots/WinDBG.png" width="510">
-  <img src="https://github.com/xenon-emu/Xenon/blob/main/Deps/Screenshots/1BL_Boot.png" width="470">
-</p>
-
-# Xenon
+  <img src="https://img.shields.io/discord/1289565618957193217?color=5865F2&label=Xenon&logo=Discord&logoColor=white" width="147" height="24">
+  <a href="https://github.com/xenon-emu/Xenon/actions/workflows/build.yml">
+  <img src="https://github.com/xenon-emu/Xenon/actions/workflows/build.yml/badge.svg" width="118" height="24">
+  <a href="https://github.com/xenon-emu/Xenon/stargazers">
+  <img src="https://img.shields.io/github/stars/xenon-emu/Xenon" width="118" height="24">
+</h1>
 
 **Xenon** is an **Xbox 360 emulator** written in **C++** available for **Windows** and **Linux**.\
 Experimental, currently only small programs work.\
-If you need help or want to talk about development, there is a [**Discord server**](https://discord.gg/TDvbdXRRQ6)!\
 For the latest news on **Xenon**, watch our [**YouTube channel**](https://www.youtube.com/@Xenon.emulator).\
 For those who want to **support** the project, a [**Kofi page**](https://ko-fi.com/bitsh1ft3r) is available for donations!
 
@@ -38,7 +25,7 @@ For those who want to **support** the project, a [**Kofi page**](https://ko-fi.c
 > [!IMPORTANT]
 > **Xenon is an early stage emulator, so don't expect games/demos to run.**
 
-Currently, XeLL Reloaded and Linux are working and we are very active in development
+Currently, XeLL (Xenon Linux Loader), Linux (ppc64-xenon), and LK (Little Kernel, lk-ppc) are the only working programs
 
 # Special Thanks
 
@@ -62,3 +49,13 @@ We need talented developers more than ever to contribute to the project and move
 
 # License
 - [**GPL-2.0 license**](https://github.com/xenon-emu/Xenon/blob/main/LICENSE)
+
+# Images
+<p align="center">
+  <img src="https://github.com/xenon-emu/Xenon/blob/main/Deps/Screenshots/lk-mandelbrot.png" width="470">
+  <img src="https://github.com/xenon-emu/Xenon/blob/main/Deps/Screenshots/Linux-Xenon.png" width="470">
+  <img src="https://github.com/xenon-emu/Xenon/blob/main/Deps/Screenshots/XeLL.png" width="470">
+  <img src="https://github.com/xenon-emu/Xenon/blob/main/Deps/Screenshots/Xell_Reloaded.png" width="470">
+  <img src="https://github.com/xenon-emu/Xenon/blob/main/Deps/Screenshots/WinDBG.png" width="470">
+  <img src="https://github.com/xenon-emu/Xenon/blob/main/Deps/Screenshots/1BL_Boot.png" width="470">
+</p>
