@@ -62,180 +62,180 @@ endif()
 add_compile_definitions(MICROPROFILE_USE_CONFIG)
 
 
-# Include third_party and Packages
+# Include Deps/ThirdParty and Packages
 if (GFX_ENABLED)
   find_package(SDL3 3.2.4 CONFIG)
 endif()
 
 find_package(fmt 10.2.1 CONFIG)
 find_package(toml11 3.7.1 CONFIG)
-include_directories(Xenon PRIVATE third_party/glad/include)
+include_directories(Xenon PRIVATE Deps/ThirdParty/glad/include)
 
-add_subdirectory(third_party)
+add_subdirectory(Deps/ThirdParty)
 
 # Include Files
 set(Logging
-    Xenon/Base/Logging/Backend.cpp
-    Xenon/Base/Logging/Backend.h
-    Xenon/Base/Logging/Filter.cpp
-    Xenon/Base/Logging/Filter.h
-    Xenon/Base/Logging/Log.h
-    Xenon/Base/Logging/Log_entry.h
-    Xenon/Base/Logging/Log_types.h
-    Xenon/Base/Logging/Text_formatter.cpp
-    Xenon/Base/Logging/Text_formatter.h
+  Xenon/Base/Logging/Backend.cpp
+  Xenon/Base/Logging/Backend.h
+  Xenon/Base/Logging/Filter.cpp
+  Xenon/Base/Logging/Filter.h
+  Xenon/Base/Logging/Log.h
+  Xenon/Base/Logging/Log_entry.h
+  Xenon/Base/Logging/Log_types.h
+  Xenon/Base/Logging/Text_formatter.cpp
+  Xenon/Base/Logging/Text_formatter.h
 )
 
 set(Base
-    ${Logging}
-    Xenon/Base/Arch.h
-    Xenon/Base/Assert.cpp
-    Xenon/Base/Assert.h
-    Xenon/Base/Bounded_threadsafe_queue.h
-    Xenon/Base/Config.cpp
-    Xenon/Base/Config.h
-    Xenon/Base/Error.cpp
-    Xenon/Base/Error.h
-    Xenon/Base/Enum.h
-    Xenon/Base/Exit.h
-    Xenon/Base/Hash.h
-    Xenon/Base/io_file.cpp
-    Xenon/Base/io_file.h
-    Xenon/Base/LRUCache.h
-    Xenon/Base/ntapi.cpp
-    Xenon/Base/ntapi.h
-    Xenon/Base/Param.h
-    Xenon/Base/Path_util.cpp
-    Xenon/Base/Path_util.h
-    Xenon/Base/Polyfill_thread.h
-    Xenon/Base/String_util.cpp
-    Xenon/Base/String_util.h
-    Xenon/Base/SystemDevice.h
-    Xenon/Base/Thread.cpp
-    Xenon/Base/Thread.h
-    Xenon/Base/Types.h
-    Xenon/Base/Version.h
+  ${Logging}
+  Xenon/Base/Arch.h
+  Xenon/Base/Assert.cpp
+  Xenon/Base/Assert.h
+  Xenon/Base/Bounded_threadsafe_queue.h
+  Xenon/Base/Config.cpp
+  Xenon/Base/Config.h
+  Xenon/Base/Error.cpp
+  Xenon/Base/Error.h
+  Xenon/Base/Enum.h
+  Xenon/Base/Exit.h
+  Xenon/Base/Hash.h
+  Xenon/Base/io_file.cpp
+  Xenon/Base/io_file.h
+  Xenon/Base/LRUCache.h
+  Xenon/Base/ntapi.cpp
+  Xenon/Base/ntapi.h
+  Xenon/Base/Param.h
+  Xenon/Base/Path_util.cpp
+  Xenon/Base/Path_util.h
+  Xenon/Base/Polyfill_thread.h
+  Xenon/Base/String_util.cpp
+  Xenon/Base/String_util.h
+  Xenon/Base/SystemDevice.h
+  Xenon/Base/Thread.cpp
+  Xenon/Base/Thread.h
+  Xenon/Base/Types.h
+  Xenon/Base/Version.h
 )
 
 set(NAND
-    Xenon/Core/NAND/NAND.cpp
-    Xenon/Core/NAND/NAND.h
+  Xenon/Core/NAND/NAND.cpp
+  Xenon/Core/NAND/NAND.h
 )
 
 set(RAM
-    Xenon/Core/RAM/RAM.cpp
-    Xenon/Core/RAM/RAM.h
+  Xenon/Core/RAM/RAM.cpp
+  Xenon/Core/RAM/RAM.h
 )
 
 set(RootBus
-    Xenon/Core/RootBus/RootBus.cpp
-    Xenon/Core/RootBus/RootBus.h
-    Xenon/Core/RootBus/HostBridge/HostBridge.cpp
-    Xenon/Core/RootBus/HostBridge/HostBridge.h
-    Xenon/Core/RootBus/HostBridge/PCIe.h
-    Xenon/Core/RootBus/HostBridge/PCIBridge/AUDIOCTRLLR/AudioController.cpp
-    Xenon/Core/RootBus/HostBridge/PCIBridge/AUDIOCTRLLR/AudioController.h
-    Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI0/EHCI0.cpp
-    Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI0/EHCI0.h
-    Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI1/EHCI1.cpp
-    Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI1/EHCI1.h
-    Xenon/Core/RootBus/HostBridge/PCIBridge/ETHERNET/Ethernet.cpp
-    Xenon/Core/RootBus/HostBridge/PCIBridge/ETHERNET/Ethernet.h
-    Xenon/Core/RootBus/HostBridge/PCIBridge/HDD/HDD.cpp
-    Xenon/Core/RootBus/HostBridge/PCIBridge/HDD/HDD.h
-    Xenon/Core/RootBus/HostBridge/PCIBridge/ODD/ODD.cpp
-    Xenon/Core/RootBus/HostBridge/PCIBridge/ODD/ODD.h
-    Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI0/OHCI0.cpp
-    Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI0/OHCI0.h
-    Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI1/OHCI1.cpp
-    Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI1/OHCI1.h
-    Xenon/Core/RootBus/HostBridge/PCIBridge/PCIBridge.cpp
-    Xenon/Core/RootBus/HostBridge/PCIBridge/PCIBridge.h
-    Xenon/Core/RootBus/HostBridge/PCIBridge/PCIBridgeConfig.h
-    Xenon/Core/RootBus/HostBridge/PCIBridge/PCIDevice.h
-    Xenon/Core/RootBus/HostBridge/PCIBridge/SFCX/SFCX.cpp
-    Xenon/Core/RootBus/HostBridge/PCIBridge/SFCX/SFCX.h
-    Xenon/Core/RootBus/HostBridge/PCIBridge/SATA.h
-    Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/SMC.cpp
-    Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/SMC.h
-    Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/HW_UART.cpp
-    Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/HW_UART.h
-    Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/HANA_State.h
-    Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/SMC_Config.h
-    Xenon/Core/RootBus/HostBridge/PCIBridge/XMA/XMA.cpp
-    Xenon/Core/RootBus/HostBridge/PCIBridge/XMA/XMA.h
+  Xenon/Core/RootBus/RootBus.cpp
+  Xenon/Core/RootBus/RootBus.h
+  Xenon/Core/RootBus/HostBridge/HostBridge.cpp
+  Xenon/Core/RootBus/HostBridge/HostBridge.h
+  Xenon/Core/RootBus/HostBridge/PCIe.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/AUDIOCTRLLR/AudioController.cpp
+  Xenon/Core/RootBus/HostBridge/PCIBridge/AUDIOCTRLLR/AudioController.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI0/EHCI0.cpp
+  Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI0/EHCI0.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI1/EHCI1.cpp
+  Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI1/EHCI1.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/ETHERNET/Ethernet.cpp
+  Xenon/Core/RootBus/HostBridge/PCIBridge/ETHERNET/Ethernet.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/HDD/HDD.cpp
+  Xenon/Core/RootBus/HostBridge/PCIBridge/HDD/HDD.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/ODD/ODD.cpp
+  Xenon/Core/RootBus/HostBridge/PCIBridge/ODD/ODD.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI0/OHCI0.cpp
+  Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI0/OHCI0.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI1/OHCI1.cpp
+  Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI1/OHCI1.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/PCIBridge.cpp
+  Xenon/Core/RootBus/HostBridge/PCIBridge/PCIBridge.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/PCIBridgeConfig.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/PCIDevice.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/SFCX/SFCX.cpp
+  Xenon/Core/RootBus/HostBridge/PCIBridge/SFCX/SFCX.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/SATA.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/SMC.cpp
+  Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/SMC.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/HW_UART.cpp
+  Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/HW_UART.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/HANA_State.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/SMC_Config.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/XMA/XMA.cpp
+  Xenon/Core/RootBus/HostBridge/PCIBridge/XMA/XMA.h
 )
 
 set(XCPU
-    Xenon/Core/XCPU/Bitfield.h
-    Xenon/Core/XCPU/Xenon.cpp
-    Xenon/Core/XCPU/Xenon.h
-    Xenon/Core/XCPU/XenonSOC.h
-    Xenon/Core/XCPU/XenonReservations.cpp
-    Xenon/Core/XCPU/XenonReservations.h
-    Xenon/Core/XCPU/eFuse.h
-    Xenon/Core/XCPU/elf_abi.h
-    Xenon/Core/XCPU/IIC/IIC.cpp
-    Xenon/Core/XCPU/IIC/IIC.h
-    Xenon/Core/XCPU/Interpreter/PPC_ALU.cpp
-    Xenon/Core/XCPU/Interpreter/PPC_FPU.cpp
-    Xenon/Core/XCPU/Interpreter/Interpreter_Helpers.cpp
-    Xenon/Core/XCPU/Interpreter/PPC_MMU.cpp
-    Xenon/Core/XCPU/Interpreter/PPC_Instruction.cpp
-    Xenon/Core/XCPU/Interpreter/PPC_Instruction.h
-    Xenon/Core/XCPU/Interpreter/PPC_LS.cpp
-    Xenon/Core/XCPU/Interpreter/PPC_BC.cpp
-    Xenon/Core/XCPU/Interpreter/PPC_System.cpp
-    Xenon/Core/XCPU/Interpreter/PPCInterpreter.cpp
-    Xenon/Core/XCPU/Interpreter/PPCInterpreter.h
-    Xenon/Core/XCPU/Interpreter/PPCInternal.h
-    Xenon/Core/XCPU/Interpreter/PPCOpcodes.h
-    Xenon/Core/XCPU/PostBus/PostBus.cpp
-    Xenon/Core/XCPU/PostBus/PostBus.h
-    Xenon/Core/XCPU/PPU/PPU.cpp
-    Xenon/Core/XCPU/PPU/PPU.h
-    Xenon/Core/XCPU/PPU/PowerPC.h
+  Xenon/Core/XCPU/Bitfield.h
+  Xenon/Core/XCPU/Xenon.cpp
+  Xenon/Core/XCPU/Xenon.h
+  Xenon/Core/XCPU/XenonSOC.h
+  Xenon/Core/XCPU/XenonReservations.cpp
+  Xenon/Core/XCPU/XenonReservations.h
+  Xenon/Core/XCPU/eFuse.h
+  Xenon/Core/XCPU/elf_abi.h
+  Xenon/Core/XCPU/IIC/IIC.cpp
+  Xenon/Core/XCPU/IIC/IIC.h
+  Xenon/Core/XCPU/Interpreter/PPC_ALU.cpp
+  Xenon/Core/XCPU/Interpreter/PPC_FPU.cpp
+  Xenon/Core/XCPU/Interpreter/Interpreter_Helpers.cpp
+  Xenon/Core/XCPU/Interpreter/PPC_MMU.cpp
+  Xenon/Core/XCPU/Interpreter/PPC_Instruction.cpp
+  Xenon/Core/XCPU/Interpreter/PPC_Instruction.h
+  Xenon/Core/XCPU/Interpreter/PPC_LS.cpp
+  Xenon/Core/XCPU/Interpreter/PPC_BC.cpp
+  Xenon/Core/XCPU/Interpreter/PPC_System.cpp
+  Xenon/Core/XCPU/Interpreter/PPCInterpreter.cpp
+  Xenon/Core/XCPU/Interpreter/PPCInterpreter.h
+  Xenon/Core/XCPU/Interpreter/PPCInternal.h
+  Xenon/Core/XCPU/Interpreter/PPCOpcodes.h
+  Xenon/Core/XCPU/PostBus/PostBus.cpp
+  Xenon/Core/XCPU/PostBus/PostBus.h
+  Xenon/Core/XCPU/PPU/PPU.cpp
+  Xenon/Core/XCPU/PPU/PPU.h
+  Xenon/Core/XCPU/PPU/PowerPC.h
 )
 
 if (GFX_ENABLED)
-  set(ImGui_Dir third_party/ImGui)
+  set(ImGui_Dir Deps/ThirdParty/ImGui)
   set(ImGui
-      ${ImGui_Dir}/backends/imgui_impl_opengl3.cpp
-      ${ImGui_Dir}/backends/imgui_impl_opengl3.h
-      ${ImGui_Dir}/backends/imgui_impl_sdl3.cpp
-      ${ImGui_Dir}/backends/imgui_impl_sdl3.h
-      ${ImGui_Dir}/imconfig.h
-      ${ImGui_Dir}/imgui.cpp
-      ${ImGui_Dir}/imgui.h
-      ${ImGui_Dir}/imgui_demo.cpp
-      ${ImGui_Dir}/imgui_internal.h
-      ${ImGui_Dir}/imgui_draw.cpp
-      ${ImGui_Dir}/imgui_tables.cpp
-      ${ImGui_Dir}/imgui_widgets.cpp
-      ${ImGui_Dir}/imstb_rectpack.h
-      ${ImGui_Dir}/imstb_textedit.h
-      ${ImGui_Dir}/imstb_truetype.h
+    ${ImGui_Dir}/backends/imgui_impl_opengl3.cpp
+    ${ImGui_Dir}/backends/imgui_impl_opengl3.h
+    ${ImGui_Dir}/backends/imgui_impl_sdl3.cpp
+    ${ImGui_Dir}/backends/imgui_impl_sdl3.h
+    ${ImGui_Dir}/imconfig.h
+    ${ImGui_Dir}/imgui.cpp
+    ${ImGui_Dir}/imgui.h
+    ${ImGui_Dir}/imgui_demo.cpp
+    ${ImGui_Dir}/imgui_internal.h
+    ${ImGui_Dir}/imgui_draw.cpp
+    ${ImGui_Dir}/imgui_tables.cpp
+    ${ImGui_Dir}/imgui_widgets.cpp
+    ${ImGui_Dir}/imstb_rectpack.h
+    ${ImGui_Dir}/imstb_textedit.h
+    ${ImGui_Dir}/imstb_truetype.h
   )
 
   set(OpenGL
-      third_party/glad/src/glad.c
+    Deps/ThirdParty/glad/src/glad.c
   )
 
   set(Render
-      ${OpenGL}
-      ${ImGui}
-      Xenon/Render/Abstractions/Texture.h
-      Xenon/Render/Implementations/OGLTexture.cpp
-      Xenon/Render/Implementations/OGLTexture.h
-      Xenon/Render/GUI/Implementations/OpenGL.cpp
-      Xenon/Render/GUI/Implementations/OpenGL.h
-      Xenon/Render/GUI/GUI.cpp
-      Xenon/Render/GUI/GUI.h
-      Xenon/Render/Renderer.cpp
-      Xenon/Render/Renderer.h
+    ${OpenGL}
+    ${ImGui}
+    Xenon/Render/Abstractions/Texture.h
+    Xenon/Render/Implementations/OGLTexture.cpp
+    Xenon/Render/Implementations/OGLTexture.h
+    Xenon/Render/GUI/Implementations/OpenGL.cpp
+    Xenon/Render/GUI/Implementations/OpenGL.h
+    Xenon/Render/GUI/GUI.cpp
+    Xenon/Render/GUI/GUI.h
+    Xenon/Render/Renderer.cpp
+    Xenon/Render/Renderer.h
   )
 endif()
-set(microprofile_dir third_party/microprofile)
+set(microprofile_dir Deps/ThirdParty/microprofile)
 set(microprofile
     Xenon/include/microprofile.config.h
     ${microprofile_dir}/microprofile.cpp
@@ -289,8 +289,8 @@ endif()
 if (GFX_ENABLED)
   add_custom_target(copy-fonts
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts" # Input
-            "${CMAKE_CURRENT_BINARY_DIR}/fonts"      # Output
+    "${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts" # Input
+    "${CMAKE_CURRENT_BINARY_DIR}/fonts"  # Output
     COMMENT "Copying fonts (${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts) to build directory (${CMAKE_CURRENT_BINARY_DIR}/fonts)"
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts)
 endif()

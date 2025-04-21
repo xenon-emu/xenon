@@ -45,11 +45,11 @@ stdenv.mkDerivation {
   postUnpack = ''
     ${lib.optionalString withGraphics ''
       echo graphics present
-      rm -rf $sourceRoot/third_party/ImGui
-      cp -r ${imgui} $sourceRoot/third_party/ImGui
+      rm -rf $sourceRoot/Deps/ThirdParty/ImGui
+      cp -r ${imgui} $sourceRoot/Deps/ThirdParty/ImGui
     ''}
-    rm -rf $sourceRoot/third_party/microprofile
-    cp -r ${microprofile} $sourceRoot/third_party/microprofile
+    rm -rf $sourceRoot/Deps/ThirdParty/microprofile
+    cp -r ${microprofile} $sourceRoot/Deps/ThirdParty/microprofile
     chmod -R +w $sourceRoot
   '';
 

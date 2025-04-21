@@ -1,19 +1,19 @@
 [submodule "third_party/SDL3"]
-	path = third_party/SDL3
+	path = Deps/ThirdParty/SDL3
 	url = https://github.com/libsdl-org/SDL.git
 	shallow = true
 [submodule "third_party/toml11"]
-	path = third_party/toml11
+	path = Deps/ThirdParty/toml11
 	url = https://github.com/ToruNiina/toml11.git
 	shallow = true
 [submodule "third_party/fmt"]
-	path = third_party/fmt
+	path = Deps/ThirdParty/fmt
 	url = https://github.com/fmtlib/fmt.git
 	shallow = true
 [submodule "third_party/ImGui"]
-	path = third_party/ImGui
+	path = Deps/ThirdParty/ImGui
 	url = https://github.com/ocornut/imgui
 	branch = docking
 [submodule "third_party/microprofile"]
-	path = third_party/microprofile
+	path = Deps/ThirdParty/microprofile
 	url = https://github.com/jonasmr/microprofile.git
