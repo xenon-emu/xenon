@@ -1076,7 +1076,7 @@ void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE *ppuState,
     } break;
     // Time Base register. Writing here starts/stops the RTC supposedly
     case 0x000611A0ULL: {
-      u64 val = (!intXCPUContext->timeBaseActive) ? 0ULL : 0x0001000000000000ULL;
+      u64 val = (!cpuContext->timeBaseActive) ? 0ULL : 0x0001000000000000ULL;
       memcpy(outData, &val, byteCount);
       return;
     } break;
@@ -1138,7 +1138,7 @@ void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE *ppuState,
       else if ((EA & ~0xF000ULL) >= XE_IIC_BASE &&
           (EA & ~0xF000ULL) < XE_IIC_BASE + XE_IIC_SIZE &&
           (EA & 0xFFFFF) < 0x56000) {
-        intXCPUContext->xenonIIC.readInterrupt(EA, outData, byteCount);
+        cpuContext->xenonIIC.readInterrupt(EA, outData, byteCount);
         return;
       }
     } break;
@@ -1179,7 +1179,7 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
       memcpy(&dataBS, data, byteCount);
       u16 offset = EA - 0x61000;
       dataBS = byteswap_be<u64>(dataBS);
-      memcpy(reinterpret_cast<u8*>(intXCPUContext->socPRVBlock.get()) + offset, &dataBS, byteCount);
+      memcpy(reinterpret_cast<u8*>(cpuContext->socPRVBlock.get()) + offset, &dataBS, byteCount);
     }
     switch (EA) {
     // CPU POST Bus
@@ -1199,11 +1199,11 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
       memcpy(&tmp, data, sizeof(tmp));
       u64 dataByteswapped = byteswap_be<u64>(tmp);
       if (dataByteswapped == 0) {
-        intXCPUContext->timeBaseActive = false;
+        cpuContext->timeBaseActive = false;
         return;
       }
       else if (dataByteswapped == 0x1FF || dataByteswapped == 0x100) {
-        intXCPUContext->timeBaseActive = true;
+        cpuContext->timeBaseActive = true;
         return;
       }
     } break;
@@ -1224,7 +1224,7 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
       // Check if writing to internal SRAM
       else if (EA >= XE_SRAM_ADDR && EA < XE_SRAM_ADDR + XE_SRAM_SIZE) {
         u32 sramAddr = static_cast<u32>(EA - XE_SRAM_ADDR);
-        memcpy(&intXCPUContext->SRAM[sramAddr], data, byteCount);
+        memcpy(&cpuContext->SRAM[sramAddr], data, byteCount);
         return;
       }
       // Check if writing to Security Engine Config Block
@@ -1241,7 +1241,7 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
       else if ((EA & ~0xF000) >= XE_IIC_BASE &&
           (EA & ~0xF000) < XE_IIC_BASE + XE_IIC_SIZE &&
           (EA & 0xFFFFF) < 0x560FF) {
-        intXCPUContext->xenonIIC.writeInterrupt(EA, data, byteCount);
+        cpuContext->xenonIIC.writeInterrupt(EA, data, byteCount);
         return;
       }
     } break;
@@ -1262,7 +1262,7 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   sysBus->Write(EA, data, byteCount);
 
   // Check if it's reserved
-  intXCPUContext->xenonRes.Check(EA);
+  cpuContext->xenonRes.Check(EA);
 
   // Debugger halt
   if (EA && EA == Config::debug.haltOnWriteAddress) {
