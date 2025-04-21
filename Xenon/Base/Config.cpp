@@ -332,7 +332,7 @@ void _log::to_toml(toml::value &value) {
   value["EnableDebugOnly"].comments().push_back("# Debug-only log options (Note: Floods the log and shows trace log options)");
   value["SimpleDebugLog"].comments().clear();
   value["SimpleDebugLog"] = simpleDebugLog;
-  value["SimpleDebugLog"].comments().push_back("# Disables SoC prints, and other 'spam' debug statements");
+  value["SimpleDebugLog"].comments().push_back("# Enables SoC prints, and other 'spam' debug statements");
 }
 bool _log::verify_toml(toml::value &value) {
   to_toml(value);

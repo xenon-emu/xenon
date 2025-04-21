@@ -221,11 +221,11 @@ inline struct _log {
 #else
   bool debugOnly = false;
 #endif
-  // Disable SoC prints, and other 'spam' debug statements
+  // Enables SoC prints, and other 'spam' debug statements
 #ifdef _DEBUG
-  bool simpleDebugLog = false;
-#else
   bool simpleDebugLog = true;
+#else
+  bool simpleDebugLog = false;
 #endif
 
   // TOML Conversion
