@@ -1,5 +1,6 @@
 // Copyright 2025 Xenon Emulator Project
 
+#include "Base/Arch.h"
 #include "Base/Logging/Log.h"
 #include "PPCInterpreter.h"
 
@@ -45,6 +46,43 @@ struct addResult {
 };
 
 // Multiply High Sign/Unsigned.
+#ifdef ARCH_X86
+inline u64 umulh64(u64 x, u64 y) {
+#ifdef _MSC_VER
+  u32 x_lo = static_cast<u32>(x);
+  u32 x_hi = static_cast<u32>(x >> 32);
+  u32 y_lo = static_cast<u32>(y);
+  u32 y_hi = static_cast<u32>(y >> 32);
+
+  u64 lo_lo = static_cast<u64>(x_lo) * y_lo;
+  u64 hi_lo = static_cast<u64>(x_hi) * y_lo;
+  u64 lo_hi = static_cast<u64>(x_lo) * y_hi;
+  u64 hi_hi = static_cast<u64>(x_hi) * y_hi;
+
+  u64 cross = (lo_lo >> 32) + (hi_lo & 0xFFFFFFFFull) + (lo_hi & 0xFFFFFFFFull);
+  return hi_hi + (hi_lo >> 32) + (lo_hi >> 32) + (cross >> 32);
+#else
+  return static_cast<u64>((u128{ x } *u128{ y }) >> 64);
+#endif
+}
+inline s64 mulh64(s64 x, s64 y) {
+#ifdef _MSC_VER
+  bool negate = (x < 0) ^ (y < 0);
+  u64 ux = static_cast<u64>(x < 0 ? -x : x);
+  u64 uy = static_cast<u64>(y < 0 ? -y : y);
+  u64 high = umulh64(ux, uy);
+  if (negate) {
+    // Perform two's complement negation for high part.
+    if (ux * uy == 0) return -static_cast<s64>(high);
+    return ~static_cast<s64>(high) + ((ux * uy & 0xFFFFFFFFFFFFFFFFull) == 0 ? 1 : 0);
+  } else {
+    return static_cast<s64>(high);
+  }
+#else
+  return static_cast<s64>((s128{ x } *s128{ y }) >> 64);
+#endif
+}
+#else
 inline u64 umulh64(u64 x, u64 y) {
 #ifdef _MSC_VER
   return __umulh(x, y);
@@ -52,7 +90,6 @@ inline u64 umulh64(u64 x, u64 y) {
   return static_cast<u64>((u128{ x } *u128{ y }) >> 64);
 #endif
 }
-
 inline s64 mulh64(s64 x, s64 y) {
 #ifdef _MSC_VER
   return __mulh(x, y);
@@ -60,6 +97,7 @@ inline s64 mulh64(s64 x, s64 y) {
   return static_cast<s64>((s128{ x } *s128{ y }) >> 64);
 #endif
 }
+#endif
 
 // Platform agnostic 32/64 bit Rotate-left.
 u32 rotl32(u32 x, u32 n)
