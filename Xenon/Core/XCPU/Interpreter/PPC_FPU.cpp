@@ -125,7 +125,7 @@ void PPCInterpreter::PPCInterpreter_fdivsx(PPU_STATE *ppuState) {
   ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
 }
 
-// Floating Multiply (Double-Precision) (x’FC00 0032’)
+// Floating Multiply (Double-Precision) (x'FC00 0032')
 void PPCInterpreter::PPCInterpreter_fmulx(PPU_STATE* ppuState) {
   /*
   frD <- (frA) * (frC)

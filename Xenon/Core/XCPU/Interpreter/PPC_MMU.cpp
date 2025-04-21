@@ -197,7 +197,8 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
 
     for (auto &tlbEntry : ppuState->TLB.tlbSet0) {
       if (mmuComparePTE(rb, tlbEntry.pte0, tlbEntry.pte1, p, _instr.l10, LP, &rpn)) {
-        LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: {:#x}", rpn);
+        if (!Config::log.simpleDebugLog)
+          LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: {:#x}", rpn);
         tlbEntry.V = false;
         tlbEntry.pte0 = 0;
         tlbEntry.pte1 = 0;
@@ -205,7 +206,8 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
     }
     for (auto &tlbEntry : ppuState->TLB.tlbSet1) {
       if (mmuComparePTE(rb, tlbEntry.pte0, tlbEntry.pte1, p, _instr.l10, LP, &rpn)) {
-        LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: {:#x}", rpn);
+        if (!Config::log.simpleDebugLog)
+          LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: {:#x}", rpn);
         tlbEntry.V = false;
         tlbEntry.pte0 = 0;
         tlbEntry.pte1 = 0;
@@ -213,7 +215,8 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
     }
     for (auto &tlbEntry : ppuState->TLB.tlbSet2) {
       if (mmuComparePTE(rb, tlbEntry.pte0, tlbEntry.pte1, p, _instr.l10, LP, &rpn)) {
-        LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: {:#x}", rpn);
+        if (!Config::log.simpleDebugLog)
+          LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: {:#x}", rpn);
         tlbEntry.V = false;
         tlbEntry.pte0 = 0;
         tlbEntry.pte1 = 0;
@@ -222,7 +225,8 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
     for (auto &tlbEntry : ppuState->TLB.tlbSet3) {
       u64 pteAVPN = tlbEntry.pte0 & PPC_HPTE64_AVPN;
       if (mmuComparePTE(rb, tlbEntry.pte0, tlbEntry.pte1, p, _instr.l10, LP, &rpn)) {
-        LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: {:#x}", rpn);
+        if (!Config::log.simpleDebugLog)
+          LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: {:#x}", rpn);
         tlbEntry.V = false;
         tlbEntry.pte0 = 0;
         tlbEntry.pte1 = 0;
@@ -250,7 +254,8 @@ void PPCInterpreter::PPCInterpreter_tlbie(PPU_STATE *ppuState) {
   // Inverse of log2, as log2 is 2^? (finding ?)
   // Example: the Log2 of 4096 is 12, because 2^12 is 4096
   u64 fullPageSize = pow(2, p);
-  LOG_INFO(Xenon, "tlbie, EA:0x{:X} | PageSize:{} | Full:0x{:X},{} | LP:{}", EA, p, fullPageSize, fullPageSize, LP ? "true" : "false");
+  if (!Config::log.simpleDebugLog)
+    LOG_TRACE(Xenon, "tlbie, EA:0x{:X} | PageSize:{} | Full:0x{:X},{} | LP:{}", EA, p, fullPageSize, fullPageSize, LP ? "true" : "false");
   for (u64 i{}; i != fullPageSize; ++i) {
     curThread.iERAT.invalidateElement(EA+i);
     curThread.dERAT.invalidateElement(EA+i);
@@ -259,7 +264,8 @@ void PPCInterpreter::PPCInterpreter_tlbie(PPU_STATE *ppuState) {
 
 void PPCInterpreter::PPCInterpreter_tlbsync(PPU_STATE *ppuState) {
   // Do nothing
-  LOG_INFO(Xenon, "tlbsync");
+  if (!Config::log.simpleDebugLog)
+    LOG_TRACE(Xenon, "tlbsync");
 }
 
 // Helper function for getting Page Size (p bit).
@@ -723,13 +729,13 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
     // Search the SLB to get the VSID
     for (auto &slbEntry : curThread.SLB) {
       if (slbEntry.V) {
-        if (false)
+        if (!Config::log.simpleDebugLog)
           LOG_TRACE(Xenon_MMU, "Checking valid SLB (V:0x{:X},LP:0x{:X},C:0x{:X},L:0x{:X},N:0x{:X},Kp:0x{:X},Ks:0x{:X},VSID:0x{:X},ESID:0x{:X},vsidReg:0x{:X},esidReg:0x{:X})", (u32)slbEntry.V, (u32)slbEntry.LP, (u32)slbEntry.C, (u32)slbEntry.L,
                                 (u32)slbEntry.N, (u32)slbEntry.Kp, (u32)slbEntry.Ks,
                                 slbEntry.VSID, slbEntry.ESID, slbEntry.vsidReg, slbEntry.esidReg);
         if (slbEntry.ESID == ESID) {
-          if (false)
-            LOG_TRACE(Xenon_MMU, "Match!");
+          if (!Config::log.simpleDebugLog)
+            LOG_TRACE(Xenon_MMU, "SLB Match");
           // Entry valid & SLB->ESID = EA->VSID
           currslbEntry = slbEntry;
           VSID = slbEntry.VSID;
@@ -1002,7 +1008,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
     curThread.dERAT.putElement((*EA & ~0xFFF), (RA & ~0xFFF));
   }
 
-  if (false)
+  if (!Config::log.simpleDebugLog)
     LOG_TRACE(Xenon_MMU, "Final translation, 0x{:X} -> 0x{:X}", *EA, RA);
 
   *EA = RA;
@@ -1148,7 +1154,8 @@ void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE *ppuState,
       pciBridge{ EA >= 0xEA000000 && EA <= 0xEA010000 },
       xGPU{ EA >= 0xEC800000 && EA <= 0xEC810000 };
     if (!nand && !pciBridge && !pciConfigSpace && !xGPU) {
-      LOG_WARNING(Xenon_MMU, "SoC Read from {:#x}, returning 0.", EA);
+      if (!Config::log.simpleDebugLog)
+        LOG_WARNING(Xenon_MMU, "SoC Read from {:#x}, returning 0.", EA);
       memset(outData, 0, byteCount);
       return;
     }
@@ -1260,7 +1267,8 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
     if (!nand && !pciBridge && !pciConfigSpace && !xGPU) {
       u64 tmp = 0;
       memcpy(&tmp, data, byteCount);
-      LOG_WARNING(Xenon_MMU, "Invalid SoC Write to {:#x} (data:{:#x})", EA, tmp);
+      if (!Config::log.simpleDebugLog)
+        LOG_WARNING(Xenon_MMU, "Invalid SoC Write to {:#x} (data:{:#x})", EA, tmp);
       return;
     }
   }
