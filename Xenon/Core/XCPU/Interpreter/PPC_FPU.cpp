@@ -115,7 +115,7 @@ void PPCInterpreter::PPCInterpreter_fctidzx(PPU_STATE* ppuState) {
 
   checkFpuAvailable(ppuState);
 
-#if defined(ARCH_X86)
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
   const auto val = _mm_set_sd(FPRi(frb).valueAsDouble);
   const auto res = _mm_xor_si128(_mm_set1_epi64x(_mm_cvttsd_si64(val)), _mm_castpd_si128(_mm_cmpge_pd(val, _mm_set1_pd(f64(1ull << 63)))));
   FPRi(frd).valueAsDouble = std::bit_cast<f64>(_mm_cvtsi128_si64(res));
@@ -134,7 +134,7 @@ void PPCInterpreter::PPCInterpreter_fctiwzx(PPU_STATE* ppuState) {
 
   checkFpuAvailable(ppuState);
 
-#if defined(ARCH_X86)
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
   const auto val = _mm_set_sd(FPRi(frb).valueAsDouble);
   const auto res = _mm_xor_si128(_mm_cvttpd_epi32(val), _mm_castpd_si128(_mm_cmpge_pd(val, _mm_set1_pd(0x80000000))));
   FPRi(frd).valueAsDouble = std::bit_cast<f64, s64>(_mm_cvtsi128_si32(res));
