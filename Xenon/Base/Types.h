@@ -163,6 +163,19 @@ template <typename cT, typename T>
 #if defined(_MSC_VER) || defined(__MINGW32__)
 #include <xmmintrin.h>
 
+#if defined(__clang__) && (__clang_major__ >= 20)
+
+static inline constexpr u8 _addcarry_u64(u8, u64, u64, u64*);
+static inline constexpr u8 _subborrow_u64(u8, u64, u64, u64*);
+
+extern "C" {
+  u64 __shiftleft128(u64, u64, u8);
+  u64 __shiftright128(u64, u64, u8);
+  u64 _umul128(u64, u64, u64*);
+}
+
+#else
+
 extern "C" {
   u8 _addcarry_u64(u8, u64, u64, u64*);
   u8 _subborrow_u64(u8, u64, u64, u64*);
@@ -170,6 +183,7 @@ extern "C" {
   u64 __shiftright128(u64, u64, u8);
   u64 _umul128(u64, u64, u64*);
 }
+#endif
 
 // Unsigned 128-bit integer implementation.
 class alignas(16) u128 {
