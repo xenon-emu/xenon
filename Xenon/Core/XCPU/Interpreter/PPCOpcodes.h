@@ -43,7 +43,6 @@ D_STUB(td)
 D_STUB(dst)
 D_STUB(dss)
 D_STUB(dstst)
-D_STUB(lfsx)
 D_STUB(lfsu)
 D_STUB(lfsux)
 D_STUB(mfsrin)
@@ -488,6 +487,7 @@ extern void PPCInterpreter_ldx(PPU_STATE *ppuState);
 // Load Floating
 //
 
+extern void PPCInterpreter_lfsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_lfd(PPU_STATE *ppuState);
 extern void PPCInterpreter_lfdx(PPU_STATE *ppuState);
 extern void PPCInterpreter_lfdu(PPU_STATE *ppuState);

@@ -1066,6 +1066,26 @@ void PPCInterpreter::PPCInterpreter_ldx(PPU_STATE *ppuState) {
   GPRi(rd) = data;
 }
 
+// Load Floating-Point Single Indexed (x'7C00 042E')
+void PPCInterpreter::PPCInterpreter_lfsx(PPU_STATE* ppuState) {
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + (rB)
+  frD <- DOUBLE(MEM(EA, 4))
+  */
+
+  checkFpuAvailable(ppuState);
+
+  const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
+  u32 data = MMURead32(ppuState, EA);
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  FPRi(frd).valueAsDouble = static_cast<f64>(static_cast<f32>(data));
+}
+
 // Load Floating-Point Double (x'C800 0000')
 void PPCInterpreter::PPCInterpreter_lfd(PPU_STATE *ppuState) {
   /*
