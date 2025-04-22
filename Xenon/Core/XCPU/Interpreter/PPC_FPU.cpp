@@ -63,6 +63,19 @@ void PPCInterpreter::PPCInterpreter_faddx(PPU_STATE* ppuState) {
   ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
 }
 
+// Floating Absolute Value (x'FC00 0210')
+void PPCInterpreter::PPCInterpreter_fabsx(PPU_STATE* ppuState) {
+  /*
+  The contents of frB with bit [0] cleared are placed into frD.
+  */
+  
+  FPRi(frd).valueAsDouble = std::fabs(FPRi(frb).valueAsDouble);
+
+  if (_instr.rc) {
+    ppuSetCR(ppuState, 1, curThread.FPSCR.FG, curThread.FPSCR.FL, curThread.FPSCR.FE, curThread.FPSCR.FU);
+  }
+}
+
 // Floating Add Single (x'EC00 002A')
 void PPCInterpreter::PPCInterpreter_faddsx(PPU_STATE *ppuState) {
   /*
@@ -99,6 +112,40 @@ void PPCInterpreter::PPCInterpreter_fcmpu(PPU_STATE *ppuState) {
   ppuUpdateFPSCR(ppuState, fra, frb, true, _instr.crfd);
 }
 
+// Floating Convert to Integer Double Word with Round toward Zero (x'FC00 065E')
+void PPCInterpreter::PPCInterpreter_fctidzx(PPU_STATE* ppuState) {
+  // This was mostly taken from rpcs3's PPUInterpreter. 
+  // TODO: Verify.
+
+#ifdef(XE_ARCH_X64)
+  const auto val = _mm_set_sd(FPRi(frb).valueAsDouble);
+  const auto res = _mm_xor_si128(_mm_set1_epi64x(_mm_cvttsd_si64(val)), _mm_castpd_si128(_mm_cmpge_pd(val, _mm_set1_pd(f64(1ull << 63)))));
+  FPRi(frd).valueAsDouble = std::bit_cast<f64>(_mm_cvtsi128_si64(res));
+#else
+  LOG_ERROR(Xenon, "fctidzx: Unsupported ARCH.");
+#endif
+
+  // TODO:
+  ppuUpdateFPSCR(ppuState, 0.0, 0.0, _instr.rc);
+}
+
+// Floating Convert to Integer Word with Round toward Zero (x'FC00 001E')
+void PPCInterpreter::PPCInterpreter_fctiwzx(PPU_STATE* ppuState) {
+  // This was mostly taken from rpcs3's PPUInterpreter. 
+  // TODO: Verify.
+
+#ifdef(XE_ARCH_X64)
+  const auto val = _mm_set_sd(FPRi(frb).valueAsDouble);
+  const auto res = _mm_xor_si128(_mm_cvttpd_epi32(val), _mm_castpd_si128(_mm_cmpge_pd(val, _mm_set1_pd(0x80000000))));
+  FPRi(frd).valueAsDouble = std::bit_cast<f64, s64>(_mm_cvtsi128_si32(res));
+#else
+  LOG_ERROR(Xenon, "fctiwzx: Unsupported ARCH.");
+#endif
+
+  // TODO:
+  ppuUpdateFPSCR(ppuState, 0.0, 0.0, _instr.rc);
+}
+
 // Floating Convert from Integer Double Word (x'FC00 069C')
 void PPCInterpreter::PPCInterpreter_fcfidx(PPU_STATE *ppuState) {
   /*
@@ -121,6 +168,28 @@ void PPCInterpreter::PPCInterpreter_fdivsx(PPU_STATE *ppuState) {
   checkFpuAvailable(ppuState);
 
   FPRi(frd).valueAsDouble = static_cast<f32>(FPRi(fra).valueAsDouble / FPRi(frb).valueAsDouble);
+
+  ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
+}
+
+// Floating Multiply-Add (Double-Precision) (x'FC00 003A')
+void PPCInterpreter::PPCInterpreter_fmaddx(PPU_STATE* ppuState) {
+  /*
+  frD <- (frA * frC) + frB
+  */
+
+  FPRi(frd).valueAsDouble = (FPRi(fra).valueAsDouble * FPRi(frc).valueAsDouble) + FPRi(frb).valueAsDouble;
+
+  ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
+}
+
+// Floating Multiply-Add Single (x'EC00 003A')
+void PPCInterpreter::PPCInterpreter_fmaddsx(PPU_STATE* ppuState) {
+  /*
+  frD <- (frA * frC) + frB
+  */
+
+  FPRi(frd).valueAsDouble = static_cast<f32>((FPRi(fra).valueAsDouble * FPRi(frc).valueAsDouble) + FPRi(frb).valueAsDouble);
 
   ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
 }
@@ -164,6 +233,17 @@ void PPCInterpreter::PPCInterpreter_fmrx(PPU_STATE *ppuState) {
   if (_instr.rc) {
     ppuSetCR(ppuState, 1, curThread.FPSCR.FG, curThread.FPSCR.FL, curThread.FPSCR.FE, curThread.FPSCR.FU);
   }
+}
+
+// Floating Negative Multiply-Subtract Single (x'EC00 003C')
+void PPCInterpreter::PPCInterpreter_fnmsubsx(PPU_STATE* ppuState) {
+  /*
+  frD <- - ([frA * frC] - frB)
+  */
+
+  FPRi(frd).valueAsDouble = static_cast<f32>(-((FPRi(fra).valueAsDouble * FPRi(frc).valueAsDouble) - FPRi(frb).valueAsDouble));
+
+  ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
 }
 
 // Floating Round to Single (x'FC00 0018')

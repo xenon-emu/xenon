@@ -461,6 +461,32 @@ void PPCInterpreter::PPCInterpreter_stdx(PPU_STATE *ppuState) {
 // Store Floating
 //
 
+// Store Floating-Point Single (x'D000 0000')
+void PPCInterpreter::PPCInterpreter_stfs(PPU_STATE* ppuState) {
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + EXTS(d)
+  MEM(EA, 4) <- SINGLE(frS)
+  */
+
+  const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
+  MMUWrite32(ppuState, EA, static_cast<f32>(FPRi(frs).valueAsDouble));
+}
+
+// Store Floating-Point Single Indexed (x'7C00 052E')
+void PPCInterpreter::PPCInterpreter_stfsx(PPU_STATE* ppuState) {
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + (rB)
+  MEM(EA, 4) <- SINGLE(frS)
+  */
+
+  const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
+  MMUWrite32(ppuState, EA, static_cast<f32>(FPRi(frs).valueAsDouble));
+}
+
 // Store Floating-Point Double (x'D800 0000')
 void PPCInterpreter::PPCInterpreter_stfd(PPU_STATE *ppuState) {
   /*
@@ -471,6 +497,19 @@ void PPCInterpreter::PPCInterpreter_stfd(PPU_STATE *ppuState) {
   */
   const u64 EA = _instr.ra || 1 ? GPRi(ra) + _instr.simm16 : _instr.simm16;
   MMUWrite64(ppuState, EA, FPRi(frs).valueAsU64);
+}
+
+// Store Floating-Point as Integer Word Indexed (x'7C00 07AE')
+void PPCInterpreter::PPCInterpreter_stfiwx(PPU_STATE* ppuState) {
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + (rB)
+  MEM(EA, 4) <- frS[32-63]
+  */
+
+  const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
+  MMUWrite32(ppuState, EA, static_cast<u32>(std::bit_cast<u64>(FPRi(frs))));
 }
 
 //

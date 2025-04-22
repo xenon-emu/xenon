@@ -25,22 +25,16 @@ D_STUBRC(mtfsb1)
 D_STUBRC(mtfsb0)
 D_STUBRC(mtfsfi)
 D_STUBRC(fctid)
-D_STUBRC(fctidz)
 D_STUBRC(fctiw)
-D_STUBRC(fctiwz)
 D_STUBRC(fdiv)
-D_STUBRC(fmadds)
 D_STUBRC(fmsubs)
 D_STUBRC(fnmsub)
-D_STUBRC(fnmsubs)
 D_STUBRC(fnmadd)
-D_STUBRC(fmadd)
 D_STUBRC(fnmadds)
 D_STUBRC(fmsub)
 D_STUBRC(fneg)
 D_STUBRC(fsel)
 D_STUBRC(fres)
-D_STUBRC(fabs)
 D_STUBRC(fnabs)
 D_STUBRC(fsqrt)
 D_STUBRC(fsqrts)
@@ -72,13 +66,10 @@ D_STUB(lvehx)
 D_STUB(stdbrx)
 D_STUB(stswx)
 D_STUB(stfdu)
-D_STUB(stfs)
 D_STUB(stfdx)
-D_STUB(stfsx)
 D_STUB(stfsu)
 D_STUB(stfsux)
 D_STUB(stfdux)
-D_STUB(stfiwx)
 D_STUB(stvebx)
 D_STUB(fcmpo)
 D_STUB(stvx)
@@ -390,13 +381,19 @@ extern void PPCInterpreter_icbi(PPU_STATE *ppuState);
 // FPU
 //
 extern void PPCInterpreter_faddx(PPU_STATE *ppuState);
+extern void PPCInterpreter_fabsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_faddsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fcmpu(PPU_STATE *ppuState);
+extern void PPCInterpreter_fctidzx(PPU_STATE *ppuState);
+extern void PPCInterpreter_fctiwzx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fcfidx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fdivsx(PPU_STATE *ppuState);
+extern void PPCInterpreter_fmaddx(PPU_STATE *ppuState);
+extern void PPCInterpreter_fmaddsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fmulx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fmulsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fmrx(PPU_STATE *ppuState);
+extern void PPCInterpreter_fnmsubsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_frspx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fsubx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fsubsx(PPU_STATE *ppuState);
@@ -442,7 +439,10 @@ extern void PPCInterpreter_stdux(PPU_STATE *ppuState);
 extern void PPCInterpreter_stdx(PPU_STATE *ppuState);
 
 // Store Floating
+extern void PPCInterpreter_stfs(PPU_STATE *ppuState);
+extern void PPCInterpreter_stfsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_stfd(PPU_STATE *ppuState);
+extern void PPCInterpreter_stfiwx(PPU_STATE *ppuState);
 
 // Load Byte
 extern void PPCInterpreter_lbz(PPU_STATE *ppuState);
