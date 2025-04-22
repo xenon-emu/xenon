@@ -50,7 +50,7 @@
           owner = "ToruNiina";
           repo = "toml11";
           tag = "v4.4.0";
-          hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+          hash = "sha256-sgWKYxNT22nw376ttGsTdg0AMzOwp8QH3E8mx0BZJTQ=";
         };
       });
       sdl3 = super.sdl3.overrideDerivation (old: {
