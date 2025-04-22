@@ -470,6 +470,8 @@ void PPCInterpreter::PPCInterpreter_stfs(PPU_STATE* ppuState) {
   MEM(EA, 4) <- SINGLE(frS)
   */
 
+  checkFpuAvailable(ppuState);
+
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
   MMUWrite32(ppuState, EA, static_cast<f32>(FPRi(frs).valueAsDouble));
 }
@@ -483,6 +485,8 @@ void PPCInterpreter::PPCInterpreter_stfsx(PPU_STATE* ppuState) {
   MEM(EA, 4) <- SINGLE(frS)
   */
 
+  checkFpuAvailable(ppuState);
+
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   MMUWrite32(ppuState, EA, static_cast<f32>(FPRi(frs).valueAsDouble));
 }
@@ -495,6 +499,9 @@ void PPCInterpreter::PPCInterpreter_stfd(PPU_STATE *ppuState) {
   EA <- b + EXTS(d)
   MEM(EA, 8) <- (frS)
   */
+
+  checkFpuAvailable(ppuState);
+
   const u64 EA = _instr.ra || 1 ? GPRi(ra) + _instr.simm16 : _instr.simm16;
   MMUWrite64(ppuState, EA, FPRi(frs).valueAsU64);
 }
@@ -507,6 +514,8 @@ void PPCInterpreter::PPCInterpreter_stfiwx(PPU_STATE* ppuState) {
   EA <- b + (rB)
   MEM(EA, 4) <- frS[32-63]
   */
+
+  checkFpuAvailable(ppuState);
 
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   MMUWrite32(ppuState, EA, static_cast<u32>(std::bit_cast<u64>(FPRi(frs))));
@@ -1065,8 +1074,8 @@ void PPCInterpreter::PPCInterpreter_lfd(PPU_STATE *ppuState) {
   EA <- b + EXTS(d)
   frD <- MEM(EA, 8)
   */
-  // Check if floating point is enabled
-  ASSERT(curThread.SPR.MSR.FP == 1);
+
+  checkFpuAvailable(ppuState);
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
   u64 data = MMURead64(ppuState, EA);
@@ -1085,8 +1094,8 @@ void PPCInterpreter::PPCInterpreter_lfdx(PPU_STATE *ppuState) {
   EA <- b + (rB)
   frD <- MEM(EA, 8)
   */
-  // Check if floating point is enabled
-  ASSERT(curThread.SPR.MSR.FP == 1);
+
+  checkFpuAvailable(ppuState);
 
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   u64 data = MMURead64(ppuState, EA);
@@ -1104,8 +1113,8 @@ void PPCInterpreter::PPCInterpreter_lfdu(PPU_STATE *ppuState) {
   frD <- MEM(EA, 8)
   rA <- EA
   */
-  // Check if floating point is enabled
-  ASSERT(curThread.SPR.MSR.FP == 1);
+
+  checkFpuAvailable(ppuState);
 
   const u64 EA = GPRi(ra) + _instr.simm16;
   u64 data = MMURead64(ppuState, EA);
@@ -1124,8 +1133,8 @@ void PPCInterpreter::PPCInterpreter_lfdux(PPU_STATE *ppuState) {
   frD <- MEM(EA, 8)
   rA <- EA
   */
-  // Check if floating point is enabled
-  ASSERT(curThread.SPR.MSR.FP == 1);
+
+  checkFpuAvailable(ppuState);
 
   const u64 EA = GPRi(ra) + GPRi(rb);
   u64 data = MMURead64(ppuState, EA);
@@ -1145,8 +1154,8 @@ void PPCInterpreter::PPCInterpreter_lfs(PPU_STATE *ppuState) {
   EA <- b + EXTS(d)
   frD <- DOUBLE(MEM(EA, 4))
   */
-  // Check if Floating Point is available
-  ASSERT(curThread.SPR.MSR.FP == 1);
+
+  checkFpuAvailable(ppuState);
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
   SFPRegister singlePresFP;

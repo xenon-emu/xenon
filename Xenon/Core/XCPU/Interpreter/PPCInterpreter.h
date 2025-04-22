@@ -37,6 +37,13 @@ extern XENON_CONTEXT *intXCPUContext;
 #define GET_FPSCR     curThread.FPSCR.FPSCR_Hex
 #define SET_FPSCR(x)  curThread.FPSCR.FPSCR_Hex = x
 
+static inline void checkFpuAvailable(PPU_STATE* ppuState) {
+  if (curThread.SPR.MSR.FP != 1) {
+    _ex |= PPU_EX_FPU;
+    return;
+  }
+}
+
 //
 //  Basic Block Loading, debug symbols and stuff.
 //

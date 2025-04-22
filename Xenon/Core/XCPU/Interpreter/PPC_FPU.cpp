@@ -3,13 +3,6 @@
 #include "Base/Logging/Log.h"
 #include "PPCInterpreter.h"
 
-static inline void checkFpuAvailable(PPU_STATE *ppuState) {
-  if (curThread.SPR.MSR.FP != 1) {
-    _ex |= PPU_EX_FPU;
-    return;
-  }
-}
-
 // Updates needed fields from FPSCR and CR1 bits if requested
 void PPCInterpreter::ppuUpdateFPSCR(PPU_STATE *ppuState, f64 op0, f64 op1, bool updateCR, u8 CR) {
   // TODO(bitsh1ft3r): Detect NaN's
@@ -68,6 +61,8 @@ void PPCInterpreter::PPCInterpreter_fabsx(PPU_STATE* ppuState) {
   /*
   The contents of frB with bit [0] cleared are placed into frD.
   */
+
+  checkFpuAvailable(ppuState);
   
   FPRi(frd).valueAsDouble = std::fabs(FPRi(frb).valueAsDouble);
 
@@ -117,7 +112,9 @@ void PPCInterpreter::PPCInterpreter_fctidzx(PPU_STATE* ppuState) {
   // This was mostly taken from rpcs3's PPUInterpreter. 
   // TODO: Verify.
 
-#ifdef(XE_ARCH_X64)
+  checkFpuAvailable(ppuState);
+
+#if defined(XE_ARCH_X64)
   const auto val = _mm_set_sd(FPRi(frb).valueAsDouble);
   const auto res = _mm_xor_si128(_mm_set1_epi64x(_mm_cvttsd_si64(val)), _mm_castpd_si128(_mm_cmpge_pd(val, _mm_set1_pd(f64(1ull << 63)))));
   FPRi(frd).valueAsDouble = std::bit_cast<f64>(_mm_cvtsi128_si64(res));
@@ -134,7 +131,9 @@ void PPCInterpreter::PPCInterpreter_fctiwzx(PPU_STATE* ppuState) {
   // This was mostly taken from rpcs3's PPUInterpreter. 
   // TODO: Verify.
 
-#ifdef(XE_ARCH_X64)
+  checkFpuAvailable(ppuState);
+
+#if defined(XE_ARCH_X64)
   const auto val = _mm_set_sd(FPRi(frb).valueAsDouble);
   const auto res = _mm_xor_si128(_mm_cvttpd_epi32(val), _mm_castpd_si128(_mm_cmpge_pd(val, _mm_set1_pd(0x80000000))));
   FPRi(frd).valueAsDouble = std::bit_cast<f64, s64>(_mm_cvtsi128_si32(res));
@@ -178,6 +177,8 @@ void PPCInterpreter::PPCInterpreter_fmaddx(PPU_STATE* ppuState) {
   frD <- (frA * frC) + frB
   */
 
+  checkFpuAvailable(ppuState);
+
   FPRi(frd).valueAsDouble = (FPRi(fra).valueAsDouble * FPRi(frc).valueAsDouble) + FPRi(frb).valueAsDouble;
 
   ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
@@ -188,6 +189,8 @@ void PPCInterpreter::PPCInterpreter_fmaddsx(PPU_STATE* ppuState) {
   /*
   frD <- (frA * frC) + frB
   */
+
+  checkFpuAvailable(ppuState);
 
   FPRi(frd).valueAsDouble = static_cast<f32>((FPRi(fra).valueAsDouble * FPRi(frc).valueAsDouble) + FPRi(frb).valueAsDouble);
 
@@ -240,6 +243,8 @@ void PPCInterpreter::PPCInterpreter_fnmsubsx(PPU_STATE* ppuState) {
   /*
   frD <- - ([frA * frC] - frB)
   */
+
+  checkFpuAvailable(ppuState);
 
   FPRi(frd).valueAsDouble = static_cast<f32>(-((FPRi(fra).valueAsDouble * FPRi(frc).valueAsDouble) - FPRi(frb).valueAsDouble));
 
