@@ -93,7 +93,7 @@ inline void ppuSetCR(PPU_STATE *ppuState, u32 crField, bool le, bool gt, bool eq
 }
 
 // Perform a comparison and write results to the specified CR field.
-template<typename T>
+template <typename T>
 inline void ppuSetCR(PPU_STATE *ppuState, u32 crField, const T& a, const T& b) {
   ppuSetCR(ppuState, crField, a < b, a > b, a == b, curThread.SPR.XER.SO);
 }

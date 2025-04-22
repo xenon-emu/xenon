@@ -115,10 +115,18 @@ void PPCInterpreter::PPCInterpreter_fctidzx(PPU_STATE* ppuState) {
 
   checkFpuAvailable(ppuState);
 
-#if defined(ARCH_X86) || defined(ARCH_X86_64)
+#if defined(ARCH_X86_64)
   const auto val = _mm_set_sd(FPRi(frb).valueAsDouble);
   const auto res = _mm_xor_si128(_mm_set1_epi64x(_mm_cvttsd_si64(val)), _mm_castpd_si128(_mm_cmpge_pd(val, _mm_set1_pd(f64(1ull << 63)))));
   FPRi(frd).valueAsDouble = std::bit_cast<f64>(_mm_cvtsi128_si64(res));
+#elif defined(ARCH_X86)
+  const double input = FPRi(frb).valueAsDouble;
+  int64_t tmp = static_cast<int64_t>(FPRi(frb).valueAsDouble); // truncates just like _mm_cvttsd_si64
+  __m128i xor_mask = _mm_castpd_si128(_mm_cmpge_pd(_mm_set_sd(input), _mm_set1_pd(double(1ull << 63))));
+  __m128i res = _mm_xor_si128(_mm_set_epi64x(0, tmp), xor_mask);
+  int64_t result = 0;
+  memcpy(&result, &res, sizeof(result));
+  FPRi(frd).valueAsDouble = std::bit_cast<f64>(result);
 #else
   LOG_ERROR(Xenon, "fctidzx: Unsupported ARCH.");
 #endif

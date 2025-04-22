@@ -100,8 +100,7 @@ inline s64 mulh64(s64 x, s64 y) {
 #endif
 
 // Platform agnostic 32/64 bit Rotate-left.
-u32 rotl32(u32 x, u32 n)
-{
+u32 rotl32(u32 x, u32 n) {
 #ifdef _MSC_VER
   return _rotl(x, n);
 #elif defined(__clang__)
@@ -111,8 +110,7 @@ u32 rotl32(u32 x, u32 n)
 #endif
 }
 
-u64 rotl64(u64 x, u64 n)
-{
+u64 rotl64(u64 x, u64 n) {
 #ifdef _MSC_VER
   return _rotl64(x, static_cast<int>(n));
 #elif defined(__clang__)
@@ -127,8 +125,7 @@ u64 rotl64(u64 x, u64 n)
 inline u64 duplicate32(u32 x) { return x | static_cast<u64>(x) << 32; }
 
 // Set XER[OV] bit. Overflow enable
-inline void ppuSetXerOv(PPU_STATE *ppuState, bool inbit)
-{
+inline void ppuSetXerOv(PPU_STATE *ppuState, bool inbit) {
   XERegister xer = curThread.SPR.XER;
   // Set register as intended
   curThread.SPR.XER.XER_Hex = 0;
@@ -142,8 +139,6 @@ inline void ppuSetXerOv(PPU_STATE *ppuState, bool inbit)
   // Set OV based on input.
   curThread.SPR.XER.OV = inbit;
 }
-
-// Vali004 loves macros, and i'm getting used to them also!
 
 // Compares and records the input value taking into account computation mode.
 #define RECORD_CR0(x) \
