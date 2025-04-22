@@ -49,7 +49,7 @@
         src = self.fetchFromGitHub {
           owner = "ToruNiina";
           repo = "toml11";
-          tag = "v4.4.06";
+          tag = "v4.4.0";
           hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
         };
       });
