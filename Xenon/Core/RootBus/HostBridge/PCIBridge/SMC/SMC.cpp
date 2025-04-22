@@ -484,6 +484,16 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
         break;
       case Xe::PCIDev::SMC::SMC_I2C_READ_WRITE:
         switch (smcCoreState->fifoDataBuffer[1]) {
+        case 0x3: // SMC_I2C_DDC_LOCK
+          LOG_INFO(SMC, "[I2C] Requested DDC Lock.");
+          smcCoreState->fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
+          smcCoreState->fifoDataBuffer[1] = 0; // Lock Succeeded.
+          break;
+        case 0x5: // SMC_I2C_DDC_UNLOCK
+          LOG_INFO(SMC, "[I2C] Requested DDC Unlock.");
+          smcCoreState->fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
+          smcCoreState->fifoDataBuffer[1] = 0; // Unlock Succeeded.
+          break;
         case 0x10: // SMC_READ_ANA
           smcCoreState->fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
           smcCoreState->fifoDataBuffer[1] = 0x0;
