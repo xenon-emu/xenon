@@ -149,6 +149,8 @@ set(RootBus
   Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI0/OHCI0.h
   Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI1/OHCI1.cpp
   Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI1/OHCI1.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI/OHCI.cpp
+  Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI/OHCI.h
   Xenon/Core/RootBus/HostBridge/PCIBridge/PCIBridge.cpp
   Xenon/Core/RootBus/HostBridge/PCIBridge/PCIBridge.h
   Xenon/Core/RootBus/HostBridge/PCIBridge/PCIBridgeConfig.h

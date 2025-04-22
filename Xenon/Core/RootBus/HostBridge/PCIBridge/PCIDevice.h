@@ -3,6 +3,7 @@
 #pragma once
 
 #include <cstring>
+#include <string>
 
 #include "Core/RootBus/HostBridge/PCIe.h"
 
