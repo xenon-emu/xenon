@@ -17,12 +17,12 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
 
   // RGH 2 for CB_A 9188 in a JRunner XDKBuild.
   if (thread.CIA == 0x0200C870) {
-    //GPR(5) = 0;
+    GPR(5) = 0;
   }
 
   // RGH 2 for CB_A 9188 in a JRunner Normal Build.
   if (thread.CIA == 0x0200C820) {
-    GPR(3) = 0;
+    //GPR(3) = 0;
   }
 
   // RGH 2 17489 in a JRunner Corona XDKBuild.
@@ -45,10 +45,30 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
     //GPR(3) = 0;
   }
 
+  // INIT_POWER_MODE bypass 2.0.17489.0.
+  if ((u32)thread.CIA == 0x80081764) {
+    return;
+  }
+
+  // XAudioRenderDriverInitialize bypass 2.0.17489.0.
+  if ((u32)thread.CIA == 0x80081830) {
+    return;
+  }
+
   // XDK 17.489.0 AudioChipCorder Device Detect bypass. This is not needed for
   // older console revisions.
   if (static_cast<u32>(thread.CIA) == 0x801AF580) {
     return;
+  }
+
+  // EDRAM Chip ID Check. r10 = 0xD1.
+  if (static_cast<u32>(thread.CIA) == 0x800FC140) {
+    LOG_INFO(Xenon, "EDRAM Chip ID Check.");
+  }
+ 
+  // VdpHasWarmBooted. Set r11 to 0x10. Skips GPU Driver init.
+  if (static_cast<u32>(thread.CIA) == 0x801b1c38) {
+    LOG_INFO(Xenon, "VdpHasWarmBooted");
   }
 
   // This is just to set a PC breakpoint in any PPU/Thread.
