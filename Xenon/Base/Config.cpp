@@ -114,12 +114,15 @@ void _debug::from_toml(const toml::value &value) {
 }
 void _debug::to_toml(toml::value &value) {
   value["HaltOnRead"].comments().clear();
+  value["HaltOnRead"].as_integer_fmt().fmt = toml::integer_format::hex;
   value["HaltOnRead"] = haltOnReadAddress;
   value["HaltOnRead"].comments().push_back("# Address to halt on when the MMU reads from this address");
   value["HaltOnWrite"].comments().clear();
+  value["HaltOnWrite"].as_integer_fmt().fmt = toml::integer_format::hex;
   value["HaltOnWrite"] = haltOnWriteAddress;
   value["HaltOnWrite"].comments().push_back("# Address to halt on when the MMU writes to this address");
   value["HaltOnAddress"].comments().clear();
+  value["HaltOnAddress"].as_integer_fmt().fmt = toml::integer_format::hex;
   value["HaltOnAddress"] = haltOnAddress;
   value["HaltOnAddress"].comments().push_back("# Address to halt on when the CPU executes this address");
   value["HaltOnExceptions"].comments().clear();
@@ -163,17 +166,16 @@ void _smc::from_toml(const toml::value &value) {
 void _smc::to_toml(toml::value &value) {
   value["AvPackType"].comments().clear();
   value["AvPackType"] = avPackType;
-  value["AvPackType"].comments().push_back("# The current connected AV Pack. Used to set Xenos internal render resolution");
+  value["AvPackType"].comments().push_back("# The current connected AV Pack");
   value["AvPackType"].comments().push_back("# Default value is 31 (HDMI_NO_AUDIO) = 1280*720");
   value["AvPackType"].comments().push_back("# Lowest value is 87 (COMPOSITE) = 640*480");
-  value["AvPackType"].comments().push_back("# Note: The window size must never be smaller than the internal resolution");
+  value["AvPackType"].comments().push_back("# The window size must never be smaller than the internal resolution");
   value["PowerOnType"].comments().clear();
   value["PowerOnType"] = powerOnReason;
   value["PowerOnType"].comments().push_back("# SMC power-up type/cause (Power Button, Eject Button, etc...)");
-  value["PowerOnType"].comments().push_back("# Most used values are:");
   value["PowerOnType"].comments().push_back("# 17: Console is being powered by a Power button press");
   value["PowerOnType"].comments().push_back("# 18: Console is being powered by an Eject button press");
-  value["PowerOnType"].comments().push_back("# Note: When trying to boot Linux/XeLL Reloaded this must be set to 18");
+  value["PowerOnType"].comments().push_back("# When trying to boot Linux/XeLL Reloaded this must be set to 18");
   value["UARTSystem"].comments().clear();
   value["UARTSystem"] = uartSystem;
   value["UARTSystem"].comments().push_back("# UART System");
@@ -218,7 +220,7 @@ bool _smc::verify_toml(toml::value &value) {
 void _xcpu::from_toml(const toml::value &value) {
   elfLoader = toml::find_or<bool>(value, "ElfLoader", elfLoader);
   clocksPerInstruction = toml::find_or<s32&>(value, "CPI", clocksPerInstruction);
-  SKIP_HW_INIT = toml::find_or<bool>(value, "SKIP_HW_INIT", SKIP_HW_INIT);
+  skipHWInit = toml::find_or<bool>(value, "SkipHWInit", skipHWInit);
   HW_INIT_SKIP_1 = toml::find_or<u64&>(value, "HW_INIT_SKIP1", HW_INIT_SKIP_1);
   HW_INIT_SKIP_2 = toml::find_or<u64&>(value, "HW_INIT_SKIP2", HW_INIT_SKIP_2);
 }
@@ -233,17 +235,21 @@ void _xcpu::to_toml(toml::value &value) {
   value["CPI"].comments().push_back("# If your system has a lower than average CPI, use CPI Bypass in HighlyExperimental");
   value["CPI"].comments().push_back("# Note: This will mess with execution timing, and may break time-sensitive things like XeLL");
 
-  value["HW_INIT_SKIP1"].comments().clear();
-  value["HW_INIT_SKIP1"].comments().push_back("Enable CB/SB HW_INIT stage skip (Hack)");
-  value["HW_INIT_SKIP1"] = SKIP_HW_INIT;
+  value["SkipHWInit"].comments().clear();
+  value["SkipHWInit"].comments().push_back("Enable CB/SB HW_INIT stage skip (Hack)");
+  value["SkipHWInit"] = skipHWInit;
 
+  value["HW_INIT_SKIP1"].comments().clear();
+  value["HW_INIT_SKIP1"].as_integer_fmt().fmt = toml::integer_format::hex;
   value["HW_INIT_SKIP1"] = HW_INIT_SKIP_1;
   value["HW_INIT_SKIP1"].comments().push_back("# Manual Hardware Init Skip address 1 override");
   value["HW_INIT_SKIP1"].comments().push_back("# RGH3 Trinity: 0x3003F48");
   value["HW_INIT_SKIP1"].comments().push_back("# RGH3 Corona:  0x3003DC0");
 
   value["HW_INIT_SKIP2"].comments().clear();
+  value["HW_INIT_SKIP2"].as_integer_fmt().fmt = toml::integer_format::hex;
   value["HW_INIT_SKIP2"] = HW_INIT_SKIP_2;
+
   value["HW_INIT_SKIP2"].comments().push_back("# Manual Hardware Init Skip address 2 override");
   value["HW_INIT_SKIP2"].comments().push_back("# RGH3 Trinity: 0x3003FDC");
   value["HW_INIT_SKIP2"].comments().push_back("# RGH3 Corona:  0x3003E54");
@@ -252,13 +258,13 @@ bool _xcpu::verify_toml(toml::value &value) {
   to_toml(value);
   cache_value(elfLoader);
   cache_value(clocksPerInstruction);
-  cache_value(SKIP_HW_INIT);
+  cache_value(skipHWInit);
   cache_value(HW_INIT_SKIP_1);
   cache_value(HW_INIT_SKIP_2);
   from_toml(value);
   verify_value(elfLoader);
   verify_value(clocksPerInstruction);
-  verify_value(SKIP_HW_INIT);
+  verify_value(skipHWInit);
   verify_value(HW_INIT_SKIP_1);
   verify_value(HW_INIT_SKIP_2);
   return true;
@@ -289,6 +295,10 @@ void _filepaths::from_toml(const toml::value &value) {
   elfBinary = toml::find_or<std::string>(value, "ElfBinary", elfBinary);
 }
 void _filepaths::to_toml(toml::value &value) {
+  value.comments().clear();
+  value.comments().push_back("# Only Fuses, OneBL, and Nand are required.");
+  value.comments().push_back("# ElfBinary is used in the elf loader");
+  value.comments().push_back("# ODDImage is Optical Disc Drive Image, takes a iso file for Linux");
   value["Fuses"] = fuses;
   value["OneBL"] = oneBl;
   value["Nand"] = nand;
@@ -316,6 +326,7 @@ void _log::from_toml(const toml::value &value) {
   tmpLevel = toml::find_or<s32&>(value, "Level", tmpLevel);
   advanced = toml::find_or<bool>(value, "Advanced", advanced);
   debugOnly = toml::find_or<bool>(value, "EnableDebugOnly", debugOnly);
+  simpleDebugLog = toml::find_or<bool>(value, "SimpleDebugLog", simpleDebugLog);
   currentLevel = static_cast<Base::Log::Level>(tmpLevel);
 }
 void _log::to_toml(toml::value &value) {
@@ -368,27 +379,22 @@ bool _highlyExperimental::verify_toml(toml::value &value) {
 }
 
 #define verify_section(x, n) if (!x.verify_toml(data[#n])) { LOG_INFO(Config, "Failed to write '{}'! Section '{}' had a bad value", path.filename().string(), #x); return false; }
-bool verifyConfig(const std::filesystem::path &path, toml::value &data) {
-  std::error_code error{};
-  // If it exists, parse it as a base
-  if (std::filesystem::exists(path, error)) {
-    try {
-      data = toml::parse(path);
-    } catch (std::exception &ex) {
-      // Parse failed, bad read
-      LOG_ERROR(Config, "Got an exception trying to load config file. {}", ex.what());
-      return false;
-    }
+#define write_section(x, n) x.to_toml(data[#n])
+#define read_section(x, n) \
+  if (data.contains(#n)) { \
+    const toml::value &x ## _ = data.at(#n); \
+    x.from_toml(x ## _); \
   }
+bool verifyConfig(const std::filesystem::path &path, toml::value &data) {
 #ifndef NO_GFX
   verify_section(rendering, Rendering);
   verify_section(imgui, ImGui);
 #endif
-  verify_section(debug, Debug);
   verify_section(smc, SMC);
   verify_section(xcpu, XCPU);
   verify_section(xgpu, XGPU);
   verify_section(filepaths, Paths);
+  verify_section(debug, Debug);
   verify_section(log, Log);
   verify_section(highlyExperimental, HighlyExperimental);
   return true;
@@ -416,50 +422,16 @@ void loadConfig(const std::filesystem::path &path) {
   }
 
 #ifndef NO_GFX
-  if (data.contains("Rendering")) {
-    const toml::value &rendering_ = data.at("Rendering");
-    rendering.from_toml(rendering_);
-  }
-  if (data.contains("ImGui")) {
-    const toml::value &imgui_ = data.at("ImGui");
-    imgui.from_toml(imgui_);
-  }
+  read_section(rendering, Rendering);
+  read_section(imgui, ImGui);
 #endif
-
-  if (data.contains("SMC")) {
-    const toml::value &smc_ = data.at("SMC");
-    smc.from_toml(smc_);
-  }
-
-  if (data.contains("XCPU")) {
-    const toml::value &xcpu_ = data.at("XCPU");
-    xcpu.from_toml(xcpu_);
-  }
-
-  if (data.contains("XGPU")) {
-    const toml::value &xgpu_ = data.at("XGPU");
-    xgpu.from_toml(xgpu_);
-  }
-
-  if (data.contains("Paths")) {
-    const toml::value &paths = data.at("Paths");
-    filepaths.from_toml(paths);
-  }
-
-  if (data.contains("Debug")) {
-    const toml::value &debug_ = data.at("Debug");
-    debug.from_toml(debug_);
-  }
-
-  if (data.contains("Log")) {
-    const toml::value &log_ = data.at("Log");
-    log.from_toml(log_);
-  }
-
-  if (data.contains("HighlyExperimental")) {
-    const toml::value &highlyExperimental_ = data.at("HighlyExperimental");
-    highlyExperimental.from_toml(highlyExperimental_);
-  }
+  read_section(smc, SMC);
+  read_section(xcpu, XCPU);
+  read_section(xgpu, XGPU);
+  read_section(filepaths, Paths);
+  read_section(debug, Debug);
+  read_section(log, Log);
+  read_section(highlyExperimental, HighlyExperimental);
 }
 
 void saveConfig(const std::filesystem::path &path) {

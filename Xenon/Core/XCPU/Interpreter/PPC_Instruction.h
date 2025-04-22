@@ -110,6 +110,7 @@ namespace PPCInterpreter {
   	  // Group 0x04 opcodes (field 21..31)
   	  fillTable<instructionHandler>(table, 0x04, 11, 0, {
         { 0x0, GET(vaddubm) },
+        { 0x79, GET(vaddubm) },
         { 0x2, GET(vmaxub) },
         { 0x4, GET(vrlb) },
         { 0x006, GET(vcmpequb) },
@@ -338,6 +339,9 @@ namespace PPCInterpreter {
         { 0x056, GET(dcbf) },
         { 0x057, GET(lbzx) },
         { 0x067, GET(lvx) },
+        { 0x0C4, GET(lvx128) },
+        { 0x0C5, GET(stvx128) },
+        { 0x180, GET(vor128) },
         { 0x068, GETRC(neg) },
         { 0x268, GETRC(nego) },
         { 0x077, GET(lbzux) },
@@ -583,6 +587,7 @@ namespace PPCInterpreter {
   	  // Group 0x04 opcodes (field 21..31)
   	  fillTable<std::string>(nameTable, 0x04, 11, 0, {
         { 0x0, GET(vaddubm) },
+        { 0x79, GET(vaddubm) },
         { 0x2, GET(vmaxub) },
         { 0x4, GET(vrlb) },
         { 0x006, GET(vcmpequb) },
@@ -812,6 +817,9 @@ namespace PPCInterpreter {
         { 0x057, GET(lbzx) },
         { 0x067, GET(lvx) },
         { 0x068, GETRC(neg) },
+        { 0x0C4, GET(lvx128) },
+        { 0x0C5, GET(stvx128) },
+        { 0x180, GET(vor128) },
         { 0x268, GETRC(nego) },
         { 0x077, GET(lbzux) },
         { 0x07C, GETRC(nor) },
