@@ -11,7 +11,7 @@
 #include "Base/Path_util.h"
 #include "Base/Logging/Log.h"
 
-//#define XE_DEBUG
+#define XE_DEBUG
 
 Xe::Xenos::XGPU::XGPU(RAM *ram) {
   // Assign RAM Pointer
@@ -95,8 +95,10 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
     const u32 regIndex = (writeAddress & 0xFFFFF) / 4;
 
 #ifdef XE_DEBUG
+    u32 tmp = 0;
+    memcpy(&tmp, data, size);
     LOG_DEBUG(Xenos, "Write to {} (addr: {:#x}), index {:#x}, data = {:#x}", GetRegisterNameById(regIndex), writeAddress, regIndex,
-      byteswap_be<u32>(*reinterpret_cast<u32*>(data)));
+      byteswap_be<u32>(tmp));
 #endif
 
     const XeRegister reg = static_cast<XeRegister>(regIndex);
