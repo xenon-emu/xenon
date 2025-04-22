@@ -57,7 +57,7 @@ void PPCInterpreter::PPCInterpreter_bclr(PPU_STATE *ppuState) {
   bool condOk = BO_GET(0) || (CR_GET(BI) == BO_GET(1));
 
   // CB/SB Hardware Init step skip (hacky)
-  if (Config::xcpu.SKIP_HW_INIT) {
+  if (Config::xcpu.skipHWInit) {
     if (curThread.CIA == Config::xcpu.HW_INIT_SKIP_1)
       condOk = false;
 
