@@ -68,7 +68,7 @@ if (GFX_ENABLED)
 endif()
 
 find_package(fmt 10.2.1 CONFIG)
-find_package(toml11 3.7.1 CONFIG)
+find_package(toml11 4.4.0 CONFIG)
 
 include_directories(Xenon)
 add_subdirectory(Deps/ThirdParty)
