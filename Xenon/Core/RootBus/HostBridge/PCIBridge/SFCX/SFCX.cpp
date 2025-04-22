@@ -197,7 +197,7 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
     LOG_INFO(SFCX, " * CB_B Version: {:#d}", cbbHeader.buildNumber);
   }
 
-  if (Config::xcpu.SKIP_HW_INIT) {
+  if (Config::xcpu.skipHWInit) {
     LOG_INFO(SFCX, "CB/SB Hardware Init stage skip enabled.");
     if (Config::xcpu.HW_INIT_SKIP_1 == 0 && Config::xcpu.HW_INIT_SKIP_2 == 0) {
       LOG_INFO(SFCX, "Auto-detecting Hardware Init stage skip addresses:");
