@@ -44,6 +44,15 @@
       xenon-cli-static = (self.extend staticOverlay).pkgsStatic.xenon-cli;
       xenon = self.callPackage ./xenon.nix {};
       xenon-cli = self.callPackage ./xenon.nix { withGraphics = false; };
+      toml11 = super.toml11.overrideDerivation (old: {
+        version = "4.4.0";
+        src = self.fetchFromGitHub {
+          owner = "ToruNiina";
+          repo = "toml11";
+          tag = "v4.4.06";
+          hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+        };
+      });
       sdl3 = super.sdl3.overrideDerivation (old: {
         version = "3.2.6";
         src = self.fetchFromGitHub {
