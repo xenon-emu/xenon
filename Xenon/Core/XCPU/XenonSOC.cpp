@@ -1,3 +1,5 @@
+// Copyright 2025 Xenon Emulator Project
+
 #include <random>
 
 #include "Base/Logging/Log.h"

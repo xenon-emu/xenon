@@ -1,3 +1,5 @@
+// Copyright 2025 Xenon Emulator Project
+
 #pragma once
 
 #include "Core/RootBus/HostBridge/PCIBridge/PCIDevice.h"

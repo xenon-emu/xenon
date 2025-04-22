@@ -1,4 +1,7 @@
+// Copyright 2025 Xenon Emulator Project
+
 #include "OHCI.h"
+
 #include "Base/Logging/Log.h"
 
 Xe::PCIDev::OHCI::OHCI(const std::string &deviceName, u64 size, int instance, unsigned int ports) : PCIDevice(deviceName, size), instance(instance), ports(ports) {
