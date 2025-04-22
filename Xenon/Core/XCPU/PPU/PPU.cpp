@@ -22,8 +22,8 @@ static constexpr u64 get_cpi_value(const u64 instrPerSecond) {
   // Use floating point for a more percise CPI
   const f64 cpi_value = (instrPerSecond / 100000ULL) / ((cpi_base_freq / 1000000ULL) * cpi_scale);
   tpi = static_cast<u64>(cpi_value);
-  // Round up
-  if ((cpi_value - static_cast<f64>(tpi)) >= 0.5 || tpi == 0)
+  // If it's zero, use one regardless
+  if (tpi == 0)
     tpi++;
   return tpi;
 }
