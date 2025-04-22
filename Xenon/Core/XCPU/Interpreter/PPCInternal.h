@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <immintrin.h>
+
 #include "Base/Types.h"
 
 #define PPC_OPC_RC 1
