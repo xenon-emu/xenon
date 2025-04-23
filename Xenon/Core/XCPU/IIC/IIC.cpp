@@ -62,16 +62,21 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
   case Xe::XCPU::IIC::EOI:
     // If there are interrupts stored in the queue, remove the ack'd.
     if (!ctrlBlock.interrupts.empty()) {
-      auto it = std::find_if(ctrlBlock.interrupts.begin(), ctrlBlock.interrupts.end(),
-                             [](const Xe_Int& i) { return i.ack; });
-      if (it != ctrlBlock.interrupts.end()) {
-#ifdef IIC_DEBUG
-        LOG_DEBUG(Xenon_IIC, "EOI interrupt {} for thread {:#x} ",
-          getIntName(static_cast<u8>(ctrlBlock.interrupts[intIdx].interrupt)),
-          ppuID);
-#endif // IIC_DEBUG
-        ctrlBlock.interrupts.erase(it);
+      u16 intIdx = 0;
+      for (auto& interrupt : ctrlBlock.interrupts) {
+        if (interrupt.ack) {
+          break;
+        }
+        intIdx++;
       }
+
+#ifdef IIC_DEBUG
+      LOG_DEBUG(Xenon_IIC, "EOI interrupt {} for thread {:#x} ",
+        getIntName(static_cast<u8>(ctrlBlock.interrupts[intIdx].interrupt)),
+        ppuID);
+#endif // IIC_DEBUG
+
+      ctrlBlock.interrupts.erase(ctrlBlock.interrupts.begin() + intIdx);
 
       ctrlBlock.intSignaled = false;
     }
@@ -90,10 +95,11 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
 #ifdef IIC_DEBUG
       LOG_DEBUG(Xenon_IIC, "EOI + Set PRIO: interrupt {} for thread {:#x}, new PRIO: {:#x}",
         getIntName(static_cast<u8>(ctrlBlock.interrupts[intIdx].interrupt)),
-        ppuID, static_cast<u8>(dataBs));
+        ppeIntCtrlBlckID, static_cast<u8>(bsIntData));
 #endif // IIC_DEBUG
 
       ctrlBlock.interrupts.erase(ctrlBlock.interrupts.begin() + intIdx);
+
       ctrlBlock.intSignaled = false;
     }
 
@@ -126,18 +132,27 @@ void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u8 *data, u64 size) 
   case Xe::XCPU::IIC::ACK: {
     // Check if the queue isn't empty
     if (!ctrlBlock.interrupts.empty()) {
-      auto it = ctrlBlock.interrupts.begin();
-      auto highestIt = it;
-      u8 highestPrio = 0;
+      // Return the top priority pending interrupt
 
-      for (; it != ctrlBlock.interrupts.end(); ++it) {
-        if (it->interrupt > highestPrio) {
-          highestPrio = it->interrupt;
-          highestIt = it;
+      // Current Interrupt position in the container
+      u16 currPos = 0;
+      // Highest interrupt priority found
+      u8 highestPrio = 0;
+      // Highest priority interrupt position
+      u16 highestPrioPos = 0;
+
+      for (auto& interrupt : ctrlBlock.interrupts) {
+        // Signal first the top priority interrupt
+        // If two of the same interrupt type exist, then signal the first that we find
+        if (interrupt.interrupt > highestPrio) {
+          highestPrio = interrupt.interrupt;
+          highestPrioPos = currPos;
         }
+        currPos++;
       }
 
-      highestIt->ack = true;
+      // Set the top priority interrypt to signaled
+      ctrlBlock.interrupts[highestPrioPos].ack = true;
 
       u64 intData = byteswap_be<u64>(highestPrio);
       memcpy(data, &intData, size <= sizeof(intData) ? size : sizeof(intData));
