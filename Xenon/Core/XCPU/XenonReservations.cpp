@@ -17,7 +17,8 @@ bool XenonReservations::Register(PPU_RES *Res) {
 }
 
 void XenonReservations::Scan(u64 PhysAddress) {
-  PhysAddress &= ~3;
+  // Address must be aligned.
+  PhysAddress &= ~7;
 
   AcquireLock();
   for (int i = 0; i < nProcessors; i++) {
