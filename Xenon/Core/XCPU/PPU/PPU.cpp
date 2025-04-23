@@ -663,7 +663,7 @@ void PPU::PPUCheckExceptions() {
     }
     // B. Floating-Point Unavailable
     if (exceptions & PPU_EX_FPU) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Floating-Point Unavailable.", ppuState->ppuName, static_cast<u8>(curThreadId));
+      PPCInterpreter::ppcFPUnavailableException(ppuState.get());
       exceptions &= ~PPU_EX_FPU;
       return;
     }
