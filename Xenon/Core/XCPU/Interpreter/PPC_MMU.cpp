@@ -1107,6 +1107,9 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
   if (!MMUTranslateAddress(&EA, ppuState, true))
     return;
 
+  // Check if it's reserved
+  cpuContext->xenonRes.Check(EA);
+
   bool socWrite = false;
 
   EA = mmuContructEndAddressFromSecEngAddr(EA, &socWrite);
@@ -1163,9 +1166,6 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
 
   // External Write
   sysBus->Write(EA, data, byteCount);
-
-  // Check if it's reserved
-  cpuContext->xenonRes.Check(EA);
 }
 
 void PPCInterpreter::MMUMemCpyFromHost(PPU_STATE *ppuState,
@@ -1187,6 +1187,9 @@ void PPCInterpreter::MMUMemSet(PPU_STATE *ppuState,
 
   if (MMUTranslateAddress(&EA, ppuState, true) == false)
     return;
+
+  // Check if it's reserved
+  intXCPUContext->xenonRes.Check(EA);
 
   bool socWrite = false;
 
@@ -1221,9 +1224,6 @@ void PPCInterpreter::MMUMemSet(PPU_STATE *ppuState,
 
   // External MemSet
   sysBus->MemSet(EA, data, size);
-
-  // Check if it's reserved
-  intXCPUContext->xenonRes.Check(EA);
 }
 
 // Reads 1 byte of memory
