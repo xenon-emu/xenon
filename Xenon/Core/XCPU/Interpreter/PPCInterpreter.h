@@ -132,6 +132,7 @@ void ppcSystemCallException(PPU_STATE *ppuState);
 void ppcDecrementerException(PPU_STATE *ppuState);
 void ppcProgramException(PPU_STATE *ppuState);
 void ppcExternalException(PPU_STATE *ppuState);
+void ppcFPUnavailableException(PPU_STATE *ppuState);
 
 //
 // MMU
