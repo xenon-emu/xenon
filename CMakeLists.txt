@@ -314,11 +314,15 @@ endif()
 
 # Add defines specific to windows
 if (WIN32)
-target_link_libraries(Xenon PRIVATE ws2_32)
-  add_compile_definitions(NTDDI_VERSION=0x0A000006)
+  target_link_libraries(Xenon PRIVATE ws2_32)
+  add_compile_definitions(NTDDI_VERSION=0x0A000008)
   add_compile_definitions(_WIN32_WINNT=0x0A00)
-  add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS)
-  # Add .rc file, for the app icon
+  add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
+
+  # Disables Warnings
+  add_compile_definitions(_WINSOCK_DEPRECATED_NO_WARNINGS _CRT_SECURE_NO_WARNINGS)
+
+  # Add .rc file, for the app icon and executable properties
   target_sources(Xenon PRIVATE Xenon/Xenon.rc)
 endif()
 
