@@ -101,7 +101,7 @@ public:
         if (!p->required) {
           if (!printedOptionalParams) {
             if (printedRequiredParams)
-              std::cout << std::endl;
+              fmt::print("\n");
             LOG_SECTIONLESS("Optional parameters:\n");
             printedOptionalParams = true;
           }

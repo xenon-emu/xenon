@@ -18,7 +18,7 @@ void HW_UART_SOCK::uartMainThread() {
       if (socketCreated)
         send(sockHandle, &c, 1, 0);
       else
-        printf("%c", c);
+        fmt::print("{}", c);
       uartTxBuffer.pop();
     }
     lock.unlock();

@@ -4,7 +4,6 @@
 #include "Base/Param.h"
 #include "Base/Exit.h"
 #include "Base/Thread.h"
-#include <iostream>
 
 volatile int hupflag = 0;
 // Clean shutdown when we are sent by the OS to shutdown
@@ -18,13 +17,11 @@ s32 globalShutdownHandler() {
   // If we tried to exit gracefully the first time and failed,
   // use fexit to forcefully send a SIGTERM
   if (!hupflag) {
-    std::cout << std::endl <<
-      "Attempting to clean shutdown..." << std::endl;
+    fmt::print("\nAttempting to clean shutdown...\n");
     hupflag = 1;
   } else {
-    std::cout << std::endl <<
-      "Unable to clean shutdown!" << std::endl <<
-      "Press Crtl+C again to forcefully exit..." << std::endl;
+    fmt::print("\nUnable to clean shutdown!\n");
+    fmt::print("Press Crtl+C again to forcefully exit...\n");
     const s32 exitCode = Base::fexit(-1);
     return exitCode;
   }

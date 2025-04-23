@@ -4,7 +4,6 @@
 
 #include <assert.h>
 #include <chrono>
-#include <iostream>
 #include <thread>
 
 #include "Core/Xe_Main.h"
@@ -314,7 +313,7 @@ void PPU::ThreadStateMachine() {
     if (ppuState.get()) {
       if (ppuState->ppuID == 0) {
         // Ensure the log is flushed
-        std::cout << std::endl;
+        fmt::print("\n");
       }
       LOG_INFO(Xenon, "PPU{} is exiting!", ppuState->ppuID);
     }
