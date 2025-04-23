@@ -3,6 +3,7 @@
 #pragma once
 
 #include <queue>
+#include <deque>
 #include <mutex>
 
 #include "Base/Types.h"
@@ -73,14 +74,15 @@ struct PPE_INT_CTRL_BLCK {
   u32 REG_EOI_SET_CPU_CURRENT_TSK_PRI;
   u32 REG_INT_MCACK;
   // Stored pending interrupts.
-  std::vector<Xe_Int> interrupts;
+  std::deque<Xe_Int> interrupts;
+  std::mutex mutex;
   // Stores whether an interrupt was already signaled to the target thread or not
   bool intSignaled = false;
 };
 
 struct IIC_State {
   // There are 6 total PPE's in the Xenon
-  PPE_INT_CTRL_BLCK ppeIntCtrlBlck[6] = {};
+  PPE_INT_CTRL_BLCK crtlBlck[6] = {};
 };
 
 class XenonIIC {
@@ -93,7 +95,6 @@ public:
   void cancelInterrupt(u8 interruptType, u8 cpusInterrupted);
 private:
   IIC_State iicState;
-  std::recursive_mutex mutex;
   // Returns the name of the input interrupt ID
   std::string getIntName(u8 intID);
 };
