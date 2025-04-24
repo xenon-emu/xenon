@@ -2,8 +2,11 @@
 
 #pragma once
 
+#include <array>
+#include <deque>
 #include <queue>
 #include <mutex>
+#include <unordered_map>
 
 #include "Base/Types.h"
 
@@ -64,6 +67,7 @@ struct Xe_Int {
 
 // Each logical thread has its own Interrupt Control Block
 struct PPE_INT_CTRL_BLCK {
+  // Registers
   u32 REG_CPU_WHOAMI;
   u32 REG_CPU_CURRENT_TSK_PRI;
   u32 REG_CPU_IPI_DISPATCH_0;
@@ -73,14 +77,16 @@ struct PPE_INT_CTRL_BLCK {
   u32 REG_EOI_SET_CPU_CURRENT_TSK_PRI;
   u32 REG_INT_MCACK;
   // Stored pending interrupts.
-  std::vector<Xe_Int> interrupts;
+  std::unordered_map<u64, Xe_Int> interrupts = {};
+  // Mutex
+  std::mutex mutex = {};
   // Stores whether an interrupt was already signaled to the target thread or not
   bool intSignaled = false;
 };
 
 struct IIC_State {
   // There are 6 total PPE's in the Xenon
-  PPE_INT_CTRL_BLCK ppeIntCtrlBlck[6] = {};
+  std::array<PPE_INT_CTRL_BLCK, 6> crtlBlck = {};
 };
 
 class XenonIIC {
