@@ -299,6 +299,29 @@ union PVRegister {
 #endif
 };
 
+// Vector Status and Control Register
+union VSCRegister
+{
+  u32 hexValue;
+#ifdef __LITTLE_ENDIAN__
+  struct
+  {
+    u32 SAT : 1;
+    u32 res0 : 15;
+    u32 NJ : 1;
+    u32 res1 : 15;
+  };
+#else
+  struct
+  {
+    u32 res1 : 15;
+    u32 NJ : 1;
+    u32 res0 : 15;
+    u32 SAT : 1;
+  };
+#endif// __LITTLE_ENDIAN__
+};
+
 // Segment Lookaside Buffer Entry
 struct SLBEntry {
   u8 V;
@@ -526,12 +549,12 @@ struct PPU_THREAD_REGISTERS {
   FPRegister FPR[32]{};
   // Condition Register
   CRegister CR;
-  CR_Reg CRBits;
-
   // Floating-Point Status Control Register
   FPSCRegister FPSCR;
   // Segment Lookaside Buffer
   SLBEntry SLB[64]{};
+  // Vector Status and Control Register
+  VSCRegister VSCR;
 
   // ERAT's
 
