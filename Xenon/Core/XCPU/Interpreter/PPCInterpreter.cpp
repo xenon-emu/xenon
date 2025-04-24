@@ -64,11 +64,13 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
   // EDRAM Chip ID Check. r10 = 0xD1.
   if (static_cast<u32>(thread.CIA) == 0x800FC140) {
     LOG_INFO(Xenon, "EDRAM Chip ID Check.");
+    thread.GPR[10] = 0xD1;
   }
  
   // VdpHasWarmBooted. Set r11 to 0x10. Skips GPU Driver init.
   if (static_cast<u32>(thread.CIA) == 0x801b1c38) {
     LOG_INFO(Xenon, "VdpHasWarmBooted");
+    thread.GPR[11] = 0x10;
   }
 
   // This is just to set a PC breakpoint in any PPU/Thread.
