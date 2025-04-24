@@ -2,11 +2,8 @@
 
 #pragma once
 
-#include <array>
-#include <deque>
 #include <queue>
 #include <mutex>
-#include <unordered_map>
 
 #include "Base/Types.h"
 
@@ -67,7 +64,6 @@ struct Xe_Int {
 
 // Each logical thread has its own Interrupt Control Block
 struct PPE_INT_CTRL_BLCK {
-  // Registers
   u32 REG_CPU_WHOAMI;
   u32 REG_CPU_CURRENT_TSK_PRI;
   u32 REG_CPU_IPI_DISPATCH_0;
@@ -76,15 +72,15 @@ struct PPE_INT_CTRL_BLCK {
   u32 REG_EOI;
   u32 REG_EOI_SET_CPU_CURRENT_TSK_PRI;
   u32 REG_INT_MCACK;
-  // Stored pending interrupts
-  std::vector<Xe_Int> interrupts = {};
+  // Stored pending interrupts.
+  std::vector<Xe_Int> interrupts;
   // Stores whether an interrupt was already signaled to the target thread or not
   bool intSignaled = false;
 };
 
 struct IIC_State {
   // There are 6 total PPE's in the Xenon
-  std::array<PPE_INT_CTRL_BLCK, 6> crtlBlck = {};
+  PPE_INT_CTRL_BLCK ppeIntCtrlBlck[6] = {};
 };
 
 class XenonIIC {
@@ -96,10 +92,8 @@ public:
   void genInterrupt(u8 interruptType, u8 cpusToInterrupt);
   void cancelInterrupt(u8 interruptType, u8 cpusInterrupted);
 private:
-  // State
-  IIC_State iicState = {};
-  // Mutex
-  std::recursive_mutex mutex = {};
+  IIC_State iicState;
+  std::recursive_mutex mutex;
   // Returns the name of the input interrupt ID
   std::string getIntName(u8 intID);
 };
