@@ -62,30 +62,39 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
     mutex.lock();
     break;
   case Xe::XCPU::IIC::EOI:
-    // If there are interrupts stored in the queue, remove the ack'd.
-    for (auto it = ctrlBlock.interrupts.begin(); it != ctrlBlock.interrupts.end(); ++it) {
-      if (it->ack) {
-#ifdef IIC_DEBUG
-        LOG_DEBUG(Xenon_IIC, "EOI interrupt {} for thread {:#x} ", getIntName(static_cast<u8>(it->first)), ppuID);
-#endif
-        ctrlBlock.interrupts.erase(it);
-        ctrlBlock.intSignaled = false;
-        break;
+    // If there are interrupts stored in the queue, remove the ack'd
+    if (!ctrlBlock.interrupts.empty()) {
+      u16 intIdx = 0;
+      for (auto& interrupt : ctrlBlock.interrupts) {
+        if (interrupt.ack) {
+          break;
+        }
+        intIdx++;
       }
+#ifdef IIC_DEBUG
+      LOG_DEBUG(Xenon_IIC, "EOI + Set PRIO: interrupt {} for thread {:#x}, new PRIO: {:#x}",
+        getIntName(static_cast<u8>(it->first)), ppuID, static_cast<u8>(dataBs));
+#endif
+      ctrlBlock.interrupts.erase(ctrlBlock.interrupts.begin() + intIdx);
+      ctrlBlock.intSignaled = false;
     }
     break;
   case Xe::XCPU::IIC::EOI_SET_CPU_CURRENT_TSK_PRI:
     // If there are interrupts stored in the queue, remove the ack'd
-    for (auto it = ctrlBlock.interrupts.begin(); it != ctrlBlock.interrupts.end(); ++it) {
-      if (it->ack) {
-#ifdef IIC_DEBUG
-        LOG_DEBUG(Xenon_IIC, "EOI + Set PRIO: interrupt {} for thread {:#x}, new PRIO: {:#x}",
-          getIntName(static_cast<u8>(it->first)), ppuID, static_cast<u8>(dataBs));
-#endif
-        ctrlBlock.interrupts.erase(it);
-        ctrlBlock.intSignaled = false;
-        break;
+    if (!ctrlBlock.interrupts.empty()) {
+      u16 intIdx = 0;
+      for (auto& interrupt : ctrlBlock.interrupts) {
+        if (interrupt.ack) {
+          break;
+        }
+        intIdx++;
       }
+#ifdef IIC_DEBUG
+      LOG_DEBUG(Xenon_IIC, "EOI + Set PRIO: interrupt {} for thread {:#x}, new PRIO: {:#x}",
+        getIntName(static_cast<u8>(it->first)), ppuID, static_cast<u8>(dataBs));
+#endif
+      ctrlBlock.interrupts.erase(ctrlBlock.interrupts.begin() + intIdx);
+      ctrlBlock.intSignaled = false;
     }
 
     // Set new Interrupt priority
@@ -117,8 +126,6 @@ void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u8 *data, u64 size) 
   case Xe::XCPU::IIC::ACK: {
     // Check if the queue isn't empty
     if (!ctrlBlock.interrupts.empty()) {
-      // Return the top priority pending interrupt
-
       // Current Interrupt position in the container
       u16 currPos = 0;
       // Highest interrupt priority found
