@@ -76,8 +76,8 @@ struct PPE_INT_CTRL_BLCK {
   u32 REG_EOI;
   u32 REG_EOI_SET_CPU_CURRENT_TSK_PRI;
   u32 REG_INT_MCACK;
-  // Stored pending interrupts.
-  std::unordered_map<u64, Xe_Int> interrupts = {};
+  // Stored pending interrupts
+  std::vector<Xe_Int> interrupts = {};
   // Stores whether an interrupt was already signaled to the target thread or not
   bool intSignaled = false;
 };

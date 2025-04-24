@@ -10,12 +10,9 @@
 
 // There are two SFCX Versions, pre-Jasper and post-Jasper
 Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::string &nandLoadPath, PCIBridge *parentPCIBridge, RAM *ram) :
-  PCIDevice(deviceName, size)
+  PCIDevice(deviceName, size),
+  parentBus(parentPCIBridge), mainMemory(ram)
 {
-  // Asign parent PCI Bridge and RAM pointer
-  parentBus = parentPCIBridge;
-  mainMemory = ram;
-
   // Set PCI Properties
   pciConfigSpace.configSpaceHeader.reg0.hexData = 0x580B1414;
   pciConfigSpace.configSpaceHeader.reg1.hexData = 0x02000006;
