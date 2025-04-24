@@ -2,7 +2,7 @@
 
 #include "XMA.h"
 
-XMA::XMA(const std::string &deviceName, u64 size) : PCIDevice(deviceName, size) {
+Xe::PCIDev::XMA::XMA(const std::string &deviceName, u64 size) : PCIDevice(deviceName, size) {
   // Set PCI Properties
   pciConfigSpace.configSpaceHeader.reg0.hexData = 0x58011414;
   pciConfigSpace.configSpaceHeader.reg1.hexData = 0x02000002;
@@ -10,20 +10,20 @@ XMA::XMA(const std::string &deviceName, u64 size) : PCIDevice(deviceName, size) 
   pciDevSizes[0] = 0x400; // BAR0
 }
 
-void XMA::Read(u64 readAddress, u8 *data, u64 size)
+void Xe::PCIDev::XMA::Read(u64 readAddress, u8 *data, u64 size)
 {}
 
-void XMA::Write(u64 writeAddress, const u8 *data, u64 size)
+void Xe::PCIDev::XMA::Write(u64 writeAddress, const u8 *data, u64 size)
 {}
 
-void XMA::MemSet(u64 writeAddress, s32 data, u64 size)
+void Xe::PCIDev::XMA::MemSet(u64 writeAddress, s32 data, u64 size)
 {}
 
-void XMA::ConfigRead(u64 readAddress, u8 *data, u64 size) {
+void Xe::PCIDev::XMA::ConfigRead(u64 readAddress, u8 *data, u64 size) {
   memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], size);
 }
 
-void XMA::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
+void Xe::PCIDev::XMA::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   // Check if we're being scanned
   u64 tmp = 0;
   memcpy(&tmp, data, size);

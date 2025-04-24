@@ -1,6 +1,6 @@
 // Copyright 2025 Xenon Emulator Project
 
-#include "HW_UART.h"
+#include "UART.h"
 
 #include "Base/Error.h"
 #include "Base/Thread.h"

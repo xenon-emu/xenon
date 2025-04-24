@@ -282,17 +282,17 @@ void PPCInterpreter::PPCInterpreter_stwcx(PPU_STATE *ppuState) {
     return;
 
   if (curThread.ppuRes->V) {
-    intXCPUContext->xenonRes.AcquireLock();
-    if (curThread.ppuRes->V) {
-      if (curThread.ppuRes->resAddr == RA) {
-        MMUWrite32(ppuState, EA, static_cast<u32>(GPRi(rs)));
-        BSET(CR, 4, CR_BIT_EQ);
-      } else {
-        intXCPUContext->xenonRes.Decrement();
-        curThread.ppuRes->V = false;
+    intXCPUContext->xenonRes.LockGuard([&] {
+      if (curThread.ppuRes->V) {
+        if (curThread.ppuRes->resAddr == RA) {
+          MMUWrite32(ppuState, EA, static_cast<u32>(GPRi(rs)));
+          BSET(CR, 4, CR_BIT_EQ);
+        } else {
+          intXCPUContext->xenonRes.Decrement();
+          curThread.ppuRes->V = false;
+        }
       }
-    }
-    intXCPUContext->xenonRes.ReleaseLock();
+    });
   }
 
   ppcUpdateCR(ppuState, 0, CR);
@@ -391,17 +391,17 @@ void PPCInterpreter::PPCInterpreter_stdcx(PPU_STATE *ppuState) {
     return;
 
   if (curThread.ppuRes->V) {
-    intXCPUContext->xenonRes.AcquireLock();
-    if (curThread.ppuRes->V) {
-      if (curThread.ppuRes->resAddr == RA) {
-        MMUWrite64(ppuState, EA, GPRi(rd));
-        BSET(CR, 4, CR_BIT_EQ);
-      } else {
-        intXCPUContext->xenonRes.Decrement();
-        curThread.ppuRes->V = false;
+    intXCPUContext->xenonRes.LockGuard([&] {
+      if (curThread.ppuRes->V) {
+        if (curThread.ppuRes->resAddr == RA) {
+          MMUWrite64(ppuState, EA, GPRi(rd));
+          BSET(CR, 4, CR_BIT_EQ);
+        } else {
+          intXCPUContext->xenonRes.Decrement();
+          curThread.ppuRes->V = false;
+        }
       }
-    }
-    intXCPUContext->xenonRes.ReleaseLock();
+    });
   }
 
   ppcUpdateCR(ppuState, 0, CR);

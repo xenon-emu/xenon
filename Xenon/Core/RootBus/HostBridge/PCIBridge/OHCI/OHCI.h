@@ -4,20 +4,22 @@
 
 #include "Core/RootBus/HostBridge/PCIBridge/PCIDevice.h"
 
+#define OHCI_DEV_SIZE 0x1000
+
 namespace Xe {
 namespace PCIDev {
 
 class OHCI : public PCIDevice {
 public:
-  OHCI(const std::string &deviceName, u64 size, int instance, unsigned int ports);
+  OHCI(const std::string &deviceName, u64 size, s32 instance, u32 ports);
   void Read(u64 readAddress, u8 *data, u64 size) override;
   void Write(u64 writeAddress, const u8 *data, u64 size) override;
   void MemSet(u64 writeAddress, s32 data, u64 size) override;
-  void ConfigRead(u64 readAddress, u8* data, u64 size) override;
-  void ConfigWrite(u64 writeAddress, const u8* data, u64 size) override;
+  void ConfigRead(u64 readAddress, u8 *data, u64 size) override;
+  void ConfigWrite(u64 writeAddress, const u8 *data, u64 size) override;
 private:
-  int instance;
-  unsigned int ports;
+  s32 instance;
+  u32 ports;
 
   u32 HcRevision;         //  0
   u32 HcControl;          //  4
@@ -35,5 +37,5 @@ private:
   u32 HcRhStatus;         // 50
 };
 
-};
-};
+} // namespace PCIDev
+} // namespace Xe

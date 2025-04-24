@@ -13,6 +13,9 @@
 // Device Size (at address 0xEA00C000)
 #define SFCX_DEV_SIZE 0x400
 
+namespace Xe {
+namespace PCIDev {
+
 // Device true size is 0xFF, then it just repeats itself.
 
 // Memory Mapped NAND Flash, 1:1. Sofware access this via 0x200 MMU flag wich
@@ -168,8 +171,8 @@ struct SFCX_STATE {
 // Secure Flash Controller for Xbox Device.
 class SFCX : public PCIDevice {
 public:
-  SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
-    PCIBridge* parentPCIBridge, RAM* ram);
+  SFCX(const std::string &deviceName, u64 size, const std::string &nandLoadPath,
+    PCIBridge *parentPCIBridge, RAM *ram);
   ~SFCX();
 
   // PCI Read/Write methods to the SFCX device.
@@ -212,3 +215,6 @@ private:
   // RAW NAND Data from loaded image.
   std::vector<u8> rawImageData{};
 };
+
+} // namespace PCIDev
+} // namespace Xe

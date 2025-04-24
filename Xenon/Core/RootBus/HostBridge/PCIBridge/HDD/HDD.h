@@ -7,6 +7,9 @@
 
 #define HDD_DEV_SIZE 0x30
 
+namespace Xe {
+namespace PCIDev {
+
 //
 //	HDD inside the  Xbox 360 is manged via an ATA interface.
 //
@@ -102,6 +105,7 @@ struct ATA_IDENTIFY_DATA {
   u16 majorRevision;
   u16 minorRevision;
   union {
+#ifdef __LITTLE_ENDIAN__
     struct {
       u16 sMARTFeatureSupport : 1;
       u16 securityModeFeatureSupport : 1;
@@ -120,9 +124,30 @@ struct ATA_IDENTIFY_DATA {
       u16 nopCommandSupport : 1;
       u16 reserved14 : 1;
     };
+#else
+    struct {
+      u16 reserved14 : 1;
+      u16 nopCommandSupport : 1;
+      u16 readBufferCommandSupport : 1;
+      u16 writeBufferCommandSupport : 1;
+      u16 reserved13 : 1;
+      u16 hostProtectedAreaFeatureSupport : 1;
+      u16 deviceResetCommandSupport : 1;
+      u16 serviceInterruptSupport : 1;
+      u16 lookAheadFeatureSupport : 1;
+      u16 releaseInterruptSupport : 1;
+      u16 writeCacheFeatureSupport : 1;
+      u16 packetFeatureSupport : 1;
+      u16 powerManagementFeatureSupport : 1;
+      u16 removableMediaFeatureSupport : 1;
+      u16 securityModeFeatureSupport : 1;
+      u16 sMARTFeatureSupport : 1;
+    };
+#endif
     u16 dataHex;
   } support1;
   union {
+#ifdef __LITTLE_ENDIAN__
     struct {
       u16 downloadMicrocodeCommandSupport : 1;
       u16 dmaQueuedCommandSupport : 1;
@@ -140,12 +165,32 @@ struct ATA_IDENTIFY_DATA {
       u16 flushCacheExtCommandSupport : 1;
       u16 reserved15 : 2;
     };
+#else
+    struct {
+      u16 reserved15 : 2;
+      u16 flushCacheExtCommandSupport : 1;
+      u16 flushCacheCommandSupport : 1;
+      u16 deviceConfigOverlapFeatureSupport : 1;
+      u16 lba48BitFeatureSupport : 1;
+      u16 acousticManagementFeatureSupport : 1;
+      u16 setMaximumCommandSupport : 1;
+      u16 addressOffsetReservedAreaBoot : 1;
+      u16 setFeaturesAfterPowerUpRequired : 1;
+      u16 powerFromStandbyFeatureSupport : 1;
+      u16 mediaStatusNotificationFeatureSupport : 1;
+      u16 advancedPowerManagementFeatureSupport : 1;
+      u16 cFAFeatureSupport : 1;
+      u16 dmaQueuedCommandSupport : 1;
+      u16 downloadMicrocodeCommandSupport : 1;
+    };
+#endif
     u16 dataHex;
   } support2;
   union {
     u16 dataHex;
   } support3;
   union {
+#ifdef __LITTLE_ENDIAN__
     struct {
       u16 SMARTFeatureEnabled : 1;
       u16 securityModeFeatureEnabled : 1;
@@ -164,9 +209,30 @@ struct ATA_IDENTIFY_DATA {
       u16 nopCommandEnabled : 1;
       u16 reserved17 : 1;
     };
+#else
+    struct {
+      u16 reserved17 : 1;
+      u16 nopCommandEnabled : 1;
+      u16 readBufferCommandEnabled : 1;
+      u16 writeBufferCommandEnabled : 1;
+      u16 reserved16 : 1;
+      u16 hostProtectedAreaFeatureEnabled : 1;
+      u16 deviceResetCommandEnabled : 1;
+      u16 serviceInterruptEnabled : 1;
+      u16 releaseInterruptEnabled : 1;
+      u16 lookAheadFeatureEnabled : 1;
+      u16 writeCacheFeatureEnabled : 1;
+      u16 packetFeatureEnabled : 1;
+      u16 powerManagementFeatureEnabled : 1;
+      u16 removableMediaFeatureEnabled : 1;
+      u16 securityModeFeatureEnabled : 1;
+      u16 SMARTFeatureEnabled : 1;
+    };
+#endif
     u16 dataHex;
   } enabled1;
   union {
+#ifdef __LITTLE_ENDIAN__
     struct {
       u16 downloadMicrocodeCommandEnabled : 1;
       u16 dmaQueuedCommandEnabled : 1;
@@ -184,20 +250,46 @@ struct ATA_IDENTIFY_DATA {
       u16 flushCacheExtCommandEnabled : 1;
       u16 reserved18 : 2;
     };
+#else
+    struct {
+      u16 reserved18 : 2;
+      u16 flushCacheExtCommandEnabled : 1;
+      u16 flushCacheCommandEnabled : 1;
+      u16 deviceConfigOverlapFeatureEnabled : 1;
+      u16 lba48BitFeatureEnabled : 1;
+      u16 acousticManagementFeatureEnabled : 1;
+      u16 setMaximumCommandEnabled : 1;
+      u16 addressOffsetReservedAreaBoot2 : 1;
+      u16 setFeaturesAfterPowerUpRequired2 : 1;
+      u16 powerFromStandbyFeatureEnabled : 1;
+      u16 mediaStatusNotificationFeatureEnabled : 1;
+      u16 advancedPowerManagementFeatureEnabled : 1;
+      u16 CFAFeatureEnabled : 1;
+      u16 dmaQueuedCommandEnabled : 1;
+      u16 downloadMicrocodeCommandEnabled : 1;
+    };
+#endif
     u16 dataHex;
   } enabled2;
   union {
     u16 dataHex;
   } enabled3;
+#ifdef __LITTLE_ENDIAN__
   u16 ultraDMASupport : 8;
   u16 ultraDMAActive : 8;
+#else
+  u16 ultraDMAActive : 8;
+  u16 ultraDMASupport : 8;
+#endif
   u16 reserved19[11];
   u32 userAddressableSectors48Bit[2];
   u16 reserved20[23];
+#ifdef __LITTLE_ENDIAN__
   u16 mediaStatusNotification : 2;
   u16 reserved21 : 6;
   u16 deviceWriteProtect : 1;
   u16 reserved22 : 7;
+
   u16 securitySupported : 1;
   u16 securityEnabled : 1;
   u16 securityLocked : 1;
@@ -205,8 +297,26 @@ struct ATA_IDENTIFY_DATA {
   u16 securityCountExpired : 1;
   u16 securityEraseSupported : 1;
   u16 reserved23 : 2;
+
   u16 securityLevel : 1;
   u16 reserved24 : 7;
+#else
+  u16 reserved21 : 6;
+  u16 mediaStatusNotification : 2;
+  u16 reserved22 : 7;
+  u16 deviceWriteProtect : 1;
+
+  u16 reserved23 : 2;
+  u16 securityEraseSupported : 1;
+  u16 securityCountExpired : 1;
+  u16 securityFrozen : 1;
+  u16 securityLocked : 1;
+  u16 securityEnabled : 1;
+  u16 securitySupported : 1;
+
+  u16 reserved24 : 7;
+  u16 securityLevel : 1;
+#endif
   u16 reserved25[127];
 };
 
@@ -259,3 +369,6 @@ private:
 
   void ataCopyIdentifyDeviceData();
 };
+
+} // namespace PCIDev
+} // namespace Xe

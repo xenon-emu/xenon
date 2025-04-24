@@ -23,6 +23,9 @@
 
 #define ODD_DEV_SIZE 0x30
 
+namespace Xe {
+namespace PCIDev {
+
 // Read Capacity Data - returned in Big Endian format
 struct READ_CAPACITY_DATA {
   u32 logicalBlockAddress;
@@ -261,7 +264,6 @@ struct XE_ATAPI_INQUIRY_DATA {
 //
 
 union XE_CDB {
-
   //
   // Generic 6-Byte CDB
   //
@@ -510,3 +512,6 @@ private:
   void atapiIdentifyPacketDeviceCommand();
   void atapiIdentifyCommand();
 };
+
+} // namespace PCIDev
+} // namespace Xe

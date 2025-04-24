@@ -2,7 +2,7 @@
 
 #include "AudioController.h"
 
-Xe::PCIDev::AUDIOCTRLR::AUDIOCTRLR::AUDIOCTRLR(const std::string &deviceName, u64 size) :
+Xe::PCIDev::AUDIOCTRLR::AUDIOCTRLR(const std::string &deviceName, u64 size) :
   PCIDevice(deviceName, size) {
   // Set PCI Properties
   pciConfigSpace.configSpaceHeader.reg0.hexData = 0x580C1414;
@@ -12,20 +12,20 @@ Xe::PCIDev::AUDIOCTRLR::AUDIOCTRLR::AUDIOCTRLR(const std::string &deviceName, u6
   pciDevSizes[0] = 0x40; // BAR0
 }
 
-void Xe::PCIDev::AUDIOCTRLR::AUDIOCTRLR::Read(u64 readAddress, u8 *data, u64 size)
+void Xe::PCIDev::AUDIOCTRLR::Read(u64 readAddress, u8 *data, u64 size)
 {}
 
-void Xe::PCIDev::AUDIOCTRLR::AUDIOCTRLR::ConfigRead(u64 readAddress, u8 *data, u64 size) {
+void Xe::PCIDev::AUDIOCTRLR::ConfigRead(u64 readAddress, u8 *data, u64 size) {
   memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], size);
 }
 
-void Xe::PCIDev::AUDIOCTRLR::AUDIOCTRLR::Write(u64 writeAddress, const u8 *data, u64 size)
+void Xe::PCIDev::AUDIOCTRLR::Write(u64 writeAddress, const u8 *data, u64 size)
 {}
 
-void Xe::PCIDev::AUDIOCTRLR::AUDIOCTRLR::MemSet(u64 writeAddress, s32 data, u64 size)
+void Xe::PCIDev::AUDIOCTRLR::MemSet(u64 writeAddress, s32 data, u64 size)
 {}
 
-void Xe::PCIDev::AUDIOCTRLR::AUDIOCTRLR::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
+void Xe::PCIDev::AUDIOCTRLR::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   // Check if we're being scanned
   u64 tmp = 0;
   memcpy(&tmp, data, size);

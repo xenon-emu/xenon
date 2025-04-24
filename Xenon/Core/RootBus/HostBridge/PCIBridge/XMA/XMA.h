@@ -6,6 +6,9 @@
 
 #define XMA_DEV_SIZE 0x400
 
+namespace Xe {
+namespace PCIDev {
+
 // Taken from:
 // https://github.com/xenia-canary/xenia-canary/blob/canary_experimental/src/xenia/apu/xma_register_table.inc
 enum XE_XMA_REGISTERS {
@@ -31,3 +34,6 @@ public:
 
 private:
 };
+
+} // namespace PCIDev
+} // namespace Xe

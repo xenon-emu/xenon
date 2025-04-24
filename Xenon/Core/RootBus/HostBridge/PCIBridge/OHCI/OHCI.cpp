@@ -2,9 +2,14 @@
 
 #include "OHCI.h"
 
+#include "Base/Assert.h"
 #include "Base/Logging/Log.h"
 
-Xe::PCIDev::OHCI::OHCI(const std::string &deviceName, u64 size, int instance, unsigned int ports) : PCIDevice(deviceName, size), instance(instance), ports(ports) {
+Xe::PCIDev::OHCI::OHCI(const std::string &deviceName, u64 size, s32 instance, u32 ports) :
+  PCIDevice(deviceName, size),
+  instance(instance), ports(ports)
+{
+  pciConfigSpace.configSpaceHeader.reg0.hexData = instance == 0 ? 0x58041414 : 0x58061414;
   pciConfigSpace.configSpaceHeader.reg1.hexData = 0x02800156;
   pciConfigSpace.configSpaceHeader.reg2.hexData = 0x0C03100F;
   pciConfigSpace.configSpaceHeader.reg3.hexData = 0x00800000;
@@ -14,12 +19,12 @@ Xe::PCIDev::OHCI::OHCI(const std::string &deviceName, u64 size, int instance, un
 
   HcControl = 0;
   HcInterruptStatus = 0;
-  HcRhDescriptorA = (1<<24) | ports;
+  HcRhDescriptorA = (1 << 24) | ports;
 }
 
 void Xe::PCIDev::OHCI::Read(u64 readAddress, u8 *data, u64 size) {
-  u64 offset = readAddress & 0xfff;
-  assert(size == 4);
+  u64 offset = readAddress & 0xFFF;
+  ASSERT(size == 4);
 
   u32 ret = 0;
 
@@ -58,22 +63,19 @@ void Xe::PCIDev::OHCI::Read(u64 readAddress, u8 *data, u64 size) {
   default:
     LOG_WARNING(OHCI, "{} Read({:#x}, data)", instance, offset);
   }
+  ret = byteswap_le<u32>(ret);
   LOG_DEBUG(OHCI, "{} Read({:#x}, data) == {:#x}", instance, offset, ret);
-  u32 *data32 = (u32*)data;
-  *data32 = byteswap_le<u32>(ret);
-  //*data32 = ret;
-}
-
-void Xe::PCIDev::OHCI::ConfigRead(u64 readAddress, u8 *data, u64 size) {
-  memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], size);
+  memcpy(data, &ret, size);
 }
 
 void Xe::PCIDev::OHCI::Write(u64 writeAddress, const u8 *data, u64 size) {
-  u64 offset = writeAddress & 0xfff;
-  assert(size == 4);
+  u64 offset = writeAddress & 0xFFF;
+  ASSERT(size == 4);
 
-  u32 value = byteswap_le<u32>( *(u32*)data );
-  //u32 value = *(u32*)data;
+  u32 value = 0;
+  memcpy(&value, data, size);
+  value = byteswap_le<u32>(value);
+
   switch (offset) {
   case 0x0:
     HcRevision = value;
@@ -94,7 +96,7 @@ void Xe::PCIDev::OHCI::Write(u64 writeAddress, const u8 *data, u64 size) {
     HcInterruptEnable &= ~value;
     break;
   case 0x18:
-    HcHCCA = value & ~0xff;
+    HcHCCA = value & ~0xFF;
     LOG_DEBUG(OHCI, "{} HcHCCA = {:#x}", instance, value);
     break;
   case 0x20:
@@ -129,6 +131,11 @@ void Xe::PCIDev::OHCI::Write(u64 writeAddress, const u8 *data, u64 size) {
 
 void Xe::PCIDev::OHCI::MemSet(u64 writeAddress, s32 data, u64 size)
 {}
+
+
+void Xe::PCIDev::OHCI::ConfigRead(u64 readAddress, u8 *data, u64 size) {
+  memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], size);
+}
 
 void Xe::PCIDev::OHCI::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   // Check if we're being scanned

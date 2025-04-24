@@ -5,10 +5,10 @@
 #include <memory>
 #include <unordered_map>
 
+#include "Base/Bitfield.h"
 #include "Base/LRUCache.h"
 #include "Core/XCPU/XenonSOC.h"
 #include "Core/XCPU/IIC/IIC.h"
-#include "Core/XCPU/Bitfield.h"
 #include "Core/XCPU/XenonReservations.h"
 #include "Core/XCPU/eFuse.h"
 

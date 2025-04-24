@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <functional>
 #include <mutex>
 #include <vector>
 
@@ -18,11 +19,11 @@ public:
   XenonReservations();
   virtual bool Register(PPU_RES *Res);
   void Increment(void) {
-    std::lock_guard lck(ReservationLock);
+    std::lock_guard lock(ReservationLock);
     nReservations++;
   }
   void Decrement(void) {
-    std::lock_guard lck(ReservationLock);
+    std::lock_guard lock(ReservationLock);
     nReservations--;
   }
   void Check(u64 x) {
@@ -30,13 +31,12 @@ public:
       Scan(x);
   }
   virtual void Scan(u64 PhysAddress);
-  void AcquireLock(void) {
-    ReservationLock.lock();
+  void LockGuard(std::function<void()> callback) {
+    std::lock_guard lock(ReservationLock);
+    if (callback) {
+      callback();
+    }
   }
-  void ReleaseLock(void) {
-    ReservationLock.unlock();
-  }
-
 private:
   long nReservations;
   std::recursive_mutex ReservationLock;

@@ -11,7 +11,7 @@
 #include "Core/RootBus/HostBridge/PCIBridge/PCIBridge.h"
 #include "Core/RootBus/HostBridge/PCIBridge/PCIDevice.h"
 
-#include "HW_UART.h"
+#include "Core/XCPU/UART.h"
 
 /*
   Xenon System Management Controller (SMC) Emulation:
@@ -28,7 +28,7 @@
 
 namespace Xe {
 namespace PCIDev {
-namespace SMC {
+
 // FIFO Queue Querys/Commands
 enum SMC_FIFO_CMD {
   SMC_PWRON_TYPE = 0x1,
@@ -232,11 +232,11 @@ struct SMC_CORE_STATE {
 };
 
 // SMC Core Object.
-class SMCCore : public PCIDevice {
+class SMC : public PCIDevice {
 public:
-  SMCCore(const std::string &deviceName, u64 size,
+  SMC(const std::string &deviceName, u64 size,
     PCIBridge* parentPCIBridge, SMC_CORE_STATE* newSMCCoreState);
-  ~SMCCore();
+  ~SMC();
 
   // Read/Write functions
   void Read(u64 readAddress, u8 *data, u64 size) override;
@@ -282,6 +282,6 @@ private:
   // UART/COM Port Setup
   void setupUART(u32 uartConfig);
 };
-} // namespace SMC
+
 } // namespace PCIDev
 } // namespace Xe

@@ -8,7 +8,6 @@
 
 namespace Xe {
 namespace PCIDev {
-namespace AUDIOCTRLR {
 
 class AUDIOCTRLR : public PCIDevice {
 public:
@@ -22,6 +21,5 @@ public:
 private:
 };
 
-} // namespace AUDIOCTRLR
 } // namespace PCIDev
 } // namespace Xe

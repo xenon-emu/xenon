@@ -41,7 +41,7 @@ XeMain::~XeMain() {
   ehci1.reset();
 
   sfcx.reset();
-  nandDevice.reset();
+  nand.reset();
   ram.reset();
   xma.reset();
   odd.reset();
@@ -111,7 +111,7 @@ void XeMain::shutdownCPU() {
   CPUStarted = false;
 }
 
-void XeMain::reboot(Xe::PCIDev::SMC::SMC_PWR_REASON type) {
+void XeMain::reboot(Xe::PCIDev::SMC_PWR_REASON type) {
   MICROPROFILE_SCOPEI("[Xe::Main]", "Reboot", MP_AUTO);
   // Check if the CPU is active
   if (CPUStarted) {
@@ -129,12 +129,12 @@ void XeMain::reloadFiles() {
   getCPU()->Halt();
   // Reset the SFCX
   sfcx.reset();
-  sfcx = std::make_unique<STRIP_UNIQUE(sfcx)>("SFCX", Config::filepaths.nand, SFCX_DEV_SIZE, pciBridge.get(), ram.get());
+  sfcx = std::make_unique<STRIP_UNIQUE(sfcx)>("SFCX", SFCX_DEV_SIZE, Config::filepaths.nand, pciBridge.get(), ram.get());
   pciBridge->resetPCIDevice(sfcx.get());
   // Reset the NAND
-  nandDevice.reset();
-  nandDevice = std::make_unique<STRIP_UNIQUE(nandDevice)>("NAND", sfcx.get(), NAND_START_ADDR, NAND_END_ADDR, true);
-  rootBus->ResetDevice(nandDevice.get());
+  nand.reset();
+  nand = std::make_unique<STRIP_UNIQUE(nand)>("NAND", NAND_START_ADDR, NAND_END_ADDR, sfcx.get(), true);
+  rootBus->ResetDevice(nand.get());
   if (!CPUStarted) {
     // Reset the CPU again to reload 1bl and fuses
     xenonCPU.reset();
@@ -173,7 +173,7 @@ void XeMain::createRootBus() {
   rootBus = std::make_unique<STRIP_UNIQUE(rootBus)>();
 
   rootBus->AddHostBridge(hostBridge.get());
-  rootBus->AddDevice(nandDevice.get());
+  rootBus->AddDevice(nand.get());
   rootBus->AddDevice(ram.get());
 }
 
@@ -190,13 +190,13 @@ void XeMain::createPCIDevices() {
     }
     {
       MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "OHCI", MP_AUTO);
-      ohci0 = std::make_unique<STRIP_UNIQUE(ohci0)>("OHCI0", OHCI0_DEV_SIZE);
-      ohci1 = std::make_unique<STRIP_UNIQUE(ohci1)>("OHCI1", OHCI1_DEV_SIZE);
+      ohci0 = std::make_unique<STRIP_UNIQUE(ohci0)>("OHCI0", OHCI_DEV_SIZE);
+      ohci1 = std::make_unique<STRIP_UNIQUE(ohci1)>("OHCI1", OHCI_DEV_SIZE);
     }
     {
       MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "EHCI", MP_AUTO);
-      ehci0 = std::make_unique<STRIP_UNIQUE(ehci0)>("EHCI0", EHCI0_DEV_SIZE);
-      ehci1 = std::make_unique<STRIP_UNIQUE(ehci1)>("EHCI1", EHCI1_DEV_SIZE);
+      ehci0 = std::make_unique<STRIP_UNIQUE(ehci0)>("EHCI0", EHCI_DEV_SIZE);
+      ehci1 = std::make_unique<STRIP_UNIQUE(ehci1)>("EHCI1", EHCI_DEV_SIZE);
     }
     {
       MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "RAM", MP_AUTO);
@@ -204,7 +204,7 @@ void XeMain::createPCIDevices() {
     }
     {
       MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "SFCX", MP_AUTO);
-      sfcx = std::make_unique<STRIP_UNIQUE(sfcx)>("SFCX", Config::filepaths.nand, SFCX_DEV_SIZE, pciBridge.get(), ram.get());
+      sfcx = std::make_unique<STRIP_UNIQUE(sfcx)>("SFCX", SFCX_DEV_SIZE, Config::filepaths.nand, pciBridge.get(), ram.get());
     }
     {
       MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "XMA", MP_AUTO);
@@ -224,7 +224,7 @@ void XeMain::createPCIDevices() {
     }
     {
       MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "NAND", MP_AUTO);
-      nandDevice = std::make_unique<STRIP_UNIQUE(nandDevice)>("NAND", sfcx.get(), NAND_START_ADDR, NAND_END_ADDR, true);
+      nand = std::make_unique<STRIP_UNIQUE(nand)>("NAND", NAND_START_ADDR, NAND_END_ADDR, sfcx.get(), true);
     }
   }
 }
@@ -235,13 +235,11 @@ void XeMain::createSMCState() {
   smcCoreState = std::make_unique<STRIP_UNIQUE(smcCoreState)>();
   smcCoreState->currentUARTSytem = Config::smc.uartSystem;
 #ifdef _WIN32
-  smcCoreState->currentCOMPort = Config::smc.COMPort().data();
+  smcCoreState->currentCOMPort = Config::smc.COMPort();
 #endif
   smcCoreState->socketIp = Config::smc.socketIp;
   smcCoreState->socketPort = Config::smc.socketPort;
-  smcCoreState->currAVPackType =
-    (Xe::PCIDev::SMC::SMC_AVPACK_TYPE)Config::smc.avPackType;
-  smcCoreState->currPowerOnReason =
-    (Xe::PCIDev::SMC::SMC_PWR_REASON)Config::smc.powerOnReason;
-  smcCoreState->currTrayState = Xe::PCIDev::SMC::SMC_TRAY_STATE::SMC_TRAY_CLOSED;
+  smcCoreState->currAVPackType = (Xe::PCIDev::SMC_AVPACK_TYPE)Config::smc.avPackType;
+  smcCoreState->currPowerOnReason = (Xe::PCIDev::SMC_PWR_REASON)Config::smc.powerOnReason;
+  smcCoreState->currTrayState = Xe::PCIDev::SMC_TRAY_CLOSED;
 }

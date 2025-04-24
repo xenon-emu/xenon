@@ -91,6 +91,7 @@ set(Base
   Xenon/Base/Arch.h
   Xenon/Base/Assert.cpp
   Xenon/Base/Assert.h
+  Xenon/Base/Bitfield.h
   Xenon/Base/Bounded_threadsafe_queue.h
   Xenon/Base/Config.cpp
   Xenon/Base/Config.h
@@ -135,22 +136,24 @@ set(RootBus
   Xenon/Core/RootBus/HostBridge/PCIe.h
   Xenon/Core/RootBus/HostBridge/PCIBridge/AUDIOCTRLLR/AudioController.cpp
   Xenon/Core/RootBus/HostBridge/PCIBridge/AUDIOCTRLLR/AudioController.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI0/EHCI0.cpp
-  Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI0/EHCI0.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI1/EHCI1.cpp
-  Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI1/EHCI1.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI/EHCI.cpp
+  Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI/EHCI.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI/EHCI0.cpp
+  Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI/EHCI0.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI/EHCI1.cpp
+  Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI/EHCI1.h
   Xenon/Core/RootBus/HostBridge/PCIBridge/ETHERNET/Ethernet.cpp
   Xenon/Core/RootBus/HostBridge/PCIBridge/ETHERNET/Ethernet.h
   Xenon/Core/RootBus/HostBridge/PCIBridge/HDD/HDD.cpp
   Xenon/Core/RootBus/HostBridge/PCIBridge/HDD/HDD.h
   Xenon/Core/RootBus/HostBridge/PCIBridge/ODD/ODD.cpp
   Xenon/Core/RootBus/HostBridge/PCIBridge/ODD/ODD.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI0/OHCI0.cpp
-  Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI0/OHCI0.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI1/OHCI1.cpp
-  Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI1/OHCI1.h
   Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI/OHCI.cpp
   Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI/OHCI.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI/OHCI0.cpp
+  Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI/OHCI0.h
+  Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI/OHCI1.cpp
+  Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI/OHCI1.h
   Xenon/Core/RootBus/HostBridge/PCIBridge/PCIBridge.cpp
   Xenon/Core/RootBus/HostBridge/PCIBridge/PCIBridge.h
   Xenon/Core/RootBus/HostBridge/PCIBridge/PCIBridgeConfig.h
@@ -160,8 +163,6 @@ set(RootBus
   Xenon/Core/RootBus/HostBridge/PCIBridge/SATA.h
   Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/SMC.cpp
   Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/SMC.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/HW_UART.cpp
-  Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/HW_UART.h
   Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/HANA_State.h
   Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/SMC_Config.h
   Xenon/Core/RootBus/HostBridge/PCIBridge/XMA/XMA.cpp
@@ -169,7 +170,6 @@ set(RootBus
 )
 
 set(XCPU
-  Xenon/Core/XCPU/Bitfield.h
   Xenon/Core/XCPU/Xenon.cpp
   Xenon/Core/XCPU/Xenon.h
   Xenon/Core/XCPU/XenonSOC.h
@@ -177,6 +177,8 @@ set(XCPU
   Xenon/Core/XCPU/XenonReservations.cpp
   Xenon/Core/XCPU/XenonReservations.h
   Xenon/Core/XCPU/eFuse.h
+  Xenon/Core/XCPU/UART.cpp
+  Xenon/Core/XCPU/UART.h
   Xenon/Core/XCPU/elf_abi.h
   Xenon/Core/XCPU/IIC/IIC.cpp
   Xenon/Core/XCPU/IIC/IIC.h

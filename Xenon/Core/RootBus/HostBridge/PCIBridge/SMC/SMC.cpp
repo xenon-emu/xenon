@@ -57,7 +57,7 @@
 #define CLCK_INT_TAKEN 0x3
 
 // Class Constructor.
-Xe::PCIDev::SMC::SMCCore::SMCCore(const std::string &deviceName, u64 size,
+Xe::PCIDev::SMC::SMC(const std::string &deviceName, u64 size,
   PCIBridge *parentPCIBridge, SMC_CORE_STATE *newSMCCoreState) :
   PCIDevice(deviceName, size) {
   LOG_INFO(SMC, "Core: Initializing...");
@@ -97,11 +97,11 @@ Xe::PCIDev::SMC::SMCCore::SMCCore(const std::string &deviceName, u64 size,
   smcCoreState->uartHandle->uartPresent = true;
 
   // Enter main execution thread.
-  smcThread = std::thread(&SMCCore::smcMainThread, this);
+  smcThread = std::thread(&SMC::smcMainThread, this);
 }
 
 // Class Destructor.
-Xe::PCIDev::SMC::SMCCore::~SMCCore() {
+Xe::PCIDev::SMC::~SMC() {
   LOG_INFO(SMC, "Core: Exiting.");
   smcThreadRunning = false;
   if (smcThread.joinable())
@@ -111,7 +111,7 @@ Xe::PCIDev::SMC::SMCCore::~SMCCore() {
 }
 
 // PCI Read
-void Xe::PCIDev::SMC::SMCCore::Read(u64 readAddress, u8 *data, u64 size) {
+void Xe::PCIDev::SMC::Read(u64 readAddress, u8 *data, u64 size) {
   const u8 regOffset = static_cast<u8>(readAddress);
 
   mutex.lock();
@@ -165,13 +165,13 @@ void Xe::PCIDev::SMC::SMCCore::Read(u64 readAddress, u8 *data, u64 size) {
 }
 
 // PCI Config Read
-void Xe::PCIDev::SMC::SMCCore::ConfigRead(u64 readAddress, u8 *data, u64 size) {
+void Xe::PCIDev::SMC::ConfigRead(u64 readAddress, u8 *data, u64 size) {
   LOG_INFO(SMC, "ConfigRead: Address = {:#x}, size = {:#x}.", readAddress, size);
   memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], size);
 }
 
 // PCI Write
-void Xe::PCIDev::SMC::SMCCore::Write(u64 writeAddress, const u8 *data, u64 size) {
+void Xe::PCIDev::SMC::Write(u64 writeAddress, const u8 *data, u64 size) {
   std::lock_guard lck(mutex);
   const u8 regOffset = static_cast<u8>(writeAddress);
 
@@ -239,7 +239,7 @@ void Xe::PCIDev::SMC::SMCCore::Write(u64 writeAddress, const u8 *data, u64 size)
 }
 
 // PCI MemSet
-void Xe::PCIDev::SMC::SMCCore::MemSet(u64 writeAddress, s32 data, u64 size) {
+void Xe::PCIDev::SMC::MemSet(u64 writeAddress, s32 data, u64 size) {
   std::lock_guard lck(mutex);
   const u8 regOffset = static_cast<u8>(writeAddress);
 
@@ -299,7 +299,7 @@ void Xe::PCIDev::SMC::SMCCore::MemSet(u64 writeAddress, s32 data, u64 size) {
 }
 
 // PCI Config Write
-void Xe::PCIDev::SMC::SMCCore::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {  
+void Xe::PCIDev::SMC::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {  
   // Check if we're being scanned
   u64 tmp = 0;
   memcpy(&tmp, data, size);
@@ -328,7 +328,7 @@ void Xe::PCIDev::SMC::SMCCore::ConfigWrite(u64 writeAddress, const u8 *data, u64
 }
 
 // Setups the UART Communication at a given configuration.
-void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
+void Xe::PCIDev::SMC::setupUART(u32 uartConfig) {
   LOG_INFO(UART, "Initializing...");
   bool socket = smcCoreState->currentUARTSytem == "vcom" ? false : true;
   if (socket) {
@@ -355,7 +355,7 @@ void Xe::PCIDev::SMC::SMCCore::setupUART(u32 uartConfig) {
 }
 
 // SMC Main Thread
-void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
+void Xe::PCIDev::SMC::smcMainThread() {
   Base::SetCurrentThreadName("[Xe] SMC");
   // Set FIFO_IN_STATUS_REG to FIFO_STATUS_READY to indicate we are ready to
   // receive a message.
@@ -457,32 +457,32 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
         LOG_INFO(SMC, "FIFO Data:{}", ss.str());
       }
       switch (smcCoreState->fifoDataBuffer[0]) {
-      case Xe::PCIDev::SMC::SMC_PWRON_TYPE:
+      case Xe::PCIDev::SMC_PWRON_TYPE:
         // Zero out the buffer
         memset(&smcCoreState->fifoDataBuffer, 0, 16);
         smcCoreState->fifoDataBuffer[0] = SMC_PWRON_TYPE;
         smcCoreState->fifoDataBuffer[1] = smcCoreState->currPowerOnReason;
         break;
-      case Xe::PCIDev::SMC::SMC_QUERY_RTC:
+      case Xe::PCIDev::SMC_QUERY_RTC:
         // Zero out the buffer
         memset(&smcCoreState->fifoDataBuffer, 0, 16);
         smcCoreState->fifoDataBuffer[0] = SMC_QUERY_RTC;
         smcCoreState->fifoDataBuffer[1] = 0;
         break;
-      case Xe::PCIDev::SMC::SMC_QUERY_TEMP_SENS:
+      case Xe::PCIDev::SMC_QUERY_TEMP_SENS:
         smcCoreState->fifoDataBuffer[0] = SMC_QUERY_TEMP_SENS;
         smcCoreState->fifoDataBuffer[1] = 0x3C;
         LOG_WARNING(SMC, "SMC_FIFO_CMD: SMC_QUERY_TEMP_SENS, returning 3C");
         break;
-      case Xe::PCIDev::SMC::SMC_QUERY_TRAY_STATE:
+      case Xe::PCIDev::SMC_QUERY_TRAY_STATE:
         smcCoreState->fifoDataBuffer[0] = SMC_QUERY_TRAY_STATE;
         smcCoreState->fifoDataBuffer[1] = smcCoreState->currTrayState;
         break;
-      case Xe::PCIDev::SMC::SMC_QUERY_AVPACK:
+      case Xe::PCIDev::SMC_QUERY_AVPACK:
         smcCoreState->fifoDataBuffer[0] = SMC_QUERY_AVPACK;
         smcCoreState->fifoDataBuffer[1] = smcCoreState->currAVPackType;
         break;
-      case Xe::PCIDev::SMC::SMC_I2C_READ_WRITE:
+      case Xe::PCIDev::SMC_I2C_READ_WRITE:
         switch (smcCoreState->fifoDataBuffer[1]) {
         case 0x3: // SMC_I2C_DDC_LOCK
           LOG_INFO(SMC, "[I2C] Requested DDC Lock.");
@@ -521,28 +521,28 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
           smcCoreState->fifoDataBuffer[1] = 0x1; // Set R/W Failed.
         }
         break;
-      case Xe::PCIDev::SMC::SMC_QUERY_VERSION:
+      case Xe::PCIDev::SMC_QUERY_VERSION:
         smcCoreState->fifoDataBuffer[0] = SMC_QUERY_VERSION;
         smcCoreState->fifoDataBuffer[1] = 0x41;
         smcCoreState->fifoDataBuffer[2] = 0x02;
         smcCoreState->fifoDataBuffer[3] = 0x03;
         break;
-      case Xe::PCIDev::SMC::SMC_FIFO_TEST:
+      case Xe::PCIDev::SMC_FIFO_TEST:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_FIFO_TEST");
         break;
-      case Xe::PCIDev::SMC::SMC_QUERY_IR_ADDRESS:
+      case Xe::PCIDev::SMC_QUERY_IR_ADDRESS:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_QUERY_IR_ADDRESS");
         break;
-      case Xe::PCIDev::SMC::SMC_QUERY_TILT_SENSOR:
+      case Xe::PCIDev::SMC_QUERY_TILT_SENSOR:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_QUERY_TILT_SENSOR");
         break;
-      case Xe::PCIDev::SMC::SMC_READ_82_INT:
+      case Xe::PCIDev::SMC_READ_82_INT:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_READ_82_INT");
         break;
-      case Xe::PCIDev::SMC::SMC_READ_8E_INT:
+      case Xe::PCIDev::SMC_READ_8E_INT:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_READ_8E_INT");
         break;
-      case Xe::PCIDev::SMC::SMC_SET_STANDBY:
+      case Xe::PCIDev::SMC_SET_STANDBY:
         smcCoreState->fifoDataBuffer[0] = SMC_SET_STANDBY;
         // TODO: Fix other HAL types
         if (smcCoreState->fifoDataBuffer[1] == 0x01) {
@@ -553,60 +553,60 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
           LOG_INFO(SMC, "[Standby] Requested reboot");
           // Note: Real hardware only respects 0x30, but for automated testing, we will allow anything
           mutex.unlock();
-          Xe_Main->reboot(static_cast<Xe::PCIDev::SMC::SMC_PWR_REASON>(smcCoreState->fifoDataBuffer[2]));
+          Xe_Main->reboot(static_cast<Xe::PCIDev::SMC_PWR_REASON>(smcCoreState->fifoDataBuffer[2]));
           mutex.lock();
         } else {
           LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD Subtype in SMC_SET_STANDBY: 0x{:02X}",
             static_cast<u16>(smcCoreState->fifoDataBuffer[1]));
         }
         break;
-      case Xe::PCIDev::SMC::SMC_SET_TIME:
+      case Xe::PCIDev::SMC_SET_TIME:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_SET_TIME");
         break;
-      case Xe::PCIDev::SMC::SMC_SET_FAN_ALGORITHM:
+      case Xe::PCIDev::SMC_SET_FAN_ALGORITHM:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_SET_FAN_ALGORITHM");
         break;
-      case Xe::PCIDev::SMC::SMC_SET_FAN_SPEED_CPU:
+      case Xe::PCIDev::SMC_SET_FAN_SPEED_CPU:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_SET_FAN_SPEED_CPU");
         break;
-      case Xe::PCIDev::SMC::SMC_SET_DVD_TRAY:
+      case Xe::PCIDev::SMC_SET_DVD_TRAY:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_SET_DVD_TRAY");
         break;
-      case Xe::PCIDev::SMC::SMC_SET_POWER_LED:
+      case Xe::PCIDev::SMC_SET_POWER_LED:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_SET_POWER_LED");
         break;
-      case Xe::PCIDev::SMC::SMC_SET_AUDIO_MUTE:
+      case Xe::PCIDev::SMC_SET_AUDIO_MUTE:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_SET_AUDIO_MUTE");
         break;
-      case Xe::PCIDev::SMC::SMC_ARGON_RELATED:
+      case Xe::PCIDev::SMC_ARGON_RELATED:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_ARGON_RELATED");
         break;
-      case Xe::PCIDev::SMC::SMC_SET_FAN_SPEED_GPU:
+      case Xe::PCIDev::SMC_SET_FAN_SPEED_GPU:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_SET_FAN_SPEED_GPU");
         break;
-      case Xe::PCIDev::SMC::SMC_SET_IR_ADDRESS:
+      case Xe::PCIDev::SMC_SET_IR_ADDRESS:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_SET_IR_ADDRESS");
         break;
-      case Xe::PCIDev::SMC::SMC_SET_DVD_TRAY_SECURE:
+      case Xe::PCIDev::SMC_SET_DVD_TRAY_SECURE:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_SET_DVD_TRAY_SECURE");
         break;
-      case Xe::PCIDev::SMC::SMC_SET_FP_LEDS:
+      case Xe::PCIDev::SMC_SET_FP_LEDS:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_SET_FP_LEDS");
         noResponse = true;
         break;
-      case Xe::PCIDev::SMC::SMC_SET_RTC_WAKE:
+      case Xe::PCIDev::SMC_SET_RTC_WAKE:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_SET_RTC_WAKE");
         break;
-      case Xe::PCIDev::SMC::SMC_ANA_RELATED:
+      case Xe::PCIDev::SMC_ANA_RELATED:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_ANA_RELATED");
         break;
-      case Xe::PCIDev::SMC::SMC_SET_ASYNC_OPERATION:
+      case Xe::PCIDev::SMC_SET_ASYNC_OPERATION:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_SET_ASYNC_OPERATION");
         break;
-      case Xe::PCIDev::SMC::SMC_SET_82_INT:
+      case Xe::PCIDev::SMC_SET_82_INT:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_SET_82_INT");
         break;
-      case Xe::PCIDev::SMC::SMC_SET_9F_INT:
+      case Xe::PCIDev::SMC_SET_9F_INT:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_SET_9F_INT");
         break;
       default:

@@ -9,8 +9,9 @@
 #define SFCX_DEBUG
 
 // There are two SFCX Versions, pre-Jasper and post-Jasper
-SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
-  PCIBridge* parentPCIBridge, RAM* ram) : PCIDevice(deviceName, size) {
+Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::string &nandLoadPath, PCIBridge *parentPCIBridge, RAM *ram) :
+  PCIDevice(deviceName, size)
+{
   // Asign parent PCI Bridge and RAM pointer
   parentBus = parentPCIBridge;
   mainMemory = ram;
@@ -237,10 +238,10 @@ SFCX::SFCX(const char* deviceName, const std::string nandLoadPath, u64 size,
   }
   // Enter SFCX Thread
   sfcxThreadRunning = true;
-  sfcxThread = std::thread(&SFCX::sfcxMainLoop, this);
+  sfcxThread = std::thread(&Xe::PCIDev::SFCX::sfcxMainLoop, this);
 }
 
-SFCX::~SFCX() {
+Xe::PCIDev::SFCX::~SFCX() {
   // Clear NAND image data
   rawImageData.clear();
   // Terminate thread
@@ -249,7 +250,7 @@ SFCX::~SFCX() {
     sfcxThread.join();
 }
 
-void SFCX::Read(u64 readAddress, u8* data, u64 size) {
+void Xe::PCIDev::SFCX::Read(u64 readAddress, u8* data, u64 size) {
   // Set a lock on registers
   std::lock_guard lck(mutex);
 
@@ -292,12 +293,12 @@ void SFCX::Read(u64 readAddress, u8* data, u64 size) {
   }
 }
 
-void SFCX::ConfigRead(u64 readAddress, u8* data, u64 size) {
+void Xe::PCIDev::SFCX::ConfigRead(u64 readAddress, u8* data, u64 size) {
   const u8 offset = readAddress & 0xFF;
   memcpy(data, &pciConfigSpace.data[offset], size);
 }
 
-void SFCX::Write(u64 writeAddress, const u8* data, u64 size) {
+void Xe::PCIDev::SFCX::Write(u64 writeAddress, const u8* data, u64 size) {
   // Set a lock on registers
   std::lock_guard lck(mutex);
 
@@ -369,7 +370,7 @@ void SFCX::Write(u64 writeAddress, const u8* data, u64 size) {
     break;
   }
 }
-void SFCX::MemSet(u64 writeAddress, s32 data, u64 size) {
+void Xe::PCIDev::SFCX::MemSet(u64 writeAddress, s32 data, u64 size) {
   // Set a lock on registers
   std::lock_guard lck(mutex);
 
@@ -412,7 +413,7 @@ void SFCX::MemSet(u64 writeAddress, s32 data, u64 size) {
   }
 }
 
-void SFCX::ReadRaw(u64 readAddress, u8* data, u64 size) {
+void Xe::PCIDev::SFCX::ReadRaw(u64 readAddress, u8* data, u64 size) {
   u32 offset = static_cast<u32>(readAddress & 0xFFFFFF);
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
 #ifdef NAND_DEBUG
@@ -421,7 +422,7 @@ void SFCX::ReadRaw(u64 readAddress, u8* data, u64 size) {
   memcpy(data, rawImageData.data() + offset, size);
 }
 
-void SFCX::WriteRaw(u64 writeAddress, const u8* data, u64 size) {
+void Xe::PCIDev::SFCX::WriteRaw(u64 writeAddress, const u8* data, u64 size) {
   u32 offset = static_cast<u32>(writeAddress & 0xFFFFFF);
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
 #ifdef NAND_DEBUG
@@ -430,7 +431,7 @@ void SFCX::WriteRaw(u64 writeAddress, const u8* data, u64 size) {
   memcpy(rawImageData.data() + offset, data, size);
 }
 
-void SFCX::MemSetRaw(u64 writeAddress, s32 data, u64 size) {
+void Xe::PCIDev::SFCX::MemSetRaw(u64 writeAddress, s32 data, u64 size) {
   u32 offset = static_cast<u32>(writeAddress & 0xFFFFFF);
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
 #ifdef NAND_DEBUG
@@ -439,7 +440,7 @@ void SFCX::MemSetRaw(u64 writeAddress, s32 data, u64 size) {
   memset(rawImageData.data() + offset, data, size);
 }
 
-void SFCX::ConfigWrite(u64 writeAddress, const u8* data, u64 size) {
+void Xe::PCIDev::SFCX::ConfigWrite(u64 writeAddress, const u8* data, u64 size) {
   const u8 offset = writeAddress & 0xFF;
 
   // Check if we're being scanned
@@ -468,7 +469,7 @@ void SFCX::ConfigWrite(u64 writeAddress, const u8* data, u64 size) {
   memcpy(&pciConfigSpace.data[offset], &tmp, size);
 }
 
-void SFCX::sfcxMainLoop() {
+void Xe::PCIDev::SFCX::sfcxMainLoop() {
   Base::SetCurrentThreadName("[Xe::SFCX] Main");
   // Config register should be initialized by now
   while (sfcxThreadRunning) {
@@ -507,7 +508,7 @@ void SFCX::sfcxMainLoop() {
   }
 }
 
-bool SFCX::checkMagic() {
+bool Xe::PCIDev::SFCX::checkMagic() {
   char magic[2];
 
   nandFile.read(reinterpret_cast<char*>(magic), sizeof(magic));
@@ -531,7 +532,7 @@ bool SFCX::checkMagic() {
   return false;
 }
 
-void SFCX::sfcxReadPageFromNAND(bool physical) {
+void Xe::PCIDev::SFCX::sfcxReadPageFromNAND(bool physical) {
   // Calculate NAND offset
   u32 nandOffset = sfcxState.addressReg;
   nandOffset = 1 ? ((nandOffset / 0x200) * 0x210) + nandOffset % 0x200 : nandOffset;
@@ -555,7 +556,7 @@ void SFCX::sfcxReadPageFromNAND(bool physical) {
   }
 }
 
-void SFCX::sfcxDoDMAfromNAND(bool physical) {
+void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND(bool physical) {
   // Physical address when doing DMA
   u32 physAddr = sfcxState.addressReg;
   // Calculate Physical address offset for starting page

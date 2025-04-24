@@ -12,7 +12,6 @@
 
 namespace Xe {
 namespace PCIDev {
-namespace ETHERNET {
 
 // Register Set and offsets.
 // Taken from Linux kernel patches for the Xbox 360.
@@ -72,6 +71,5 @@ private:
   XE_PCI_STATE ethPciState{};
 };
 
-} // namespace ETHERNET
 } // namespace PCIDev
 } // namespace Xe

@@ -5,7 +5,7 @@
 #include "Base/Config.h"
 #include "Base/Logging/Log.h"
 
-void ODD::atapiReset() {
+void Xe::PCIDev::ODD::atapiReset() {
   // Set status to ready
   atapiState.atapiRegs.statusReg = ATA_STATUS_DRDY;
 
@@ -23,7 +23,7 @@ void ODD::atapiReset() {
   atapiState.mountedCDImage = std::make_unique<STRIP_UNIQUE(atapiState.mountedCDImage)>(Config::filepaths.oddImage);
 }
 
-void ODD::atapiIdentifyPacketDeviceCommand() {
+void Xe::PCIDev::ODD::atapiIdentifyPacketDeviceCommand() {
   // This command is only for ATAPI devices
   LOG_DEBUG(ODD, "ATAPI_IDENTIFY_PACKET_DEVICE_COMMAND");
 
@@ -85,7 +85,7 @@ void ODD::atapiIdentifyPacketDeviceCommand() {
 }
 
 
-void ODD::atapiIdentifyCommand() {
+void Xe::PCIDev::ODD::atapiIdentifyCommand() {
   // Used by software to decide whether the device is an ATA or ATAPI device
   /*
       ATAPI drives will set the ABRT bit in the Error register and will place
@@ -116,7 +116,7 @@ void ODD::atapiIdentifyCommand() {
   atapiState.atapiRegs.interruptReasonReg = IDE_INTERRUPT_REASON_IO;
 }
 
-void ODD::processSCSICommand() {
+void Xe::PCIDev::ODD::processSCSICommand() {
   atapiState.dataWriteBuffer.reset();
   memcpy(&atapiState.scsiCBD.AsByte, atapiState.dataWriteBuffer.get(), 16);
 
@@ -152,7 +152,7 @@ void ODD::processSCSICommand() {
   atapiState.atapiRegs.interruptReasonReg = IDE_INTERRUPT_REASON_IO;
 }
 
-void ODD::doDMA() {
+void Xe::PCIDev::ODD::doDMA() {
   for (;;) {
     // Read the first entry of the table in memory
     u8* DMAPointer = mainMemory->getPointerToAddress(atapiState.atapiRegs.dmaTableOffsetReg + atapiState.dmaState.currentTableOffset);
@@ -201,7 +201,7 @@ void ODD::doDMA() {
   }
 }
 
-ODD::ODD(const char* deviceName, u64 size,
+Xe::PCIDev::ODD::ODD(const char* deviceName, u64 size,
   PCIBridge *parentPCIBridge, RAM *ram) : PCIDevice(deviceName, size) {
   // Note:
   // The ATA/ATAPI Controller in the Xenon Southbridge contain two BAR's:
@@ -257,7 +257,7 @@ ODD::ODD(const char* deviceName, u64 size,
   atapiReset();
 }
 
-void ODD::Read(u64 readAddress, u8 *data, u64 size) {
+void Xe::PCIDev::ODD::Read(u64 readAddress, u8 *data, u64 size) {
   // PCI BAR0 is the Primary Command Block Base Address
   u8 atapiCommandReg =
       static_cast<u8>(readAddress - pciConfigSpace.configSpaceHeader.BAR0);
@@ -334,7 +334,7 @@ void ODD::Read(u64 readAddress, u8 *data, u64 size) {
   }
 }
 
-void ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
+void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
   // PCI BAR0 is the Primary Command Block Base Address
   u8 atapiCommandReg =
       static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR0);
@@ -451,7 +451,7 @@ void ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
   }
 }
 
-void ODD::MemSet(u64 writeAddress, s32 data, u64 size) {
+void Xe::PCIDev::ODD::MemSet(u64 writeAddress, s32 data, u64 size) {
   // PCI BAR0 is the primary command block base address
   u8 atapiCommandReg =
       static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR0);
@@ -581,7 +581,7 @@ void ODD::MemSet(u64 writeAddress, s32 data, u64 size) {
   }
 }
 
-void ODD::ConfigRead(u64 readAddress, u8 *data, u64 size) {
+void Xe::PCIDev::ODD::ConfigRead(u64 readAddress, u8 *data, u64 size) {
   const u8 readReg = static_cast<u8>(readAddress);
   if (readReg >= XE_SIS_SCR_BASE && readReg <= 0xFF) {
     // Read the SATA status and control registers
@@ -610,7 +610,7 @@ void ODD::ConfigRead(u64 readAddress, u8 *data, u64 size) {
   LOG_DEBUG(ODD, "ConfigRead to reg {:#x}", readReg * 4);
 }
 
-void ODD::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
+void Xe::PCIDev::ODD::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   // Check if we're being scanned
   u64 tmp = 0;
   memcpy(&tmp, data, size);

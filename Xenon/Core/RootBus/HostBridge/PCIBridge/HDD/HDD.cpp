@@ -4,7 +4,7 @@
 
 #include "Base/Logging/Log.h"
 
-HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentPCIBridge) :
+Xe::PCIDev::HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentPCIBridge) :
   PCIDevice(deviceName, size) {
   // Note:
    // The ATA/ATAPI Controller in the Xenon Southbridge contain two BAR's:
@@ -61,7 +61,7 @@ HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentPCIBridge) :
   ataDeviceState.ataReadState.status = ATA_STATUS_DRDY;
 }
 
-void HDD::Read(u64 readAddress, u8 *data, u64 size) {
+void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
   const u32 regOffset = (readAddress & 0xFF) * 4;
 
   if (regOffset < sizeof(ATA_REG_STATE)) {
@@ -97,7 +97,7 @@ void HDD::Read(u64 readAddress, u8 *data, u64 size) {
   }
 }
 
-void HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
+void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
   const u32 regOffset = (writeAddress & 0xFF) * 4;
 
   if (regOffset < sizeof(ATA_REG_STATE)) {
@@ -167,7 +167,7 @@ void HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
   }
 }
 
-void HDD::MemSet(u64 writeAddress, s32 data, u64 size) {
+void Xe::PCIDev::HDD::MemSet(u64 writeAddress, s32 data, u64 size) {
   const u32 regOffset = (writeAddress & 0xFF) * 4;
 
   if (regOffset < sizeof(ATA_REG_STATE)) {
@@ -240,11 +240,11 @@ void HDD::MemSet(u64 writeAddress, s32 data, u64 size) {
   }
 }
 
-void HDD::ConfigRead(u64 readAddress, u8 *data, u64 size) {
+void Xe::PCIDev::HDD::ConfigRead(u64 readAddress, u8 *data, u64 size) {
   memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], size);
 }
 
-void HDD::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
+void Xe::PCIDev::HDD::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   // Check if we're being scanned
   u64 tmp = 0;
   memcpy(&tmp, data, size);
@@ -270,7 +270,7 @@ void HDD::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &tmp, size);
 }
 
-void HDD::ataCopyIdentifyDeviceData() {
+void Xe::PCIDev::HDD::ataCopyIdentifyDeviceData() {
   if (!ataDeviceState.readBuffer.empty())
     LOG_ERROR(HDD, "Read Buffer not empty!");
 

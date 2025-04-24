@@ -3,21 +3,17 @@
 #pragma once
 
 #include "Core/RootBus/HostBridge/PCIBridge/PCIDevice.h"
-#include "Core/RootBus/HostBridge/PCIBridge/OHCI/OHCI.h"
-
-#define OHCI0_DEV_SIZE 0x1000
+#include "Core/RootBus/HostBridge/PCIBridge/EHCI/EHCI.h"
 
 namespace Xe {
 namespace PCIDev {
-namespace OHCI0 {
-
-class OHCI0 : public OHCI {
+  
+class EHCI0 : public EHCI {
 public:
-  OHCI0(const std::string &deviceName, u64 size);
+  EHCI0(const std::string &deviceName, u64 size);
 
 private:
 };
 
-} // namespace OHCI0
 } // namespace PCIDev
 } // namespace Xe
