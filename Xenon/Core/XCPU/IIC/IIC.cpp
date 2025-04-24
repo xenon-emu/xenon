@@ -140,12 +140,8 @@ bool Xe::XCPU::IIC::XenonIIC::checkExtInterrupt(u8 ppuID) {
   MICROPROFILE_SCOPEI("[Xe::IIC]", "CheckExternalInterrupt", MP_AUTO);
 
   // Ensure there is a lock
+  std::lock_guard lock(mutex);
   auto &ctrlBlock = iicState.crtlBlck[ppuID];
-  if (!mutex.try_lock()) {
-    LOG_ERROR(Xenon_IIC, "Mutex already locked! ppuID: {}", ppuID);
-    return false;
-  }
-  std::lock_guard lock(mutex, std::adopt_lock);
 
   // Check for some interrupt that was already signaled and if there's interrupts
   if (ctrlBlock.intSignaled || ctrlBlock.interrupts.empty()) {
