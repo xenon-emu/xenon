@@ -25,6 +25,7 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
     LOG_CRITICAL(Xenon, "Invalid interrupt write! Expected a size of at least 4, got {} instead", size);
     return;
   }
+  mutex.lock();
 
   u64 intData = 0;
   memcpy(&intData, data, size);
@@ -35,9 +36,8 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
   u8 intType = (intData >> 56) & 0xFF;
   u8 cpusToInterrupt = (intData >> 40) & 0xFF;
   u32 dataBs = static_cast<u32>(byteswap_be<u64>(intData));
-
+  
   auto &ctrlBlock = iicState.crtlBlck[ppuID];
-  ctrlBlock.mutex.lock();
   switch (reg) {
   case Xe::XCPU::IIC::CPU_WHOAMI:
 #ifdef IIC_DEBUG
@@ -51,15 +51,15 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
     break;
   case Xe::XCPU::IIC::CPU_IPI_DISPATCH_0:
     ctrlBlock.REG_CPU_IPI_DISPATCH_0 = dataBs;
-    ctrlBlock.mutex.unlock();
+    mutex.unlock();
     genInterrupt(intType, cpusToInterrupt);
-    ctrlBlock.mutex.lock();
+    mutex.lock();
     break;
   case Xe::XCPU::IIC::INT_0x30:
     // Dont know what this does, lets cause an interrupt?
-    ctrlBlock.mutex.unlock();
+    mutex.unlock();
     genInterrupt(intType, cpusToInterrupt);
-    ctrlBlock.mutex.lock();
+    mutex.lock();
     break;
   case Xe::XCPU::IIC::EOI:
     // If there are interrupts stored in the queue, remove the ack'd.
@@ -97,7 +97,7 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
     LOG_ERROR(Xenon_IIC, "Unknown CPU Interrupt Ctrl Blck Reg being written: {:#x}", reg);
     break;
   }
-  ctrlBlock.mutex.unlock();
+  mutex.unlock();
 }
 
 void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u8 *data, u64 size) {
@@ -108,7 +108,6 @@ void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u8 *data, u64 size) 
   u8 reg = intAddress & 0xFF;
 
   auto &ctrlBlock = iicState.crtlBlck[ppuID];
-  ctrlBlock.mutex.lock();
   switch (reg) {
   case Xe::XCPU::IIC::CPU_CURRENT_TSK_PRI: {
     u64 intData = byteswap_be<u64>(ctrlBlock.REG_CPU_CURRENT_TSK_PRI);
@@ -135,7 +134,6 @@ void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u8 *data, u64 size) 
     LOG_ERROR(Xenon_IIC, "Unknown interrupt being read {:#x}", reg);
     break;
   }
-  ctrlBlock.mutex.unlock();
 }
 
 bool Xe::XCPU::IIC::XenonIIC::checkExtInterrupt(u8 ppuID) {
@@ -143,11 +141,11 @@ bool Xe::XCPU::IIC::XenonIIC::checkExtInterrupt(u8 ppuID) {
 
   // Ensure there is a lock
   auto &ctrlBlock = iicState.crtlBlck[ppuID];
-  if (!ctrlBlock.mutex.try_lock()) {
+  if (!mutex.try_lock()) {
     LOG_ERROR(Xenon_IIC, "Mutex already locked! ppuID: {}", ppuID);
     return false;
   }
-  std::lock_guard<std::mutex> lock(ctrlBlock.mutex, std::adopt_lock);
+  std::lock_guard lock(mutex, std::adopt_lock);
 
   // Check for some interrupt that was already signaled and if there's interrupts
   if (ctrlBlock.intSignaled || ctrlBlock.interrupts.empty()) {

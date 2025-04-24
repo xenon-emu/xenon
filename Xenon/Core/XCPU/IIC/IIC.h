@@ -78,8 +78,6 @@ struct PPE_INT_CTRL_BLCK {
   u32 REG_INT_MCACK;
   // Stored pending interrupts.
   std::unordered_map<u64, Xe_Int> interrupts = {};
-  // Mutex
-  std::mutex mutex = {};
   // Stores whether an interrupt was already signaled to the target thread or not
   bool intSignaled = false;
 };
@@ -98,8 +96,10 @@ public:
   void genInterrupt(u8 interruptType, u8 cpusToInterrupt);
   void cancelInterrupt(u8 interruptType, u8 cpusInterrupted);
 private:
-  IIC_State iicState;
-  std::recursive_mutex mutex;
+  // State
+  IIC_State iicState = {};
+  // Mutex
+  std::recursive_mutex mutex = {};
   // Returns the name of the input interrupt ID
   std::string getIntName(u8 intID);
 };
