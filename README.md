@@ -44,8 +44,8 @@ We need talented developers more than ever to contribute to the project and move
 </a>
 
 # Building
-- [**Windows**](https://github.com/xenon-emu/Xenon/blob/main/Deps/Building/building-windows.md)
-- [**Linux**](https://github.com/xenon-emu/Xenon/blob/main/Deps/Building/building-linux.md)
+- [**Windows**](https://github.com/xenon-emu/Xenon/blob/main/Deps/Docs/Building/building-windows.md)
+- [**Linux**](https://github.com/xenon-emu/Xenon/blob/main/Deps/Docs/Building/building-linux.md)
 
 # License
 - [**GPL-2.0 license**](https://github.com/xenon-emu/Xenon/blob/main/LICENSE)
@@ -54,8 +54,8 @@ We need talented developers more than ever to contribute to the project and move
 <p align="center">
   <img src="https://github.com/xenon-emu/Xenon/blob/main/Deps/Screenshots/lk-mandelbrot.png" width="470">
   <img src="https://github.com/xenon-emu/Xenon/blob/main/Deps/Screenshots/Linux-Xenon.png" width="470">
+  <img src="https://github.com/xenon-emu/Xenon/blob/main/Deps/Screenshots/xboxkrnl.png" width="470">
   <img src="https://github.com/xenon-emu/Xenon/blob/main/Deps/Screenshots/XeLL.png" width="470">
   <img src="https://github.com/xenon-emu/Xenon/blob/main/Deps/Screenshots/Xell_Reloaded.png" width="470">
-  <img src="https://github.com/xenon-emu/Xenon/blob/main/Deps/Screenshots/WinDBG.png" width="470">
   <img src="https://github.com/xenon-emu/Xenon/blob/main/Deps/Screenshots/1BL_Boot.png" width="470">
 </p>
