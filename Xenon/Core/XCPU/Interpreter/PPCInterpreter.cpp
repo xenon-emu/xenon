@@ -73,6 +73,18 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
     thread.GPR[11] = 0x10;
   }
 
+  // VdpWriteXDVOUllong. Set r10 to 1. Skips XDVO write loop.
+  if (static_cast<u32>(thread.CIA) == 0x800ef7c0) {
+    LOG_INFO(Xenon, "VdpWriteXDVOUllong");
+    thread.GPR[10] = 1;
+  }
+
+  // VdpSetDisplayTimingParameter. Set r11 to 0x10. Skips ANA Check.
+  if (static_cast<u32>(thread.CIA) == 0x800f6264) {
+    LOG_INFO(Xenon, "VdpSetDisplayTimingParameter");
+    thread.GPR[11] = 0x15E;
+  }
+
   // This is just to set a PC breakpoint in any PPU/Thread.
   if (static_cast<u32>(thread.CIA) == 0x8009CE40) {
     u8 a = 0;
