@@ -12,8 +12,14 @@ Xe::PCIDev::EHCI1::EHCI1::EHCI1(const std::string &deviceName, u64 size) :
   pciDevSizes[0] = 0x1000; // BAR0
 }
 
-void Xe::PCIDev::EHCI1::EHCI1::Read(u64 readAddress, u8 *data, u64 size)
-{}
+void Xe::PCIDev::EHCI1::EHCI1::Read(u64 readAddress, u8 *data, u64 size) {
+  // Needed for now for EHCI driver init on xboxkrnl.exe.
+  u16 offset = readAddress & 0xFFF;
+  u32 value = 0x1000;
+  if (offset == 0x4) {
+    memcpy(data, &value, size);
+  }
+}
 
 void Xe::PCIDev::EHCI1::EHCI1::ConfigRead(u64 readAddress, u8 *data, u64 size) {
   memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], size);
