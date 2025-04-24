@@ -490,7 +490,11 @@ void SFCX::sfcxMainLoop() {
         sfcxDoDMAfromNAND(true);
         break;
       default:
-        LOG_ERROR(SFCX, "Unrecognized command was issued. {:#x}", sfcxState.commandReg);
+        LOG_ERROR(SFCX, "Unrecognized command was issued. {:#x}. Issuing interrupt if enabled.", sfcxState.commandReg);
+        if (sfcxState.configReg & CONFIG_INT_EN) {
+          parentBus->RouteInterrupt(PRIO_SFCX);
+          sfcxState.statusReg |= STATUS_INT_CP;
+        }
         break;
       }
 
