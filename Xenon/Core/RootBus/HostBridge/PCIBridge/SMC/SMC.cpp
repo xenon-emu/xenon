@@ -497,13 +497,13 @@ void Xe::PCIDev::SMC::SMCCore::smcMainThread() {
         case 0x10: // SMC_READ_ANA
           smcCoreState->fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
           smcCoreState->fifoDataBuffer[1] = 0x0;
-          smcCoreState->fifoDataBuffer[4] =
+          smcCoreState->fifoDataBuffer[3] =
               (HANA_State[smcCoreState->fifoDataBuffer[6]] & 0xFF);
-          smcCoreState->fifoDataBuffer[5] =
+          smcCoreState->fifoDataBuffer[4] =
               ((HANA_State[smcCoreState->fifoDataBuffer[6]] >> 8) & 0xFF);
-          smcCoreState->fifoDataBuffer[6] =
+          smcCoreState->fifoDataBuffer[5] =
               ((HANA_State[smcCoreState->fifoDataBuffer[6]] >> 16) & 0xFF);
-          smcCoreState->fifoDataBuffer[7] =
+          smcCoreState->fifoDataBuffer[6] =
               ((HANA_State[smcCoreState->fifoDataBuffer[6]] >> 24) & 0xFF);
           break;
         case 0x60: // SMC_WRITE_ANA
