@@ -5,7 +5,7 @@
 * various sources across the internet.
 *
 * In particular, this work is based heavily on research by
-* the Xenia developers — especially Triang3l —
+* the Xenia developers - especially Triang3l -
 * whose dedication and deep understanding of the hardware
 * made accurate Xenos emulation possible.
 *
