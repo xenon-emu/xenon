@@ -126,13 +126,13 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
       u32 tmp = 0;
       memcpy(&tmp, data, size);
       tmp = byteswap_be<u32>(tmp);
-      commandProcessor.CPUpdateRBSize(tmp);
+      commandProcessor->CPUpdateRBSize(tmp);
     }
     if (reg == XeRegister::CP_RB_BASE) {
       u32 tmp = 0;
       memcpy(&tmp, data, size);
       tmp = byteswap_be<u32>(tmp);
-      commandProcessor.CPUpdateRBBase(tmp);
+      commandProcessor->CPUpdateRBBase(tmp);
     }
 
     memcpy(&xenosState.Regs[regIndex * 4], data, size);
