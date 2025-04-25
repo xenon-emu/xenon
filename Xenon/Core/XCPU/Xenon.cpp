@@ -65,8 +65,7 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPa
       }
     }
     catch (const std::exception& ex) {
-      LOG_ERROR(Base_Filesystem, "Exception trying to get file size. Exception: {}",
-        ex.what());
+      LOG_ERROR(Base_Filesystem, "Exception trying to get file size. Reason: {}", ex.what());
       return;
     }
     if (fileSize == XE_SROM_SIZE) {
@@ -77,7 +76,7 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPa
   file.close();
 
   // Asign Interpreter global variables
-  PPCInterpreter::intXCPUContext = &xenonContext;
+  PPCInterpreter::CPUContext = &xenonContext;
   PPCInterpreter::sysBus = mainBus;
 
   // Setup SOC blocks.

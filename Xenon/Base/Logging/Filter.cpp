@@ -5,6 +5,7 @@
 #include "Base/Assert.h"
 
 namespace Base::Log {
+
 template <typename It>
 Level GetLevelByName(const It begin, const It end) {
   for (u8 i = 0; i < static_cast<u8>(Level::Count); ++i) {
@@ -28,31 +29,31 @@ Class GetClassByName(const It begin, const It end) {
 }
 
 template <typename Iterator>
-bool ParseFilterRule(Filter& instance, Iterator begin, Iterator end) {
-  const auto level_separator = std::find(begin, end, ':');
-  if (level_separator == end) {
+bool ParseFilterRule(Filter &instance, Iterator begin, Iterator end) {
+  const auto levelSeparator = std::find(begin, end, ':');
+  if (levelSeparator == end) {
     LOG_ERROR(Log, "Invalid log filter. Must specify a log level after `:`: {}", std::string_view(begin, end));
     return false;
   }
 
-  const Level level = GetLevelByName(level_separator + 1, end);
+  const Level level = GetLevelByName(levelSeparator + 1, end);
   if (level == Level::Count) {
     LOG_ERROR(Log, "Unknown log level in filter: {}", std::string_view(begin, end));
     return false;
   }
 
-  if (std::string_view(begin, level_separator).compare("*") == 0) {
+  if (std::string_view(begin, levelSeparator).compare("*") == 0) {
     instance.ResetAll(level);
     return true;
   }
 
-  const Class log_class = GetClassByName(begin, level_separator);
-  if (log_class == Class::Count) {
+  const Class logClass = GetClassByName(begin, levelSeparator);
+  if (logClass == Class::Count) {
     LOG_ERROR(Log, "Unknown log class in filter: {}", std::string(begin, end));
     return false;
   }
 
-  instance.SetClassLevel(log_class, level);
+  instance.SetClassLevel(logClass, level);
   return true;
 }
 
@@ -87,8 +88,8 @@ bool ParseFilterRule(Filter& instance, Iterator begin, Iterator end) {
   CLS(UART)  
 
 // GetClassName is a macro defined by Windows.h, grrr...
-const char* GetLogClassName(Class log_class) {
-  switch (log_class) {
+const char* GetLogClassName(Class logClass) {
+  switch (logClass) {
 #define CLS(x)                                                                                   \
   case Class::x:                                                                                 \
     return #x;
@@ -105,11 +106,11 @@ const char* GetLogClassName(Class log_class) {
   UNREACHABLE();
 }
 
-const char* GetLevelName(Level log_level) {
-#define LVL(x)                                                                                     \
+const char* GetLevelName(Level logLevel) {
+#define LVL(x)                                                                                   \
   case Level::x:                                                                                 \
     return #x
-  switch (log_level) {
+  switch (logLevel) {
   LVL(Trace);
   LVL(Debug);
   LVL(Info);
@@ -125,29 +126,29 @@ const char* GetLevelName(Level log_level) {
   UNREACHABLE();
 }
 
-Filter::Filter(Level default_level) {
-  ResetAll(default_level);
+Filter::Filter(Level defaultLevel) {
+  ResetAll(defaultLevel);
 }
 
 void Filter::ResetAll(Level level) {
-  class_levels.fill(level);
+  classLevels.fill(level);
 }
 
-void Filter::SetClassLevel(Class log_class, Level level) {
-  class_levels[static_cast<size_t>(log_class)] = level;
+void Filter::SetClassLevel(Class logClass, Level level) {
+  classLevels[static_cast<size_t>(logClass)] = level;
 }
 
-void Filter::ParseFilterString(std::string_view filter_view) {
-  auto clause_begin = filter_view.cbegin();
-  while (clause_begin != filter_view.cend()) {
-    auto clause_end = std::find(clause_begin, filter_view.cend(), ' ');
+void Filter::ParseFilterString(const std::string_view &filterView) {
+  auto clause_begin = filterView.cbegin();
+  while (clause_begin != filterView.cend()) {
+    auto clause_end = std::find(clause_begin, filterView.cend(), ' ');
 
     // If clause isn't empty
     if (clause_end != clause_begin) {
       ParseFilterRule(*this, clause_begin, clause_end);
     }
 
-    if (clause_end != filter_view.cend()) {
+    if (clause_end != filterView.cend()) {
       // Skip over the whitespace
       ++clause_end;
     }
@@ -155,13 +156,13 @@ void Filter::ParseFilterString(std::string_view filter_view) {
   }
 }
 
-bool Filter::CheckMessage(Class log_class, Level level) const {
+bool Filter::CheckMessage(Class logClass, Level level) const {
   return static_cast<u8>(level) >=
-         static_cast<u8>(class_levels[static_cast<size_t>(log_class)]);
+         static_cast<u8>(classLevels[static_cast<size_t>(logClass)]);
 }
 
 bool Filter::IsDebug() const {
-  return std::any_of(class_levels.begin(), class_levels.end(), [](const Level& l) {
+  return std::any_of(classLevels.begin(), classLevels.end(), [](const Level& l) {
     return static_cast<u8>(l) <= static_cast<u8>(Level::Debug);
   });
 }

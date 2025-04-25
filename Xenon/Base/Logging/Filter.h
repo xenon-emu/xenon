@@ -26,13 +26,13 @@ const char* GetLevelName(Level log_level);
 class Filter {
 public:
   /// Initializes the filter with all classes having `default_level` as the minimum level.
-  explicit Filter(Level default_level = Level::Info);
+  explicit Filter(Level defaultLevel = Level::Info);
 
   /// Resets the filter so that all classes have `level` as the minimum displayed level.
   void ResetAll(Level level);
 
   /// Sets the minimum level of `log_class` (and not of its subclasses) to `level`.
-  void SetClassLevel(Class log_class, Level level);
+  void SetClassLevel(Class logClass, Level level);
 
   /*
    * Parses a filter string and applies it to this filter.
@@ -48,16 +48,16 @@ public:
    *  - `Service:Info` -- Sets the level of Service to Info.
    *  - `Service.FS:Trace` -- Sets the level of the Service.FS class to Trace.
    */
-  void ParseFilterString(std::string_view filter_view);
+  void ParseFilterString(const std::string_view &filterView);
 
   /// Matches class/level combination against the filter, returning true if it passed.
-  bool CheckMessage(Class log_class, Level level) const;
+  bool CheckMessage(Class logClass, Level level) const;
 
   /// Returns true if any logging classes are set to debug
   bool IsDebug() const;
 
 private:
-  std::array<Level, static_cast<const size_t>(Class::Count)> class_levels;
+  std::array<Level, static_cast<const size_t>(Class::Count)> classLevels;
 };
 
 } // namespace Base::Log

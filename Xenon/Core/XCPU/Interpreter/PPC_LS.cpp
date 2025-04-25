@@ -282,13 +282,13 @@ void PPCInterpreter::PPCInterpreter_stwcx(PPU_STATE *ppuState) {
     return;
 
   if (curThread.ppuRes->V) {
-    intXCPUContext->xenonRes.LockGuard([&] {
+    CPUContext->xenonRes.LockGuard([&] {
       if (curThread.ppuRes->V) {
         if (curThread.ppuRes->resAddr == RA) {
           MMUWrite32(ppuState, EA, static_cast<u32>(GPRi(rs)));
           BSET(CR, 4, CR_BIT_EQ);
         } else {
-          intXCPUContext->xenonRes.Decrement();
+          CPUContext->xenonRes.Decrement();
           curThread.ppuRes->V = false;
         }
       }
@@ -391,13 +391,13 @@ void PPCInterpreter::PPCInterpreter_stdcx(PPU_STATE *ppuState) {
     return;
 
   if (curThread.ppuRes->V) {
-    intXCPUContext->xenonRes.LockGuard([&] {
+    CPUContext->xenonRes.LockGuard([&] {
       if (curThread.ppuRes->V) {
         if (curThread.ppuRes->resAddr == RA) {
           MMUWrite64(ppuState, EA, GPRi(rd));
           BSET(CR, 4, CR_BIT_EQ);
         } else {
-          intXCPUContext->xenonRes.Decrement();
+          CPUContext->xenonRes.Decrement();
           curThread.ppuRes->V = false;
         }
       }
@@ -835,7 +835,7 @@ void PPCInterpreter::PPCInterpreter_lwarx(PPU_STATE *ppuState) {
 
   curThread.ppuRes->V = true;
   curThread.ppuRes->resAddr = RA;
-  intXCPUContext->xenonRes.Increment();
+  CPUContext->xenonRes.Increment();
 
   u32 data = MMURead32(ppuState, EA);
 
@@ -1002,7 +1002,7 @@ void PPCInterpreter::PPCInterpreter_ldarx(PPU_STATE *ppuState) {
 
   curThread.ppuRes->resAddr = RA;
   curThread.ppuRes->V = true;
-  intXCPUContext->xenonRes.Increment();
+  CPUContext->xenonRes.Increment();
 
   u64 data = MMURead64(ppuState, EA);
 
@@ -1192,7 +1192,7 @@ void PPCInterpreter::PPCInterpreter_lvx128(PPU_STATE* ppuState) {
   Base::Vector128 vector {};
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   
-  MMURead(intXCPUContext, ppuState, EA, 16, vector.bytes.data());
+  MMURead(CPUContext, ppuState, EA, 16, vector.bytes.data());
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;

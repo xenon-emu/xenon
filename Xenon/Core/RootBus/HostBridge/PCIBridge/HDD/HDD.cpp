@@ -92,7 +92,7 @@ void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
 
     memcpy(data, (u8*)&ataDeviceState.ataReadState + regOffset, size);
   } else {
-    LOG_ERROR(HDD, "Unknown register being accessed: (Read) {:#x}", regOffset);
+    LOG_ERROR(HDD, "Unknown register! Attempted to read 0x{:X}", regOffset);
     memset(data, 0, size);
   }
 }
@@ -213,7 +213,7 @@ void Xe::PCIDev::HDD::MemSet(u64 writeAddress, s32 data, u64 size) {
       case ATA_COMMAND_IDENTIFY_DEVICE:
         // Copy the device indetification data to our read buffer.
         if (!ataDeviceState.readBuffer.empty())
-          LOG_ERROR(HDD, "Read Buffer not empty!");
+          LOG_ERROR(HDD, "Read buffer not empty!");
         ataDeviceState.readBuffer.resize(sizeof(ATA_IDENTIFY_DATA));
         memset(ataDeviceState.readBuffer.data(), data, sizeof(ATA_IDENTIFY_DATA));
         // Set data ready flag.
@@ -236,7 +236,7 @@ void Xe::PCIDev::HDD::MemSet(u64 writeAddress, s32 data, u64 size) {
 
     memset(reinterpret_cast<u8*>(&ataDeviceState.ataWriteState + regOffset), data, size);
   } else {
-    LOG_ERROR(HDD, "Unknown register being accessed: (Write) {:#x}", regOffset);
+    LOG_ERROR(HDD, "Unknown register! Attempted to write 0x{:X}", regOffset);
   }
 }
 
@@ -272,7 +272,7 @@ void Xe::PCIDev::HDD::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
 
 void Xe::PCIDev::HDD::ataCopyIdentifyDeviceData() {
   if (!ataDeviceState.readBuffer.empty())
-    LOG_ERROR(HDD, "Read Buffer not empty!");
+    LOG_ERROR(HDD, "Read buffer not empty!");
 
   ataDeviceState.readBuffer.resize(sizeof(ATA_IDENTIFY_DATA));
   memcpy(ataDeviceState.readBuffer.data(), &ataDeviceState.ataIdentifyData, sizeof(ATA_IDENTIFY_DATA));

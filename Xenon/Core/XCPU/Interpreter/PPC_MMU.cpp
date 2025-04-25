@@ -488,26 +488,18 @@ bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *ppuState, u64 *RPN, u64 VA, u8
 
 // Routine to read a string from memory, using a PSTRNG given by the kernel.
 void PPCInterpreter::mmuReadString(PPU_STATE *ppuState, u64 stringAddress,
-                                   char *string, u32 maxLenght) {
+                                   char *string, u32 maxLength) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUReadString", MP_AUTO);
   u32 strIndex;
   u32 stringBufferAddress = 0;
-  u16 Length = 0;
+  u16 strLength = MMURead16(ppuState, stringAddress);
 
-  Length = MMURead16(ppuState, stringAddress);
-  if (Length < maxLenght)
-    maxLenght = Length + 1;
+  if (strLength < maxLength)
+    maxLength = strLength + 1;
 
-  // Search Buffer
   stringBufferAddress = MMURead32(ppuState, stringAddress + 4);
-
-  for (strIndex = 0; strIndex < maxLenght; strIndex++, stringBufferAddress++) {
-    string[strIndex] = MMURead8(ppuState, stringBufferAddress);
-    if (string[strIndex] == 0)
-      break;
-  }
-
-  string[maxLenght - 1] = 0;
+  MMURead(CPUContext, ppuState, stringBufferAddress, maxLength, reinterpret_cast<u8*>(string));
+  string[maxLength - 1] = 0;
 }
 
 SECENG_ADDRESS_INFO
@@ -1170,14 +1162,14 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
 
 void PPCInterpreter::MMUMemCpyFromHost(PPU_STATE *ppuState,
                                        u64 EA, const void* source, u64 size) {
-  MMUWrite(intXCPUContext, ppuState, reinterpret_cast<const u8*>(source), EA, size);
+  MMUWrite(CPUContext, ppuState, reinterpret_cast<const u8*>(source), EA, size);
 }
 
 void PPCInterpreter::MMUMemCpy(PPU_STATE *ppuState,
                                u64 EA, u32 source, u64 size) {
   std::unique_ptr<u8[]> data = std::make_unique<STRIP_UNIQUE_ARR(data)>(size);
-  MMURead(intXCPUContext, ppuState, source, size, data.get());
-  MMUWrite(intXCPUContext, ppuState, data.get(), EA, size);
+  MMURead(CPUContext, ppuState, source, size, data.get());
+  MMUWrite(CPUContext, ppuState, data.get(), EA, size);
   data.reset();
 }
 
@@ -1189,7 +1181,7 @@ void PPCInterpreter::MMUMemSet(PPU_STATE *ppuState,
     return;
 
   // Check if it's reserved
-  intXCPUContext->xenonRes.Check(EA);
+  CPUContext->xenonRes.Check(EA);
 
   bool socWrite = false;
 
@@ -1209,13 +1201,13 @@ void PPCInterpreter::MMUMemSet(PPU_STATE *ppuState,
       // Check if writing to internal SRAM
       else if (EA >= XE_SRAM_ADDR && EA < XE_SRAM_ADDR + XE_SRAM_SIZE) {
         u32 sramAddr = static_cast<u32>(EA - XE_SRAM_ADDR);
-        memset(&intXCPUContext->SRAM[sramAddr], data, size);
+        memset(&CPUContext->SRAM[sramAddr], data, size);
         return;
       }
       // Check if writing to Security Engine Config Block
       else if (EA >= XE_SOCSECENG_BLOCK_START && EA < XE_SOCSECENG_BLOCK_START + XE_SOCSECENG_BLOCK_SIZE) {
         u32 secEngOffset = static_cast<u32>(EA - XE_SOCSECENG_BLOCK_START);
-        memset(reinterpret_cast<u8*>(intXCPUContext->socSecEngBlock.get()) + secEngOffset, 0, size);
+        memset(reinterpret_cast<u8*>(CPUContext->socSecEngBlock.get()) + secEngOffset, 0, size);
         return;
       }
     } break;
@@ -1229,43 +1221,43 @@ void PPCInterpreter::MMUMemSet(PPU_STATE *ppuState,
 // Reads 1 byte of memory
 u8 PPCInterpreter::MMURead8(PPU_STATE *ppuState, u64 EA) {
   u8 data = 0;
-  MMURead(intXCPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data));
+  MMURead(CPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data));
   return data;
 }
 // Reads 2 bytes of memory
 u16 PPCInterpreter::MMURead16(PPU_STATE *ppuState, u64 EA) {
   u16 data = 0;
-  MMURead(intXCPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data));
+  MMURead(CPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data));
   return byteswap_be<u16>(data);
 }
 // Reads 4 bytes of memory
 u32 PPCInterpreter::MMURead32(PPU_STATE *ppuState, u64 EA) {
   u32 data = 0;
-  MMURead(intXCPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data));
+  MMURead(CPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data));
   return byteswap_be<u32>(data);
 }
 // Reads 8 bytes of memory
 u64 PPCInterpreter::MMURead64(PPU_STATE *ppuState, u64 EA) {
   u64 data = 0;
-  MMURead(intXCPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data));
+  MMURead(CPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data));
   return byteswap_be<u64>(data);
 }
 // Writes 1 byte to memory
 void PPCInterpreter::MMUWrite8(PPU_STATE *ppuState, u64 EA, u8 data) {
-  MMUWrite(intXCPUContext, ppuState, reinterpret_cast<const u8*>(&data), EA, sizeof(data));
+  MMUWrite(CPUContext, ppuState, reinterpret_cast<const u8*>(&data), EA, sizeof(data));
 }
 // Writes 2 bytes to memory
 void PPCInterpreter::MMUWrite16(PPU_STATE *ppuState, u64 EA, u16 data) {
   const u16 dataBS = byteswap_be<u16>(data);
-  MMUWrite(intXCPUContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data));
+  MMUWrite(CPUContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data));
 }
 // Writes 4 bytes to memory
 void PPCInterpreter::MMUWrite32(PPU_STATE *ppuState, u64 EA, u32 data) {
   const u32 dataBS = byteswap_be<u32>(data);
-  MMUWrite(intXCPUContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data));
+  MMUWrite(CPUContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data));
 }
 // Writes 8 bytes to memory
 void PPCInterpreter::MMUWrite64(PPU_STATE *ppuState, u64 EA, u64 data) {
   const u64 dataBS = byteswap_be<u64>(data);
-  MMUWrite(intXCPUContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data));
+  MMUWrite(CPUContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data));
 }

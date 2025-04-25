@@ -7,7 +7,7 @@
 using namespace PPCInterpreter;
 
 // Forward Declaration
-XENON_CONTEXT* PPCInterpreter::intXCPUContext = nullptr;
+XENON_CONTEXT* PPCInterpreter::CPUContext = nullptr;
 RootBus* PPCInterpreter::sysBus = nullptr;
 PPCInterpreter::PPCDecoder PPCInterpreter::ppcDecoder{};
 
@@ -235,35 +235,48 @@ void PPCInterpreter::ppcSystemCallException(PPU_STATE *ppuState) {
 
 void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
   PPU_THREAD_REGISTERS &thread = curThread;
+  // Hacky optimization
+  #undef curThread
+  #define curThread thread
 
   // DbgPrint, r3 = PCSTR stringAddress, r4 = int String Size.
-  if (trapNumber == 0x14) {
-    std::string dbgString;
-    dbgString.resize(thread.GPR[0x4]);
-    size_t strSize = (size_t)thread.GPR[0x4];
-    for (int idx = 0; idx < strSize; idx++) {
-      dbgString[idx] = MMURead8(ppuState, GPR(3) + idx);
-    }
-    LOG_XBOX(DebugPrint, "> {}", dbgString);
+  switch (trapNumber) {
+  case 0x14: {
+    u32 strAddr = GPR(3);
+    u64 strSize = (u64)GPR(4);
+    std::unique_ptr<u8[]> buffer = std::make_unique<STRIP_UNIQUE_ARR(buffer)>(strSize);
+    MMURead(CPUContext, ppuState, strAddr, strSize, buffer.get());
+    char *dbgString = reinterpret_cast<char*>(buffer.get());
+    Base::Log::NoFmtMessage(Base::Log::Class::DebugPrint, Base::Log::Level::Guest, dbgString);
+    break;
   }
-
-  if (trapNumber == 0x17) {
+  case 0x17:
     // DebugLoadImageSymbols, type signature:
     // PUBLIC VOID DebugLoadImageSymbols(IN PSTRING ModuleName == $r3,
     //                   IN PKD_SYMBOLS_INFO Info == $r4)
-
     ppcDebugLoadImageSymbols(ppuState, GPR(3), GPR(4));
-  }
-  if (trapNumber == 24) {
+    break;
+  case 0x18:
     // DebugUnloadImageSymbols, type signature:
     // PUBLIC VOID DebugUnloadImageSymbols(IN PSTRING ModuleName == $r3,
     //                   IN PKD_SYMBOLS_INFO Info == $r4)
-
     ppcDebugUnloadImageSymbols(ppuState, GPR(3), GPR(4));
+    break;
+  }
+  if (trapNumber == 0x14) {
+    u32 strAddr = GPR(3);
+    u64 strSize = (u64)GPR(4);
+    std::unique_ptr<u8[]> buffer = std::make_unique<STRIP_UNIQUE_ARR(buffer)>(strSize);
+    MMURead(CPUContext, ppuState, strAddr, strSize, buffer.get());
+    char *dbgString = reinterpret_cast<char*>(buffer.get());
+    Base::Log::NoFmtMessage(Base::Log::Class::DebugPrint, Base::Log::Level::Guest, dbgString);
   }
 
   _ex |= PPU_EX_PROG;
   thread.exceptTrapType = TRAP_TYPE_SRR1_TRAP_TRAP;
+  // Hacky optimization
+  #undef curThread
+  #define curThread ppuState->ppuThread[curThreadId]
 }
 
 // FP Unavailable (0x800)
