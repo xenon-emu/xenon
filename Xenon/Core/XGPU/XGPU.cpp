@@ -41,10 +41,11 @@ Xe::Xenos::XGPU::XGPU(RAM *ram) {
   reg = 0x19100000;
   memcpy(&xenosState.Regs[(u32)XeRegister::MPLL_CNTL_REG * 4], &reg, 4);
 
-  commandProcessor.assignRamPtr(ramPtr);
+  commandProcessor = std::make_unique<STRIP_UNIQUE(commandProcessor)>(ramPtr);
 }
 
 Xe::Xenos::XGPU::~XGPU() {
+  commandProcessor.reset();
   xenosState.Regs.reset();
 }
 

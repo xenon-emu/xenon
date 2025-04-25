@@ -51,19 +51,20 @@ public:
 
 private:
   // Mutex handle
-  std::recursive_mutex mutex{};
+  std::recursive_mutex mutex = {};
   // XGPU Config Space Data at address 0xD0010000.
-  GENRAL_PCI_DEVICE_CONFIG_SPACE xgpuConfigSpace{};
+  GENRAL_PCI_DEVICE_CONFIG_SPACE xgpuConfigSpace = {};
   // PCI Device Size, using when determining PCI device size of each BAR in Linux.
-  u32 pciDevSizes[6]{};
+  u32 pciDevSizes[6] = {};
 
   // RAM Pointer
-  RAM *ramPtr{};
+  RAM *ramPtr = nullptr;
 
   // GPU State
-  XenosState xenosState{};
+  XenosState xenosState = {};
 
-  Xe::XGPU::CommandProcessor commandProcessor;
+  // Command Processor
+  std::unique_ptr<Xe::XGPU::CommandProcessor> commandProcessor = {};
 };
 } // namespace Xenos
 } // namespace Xe
