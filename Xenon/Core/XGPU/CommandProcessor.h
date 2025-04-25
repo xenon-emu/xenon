@@ -1,3 +1,20 @@
+/*
+* Copyright 2025 Xenon Emulator Project. All rights reserved.
+* 
+* Most of the information in this file was gathered from
+* various sources across the internet.
+*
+* In particular, this work is based heavily on research by
+* the Xenia developers — especially Triang3l —
+* whose dedication and deep understanding of the hardware
+* made accurate Xenos emulation possible.
+*
+* Huge thanks to everyone who contributed to uncovering and
+* documenting this complex system.
+*/
+
+#pragma once
+
 #include "Core/RAM/RAM.h"
 #include "Base/Logging/Log.h"
 
