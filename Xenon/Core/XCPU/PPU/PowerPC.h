@@ -76,6 +76,95 @@ union PPCOpcode {
   PPCBitfield<u32, 15, 1> l15; // 15
   ControlField<PPCBitfield<s32, 16, 14>, FixedField<u32, 0, 2>> bt14;
   ControlField<PPCBitfield<s32, 6, 24>, FixedField<u32, 0, 2>> bt24;
+  
+  // VMX128 Bitfields.
+
+  // VD128 = VD128l | (VD128h << 5)
+  // VA128 = VA128l | (VA128h << 5) | (VA128H << 6)
+  // VB128 = VB128l | (VB128h << 5)
+  struct {
+    PPCBitfield<u32, 6, 5>  VD128l; // 6..10
+    PPCBitfield<u32, 11, 5> VA128l; // 11..15
+    PPCBitfield<u32, 16, 5> VB128l; // 16..20
+    PPCBitfield<u32, 21, 1> VA128H; // 21
+    PPCBitfield<u32, 26, 1> VA128h; // 26
+    PPCBitfield<u32, 28, 2> VD128h; // 28..29
+    PPCBitfield<u32, 30, 2> VB128h; // 30..31
+  } VMX128;
+  // VD128 = VD128l | (VD128h << 5)
+  struct {
+    PPCBitfield<u32, 6, 5>  VD128l; // 6..10
+    PPCBitfield<u32, 28, 2> VD128h; // 28..30
+  } VMX128_1;
+  // VD128 = VD128l | (VD128h << 5)
+  // VA128 = VA128l | (VA128h << 5) | (VA128H << 6)
+  // VB128 = VB128l | (VB128h << 5)
+  struct {
+    PPCBitfield<u32, 6, 5>  VD128l; // 6..10
+    PPCBitfield<u32, 11, 5> VA128l; // 11..15
+    PPCBitfield<u32, 16, 5> VB128l; // 16..20
+    PPCBitfield<u32, 21, 1> VA128H; // 21
+    PPCBitfield<u32, 23, 3> VC;     // 23..25
+    PPCBitfield<u32, 26, 1> VA128h; // 26
+    PPCBitfield<u32, 28, 2> VD128h; // 28..29
+    PPCBitfield<u32, 30, 2> VB128h; // 30..31
+  } VMX128_2;
+  // VD128 = VD128l | (VD128h << 5)
+  // VB128 = VB128l | (VB128h << 5)
+  struct {
+    PPCBitfield<u32, 6, 5>  VD128l; // 6..10
+    PPCBitfield<u32, 11, 5> IMM;    // 11..15
+    PPCBitfield<u32, 16, 5> VB128l; // 16..20
+    PPCBitfield<u32, 28, 2> VD128h; // 28..29
+    PPCBitfield<u32, 30, 2> VB128h; // 30..31
+  } VMX128_3;
+  // VD128 = VD128l | (VD128h << 5)
+  // VB128 = VB128l | (VB128h << 5)
+  struct {
+    PPCBitfield<u32, 6, 5>  VD128l; // 6..10
+    PPCBitfield<u32, 11, 5> IMM;    // 11..15
+    PPCBitfield<u32, 16, 5> VB128l; // 16..20
+    PPCBitfield<u32, 24, 2> z;      // 24..25
+    PPCBitfield<u32, 28, 2> VD128h; // 28..29
+    PPCBitfield<u32, 30, 2> VB128h; // 30..31
+  } VMX128_4;
+  // VD128 = VD128l | (VD128h << 5)
+  // VA128 = VA128l | (VA128h << 5) | (VA128H << 6)
+  // VB128 = VB128l | (VB128h << 5)
+  struct {
+    PPCBitfield<u32, 6, 5>  VD128l; // 6..10
+    PPCBitfield<u32, 11, 5> VA128l; // 11..15
+    PPCBitfield<u32, 16, 5> VB128l; // 16..20
+    PPCBitfield<u32, 21, 1> VA128H; // 21
+    PPCBitfield<u32, 22, 4> SH;     // 22..25
+    PPCBitfield<u32, 26, 1> VA128h; // 26
+    PPCBitfield<u32, 28, 2> VD128h; // 28..29
+    PPCBitfield<u32, 30, 2> VB128h; // 30..31
+  } VMX128_5;
+  // VD128 = VD128l | (VD128h << 5)
+  // VB128 = VB128l | (VB128h << 5)
+  // PERM = PERMl | (PERMh << 5)
+  struct {
+    PPCBitfield<u32, 6, 5>  VD128l; // 6..10
+    PPCBitfield<u32, 11, 5> PERMl;  // 11..15
+    PPCBitfield<u32, 16, 5> VB128l; // 16..20
+    PPCBitfield<u32, 23, 3> PERMh;  // 23..25
+    PPCBitfield<u32, 28, 2> VD128h; // 28..29
+    PPCBitfield<u32, 30, 2> VB128h; // 30..31
+  } VMX128_P;
+  // VD128 = VD128l | (VD128h << 5)
+  // VA128 = VA128l | (VA128h << 5) | (VA128H << 6)
+  // VB128 = VB128l | (VB128h << 5)
+  struct {
+    PPCBitfield<u32, 6, 5>  VD128l; // 6..10
+    PPCBitfield<u32, 11, 5> VA128l; // 11..15
+    PPCBitfield<u32, 16, 5> VB128l; // 16..20
+    PPCBitfield<u32, 21, 1> VA128H; // 21
+    PPCBitfield<u32, 25, 1> Rc;     // 25
+    PPCBitfield<u32, 26, 1> VA128h; // 26
+    PPCBitfield<u32, 28, 2> VD128h; // 28..29
+    PPCBitfield<u32, 30, 2> VB128h; // 30..31
+  } VMX128_R;
 };
 
 //
@@ -504,9 +593,10 @@ struct SECENG_ADDRESS_INFO {
 #define PPU_EX_FPU 0x200
 #define PPU_EX_DEC 0x400
 #define PPU_EX_HDEC 0x800
-#define PPU_EX_SC 0x1000
-#define PPU_EX_TRACE 0x2000
-#define PPU_EX_PERFMON 0x4000
+#define PPU_EX_VXU 0x1000
+#define PPU_EX_SC 0x2000
+#define PPU_EX_TRACE 0x4000
+#define PPU_EX_PERFMON 0x8000
 
 // Floating Point Register
 

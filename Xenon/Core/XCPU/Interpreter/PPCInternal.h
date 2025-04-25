@@ -418,3 +418,32 @@ static constexpr u64 ExtractBits64(u32 input, u32 begin, u32 end) {
 #define CR_BIT_GT 1
 #define CR_BIT_EQ 2
 #define CR_BIT_SO 3
+
+// VMX Bitfields.
+// Sources:
+// https://github.com/kakaroto/ps3ida/blob/master/plugins/PPCAltivec/src/main.cpp
+// http://biallas.net/doc/vmx128/vmx128.txt
+
+#define VMX128_VD128   (_instr.VMX128.VD128l | (_instr.VMX128.VD128h << 5))
+#define VMX128_VA128   (_instr.VMX128.VA128l | (_instr.VMX128.VA128h << 5) | (_instr.VMX128.VA128H << 6))
+#define VMX128_VB128   (_instr.VMX128.VB128l | (_instr.VMX128.VB128h << 5))
+
+#define VMX128_1_VD128 (_instr.VMX128_1.VD128l | (_instr.VMX128_1.VD128h << 5))
+
+#define VMX128_2_VD128 (_instr.VMX128_2.VD128l | (_instr.VMX128_2.VD128h << 5))
+#define VMX128_2_VA128 (_instr.VMX128_2.VA128l | (_instr.VMX128_2.VA128h << 5) | (_instr.VMX128_2.VA128H << 6))
+#define VMX128_2_VB128 (_instr.VMX128_2.VB128l | (_instr.VMX128_2.VB128h << 5))
+#define VMX128_2_VC    (_instr.VMX128_2.VC)
+
+#define VMX128_3_VD128 (_instr.VMX128_3.VD128l | (_instr.VMX128_3.VD128h << 5))
+#define VMX128_3_VB128 (_instr.VMX128_3.VB128l | (_instr.VMX128_3.VB128h << 5))
+#define VMX128_3_IMM   (_instr.VMX128_3.IMM)
+
+#define VMX128_5_VD128 (_instr.VMX128_5.VD128l | (_instr.VMX128_5.VD128h << 5))
+#define VMX128_5_VA128 (_instr.VMX128_5.VA128l | (_instr.VMX128_5.VA128h << 5)) | (_instr.VMX128_5.VA128H << 6)
+#define VMX128_5_VB128 (_instr.VMX128_5.VB128l | (_instr.VMX128_5.VB128h << 5))
+#define VMX128_5_SH    (_instr.VMX128_5.SH)
+
+#define VMX128_R_VD128 (_instr.VMX128_R.VD128l | (_instr.VMX128_R.VD128h << 5))
+#define VMX128_R_VA128 (_instr.VMX128_R.VA128l | (_instr.VMX128_R.VA128h << 5) | (_instr.VMX128_R.VA128H << 6))
+#define VMX128_R_VB128 (_instr.VMX128_R.VB128l | (_instr.VMX128_R.VB128h << 5))
