@@ -516,6 +516,28 @@ void PPCInterpreter::PPCInterpreter_stfiwx(PPU_STATE* ppuState) {
 }
 
 //
+// Store Vector
+//
+
+// Store Vector Indexed LRU (x'7C00 03CE')
+void PPCInterpreter::PPCInterpreter_stvxl(PPU_STATE* ppuState) {
+  /*
+  if rA=0 then b <- 0
+  else b <- (rA)
+  EA <- (b + (rB)) & 0xFFFF_FFFF_FFFF_FFF0
+  if the processor is in big-endian mode
+   then MEM(EA,16) <- (vS)
+   else MEM(EA,16) <- (vS)64:127 || (vS)0:63
+  */
+
+  CHECK_VXU;
+
+  const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
+  
+  MMUWrite(CPUContext, ppuState, VRi(vs).bytes.data(), EA, 16);
+}
+
+//
 // Load Byte
 //
 
