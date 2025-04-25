@@ -262,14 +262,9 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
     //                   IN PKD_SYMBOLS_INFO Info == $r4)
     ppcDebugUnloadImageSymbols(ppuState, GPR(3), GPR(4));
     break;
-  }
-  if (trapNumber == 0x14) {
-    u32 strAddr = GPR(3);
-    u64 strSize = (u64)GPR(4);
-    std::unique_ptr<u8[]> buffer = std::make_unique<STRIP_UNIQUE_ARR(buffer)>(strSize);
-    MMURead(CPUContext, ppuState, strAddr, strSize, buffer.get());
-    char *dbgString = reinterpret_cast<char*>(buffer.get());
-    Base::Log::NoFmtMessage(Base::Log::Class::DebugPrint, Base::Log::Level::Guest, dbgString);
+  default:
+    LOG_WARNING(Xenon, "Unimplemented trap! trapNumber = '0x{:X}'", trapNumber);
+    break;
   }
 
   _ex |= PPU_EX_PROG;
