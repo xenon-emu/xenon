@@ -269,7 +269,6 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
 // FP Unavailable (0x800)
 void PPCInterpreter::ppcFPUnavailableException(PPU_STATE* ppuState) {
   PPU_THREAD_REGISTERS& thread = curThread;
-  return;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): FPU exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA;
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & (QMASK(0, 32) | QMASK(37, 41) | QMASK(48, 63));
