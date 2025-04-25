@@ -109,6 +109,15 @@ namespace PPCInterpreter {
       });
       // Special case opcodes
       fillTable<instructionHandler>(table, 0x04, 11, 12, {
+        //{ 0x083, GET(lvewx128) },
+        //{ 0x403, GET(lvlx128) },
+        //{ 0x603, GET(lvlxl128) },
+        //{ 0x443, GET(lvrx128) },
+        //{ 0x643, GET(lvrxl128) },
+        //{ 0x003, GET(lvsl128) },
+        //{ 0x043, GET(lvsr128) },
+        //{ 0x2C3, GET(lvxl128) },
+        { 0x33C4, GET(lvx128) },
         { 0x7193, GET(stvewx128) },
         { 0x7393, GET(stvrx128) },
         { 0x73C4, GET(stvx128) },
@@ -119,15 +128,6 @@ namespace PPCInterpreter {
       });
       // Group 0x4 opcodes (field 21..31)
       fillTable<instructionHandler>(table, 0x04, 11, 0, {
-        { 0x083, GET(lvewx128) },
-        { 0x403, GET(lvlx128) },
-        { 0x603, GET(lvlxl128) },
-        { 0x443, GET(lvrx128) },
-        { 0x643, GET(lvrxl128) },
-        { 0x003, GET(lvsl128) },
-        { 0x043, GET(lvsr128) },
-        { 0x0C3, GET(lvx128) },
-        { 0x2C3, GET(lvxl128) },
         { 0x604, GET(mfvscr) },
         { 0x644, GET(mtvscr) },
         { 0x180, GET(vaddcuw) },
