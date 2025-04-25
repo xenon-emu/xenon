@@ -51,7 +51,7 @@ void Xe::PCIDev::EHCI::Read(u64 readAddress, u8 *data, u64 size) {
     value = usbCmd;
     break;
   case 0x24:
-    value = usbSts;
+    value = 0x1000; // usbSts, return this for now.
     break;
   case 0x28:
     value = usbIntr;
