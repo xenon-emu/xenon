@@ -11,6 +11,7 @@
 
 #include "Base/Types.h"
 #include "Core/RAM/RAM.h"
+#include "Core/XGPU/CommandProcessor.h"
 #include "Core/RootBus/HostBridge/PCIe.h"
 
 /*
@@ -61,6 +62,8 @@ private:
 
   // GPU State
   XenosState xenosState{};
+
+  Xe::XGPU::CommandProcessor commandProcessor;
 };
 } // namespace Xenos
 } // namespace Xe

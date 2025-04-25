@@ -248,6 +248,8 @@ set(XGPU
     Xenon/Core/XGPU/XenosRegisters.h
     Xenon/Core/XGPU/XGPU.h
     Xenon/Core/XGPU/XGPUConfig.h
+    Xenon/Core/XGPU/CommandProcessor.h
+    Xenon/Core/XGPU/CommandProcessor.cpp
 )
 
 set(Core

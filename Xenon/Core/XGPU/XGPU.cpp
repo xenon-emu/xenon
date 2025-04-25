@@ -40,6 +40,8 @@ Xe::Xenos::XGPU::XGPU(RAM *ram) {
   memcpy(&xenosState.Regs[(u32)XeRegister::FPLL_CNTL_REG * 4], &reg, 4);
   reg = 0x19100000;
   memcpy(&xenosState.Regs[(u32)XeRegister::MPLL_CNTL_REG * 4], &reg, 4);
+
+  commandProcessor.assignRamPtr(ramPtr);
 }
 
 Xe::Xenos::XGPU::~XGPU() {
@@ -119,6 +121,18 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
       LOG_INFO(Xenos, "Setting new Internal Height: {:#x}", Xe_Main->renderer->internalHeight);
     }
 #endif
+    if (reg == XeRegister::CP_RB_CNTL) {
+      u32 tmp = 0;
+      memcpy(&tmp, data, size);
+      tmp = byteswap_be<u32>(tmp);
+      commandProcessor.CPUpdateRBSize(tmp);
+    }
+    if (reg == XeRegister::CP_RB_BASE) {
+      u32 tmp = 0;
+      memcpy(&tmp, data, size);
+      tmp = byteswap_be<u32>(tmp);
+      commandProcessor.CPUpdateRBBase(tmp);
+    }
 
     memcpy(&xenosState.Regs[regIndex * 4], data, size);
     return true;
