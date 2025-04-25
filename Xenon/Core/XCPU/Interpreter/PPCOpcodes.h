@@ -71,7 +71,6 @@ D_STUB(vmulfp128)
 D_STUB(vmrglw128)
 D_STUB(vmrghw128)
 D_STUB(lvrx)
-D_STUB(lvxl)
 D_STUB(lvrxl)
 D_STUB(lvlx)
 D_STUB(lvlxl)
@@ -253,10 +252,8 @@ D_STUB(vavgsh)
 D_STUB(vsubcuw)
 D_STUB(vavgsw)
 D_STUB(vsububs)
-D_STUB(mfvscr)
 D_STUB(vsum4ubs)
 D_STUB(vsubuhs)
-D_STUB(mtvscr)
 D_STUB(vsum4shs)
 D_STUB(vsubuws)
 D_STUB(vsum2sws)
@@ -420,6 +417,12 @@ extern void PPCInterpreter_mffsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_mtfsfx(PPU_STATE *ppuState);
 
 //
+// VXU
+//
+extern void PPCInterpreter_mfvscr(PPU_STATE* ppuState);
+extern void PPCInterpreter_mtvscr(PPU_STATE* ppuState);
+
+//
 // Load/Store
 //
 
@@ -519,4 +522,5 @@ extern void PPCInterpreter_lfs(PPU_STATE *ppuState);
 //
 
 extern void PPCInterpreter_lvx128(PPU_STATE* ppuState);
+extern void PPCInterpreter_lvxl(PPU_STATE* ppuState);
 }

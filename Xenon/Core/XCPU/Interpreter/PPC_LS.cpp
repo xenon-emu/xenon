@@ -1184,18 +1184,52 @@ void PPCInterpreter::PPCInterpreter_lfs(PPU_STATE *ppuState) {
   FPRi(frd).valueAsDouble = static_cast<double>(singlePresFP.valueAsFloat);
 }
 
+//
+// Load Vector
+//
+
 // Load Vector Indexed 128
 void PPCInterpreter::PPCInterpreter_lvx128(PPU_STATE* ppuState) {
   
   CHECK_VXU;
 
   Base::Vector128 vector {};
-  const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
+  const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
   
   MMURead(CPUContext, ppuState, EA, 16, vector.bytes.data());
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  VR(VMX128_1_VD128) = vector;
+  VR(VMX128_1_VD128).dword[0] = byteswap_be<u32>(vector.dword[0]);
+  VR(VMX128_1_VD128).dword[1] = byteswap_be<u32>(vector.dword[1]);
+  VR(VMX128_1_VD128).dword[2] = byteswap_be<u32>(vector.dword[2]);
+  VR(VMX128_1_VD128).dword[3] = byteswap_be<u32>(vector.dword[3]);
+}
+
+// Load Vector Indexed LRU (x'7C00 02CE')
+void PPCInterpreter::PPCInterpreter_lvxl(PPU_STATE* ppuState) {
+  /*
+  if rA=0 then b <- 0
+  else b <- (rA)
+  EA <- (b + (rB)) & (~0xF)
+  if the processor is in big-endian mode
+   then vD <- MEM(EA,16)
+   else vD <- MEM(EA+8,8) || MEM(EA,8)
+  */
+
+  CHECK_VXU;
+
+  Base::Vector128 vector{};
+  const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
+
+  MMURead(intXCPUContext, ppuState, EA, 16, vector.bytes.data());
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  VR(_instr.rd).dword[0] = byteswap_be<u32>(vector.dword[0]);
+  VR(_instr.rd).dword[1] = byteswap_be<u32>(vector.dword[1]);
+  VR(_instr.rd).dword[2] = byteswap_be<u32>(vector.dword[2]);
+  VR(_instr.rd).dword[3] = byteswap_be<u32>(vector.dword[3]);
 }
