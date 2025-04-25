@@ -320,8 +320,6 @@ endif()
 # Add defines specific to windows
 if (WIN32)
   target_link_libraries(Xenon PRIVATE ws2_32)
-  add_compile_definitions(NTDDI_VERSION=0x0A000008)
-  add_compile_definitions(_WIN32_WINNT=0x0A00)
   add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
 
   # Disables Warnings
