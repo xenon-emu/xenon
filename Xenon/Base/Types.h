@@ -210,18 +210,26 @@ public:
     return lo;
   }
 
-  constexpr friend u128 operator+(const u128& l, const u128& r) {
+  constexpr friend bool operator==(const u128 &l, const u128 &r) {
+    return l.lo == r.lo && l.hi == r.hi;
+  }
+
+  constexpr friend bool operator!=(const u128 &l, const u128 &r) {
+    return l.lo != r.lo && l.hi != r.hi;
+  }
+
+  constexpr friend u128 operator+(const u128 &l, const u128 &r) {
     u128 value = l;
     value += r;
     return value;
   }
 
-  constexpr friend u128 operator-(const u128& l, const u128& r) {
+  constexpr friend u128 operator-(const u128 &l, const u128 &r) {
     u128 value = l;
     value -= r;
     return value;
   }
-  constexpr friend u128 operator*(const u128& l, const u128& r) {
+  constexpr friend u128 operator*(const u128 &l, const u128 &r) {
     u128 value = l;
     value *= r;
     return value;
@@ -270,26 +278,26 @@ public:
     value.hi = ~hi;
     return value;
   }
-  constexpr friend u128 operator&(const u128& l, const u128& r) {
+  constexpr friend u128 operator&(const u128 &l, const u128 &r) {
     u128 value{};
     value.lo = l.lo & r.lo;
     value.hi = l.hi & r.hi;
     return value;
   }
-  constexpr friend u128 operator|(const u128& l, const u128& r) {
+  constexpr friend u128 operator|(const u128 &l, const u128 &r) {
     u128 value{};
     value.lo = l.lo | r.lo;
     value.hi = l.hi | r.hi;
     return value;
   }
-  constexpr friend u128 operator^(const u128& l, const u128& r) {
+  constexpr friend u128 operator^(const u128 &l, const u128 &r) {
     u128 value{};
     value.lo = l.lo ^ r.lo;
     value.hi = l.hi ^ r.hi;
     return value;
   }
 
-  constexpr u128& operator+=(const u128& r) {
+  constexpr u128& operator+=(const u128 &r) {
     if (std::is_constant_evaluated()) {
       lo += r.lo;
       hi += r.hi + (lo < r.lo);
@@ -300,7 +308,7 @@ public:
 
     return *this;
   }
-  constexpr u128& operator-=(const u128& r) {
+  constexpr u128& operator-=(const u128 &r) {
     if (std::is_constant_evaluated()) {
       hi -= r.hi + (lo < r.lo);
       lo -= r.lo;
@@ -311,7 +319,7 @@ public:
 
     return *this;
   }
-  constexpr u128& operator*=(const u128& r) {
+  constexpr u128& operator*=(const u128 &r) {
     const u64 _hi = r.hi * lo + r.lo * hi;
     if (std::is_constant_evaluated()) {
       hi = (lo >> 32) * (r.lo >> 32) + (((lo >> 32) * (r.lo & 0xffffffff)) >> 32) + (((r.lo >> 32) * (lo & 0xffffffff)) >> 32);
@@ -325,7 +333,7 @@ public:
     return *this;
   }
 
-  constexpr u128& operator<<=(const u128& r) {
+  constexpr u128& operator<<=(const u128 &r) {
     if (std::is_constant_evaluated()) {
       if (r.hi == 0 && r.lo < 64) {
         hi = (hi << r.lo) | (lo >> (64 - r.lo));
@@ -345,7 +353,7 @@ public:
     hi = (r.lo & 64) ? v0 : v1;
     return *this;
   }
-  constexpr u128& operator>>=(const u128& r) {
+  constexpr u128& operator>>=(const u128 &r) {
     if (std::is_constant_evaluated()) {
       if (r.hi == 0 && r.lo < 64) {
         lo = (lo >> r.lo) | (hi << (64 - r.lo));
@@ -365,17 +373,17 @@ public:
     hi = (r.lo & 64) ? 0 : v0;
     return *this;
   }
-  constexpr u128& operator&=(const u128& r) {
+  constexpr u128& operator&=(const u128 &r) {
     lo &= r.lo;
     hi &= r.hi;
     return *this;
   }
-  constexpr u128& operator|=(const u128& r) {
+  constexpr u128& operator|=(const u128 &r) {
     lo |= r.lo;
     hi |= r.hi;
     return *this;
   }
-  constexpr u128& operator^=(const u128& r) {
+  constexpr u128& operator^=(const u128 &r) {
     lo ^= r.lo;
     hi ^= r.hi;
     return *this;
@@ -394,7 +402,7 @@ public:
     value >>= shift_value;
     return value;
   }
-  constexpr s128& operator>>=(const u128& r) {
+  constexpr s128& operator>>=(const u128 &r) {
     if (std::is_constant_evaluated()) {
       if (r.hi == 0 && r.lo < 64) {
         lo = (lo >> r.lo) | (hi << (64 - r.lo));

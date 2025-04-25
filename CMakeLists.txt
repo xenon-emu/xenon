@@ -115,6 +115,7 @@ set(Base
   Xenon/Base/Thread.cpp
   Xenon/Base/Thread.h
   Xenon/Base/Types.h
+  Xenon/Base/Vector128.h
   Xenon/Base/Version.h
 )
 

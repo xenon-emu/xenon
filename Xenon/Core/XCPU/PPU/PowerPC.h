@@ -7,6 +7,7 @@
 
 #include "Base/Bitfield.h"
 #include "Base/LRUCache.h"
+#include "Base/Vector128.h"
 #include "Core/XCPU/XenonSOC.h"
 #include "Core/XCPU/IIC/IIC.h"
 #include "Core/XCPU/XenonReservations.h"
@@ -300,20 +301,17 @@ union PVRegister {
 };
 
 // Vector Status and Control Register
-union VSCRegister
-{
+union VSCRegister {
   u32 hexValue;
 #ifdef __LITTLE_ENDIAN__
-  struct
-  {
+  struct {
     u32 SAT : 1;
     u32 res0 : 15;
     u32 NJ : 1;
     u32 res1 : 15;
   };
 #else
-  struct
-  {
+  struct {
     u32 res1 : 15;
     u32 NJ : 1;
     u32 res0 : 15;
