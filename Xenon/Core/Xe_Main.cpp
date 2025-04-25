@@ -24,7 +24,6 @@ XeMain::XeMain() {
   pciBridge->RegisterIIC(xenonCPU->GetIICPointer());
 }
 XeMain::~XeMain() {
-  MICROPROFILE_SCOPEI("[Xe::Main]", "Shutdown", MP_AUTO);
   saveConfig();
   // Delete the XGPU and XCPU
   xenos.reset();
@@ -62,6 +61,10 @@ XeMain::~XeMain() {
 
   // Delete the log filter
   logFilter.reset();
+#if AUTO_FLIP
+  MicroProfileStopAutoFlip();
+#endif
+  MicroProfileShutdown();
 }
 
 void XeMain::saveConfig() {

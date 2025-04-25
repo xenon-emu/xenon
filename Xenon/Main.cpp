@@ -117,13 +117,6 @@ s32 main(s32 argc, char *argv[]) {
     std::this_thread::sleep_for(100ns);
   }
   // Shutdown
-  {
-    MICROPROFILE_SCOPEI("[Core]", "Shutdown", MP_AUTO);
-    Xe_Main.reset();
-  }
-#if AUTO_FLIP
-  MicroProfileStopAutoFlip();
-#endif
-  MicroProfileShutdown();
+  Xe_Main.reset();
   return 0;
 }
