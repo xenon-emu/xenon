@@ -3,7 +3,7 @@
 namespace Xe::XGPU {
   
 CommandProcessor::CommandProcessor(RAM *ramPtr) : ram(ramPtr) {
-  cpWorkerThread = std::thread(&CommandProcessor::cpWorkerThreadLoop);
+  cpWorkerThread = std::thread(&CommandProcessor::cpWorkerThreadLoop, this);
 }
 
 CommandProcessor::~CommandProcessor() {
