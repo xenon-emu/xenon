@@ -29,19 +29,40 @@ extern XENON_CONTEXT *intXCPUContext;
 #define GPRi(x)       GPR(_instr.x)
 #define XER_SET_CA(v) curThread.SPR.XER.CA = v
 #define XER_GET_CA    curThread.SPR.XER.CA
+
 //
 // Floating Point helpers
 //
+
 #define FPR(x)        curThread.FPR[x]
 #define FPRi(x)       curThread.FPR[_instr.x]
 #define GET_FPSCR     curThread.FPSCR.FPSCR_Hex
 #define SET_FPSCR(x)  curThread.FPSCR.FPSCR_Hex = x
+// Check for Enabled FPU.
+#define CHECK_FPU       if (!checkFpuAvailable(ppuState)) { return; }
 
-static inline void checkFpuAvailable(PPU_STATE* ppuState) {
+//
+// VXU Helpers
+//
+#define VR(x)         curThread.VR[x]
+// Check for Enabled VXU.
+#define CHECK_VXU       if (!checkVxuAvailable(ppuState)) { return; }
+
+
+static inline bool checkFpuAvailable(PPU_STATE* ppuState) {
   if (curThread.SPR.MSR.FP != 1) {
     _ex |= PPU_EX_FPU;
-    return;
+    return false;
   }
+  return true;
+}
+
+static inline bool checkVxuAvailable(PPU_STATE* ppuState) {
+  if (curThread.SPR.MSR.VXU != 1) {
+    _ex |= PPU_EX_VXU;
+    return false;
+  }
+  return true;
 }
 
 //
