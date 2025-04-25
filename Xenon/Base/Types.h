@@ -130,7 +130,7 @@ public:
 template <typename T>
 constexpr T max_v = max<T>::value;
 
-extern void assert_fail_debug_msg(const std::string& msg);
+extern void throw_fail_debug_msg(const std::string& msg);
 
 // Array accessors
 template <typename cT, typename T>
@@ -139,7 +139,7 @@ template <typename cT, typename T>
   // Associative container
   size_t cSize = c.size();
   if (cSize <= idx) [[unlikely]] {
-    assert_fail_debug_msg(std::format("Range check failed! (index: {}{})", idx, cSize != max_v<size_t> ? std::format(", size: {}", cSize) : ""));
+    throw_fail_debug_msg(std::format("Range check failed! (index: {}{})", idx, cSize != max_v<size_t> ? std::format(", size: {}", cSize) : ""));
   }
   auto it = std::begin(std::forward<cT>(c));
   std::advance(it, idx);
@@ -155,7 +155,7 @@ template <typename cT, typename T>
   if constexpr ((requires() { c.size(); }))
     cSize = c.size();
   if (found == c.end()) [[unlikely]] {
-    assert_fail_debug_msg(std::format("Range check failed! (index: {}{})", idx, cSize != max_v<size_t> ? std::format(", size: {}", cSize) : ""));
+    throw_fail_debug_msg(std::format("Range check failed! (index: {}{})", idx, cSize != max_v<size_t> ? std::format(", size: {}", cSize) : ""));
   }
   return found->second;
 }

@@ -53,13 +53,13 @@ namespace PPCInterpreter {
   public:
     void fillTables() {
       #define GET_(name) &PPCInterpreter_##name
-  	  #define GET(name) GET_(name), GET_(name)
+      #define GET(name) GET_(name), GET_(name)
       #define GETRC(name) GET_(name##x), GET_(name##x)
-  	  for (auto& x : table) {
+      for (auto& x : table) {
         x = GET(invalid);
-  	  }
-  	  // Main opcodes (field 0..5)
-  	  fillTable<instructionHandler>(table, 0x00, 6, -1, {
+      }
+      // Main opcodes (field 0..5)
+      fillTable<instructionHandler>(table, 0x00, 6, -1, {
         { 0x02, GET(tdi) },
         { 0x03, GET(twi) },
         { 0x07, GET(mulli) },
@@ -106,7 +106,17 @@ namespace PPCInterpreter {
         { 0x35, GET(stfsu) },
         { 0x36, GET(stfd) },
         { 0x37, GET(stfdu) },
-  	  });
+      });
+      // Special case opcodes
+      fillTable<instructionHandler>(table, 0x04, 11, 12, {
+        { 0x7193, GET(stvewx128) },
+        { 0x7393, GET(stvrx128) },
+        { 0x73C4, GET(stvx128) },
+        //{ 0x503, GET(stvlx128) },
+        //{ 0x703, GET(stvlxl128) },
+        //{ 0x743, GET(stvrxl128) },
+        //{ 0x3C3, GET(stvxl128) },
+      });
       // Group 0x4 opcodes (field 21..31)
       fillTable<instructionHandler>(table, 0x04, 11, 0, {
         { 0x083, GET(lvewx128) },
@@ -120,13 +130,6 @@ namespace PPCInterpreter {
         { 0x2C3, GET(lvxl128) },
         { 0x604, GET(mfvscr) },
         { 0x644, GET(mtvscr) },
-        { 0x7193, GET(stvewx128), 3 },
-        //{ 0x503, GET(stvlx128) },
-        //{ 0x703, GET(stvlxl128) },
-        { 0x7393, GET(stvrx128), 3 },
-        //{ 0x743, GET(stvrxl128) },
-        { 0x73C4, GET(stvx128), 3 },
-        //{ 0x3C3, GET(stvxl128) },
         { 0x180, GET(vaddcuw) },
         { 0x00A, GET(vaddfp) },
         { 0x300, GET(vaddsbs) },
@@ -271,9 +274,9 @@ namespace PPCInterpreter {
         { 0x28E, GET(vupklsb) },
         { 0x2CE, GET(vupklsh) },
         { 0x4C4, GET(vxor) },
-        });
-  	  // Group 0x13 opcodes (field 21..30)
-  	  fillTable<instructionHandler>(table, 0x13, 10, 1, {
+      });
+      // Group 0x13 opcodes (field 21..30)
+      fillTable<instructionHandler>(table, 0x13, 10, 1, {
         { 0x000, GET(mcrf) },
         { 0x010, GET(bclr) },
         { 0x012, GET(rfid) },
@@ -287,9 +290,9 @@ namespace PPCInterpreter {
         { 0x1A1, GET(crorc) },
         { 0x1C1, GET(cror) },
         { 0x210, GET(bcctr) },
-  	  });
-  	  // Group 0x1E opcodes (field 27..30)
-  	  fillTable<instructionHandler>(table, 0x1E, 4, 1, {
+      });
+      // Group 0x1E opcodes (field 27..30)
+      fillTable<instructionHandler>(table, 0x1E, 4, 1, {
         { 0x0, GETRC(rldicl) },
         { 0x1, GETRC(rldicl) },
         { 0x2, GETRC(rldicr) },
@@ -300,9 +303,9 @@ namespace PPCInterpreter {
         { 0x7, GETRC(rldimi) },
         { 0x8, GETRC(rldcl) },
         { 0x9, GETRC(rldcr) },
-  	  });
-  	  // Group 0x1F opcodes (field 21..30)
-  	  fillTable<instructionHandler>(table, 0x1F, 10, 1, {
+      });
+      // Group 0x1F opcodes (field 21..30)
+      fillTable<instructionHandler>(table, 0x1F, 10, 1, {
         { 0x000, GET(cmp) },
         { 0x004, GET(tw) },
         { 0x006, GET(lvsl) },
@@ -463,15 +466,15 @@ namespace PPCInterpreter {
         { 0x3DA, GETRC(extsw) },
         { 0x3D6, GET(icbi) },
         { 0x3F6, GET(dcbz) },
-  	  });
-  	  // Group 0x3A opcodes (field 30..31)
-  	  fillTable<instructionHandler>(table, 0x3A, 2, 0, {
+      });
+      // Group 0x3A opcodes (field 30..31)
+      fillTable<instructionHandler>(table, 0x3A, 2, 0, {
         { 0x0, GET(ld) },
         { 0x1, GET(ldu) },
         { 0x2, GET(lwa) },
-  	  });
-  	  // Group 0x3B opcodes (field 21..30)
-  	  fillTable<instructionHandler>(table, 0x3B, 10, 1, {
+      });
+      // Group 0x3B opcodes (field 21..30)
+      fillTable<instructionHandler>(table, 0x3B, 10, 1, {
         { 0x12, GETRC(fdivs), 5 },
         { 0x14, GETRC(fsubs), 5 },
         { 0x15, GETRC(fadds), 5 },
@@ -482,14 +485,14 @@ namespace PPCInterpreter {
         { 0x1D, GETRC(fmadds), 5 },
         { 0x1E, GETRC(fnmsubs), 5 },
         { 0x1F, GETRC(fnmadds), 5 },
-  	  });
-  	  // Group 0x3E opcodes (field 30..31)
-  	  fillTable<instructionHandler>(table, 0x3E, 2, 0, {
+      });
+      // Group 0x3E opcodes (field 30..31)
+      fillTable<instructionHandler>(table, 0x3E, 2, 0, {
         { 0x0, GET(std) },
         { 0x1, GET(stdu) },
-  	  });
-  	  // Group 0x3F opcodes (field 21..30)
-  	  fillTable<instructionHandler>(table, 0x3F, 10, 1, {
+      });
+      // Group 0x3F opcodes (field 21..30)
+      fillTable<instructionHandler>(table, 0x3F, 10, 1, {
         { 0x026, GETRC(mtfsb1) },
         { 0x040, GETRC(mcrfs) },
         { 0x046, GETRC(mtfsb0) },
@@ -522,20 +525,20 @@ namespace PPCInterpreter {
         { 0x32E, GETRC(fctid) },
         { 0x32F, GETRC(fctidz) },
         { 0x34E, GETRC(fcfid) },
-  	  });
+      });
       #undef GET_
       #undef GET
       #undef GETRC
     }
     void fillNameTables() {
       #define GET_(name) std::string(#name)
-  	  #define GET(name) GET_(name), GET_(name)
+      #define GET(name) GET_(name), GET_(name)
       #define GETRC(name) GET_(name##x), GET_(name##x)
-  	  for (auto& x : nameTable) {
+      for (auto& x : nameTable) {
         x = GET(invalid);
-  	  }
-  	  // Main opcodes (field 0..5)
-  	  fillTable<std::string>(nameTable, 0x00, 6, -1, {
+      }
+      // Main opcodes (field 0..5)
+      fillTable<std::string>(nameTable, 0x00, 6, -1, {
         { 0x02, GET(tdi) },
         { 0x03, GET(twi) },
         { 0x07, GET(mulli) },
@@ -582,9 +585,19 @@ namespace PPCInterpreter {
         { 0x35, GET(stfsu) },
         { 0x36, GET(stfd) },
         { 0x37, GET(stfdu) },
-  	  });
-  	  // Group 0x04 opcodes (field 21..31)
-      fillTable<std::string>(nameTable, 0x4, 11, 0, {
+      });
+      // Special case opcodes
+      fillTable<std::string>(nameTable, 0x04, 11, 11, {
+        { 0x7193, GET(stvewx128), 3 },
+        { 0x7393, GET(stvrx128), 3 },
+        { 0x73C4, GET(stvx128), 3 },
+        //{ 0x503, GET(stvlx128) },
+        //{ 0x703, GET(stvlxl128) },
+        //{ 0x743, GET(stvrxl128) },
+        //{ 0x3C3, GET(stvxl128) },
+      });
+      // Group 0x04 opcodes (field 21..31)
+      fillTable<std::string>(nameTable, 0x04, 11, 0, {
         { 0x83, GET(lvewx128) },
         { 0x403, GET(lvlx128) },
         { 0x603, GET(lvlxl128) },
@@ -596,13 +609,6 @@ namespace PPCInterpreter {
         { 0x2C3, GET(lvxl128) },
         { 0x604, GET(mfvscr) },
         { 0x644, GET(mtvscr) },
-        { 0x7193, GET(stvewx128), 3 },
-        //{ 0x503, GET(stvlx128) },
-        //{ 0x703, GET(stvlxl128) },
-        { 0x7393, GET(stvrx128), 3 },
-        //{ 0x743, GET(stvrxl128) },
-        { 0x73C4, GET(stvx128), 3 },
-        //{ 0x3C3, GET(stvxl128) },
         { 0x180, GET(vaddcuw) },
         { 0xA, GET(vaddfp) },
         { 0x300, GET(vaddsbs) },
@@ -747,9 +753,9 @@ namespace PPCInterpreter {
         { 0x28E, GET(vupklsb) },
         { 0x2CE, GET(vupklsh) },
         { 0x4C4, GET(vxor) },
-        });
-  	  // Group 0x13 opcodes (field 21..30)
-  	  fillTable<std::string>(nameTable, 0x13, 10, 1, {
+      });
+      // Group 0x13 opcodes (field 21..30)
+      fillTable<std::string>(nameTable, 0x13, 10, 1, {
         { 0x000, GET(mcrf) },
         { 0x010, GET(bclr) },
         { 0x012, GET(rfid) },
@@ -763,9 +769,9 @@ namespace PPCInterpreter {
         { 0x1A1, GET(crorc) },
         { 0x1C1, GET(cror) },
         { 0x210, GET(bcctr) },
-  	  });
-  	  // Group 0x1E opcodes (field 27..30)
-  	  fillTable<std::string>(nameTable, 0x1E, 4, 1, {
+      });
+      // Group 0x1E opcodes (field 27..30)
+      fillTable<std::string>(nameTable, 0x1E, 4, 1, {
         { 0x0, GETRC(rldicl) },
         { 0x1, GETRC(rldicl) },
         { 0x2, GETRC(rldicr) },
@@ -776,9 +782,9 @@ namespace PPCInterpreter {
         { 0x7, GETRC(rldimi) },
         { 0x8, GETRC(rldcl) },
         { 0x9, GETRC(rldcr) },
-  	  });
-  	  // Group 0x1F opcodes (field 21..30)
-  	  fillTable<std::string>(nameTable, 0x1F, 10, 1, {
+      });
+      // Group 0x1F opcodes (field 21..30)
+      fillTable<std::string>(nameTable, 0x1F, 10, 1, {
         { 0x000, GET(cmp) },
         { 0x004, GET(tw) },
         { 0x006, GET(lvsl) },
@@ -939,15 +945,15 @@ namespace PPCInterpreter {
         { 0x3DA, GETRC(extsw) },
         { 0x3D6, GET(icbi) },
         { 0x3F6, GET(dcbz) },
-  	  });
-  	  // Group 0x3A opcodes (field 30..31)
-  	  fillTable<std::string>(nameTable, 0x3A,2, 0, {
+      });
+      // Group 0x3A opcodes (field 30..31)
+      fillTable<std::string>(nameTable, 0x3A, 2, 0, {
         { 0x0, GET(ld) },
         { 0x1, GET(ldu) },
         { 0x2, GET(lwa) },
-  	  });
-  	  // Group 0x3B opcodes (field 21..30)
-  	  fillTable<std::string>(nameTable, 0x3B, 10, 1, {
+      });
+      // Group 0x3B opcodes (field 21..30)
+      fillTable<std::string>(nameTable, 0x3B, 10, 1, {
         { 0x12, GETRC(fdivs), 5 },
         { 0x14, GETRC(fsubs), 5 },
         { 0x15, GETRC(fadds), 5 },
@@ -958,14 +964,14 @@ namespace PPCInterpreter {
         { 0x1D, GETRC(fmadds), 5 },
         { 0x1E, GETRC(fnmsubs), 5 },
         { 0x1F, GETRC(fnmadds), 5 },
-  	  });
-  	  // Group 0x3E opcodes (field 30..31)
-  	  fillTable<std::string>(nameTable, 0x3E, 2, 0, {
+      });
+      // Group 0x3E opcodes (field 30..31)
+      fillTable<std::string>(nameTable, 0x3E, 2, 0, {
         { 0x0, GET(std) },
         { 0x1, GET(stdu) },
-  	  });
-  	  // Group 0x3F opcodes (field 21..30)
-  	  fillTable<std::string>(nameTable, 0x3F, 10, 1, {
+      });
+      // Group 0x3F opcodes (field 21..30)
+      fillTable<std::string>(nameTable, 0x3F, 10, 1, {
         { 0x026, GETRC(mtfsb1) },
         { 0x040, GETRC(mcrfs) },
         { 0x046, GETRC(mtfsb0) },
@@ -998,7 +1004,7 @@ namespace PPCInterpreter {
         { 0x32E, GETRC(fctid) },
         { 0x32F, GETRC(fctidz) },
         { 0x34E, GETRC(fcfid) },
-  	  });
+      });
     }
     PPCDecoder();
     ~PPCDecoder() = default;

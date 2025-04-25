@@ -1,5 +1,7 @@
 // Copyright 2025 Xenon Emulator Project
 
+#include <iostream>
+
 #include "Assert.h"
 #include "Arch.h"
 
@@ -28,29 +30,27 @@
 #endif // _MSVC_VER
 
 void throw_fail_impl() {
-  Base::Log::Stop();
   std::fflush(stdout);
   Crash();
 }
 
 void assert_fail_impl() {
   Xe_Main->getCPU()->Halt();
-  LOG_CRITICAL(Debug, "Assertion Failed! Soft halting emulator...");
+  std::cout << "Assertion Failed! Soft halting emulator..." << std::endl;
 }
 
 [[noreturn]] void unreachable_impl() {
-  Base::Log::Stop();
   std::fflush(stdout);
   Crash();
   throw std::runtime_error("Unreachable code");
 }
 
 void assert_fail_debug_msg(const std::string& msg) {
-  LOG_CRITICAL(Debug, "Assertion Failed!\n{}", msg.data());
+  std::cout << "Assertion Failed!" << msg.data() << std::endl;
   assert_fail_impl();
 }
 
 void throw_fail_debug_msg(const std::string& msg) {
-  LOG_CRITICAL(Debug, "Assertion Failed!\n{}", msg.data());
+  std::cout << "Assertion Failed!" << msg.data() << std::endl;
   throw_fail_impl();
 }
