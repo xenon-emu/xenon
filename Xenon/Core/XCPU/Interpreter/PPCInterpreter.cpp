@@ -85,6 +85,11 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
     thread.GPR[11] = 0x15E;
   }
 
+  // VdSwap Call. 2.0.17489.0
+  if (static_cast<u32>(thread.CIA) == 0x800F8E20) {
+    LOG_INFO(Xenon, "*** VdSwap ***");
+  }
+
   // This is just to set a PC breakpoint in any PPU/Thread.
   if (static_cast<u32>(thread.CIA) == 0x8009CE40) {
     u8 a = 0;
