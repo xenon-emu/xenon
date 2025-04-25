@@ -1223,7 +1223,7 @@ void PPCInterpreter::PPCInterpreter_lvxl(PPU_STATE* ppuState) {
   Base::Vector128 vector{};
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
 
-  MMURead(intXCPUContext, ppuState, EA, 16, vector.bytes.data());
+  MMURead(CPUContext, ppuState, EA, 16, vector.bytes.data());
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
