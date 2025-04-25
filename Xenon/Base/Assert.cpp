@@ -35,8 +35,10 @@ void throw_fail_impl() {
 }
 
 void assert_fail_impl() {
-  Xe_Main->getCPU()->Halt();
-  std::cout << "Assertion Failed! Soft halting emulator..." << std::endl;
+  if (Config::debug.softHaltOnAssertions) {
+    Xe_Main->getCPU()->Halt();
+    std::cout << "Assertion Failed! Soft halting emulator..." << std::endl;
+  }
 }
 
 [[noreturn]] void unreachable_impl() {

@@ -45,10 +45,6 @@ public:
   RAM *ramPointer{};
   u8 *fbPointer{};
 
-  // Initial Internal rendering width/height.
-  u32 internalWidth = 1280;
-  u32 internalHeight = 720;
-
   // Window Resolution
   u32 width = 1280;
   u32 height = 720;

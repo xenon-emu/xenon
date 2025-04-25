@@ -49,6 +49,11 @@ public:
   // Dump framebuffer from RAM
   void DumpFB(const std::filesystem::path &path, int pitch);
 
+  // Primary surface
+  u32 fbSurfaceAddress = XE_FB_BASE;
+  // Internal rendering width/height
+  u32 internalWidth = 1280;
+  u32 internalHeight = 720;
 private:
   // Mutex handle
   std::recursive_mutex mutex = {};

@@ -111,6 +111,7 @@ void _debug::from_toml(const toml::value &value) {
   haltOnSlbMiss = toml::find_or<bool>(value, "HaltOnSLBMiss", haltOnSlbMiss);
   haltOnExceptions = toml::find_or<bool>(value, "HaltOnExceptions", haltOnExceptions);
   startHalted = toml::find_or<bool>(value, "StartHalted", startHalted);
+  softHaltOnAssertions = toml::find_or<bool>(value, "SoftHaltOnAssertions", softHaltOnAssertions);
 }
 void _debug::to_toml(toml::value &value) {
   value["HaltOnRead"].comments().clear();
@@ -134,6 +135,10 @@ void _debug::to_toml(toml::value &value) {
   value["StartHalted"].comments().clear();
   value["StartHalted"] = startHalted;
   value["StartHalted"].comments().push_back("# Starts with the CPU halted");
+  value["SoftHaltOnAssertions"].comments().clear();
+  value["SoftHaltOnAssertions"] = softHaltOnAssertions;
+  value["SoftHaltOnAssertions"].comments().push_back("# Soft-halts on asserts, in cases like implemented instructions");
+  value["SoftHaltOnAssertions"].comments().push_back("# Disabling this causes assertions to do nothing");
 }
 bool _debug::verify_toml(toml::value &value) {
   to_toml(value);
@@ -143,6 +148,7 @@ bool _debug::verify_toml(toml::value &value) {
   cache_value(haltOnExceptions);
   cache_value(haltOnSlbMiss);
   cache_value(startHalted);
+  cache_value(softHaltOnAssertions);
   from_toml(value);
   verify_value(haltOnReadAddress);
   verify_value(haltOnWriteAddress);
@@ -150,6 +156,7 @@ bool _debug::verify_toml(toml::value &value) {
   verify_value(haltOnExceptions);
   verify_value(haltOnSlbMiss);
   verify_value(startHalted);
+  verify_value(softHaltOnAssertions);
   return true;
 }
 

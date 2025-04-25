@@ -47,8 +47,6 @@ GLuint createShaderPrograms(const char* vertex, const char* fragment) {
 
 Render::Renderer::Renderer(RAM *ram) :
   ramPointer(ram),
-  internalWidth(Config::xgpu.internal.width),
-  internalHeight(Config::xgpu.internal.height),
   width(TILE(Config::rendering.window.width)),
   height(TILE(Config::rendering.window.height)),
   VSYNC(Config::rendering.vsync),
@@ -217,8 +215,6 @@ void Render::Renderer::Resize(int x, int y, bool resizeViewport) {
 void Render::Renderer::Thread() {
   // Set thread name
   Base::SetCurrentThreadName("[Xe] Render");
-  // Framebuffer pointer from main memory.
-  fbPointer = ramPointer->getPointerToAddress(XE_FB_BASE);
   // Should we render?
   threadRunning = Config::rendering.enable;
   if (!threadRunning) {
@@ -270,6 +266,9 @@ void Render::Renderer::Thread() {
       inFocus = true;
     }
 
+    // Framebuffer pointer from main memory
+    fbPointer = ramPointer->getPointerToAddress(Xe_Main->xenos->fbSurfaceAddress);
+
     // Upload buffer
     if (fbPointer && !Xe_Main->renderHalt && inFocus) {
       // Profile
@@ -281,8 +280,8 @@ void Render::Renderer::Thread() {
       // Use the compute shader
       glUseProgram(shaderProgram);
       glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, pixelBuffer);
-      glUniform1i(glGetUniformLocation(shaderProgram, "internalWidth"), internalWidth);
-      glUniform1i(glGetUniformLocation(shaderProgram, "internalHeight"), internalHeight);
+      glUniform1i(glGetUniformLocation(shaderProgram, "internalWidth"), Xe_Main->xenos->internalWidth);
+      glUniform1i(glGetUniformLocation(shaderProgram, "internalHeight"), Xe_Main->xenos->internalHeight);
       glUniform1i(glGetUniformLocation(shaderProgram, "resWidth"), width);
       glUniform1i(glGetUniformLocation(shaderProgram, "resHeight"), height);
       glDispatchCompute(width / 16, height / 16, 1);

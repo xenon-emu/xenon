@@ -100,6 +100,8 @@ inline struct _debug {
   bool haltOnSlbMiss = false;
   // Start the CPU halted
   bool startHalted = false;
+  // Soft halts on assertions, otherwise, ignores them
+  bool softHaltOnAssertions = true;
 
   // TOML Conversion
   void to_toml(toml::value &value);
