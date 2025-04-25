@@ -50,7 +50,6 @@ D_STUB(mfsr)
 D_STUB(lvsr)
 D_STUB(lvsl)
 D_STUB(lvx)
-D_STUB(lvx128)
 D_STUB(stvx128)
 D_STUB(lvsl128)
 D_STUB(lvewx128)
@@ -515,4 +514,9 @@ extern void PPCInterpreter_lfdu(PPU_STATE *ppuState);
 extern void PPCInterpreter_lfdux(PPU_STATE *ppuState);
 extern void PPCInterpreter_lfs(PPU_STATE *ppuState);
 
+//
+// Load Vector
+//
+
+extern void PPCInterpreter_lvx128(PPU_STATE* ppuState);
 }
