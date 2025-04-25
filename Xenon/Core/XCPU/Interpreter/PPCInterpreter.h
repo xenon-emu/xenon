@@ -45,6 +45,7 @@ extern XENON_CONTEXT *CPUContext;
 // VXU Helpers
 //
 #define VR(x)         curThread.VR[x]
+#define VRi(x)         curThread.VR[_instr.x]
 // Check for Enabled VXU.
 #define CHECK_VXU       if (!checkVxuAvailable(ppuState)) { return; }
 
@@ -154,6 +155,7 @@ void ppcDecrementerException(PPU_STATE *ppuState);
 void ppcProgramException(PPU_STATE *ppuState);
 void ppcExternalException(PPU_STATE *ppuState);
 void ppcFPUnavailableException(PPU_STATE *ppuState);
+void ppcVXUnavailableException(PPU_STATE *ppuState);
 
 //
 // MMU

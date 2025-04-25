@@ -756,7 +756,7 @@ void PPU::PPUCheckExceptions() {
     }
     // VX Unavailable.
     if (exceptions & PPU_EX_VXU) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: VX Unavailable.", ppuState->ppuName, static_cast<u8>(curThreadId));
+      PPCInterpreter::ppcVXUnavailableException(ppuState.get());
       exceptions &= ~PPU_EX_VXU;
       return;
     }

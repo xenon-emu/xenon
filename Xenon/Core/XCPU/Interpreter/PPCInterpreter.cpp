@@ -286,3 +286,16 @@ void PPCInterpreter::ppcFPUnavailableException(PPU_STATE* ppuState) {
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
+
+// VX Unavailable (0xF20)
+void PPCInterpreter::ppcVXUnavailableException(PPU_STATE* ppuState) {
+  PPU_THREAD_REGISTERS& thread = curThread;
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): VXU exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
+  thread.SPR.SRR0 = thread.NIA;
+  thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & (QMASK(0, 32) | QMASK(37, 41) | QMASK(48, 63));
+  thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
+  thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | QMASK(0, 0) | (QMASK(3, 3));
+  thread.NIA = 0xF20;
+  thread.SPR.MSR.DR = 0;
+  thread.SPR.MSR.IR = 0;
+}
