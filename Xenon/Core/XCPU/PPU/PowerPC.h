@@ -545,6 +545,8 @@ struct PPU_THREAD_REGISTERS {
   u64 GPR[32]{};
   // Floating-Point Registers (32)
   FPRegister FPR[32]{};
+  // Vector Registers (128)
+  Base::Vector128 VR[128]{};
   // Condition Register
   CRegister CR;
   // Floating-Point Status Control Register
