@@ -114,16 +114,16 @@ void _debug::from_toml(const toml::value &value) {
 }
 void _debug::to_toml(toml::value &value) {
   value["HaltOnRead"].comments().clear();
-  value["HaltOnRead"].as_integer_fmt().fmt = toml::integer_format::hex;
   value["HaltOnRead"] = haltOnReadAddress;
+  value["HaltOnRead"].as_integer_fmt().fmt = toml::integer_format::hex;
   value["HaltOnRead"].comments().push_back("# Address to halt on when the MMU reads from this address");
   value["HaltOnWrite"].comments().clear();
-  value["HaltOnWrite"].as_integer_fmt().fmt = toml::integer_format::hex;
   value["HaltOnWrite"] = haltOnWriteAddress;
+  value["HaltOnWrite"].as_integer_fmt().fmt = toml::integer_format::hex;
   value["HaltOnWrite"].comments().push_back("# Address to halt on when the MMU writes to this address");
   value["HaltOnAddress"].comments().clear();
-  value["HaltOnAddress"].as_integer_fmt().fmt = toml::integer_format::hex;
   value["HaltOnAddress"] = haltOnAddress;
+  value["HaltOnAddress"].as_integer_fmt().fmt = toml::integer_format::hex;
   value["HaltOnAddress"].comments().push_back("# Address to halt on when the CPU executes this address");
   value["HaltOnExceptions"].comments().clear();
   value["HaltOnExceptions"] = haltOnExceptions;
@@ -240,15 +240,15 @@ void _xcpu::to_toml(toml::value &value) {
   value["SkipHWInit"] = skipHWInit;
 
   value["HW_INIT_SKIP1"].comments().clear();
-  value["HW_INIT_SKIP1"].as_integer_fmt().fmt = toml::integer_format::hex;
   value["HW_INIT_SKIP1"] = HW_INIT_SKIP_1;
+  value["HW_INIT_SKIP1"].as_integer_fmt().fmt = toml::integer_format::hex;
   value["HW_INIT_SKIP1"].comments().push_back("# Manual Hardware Init Skip address 1 override");
   value["HW_INIT_SKIP1"].comments().push_back("# RGH3 Trinity: 0x3003F48");
   value["HW_INIT_SKIP1"].comments().push_back("# RGH3 Corona:  0x3003DC0");
 
   value["HW_INIT_SKIP2"].comments().clear();
-  value["HW_INIT_SKIP2"].as_integer_fmt().fmt = toml::integer_format::hex;
   value["HW_INIT_SKIP2"] = HW_INIT_SKIP_2;
+  value["HW_INIT_SKIP2"].as_integer_fmt().fmt = toml::integer_format::hex;
 
   value["HW_INIT_SKIP2"].comments().push_back("# Manual Hardware Init Skip address 2 override");
   value["HW_INIT_SKIP2"].comments().push_back("# RGH3 Trinity: 0x3003FDC");
