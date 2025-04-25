@@ -244,9 +244,10 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
   case 0x14: {
     u32 strAddr = GPR(3);
     u64 strSize = (u64)GPR(4);
-    std::unique_ptr<u8[]> buffer = std::make_unique<STRIP_UNIQUE_ARR(buffer)>(strSize);
+    std::unique_ptr<u8[]> buffer = std::make_unique<STRIP_UNIQUE_ARR(buffer)>(strSize+1);
     MMURead(CPUContext, ppuState, strAddr, strSize, buffer.get());
     char *dbgString = reinterpret_cast<char*>(buffer.get());
+    dbgString[strSize] = '\0'; // nul-term
     Base::Log::NoFmtMessage(Base::Log::Class::DebugPrint, Base::Log::Level::Guest, dbgString);
     break;
   }
