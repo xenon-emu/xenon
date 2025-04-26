@@ -343,9 +343,11 @@ void PPCInterpreter::mmuAddTlbEntry(PPU_STATE *ppuState) {
   u16 TI = MMU_GET_TLB_INDEX_TI(tlbIndex);
   u16 TS = MMU_GET_TLB_INDEX_TS(tlbIndex);
 
-  PPU *ppu = Xe_Main->xenonCPU->GetPPU(ppuState->ppuID);
-  if (ppu->traceFile) {
-    fprintf(ppu->traceFile, "TLB[%d:%d] map 0x%llx -> 0x%llx\n", TS, TI, tlbVpn, tlbRpn);
+  if (Xe_Main.get() && Xe_Main->xenonCPU.get()) {
+    PPU *ppu = Xe_Main->xenonCPU->GetPPU(ppuState->ppuID);
+    if (ppu && ppu->traceFile) {
+      fprintf(ppu->traceFile, "TLB[%d:%d] map 0x%llx -> 0x%llx\n", TS, TI, tlbVpn, tlbRpn);
+    }
   }
 
   // TLB set to choose from
