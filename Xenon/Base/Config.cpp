@@ -139,6 +139,9 @@ void _debug::to_toml(toml::value &value) {
   value["SoftHaltOnAssertions"] = softHaltOnAssertions;
   value["SoftHaltOnAssertions"].comments().push_back("# Soft-halts on asserts, in cases like implemented instructions");
   value["SoftHaltOnAssertions"].comments().push_back("# Disabling this causes assertions to do nothing");
+  value["HaltOnInvalidInstructions"].comments().clear();
+  value["HaltOnInvalidInstructions"] = haltOnInvalidInstructions;
+  value["HaltOnInvalidInstructions"].comments().push_back("# Halts the PPU core on invalid instructions");
 }
 bool _debug::verify_toml(toml::value &value) {
   to_toml(value);
@@ -149,6 +152,7 @@ bool _debug::verify_toml(toml::value &value) {
   cache_value(haltOnSlbMiss);
   cache_value(startHalted);
   cache_value(softHaltOnAssertions);
+  cache_value(haltOnInvalidInstructions);
   from_toml(value);
   verify_value(haltOnReadAddress);
   verify_value(haltOnWriteAddress);
@@ -157,6 +161,7 @@ bool _debug::verify_toml(toml::value &value) {
   verify_value(haltOnSlbMiss);
   verify_value(startHalted);
   verify_value(softHaltOnAssertions);
+  verify_value(haltOnInvalidInstructions);
   return true;
 }
 
