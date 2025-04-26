@@ -103,6 +103,8 @@ inline struct _debug {
   bool softHaltOnAssertions = true;
   // Halts on invalid instructions
   bool haltOnInvalidInstructions = true;
+  // Halt on guest assertion
+  bool haltOnGuestAssertion = true;
 
   // TOML Conversion
   void to_toml(toml::value &value);

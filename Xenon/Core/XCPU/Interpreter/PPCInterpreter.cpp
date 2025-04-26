@@ -3,6 +3,7 @@
 #include "PPCInterpreter.h"
 
 #include "Base/Logging/Log.h"
+#include "Core/Xe_Main.h"
 
 using namespace PPCInterpreter;
 
@@ -241,7 +242,8 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
 
   // DbgPrint, r3 = PCSTR stringAddress, r4 = int String Size.
   switch (trapNumber) {
-  case 0x14: {
+  case 0x14:
+  case 0x1A: {
     u32 strAddr = GPR(3);
     u64 strSize = (u64)GPR(4);
     std::unique_ptr<u8[]> buffer = std::make_unique<STRIP_UNIQUE_ARR(buffer)>(strSize+1);
@@ -257,6 +259,21 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
     //                   IN PKD_SYMBOLS_INFO Info == $r4)
     ppcDebugLoadImageSymbols(ppuState, GPR(3), GPR(4));
     break;
+  case 0x19: {
+    if (Config::debug.haltOnGuestAssertion) {
+#ifndef NO_GFX
+      LOG_XBOX(Xenon, "Assertion! Halting CPU... (Continuing will cause execution to resume as normal)");
+      Xe_Main->xenonCPU->Halt(0, true, ppuState->ppuID, curThreadId);
+#else
+      LOG_XBOX(Xenon, "Assertion! Continuing...");
+#endif
+      thread.exceptTrapType = TRAP_TYPE_SRR1_TRAP_TRAP;
+      return;
+    } else {
+      LOG_XBOX(Xenon, "Assertion!");
+    }
+    break;
+  }
   case 0x18:
     // DebugUnloadImageSymbols, type signature:
     // PUBLIC VOID DebugUnloadImageSymbols(IN PSTRING ModuleName == $r3,

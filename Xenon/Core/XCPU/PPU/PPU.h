@@ -34,8 +34,9 @@ public:
   void Reset();
 
   // Debug tools
-  void Halt(u64 haltOn = 0);
+  void Halt(u64 haltOn = 0, bool requestedByGuest = false, s8 ppuId = 0, ePPUThread threadId = ePPUThread_None);
   void Continue();
+  void ContinueFromException();
   void Step(int amount = 1);
 
   // Thread state machine
@@ -64,6 +65,11 @@ public:
   // Checks if the thread is halted
   bool IsHalted() {
     return ppuThreadState == eThreadState::Halted;
+  }
+
+  // Checks if the thread is halted
+  bool IsHaltedByGuest() {
+    return guestHalt && IsHalted() && guestHaltPPUId != -1 && guestHaltThreadId != ePPUThread_None;
   }
 
   // Returns the thread state
@@ -95,6 +101,15 @@ private:
 
   // If this is set to a non-zero value, it will halt on that address then clear it
   u64 ppuHaltOn = 0;
+
+  // If this is set, then the guest requested us to halt. Opens another option in the debugger
+  bool guestHalt = false;
+
+  // What PPU caused guestHalt
+  s8 guestHaltPPUId = -1;
+
+  // What thread caused guestHalt
+  ePPUThread guestHaltThreadId = ePPUThread_None;
 
   // Amount of instructions to step
   u64 ppuStepAmount = 0;

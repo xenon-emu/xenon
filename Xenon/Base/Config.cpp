@@ -113,6 +113,7 @@ void _debug::from_toml(const toml::value &value) {
   startHalted = toml::find_or<bool>(value, "StartHalted", startHalted);
   softHaltOnAssertions = toml::find_or<bool>(value, "SoftHaltOnAssertions", softHaltOnAssertions);
   haltOnInvalidInstructions = toml::find_or<bool>(value, "HaltOnInvalidInstructions", haltOnInvalidInstructions);
+  haltOnGuestAssertion = toml::find_or<bool>(value, "HaltOnGuestAssertion", haltOnGuestAssertion);
 }
 void _debug::to_toml(toml::value &value) {
   value["HaltOnRead"].comments().clear();
@@ -143,6 +144,9 @@ void _debug::to_toml(toml::value &value) {
   value["HaltOnInvalidInstructions"].comments().clear();
   value["HaltOnInvalidInstructions"] = haltOnInvalidInstructions;
   value["HaltOnInvalidInstructions"].comments().push_back("# Halts the PPU core on invalid instructions");
+  value["HaltOnGuestAssertion"].comments().clear();
+  value["HaltOnGuestAssertion"] = haltOnGuestAssertion;
+  value["HaltOnGuestAssertion"].comments().push_back("# Halts whenever a guest causes a TRAP opcode for asserting");
 }
 bool _debug::verify_toml(toml::value &value) {
   to_toml(value);

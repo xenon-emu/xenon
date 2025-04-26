@@ -31,13 +31,17 @@ public:
 
   void Reset();
 
-  void Halt(u64 haltOn = 0);
+  void Halt(u64 haltOn = 0, bool requestedByGuest = false, u8 ppuId = 0, ePPUThread threadId = ePPUThread_Zero);
 
   void Continue();
+
+  void ContinueFromException();
 
   void Step(int amount = 1);
 
   bool IsHalted();
+
+  bool IsHaltedByGuest();
 
   Xe::XCPU::IIC::XenonIIC *GetIICPointer() { return &xenonContext.xenonIIC; }
 

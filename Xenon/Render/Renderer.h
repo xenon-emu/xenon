@@ -60,6 +60,12 @@ public:
     return gui.get() && gui.get()->ppcDebuggerActive;
   }
 
+  void SetDebuggerActive() {
+    if (gui.get()) {
+      gui.get()->ppcDebuggerActive = true;
+    }
+  }
+
   // FB Pitch
   int pitch = 0;
 private:

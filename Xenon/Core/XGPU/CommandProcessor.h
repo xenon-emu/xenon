@@ -15,10 +15,10 @@
 
 #pragma once
 
-#include "Core/RAM/RAM.h"
-#include "Base/Logging/Log.h"
-
 #include <thread>
+
+#include "Base/Logging/Log.h"
+#include "Core/RAM/RAM.h"
 
 // Xenos GPU Command Processor.
 // Handles all commands sent to the Xenos via the RingBuffer.

@@ -176,13 +176,13 @@ void Xenon::Reset() {
   std::this_thread::sleep_for(200ms);
 }
 
-void Xenon::Halt(u64 haltOn) {
+void Xenon::Halt(u64 haltOn, bool requestedByGuest, u8 ppuId, ePPUThread threadId) {
   if (ppu0.get())
-    ppu0->Halt(haltOn);
+    ppu0->Halt(haltOn, requestedByGuest, ppuId, threadId);
   if (ppu1.get())
-    ppu1->Halt(haltOn);
+    ppu1->Halt(haltOn, requestedByGuest, ppuId, threadId);
   if (ppu2.get())
-    ppu2->Halt(haltOn);
+    ppu2->Halt(haltOn, requestedByGuest, ppuId, threadId);
 }
 
 void Xenon::Continue() {
@@ -192,6 +192,15 @@ void Xenon::Continue() {
     ppu1->Continue();
   if (ppu2.get())
     ppu2->Continue();
+}
+
+void Xenon::ContinueFromException() {
+  if (ppu0.get())
+    ppu0->ContinueFromException();
+  if (ppu1.get())
+    ppu1->ContinueFromException();
+  if (ppu2.get())
+    ppu2->ContinueFromException();
 }
 
 void Xenon::Step(int amount) {
@@ -204,6 +213,19 @@ void Xenon::Step(int amount) {
 }
 
 bool Xenon::IsHalted() {
+  if (ppu0.get() && ppu0->IsHalted()) {
+    return true;
+  }
+  if (ppu1.get() && ppu1->IsHalted()) {
+    return true;
+  }
+  if (ppu2.get() && ppu2->IsHalted()) {
+    return true;
+  }
+  return false;
+}
+
+bool Xenon::IsHaltedByGuest() {
   if (ppu0.get() && ppu0->IsHalted()) {
     return true;
   }

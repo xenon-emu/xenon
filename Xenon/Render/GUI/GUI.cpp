@@ -621,8 +621,9 @@ void PPCDebugger(Render::GUI *gui) {
   ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 2.f, 8.f });
   ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 8.f, 4.f });
   gui->Child("##instrs", [&] {
-    gui->MenuBar([&gui] {
-      gui->Menu("Window", [&gui] {
+    Xenon *CPU = Xe_Main->getCPU();
+    gui->MenuBar([&gui, &CPU] {
+      gui->Menu("Window", [&gui, &CPU] {
         if (!gui->ppcDebuggerActive) {
           gui->MenuItem("Enable", [&] {
             gui->ppcDebuggerActive = true;
@@ -636,10 +637,10 @@ void PPCDebugger(Render::GUI *gui) {
           });
         }
       });
-      gui->Menu("Debug", [&gui] {
-        if (!Xe_Main->getCPU()->IsHalted()) {
-          gui->MenuItem("Pause", [&gui] {
-            Xe_Main->getCPU()->Halt();
+      gui->Menu("Debug", [&gui, &CPU] {
+        if (!CPU->IsHalted()) {
+          gui->MenuItem("Pause", [&CPU] {
+            CPU->Halt();
           });
           gui->MenuItem("Exit (Soft)", [] {
             Xe_Main->shutdown();
@@ -648,20 +649,29 @@ void PPCDebugger(Render::GUI *gui) {
             exit(0);
           });
         } else {
-          gui->MenuItem("Continue", [&gui] {
-            Xe_Main->getCPU()->Continue();
+          gui->MenuItem("Continue", [&CPU] {
+            CPU->Continue();
           });
+          if (CPU->IsHaltedByGuest()) {
+            gui->MenuItem("Continue From Exception Handler", [&CPU] {
+              CPU->ContinueFromException();
+            });
+          }
           gui->InputInt("Amount", &gui->stepAmount);
-          gui->MenuItem("Step (F10)", [&gui] {
-            Xe_Main->getCPU()->Step(gui->stepAmount);
+          gui->MenuItem("Step (F10)", [&gui, &CPU] {
+            CPU->Step(gui->stepAmount);
           });
         }
       });
+      if (gui->ppcDebuggerActive) {
+        gui->MenuItem("Disable", [&] {
+          gui->ppcDebuggerActive = false;
+        });
+      }
     });
     if (ImGui::IsKeyPressed(ImGuiKey_F10)) {
-      Xe_Main->getCPU()->Step(gui->stepAmount);
+      CPU->Step(gui->stepAmount);
     }
-    Xenon *CPU = Xe_Main->getCPU();
     if (CPU) {
       PPC_PPU(gui, CPU->GetPPU(0));
       PPC_PPU(gui, CPU->GetPPU(1));

@@ -229,8 +229,7 @@ bool XENON_CONTEXT::HandlePRVWrite(u64 writeAddr, const u8* data, size_t byteCou
   memcpy(reinterpret_cast<u8*>(socPRVBlock.get()) + offset, &dataIn, byteCount);
 
   // Apply operations on know registers.
-  switch (writeAddr)
-  {
+  switch (writeAddr) {
   case 0x61010ULL:
     // POST Output.
     Xe::XCPU::POSTBUS::POST(byteswap_be<u64>(dataIn));
