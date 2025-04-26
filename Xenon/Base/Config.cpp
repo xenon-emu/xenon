@@ -249,7 +249,7 @@ void _xcpu::to_toml(toml::value &value) {
   value["CPI"].comments().push_back("# Note: This will mess with execution timing, and may break time-sensitive things like XeLL");
 
   value["SkipHWInit"].comments().clear();
-  value["SkipHWInit"].comments().push_back("Enable CB/SB HW_INIT stage skip (Hack)");
+  value["SkipHWInit"].comments().push_back("# Enable CB/SB HW_INIT stage skip [HACK]");
   value["SkipHWInit"] = skipHWInit;
 
   value["HW_INIT_SKIP1"].comments().clear();

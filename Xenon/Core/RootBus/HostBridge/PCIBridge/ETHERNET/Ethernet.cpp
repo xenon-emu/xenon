@@ -19,8 +19,6 @@ Xe::PCIDev::ETHERNET::ETHERNET(const std::string &deviceName, u64 size) :
 void Xe::PCIDev::ETHERNET::Read(u64 readAddress, u8 *data, u64 size) {
   u8 offset = readAddress & 0xFF;
 
-  return; // For now.
-
   switch (offset) {
   case Xe::PCIDev::TX_CONFIG:
     memcpy(data, &ethPciState.txConfigReg, size);
