@@ -25,12 +25,10 @@ void compileShaders(const GLuint shader, const char* source) {
   if (!success) {
     glGetShaderInfoLog(shader, 512, nullptr, infoLog);
     LOG_ERROR(System, "Failed to initialize SDL video subsystem: {}", infoLog);
-  } else {
-    LOG_INFO(Render, "Compiling Shader {:#x}", shader);
   }
 }
 
-GLuint createShaderPrograms(const char* vertex, const char* fragment) {
+GLuint createShaderPrograms(const char *vertex, const char *fragment) {
   MICROPROFILE_SCOPEI("[Xe::Render]", "CreateShaders", MP_AUTO);
   GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
   compileShaders(vertexShader, vertex);

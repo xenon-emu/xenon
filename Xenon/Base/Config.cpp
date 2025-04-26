@@ -489,6 +489,7 @@ void saveConfig(const std::filesystem::path &path) {
     std::error_code fs_error;
     u64 fSize = std::filesystem::file_size(new_path, fs_error);
     if (fSize != -1 && fSize) {
+      std::filesystem::remove(path);
       std::filesystem::rename(new_path, path);
     } else {
       fSize = 0;
