@@ -112,6 +112,7 @@ void _debug::from_toml(const toml::value &value) {
   haltOnExceptions = toml::find_or<bool>(value, "HaltOnExceptions", haltOnExceptions);
   startHalted = toml::find_or<bool>(value, "StartHalted", startHalted);
   softHaltOnAssertions = toml::find_or<bool>(value, "SoftHaltOnAssertions", softHaltOnAssertions);
+  haltOnInvalidInstructions = toml::find_or<bool>(value, "HaltOnInvalidInstructions", haltOnInvalidInstructions);
 }
 void _debug::to_toml(toml::value &value) {
   value["HaltOnRead"].comments().clear();
