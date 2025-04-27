@@ -288,6 +288,9 @@ else()
   add_definitions(-DNO_GFX)
 endif()
 
+if (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+  add_definitions(-D_DEBUG)
+endif()
 
 # Copy fonts to build directory
 if (GFX_ENABLED)
