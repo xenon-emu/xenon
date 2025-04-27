@@ -119,8 +119,8 @@ public:
   ~CommandProcessor();
 
   // Methods for R/W of the CP/PFP uCode data.
-  void CPWriteMicrocodeData(CPMicrocodeType uCodeTpe) {};
-  u32 CPReadMicrocodeData(CPMicrocodeType uCodeTpe) {};
+  void CPWriteMicrocodeData(CPMicrocodeType uCodeType) { (void)uCodeType; }
+  u32 CPReadMicrocodeData(CPMicrocodeType uCodeType) { (void)uCodeType; return 0; }
 
   // Update RingBuffer Base Address.
   void CPUpdateRBBase(u32 address);
