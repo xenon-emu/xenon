@@ -268,7 +268,7 @@ void Render::Renderer::Thread() {
     fbPointer = ramPointer->getPointerToAddress(Xe_Main->xenos->fbSurfaceAddress);
 
     // Upload buffer
-    if (fbPointer && !Xe_Main->renderHalt && inFocus) {
+    if (fbPointer && Xe_Main.get() && !Xe_Main->renderHalt && inFocus) {
       // Profile
       MICROPROFILE_SCOPEI("[Xe::Render]", "Deswizle", MP_AUTO);
       const u32* ui_fbPointer = reinterpret_cast<u32*>(fbPointer);

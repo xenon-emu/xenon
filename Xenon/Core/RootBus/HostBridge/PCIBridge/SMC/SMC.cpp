@@ -172,7 +172,6 @@ void Xe::PCIDev::SMC::ConfigRead(u64 readAddress, u8 *data, u64 size) {
 
 // PCI Write
 void Xe::PCIDev::SMC::Write(u64 writeAddress, const u8 *data, u64 size) {
-  std::lock_guard lck(mutex);
   const u8 regOffset = static_cast<u8>(writeAddress);
 
   mutex.lock();
@@ -240,7 +239,6 @@ void Xe::PCIDev::SMC::Write(u64 writeAddress, const u8 *data, u64 size) {
 
 // PCI MemSet
 void Xe::PCIDev::SMC::MemSet(u64 writeAddress, s32 data, u64 size) {
-  std::lock_guard lck(mutex);
   const u8 regOffset = static_cast<u8>(writeAddress);
 
   mutex.lock();
