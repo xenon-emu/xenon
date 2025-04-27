@@ -14,9 +14,6 @@ XeMain::XeMain() {
   if (Config::debug.RenderDoc) {
     // Load RenderDoc module
     Render::LoadRenderDoc();
-
-    const auto captures_dir = Base::FS::GetUserPath(Base::FS::PathType::RDocDir);
-    Render::SetOutputDir(captures_dir.generic_string());
   }
 
   pciBridge = std::make_unique<STRIP_UNIQUE(pciBridge)>();

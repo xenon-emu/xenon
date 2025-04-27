@@ -118,12 +118,14 @@ void TriggerCapture() {
   }
 }
 
-void SetOutputDir(const std::string& path) {
+const auto& captures_dir = Base::FS::GetUserPath(Base::FS::PathType::RDocDir);
+
+void SetOutputDir(const std::string& captures_dir) {
   if (!rdoc_api) {
     return;
   }
 
-  rdoc_api->SetCaptureFilePathTemplate(std::string(path).c_str());
+  rdoc_api->SetCaptureFilePathTemplate(captures_dir.c_str());
 }
 
 } // namespace Render
