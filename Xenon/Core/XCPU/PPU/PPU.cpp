@@ -252,7 +252,7 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
 #ifdef TODO_RELEASE_BUILD
       if (traceFile) {
         const std::string instrName = PPCInterpreter::ppcDecoder.decodeName(_instr.opcode);
-        fprintf(traceFile, "%llx: 0x%x %s\n", thread.CIA, _instr.opcode, instrName.c_str());
+        fprintf(traceFile, "%llx: 0x%x %s\n", curThread.CIA, _instr.opcode, instrName.c_str());
       }
 #endif
       // Start Profile
