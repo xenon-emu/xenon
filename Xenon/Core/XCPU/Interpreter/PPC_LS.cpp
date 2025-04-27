@@ -5,6 +5,8 @@
 #include "Base/Assert.h"
 #include "PPCInterpreter.h"
 
+using namespace Base;
+
 //
 // Store Byte
 //
@@ -519,6 +521,27 @@ void PPCInterpreter::PPCInterpreter_stfiwx(PPU_STATE* ppuState) {
 // Store Vector
 //
 
+// Store Vector Indexed
+void PPCInterpreter::PPCInterpreter_stvx(PPU_STATE* ppuState) {
+  /*
+  if rA=0 then b <- 0
+  else b <- (rA)
+  EA <- (b + (rB)) & 0xFFFF_FFFF_FFFF_FFF0
+  if the processor is in big-endian mode
+   then MEM(EA,16) <- (vS)
+   else MEM(EA,16) <- (vS)64:127 || (vS)0:63
+  */
+
+  CHECK_VXU;
+
+  const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
+
+  MMUWrite32(ppuState, EA, byteswap_be<u32>(VRi(vs).dword[0]));
+  MMUWrite32(ppuState, EA + (sizeof(u32) * 1), byteswap_be<u32>(VRi(vs).dword[1]));
+  MMUWrite32(ppuState, EA + (sizeof(u32) * 2), byteswap_be<u32>(VRi(vs).dword[2]));
+  MMUWrite32(ppuState, EA + (sizeof(u32) * 3), byteswap_be<u32>(VRi(vs).dword[3]));
+}
+
 // Store Vector Indexed LRU (x'7C00 03CE')
 void PPCInterpreter::PPCInterpreter_stvxl(PPU_STATE* ppuState) {
   /*
@@ -538,6 +561,28 @@ void PPCInterpreter::PPCInterpreter_stvxl(PPU_STATE* ppuState) {
   MMUWrite32(ppuState, EA + (sizeof(u32) * 1), byteswap_be<u32>(VRi(vs).dword[1]));
   MMUWrite32(ppuState, EA + (sizeof(u32) * 2), byteswap_be<u32>(VRi(vs).dword[2]));
   MMUWrite32(ppuState, EA + (sizeof(u32) * 3), byteswap_be<u32>(VRi(vs).dword[3]));
+}
+
+// Store Vector Left Indexed 128
+void PPCInterpreter::PPCInterpreter_stvlxl128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
+  u8 eb = EA & 0xF;
+  EA &= ~0xF;
+
+  if (eb == 0) { // Address is aligned.
+    MMUWrite32(ppuState, EA, byteswap_be<u32>(VR(VMX128_1_VD128).dword[0]));
+    MMUWrite32(ppuState, EA + (sizeof(u32) * 1), byteswap_be<u32>(VR(VMX128_1_VD128).dword[1]));
+    MMUWrite32(ppuState, EA + (sizeof(u32) * 2), byteswap_be<u32>(VR(VMX128_1_VD128).dword[2]));
+    MMUWrite32(ppuState, EA + (sizeof(u32) * 3), byteswap_be<u32>(VR(VMX128_1_VD128).dword[3]));
+  }
+  else {
+    for (int i = 0; i < eb; ++i) {
+      LOG_WARNING(Xenon, "stvlxl128: Unaligned store! Check!");
+      MMUWrite8(ppuState, EA + i, VR(VMX128_1_VD128).bytes[(16 - eb) + i]);
+    }
+  }
 }
 
 //
@@ -1218,7 +1263,7 @@ void PPCInterpreter::PPCInterpreter_lvx128(PPU_STATE* ppuState) {
   
   CHECK_VXU;
 
-  Base::Vector128 vector {};
+  Vector128 vector {};
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
   
   MMURead(CPUContext, ppuState, EA, 16, vector.bytes.data());
@@ -1245,7 +1290,7 @@ void PPCInterpreter::PPCInterpreter_lvxl(PPU_STATE* ppuState) {
 
   CHECK_VXU;
 
-  Base::Vector128 vector{};
+  Vector128 vector{};
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
 
   MMURead(CPUContext, ppuState, EA, 16, vector.bytes.data());
@@ -1257,4 +1302,94 @@ void PPCInterpreter::PPCInterpreter_lvxl(PPU_STATE* ppuState) {
   VR(_instr.rd).dword[1] = byteswap_be<u32>(vector.dword[1]);
   VR(_instr.rd).dword[2] = byteswap_be<u32>(vector.dword[2]);
   VR(_instr.rd).dword[3] = byteswap_be<u32>(vector.dword[3]);
+}
+
+// Load Vector Left Indexed (x'7C00 040E')
+void PPCInterpreter::PPCInterpreter_lvlx(PPU_STATE* ppuState) {
+  /*
+  if rA=0 then base <- 0
+  else base <- (rA)
+  EA <- (base + (rB))
+  eb <- EA60:63
+  (vD) <- MEM(EA,16-eb) || (eb*8) (0)
+  */
+
+  CHECK_VXU;
+
+  Vector128 vector0{};
+  Vector128 vector1{};
+
+  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
+  u8 eb = EA & 0xF;
+  EA &= ~0xF;
+
+  MMURead(CPUContext, ppuState, EA, 16, vector0.bytes.data());
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  if (eb != 0) {
+    LOG_WARNING(Xenon, "lvlx: Unaligned load! Check!");
+  }
+
+  int i = 0;
+
+  for (i = 0; i < 16 - eb; ++i)
+    vector1.bytes[i] = vector0.bytes[i + eb];
+
+  while (i < 16)
+    vector1.bytes[i++] = 0;
+
+  VR(_instr.rd).dword[0] = byteswap_be<u32>(vector1.dword[0]);
+  VR(_instr.rd).dword[1] = byteswap_be<u32>(vector1.dword[1]);
+  VR(_instr.rd).dword[2] = byteswap_be<u32>(vector1.dword[2]);
+  VR(_instr.rd).dword[3] = byteswap_be<u32>(vector1.dword[3]);
+}
+
+// Load Vector Right Indexed (x'7C00 044E')
+void PPCInterpreter::PPCInterpreter_lvrx(PPU_STATE* ppuState) {
+  /*
+  if rA=0 then base <- 0
+  else base <- (rA)
+  EA <- (base + (rB))
+  eb <- EA[60:63]
+  (vD) <- (16-eb×8) (0) || MEM(EA-eb,eb
+  */
+
+  CHECK_VXU;
+
+  Vector128 vector0{};
+  Vector128 vector1{};
+
+  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
+  u8 eb = EA & 0xF;
+  EA &= ~0xF;
+
+  MMURead(CPUContext, ppuState, EA, 16, vector0.bytes.data());
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  if (eb != 0) {
+    LOG_WARNING(Xenon, "lvrx: Unaligned load! Check!");
+  }
+
+  int i = 0;
+
+  while (i < (16 - eb))
+  {
+    vector1.bytes[i] = 0;
+    ++i;
+  }
+
+  while (i < 16)
+  {
+    vector1.bytes[i] = vector0.bytes[i - (16 - eb)];
+    ++i;
+  }
+
+  VR(_instr.rd).dword[0] = byteswap_be<u32>(vector1.dword[0]);
+  VR(_instr.rd).dword[1] = byteswap_be<u32>(vector1.dword[1]);
+  VR(_instr.rd).dword[2] = byteswap_be<u32>(vector1.dword[2]);
+  VR(_instr.rd).dword[3] = byteswap_be<u32>(vector1.dword[3]);
 }

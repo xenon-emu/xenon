@@ -125,8 +125,9 @@ namespace PPCInterpreter {
         { 0x2405, GET(vmulfp128) },
         { 0x1D8C6, GET(vmrglw128) },
         { 0x1C8C6, GET(vmrghw128) },
+        { 0x1C1C4, GET(stvlxl128) },
+        { 0x1C2C4, GET(stvlxl128) },
         //{ 0x503, GET(stvlx128) },
-        //{ 0x703, GET(stvlxl128) },
         //{ 0x743, GET(stvrxl128) },
         //{ 0x3C3, GET(stvxl128) },
       });
@@ -598,7 +599,9 @@ namespace PPCInterpreter {
         { 0x30C4, GET(lvx128), 3 },
         { 0x2405, GET(vmulfp128), 3 },
         { 0x1D8C6, GET(vmrglw128), 3 },
-        { 0x1C8C6, GET(vmrghw128), 3 },
+        { 0x1C8C6, GET(vmrghw128), 3 },        
+        { 0x1C1C4, GET(stvlxl128), 3 },
+        { 0x1C2C4, GET(stvlxl128), 3 },
       });
       // Group 0x04 opcodes (field 21..31)
       fillTable<std::string>(nameTable, 0x04, 11, 0, {

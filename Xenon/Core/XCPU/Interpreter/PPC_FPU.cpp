@@ -247,6 +247,21 @@ void PPCInterpreter::PPCInterpreter_fmrx(PPU_STATE *ppuState) {
   }
 }
 
+// Floating Negate (x'FC00 0050')
+void PPCInterpreter::PPCInterpreter_fnegx(PPU_STATE* ppuState) {
+  /*
+  frD <- ~ frB[0] || frB[1-63]
+  */
+
+  CHECK_FPU;
+
+  FPRi(frd).valueAsU64 = ~FPRi(frb).valueAsU64;
+
+  if (_instr.rc) {
+    ppuSetCR(ppuState, 1, curThread.FPSCR.FG, curThread.FPSCR.FL, curThread.FPSCR.FE, curThread.FPSCR.FU);
+  }
+}
+
 // Floating Negative Multiply-Subtract Single (x'EC00 003C')
 void PPCInterpreter::PPCInterpreter_fnmsubsx(PPU_STATE* ppuState) {
   /*

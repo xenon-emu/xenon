@@ -32,7 +32,6 @@ D_STUBRC(fnmsub)
 D_STUBRC(fnmadd)
 D_STUBRC(fnmadds)
 D_STUBRC(fmsub)
-D_STUBRC(fneg)
 D_STUBRC(fsel)
 D_STUBRC(fres)
 D_STUBRC(fnabs)
@@ -62,17 +61,12 @@ D_STUB(stvlx128)
 D_STUB(stvrx128)
 D_STUB(lvlxl128)
 D_STUB(lvrxl128)
-D_STUB(stvlxl128)
 D_STUB(stvrxl128)
 D_STUB(vor128)
 D_STUB(lvsr128)
 D_STUB(vsldoi128)
-D_STUB(vmulfp128)
 D_STUB(vmrglw128)
-D_STUB(vmrghw128)
-D_STUB(lvrx)
 D_STUB(lvrxl)
-D_STUB(lvlx)
 D_STUB(lvlxl)
 D_STUB(lwaux)
 D_STUB(lswx)
@@ -90,7 +84,6 @@ D_STUB(stfsux)
 D_STUB(stfdux)
 D_STUB(stvebx)
 D_STUB(fcmpo)
-D_STUB(stvx)
 D_STUB(stvrx)
 D_STUB(stvlx)
 D_STUB(stvrxl)
@@ -142,7 +135,6 @@ D_STUB(vmaxuw)
 D_STUB(vrlw)
 D_STUB(vcmpequw)
 D_STUB(vcmpequw_)
-D_STUB(vmrghw)
 D_STUB(vpkuhus)
 D_STUB(vcmpeqfp)
 D_STUB(vcmpeqfp_)
@@ -164,7 +156,6 @@ D_STUB(vaddcuw)
 D_STUB(vmaxsw)
 D_STUB(vslw)
 D_STUB(vexptefp)
-D_STUB(vmrglw)
 D_STUB(vpkshss)
 D_STUB(vsl)
 D_STUB(vcmpgefp)
@@ -195,7 +186,6 @@ D_STUB(vsrw)
 D_STUB(vcmpgtuw)
 D_STUB(vcmpgtuw_)
 D_STUB(vrfip)
-D_STUB(vspltw)
 D_STUB(vupklsb)
 D_STUB(vsr)
 D_STUB(vcmpgtfp)
@@ -408,6 +398,7 @@ extern void PPCInterpreter_fmaddsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fmulx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fmulsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fmrx(PPU_STATE *ppuState);
+extern void PPCInterpreter_fnegx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fnmsubsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_frspx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fsubx(PPU_STATE *ppuState);
@@ -420,6 +411,11 @@ extern void PPCInterpreter_mtfsfx(PPU_STATE *ppuState);
 //
 extern void PPCInterpreter_mfvscr(PPU_STATE* ppuState);
 extern void PPCInterpreter_mtvscr(PPU_STATE* ppuState);
+extern void PPCInterpreter_vspltw(PPU_STATE* ppuState);
+extern void PPCInterpreter_vmulfp128(PPU_STATE* ppuState);
+extern void PPCInterpreter_vmrghw(PPU_STATE* ppuState);
+extern void PPCInterpreter_vmrglw(PPU_STATE* ppuState);
+extern void PPCInterpreter_vmrghw128(PPU_STATE* ppuState);
 
 //
 // Load/Store
@@ -466,7 +462,9 @@ extern void PPCInterpreter_stfd(PPU_STATE *ppuState);
 extern void PPCInterpreter_stfiwx(PPU_STATE *ppuState);
 
 // Store Vector
+extern void PPCInterpreter_stvx(PPU_STATE* ppuState);
 extern void PPCInterpreter_stvxl(PPU_STATE* ppuState);
+extern void PPCInterpreter_stvlxl128(PPU_STATE* ppuState);
 
 // Load Byte
 extern void PPCInterpreter_lbz(PPU_STATE *ppuState);
@@ -520,4 +518,6 @@ extern void PPCInterpreter_lfs(PPU_STATE *ppuState);
 // Load Vector
 extern void PPCInterpreter_lvx128(PPU_STATE* ppuState);
 extern void PPCInterpreter_lvxl(PPU_STATE* ppuState);
+extern void PPCInterpreter_lvlx(PPU_STATE* ppuState);
+extern void PPCInterpreter_lvrx(PPU_STATE* ppuState);
 }
