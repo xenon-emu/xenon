@@ -12,8 +12,26 @@ env:
   BUILD_TYPE: Release
 
 jobs:
+  get-info:
+    runs-on: ubuntu-24.04
+    outputs:
+      shorthash: ${{ steps.vars.outputs.shorthash }}
+      commit: ${{ steps.vars.outputs.commit }}
+    steps:
+    - uses: actions/checkout@main
+      with:
+        fetch-depth: 0
+    - name: Commit Count and Git Hash
+      id: vars
+      run: |
+        echo "shorthash=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+        echo "commit=$(git rev-list --count HEAD)" >> $GITHUB_ENV
+        echo "shorthash=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        echo "commit=$(git rev-list --count HEAD)" >> $GITHUB_OUTPUT
+
   Windows:
     runs-on: windows-2025
+    needs: get-info
     steps:
     - uses: actions/checkout@main
       with:
@@ -23,7 +41,7 @@ jobs:
     - name: Cache CMake Configuration
       uses: actions/cache@main
       env:
-          cache-name: ${{ runner.os }}-xenon-cache-config-windows
+          cache-name: ${{ runner.os }}-xenon-cache-config
       with:
           path: |
             ${{github.workspace}}/build
@@ -34,13 +52,13 @@ jobs:
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.17
       env:
-          cache-name: ${{ runner.os }}-xenon-cache-build-windows
+          cache-name: ${{ runner.os }}-xenon-cache-build
       with:
         append-timestamp: false
         key: ${{ env.cache-name }}-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
 
     - name: Configure CMake
-      run: cmake --fresh -G Ninja -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+      run: cmake -G Ninja -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --parallel $env:NUMBER_OF_PROCESSORS
@@ -48,11 +66,12 @@ jobs:
     - name: Upload Windows Artifact
       uses: actions/upload-artifact@main
       with:
-        name: Xenon-win64
+        name: Xenon-win64-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
         path: ${{github.workspace}}/build/Xenon.exe
 
   Linux:
     runs-on: ubuntu-24.04
+    needs: get-info
     steps:
     - uses: actions/checkout@main
       with:
@@ -70,7 +89,7 @@ jobs:
     - name: Cache CMake Configuration
       uses: actions/cache@main
       env:
-          cache-name: ${{ runner.os }}-xenon-cache-config-linux
+          cache-name: ${{ runner.os }}-xenon-cache-config
       with:
           path: |
             ${{github.workspace}}/build
@@ -81,13 +100,13 @@ jobs:
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.17
       env:
-          cache-name: ${{ runner.os }}-xenon-cache-build-linux
+          cache-name: ${{ runner.os }}-xenon-cache-build
       with:
         append-timestamp: false
         key: ${{ env.cache-name }}-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
 
     - name: Configure CMake
-      run: cmake --fresh -G Ninja -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+      run: cmake -G Ninja -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
     - name: Build
       run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --parallel $(nproc)
@@ -95,7 +114,7 @@ jobs:
     - name: Upload Linux Artifact
       uses: actions/upload-artifact@main
       with:
-        name: Xenon-linux64
+        name: Xenon-linux64-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
         path: ${{github.workspace}}/build/Xenon
 
   linux_nix:
