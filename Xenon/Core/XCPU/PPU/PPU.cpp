@@ -197,6 +197,8 @@ void PPU::Halt(u64 haltOn, bool requestedByGuest, s8 ppuId, ePPUThread threadId)
   ppuThreadState = eThreadState::Halted;
 }
 void PPU::Continue() {
+  if (ppuThreadState.load() == eThreadState::Running)
+    return;
   if (ppuThreadPreviousState == eThreadState::Running)
     LOG_DEBUG(Xenon, "Continuing execution on PPU{}", ppuState->ppuID);
   ppuThreadState.store(ppuThreadPreviousState.load());
@@ -206,6 +208,8 @@ void PPU::Continue() {
   guestHaltThreadId = ePPUThread_None;
 }
 void PPU::ContinueFromException() {
+  if (ppuThreadState.load() == eThreadState::Running)
+    return;
   if (ppuThreadPreviousState == eThreadState::Running)
     LOG_DEBUG(Xenon, "Jumping to exception handler");
   if (ppuState->ppuID == guestHaltPPUId && guestHaltThreadId != ePPUThread_None) {
