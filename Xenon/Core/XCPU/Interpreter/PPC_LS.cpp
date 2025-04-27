@@ -534,7 +534,10 @@ void PPCInterpreter::PPCInterpreter_stvxl(PPU_STATE* ppuState) {
 
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
   
-  MMUWrite(CPUContext, ppuState, VRi(vs).bytes.data(), EA, 16);
+  MMUWrite32(ppuState, EA, byteswap_be<u32>(VRi(vs).dword[0]));
+  MMUWrite32(ppuState, EA + (sizeof(u32) * 1), byteswap_be<u32>(VRi(vs).dword[1]));
+  MMUWrite32(ppuState, EA + (sizeof(u32) * 2), byteswap_be<u32>(VRi(vs).dword[2]));
+  MMUWrite32(ppuState, EA + (sizeof(u32) * 3), byteswap_be<u32>(VRi(vs).dword[3]));
 }
 
 //
