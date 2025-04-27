@@ -139,11 +139,6 @@ void ppcExecuteSingleInstruction(PPU_STATE *ppuState);
 // Exceptions
 //
 
-#define TRAP_TYPE_SRR1_TRAP_FPU 43
-#define TRAP_TYPE_SRR1_TRAP_ILL 44
-#define TRAP_TYPE_SRR1_TRAP_PRIV 45
-#define TRAP_TYPE_SRR1_TRAP_TRAP 46
-
 void ppcResetException(PPU_STATE *ppuState);
 void ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber);
 void ppcInstStorageException(PPU_STATE *ppuState);

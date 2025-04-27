@@ -211,6 +211,7 @@ void PPU::ContinueFromException() {
   if (ppuState->ppuID == guestHaltPPUId && guestHaltThreadId != ePPUThread_None) {
     PPU_THREAD_REGISTERS &thread = ppuState->ppuThread[guestHaltThreadId];
     thread.exceptReg |= PPU_EX_PROG;
+    thread.exceptTrapType = EX_SRR1_TRAP_TRAP;
   }
   ppuThreadState.store(ppuThreadPreviousState.load());
   ppuThreadPreviousState = eThreadState::None;
@@ -685,7 +686,7 @@ void PPU::PPUCheckExceptions() {
     // 3. Instruction-Dependent
     //
     // A. Program - Illegal Instruction
-    if (exceptions & PPU_EX_PROG && thread.exceptTrapType == TRAP_TYPE_SRR1_TRAP_ILL) {
+    if (exceptions & PPU_EX_PROG && thread.exceptTrapType == EX_SRR1_TRAP_ILL) {
       LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Illegal Instruction.", ppuState->ppuName, static_cast<u8>(curThreadId));
       exceptions &= ~PPU_EX_PROG;
       return;
@@ -723,7 +724,7 @@ void PPU::PPUCheckExceptions() {
     }
     // E. Program Trap, System Call, Program Priv Inst, Program Illegal Inst
     // Program Trap
-    if (exceptions & PPU_EX_PROG && thread.exceptTrapType == TRAP_TYPE_SRR1_TRAP_TRAP) {
+    if (exceptions & PPU_EX_PROG && thread.exceptTrapType == EX_SRR1_TRAP_TRAP) {
       PPCInterpreter::ppcProgramException(ppuState.get());
       exceptions &= ~PPU_EX_PROG;
       return;
@@ -735,7 +736,7 @@ void PPU::PPUCheckExceptions() {
       return;
     }
     // Program - Privileged Instruction
-    if (exceptions & PPU_EX_PROG && thread.exceptTrapType == TRAP_TYPE_SRR1_TRAP_PRIV) {
+    if (exceptions & PPU_EX_PROG && thread.exceptTrapType == EX_SRR1_TRAP_PRIV) {
       LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Privileged Instruction.", ppuState->ppuName, static_cast<u8>(curThreadId));
       exceptions &= ~PPU_EX_PROG;
       return;

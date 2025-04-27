@@ -598,6 +598,13 @@ struct SECENG_ADDRESS_INFO {
 #define PPU_EX_TRACE 0x4000
 #define PPU_EX_PERFMON 0x8000
 
+// Exception trap types
+
+#define EX_SRR1_TRAP_FPU 43
+#define EX_SRR1_TRAP_ILL 44
+#define EX_SRR1_TRAP_PRIV 45
+#define EX_SRR1_TRAP_TRAP 46
+
 // Floating Point Register
 
 union SFPRegister { // Single Precision

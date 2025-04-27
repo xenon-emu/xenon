@@ -267,7 +267,7 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
 #else
       LOG_XBOX(Xenon, "Assertion! Continuing...");
 #endif
-      thread.exceptTrapType = TRAP_TYPE_SRR1_TRAP_TRAP;
+      thread.exceptTrapType = EX_SRR1_TRAP_TRAP;
       return;
     } else {
       LOG_XBOX(Xenon, "Assertion!");
@@ -286,7 +286,7 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
   }
 
   _ex |= PPU_EX_PROG;
-  thread.exceptTrapType = TRAP_TYPE_SRR1_TRAP_TRAP;
+  thread.exceptTrapType = EX_SRR1_TRAP_TRAP;
   // Hacky optimization
   #undef curThread
   #define curThread ppuState->ppuThread[curThreadId]
