@@ -409,13 +409,13 @@ extern void PPCInterpreter_mtfsfx(PPU_STATE *ppuState);
 //
 // VXU
 //
-extern void PPCInterpreter_mfvscr(PPU_STATE* ppuState);
-extern void PPCInterpreter_mtvscr(PPU_STATE* ppuState);
-extern void PPCInterpreter_vspltw(PPU_STATE* ppuState);
-extern void PPCInterpreter_vmulfp128(PPU_STATE* ppuState);
-extern void PPCInterpreter_vmrghw(PPU_STATE* ppuState);
-extern void PPCInterpreter_vmrglw(PPU_STATE* ppuState);
-extern void PPCInterpreter_vmrghw128(PPU_STATE* ppuState);
+extern void PPCInterpreter_mfvscr(PPU_STATE *ppuState);
+extern void PPCInterpreter_mtvscr(PPU_STATE *ppuState);
+extern void PPCInterpreter_vspltw(PPU_STATE *ppuState);
+extern void PPCInterpreter_vmulfp128(PPU_STATE *ppuState);
+extern void PPCInterpreter_vmrghw(PPU_STATE *ppuState);
+extern void PPCInterpreter_vmrglw(PPU_STATE *ppuState);
+extern void PPCInterpreter_vmrghw128(PPU_STATE *ppuState);
 
 //
 // Load/Store
@@ -462,9 +462,9 @@ extern void PPCInterpreter_stfd(PPU_STATE *ppuState);
 extern void PPCInterpreter_stfiwx(PPU_STATE *ppuState);
 
 // Store Vector
-extern void PPCInterpreter_stvx(PPU_STATE* ppuState);
-extern void PPCInterpreter_stvxl(PPU_STATE* ppuState);
-extern void PPCInterpreter_stvlxl128(PPU_STATE* ppuState);
+extern void PPCInterpreter_stvx(PPU_STATE *ppuState);
+extern void PPCInterpreter_stvxl(PPU_STATE *ppuState);
+extern void PPCInterpreter_stvlxl128(PPU_STATE *ppuState);
 
 // Load Byte
 extern void PPCInterpreter_lbz(PPU_STATE *ppuState);
@@ -516,8 +516,8 @@ extern void PPCInterpreter_lfs(PPU_STATE *ppuState);
 
 
 // Load Vector
-extern void PPCInterpreter_lvx128(PPU_STATE* ppuState);
-extern void PPCInterpreter_lvxl(PPU_STATE* ppuState);
-extern void PPCInterpreter_lvlx(PPU_STATE* ppuState);
-extern void PPCInterpreter_lvrx(PPU_STATE* ppuState);
+extern void PPCInterpreter_lvx128(PPU_STATE *ppuState);
+extern void PPCInterpreter_lvxl(PPU_STATE *ppuState);
+extern void PPCInterpreter_lvlx(PPU_STATE *ppuState);
+extern void PPCInterpreter_lvrx(PPU_STATE *ppuState);
 }

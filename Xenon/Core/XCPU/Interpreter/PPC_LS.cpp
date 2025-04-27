@@ -458,7 +458,7 @@ void PPCInterpreter::PPCInterpreter_stdx(PPU_STATE *ppuState) {
 //
 
 // Store Floating-Point Single (x'D000 0000')
-void PPCInterpreter::PPCInterpreter_stfs(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_stfs(PPU_STATE *ppuState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -473,7 +473,7 @@ void PPCInterpreter::PPCInterpreter_stfs(PPU_STATE* ppuState) {
 }
 
 // Store Floating-Point Single Indexed (x'7C00 052E')
-void PPCInterpreter::PPCInterpreter_stfsx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_stfsx(PPU_STATE *ppuState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -503,7 +503,7 @@ void PPCInterpreter::PPCInterpreter_stfd(PPU_STATE *ppuState) {
 }
 
 // Store Floating-Point as Integer Word Indexed (x'7C00 07AE')
-void PPCInterpreter::PPCInterpreter_stfiwx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_stfiwx(PPU_STATE *ppuState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -522,7 +522,7 @@ void PPCInterpreter::PPCInterpreter_stfiwx(PPU_STATE* ppuState) {
 //
 
 // Store Vector Indexed
-void PPCInterpreter::PPCInterpreter_stvx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_stvx(PPU_STATE *ppuState) {
   /*
   if rA=0 then b <- 0
   else b <- (rA)
@@ -543,7 +543,7 @@ void PPCInterpreter::PPCInterpreter_stvx(PPU_STATE* ppuState) {
 }
 
 // Store Vector Indexed LRU (x'7C00 03CE')
-void PPCInterpreter::PPCInterpreter_stvxl(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_stvxl(PPU_STATE *ppuState) {
   /*
   if rA=0 then b <- 0
   else b <- (rA)
@@ -556,7 +556,7 @@ void PPCInterpreter::PPCInterpreter_stvxl(PPU_STATE* ppuState) {
   CHECK_VXU;
 
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
-  
+
   MMUWrite32(ppuState, EA, byteswap_be<u32>(VRi(vs).dword[0]));
   MMUWrite32(ppuState, EA + (sizeof(u32) * 1), byteswap_be<u32>(VRi(vs).dword[1]));
   MMUWrite32(ppuState, EA + (sizeof(u32) * 2), byteswap_be<u32>(VRi(vs).dword[2]));
@@ -564,7 +564,7 @@ void PPCInterpreter::PPCInterpreter_stvxl(PPU_STATE* ppuState) {
 }
 
 // Store Vector Left Indexed 128
-void PPCInterpreter::PPCInterpreter_stvlxl128(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_stvlxl128(PPU_STATE *ppuState) {
   CHECK_VXU;
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
@@ -895,7 +895,7 @@ void PPCInterpreter::PPCInterpreter_lwarx(PPU_STATE *ppuState) {
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   u64 RA = EA & ~7;
-  
+
   // TODO: If address is not aligned by 4, then we must issue a trap.
 
   MMUTranslateAddress(&RA, ppuState, false);
@@ -1134,7 +1134,7 @@ void PPCInterpreter::PPCInterpreter_ldx(PPU_STATE *ppuState) {
 }
 
 // Load Floating-Point Single Indexed (x'7C00 042E')
-void PPCInterpreter::PPCInterpreter_lfsx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_lfsx(PPU_STATE *ppuState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1259,13 +1259,13 @@ void PPCInterpreter::PPCInterpreter_lfs(PPU_STATE *ppuState) {
 //
 
 // Load Vector Indexed 128
-void PPCInterpreter::PPCInterpreter_lvx128(PPU_STATE* ppuState) {
-  
+void PPCInterpreter::PPCInterpreter_lvx128(PPU_STATE *ppuState) {
+
   CHECK_VXU;
 
   Vector128 vector {};
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
-  
+
   MMURead(CPUContext, ppuState, EA, 16, vector.bytes.data());
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
@@ -1278,7 +1278,7 @@ void PPCInterpreter::PPCInterpreter_lvx128(PPU_STATE* ppuState) {
 }
 
 // Load Vector Indexed LRU (x'7C00 02CE')
-void PPCInterpreter::PPCInterpreter_lvxl(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_lvxl(PPU_STATE *ppuState) {
   /*
   if rA=0 then b <- 0
   else b <- (rA)
@@ -1305,7 +1305,7 @@ void PPCInterpreter::PPCInterpreter_lvxl(PPU_STATE* ppuState) {
 }
 
 // Load Vector Left Indexed (x'7C00 040E')
-void PPCInterpreter::PPCInterpreter_lvlx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_lvlx(PPU_STATE *ppuState) {
   /*
   if rA=0 then base <- 0
   else base <- (rA)
@@ -1347,13 +1347,13 @@ void PPCInterpreter::PPCInterpreter_lvlx(PPU_STATE* ppuState) {
 }
 
 // Load Vector Right Indexed (x'7C00 044E')
-void PPCInterpreter::PPCInterpreter_lvrx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_lvrx(PPU_STATE *ppuState) {
   /*
   if rA=0 then base <- 0
   else base <- (rA)
   EA <- (base + (rB))
   eb <- EA[60:63]
-  (vD) <- (16-eb×8) (0) || MEM(EA-eb,eb
+  (vD) <- (16-eb-8) (0) || MEM(EA-eb,eb)
   */
 
   CHECK_VXU;

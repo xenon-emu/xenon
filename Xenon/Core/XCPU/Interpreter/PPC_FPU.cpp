@@ -45,7 +45,7 @@ void PPCInterpreter::ppuUpdateFPSCR(PPU_STATE *ppuState, f64 op0, f64 op1, bool 
 }
 
 // Floating Add (Double-Precision) (x'FC00 002A')
-void PPCInterpreter::PPCInterpreter_faddx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_faddx(PPU_STATE *ppuState) {
   /*
   frD <- (frA) + (frB)
   */
@@ -58,7 +58,7 @@ void PPCInterpreter::PPCInterpreter_faddx(PPU_STATE* ppuState) {
 }
 
 // Floating Absolute Value (x'FC00 0210')
-void PPCInterpreter::PPCInterpreter_fabsx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_fabsx(PPU_STATE *ppuState) {
   /*
   The contents of frB with bit [0] cleared are placed into frD.
   */
@@ -109,7 +109,7 @@ void PPCInterpreter::PPCInterpreter_fcmpu(PPU_STATE *ppuState) {
 }
 
 // Floating Convert to Integer Double Word with Round toward Zero (x'FC00 065E')
-void PPCInterpreter::PPCInterpreter_fctidzx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_fctidzx(PPU_STATE *ppuState) {
   // This was mostly taken from rpcs3's PPUInterpreter. 
   // TODO: Verify.
 
@@ -136,7 +136,7 @@ void PPCInterpreter::PPCInterpreter_fctidzx(PPU_STATE* ppuState) {
 }
 
 // Floating Convert to Integer Word with Round toward Zero (x'FC00 001E')
-void PPCInterpreter::PPCInterpreter_fctiwzx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_fctiwzx(PPU_STATE *ppuState) {
   // This was mostly taken from rpcs3's PPUInterpreter. 
   // TODO: Verify.
 
@@ -181,7 +181,7 @@ void PPCInterpreter::PPCInterpreter_fdivsx(PPU_STATE *ppuState) {
 }
 
 // Floating Multiply-Add (Double-Precision) (x'FC00 003A')
-void PPCInterpreter::PPCInterpreter_fmaddx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_fmaddx(PPU_STATE *ppuState) {
   /*
   frD <- (frA * frC) + frB
   */
@@ -194,7 +194,7 @@ void PPCInterpreter::PPCInterpreter_fmaddx(PPU_STATE* ppuState) {
 }
 
 // Floating Multiply-Add Single (x'EC00 003A')
-void PPCInterpreter::PPCInterpreter_fmaddsx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_fmaddsx(PPU_STATE *ppuState) {
   /*
   frD <- (frA * frC) + frB
   */
@@ -207,7 +207,7 @@ void PPCInterpreter::PPCInterpreter_fmaddsx(PPU_STATE* ppuState) {
 }
 
 // Floating Multiply (Double-Precision) (x'FC00 0032')
-void PPCInterpreter::PPCInterpreter_fmulx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_fmulx(PPU_STATE *ppuState) {
   /*
   frD <- (frA) * (frC)
   */
@@ -248,7 +248,7 @@ void PPCInterpreter::PPCInterpreter_fmrx(PPU_STATE *ppuState) {
 }
 
 // Floating Negate (x'FC00 0050')
-void PPCInterpreter::PPCInterpreter_fnegx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_fnegx(PPU_STATE *ppuState) {
   /*
   frD <- ~ frB[0] || frB[1-63]
   */
@@ -263,7 +263,7 @@ void PPCInterpreter::PPCInterpreter_fnegx(PPU_STATE* ppuState) {
 }
 
 // Floating Negative Multiply-Subtract Single (x'EC00 003C')
-void PPCInterpreter::PPCInterpreter_fnmsubsx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_fnmsubsx(PPU_STATE *ppuState) {
   /*
   frD <- - ([frA * frC] - frB)
   */
@@ -289,7 +289,7 @@ void PPCInterpreter::PPCInterpreter_frspx(PPU_STATE *ppuState) {
 }
 
 // Floating Subtract (Double-Precision) (x'FC00 0028')
-void PPCInterpreter::PPCInterpreter_fsubx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_fsubx(PPU_STATE *ppuState) {
   /*
     frD <- (frA) - (frB)
     */

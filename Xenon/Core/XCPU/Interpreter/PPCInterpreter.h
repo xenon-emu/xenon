@@ -50,7 +50,7 @@ extern XENON_CONTEXT *CPUContext;
 #define CHECK_VXU       if (!checkVxuAvailable(ppuState)) { return; }
 
 
-static inline bool checkFpuAvailable(PPU_STATE* ppuState) {
+static inline bool checkFpuAvailable(PPU_STATE *ppuState) {
   if (curThread.SPR.MSR.FP != 1) {
     _ex |= PPU_EX_FPU;
     return false;
@@ -58,7 +58,7 @@ static inline bool checkFpuAvailable(PPU_STATE* ppuState) {
   return true;
 }
 
-static inline bool checkVxuAvailable(PPU_STATE* ppuState) {
+static inline bool checkVxuAvailable(PPU_STATE *ppuState) {
   if (curThread.SPR.MSR.VXU != 1) {
     _ex |= PPU_EX_VXU;
     return false;

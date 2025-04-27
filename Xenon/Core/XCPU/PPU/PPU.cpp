@@ -27,18 +27,17 @@ static constexpr u64 get_cpi_value(const u64 instrPerSecond) {
   return tpi;
 }
 
-//#define TODO_RELEASE_BUILD
-
 PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PVR,
                   u32 PIR) :
   resetVector(resetVector)
 {
   traceFile = NULL;
-#ifdef TODO_RELEASE_BUILD
-  // TODO, config file
-  char path[128];
-  snprintf(path, 127, "trace_%d.log", PIR);
-  traceFile = fopen(path, "w");
+#ifdef _DEBUG
+  if (Config::debug.createTraceFile) {
+    char path[128];
+    snprintf(path, 127, "trace_%d.log", PIR);
+    traceFile = fopen(path, "w");
+  }
 #endif
 
   //
@@ -249,7 +248,7 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
       readNextInstr = PPUReadNextInstruction();
     }
     if (readNextInstr) {
-#ifdef TODO_RELEASE_BUILD
+#ifdef _DEBUG
       if (traceFile) {
         const std::string instrName = PPCInterpreter::PPCInterpreter_getFullName(_instr.opcode);
         fprintf(traceFile, "%llx: 0x%x %s\n", curThread.CIA, _instr.opcode, instrName.c_str());

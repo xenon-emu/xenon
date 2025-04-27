@@ -294,7 +294,7 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
 }
 
 // FP Unavailable (0x800)
-void PPCInterpreter::ppcFPUnavailableException(PPU_STATE* ppuState) {
+void PPCInterpreter::ppcFPUnavailableException(PPU_STATE *ppuState) {
   PPU_THREAD_REGISTERS& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): FPU exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA;
@@ -307,7 +307,7 @@ void PPCInterpreter::ppcFPUnavailableException(PPU_STATE* ppuState) {
 }
 
 // VX Unavailable (0xF20)
-void PPCInterpreter::ppcVXUnavailableException(PPU_STATE* ppuState) {
+void PPCInterpreter::ppcVXUnavailableException(PPU_STATE *ppuState) {
   PPU_THREAD_REGISTERS& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): VXU exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.NIA;
