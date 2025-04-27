@@ -23,7 +23,6 @@ project(Xenon)
 # Options
 option(GFX_ENABLED "Enable graphics" ON)
 
-
 # Set Version
 set(EMULATOR_VERSION_MAJOR "0")
 set(EMULATOR_VERSION_MINOR "0")
@@ -289,7 +288,7 @@ else()
 endif()
 
 if (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-  add_definitions(-D_DEBUG)
+  add_definitions(-DDEBUG_BUILD)
 endif()
 
 # Copy fonts to build directory

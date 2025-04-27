@@ -3,8 +3,6 @@
 #include "NAND.h"
 #include "Base/Logging/Log.h"
 
-//#define NAND_DEBUG
-
 /********************Responsible for loading the NAND file********************/
 NAND::NAND(const std::string &deviceName, u64 startAddress, u64 endAddress,
   Xe::PCIDev::SFCX *sfcx, bool isSOCDevice) :

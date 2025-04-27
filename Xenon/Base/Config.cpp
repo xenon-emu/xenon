@@ -114,7 +114,7 @@ void _debug::from_toml(const toml::value &value) {
   softHaltOnAssertions = toml::find_or<bool>(value, "SoftHaltOnAssertions", softHaltOnAssertions);
   haltOnInvalidInstructions = toml::find_or<bool>(value, "HaltOnInvalidInstructions", haltOnInvalidInstructions);
   haltOnGuestAssertion = toml::find_or<bool>(value, "HaltOnGuestAssertion", haltOnGuestAssertion);
-#ifdef _DEBUG
+#ifdef DEBUG_BUILD
   createTraceFile = toml::find_or<bool>(value, "CreateTraceFile", createTraceFile);
 #endif
 }
@@ -150,7 +150,7 @@ void _debug::to_toml(toml::value &value) {
   value["HaltOnGuestAssertion"].comments().clear();
   value["HaltOnGuestAssertion"] = haltOnGuestAssertion;
   value["HaltOnGuestAssertion"].comments().push_back("# Halts whenever a guest causes a TRAP opcode for asserting");
-#ifdef _DEBUG
+#ifdef DEBUG_BUILD
   value["CreateTraceFile"].comments().clear();
   value["CreateTraceFile"] = createTraceFile;
   value["CreateTraceFile"].comments().push_back("# Creates a trace file with every single jump/bc opcode");

@@ -32,7 +32,7 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
   resetVector(resetVector)
 {
   traceFile = NULL;
-#ifdef _DEBUG
+#ifdef DEBUG_BUILD
   if (Config::debug.createTraceFile) {
     char path[128];
     snprintf(path, 127, "trace_%d.log", PIR);
@@ -248,7 +248,7 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
       readNextInstr = PPUReadNextInstruction();
     }
     if (readNextInstr) {
-#ifdef _DEBUG
+#ifdef DEBUG_BUILD
       if (traceFile) {
         const std::string instrName = PPCInterpreter::PPCInterpreter_getFullName(_instr.opcode);
         fprintf(traceFile, "%llx: 0x%x %s\n", curThread.CIA, _instr.opcode, instrName.c_str());
