@@ -265,7 +265,6 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
       LOG_XBOX(Xenon, "Assertion! Halting CPU... (Continuing will cause execution to resume as normal)");
       PPU *PPU = Xe_Main->xenonCPU->GetPPU(ppuState->ppuID);
       PPU->Halt(0, true, ppuState->ppuID, curThreadId);
-      //Xe_Main->xenonCPU->Halt(0, true, ppuState->ppuID, curThreadId);
 #else
       LOG_XBOX(Xenon, "Assertion! Continuing...");
 #endif
