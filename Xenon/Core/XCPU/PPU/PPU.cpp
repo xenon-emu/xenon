@@ -184,7 +184,7 @@ void PPU::Halt(u64 haltOn, bool requestedByGuest, s8 ppuId, ePPUThread threadId)
     LOG_DEBUG(Xenon, "Halting PPU{} on address {:#x}", ppuState->ppuID, haltOn);
     ppuHaltOn = haltOn;
   }
-  requestedByGuest = guestHalt;
+  guestHalt = requestedByGuest;
   if (guestHalt) {
     guestHaltPPUId = ppuId;
     guestHaltThreadId = threadId;
