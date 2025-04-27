@@ -114,6 +114,7 @@ void _debug::from_toml(const toml::value &value) {
   softHaltOnAssertions = toml::find_or<bool>(value, "SoftHaltOnAssertions", softHaltOnAssertions);
   haltOnInvalidInstructions = toml::find_or<bool>(value, "HaltOnInvalidInstructions", haltOnInvalidInstructions);
   haltOnGuestAssertion = toml::find_or<bool>(value, "HaltOnGuestAssertion", haltOnGuestAssertion);
+  RenderDoc = toml::find_or<bool>(value, "RenderDoc", RenderDoc);
 }
 void _debug::to_toml(toml::value &value) {
   value["HaltOnRead"].comments().clear();
@@ -147,6 +148,9 @@ void _debug::to_toml(toml::value &value) {
   value["HaltOnGuestAssertion"].comments().clear();
   value["HaltOnGuestAssertion"] = haltOnGuestAssertion;
   value["HaltOnGuestAssertion"].comments().push_back("# Halts whenever a guest causes a TRAP opcode for asserting");
+  value["RenderDoc"].comments().clear();
+  value["RenderDoc"] = RenderDoc;
+  value["RenderDoc"].comments().push_back("# Enables RenderDoc Debugging");
 }
 bool _debug::verify_toml(toml::value &value) {
   to_toml(value);
@@ -158,6 +162,7 @@ bool _debug::verify_toml(toml::value &value) {
   cache_value(startHalted);
   cache_value(softHaltOnAssertions);
   cache_value(haltOnInvalidInstructions);
+  cache_value(RenderDoc);
   from_toml(value);
   verify_value(haltOnReadAddress);
   verify_value(haltOnWriteAddress);
@@ -167,6 +172,7 @@ bool _debug::verify_toml(toml::value &value) {
   verify_value(startHalted);
   verify_value(softHaltOnAssertions);
   verify_value(haltOnInvalidInstructions);
+  verify_value(RenderDoc);
   return true;
 }
 

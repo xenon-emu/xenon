@@ -15,6 +15,13 @@ endif()
 # GLAD
 add_subdirectory(glad)
 
+# RenderDoc
+if (NOT TARGET RenderDoc::API)
+    add_library(renderdoc INTERFACE)
+    target_include_directories(renderdoc INTERFACE ./renderdoc)
+    add_library(RenderDoc::API ALIAS renderdoc)
+endif()
+
 # SDL3
 if (GFX_ENABLED)
   if (NOT TARGET SDL3::SDL3)

@@ -30,6 +30,7 @@
 #include "Core/XGPU/XGPU.h"
 
 #include "Render/Renderer.h"
+#include "Render/RenderDoc.h"
 
 // Global thread state
 inline std::atomic<bool> XeRunning{ true };

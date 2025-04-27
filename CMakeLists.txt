@@ -235,6 +235,8 @@ if (GFX_ENABLED)
     Xenon/Render/GUI/GUI.h
     Xenon/Render/Renderer.cpp
     Xenon/Render/Renderer.h
+    Xenon/Render/RenderDoc.cpp
+    Xenon/Render/RenderDoc.h
   )
 endif()
 set(microprofile_dir Deps/ThirdParty/microprofile)
@@ -303,7 +305,7 @@ endif()
 # Link libraries
 target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11)
 if (GFX_ENABLED)
-  target_link_libraries(Xenon PRIVATE glad SDL3::SDL3)
+  target_link_libraries(Xenon PRIVATE glad RenderDoc::API SDL3::SDL3)
 endif()
 
 # Add includes

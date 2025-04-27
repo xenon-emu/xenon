@@ -52,11 +52,13 @@ static auto UserPaths = [] {
     insert_path(PathType::RootDir, currentDir);
     insert_path(PathType::ConsoleDir, currentDir / CONSOLE_DIR);
     insert_path(PathType::LogDir, currentDir / LOG_DIR);
+    insert_path(PathType::RDocDir, currentDir / RDOC_DIR);
   }
   else {
     insert_path(PathType::RootDir, currentDir, false);
     insert_path(PathType::ConsoleDir, binaryDir / CONSOLE_DIR);
     insert_path(PathType::LogDir, binaryDir / LOG_DIR);
+    insert_path(PathType::RDocDir, binaryDir / RDOC_DIR);
   }
   fs::path fontDir = binaryDir / FONT_DIR;
   // Check if fonts are in ../share/FONT_DIR

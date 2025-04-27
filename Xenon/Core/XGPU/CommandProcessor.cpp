@@ -17,13 +17,17 @@
 
 #include "Core/XGPU/CommandProcessor.h"
 
+#include "Render/RenderDoc.h"
+
 namespace Xe::XGPU {
   
 CommandProcessor::CommandProcessor(RAM *ramPtr) : ram(ramPtr) {
+  Render::StartCapture();
   cpWorkerThread = std::thread(&CommandProcessor::cpWorkerThreadLoop, this);
 }
 
 CommandProcessor::~CommandProcessor() {
+  Render::EndCapture();
   cpWorkerThreadRunning = false;
   if (cpWorkerThread.joinable()) {
     cpWorkerThread.join();

@@ -106,6 +106,9 @@ inline struct _debug {
   // Halt on guest assertion
   bool haltOnGuestAssertion = true;
 
+  // Enable RenderDoc Debugging
+  bool RenderDoc = false;
+
   // TOML Conversion
   void to_toml(toml::value &value);
   void from_toml(const toml::value &value);

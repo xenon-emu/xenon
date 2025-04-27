@@ -13,6 +13,8 @@
 #include "Core/XGPU/XGPU.h"
 #include "Core/Xe_Main.h"
 
+#include "RenderDoc.h"
+
 // Shaders
 void compileShaders(const GLuint shader, const char* source) {
   MICROPROFILE_SCOPEI("[Xe::Render]", "CompileShader", MP_AUTO);
@@ -249,6 +251,8 @@ void Render::Renderer::Thread() {
           SDL_WindowFlags flag = SDL_GetWindowFlags(mainWindow);
           bool fullscreenMode = flag & SDL_WINDOW_FULLSCREEN;
           SDL_SetWindowFullscreen(mainWindow, !fullscreenMode);
+        } if (windowEvent.key.key == SDLK_F12) {
+          Render::TriggerCapture();
         }
         break;
       default:
