@@ -251,7 +251,7 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
     if (readNextInstr) {
 #ifdef TODO_RELEASE_BUILD
       if (traceFile) {
-        const std::string instrName = PPCInterpreter::ppcDecoder.decodeName(_instr.opcode);
+        const std::string instrName = PPCInterpreter::PPCInterpreter_getFullName(_instr.opcode);
         fprintf(traceFile, "%llx: 0x%x %s\n", curThread.CIA, _instr.opcode, instrName.c_str());
       }
 #endif

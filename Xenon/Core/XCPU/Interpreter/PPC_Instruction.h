@@ -1028,6 +1028,9 @@ namespace PPCInterpreter {
     std::string decodeName(u32 instr) const noexcept {
       return getNameTable()[PPCDecode(instr)];
     }
+    std::string decodeFull(u32 instr) const noexcept {
+      return getNameTable()[PPCDecode(instr)];
+    }
   private:
     // Fast lookup table
     std::array<instructionHandler, 0x20000> table;
