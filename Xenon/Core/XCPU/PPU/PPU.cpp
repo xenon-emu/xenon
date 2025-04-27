@@ -41,7 +41,7 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
 #endif
 
   //
-  // Set evrything as in POR. See CELL-BE Programming Handbook.
+  // Set everything as in POR. See CELL-BE Programming Handbook
   //
 
   if (ppuThreadState.load() == eThreadState::Unused) {
