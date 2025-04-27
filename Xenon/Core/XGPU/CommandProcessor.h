@@ -165,12 +165,12 @@ private:
   std::atomic<size_t> cpRingBufferSize = 0;
 
   // Execute a packet based on the Ringbuffer data.
-  bool ExecutePacket() {};
+  bool ExecutePacket() { return false; }
 
   // Execute the different packet types.
-  bool ExecutePacketType0() {};
-  bool ExecutePacketType1() {};
-  bool ExecutePacketType2() {};
-  bool ExecutePacketType3() {};
+  bool ExecutePacketType0() { return false; }
+  bool ExecutePacketType1() { return false; }
+  bool ExecutePacketType2() { return false; }
+  bool ExecutePacketType3() { return false; }
 };
 }
