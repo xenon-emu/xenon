@@ -251,6 +251,8 @@ set(XGPU
     Xenon/Core/XGPU/XGPUConfig.h
     Xenon/Core/XGPU/CommandProcessor.h
     Xenon/Core/XGPU/CommandProcessor.cpp
+    Xenon/Core/XGPU/RingBuffer.h
+    Xenon/Core/XGPU/RingBuffer.cpp
 )
 
 set(Core
