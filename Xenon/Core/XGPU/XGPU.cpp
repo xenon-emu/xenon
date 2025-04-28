@@ -11,9 +11,9 @@
 #include "Base/Path_util.h"
 #include "Base/Logging/Log.h"
 
-#ifdef _DEBUG
+//#ifdef _DEBUG
 #define XE_DEBUG
-#endif
+//#endif
 
 Xe::Xenos::XGPU::XGPU(RAM *ram) :
   ramPtr(ram),
@@ -136,6 +136,9 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
       break;
     case XeRegister::CP_RB_BASE:
       commandProcessor->CPUpdateRBBase(tmp);
+      break;
+    case XeRegister::CP_RB_WPTR:
+      commandProcessor->CPUpdateRBWritePointer(tmp);
       break;
     }
 

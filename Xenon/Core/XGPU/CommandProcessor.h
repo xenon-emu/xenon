@@ -19,6 +19,8 @@
 
 #include "Base/Logging/Log.h"
 #include "Core/RAM/RAM.h"
+#include "Core/XGPU/RingBuffer.h"
+#include "Core/XGPU/XenosRegisters.h"
 
 // Xenos GPU Command Processor.
 // Handles all commands sent to the Xenos via the RingBuffer.
@@ -126,6 +128,8 @@ public:
   void CPUpdateRBBase(u32 address);
   // Update RingBuffer Size.
   void CPUpdateRBSize(size_t newSize);
+  // CP RB Write Ptr offset (from base in words).
+  void CPUpdateRBWritePointer(u32 offset);
 
 private:
   // RAM Poiner, for DMA ops and RingBuffer access.
@@ -148,7 +152,9 @@ private:
   // CP Microcode Engine data. 
   std::vector<u32> cpMEuCodeData;
   // CP PreFetch Parser data.
-  std::vector<u32> cpPFPuCodeData;
+  std::vector<u32> cpPFPuCodeData;  
+  // CP ME for PM4_ME_INIT data.
+  std::vector<u32> cpME_PM4_ME_INIT_Data;
 
   // Basically, the driver sets the CP write base to an address in memory where
   // the RingBuffer is located, and after it stores a Read Pointer to the location
@@ -164,13 +170,32 @@ private:
   // RingBuffer Size.
   std::atomic<size_t> cpRingBufferSize = 0;
 
+  // Read/Write indexes.
+  u32 cpReadPtrIndex = 0;
+  std::atomic<u32> cpWritePtrIndex = 0;
+
+  // Execute primary buffer from CP_RB_BASE.
+  u32 cpExecutePrimaryBuffer(u32 readIndex, u32 writeIndex);
+
+  // Execute indirect buffer from PM4_INDIRECT_BUFFER.
+  void cpExecuteIndirectBuffer(u32 bufferPtr, u32 bufferSize);
+
+  // For tiling.
+  uint64_t binSelect = 0xFFFFFFFFull;
+  uint64_t binMask = 0xFFFFFFFFull;
+
   // Execute a packet based on the Ringbuffer data.
-  bool ExecutePacket() { return false; }
+  bool ExecutePacket(Xe::XGPU::RingBuffer* ringBuffer);
 
   // Execute the different packet types.
-  bool ExecutePacketType0() { return false; }
-  bool ExecutePacketType1() { return false; }
-  bool ExecutePacketType2() { return false; }
-  bool ExecutePacketType3() { return false; }
+  bool ExecutePacketType0(Xe::XGPU::RingBuffer* ringBuffer, u32 packetData);
+  bool ExecutePacketType1(Xe::XGPU::RingBuffer* ringBuffer, u32 packetData);
+  bool ExecutePacketType2(Xe::XGPU::RingBuffer* ringBuffer, u32 packetData);
+  bool ExecutePacketType3(Xe::XGPU::RingBuffer* ringBuffer, u32 packetData);
+
+  // Packet type 3 OpCodes definitions.
+  bool ExecutePacketType3_NOP(RingBuffer* ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_ME_INIT(RingBuffer* ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_INDIRECT_BUFFER(RingBuffer* ringBuffer, u32 packetData, u32 dataCount);
 };
 }
