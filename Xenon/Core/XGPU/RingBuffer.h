@@ -1,3 +1,5 @@
+// Copyright 2025 Xenon Emulator Project
+
 #include "Base/Types.h"
 #include "Base/Logging/Log.h"
 

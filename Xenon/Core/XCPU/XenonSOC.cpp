@@ -123,7 +123,7 @@ bool XENON_CONTEXT::HandleSecRNGRead(u64 readAddr, u8* data, size_t byteCount) {
   if (readAddr == 0x26008) {
     std::random_device randomDevice;  // Seed for the random number engine
     std::default_random_engine generator(randomDevice());
-    std::uniform_int_distribution<uint64_t> distribution(0, UINT64_MAX);
+    std::uniform_int_distribution<u64> distribution(0, UINT64_MAX);
 
     socSecRNGBlock.get()->Fifo = distribution(generator);
   }

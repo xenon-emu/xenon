@@ -62,7 +62,7 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
 
     LOG_TRACE(Xenos, "Read Addr = {:#x}, reg: {:#x}.", readAddress, regIndex);
 
-    XeRegister reg = static_cast<XeRegister>(regIndex);
+    const XeRegister reg = static_cast<XeRegister>(regIndex);
 
     u32 regData = 0;
     memcpy(&regData, &xenosState.Regs[regIndex * 4], 4);

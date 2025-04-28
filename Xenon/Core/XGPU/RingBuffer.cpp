@@ -1,8 +1,10 @@
+// Copyright 2025 Xenon Emulator Project
+
 #include "Core/XGPU/RingBuffer.h"
 
 namespace Xe::XGPU {
 
-  RingBuffer::RingBuffer(uint8_t* buffer, size_t capacity)
+  RingBuffer::RingBuffer(u8* buffer, size_t capacity)
     : _buffer(buffer), _capacity(capacity) {
   }
 
@@ -52,7 +54,7 @@ namespace Xe::XGPU {
     }
   }
 
-  size_t RingBuffer::Read(uint8_t* buffer, size_t count) {
+  size_t RingBuffer::Read(u8* buffer, size_t count) {
     count = std::min(count, _capacity);
     if (!count) {
       return 0;
@@ -82,7 +84,7 @@ namespace Xe::XGPU {
     return count;
   }
 
-  size_t RingBuffer::Write(const uint8_t* buffer, size_t count) {
+  size_t RingBuffer::Write(const u8* buffer, size_t count) {
     count = std::min(count, _capacity);
     if (!count) {
       return 0;

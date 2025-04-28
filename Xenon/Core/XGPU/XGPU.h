@@ -28,9 +28,6 @@ struct XenosState {
   std::unique_ptr<u8[]> Regs;
 };
 
-// ARGB (Console is BGRA)
-#define COLOR(r, g, b, a) ((a) << 24 | (r) << 16 | (g) << 8 | (b) << 0)
-#define TILE(x) ((x + 31) >> 5) << 5
 class XGPU {
 public:
   XGPU(RAM *ram);

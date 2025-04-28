@@ -13,9 +13,9 @@
 * documenting this complex system.
 */
 
-#include "Base/Thread.h"
+#include "CommandProcessor.h"
 
-#include "Core/XGPU/CommandProcessor.h"
+#include "Base/Thread.h"
 
 namespace Xe::XGPU {
   
@@ -145,7 +145,7 @@ bool CommandProcessor::ExecutePacket(Xe::XGPU::RingBuffer* ringBuffer) {
 
 // Executes a packet type 0. Description is in CPPacketType enum.
 bool CommandProcessor::ExecutePacketType0(Xe::XGPU::RingBuffer* ringBuffer, u32 packetData) {
-  u32 regCount = ((packetData >> 16) & 0x3FFF) + 1;
+  const u32 regCount = ((packetData >> 16) & 0x3FFF) + 1;
   
   if (ringBuffer->readCount() < regCount * sizeof(u32)) {
     LOG_ERROR(Xenos, "CP[ExecutePacketType0]: Data overflow, read count {:#x}, registers count {:#x})",
@@ -154,9 +154,9 @@ bool CommandProcessor::ExecutePacketType0(Xe::XGPU::RingBuffer* ringBuffer, u32 
   }
 
   // Base register to start from.
-  u32 baseIndex = (packetData & 0x7FFF); 
+  const u32 baseIndex = (packetData & 0x7FFF); 
   // Tells wheter the write is to one or multiple regs starting at specified register at base index.
-  u32 singleRegWrite = (packetData >> 15) & 0x1;
+  const u32 singleRegWrite = (packetData >> 15) & 0x1;
 
   for (size_t idx = 0; idx < regCount; idx++) {
     // Get the data to be written to the (internal) Register.
@@ -173,11 +173,11 @@ bool CommandProcessor::ExecutePacketType0(Xe::XGPU::RingBuffer* ringBuffer, u32 
 // Executes a packet type 1. Description is in CPPacketType enum.
 bool CommandProcessor::ExecutePacketType1(Xe::XGPU::RingBuffer* ringBuffer, u32 packetData) {
   // Get both registers index.
-  u32 regIndex0 = packetData & 0x7FF;
-  u32 regIndex1 = (packetData >> 11) & 0x7FF;
+  const u32 regIndex0 = packetData & 0x7FF;
+  const u32 regIndex1 = (packetData >> 11) & 0x7FF;
   // Get both registers data.
-  u32 reg0Data = ringBuffer->ReadAndSwap<u32>();
-  u32 reg1Data = ringBuffer->ReadAndSwap<u32>();
+  const u32 reg0Data = ringBuffer->ReadAndSwap<u32>();
+  const u32 reg1Data = ringBuffer->ReadAndSwap<u32>();
   // Do the write.
   LOG_TRACE(Xenos, "CP[ExecutePacketType1]: Writing register at index {:#x}, data {:#x}", regIndex0, reg0Data);
   LOG_TRACE(Xenos, "CP[ExecutePacketType1]: Writing register at index {:#x}, data {:#x}", regIndex1, reg1Data);
@@ -194,9 +194,9 @@ bool CommandProcessor::ExecutePacketType2(Xe::XGPU::RingBuffer* ringBuffer, u32 
 // Executes a packet type 3. Description is in CPPacketType enum.
 bool CommandProcessor::ExecutePacketType3(Xe::XGPU::RingBuffer* ringBuffer, u32 packetData) {
   // Current opcode we're executing.
-  CPPacketType3Opcode currentOpCode = static_cast<CPPacketType3Opcode>((packetData >> 8) & 0x7F);
+  const CPPacketType3Opcode currentOpCode = static_cast<CPPacketType3Opcode>((packetData >> 8) & 0x7F);
   // Amount of data we're reading.
-  uint32_t dataCount = ((packetData >> 16) & 0x3FFF) + 1;
+  const u32 dataCount = ((packetData >> 16) & 0x3FFF) + 1;
   // Get the read offset.
   auto data_start_offset = ringBuffer->readOffset();
   
@@ -346,7 +346,7 @@ bool CommandProcessor::ExecutePacketType3_ME_INIT(RingBuffer* ringBuffer, u32 pa
 
 bool CommandProcessor::ExecutePacketType3_INDIRECT_BUFFER(RingBuffer* ringBuffer, u32 packetData, u32 dataCount) {
   // Indirect buffer.
-  u32 bufferPtr = ringBuffer->ReadAndSwap<u32>();
+  const u32 bufferPtr = ringBuffer->ReadAndSwap<u32>();
   // Get the list pointer.
   u32 bufferSize = ringBuffer->ReadAndSwap<u32>();
   bufferSize &= 0xFFFFF;
