@@ -203,6 +203,15 @@ set(XCPU
   Xenon/Core/XCPU/PPU/PowerPC.h
 )
 
+set(XCPU_JIT
+  Xenon/Core/XCPU/Interpreter/JIT/x86_64/JITEmitter_ALU.cpp
+  Xenon/Core/XCPU/Interpreter/JIT/x86_64/JITEmitter_BC.cpp
+  Xenon/Core/XCPU/Interpreter/JIT/x86_64/JITEmitter_Helpers.h
+  Xenon/Core/XCPU/Interpreter/JIT/x86_64/JITEmitter_System.cpp
+  Xenon/Core/XCPU/PPU/PPU_JIT.cpp
+  Xenon/Core/XCPU/PPU/PPU_JIT.h
+)
+
 if (GFX_ENABLED)
   set(ImGui_Dir Deps/ThirdParty/ImGui)
   set(ImGui
@@ -236,6 +245,7 @@ if (GFX_ENABLED)
     Xenon/Render/Renderer.h
   )
 endif()
+
 set(microprofile_dir Deps/ThirdParty/microprofile)
 set(microprofile
     Xenon/include/microprofile.config.h
@@ -261,6 +271,7 @@ set(Core
     ${Render}
     ${RootBus}
     ${XCPU}
+    ${XCPU_JIT}
     ${XGPU}
     Xenon/Core/Xe_Main.cpp
     Xenon/Core/Xe_Main.h
@@ -305,7 +316,7 @@ endif()
 
 
 # Link libraries
-target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11)
+target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11 asmjit::asmjit)
 if (GFX_ENABLED)
   target_link_libraries(Xenon PRIVATE glad SDL3::SDL3)
 endif()
