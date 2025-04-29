@@ -12,6 +12,7 @@
 #include "Base/Logging/Log.h"
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
 #include "Core/XCPU/elf_abi.h"
+#include "PPU_JIT.h"
 
 // Clocks per instruction / Ticks per instruction
 static constexpr f64 cpi_a = -5.8868;
@@ -70,18 +71,21 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
   // Set Thread Timeout Register
   ppuState->SPR.TTR = 0x1000; // Execute 4096 instructions
 
+  ppuJIT = std::make_unique<PPU_JIT>(ppuState.get());
+
   // Asign global Xenon context
   xenonContext = inXenonContext;
 
-  if (Config::xcpu.clocksPerInstruction) {
-    clocksPerInstruction = Config::xcpu.clocksPerInstruction;
-    LOG_INFO(Xenon, "{}: Using cached CPI from Config, got {}", ppuState->ppuName, clocksPerInstruction);
-  } else {
-    CalculateCPI();
-    if (ppuState->ppuID == 0) {
-      Config::xcpu.clocksPerInstruction = clocksPerInstruction;
-    }
-  }
+  //if (Config::xcpu.clocksPerInstruction) {
+  //  clocksPerInstruction = Config::xcpu.clocksPerInstruction;
+  //  LOG_INFO(Xenon, "{}: Using cached CPI from Config, got {}", ppuState->ppuName, clocksPerInstruction);
+  //} else {
+  //  CalculateCPI();
+  //  if (ppuState->ppuID == 0) {
+  //    Config::xcpu.clocksPerInstruction = clocksPerInstruction;
+  //  }
+  //}
+  CalculateCPI();
   if (!Config::highlyExperimental.clocksPerInstructionBypass) {
     LOG_INFO(Xenon, "{}: {} clocks per instruction", ppuState->ppuName, clocksPerInstruction);
   }
@@ -139,6 +143,7 @@ PPU::~PPU() {
   // Kill the thread
   if (ppuThread.joinable())
     ppuThread.join();
+  ppuJIT.reset();
   ppuState.reset();
 }
 
@@ -246,7 +251,12 @@ void PPU::Step(int amount) {
 }
 
 // PPU Entry Point.
-void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
+void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) { 
+  if (currentExecMode != eExecutorMode::Interpreter) {
+    ppuJIT->ExecuteJITInstrs(numInstrs, enableHalt, ppuThreadActive);
+    return;
+  }
+    
   // Start Profile
   MICROPROFILE_SCOPEI("[Xe::PPU]", "PPURunInstructions", MP_AUTO);
   for (size_t instrCount = 0; instrCount < numInstrs && ppuThreadActive; ++instrCount) {
@@ -447,8 +457,12 @@ u32 PPU::GetIPS() {
 
   // Execute the amount of cycles we're requested
   while (auto timerEnd = std::chrono::steady_clock::now() <= timerStart + 1s) {
-    PPUReadNextInstruction();
-    PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
+    if (currentExecMode != eExecutorMode::Interpreter) {
+      ppuJIT->ExecuteJITInstrs(1, ppuThreadActive);
+    } else {
+      PPUReadNextInstruction();
+      PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
+    }
     instrCount++;
   }
 

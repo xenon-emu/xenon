@@ -16,6 +16,7 @@
 #include "Base/Logging/Log.h"
 #include "Core/XCPU/PPU/PowerPC.h"
 #include "Core/XCPU/Interpreter/PPCOpcodes.h"
+#include "Core/XCPU/PPU/PPU_JIT.h"
 
 constexpr u64 PPCRotateMask(u32 mb, u32 me) {
   const u64 mask = ~0ULL << (~(me - mb) & 63);
@@ -28,7 +29,8 @@ constexpr u32 PPCDecode(u32 instr) {
 
 namespace PPCInterpreter {
   // Define a type alias for function pointers
-  using instructionHandler = void(*)(PPU_STATE *ppuState);
+  using instructionHandler = fptr<void(PPU_STATE *ppuState)>;
+  using instructionHandlerJIT = fptr<void(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr)>;
   extern void PPCInterpreter_nop(PPU_STATE *ppuState);
   extern void PPCInterpreter_invalid(PPU_STATE *ppuState);
   extern void PPCInterpreter_known_unimplemented(const char *name, PPU_STATE *ppuState);
@@ -535,6 +537,33 @@ namespace PPCInterpreter {
       #undef GET
       #undef GETRC
     }
+    void fillJITTables() {
+      #define GET_(name) &PPCInterpreterJIT_##name
+      #define GET(name) GET_(name), GET_(name)
+      #define GETRC(name) GET_(name##x), GET_(name##x)
+
+      for (auto& x : jitTable) {
+        x = GET(invalid);
+      }
+
+      // Main opcodes (field 0..5)
+      fillTable<instructionHandlerJIT>(jitTable, 0x00, 6, -1, {
+        { 0x0E, GET(addi) },
+        { 0x12, GET(b) },
+        { 0x15, GETRC(rlwinm) },
+        { 0x19, GET(oris) },
+        { 0x1C, GET(andi) },
+      });
+
+      // Group 0x1F opcodes (field 21..30)
+      fillTable<instructionHandlerJIT>(jitTable, 0x1F, 10, 1, {
+        { 0x153, GET(mfspr) },
+      });
+
+      #undef GET_
+      #undef GET
+      #undef GETRC
+    }
     void fillNameTables() {
       #define GET_(name) std::string(#name)
       #define GET(name) GET_(name), GET_(name)
@@ -1017,11 +1046,17 @@ namespace PPCInterpreter {
     const std::array<instructionHandler, 0x20000> &getTable() const noexcept {
       return table;
     }
+    const std::array<instructionHandlerJIT, 0x20000>& getJITTable() const noexcept {
+      return jitTable;
+    }
     instructionHandler decode(u32 instr) const noexcept {
       if (instr == 0x60000000) {
         return &PPCInterpreter_nop;
       }
       return getTable()[PPCDecode(instr)];
+    }
+    instructionHandlerJIT decodeJIT(u32 instr) const noexcept {
+      return getJITTable()[PPCDecode(instr)];
     }
     const std::array<std::string, 0x20000> &getNameTable() const noexcept {
       return nameTable;
@@ -1032,6 +1067,7 @@ namespace PPCInterpreter {
   private:
     // Fast lookup table
     std::array<instructionHandler, 0x20000> table;
+    std::array<instructionHandlerJIT, 0x20000> jitTable;
     std::array<std::string, 0x20000> nameTable;
 
     template <typename T>

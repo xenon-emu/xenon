@@ -89,6 +89,15 @@ file(GLOB_RECURSE Base Xenon/Base/*.cpp Xenon/Base/*.h)
 
 file(GLOB_RECURSE Core Xenon/Core/*.cpp Xenon/Core/*.h)
 
+set(XCPU_JIT
+  Xenon/Core/XCPU/Interpreter/JIT/x86_64/JITEmitter_ALU.cpp
+  Xenon/Core/XCPU/Interpreter/JIT/x86_64/JITEmitter_BC.cpp
+  Xenon/Core/XCPU/Interpreter/JIT/x86_64/JITEmitter_Helpers.h
+  Xenon/Core/XCPU/Interpreter/JIT/x86_64/JITEmitter_System.cpp
+  Xenon/Core/XCPU/PPU/PPU_JIT.cpp
+  Xenon/Core/XCPU/PPU/PPU_JIT.h
+)
+
 if (GFX_ENABLED)
   set(ImGuiDir Deps/ThirdParty/ImGui)
   set(ImGuiBackends
@@ -106,10 +115,36 @@ if (GFX_ENABLED)
   )
 endif()
 
-file(GLOB_RECURSE include Xenon/include/*.cpp Xenon/include/*.h)
-
 set(microprofile_dir Deps/ThirdParty/microprofile)
-file(GLOB microprofile ${microprofile_dir}/*.cpp ${microprofile_dir}/*.h)
+set(microprofile
+    Xenon/include/microprofile.config.h
+    ${microprofile_dir}/microprofile.cpp
+    ${microprofile_dir}/microprofile.h
+    ${microprofile_dir}/microprofile_html.h
+)
+
+set(XGPU
+    Xenon/Core/XGPU/XGPU.cpp
+    Xenon/Core/XGPU/XenosRegisters.h
+    Xenon/Core/XGPU/XGPU.h
+    Xenon/Core/XGPU/XGPUConfig.h
+    Xenon/Core/XGPU/CommandProcessor.h
+    Xenon/Core/XGPU/CommandProcessor.cpp
+    Xenon/Core/XGPU/RingBuffer.h
+    Xenon/Core/XGPU/RingBuffer.cpp
+)
+
+set(Core
+    ${NAND}
+    ${RAM}
+    ${Render}
+    ${RootBus}
+    ${XCPU}
+    ${XCPU_JIT}
+    ${XGPU}
+    Xenon/Core/Xe_Main.cpp
+    Xenon/Core/Xe_Main.h
+)
 
 add_executable(Xenon
   ${Base}
@@ -133,7 +168,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" OR "Debug")
 endif()
 
 # Link libraries
-target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11)
+target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11 asmjit::asmjit)
 if (GFX_ENABLED)
   target_link_libraries(Xenon PRIVATE glad sirit SDL3::SDL3)
 endif()
