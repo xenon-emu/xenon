@@ -15,7 +15,7 @@ XeMain::XeMain() {
   createPCIDevices();
   addPCIDevices();
 #ifndef NO_GFX
-  renderer = std::make_unique<STRIP_UNIQUE(renderer)>(ram.get());
+  renderer = std::make_unique<Render::OGLRenderer>(ram.get());
 #endif
   xenos = std::make_unique<STRIP_UNIQUE(xenos)>(ram.get());
   createHostBridge();

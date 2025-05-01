@@ -16,13 +16,15 @@ enum eDataFormat : const u8 {
 class Texture {
 public:
   virtual ~Texture() = default;
-  virtual void CreateTextureHandle(u32 width, u32 height, int flags) {}
-  virtual void CreateTextureWithData(u32 width, u32 height, eDataFormat format, u8* data, u32 dataSize, int flags) {}
-  virtual void ResizeTexture(u32 width, u32 height) {}
-  virtual void Bind() {}
-  virtual void Unbind() {}
-  virtual void DestroyTexture() {}
-  virtual void SetTexture(void* handle) { Texture = handle; }
+  virtual void CreateTextureHandle(u32 width, u32 height, s32 flags) = 0;
+  virtual void CreateTextureWithData(u32 width, u32 height, eDataFormat format, u8* data, u32 dataSize, s32 flags) = 0;
+  virtual void ResizeTexture(u32 width, u32 height) = 0;
+  virtual void GenerateMipmaps() = 0;
+  virtual void UpdateSubRegion(u32 x, u32 y, u32 w, u32 h, eDataFormat format, u8 *data) = 0;
+  virtual void Bind() = 0;
+  virtual void Unbind() = 0;
+  virtual void DestroyTexture() = 0;
+  virtual void SetTexture(void *handle) { Texture = handle; }
   virtual void* GetTexture() { return Texture; }
   virtual void SetDepth(u32 depth) {  Depth = depth; }
   virtual u32 GetDepth() { return Depth; }
@@ -30,11 +32,11 @@ public:
   virtual u32 GetWidth() { return Width; }
   virtual void SetHeight(u32 height) { Height = height; }
   virtual u32 GetHeight() { return Height; }
-private:
-  u32 Depth;
-  u32 Width, Height;
-  void* Texture;
+protected:
+  u32 Depth = 0;
+  u32 Width = 0, Height = 0;
+  void *Texture;
 };
 
-} // Namespace Render
+} // namespace Render
 #endif

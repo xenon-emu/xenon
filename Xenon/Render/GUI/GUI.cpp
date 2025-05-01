@@ -27,7 +27,7 @@
 #define U8Dec(g, c, x) CopyCustom(g, x, "{}", static_cast<u32>(c.x))
 #define Bool(g, c, x) CopyCustom(g, x, "{}", c.x ? "true" : "false")
 
-void Render::GUI::Init(SDL_Window* window, void* context) {
+void Render::GUI::Init(SDL_Window* window, void *context) {
   MICROPROFILE_SCOPEI("[Xe::Render::GUI]", "Init", MP_AUTO);
   // Set our mainWindow handle
   mainWindow = window;

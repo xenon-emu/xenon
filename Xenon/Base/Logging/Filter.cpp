@@ -4,7 +4,8 @@
 
 #include "Base/Assert.h"
 
-namespace Base::Log {
+namespace Base {
+namespace Log {
 
 template <typename It>
 Level GetLevelByName(const It begin, const It end) {
@@ -167,4 +168,5 @@ bool Filter::IsDebug() const {
   });
 }
 
-} // namespace Base::Log
+} // namespace Log
+} // namespace Base

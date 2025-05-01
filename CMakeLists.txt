@@ -225,52 +225,65 @@ if (GFX_ENABLED)
 
   set(Render
     ${ImGui}
+    Xenon/Render/Abstractions/Factory/ResourceFactory.h
+    Xenon/Render/Abstractions/Factory/ShaderFactory.h
+    Xenon/Render/Abstractions/Buffer.h
+    Xenon/Render/Abstractions/Renderer.cpp
+    Xenon/Render/Abstractions/Renderer.h
+    Xenon/Render/Abstractions/Shader.h
     Xenon/Render/Abstractions/Texture.h
-    Xenon/Render/Implementations/OGLTexture.cpp
-    Xenon/Render/Implementations/OGLTexture.h
-    Xenon/Render/GUI/Implementations/OpenGL.cpp
-    Xenon/Render/GUI/Implementations/OpenGL.h
     Xenon/Render/GUI/GUI.cpp
     Xenon/Render/GUI/GUI.h
-    Xenon/Render/Renderer.cpp
-    Xenon/Render/Renderer.h
+    Xenon/Render/GUI/OpenGL.cpp
+    Xenon/Render/GUI/OpenGL.h
+    Xenon/Render/OpenGL/Factory/OGLResourceFactory.h
+    Xenon/Render/OpenGL/Factory/OGLShaderFactory.cpp
+    Xenon/Render/OpenGL/Factory/OGLShaderFactory.h
+    Xenon/Render/OpenGL/OGLTexture.cpp
+    Xenon/Render/OpenGL/OGLTexture.h
+    Xenon/Render/OpenGL/OGLBuffer.cpp
+    Xenon/Render/OpenGL/OGLBuffer.h
+    Xenon/Render/OpenGL/OGLShader.cpp
+    Xenon/Render/OpenGL/OGLShader.h
+    Xenon/Render/OGLRenderer.h
+    Xenon/Render/OGLRenderer.cpp
   )
 endif()
 set(microprofile_dir Deps/ThirdParty/microprofile)
 set(microprofile
-    Xenon/include/microprofile.config.h
-    ${microprofile_dir}/microprofile.cpp
-    ${microprofile_dir}/microprofile.h
-    ${microprofile_dir}/microprofile_html.h
+  Xenon/include/microprofile.config.h
+  ${microprofile_dir}/microprofile.cpp
+  ${microprofile_dir}/microprofile.h
+  ${microprofile_dir}/microprofile_html.h
 )
 
 set(XGPU
-    Xenon/Core/XGPU/XGPU.cpp
-    Xenon/Core/XGPU/XenosRegisters.h
-    Xenon/Core/XGPU/XGPU.h
-    Xenon/Core/XGPU/XGPUConfig.h
-    Xenon/Core/XGPU/CommandProcessor.h
-    Xenon/Core/XGPU/CommandProcessor.cpp
-    Xenon/Core/XGPU/RingBuffer.h
-    Xenon/Core/XGPU/RingBuffer.cpp
+  Xenon/Core/XGPU/XGPU.cpp
+  Xenon/Core/XGPU/XenosRegisters.h
+  Xenon/Core/XGPU/XGPU.h
+  Xenon/Core/XGPU/XGPUConfig.h
+  Xenon/Core/XGPU/CommandProcessor.h
+  Xenon/Core/XGPU/CommandProcessor.cpp
+  Xenon/Core/XGPU/RingBuffer.h
+  Xenon/Core/XGPU/RingBuffer.cpp
 )
 
 set(Core
-    ${NAND}
-    ${RAM}
-    ${Render}
-    ${RootBus}
-    ${XCPU}
-    ${XGPU}
-    Xenon/Core/Xe_Main.cpp
-    Xenon/Core/Xe_Main.h
+  ${NAND}
+  ${RAM}
+  ${Render}
+  ${RootBus}
+  ${XCPU}
+  ${XGPU}
+  Xenon/Core/Xe_Main.cpp
+  Xenon/Core/Xe_Main.h
 )
 
 add_executable(Xenon
-    ${Base}
-    ${Core}
-    ${microprofile}
-    Xenon/Main.cpp
+  ${Base}
+  ${Core}
+  ${microprofile}
+  "Xenon/Main.cpp"
 )
 
 
@@ -284,9 +297,9 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 endif()
 
 if (GFX_ENABLED)
-  add_definitions(-DGFX_ENABLED)
+  add_compile_definitions(GFX_ENABLED)
 else()
-  add_definitions(-DNO_GFX)
+  add_compile_definitions(NO_GFX)
 endif()
 
 if (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")

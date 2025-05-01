@@ -8,7 +8,8 @@
 #include "Log_types.h"
 #include "Base/Config.h"
 
-namespace Base::Log {
+namespace Base {
+namespace Log {
 
 constexpr const char* TrimSourcePath(const std::string_view &source) {
   const auto rfind = [source](const std::string_view match) {
@@ -33,7 +34,8 @@ void FmtLogMessage(Class logClass, Level logLevel, const char *filename, u32 lin
                     fmt::make_format_args(args...));
 }
 
-} // namespace Base::Log
+} // namespace Log
+} // namespace Base
 
 // Define the fmt lib macros
 #define LOG_GENERIC(logClass, logLevel, ...)                                             \

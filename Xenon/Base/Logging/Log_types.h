@@ -4,7 +4,8 @@
 
 #include "Base/Types.h"
 
-namespace Base::Log {
+namespace Base {
+namespace Log {
 
 /// Specifies the severity or level of detail of the log message
 enum class Level : const u8 {
@@ -55,4 +56,5 @@ enum class Class : const u8 {
   Count                   // Total number of logging classes
 };
 
-} // namespace Base::Log
+} // namespace Log
+} // namespace Base

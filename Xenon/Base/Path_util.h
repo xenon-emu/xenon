@@ -7,7 +7,8 @@
 
 namespace fs = std::filesystem;
 
-namespace Base::FS {
+namespace Base {
+namespace FS {
 
 enum class PathType {
   BinaryDir,  // Binary Path
@@ -53,4 +54,5 @@ constexpr auto LOG_FILE = "xenon_log.txt";
 // Sets the current Path for a given PathType.
 void SetUserPath(PathType user_path, const fs::path &new_path);
 
-} // namespace Base::FS
+} // namespace FS
+} // namespace Base

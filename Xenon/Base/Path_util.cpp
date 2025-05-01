@@ -11,7 +11,8 @@
 #include <Windows.h>
 #endif // _WIN32
 
-namespace Base::FS {
+namespace Base {
+namespace FS {
 
 const fs::path GetBinaryDirectory() {
   fs::path fspath = {};
@@ -113,4 +114,5 @@ std::vector<FileInfo> ListFilesFromPath(const fs::path &path) {
 void SetUserPath(PathType xenon_path, const fs::path &new_path) {
   UserPaths.insert_or_assign(xenon_path, new_path);
 }
-} // namespace Base::FS
+} // namespace FS
+} // namespace Base

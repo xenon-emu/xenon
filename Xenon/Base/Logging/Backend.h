@@ -2,16 +2,20 @@
 
 #pragma once
 
+#include <string_view>
 #include <filesystem>
+
+#include "Base/Path_util.h"
 
 #include "Filter.h"
 
-namespace Base::Log {
+namespace Base {
+namespace Log {
 
 class Filter;
 
 /// Cleans up logs from previous days, and any logs within the desired limit
-void CleanupOldLogs(const std::string_view &logFileBase, const std::filesystem::path &logDir, const u16 logLimit = 50);
+void CleanupOldLogs(const std::string_view &logFileBase, const fs::path &logDir, const u16 logLimit = 50);
 
 /// Initializes the logging system
 void Initialize(const std::string_view &logFile = {});
@@ -29,4 +33,5 @@ void SetGlobalFilter(const Filter &filter);
 
 void SetColorConsoleBackendEnabled(bool enabled);
 
-} // namespace Base::Log
+} // namespace Log
+} // namespace Base

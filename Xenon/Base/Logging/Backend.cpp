@@ -19,7 +19,8 @@
 #include "Log_entry.h"
 #include "Text_formatter.h"
 
-namespace Base::Log {
+namespace Base {
+namespace Log {
 
 using namespace Base::FS;
 
@@ -442,4 +443,5 @@ void NoFmtMessage(Class logClass, Level logLevel, const std::string &message) {
     Impl::Instance().PushEntryNoFmt(logClass, logLevel, message);
   }
 }
-} // namespace Base::Log
+} // namespace Log
+} // namespace Base

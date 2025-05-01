@@ -6,8 +6,8 @@
 #include "Core/Xe_Main.h"
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
 #include "Base/Config.h"
-#include "Render/Renderer.h"
-#include "Render/Implementations/OGLTexture.h"
+#include "Render/Abstractions/Renderer.h"
+#include "Render/OpenGL/OGLTexture.h"
 
 void Render::OpenGLGUI::InitBackend(void *context) {
   if (!ImGui_ImplSDL3_InitForOpenGL(mainWindow, context)) {

@@ -5,43 +5,49 @@
 #include <thread>
 #include <vector>
 #include <fstream>
+#ifndef NO_GFX
+#include <SDL3/SDL.h>
+#define IMGUI_DEFINE_MATH_OPERATORS
+#include <backends/imgui_impl_sdl3.h>
+#endif
 
 #include "Base/Types.h"
 
-#ifndef NO_GFX
-#include <SDL3/SDL.h>
-
-#define GL_GLEXT_PROTOTYPES
-#include <KHR/khrplatform.h>
-#include <glad/glad.h>
-
-#define IMGUI_DEFINE_MATH_OPERATORS
-#include <backends/imgui_impl_opengl3.h>
-#include <backends/imgui_impl_sdl3.h>
-
 #include "Core/RAM/RAM.h"
 #include "Core/RootBus/HostBridge/PCIe.h"
-#include "Render/Abstractions/Texture.h"
+#include "Render/Abstractions/Factory/ResourceFactory.h"
+#include "Render/Abstractions/Factory/ShaderFactory.h"
 #include "Render/GUI/GUI.h"
 
+#ifndef NO_GFX
 // ARGB (Console is BGRA)
 #define COLOR(r, g, b, a) ((a) << 24 | (r) << 16 | (g) << 8 | (b) << 0)
 #define TILE(x) ((x + 31) >> 5) << 5
-
 namespace Render {
 
 class Renderer {
 public:
   Renderer(RAM *ram);
-  ~Renderer();
+  virtual ~Renderer() = default;
+  virtual void BackendSDLProperties(SDL_PropertiesID properties) = 0;
+  virtual void BackendStart() = 0;
+  virtual void BackendShutdown() = 0;
+  virtual void BackendSDLInit() = 0;
+  virtual void BackendSDLShutdown() = 0;
+  virtual void BackendResize(s32 x, s32 y) = 0;
+  virtual void OnCompute() = 0;
+  virtual void OnBind() = 0;
+  virtual void OnSwap(SDL_Window *window) = 0;
+  virtual s32 GetBackbufferFlags() = 0;
+  virtual void* GetBackendContext() = 0;
   void Start();
   void Shutdown();
 
-  void Resize(int x, int y, bool resizeViewport = true);
+  void Resize(s32 x, s32 y);
 
   void Thread();
 
-  // Debugger Pointers (RAM, and FrameBuffer)
+  // CPU Handles
   RAM *ramPointer{};
   u8 *fbPointer{};
 
@@ -56,6 +62,20 @@ public:
   // Thread Running
   volatile bool threadRunning = true;
 
+  // FB Pitch
+  s32 pitch = 0;
+  // SDL Window data
+  SDL_Window *mainWindow = nullptr;
+  SDL_Event windowEvent = {};
+  SDL_WindowID windowID = {};
+  // Factories
+  std::unique_ptr<ResourceFactory> resourceFactory{};
+  std::unique_ptr<ShaderFactory> shaderFactory{};
+
+  // Backbuffer texture
+  std::unique_ptr<Texture> backbuffer{};
+
+  // GUI Helpers
   bool DebuggerActive() {
     return gui.get() && gui.get()->ppcDebuggerActive;
   }
@@ -65,39 +85,25 @@ public:
       gui.get()->ppcDebuggerActive = true;
     }
   }
-
-  // FB Pitch
-  int pitch = 0;
 private:
   // Thread handle
   std::thread thread;
 
-  // Backbuffer texture
-  std::unique_ptr<Texture> backbuffer;
-
   // GUI handle
-  std::unique_ptr<GUI> gui;
+  std::unique_ptr<GUI> gui{};
 
   // Pixel buffer
+  std::unique_ptr<Buffer> pixelSSBO{};
   std::vector<u32> pixels{};
-  // SDL Window data
-  SDL_Window *mainWindow{};
-  SDL_GLContext context;
-  SDL_Event windowEvent;
-  SDL_WindowID windowID;
-public:
-  // OpenGL Handles
-  // XeFB Pixel Buffer
-  GLuint pixelBuffer;
-  // Texture handles
-  GLuint texture, dummyVAO;
+
   // Shaders
-  GLuint shaderProgram, renderShaderProgram;
+  std::shared_ptr<Shader> computeShaderProgram{};
+  std::shared_ptr<Shader> renderShaderPrograms{};
 };
 
 // Shaders
 
-inline constexpr const char* vertexShaderSource = R"(
+inline constexpr const char* vertexShaderSource = R"glsl(
 #version 430 core
 
 out vec2 o_texture_coord;
@@ -105,9 +111,9 @@ out vec2 o_texture_coord;
 void main() {
   o_texture_coord = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
   gl_Position = vec4(o_texture_coord * vec2(2.0f, -2.0f) + vec2(-1.0f, 1.0f), 0.0f, 1.0f);
-})";
+})glsl";
 
-inline constexpr const char* fragmentShaderSource = R"(
+inline constexpr const char* fragmentShaderSource = R"glsl(
 #version 430 core
 
 in vec2 o_texture_coord;
@@ -123,9 +129,9 @@ void main() {
   const float g = float((pixel >> 8) & 0xFF) / 255.0;
   const float b = float((pixel >> 0) & 0xFF) / 255.0;
   o_color = vec4(r, g, b, a);
-})";
+})glsl";
 
-inline constexpr const char* computeShaderSource = R"(
+inline constexpr const char* computeShaderSource = R"glsl(
 #version 430 core
 
 layout (local_size_x = 16, local_size_y = 16) in;
@@ -170,8 +176,7 @@ void main() {
 
   uint packedColor = pixel_data[xeIndex];
   imageStore(o_texture, texel_pos, uvec4(packedColor, 0, 0, 0));
-})";
+})glsl";
 
 } // namespace Render
-
 #endif

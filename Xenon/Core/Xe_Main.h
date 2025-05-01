@@ -29,7 +29,7 @@
 #include "Core/XCPU/Xenon.h"
 #include "Core/XGPU/XGPU.h"
 
-#include "Render/Renderer.h"
+#include "Render/OGLRenderer.h"
 
 // Global thread state
 inline std::atomic<bool> XeRunning{ true };

@@ -6,7 +6,8 @@
 
 #include "Log_types.h"
 
-namespace Base::Log {
+namespace Base {
+namespace Log {
 
 /*
  * A log entry. Log entries are store in a structured format to permit more varied output
@@ -22,4 +23,5 @@ struct Entry {
   std::string message = {};
 };
 
-} // namespace Base::Log
+} // namespace Log
+} // namespace Base

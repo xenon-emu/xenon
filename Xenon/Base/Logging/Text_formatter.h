@@ -4,7 +4,8 @@
 
 #include <string>
 
-namespace Base::Log {
+namespace Base {
+namespace Log {
 
 struct Entry;
 
@@ -20,4 +21,5 @@ void PrintMessageFmt(const Entry &entry);
 /// Prints the same message as `PrintMessage`, but colored according to the severity level.
 void PrintColoredMessage(const Entry &entry, bool withFmt = true);
 
-} // namespace Base::Log
+} // namespace Log
+} // namespace Base

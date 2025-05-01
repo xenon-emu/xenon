@@ -5,7 +5,8 @@
 #include <array>
 #include "Log_types.h"
 
-namespace Base::Log {
+namespace Base {
+namespace Log {
 
 /*
  * Returns the name of the passed log class as a C-string. Subclasses are separated by periods
@@ -60,4 +61,5 @@ private:
   std::array<Level, static_cast<const size_t>(Class::Count)> classLevels;
 };
 
-} // namespace Base::Log
+} // namespace Log
+} // namespace Base

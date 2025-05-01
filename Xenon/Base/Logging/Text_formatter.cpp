@@ -11,7 +11,8 @@
 #include "Filter.h"
 #include "Log_entry.h"
 
-namespace Base::Log {
+namespace Base {
+namespace Log {
 
 std::string FormatLogMessage(const Entry &entry) {
   const char *className = GetLogClassName(entry.logClass);
@@ -77,4 +78,5 @@ void PrintColoredMessage(const Entry &entry, bool withFmt) {
   #undef ESC
 }
 
-} // namespace Base::Log
+} // namespace Log
+} // namespace Base
