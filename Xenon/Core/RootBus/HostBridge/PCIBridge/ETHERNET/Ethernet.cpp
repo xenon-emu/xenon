@@ -14,68 +14,85 @@ Xe::PCIDev::ETHERNET::ETHERNET(const std::string &deviceName, u64 size) :
   pciConfigSpace.configSpaceHeader.reg2.hexData = 0x02000001;
   // Set our PCI Dev Sizes
   pciDevSizes[0] = 0x80; // BAR0
+  // xboxkrnld looks for these values, and will return E75 if it doesn't get it
+  mdioRegisters[1][2] = 0x0015; // PHY ID1 (expected OUI MSBs)
+  mdioRegisters[1][3] = 0x0141; // PHY ID2 (expected OUI LSBs + model/rev)
 }
 
 void Xe::PCIDev::ETHERNET::Read(u64 readAddress, u8 *data, u64 size) {
   u8 offset = readAddress & 0xFF;
-
+  
   switch (offset) {
-  case Xe::PCIDev::TX_CONFIG:
+  case TX_CONFIG:
     memcpy(data, &ethPciState.txConfigReg, size);
     break;
-  case Xe::PCIDev::TX_DESCRIPTOR_BASE:
+  case TX_DESCRIPTOR_BASE:
     memcpy(data, &ethPciState.txDescriptorBaseReg, size);
     break;
-  case Xe::PCIDev::TX_DESCRIPTOR_STATUS:
+  case TX_DESCRIPTOR_STATUS:
     memcpy(data, &ethPciState.txDescriptorStatusReg, size);
     break;
-  case Xe::PCIDev::RX_CONFIG:
+  case RX_CONFIG:
     memcpy(data, &ethPciState.rxConfigReg, size);
     break;
-  case Xe::PCIDev::RX_DESCRIPTOR_BASE:
+  case RX_DESCRIPTOR_BASE:
     memcpy(data, &ethPciState.rxDescriptorBaseReg, size);
     break;
-  case Xe::PCIDev::INTERRUPT_STATUS:
+  case INTERRUPT_STATUS:
     memcpy(data, &ethPciState.interruptStatusReg, size);
     break;
-  case Xe::PCIDev::INTERRUPT_MASK:
+  case INTERRUPT_MASK:
     memcpy(data, &ethPciState.interruptMaskReg, size);
     break;
-  case Xe::PCIDev::CONFIG_0:
+  case CONFIG_0:
     memcpy(data, &ethPciState.config0Reg, size);
     break;
-  case Xe::PCIDev::POWER:
+  case POWER:
     memcpy(data, &ethPciState.powerReg, size);
     break;
-  case Xe::PCIDev::PHY_CONFIG:
+  case PHY_CONFIG:
     memcpy(data, &ethPciState.phyConfigReg, size);
     break;
-  case Xe::PCIDev::PHY_CONTROL:
-    memcpy(data, &ethPciState.phyControlReg, size);
-    break;
-  case Xe::PCIDev::CONFIG_1:
+  case PHY_CONTROL: {
+    u32 regVal = PhyReadReg();
+    memcpy(data, &regVal, size);
+  } break;
+  case CONFIG_1:
     memcpy(data, &ethPciState.config1Reg, size);
     break;
-  case Xe::PCIDev::RETRY_COUNT:
+  case RETRY_COUNT:
     memcpy(data, &ethPciState.retryCountReg, size);
     break;
-  case Xe::PCIDev::MULTICAST_FILTER_CONTROL:
+  case MULTICAST_FILTER_CONTROL:
     memcpy(data, &ethPciState.multicastFilterControlReg, size);
     break;
-  case Xe::PCIDev::ADDRESS_0:
-    memcpy(data, &ethPciState.address0Reg, size);
+  case ADDRESS_0:
+  case ADDRESS_0 + 1:
+  case ADDRESS_0 + 2:
+  case ADDRESS_0 + 3:
+  case ADDRESS_0 + 4:
+  case ADDRESS_0 + 5:
+    memcpy(data, &ethPciState.macAddress[(offset - ADDRESS_0)], size);
     break;
-  case Xe::PCIDev::MULTICAST_HASH:
-    memcpy(data, &ethPciState.multicastHashReg, size);
+  case MULTICAST_HASH + 0x0:
+    memcpy(data, &ethPciState.multicastHashFilter0, size);
     break;
-  case Xe::PCIDev::MAX_PACKET_SIZE:
+  case MULTICAST_HASH + 0x4:
+    memcpy(data, &ethPciState.multicastHashFilter1, size);
+    break;
+  case MAX_PACKET_SIZE:
     memcpy(data, &ethPciState.maxPacketSizeReg, size);
     break;
-  case Xe::PCIDev::ADDRESS_1:
-    memcpy(data, &ethPciState.address1Reg, size);
+  case ADDRESS_1:
+  case ADDRESS_1 + 1:
+  case ADDRESS_1 + 2:
+  case ADDRESS_1 + 3:
+  case ADDRESS_1 + 4:
+  case ADDRESS_1 + 5:
+    memcpy(data, &ethPciState.macAddress2[(offset - ADDRESS_1)], size);
     break;
   default:
-    LOG_ERROR(ETH, "Unknown PCI Reg being read {:#x}", static_cast<u16>(offset));
+    LOG_ERROR(ETH, "Register '{:#x}' is unknown! Attempted to read {} bytes", static_cast<u16>(offset), size);
     memset(data, 0xFF, size);
     break;
   }
@@ -88,65 +105,123 @@ void Xe::PCIDev::ETHERNET::ConfigRead(u64 readAddress, u8 *data, u64 size) {
 void Xe::PCIDev::ETHERNET::Write(u64 writeAddress, const u8 *data, u64 size) {
   u8 offset = writeAddress & 0xFF;
 
+  u32 val = 0;
+  val = byteswap_be(val);
+  memcpy(&val, data, size);
   switch (offset) {
-  case Xe::PCIDev::TX_CONFIG:
-    memcpy(&ethPciState.txConfigReg, data, size);
+  case TX_CONFIG:
+    ethPciState.txConfigReg = val;
+    LOG_DEBUG(ETH, "TX_CONFIG = 0x{:X}", val);
     break;
-  case Xe::PCIDev::TX_DESCRIPTOR_BASE:
-    memcpy(&ethPciState.txDescriptorBaseReg, data, size);
+  case TX_DESCRIPTOR_BASE:
+    ethPciState.txDescriptorBaseReg = val;
+    LOG_DEBUG(ETH, "TX_DESCRIPTOR_BASE = 0x{:X}", val);
     break;
-  case Xe::PCIDev::TX_DESCRIPTOR_STATUS:
-    memcpy(&ethPciState.txDescriptorStatusReg, data, size);
+  case TX_DESCRIPTOR_STATUS:
+    ethPciState.txDescriptorStatusReg = val;
+    LOG_DEBUG(ETH, "TX_DESCRIPTOR_STATUS = 0x{:X}", val);
     break;
-  case Xe::PCIDev::RX_CONFIG:
-    memcpy(&ethPciState.rxConfigReg, data, size);
+  case RX_CONFIG:
+    ethPciState.rxConfigReg = val;
+    LOG_DEBUG(ETH, "RX_CONFIG = 0x{:X}", val);
     break;
-  case Xe::PCIDev::RX_DESCRIPTOR_BASE:
-    memcpy(&ethPciState.rxDescriptorBaseReg, data, size);
+  case RX_DESCRIPTOR_BASE:
+    ethPciState.rxDescriptorBaseReg = val;
+    LOG_DEBUG(ETH, "RX_DESCRIPTOR_BASE = 0x{:X}", val);
     break;
-  case Xe::PCIDev::INTERRUPT_STATUS:
-    memcpy(&ethPciState.interruptStatusReg, data, size);
+  case INTERRUPT_STATUS:
+    ethPciState.interruptStatusReg &= ~val;
+    LOG_DEBUG(ETH, "INTERRUPT_STATUS (ACK) = 0x{:X} -> 0x{:X}", val, ethPciState.interruptStatusReg);
     break;
-  case Xe::PCIDev::INTERRUPT_MASK:
-    memcpy(&ethPciState.interruptMaskReg, data, size);
+  case INTERRUPT_MASK:
+    ethPciState.interruptMaskReg = val;
+    LOG_DEBUG(ETH, "INTERRUPT_MASK = 0x{:X}", val);
     break;
-  case Xe::PCIDev::CONFIG_0:
-    memcpy(&ethPciState.config0Reg, data, size);
+  case CONFIG_0:
+    ethPciState.config0Reg = val;
+    LOG_DEBUG(ETH, "CONFIG_0 = 0x{:X}", val);
     break;
-  case Xe::PCIDev::POWER:
-    memcpy(&ethPciState.powerReg, data, size);
+  case POWER:
+    ethPciState.powerReg = val;
+    LOG_DEBUG(ETH, "POWER = 0x{:X}", val);
     break;
-  case Xe::PCIDev::PHY_CONFIG:
-    memcpy(&ethPciState.phyConfigReg, data, size);
+  case PHY_CONFIG:
+    ethPciState.phyConfigReg = val;
+    LOG_DEBUG(ETH, "PHY_CONFIG = 0x{:X}", val);
     break;
-  case Xe::PCIDev::PHY_CONTROL:
-    memcpy(&ethPciState.phyControlReg, data, size);
+  case PHY_CONTROL: {
+    ethPciState.phyControlReg = val;
+    u8 phyAddr = (ethPciState.phyConfigReg >> 8) & 0x1F;
+    u8 regNum  = (ethPciState.phyConfigReg >> 0) & 0x1F;
+    bool isWrite = ethPciState.phyConfigReg & (1 << 16);
+
+    if (phyAddr < 32 && regNum < 32) {
+      if (isWrite) {
+        u16 writeVal = static_cast<u16>(val & 0xFFFF);
+        switch (regNum) {
+        case 0: {
+          if (writeVal & 0x8000) {
+            // Bit 15 is the reset bit — emulate reset behavior
+            writeVal &= ~0x8000; // Clear the reset bit immediately
+          }
+        } break;
+        default: {
+          // Handle as normal until needed
+        } break;
+        }
+        LOG_INFO(ETH, "PHY addr {} reg {} with a value of 0x{:X}", phyAddr, regNum, writeVal);
+        mdioRegisters[phyAddr][regNum] = writeVal;
+      } else {
+        ethPciState.phyControlReg = (1u << 31) | mdioRegisters[phyAddr][regNum];
+      }
+    } else {
+      LOG_WARNING(ETH, "MDIO access to invalid PHY addr {} reg {}", phyAddr, regNum);
+    }
+  } break;
+  case CONFIG_1:
+    ethPciState.config1Reg = val;
+    LOG_DEBUG(ETH, "CONFIG_1 = 0x{:X}", val);
     break;
-  case Xe::PCIDev::CONFIG_1:
-    memcpy(&ethPciState.config1Reg, data, size);
+  case RETRY_COUNT:
+    ethPciState.retryCountReg = val;
+    LOG_DEBUG(ETH, "RETRY_COUNT = 0x{:X}", val);
     break;
-  case Xe::PCIDev::RETRY_COUNT:
-    memcpy(&ethPciState.retryCountReg, data, size);
+  case MULTICAST_FILTER_CONTROL:
+    ethPciState.multicastFilterControlReg = val;
+    LOG_DEBUG(ETH, "MULTICAST_FILTER_CONTROL = 0x{:X}", val);
     break;
-  case Xe::PCIDev::MULTICAST_FILTER_CONTROL:
-    memcpy(&ethPciState.multicastFilterControlReg, data, size);
+  case ADDRESS_0:
+  case ADDRESS_0 + 1:
+  case ADDRESS_0 + 2:
+  case ADDRESS_0 + 3:
+  case ADDRESS_0 + 4:
+  case ADDRESS_0 + 5:
+    memcpy(&ethPciState.macAddress[(offset - ADDRESS_0)], data, size);
+    LOG_DEBUG(ETH, "macAddress[{}] = 0x{:X}", (offset - ADDRESS_0), (u32)*data);
     break;
-  case Xe::PCIDev::ADDRESS_0:
-    memcpy(&ethPciState.address0Reg, data, size);
+  case MULTICAST_HASH + 0x0:
+    ethPciState.multicastHashFilter0 = val;
+    LOG_DEBUG(ETH, "MULTICAST_HASH_0 = 0x{:X}", val);
     break;
-  case Xe::PCIDev::MULTICAST_HASH:
-    memcpy(&ethPciState.multicastHashReg, data, size);
+  case MULTICAST_HASH + 0x4:
+    ethPciState.multicastHashFilter1 = val;
+    LOG_DEBUG(ETH, "MULTICAST_HASH_1 = 0x{:X}", val);
     break;
-  case Xe::PCIDev::MAX_PACKET_SIZE:
-    memcpy(&ethPciState.maxPacketSizeReg, data, size);
+  case MAX_PACKET_SIZE:
+    ethPciState.maxPacketSizeReg = val;
+    LOG_DEBUG(ETH, "MAX_PACKET_SIZE = 0x{:X}", val);
     break;
-  case Xe::PCIDev::ADDRESS_1:
-    memcpy(&ethPciState.address1Reg, data, size);
+  case ADDRESS_1:
+  case ADDRESS_1 + 1:
+  case ADDRESS_1 + 2:
+  case ADDRESS_1 + 3:
+  case ADDRESS_1 + 4:
+  case ADDRESS_1 + 5:
+    memcpy(&ethPciState.macAddress2[(offset - ADDRESS_1)], data, size);
+    LOG_DEBUG(ETH, "macAddress2[{}] = 0x{:X}", (offset - ADDRESS_1), (u32)*data);
     break;
   default:
-    u64 tmp = 0;
-    memcpy(&tmp, data, size);
-    LOG_ERROR(ETH, "Unknown PCI Reg being written {:#x} data = {:#x}", static_cast<u16>(offset), tmp);
+    LOG_ERROR(ETH, "Register '{:#x}' is unknown! Data = {:#x} ({}b)", static_cast<u16>(offset), val, size);
     break;
   }
 }
@@ -155,66 +230,110 @@ void Xe::PCIDev::ETHERNET::MemSet(u64 writeAddress, s32 data, u64 size) {
   u8 offset = writeAddress & 0xFF;
 
   switch (offset) {
-  case Xe::PCIDev::TX_CONFIG:
-    memset(&ethPciState.txConfigReg, data, size);
+  case TX_CONFIG:
+    ethPciState.txConfigReg = data;
+    LOG_DEBUG(ETH, "TX_CONFIG = 0x{:X}", data);
     break;
-  case Xe::PCIDev::TX_DESCRIPTOR_BASE:
-    memset(&ethPciState.txDescriptorBaseReg, data, size);
+  case TX_DESCRIPTOR_BASE:
+    ethPciState.txDescriptorBaseReg = data;
+    LOG_DEBUG(ETH, "TX_DESCRIPTOR_BASE = 0x{:X}", data);
     break;
-  case Xe::PCIDev::TX_DESCRIPTOR_STATUS:
-    memset(&ethPciState.txDescriptorStatusReg, data, size);
+  case TX_DESCRIPTOR_STATUS:
+    ethPciState.txDescriptorStatusReg = data;
+    LOG_DEBUG(ETH, "TX_DESCRIPTOR_STATUS = 0x{:X}", data);
     break;
-  case Xe::PCIDev::RX_CONFIG:
-    memset(&ethPciState.rxConfigReg, data, size);
+  case RX_CONFIG:
+    ethPciState.rxConfigReg = data;
+    LOG_DEBUG(ETH, "RX_CONFIG = 0x{:X}", data);
     break;
-  case Xe::PCIDev::RX_DESCRIPTOR_BASE:
-    memset(&ethPciState.rxDescriptorBaseReg, data, size);
+  case RX_DESCRIPTOR_BASE:
+    ethPciState.rxDescriptorBaseReg = data;
+    LOG_DEBUG(ETH, "RX_DESCRIPTOR_BASE = 0x{:X}", data);
     break;
-  case Xe::PCIDev::INTERRUPT_STATUS:
-    memset(&ethPciState.interruptStatusReg, data, size);
+  case INTERRUPT_STATUS:
+    ethPciState.interruptStatusReg = data;
+    LOG_DEBUG(ETH, "INTERRUPT_STATUS (ACK) = 0x{:X} -> 0x{:X}", data, ethPciState.interruptStatusReg);
     break;
-  case Xe::PCIDev::INTERRUPT_MASK:
-    memset(&ethPciState.interruptMaskReg, data, size);
+  case INTERRUPT_MASK:
+    ethPciState.interruptMaskReg = data;
+    LOG_DEBUG(ETH, "INTERRUPT_MASK = 0x{:X}", data);
     break;
-  case Xe::PCIDev::CONFIG_0:
-    memset(&ethPciState.config0Reg, data, size);
+  case CONFIG_0:
+    ethPciState.config0Reg = data;
+    LOG_DEBUG(ETH, "CONFIG_0 = 0x{:X}", data);
     break;
-  case Xe::PCIDev::POWER:
-    memset(&ethPciState.powerReg, data, size);
+  case POWER:
+    ethPciState.powerReg = data;
+    LOG_DEBUG(ETH, "POWER = 0x{:X}", data);
     break;
-  case Xe::PCIDev::PHY_CONFIG:
-    memset(&ethPciState.phyConfigReg, data, size);
+  case PHY_CONFIG:
+    ethPciState.phyConfigReg = data;
+    LOG_DEBUG(ETH, "PHY_CONFIG = 0x{:X}", data);
     break;
-  case Xe::PCIDev::PHY_CONTROL:
-    memset(&ethPciState.phyControlReg, data, size);
+  case PHY_CONTROL:
+    ethPciState.phyControlReg = data;
+    LOG_DEBUG(ETH, "PHY_CONTROL = 0x{:X}", data);
     break;
-  case Xe::PCIDev::CONFIG_1:
-    memset(&ethPciState.config1Reg, data, size);
+  case CONFIG_1:
+    ethPciState.config1Reg = data;
+    LOG_DEBUG(ETH, "CONFIG_1 = 0x{:X}", data);
     break;
-  case Xe::PCIDev::RETRY_COUNT:
-    memset(&ethPciState.retryCountReg, data, size);
+  case RETRY_COUNT:
+    ethPciState.retryCountReg = data;
+    LOG_DEBUG(ETH, "RETRY_COUNT = 0x{:X}", data);
     break;
-  case Xe::PCIDev::MULTICAST_FILTER_CONTROL:
-    memset(&ethPciState.multicastFilterControlReg, data, size);
+  case ADDRESS_0:
+  case ADDRESS_0 + 1:
+  case ADDRESS_0 + 2:
+  case ADDRESS_0 + 3:
+  case ADDRESS_0 + 4:
+  case ADDRESS_0 + 5:
+    memset(&ethPciState.macAddress[(offset - ADDRESS_0)], data, size);
+    LOG_DEBUG(ETH, "macAddress[{}] = 0x{:X}", (offset - ADDRESS_0), (u32)data);
     break;
-  case Xe::PCIDev::ADDRESS_0:
-    memset(&ethPciState.address0Reg, data, size);
+  case MULTICAST_FILTER_CONTROL:
+    ethPciState.multicastFilterControlReg = data;
+    LOG_DEBUG(ETH, "MULTICAST_FILTER_CONTROL = 0x{:X}", data);
     break;
-  case Xe::PCIDev::MULTICAST_HASH:
-    memset(&ethPciState.multicastHashReg, data, size);
+  case MULTICAST_HASH + 0x0:
+    ethPciState.multicastHashFilter0 = data;
+    LOG_DEBUG(ETH, "MULTICAST_HASH_0 = 0x{:X}", data);
     break;
-  case Xe::PCIDev::MAX_PACKET_SIZE:
-    memset(&ethPciState.maxPacketSizeReg, data, size);
+  case MULTICAST_HASH + 0x4:
+    ethPciState.multicastHashFilter1 = data;
+    LOG_DEBUG(ETH, "MULTICAST_HASH_1 = 0x{:X}", data);
     break;
-  case Xe::PCIDev::ADDRESS_1:
-    memset(&ethPciState.address1Reg, data, size);
+  case MAX_PACKET_SIZE:
+    ethPciState.maxPacketSizeReg = data;
+    LOG_DEBUG(ETH, "MAX_PACKET_SIZE = 0x{:X}", data);
+    break;
+  case ADDRESS_1:
+  case ADDRESS_1 + 1:
+  case ADDRESS_1 + 2:
+  case ADDRESS_1 + 3:
+  case ADDRESS_1 + 4:
+  case ADDRESS_1 + 5:
+    memset(&ethPciState.macAddress2[(offset - ADDRESS_1)], data, size);
+    LOG_DEBUG(ETH, "macAddress2[{}] = 0x{:X}", (offset - ADDRESS_1), (u32)data);
     break;
   default:
-    u64 tmp = 0;
-    memset(&tmp, data, size);
-    LOG_ERROR(ETH, "Unknown PCI Reg being written {:#x} data = {:#x}", static_cast<u16>(offset), tmp);
+    LOG_ERROR(ETH, "Register '{:#x}' is unknown! Data = {:#x} ({}b)", static_cast<u16>(offset), data, size);
     break;
   }
+}
+
+u32 Xe::PCIDev::ETHERNET::PhyReadReg() {
+  u8 phyAddr = (ethPciState.phyConfigReg >> 8) & 0x1F;
+  u8 regNum  = (ethPciState.phyConfigReg >> 0) & 0x1F;
+
+  if (phyAddr >= 32 || regNum >= 32) {
+    LOG_WARNING(ETH, "MDIO read from invalid PHY addr {} reg {}", phyAddr, regNum);
+    return 0xFFFFFFFF; // Error pattern
+  }
+
+  u16 val = mdioRegisters[phyAddr][regNum];
+  LOG_INFO(ETH, "PHY Read: addr {} reg {} = 0x{:X}", phyAddr, regNum, val);
+  return (1u << 31) | val; // Bit 31 signals read complete
 }
 
 void Xe::PCIDev::ETHERNET::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {

@@ -38,24 +38,41 @@ enum XE_ETH_REGISTERS {
 
 // Xenon Fast Ethernet PCI Device State struct.
 struct XE_PCI_STATE {
+  // Transmission
   u32 txConfigReg;
   u32 txDescriptorBaseReg;
   u32 txDescriptorStatusReg;
+
+  // Reception
   u32 rxConfigReg;
   u32 rxDescriptorBaseReg;
+
+  // Interrupts
   u32 interruptStatusReg;
   u32 interruptMaskReg;
+
+  // Configuration and power
   u32 config0Reg;
   u32 powerReg;
   u32 phyConfigReg;
   u32 phyControlReg;
   u32 config1Reg;
   u32 retryCountReg;
+
+  // Multicast filter control
   u32 multicastFilterControlReg;
-  u32 address0Reg;
-  u32 multicastHashReg;
+
+  // MAC address (6 bytes stored as array)
+  u8 macAddress[6];
+
+  // Multicast hash filters
+  u32 multicastHashFilter0; // Possibly at 0x68
+  u32 multicastHashFilter1; // Possibly at 0x6C
+
+  // Packet limits and secondary address
   u32 maxPacketSizeReg;
-  u32 address1Reg;
+  // MAC address 2 (6 bytes stored as array)
+  u8 macAddress2[6];
 };
 
 class ETHERNET : public PCIDevice {
@@ -67,7 +84,9 @@ public:
   void ConfigRead(u64 readAddress, u8* data, u64 size) override;
   void ConfigWrite(u64 writeAddress, const u8* data, u64 size) override;
 
+  u32 PhyReadReg();
 private:
+  u16 mdioRegisters[32][32]; // [phy_address][reg_index]
   XE_PCI_STATE ethPciState{};
 };
 
