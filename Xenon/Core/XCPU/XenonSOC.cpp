@@ -7,59 +7,56 @@
 #include "Core/XCPU/PostBus/PostBus.h"
 
 bool XENON_CONTEXT::HandleSOCRead(u64 readAddr, u8* data, size_t byteCount) {
-  // Get target Block.
+  // Get target block
   if (readAddr >= XE_SOCSECENG_BLOCK_START && readAddr < XE_SOCSECENG_BLOCK_START + XE_SOCSECENG_BLOCK_SIZE) {
-    // Security Engine.
+    // Security Engine
     return HandleSecEngRead(readAddr, data, byteCount);
   } else if (readAddr >= XE_SOCSECOTP_BLOCK_START && readAddr < XE_SOCSECOTP_BLOCK_START + XE_SOCSECOTP_BLOCK_SIZE) {
-    // Secure OTP.
+    // Secure OTP
     return HandleSecOTPRead(readAddr, data, byteCount);
   } else if (readAddr >= XE_SOCSECRNG_BLOCK_START && readAddr < XE_SOCSECRNG_BLOCK_START + XE_SOCSECRNG_BLOCK_SIZE) {
-    // Secure RNG.
+    // Secure RNG
     return HandleSecRNGRead(readAddr, data, byteCount);
   } else if (readAddr >= XE_SOCCBI_BLOCK_START && readAddr < XE_SOCCBI_BLOCK_START + XE_SOCCBI_BLOCK_SIZE) {
-    // CBI.
+    // CBI
     return HandleCBIRead(readAddr, data, byteCount);
   } else if (readAddr >= XE_SOCPMW_BLOCK_START && readAddr < XE_SOCPMW_BLOCK_START + XE_SOCPMW_BLOCK_SIZE) {
-    // PMW.
+    // PMW
     return HandlePMWRead(readAddr, data, byteCount);
   } else if (readAddr >= XE_SOCPRV_BLOCK_START && readAddr < XE_SOCPRV_BLOCK_START + XE_SOCPRV_BLOCK_SIZE) {
-    // Pervasive Logic.
+    // Pervasive Logic
     return HandlePRVRead(readAddr, data, byteCount);
   }
-
   return false;
 }
 
 bool XENON_CONTEXT::HandleSOCWrite(u64 writeAddr, const u8* data, size_t byteCount) {
-  // Get target Block.
-
+  // Get target block
   if (writeAddr >= XE_SOCSECENG_BLOCK_START && writeAddr < XE_SOCSECENG_BLOCK_START + XE_SOCSECENG_BLOCK_SIZE) {
-    // Security Engine.
+    // Security Engine
     return HandleSecEngWrite(writeAddr, data, byteCount);
   } else if (writeAddr >= XE_SOCSECOTP_BLOCK_START && writeAddr < XE_SOCSECOTP_BLOCK_START + XE_SOCSECOTP_BLOCK_SIZE) {
-    // Secure OTP.
+    // Secure OTP
     return HandleSecOTPWrite(writeAddr, data, byteCount);
   } else if (writeAddr >= XE_SOCSECRNG_BLOCK_START && writeAddr < XE_SOCSECRNG_BLOCK_START + XE_SOCSECRNG_BLOCK_SIZE) {
-    // Secure RNG.
+    // Secure RNG
     return HandleSecRNGWrite(writeAddr, data, byteCount);
   } else if (writeAddr >= XE_SOCCBI_BLOCK_START && writeAddr < XE_SOCCBI_BLOCK_START + XE_SOCCBI_BLOCK_SIZE) {
-    // CBI.
+    // CBI
     return HandleCBIWrite(writeAddr, data, byteCount);
   } else if (writeAddr >= XE_SOCPMW_BLOCK_START && writeAddr < XE_SOCPMW_BLOCK_START + XE_SOCPMW_BLOCK_SIZE) {
-    // PMW.
+    // PMW
     return HandlePMWWrite(writeAddr, data, byteCount);
   } else if (writeAddr >= XE_SOCPRV_BLOCK_START && writeAddr < XE_SOCPRV_BLOCK_START + XE_SOCPRV_BLOCK_SIZE) {
-    // Pervasive Logic.
+    // Pervasive Logic
     return HandlePRVWrite(writeAddr, data, byteCount);
   }
-
   return false;
 }
 
-// Security Engine Read.
+// Security Engine Read
 bool XENON_CONTEXT::HandleSecEngRead(u64 readAddr, u8* data, size_t byteCount) {
-  mutex.lock();
+  std::lock_guard lock(mutex);
 
   u64 dataOut = 0;
   u16 offset = readAddr - XE_SOCSECENG_BLOCK_START;
@@ -68,13 +65,11 @@ bool XENON_CONTEXT::HandleSecEngRead(u64 readAddr, u8* data, size_t byteCount) {
   memcpy(data, &dataOut, byteCount);
 
   LOG_TRACE(Xenon, "SoC SecEng Read at address {:#x}, data {:#x}.", readAddr, dataOut);
-
-  mutex.unlock();
   return true;
 }
-// Security Engine Write.
+// Security Engine Write
 bool XENON_CONTEXT::HandleSecEngWrite(u64 writeAddr, const u8* data, size_t byteCount) {
-  mutex.lock();
+  std::lock_guard lock(mutex);
 
   u64 dataIn = 0;
   memcpy(&dataIn, data, byteCount);
@@ -84,15 +79,12 @@ bool XENON_CONTEXT::HandleSecEngWrite(u64 writeAddr, const u8* data, size_t byte
   memcpy(reinterpret_cast<u8*>(socSecEngBlock.get()) + offset, &dataIn, byteCount);
 
   LOG_TRACE(Xenon, "SoC SecEng Write at address {:#x}, data {:#x}.", writeAddr, dataIn);
-
-  mutex.unlock();
   return true;
 }
 
-// Secure OTP Read.
+// Secure OTP Read
 bool XENON_CONTEXT::HandleSecOTPRead(u64 readAddr, u8* data, size_t byteCount) {
-  mutex.lock();
-
+  std::lock_guard lock(mutex);
   u64 dataOut = 0;
   u16 offset = readAddr - XE_SOCSECOTP_BLOCK_START;
   memcpy(&dataOut, reinterpret_cast<u8*>(socSecOTPBlock.get()) + offset, byteCount);
@@ -100,24 +92,18 @@ bool XENON_CONTEXT::HandleSecOTPRead(u64 readAddr, u8* data, size_t byteCount) {
   memcpy(data, &dataOut, byteCount);
 
   LOG_TRACE(Xenon, "SoC SecOTP Read at address {:#x}, data {:#x}.", readAddr, dataOut);
-
-  mutex.unlock();
   return true;
 }
-// Secure OTP Write.
+// Secure OTP Write
 bool XENON_CONTEXT::HandleSecOTPWrite(u64 writeAddr, const u8* data, size_t byteCount) {
-  mutex.lock();
-
+  std::lock_guard lock(mutex);
   LOG_ERROR(Xenon, "SoC SecOTP Write at address {:#x}.", writeAddr);
-
-  mutex.unlock();
   return false;
 }
 
-// Secure RNG Read.
+// Secure RNG Read
 bool XENON_CONTEXT::HandleSecRNGRead(u64 readAddr, u8* data, size_t byteCount) {
-  mutex.lock();
-
+  std::lock_guard lock(mutex);
   u64 dataOut = 0;
   u16 offset = readAddr - XE_SOCSECRNG_BLOCK_START;
   if (readAddr == 0x26008) {
@@ -136,14 +122,11 @@ bool XENON_CONTEXT::HandleSecRNGRead(u64 readAddr, u8* data, size_t byteCount) {
   // Afterwards reads the FiFo queue and reads a random number.
 
   LOG_TRACE(Xenon, "SoC SecRNG Read at address {:#x}, data {:#x}.", readAddr, dataOut);
-
-  mutex.unlock();
   return true;
 }
-// Secure RNG Write.
+// Secure RNG Write
 bool XENON_CONTEXT::HandleSecRNGWrite(u64 writeAddr, const u8* data, size_t byteCount) {
-  mutex.lock();
-
+  std::lock_guard lock(mutex);
   u64 dataIn = 0;
   memcpy(&dataIn, data, byteCount);
   dataIn = byteswap_be<u64>(dataIn);
@@ -152,43 +135,31 @@ bool XENON_CONTEXT::HandleSecRNGWrite(u64 writeAddr, const u8* data, size_t byte
   memcpy(reinterpret_cast<u8*>(socSecRNGBlock.get()) + offset, &dataIn, byteCount);
 
   LOG_TRACE(Xenon, "SoC SecRNG Write at address {:#x}, data {:#x}.", writeAddr, dataIn);
-
-  mutex.unlock();
   return true;
 }
 
-// CBI Read.
+// CBI Read
 bool XENON_CONTEXT::HandleCBIRead(u64 readAddr, u8* data, size_t byteCount) {
-  mutex.lock();
-
+  std::lock_guard lock(mutex);
   LOG_ERROR(Xenon, "SoC CBI Read at address {:#x}.", readAddr);
-
-  mutex.unlock();
   return false;
 }
-// CBI Write.
+// CBI Write
 bool XENON_CONTEXT::HandleCBIWrite(u64 writeAddr, const u8* data, size_t byteCount) {
-  mutex.lock();
-
+  std::lock_guard lock(mutex);
   LOG_ERROR(Xenon, "SoC CBI Write at address {:#x}.", writeAddr);
-
-  mutex.unlock();
   return false;
 }
 
-// PMW Read.
+// PMW Read
 bool XENON_CONTEXT::HandlePMWRead(u64 readAddr, u8* data, size_t byteCount) {
-  mutex.lock();
-
+  std::lock_guard lock(mutex);
   LOG_ERROR(Xenon, "SoC PWM Read at address {:#x}.", readAddr);
-
-  mutex.unlock();
   return false;
 }
-// PMW Write.
+// PMW Write
 bool XENON_CONTEXT::HandlePMWWrite(u64 writeAddr, const u8* data, size_t byteCount) {
-  mutex.lock();
-
+  std::lock_guard lock(mutex);
   u64 dataIn = 0;
   memcpy(&dataIn, data, byteCount);
   dataIn = byteswap_be<u64>(dataIn);
@@ -197,15 +168,12 @@ bool XENON_CONTEXT::HandlePMWWrite(u64 writeAddr, const u8* data, size_t byteCou
   memcpy(reinterpret_cast<u8*>(socPMWBlock.get()) + offset, &dataIn, byteCount);
 
   LOG_TRACE(Xenon, "SoC PMW Write at address {:#x}, data {:#x}.", writeAddr, dataIn);
-
-  mutex.unlock();
   return true;
 }
 
-// Pervasive logic Read.
+// Pervasive logic Read
 bool XENON_CONTEXT::HandlePRVRead(u64 readAddr, u8* data, size_t byteCount) {
-  mutex.lock();
-
+  std::lock_guard lock(mutex);
   u64 dataOut = 0;
   u16 offset = readAddr - XE_SOCPRV_BLOCK_START;
   memcpy(&dataOut, reinterpret_cast<u8*>(socPRVBlock.get()) + offset, byteCount);
@@ -213,14 +181,11 @@ bool XENON_CONTEXT::HandlePRVRead(u64 readAddr, u8* data, size_t byteCount) {
   memcpy(data, &dataOut, byteCount);
 
   LOG_TRACE(Xenon, "SoC PRV Read at address {:#x}, data {:#x}.", readAddr, dataOut);
-
-  mutex.unlock();
   return true;
 }
-// Pervasive logic Write.
+// Pervasive logic Write
 bool XENON_CONTEXT::HandlePRVWrite(u64 writeAddr, const u8* data, size_t byteCount) {
-  mutex.lock();
-
+  std::lock_guard lock(mutex);
   u64 dataIn = 0;
   memcpy(&dataIn, data, byteCount);
   dataIn = byteswap_be<u64>(dataIn);
@@ -228,27 +193,27 @@ bool XENON_CONTEXT::HandlePRVWrite(u64 writeAddr, const u8* data, size_t byteCou
 
   memcpy(reinterpret_cast<u8*>(socPRVBlock.get()) + offset, &dataIn, byteCount);
 
-  // Apply operations on know registers.
+  // Apply operations on know registers
   switch (writeAddr) {
   case 0x61010ULL:
-    // POST Output.
+    // POST Output
     Xe::XCPU::POSTBUS::POST(byteswap_be<u64>(dataIn));
     break;
   case 0x611A0ULL:
     if (socPRVBlock.get()->TimebaseControl.AsBITS.TimebaseEnable) {
-      // TimeBase Enabled.
+      // TimeBase Enabled
       timeBaseActive = true;
     }
     else {
-      // TimeBase Disabled.
+      // TimeBase Disabled
       timeBaseActive = false;
     }
-    // TimeBase Control.
+    // TimeBase Control
     LOG_TRACE(Xenon, "SoC PRV: TimeBase Control being set {:#x}, enabled: {}, divider: {:#x}.",
       dataIn, timeBaseActive, socPRVBlock.get()->TimebaseControl.AsBITS.TimebaseDivider);
     break;
   case 0x61188ULL:
-    // CPU VID Register.
+    // CPU VID Register
     LOG_WARNING(Xenon, "SoC PRV: New VID value being set: {:#x}", dataIn);
     break;
   default:
@@ -256,7 +221,5 @@ bool XENON_CONTEXT::HandlePRVWrite(u64 writeAddr, const u8* data, size_t byteCou
   }
 
   LOG_TRACE(Xenon, "SoC PRV Write at address {:#x}, data {:#x}.", writeAddr, dataIn);
-
-  mutex.unlock();
   return true;
 }
