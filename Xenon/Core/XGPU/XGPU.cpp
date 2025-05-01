@@ -140,6 +140,8 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
     case XeRegister::CP_RB_WPTR:
       commandProcessor->CPUpdateRBWritePointer(tmp);
       break;
+    default:
+      break;
     }
 
     memcpy(&xenosState.Regs[regIndex * 4], data, size);
