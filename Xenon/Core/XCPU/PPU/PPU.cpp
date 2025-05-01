@@ -14,17 +14,24 @@
 #include "Core/XCPU/elf_abi.h"
 
 // Clocks per instruction / Ticks per instruction
-static constexpr f64 cpi_base_freq = 50000000ULL; // 50Mhz
-static constexpr f64 cpi_scale = 1.0f; // Scale of how many clocks to speed up in percentage of speed
+static constexpr f64 cpi_a = -5.8868;
+static constexpr f64 cpi_b = 0.26415;
+static constexpr f64 cpi_c = 217.1;
+
 static constexpr u64 get_cpi_value(const u64 instrPerSecond) {
-  u64 tpi = 0;
-  // Use floating point for a more percise CPI
-  const f64 cpi_value = (instrPerSecond / 100000ULL) / ((cpi_base_freq / 1000000ULL) * cpi_scale);
-  tpi = static_cast<u64>(cpi_value);
-  // If it's zero, use one regardless
-  if (tpi == 0)
-    tpi++;
-  return tpi;
+  if (instrPerSecond == 0)
+      return 1; // Avoid division by zero
+
+  f64 f = static_cast<f64>(instrPerSecond) / 1'000'000.0;
+  f += cpi_b;
+  f = cpi_c / f;
+  f += cpi_a;
+
+  u64 tpi = static_cast<u64>(f);
+  if ((f - static_cast<f64>(tpi)) >= 0.5)
+      ++tpi;
+
+  return tpi == 0 ? 1 : tpi;
 }
 
 PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PVR,
