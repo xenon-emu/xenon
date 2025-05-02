@@ -253,6 +253,11 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
     Base::Log::NoFmtMessage(Base::Log::Class::DebugPrint, Base::Log::Level::Guest, dbgString);
     break;
   }
+  case 0x16: {
+    LOG_XBOX(Xenon, "FATAL ERROR! Halting CPU...");
+    PPU *PPU = Xe_Main->xenonCPU->GetPPU(ppuState->ppuID);
+    PPU->Halt(0, true, ppuState->ppuID, curThreadId);
+  } break;
   case 0x17:
     // DebugLoadImageSymbols, type signature:
     // PUBLIC VOID DebugLoadImageSymbols(IN PSTRING ModuleName == $r3,
@@ -268,6 +273,10 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
 #else
       LOG_XBOX(Xenon, "Assertion! Continuing...");
 #endif
+      thread.exceptTrapType = EX_SRR1_TRAP_TRAP;
+      return;
+    } else if (Config::debug.autoContinueOnGuestAssertion) {
+      LOG_XBOX(Xenon, "Assertion! Automatically continuing execution...");
       thread.exceptTrapType = EX_SRR1_TRAP_TRAP;
       return;
     } else {

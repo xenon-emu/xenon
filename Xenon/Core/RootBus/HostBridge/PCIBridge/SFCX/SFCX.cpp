@@ -473,6 +473,7 @@ void Xe::PCIDev::SFCX::sfcxMainLoop() {
     // Did we got a command?
     if (sfcxState.commandReg != NO_CMD) {
       // Check the command reg to see what command was issued
+      std::lock_guard lck(mutex);
       switch (sfcxState.commandReg) {
       case PHY_PAGE_TO_BUF:
         sfcxReadPageFromNAND(true);
@@ -526,8 +527,6 @@ bool Xe::PCIDev::SFCX::checkMagic() {
 }
 
 void Xe::PCIDev::SFCX::sfcxReadPageFromNAND(bool physical) {
-  std::lock_guard lck(mutex);
-
   // Calculate NAND offset
   u32 nandOffset = sfcxState.addressReg;
   nandOffset = 1 ? ((nandOffset / 0x200) * 0x210) + nandOffset % 0x200 : nandOffset;
@@ -552,8 +551,6 @@ void Xe::PCIDev::SFCX::sfcxReadPageFromNAND(bool physical) {
 }
 
 void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND(bool physical) {
-  std::lock_guard lck(mutex);
-
   // Physical address when doing DMA
   u32 physAddr = sfcxState.addressReg;
   // Calculate Physical address offset for starting page

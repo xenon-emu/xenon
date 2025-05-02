@@ -6,8 +6,8 @@
 
 #define XE_NET_STATUS_INT 0x0000004C
 
-Xe::PCIDev::ETHERNET::ETHERNET(const std::string &deviceName, u64 size) :
-  PCIDevice(deviceName, size) {
+Xe::PCIDev::ETHERNET::ETHERNET(const std::string &deviceName, u64 size, PCIBridge *parentPCIBridge, RAM *ram) :
+  PCIDevice(deviceName, size), ramPtr(ram), parentBus(parentPCIBridge) {
   // Set PCI Properties
   pciConfigSpace.configSpaceHeader.reg0.hexData = 0x580A1414;
   pciConfigSpace.configSpaceHeader.reg1.hexData = 0x02100006;
@@ -16,8 +16,31 @@ Xe::PCIDev::ETHERNET::ETHERNET(const std::string &deviceName, u64 size) :
   pciDevSizes[0] = 0x80; // BAR0
   memset(mdioRegisters, 0, sizeof(mdioRegisters));
   // xboxkrnld looks for these values, and will return E75 if it doesn't get it
-  mdioRegisters[1][2] = 0x0015; // PHY ID1 (expected OUI MSBs)
-  mdioRegisters[1][3] = 0x0141; // PHY ID2 (expected OUI LSBs + model/rev)
+  // Setup MDIO
+  for (int phy = 0; phy < 32; ++phy) {
+    for (int r = 0; r < 32; ++r) {
+      mdioRegisters[phy][r] = 0;
+    }
+    mdioRegisters[phy][0] = byteswap_be<u16>(0x1100); // BMCR - autoneg=0, full-duplex, 100Mb
+    mdioRegisters[phy][1] = byteswap_be<u16>(0x7849); // BSR - Link, auto-negotiation capable, etc.
+    mdioRegisters[phy][2] = byteswap_be<u16>(0x0015); // PHY ID1 (expected OUI MSBs)
+    mdioRegisters[phy][3] = byteswap_be<u16>(0x0141); // PHY ID2 (expected OUI LSBs + model/rev)
+    mdioRegisters[phy][4] = byteswap_be<u16>((1 << 8) | (1 << 6) | 0x0001); // ANAR: 100FDX + 10FDX + selector
+    mdioRegisters[phy][5] = mdioRegisters[phy][4]; // partner = same
+    // Set bit-24
+    mdioRegisters[phy][4] |= (1 << (24 - 16));
+    mdioRegisters[phy][5] |= (1 << (24 - 16));
+    mdioRegisters[phy][17] = byteswap_be<u16>(0x6024); // 0110 0000 0010 0100 = 100 Mb, full-duplex, AN-complete, link-up
+  }
+  // Create thread
+  mdioThread = std::thread(&ETHERNET::MdioThreadFunc, this);
+}
+Xe::PCIDev::ETHERNET::~ETHERNET() {
+  mdioRunning = false;
+  mdioCV.notify_all();
+  if (mdioThread.joinable()) {
+    mdioThread.join();
+  }
 }
 
 void Xe::PCIDev::ETHERNET::Read(u64 readAddress, u8 *data, u64 size) {
@@ -55,7 +78,7 @@ void Xe::PCIDev::ETHERNET::Read(u64 readAddress, u8 *data, u64 size) {
     memcpy(data, &ethPciState.phyConfigReg, size);
     break;
   case PHY_CONTROL: {
-    u32 regVal = PhyReadReg();
+    u32 regVal = ethPciState.phyControlReg;
     memcpy(data, &regVal, size);
   } break;
   case CONFIG_1:
@@ -107,7 +130,6 @@ void Xe::PCIDev::ETHERNET::Write(u64 writeAddress, const u8 *data, u64 size) {
   u8 offset = writeAddress & 0xFF;
 
   u32 val = 0;
-  val = byteswap_be(val);
   memcpy(&val, data, size);
   switch (offset) {
   case TX_CONFIG:
@@ -152,31 +174,11 @@ void Xe::PCIDev::ETHERNET::Write(u64 writeAddress, const u8 *data, u64 size) {
     break;
   case PHY_CONTROL: {
     ethPciState.phyControlReg = val;
-    u8 phyAddr = (ethPciState.phyConfigReg >> 8) & 0x1F;
-    u8 regNum  = (ethPciState.phyConfigReg >> 0) & 0x1F;
     bool isWrite = ethPciState.phyConfigReg & (1 << 16);
-
-    if (phyAddr < 32 && regNum < 32) {
-      if (isWrite) {
-        u16 writeVal = static_cast<u16>(val & 0xFFFF);
-        switch (regNum) {
-        case 0: {
-          if (writeVal & 0x8000) {
-            // Bit 15 is the reset bit - emulate reset behavior
-            writeVal &= ~0x8000; // Clear the reset bit immediately
-          }
-        } break;
-        default: {
-          // Handle as normal until needed
-        } break;
-        }
-        LOG_INFO(ETH, "PHY addr {} reg {} with a value of 0x{:X}", phyAddr, regNum, writeVal);
-        mdioRegisters[phyAddr][regNum] = writeVal;
-      } else {
-        ethPciState.phyControlReg = (1u << 31) | mdioRegisters[phyAddr][regNum];
-      }
+    if (isWrite) {
+      MdioWrite(val);
     } else {
-      LOG_WARNING(ETH, "MDIO access to invalid PHY addr {} reg {}", phyAddr, regNum);
+      ethPciState.phyControlReg = MdioRead();
     }
   } break;
   case CONFIG_1:
@@ -227,114 +229,99 @@ void Xe::PCIDev::ETHERNET::Write(u64 writeAddress, const u8 *data, u64 size) {
   }
 }
 
-void Xe::PCIDev::ETHERNET::MemSet(u64 writeAddress, s32 data, u64 size) {
-  u8 offset = writeAddress & 0xFF;
+void Xe::PCIDev::ETHERNET::MemSet(u64 writeAddress, s32 data, u64 size) {}
 
-  switch (offset) {
-  case TX_CONFIG:
-    ethPciState.txConfigReg = data;
-    LOG_DEBUG(ETH, "TX_CONFIG = 0x{:X}", data);
-    break;
-  case TX_DESCRIPTOR_BASE:
-    ethPciState.txDescriptorBaseReg = data;
-    LOG_DEBUG(ETH, "TX_DESCRIPTOR_BASE = 0x{:X}", data);
-    break;
-  case TX_DESCRIPTOR_STATUS:
-    ethPciState.txDescriptorStatusReg = data;
-    LOG_DEBUG(ETH, "TX_DESCRIPTOR_STATUS = 0x{:X}", data);
-    break;
-  case RX_CONFIG:
-    ethPciState.rxConfigReg = data;
-    LOG_DEBUG(ETH, "RX_CONFIG = 0x{:X}", data);
-    break;
-  case RX_DESCRIPTOR_BASE:
-    ethPciState.rxDescriptorBaseReg = data;
-    LOG_DEBUG(ETH, "RX_DESCRIPTOR_BASE = 0x{:X}", data);
-    break;
-  case INTERRUPT_STATUS:
-    ethPciState.interruptStatusReg = data;
-    LOG_DEBUG(ETH, "INTERRUPT_STATUS (ACK) = 0x{:X} -> 0x{:X}", data, ethPciState.interruptStatusReg);
-    break;
-  case INTERRUPT_MASK:
-    ethPciState.interruptMaskReg = data;
-    LOG_DEBUG(ETH, "INTERRUPT_MASK = 0x{:X}", data);
-    break;
-  case CONFIG_0:
-    ethPciState.config0Reg = data;
-    LOG_DEBUG(ETH, "CONFIG_0 = 0x{:X}", data);
-    break;
-  case POWER:
-    ethPciState.powerReg = data;
-    LOG_DEBUG(ETH, "POWER = 0x{:X}", data);
-    break;
-  case PHY_CONFIG:
-    ethPciState.phyConfigReg = data;
-    LOG_DEBUG(ETH, "PHY_CONFIG = 0x{:X}", data);
-    break;
-  case PHY_CONTROL:
-    ethPciState.phyControlReg = data;
-    LOG_DEBUG(ETH, "PHY_CONTROL = 0x{:X}", data);
-    break;
-  case CONFIG_1:
-    ethPciState.config1Reg = data;
-    LOG_DEBUG(ETH, "CONFIG_1 = 0x{:X}", data);
-    break;
-  case RETRY_COUNT:
-    ethPciState.retryCountReg = data;
-    LOG_DEBUG(ETH, "RETRY_COUNT = 0x{:X}", data);
-    break;
-  case ADDRESS_0:
-  case ADDRESS_0 + 1:
-  case ADDRESS_0 + 2:
-  case ADDRESS_0 + 3:
-  case ADDRESS_0 + 4:
-  case ADDRESS_0 + 5:
-    memset(&ethPciState.macAddress[(offset - ADDRESS_0)], data, size);
-    LOG_DEBUG(ETH, "macAddress[{}] = 0x{:X}", (offset - ADDRESS_0), (u32)data);
-    break;
-  case MULTICAST_FILTER_CONTROL:
-    ethPciState.multicastFilterControlReg = data;
-    LOG_DEBUG(ETH, "MULTICAST_FILTER_CONTROL = 0x{:X}", data);
-    break;
-  case MULTICAST_HASH + 0x0:
-    ethPciState.multicastHashFilter0 = data;
-    LOG_DEBUG(ETH, "MULTICAST_HASH_0 = 0x{:X}", data);
-    break;
-  case MULTICAST_HASH + 0x4:
-    ethPciState.multicastHashFilter1 = data;
-    LOG_DEBUG(ETH, "MULTICAST_HASH_1 = 0x{:X}", data);
-    break;
-  case MAX_PACKET_SIZE:
-    ethPciState.maxPacketSizeReg = data;
-    LOG_DEBUG(ETH, "MAX_PACKET_SIZE = 0x{:X}", data);
-    break;
-  case ADDRESS_1:
-  case ADDRESS_1 + 1:
-  case ADDRESS_1 + 2:
-  case ADDRESS_1 + 3:
-  case ADDRESS_1 + 4:
-  case ADDRESS_1 + 5:
-    memset(&ethPciState.macAddress2[(offset - ADDRESS_1)], data, size);
-    LOG_DEBUG(ETH, "macAddress2[{}] = 0x{:X}", (offset - ADDRESS_1), (u32)data);
-    break;
-  default:
-    LOG_ERROR(ETH, "Register '{:#x}' is unknown! Data = {:#x} ({}b)", static_cast<u16>(offset), data, size);
-    break;
-  }
+u32 Xe::PCIDev::ETHERNET::MdioRead() {
+  std::unique_lock<std::mutex> lock(mdioMutex);
+  mdioReq = {
+    .isRead = true,
+    .phyAddr = static_cast<u8>((ethPciState.phyConfigReg >> 8) & 0x1F),
+    .regNum = static_cast<u8>(ethPciState.phyConfigReg & 0x1F),
+    .writeVal = 0,
+    .readResult = 0,
+    .completed = false
+  };
+  mdioRequestPending = true;
+  mdioCV.notify_one();
+
+  mdioCV.wait(lock, [&]() { return mdioReq.completed; });
+  return mdioReq.readResult;
 }
 
-u32 Xe::PCIDev::ETHERNET::PhyReadReg() {
-  u8 phyAddr = (ethPciState.phyConfigReg >> 8) & 0x1F;
-  u8 regNum  = (ethPciState.phyConfigReg >> 0) & 0x1F;
+void Xe::PCIDev::ETHERNET::MdioWrite(u32 val) {
+  std::unique_lock<std::mutex> lock(mdioMutex);
+  mdioReq = {
+    .isRead = false,
+    .phyAddr = static_cast<u8>((ethPciState.phyConfigReg >> 8) & 0x1F),
+    .regNum = static_cast<u8>(ethPciState.phyConfigReg & 0x1F),
+    .writeVal = val,
+    .readResult = 0,
+    .completed = false
+  };
+  mdioRequestPending = true;
+  mdioCV.notify_one();
 
-  if (phyAddr >= 32 || regNum >= 32) {
-    LOG_WARNING(ETH, "MDIO read from invalid PHY addr {} reg {}", phyAddr, regNum);
-    return 0xFFFFFFFF; // Error pattern
+  mdioCV.wait(lock, [&]() { return mdioReq.completed; });
+}
+
+void Xe::PCIDev::ETHERNET::MdioThreadFunc() {
+  while (mdioRunning) {
+    std::unique_lock<std::mutex> lock(mdioMutex);
+    mdioCV.wait(lock, [&]() { return mdioRequestPending || !mdioRunning; });
+
+    if (!mdioRequestPending)
+      continue;
+
+    auto& req = mdioReq;
+
+    if (req.phyAddr >= 32 || req.regNum >= 32) {
+      LOG_WARNING(ETH, "Invalid MDIO access: PHY {} REG {}", req.phyAddr, req.regNum);
+      req.readResult = 0xFFFFFFFF;
+    } else {
+      u16 *mdio = mdioRegisters[req.phyAddr];
+
+      if (req.isRead) {
+        u16 val = mdio[req.regNum];
+        switch (req.regNum) {
+        //case 1: {
+        //  val &= ~(1 << 2); // Clear status bit
+        //  mdio[req.regNum] = val;
+        //} break;
+        case 2: {
+          LOG_DEBUG(ETH, ">> MDIO ID READ: PHY {} REG 2 returned 0x{:04X}", req.phyAddr, val);
+        } break;
+        case 17: {
+          bool linkUp = (val & (1 << 2)) != 0;
+          if (linkUp && !lastLinkState[req.phyAddr]) {
+            ethPciState.interruptStatusReg |= XE_NET_STATUS_INT;
+            parentBus->RouteInterrupt(PRIO_ENET);
+          }
+          lastLinkState[req.phyAddr] = linkUp;
+        } break;
+        }
+        req.readResult = val;
+        LOG_INFO(ETH, "MDIO READ: PHY {} REG {} = 0x{:04X}", req.phyAddr, req.regNum, val);
+      } else {
+        u16 writeVal = static_cast<u16>(req.writeVal);
+        switch (req.regNum) {
+        case 0: {
+          if (writeVal & 0x8000) {
+            // Reset PHY
+            writeVal &= ~0x8000;
+          }
+        } break;
+        }
+        mdio[req.regNum] = writeVal;
+        LOG_INFO(ETH, "MDIO WRITE: PHY {} REG {} <= 0x{:04X}", req.phyAddr, req.regNum, writeVal);
+      }
+    }
+
+    // Clear request, and mark as done
+    req.completed = true;
+    ethPciState.phyConfigReg &= ~0x10;
+    mdioRequestPending = false;
+    mdioCV.notify_all();
   }
-
-  u16 val = mdioRegisters[phyAddr][regNum];
-  LOG_INFO(ETH, "PHY Read: addr {} reg {} = 0x{:X}", phyAddr, regNum, val);
-  return (1u << 31) | val; // Bit 31 signals read complete
 }
 
 void Xe::PCIDev::ETHERNET::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {

@@ -95,7 +95,6 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
   ppuHaltOn = Config::debug.haltOnAddress;
 
   for (u8 thrdID = 0; thrdID < 2; thrdID++) {
-
     PPU_THREAD_REGISTERS &thread = ppuState->ppuThread[static_cast<ePPUThread>(thrdID)];
     thread.ppuRes = std::make_unique<STRIP_UNIQUE(PPU_THREAD_REGISTERS::ppuRes)>();
     memset(thread.ppuRes.get(), 0, sizeof(PPU_RES));

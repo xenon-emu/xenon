@@ -203,7 +203,7 @@ private:
   // I/O File stream.
   std::ifstream nandFile;
   // PCI Bridge pointer. Used for Interrupts.
-  PCIBridge* parentBus = nullptr;
+  PCIBridge *parentBus = nullptr;
   // Mutex for thread-safe behavior.
   std::recursive_mutex mutex;
   // RAM pointer. Used for DMA.

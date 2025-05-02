@@ -6,6 +6,14 @@
 
 #pragma once
 
+#include <thread>
+#include <mutex>
+#include <condition_variable>
+#include <atomic>
+#include <queue>
+
+#include "Core/RAM/RAM.h"
+#include "Core/RootBus/HostBridge/PCIBridge/PCIBridge.h"
 #include "Core/RootBus/HostBridge/PCIBridge/PCIDevice.h"
 
 #define ETHERNET_DEV_SIZE 0x80
@@ -75,19 +83,51 @@ struct XE_PCI_STATE {
   u8 macAddress2[6];
 };
 
+struct XE_MDIO_REQ {
+  bool isRead;
+  u8 phyAddr;
+  u8 regNum;
+  u32 writeVal;
+  u32 readResult;
+  bool completed = false;
+};
+
 class ETHERNET : public PCIDevice {
 public:
-  ETHERNET(const std::string &deviceName, u64 size);
+  ETHERNET(const std::string &deviceName, u64 size, PCIBridge *parentPCIBridge, RAM *ram);
+  ~ETHERNET();
   void Read(u64 readAddress, u8 *data, u64 size) override;
   void Write(u64 writeAddress, const u8 *data, u64 size) override;
   void MemSet(u64 writeAddress, s32 data, u64 size) override;
   void ConfigRead(u64 readAddress, u8* data, u64 size) override;
   void ConfigWrite(u64 writeAddress, const u8* data, u64 size) override;
 
-  u32 PhyReadReg();
 private:
-  u16 mdioRegisters[32][32]; // [phy_address][reg_index]
-  XE_PCI_STATE ethPciState{};
+  // MDIO Read
+  u32 MdioRead();
+  // MDIO Write
+  void MdioWrite(u32 val);
+  // MDIO Thread function
+  void MdioThreadFunc();
+
+  // PCI Bridge pointer. Used for Interrupts.
+  PCIBridge *parentBus = nullptr;
+  // RAM Pointer
+  RAM *ramPtr = nullptr;
+  // MDIO Registers
+  u16 mdioRegisters[32][32] = {};
+  XE_PCI_STATE ethPciState = {};
+  // Track PHY link transitions
+  bool lastLinkState[32] = {};
+  // MDIO Thread Handle
+  std::thread mdioThread;
+  std::atomic<bool> mdioRunning = true;
+  // MDIO Mutex
+  std::mutex mdioMutex;
+  std::condition_variable mdioCV;
+  // MDIO Request
+  XE_MDIO_REQ mdioReq = {};
+  bool mdioRequestPending = false;
 };
 
 } // namespace PCIDev

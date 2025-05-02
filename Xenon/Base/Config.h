@@ -105,6 +105,8 @@ inline struct _debug {
   bool haltOnInvalidInstructions = true;
   // Halt on guest assertion
   bool haltOnGuestAssertion = true;
+  // Automatically continue on guest assertion
+  bool autoContinueOnGuestAssertion = false;
 #ifdef DEBUG_BUILD
   // Create a trace file | NOTE: This can create up to a 20GB file
   bool createTraceFile = false;

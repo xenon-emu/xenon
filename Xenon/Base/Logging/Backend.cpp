@@ -219,7 +219,7 @@ private:
     GetConsoleMode(conOut, &mode);
     // Set WinAPI to use a more 'modern' approach, by enabling VT
     // Allows ASCII escape codes
-    mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING | DISABLE_NEWLINE_AUTO_RETURN;
+    mode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
     // Write adjusted mode back
     SetConsoleMode(conOut, mode);
 #endif
