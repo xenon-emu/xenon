@@ -19,19 +19,15 @@ static constexpr f64 cpi_b = 0.26415;
 static constexpr f64 cpi_c = 217.1;
 
 static constexpr u64 get_cpi_value(const u64 instrPerSecond) {
-  if (instrPerSecond == 0)
-      return 1; // Avoid division by zero
+  // Convert IPS to MIPS
+  f64 x = static_cast<f64>(instrPerSecond) / 1'000'000.0;
 
-  f64 f = static_cast<f64>(instrPerSecond) / 1'000'000.0;
-  f += cpi_b;
-  f = cpi_c / f;
-  f += cpi_a;
+  // Compute CPI: y = a + c / (x + b)
+  f64 cpif = cpi_a + (cpi_c / (x + cpi_b));
 
-  u64 tpi = static_cast<u64>(f);
-  if ((f - static_cast<f64>(tpi)) >= 0.5)
-      ++tpi;
+  u64 cpi = static_cast<u64>(cpif);
 
-  return tpi == 0 ? 1 : tpi;
+  return cpi == 0 ? 1 : cpi;
 }
 
 PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PVR,

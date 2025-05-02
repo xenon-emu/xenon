@@ -304,6 +304,8 @@ endif()
 
 if (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
   add_definitions(-DDEBUG_BUILD)
+elseif (CMAKE_BUILD_TYPE STREQUAL "Debug")
+  add_definitions(-DDEBUG_BUILD)
 endif()
 
 # Copy fonts to build directory

@@ -161,7 +161,7 @@ void Xe::PCIDev::ETHERNET::Write(u64 writeAddress, const u8 *data, u64 size) {
         switch (regNum) {
         case 0: {
           if (writeVal & 0x8000) {
-            // Bit 15 is the reset bit — emulate reset behavior
+            // Bit 15 is the reset bit - emulate reset behavior
             writeVal &= ~0x8000; // Clear the reset bit immediately
           }
         } break;
