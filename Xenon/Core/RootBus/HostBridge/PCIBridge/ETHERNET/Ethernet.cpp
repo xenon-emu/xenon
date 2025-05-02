@@ -14,6 +14,7 @@ Xe::PCIDev::ETHERNET::ETHERNET(const std::string &deviceName, u64 size) :
   pciConfigSpace.configSpaceHeader.reg2.hexData = 0x02000001;
   // Set our PCI Dev Sizes
   pciDevSizes[0] = 0x80; // BAR0
+  memset(mdioRegisters, 0, sizeof(mdioRegisters));
   // xboxkrnld looks for these values, and will return E75 if it doesn't get it
   mdioRegisters[1][2] = 0x0015; // PHY ID1 (expected OUI MSBs)
   mdioRegisters[1][3] = 0x0141; // PHY ID2 (expected OUI LSBs + model/rev)

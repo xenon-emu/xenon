@@ -192,10 +192,12 @@ void Renderer::Thread() {
       // Use the compute shader
       computeShaderProgram->Bind();
       pixelSSBO->Bind();
-      computeShaderProgram->SetUniformInt("internalWidth", Xe_Main->xenos->internalWidth);
-      computeShaderProgram->SetUniformInt("internalHeight", Xe_Main->xenos->internalHeight);
-      computeShaderProgram->SetUniformInt("resWidth", width);
-      computeShaderProgram->SetUniformInt("resHeight", height);
+      if (Xe_Main.get()) {
+        computeShaderProgram->SetUniformInt("internalWidth", Xe_Main->xenos->internalWidth);
+        computeShaderProgram->SetUniformInt("internalHeight", Xe_Main->xenos->internalHeight);
+        computeShaderProgram->SetUniformInt("resWidth", width);
+        computeShaderProgram->SetUniformInt("resHeight", height);
+      }
       OnCompute();
     }
 
