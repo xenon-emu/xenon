@@ -159,7 +159,7 @@ void SetThreadName(void *thread, const std::string_view &name) {
 void SetCurrentThreadName(const std::string_view &name) {
   const char* nchar = name.data();
 #ifdef __APPLE__
-  pthread_setname_np(name);
+  pthread_setname_np(nchar);
 #elif defined(__Bitrig__) || defined(__DragonFly__) || defined(__FreeBSD__) || defined(__OpenBSD__)
   pthread_set_name_np(pthread_self(), nchar);
 #elif defined(__NetBSD__)
