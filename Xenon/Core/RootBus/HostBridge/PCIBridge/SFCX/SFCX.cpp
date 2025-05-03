@@ -590,6 +590,10 @@ void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND(bool physical) {
     dataPhysAddrPtr += sfcxState.pageSize;   // Logical page size
     sparePhysAddrPtr += sfcxState.spareSize; // Spare Size
 
+    // Add a small delay to simulate the time it takes to read the page.
+    // We're slow af.
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
     // Increase read address
     physAddr += sfcxState.pageSizePhys;
   }
