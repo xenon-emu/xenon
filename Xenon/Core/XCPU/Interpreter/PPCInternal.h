@@ -6,8 +6,6 @@
 #include <immintrin.h>
 #endif
 
-#include "Base/Types.h"
-
 #define PPC_OPC_RC 1
 #define PPC_OPC_LK 1
 #define PPC_OPC_AA (1 << 1)

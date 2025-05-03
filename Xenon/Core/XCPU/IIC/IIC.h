@@ -5,8 +5,6 @@
 #include <queue>
 #include <mutex>
 
-#include "Base/Types.h"
-
 namespace Xe {
 namespace XCPU {
 namespace IIC {

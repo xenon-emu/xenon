@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "Base/Types.h"
 #include "Render/Abstractions/Texture.h"
 
 #ifndef NO_GFX

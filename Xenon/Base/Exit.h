@@ -8,8 +8,6 @@
 #include <processthreadsapi.h>
 #endif
 
-#include "Types.h"
-
 namespace Base {
 
 inline std::atomic<bool> gSafeTerm{ true };

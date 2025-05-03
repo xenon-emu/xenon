@@ -2,8 +2,6 @@
 
 #pragma once
 
-#include "Base/Types.h"
-
 // HANA Dump before initialization, taken from a Corona v4
 static u32 HANA_State[] = {
   0x00000000, 0x0000001b, 0x00000000, 0x00000000,

@@ -4,8 +4,6 @@
 
 #include <string_view>
 
-#include "Types.h"
-
 namespace Base {
 
 inline constexpr char jTolower(char const c) {

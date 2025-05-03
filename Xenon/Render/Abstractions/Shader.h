@@ -4,8 +4,6 @@
 
 #include <string>
 
-#include "Base/Types.h"
-
 #ifndef NO_GFX
 namespace Render {
   

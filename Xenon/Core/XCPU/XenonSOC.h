@@ -15,8 +15,6 @@
 * Much love to c0z, for all of his work in the Xbox 360 scene.
 */
 
-#include "Base/Types.h"
-
 namespace Xe::XCPU::SOC {
 
   //

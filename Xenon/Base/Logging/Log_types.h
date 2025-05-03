@@ -2,8 +2,6 @@
 
 #pragma once
 
-#include "Base/Types.h"
-
 namespace Base {
 namespace Log {
 

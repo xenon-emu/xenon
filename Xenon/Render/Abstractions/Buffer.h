@@ -2,8 +2,6 @@
 
 #pragma once
 
-#include "Base/Types.h"
-
 #ifndef NO_GFX
 namespace Render {
 

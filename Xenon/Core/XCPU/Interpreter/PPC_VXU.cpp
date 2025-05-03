@@ -1,3 +1,5 @@
+// Copyright 2025 Xenon Emulator Project
+
 #include "PPCInterpreter.h"
 
 // Move from Vector Status and Control Register (x'1000 0604')

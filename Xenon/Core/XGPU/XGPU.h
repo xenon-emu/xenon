@@ -9,7 +9,6 @@
 #include <thread>
 #include <vector>
 
-#include "Base/Types.h"
 #include "Core/RAM/RAM.h"
 #include "Core/XGPU/CommandProcessor.h"
 #include "Core/XGPU/XGPUConfig.h"

@@ -113,7 +113,6 @@ set(Base
   Xenon/Base/SystemDevice.h
   Xenon/Base/Thread.cpp
   Xenon/Base/Thread.h
-  Xenon/Base/Types.h
   Xenon/Base/Vector128.h
   Xenon/Base/Version.h
 )
@@ -286,6 +285,7 @@ add_executable(Xenon
   "Xenon/Main.cpp"
 )
 
+target_precompile_headers(Xenon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Xenon/Base/Types.h)
 
 # Set compiler ID
 if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
@@ -302,9 +302,7 @@ else()
   add_compile_definitions(NO_GFX)
 endif()
 
-if (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-  add_compile_definitions(DEBUG_BUILD)
-elseif (CMAKE_BUILD_TYPE STREQUAL "Debug")
+if (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" OR CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_compile_definitions(DEBUG_BUILD)
 endif()
 

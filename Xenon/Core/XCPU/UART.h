@@ -19,7 +19,6 @@
 #include <thread>
 #include <queue>
 
-#include "Base/Types.h"
 #include "Base/Assert.h"
 
 //

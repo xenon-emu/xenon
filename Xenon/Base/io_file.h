@@ -5,7 +5,6 @@
 #include <filesystem>
 #include <span>
 
-#include "Types.h"
 #include "Enum.h"
 
 namespace Base::FS {

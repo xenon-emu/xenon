@@ -7,8 +7,6 @@
 #include <cstring>
 #include <format>
 
-#include "Types.h"
-
 namespace Base {
 
 #define LOG(x, f, ...) std::cout << "[" << #x << "]" << std::format(f, __VA_ARGS__)

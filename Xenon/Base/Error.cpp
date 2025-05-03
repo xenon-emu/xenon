@@ -10,8 +10,6 @@
 #endif
 #include <fmt/format.h>
 
-#include "Types.h"
-
 namespace Base {
 
 std::string NativeErrorToString(int e) {

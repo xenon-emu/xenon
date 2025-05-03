@@ -2,8 +2,6 @@
 
 #pragma once
 
-#include "Base/Types.h"
-
 // IBM's eFuse technology. Used on the Xbox 360 Xenon CPU.
 // Contains console-specific information such as CPU Key, CB and lockdown
 // values

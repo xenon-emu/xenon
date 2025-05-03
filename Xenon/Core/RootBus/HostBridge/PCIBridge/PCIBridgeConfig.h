@@ -2,8 +2,6 @@
 
 #pragma once
 
-#include "Base/Types.h"
-
 // Taken from a Corona PCI bridge dump.
 /*
       PCI Revision is the last byte of the third word of this map

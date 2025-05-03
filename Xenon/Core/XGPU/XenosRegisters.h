@@ -6,7 +6,6 @@
 #include <unordered_map>
 
 #include "Base/Assert.h"
-#include "Base/Types.h"
 
 // A major part of the registers were taken from:
 // 1 -> https://github.com/xenia-canary/xenia-canary/blob/canary_experimental/src/xenia/gpu/register_table.inc

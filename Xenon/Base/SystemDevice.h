@@ -2,8 +2,6 @@
 
 #pragma once
 
-#include "Types.h"
-
 struct DeviceInfo {
   std::string deviceName = ""; // Device Name
   u64 startAddr = 0; // Start Address

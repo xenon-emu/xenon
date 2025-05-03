@@ -6,8 +6,6 @@
 #include <mutex>
 #include <unordered_map>
 
-#include "Types.h"
-
 class LRUCache {
 private:
   size_t capacity;

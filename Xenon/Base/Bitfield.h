@@ -8,8 +8,6 @@
 * License: GPL2
 */
 
-#include "Base/Types.h"
-
 template <typename T, u64 N>
 class _bitfield {
 public:

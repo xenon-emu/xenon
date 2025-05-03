@@ -3,8 +3,6 @@
 
 #pragma once
 
-#include "Base/Types.h"
-
 /* 32-bit ELF base types. */
 typedef u32 Elf32_Addr;
 typedef u16 Elf32_Half;

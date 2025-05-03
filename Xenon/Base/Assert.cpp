@@ -1,7 +1,5 @@
 // Copyright 2025 Xenon Emulator Project
 
-#include <iostream>
-
 #include "Assert.h"
 #include "Arch.h"
 
@@ -37,7 +35,7 @@ void throw_fail_impl() {
 void assert_fail_impl() {
   if (Config::debug.softHaltOnAssertions) {
     Xe_Main->getCPU()->Halt();
-    std::cout << "Assertion Failed! Soft halting emulator..." << std::endl;
+    fmt::print("Assertion Failed! Soft halting emulator...\n");
   }
 }
 
@@ -48,11 +46,11 @@ void assert_fail_impl() {
 }
 
 void assert_fail_debug_msg(const std::string& msg) {
-  std::cout << "Assertion Failed!" << msg.data() << std::endl;
+  fmt::print("Assertion Failed! {}\n", msg.data());
   assert_fail_impl();
 }
 
 void throw_fail_debug_msg(const std::string& msg) {
-  std::cout << "Assertion Failed!" << msg.data() << std::endl;
+  fmt::print("Assertion Failed! {}\n", msg.data());
   throw_fail_impl();
 }

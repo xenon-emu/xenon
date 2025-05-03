@@ -5,7 +5,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "Base/Types.h"
 #include "Render/Abstractions/Shader.h"
 
 #ifndef NO_GFX

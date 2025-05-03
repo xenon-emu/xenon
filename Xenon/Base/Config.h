@@ -8,7 +8,6 @@
 
 #include <toml.hpp>
 
-#include "Types.h"
 #include "Logging/Backend.h"
 
 using namespace std::chrono_literals;

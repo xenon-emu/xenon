@@ -7,7 +7,6 @@
 #define NTDDI_VERSION 0x0A000008
 #define _WIN32_WINNT 0x0A00
 #include <windows.h>
-#include "Types.h"
 
 typedef enum _FILE_INFORMATION_CLASS {
   FileDirectoryInformation = 1,

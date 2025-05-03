@@ -2,7 +2,6 @@
 
 #pragma once
 
-#include "Types.h"
 #include <array>
 
 namespace Base {

@@ -6,8 +6,6 @@
 #include <mutex>
 #include <vector>
 
-#include "Base/Types.h"
-
 struct PPU_RES {
   u8 ppuID;
   volatile bool valid;

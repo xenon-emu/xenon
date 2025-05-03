@@ -6,8 +6,6 @@
 #include <windows.h>
 #endif
 
-#include "Base/Types.h"
-
 #define POST_BUS_ADDR 0x61010ULL
 
 namespace Xe {
