@@ -10,6 +10,10 @@
 #ifdef _WIN32
 #include <Windows.h>
 #endif // _WIN32
+#ifdef __APPLE__
+#include <unistd.h>
+#include <libproc.h>
+#endif // __APPLE__
 
 namespace Base {
 namespace FS {
@@ -22,6 +26,14 @@ const fs::path GetBinaryDirectory() {
   fspath = path;
 #elif __linux__
   fspath = fs::canonical("/proc/self/exe");
+#elif __APPLE__
+  pid_t pid = getpid();
+  char path[PROC_PIDPATHINFO_MAXSIZE];
+  // While this is fine for a raw executable,
+  // an application bundle is read-only and these files
+  // should instead be placed in Application Support.
+  proc_pidpath(pid, path, sizeof(path));
+  fspath = path;
 #else
   // Unknown, just return rootdir
   fspath = fs::current_path() / "Xenon";
