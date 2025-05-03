@@ -9,13 +9,9 @@
 #include "Base/SystemDevice.h"
 #include "Core/RootBus/HostBridge/PCIBridge/SFCX/SFCX.h"
 
-#define NAND_START_ADDR 0xC8000000
-#define NAND_END_ADDR 0xCC000000 // 64 Mb region
-
 class NAND : public SystemDevice {
 public:
-  NAND(const std::string &deviceName, u64 startAddress, u64 endAddress,
-    Xe::PCIDev::SFCX *sfcx, bool isSOCDevice);
+  NAND(const std::string &deviceName, Xe::PCIDev::SFCX *sfcx, bool isSOCDevice);
   ~NAND();
 
   void Read(u64 readAddress, u8 *data, u64 size) override;
@@ -23,5 +19,5 @@ public:
   void MemSet(u64 writeAddress, s32 data, u64 size) override;
 
 private:
-  Xe::PCIDev::SFCX* sfcxDevice;
+  Xe::PCIDev::SFCX *sfcxDevice = nullptr;
 };

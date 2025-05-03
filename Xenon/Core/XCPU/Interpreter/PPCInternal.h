@@ -2,7 +2,7 @@
 
 #pragma once
 
-#if defined(__x86_64__)
+#if defined(ARCH_X86_64) || defined(ARCH_X86)
 #include <immintrin.h>
 #endif
 

@@ -156,7 +156,7 @@ void ppcVXUnavailableException(PPU_STATE *ppuState);
 // MMU
 //
 
-bool MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState, bool memWrite);
+bool MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState, bool memWrite, ePPUThread thr = ePPUThread_None);
 u8 mmuGetPageSize(PPU_STATE *ppuState, bool L, u8 LP);
 void mmuAddTlbEntry(PPU_STATE *ppuState);
 bool mmuSearchTlbEntry(PPU_STATE *ppuState, u64 *RPN, u64 VA, u8 p, bool L, bool LP);
@@ -168,25 +168,25 @@ u64 mmuContructEndAddressFromSecEngAddr(u64 inputAddress, bool *socAccess);
 
 // Main R/W Routines.
 void MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
-            u64 EA, u64 byteCount, u8 *outData);
+            u64 EA, u64 byteCount, u8 *outData, ePPUThread thr = ePPUThread_None);
 void MMUWrite(XENON_CONTEXT* cpuContext, PPU_STATE *ppuState,
-              const u8* data, u64 EA, u64 byteCount);
+              const u8* data, u64 EA, u64 byteCount, ePPUThread thr = ePPUThread_None);
 
-void MMUMemCpyFromHost(PPU_STATE *ppuState, u64 EA, const void* source, u64 size);
+void MMUMemCpyFromHost(PPU_STATE *ppuState, u64 EA, const void *source, u64 size, ePPUThread thr = ePPUThread_None);
 
-void MMUMemCpy(PPU_STATE *ppuState, u64 EA, u32 source, u64 size);
+void MMUMemCpy(PPU_STATE *ppuState, u64 EA, u32 source, u64 size, ePPUThread thr = ePPUThread_None);
 
-void MMUMemSet(PPU_STATE *ppuState, u64 EA, s32 data, u64 size);
+void MMUMemSet(PPU_STATE *ppuState, u64 EA, s32 data, u64 size, ePPUThread thr = ePPUThread_None);
 
 // Helper Read Routines.
-u8 MMURead8(PPU_STATE *ppuState, u64 EA);
-u16 MMURead16(PPU_STATE *ppuState, u64 EA);
-u32 MMURead32(PPU_STATE *ppuState, u64 EA);
-u64 MMURead64(PPU_STATE *ppuState, u64 EA);
+u8 MMURead8(PPU_STATE *ppuState, u64 EA, ePPUThread thr = ePPUThread_None);
+u16 MMURead16(PPU_STATE *ppuState, u64 EA, ePPUThread thr = ePPUThread_None);
+u32 MMURead32(PPU_STATE *ppuState, u64 EA, ePPUThread thr = ePPUThread_None);
+u64 MMURead64(PPU_STATE *ppuState, u64 EA, ePPUThread thr = ePPUThread_None);
 // Helper Write Routines.
-void MMUWrite8(PPU_STATE *ppuState, u64 EA, u8 data);
-void MMUWrite16(PPU_STATE *ppuState, u64 EA, u16 data);
-void MMUWrite32(PPU_STATE *ppuState, u64 EA, u32 data);
-void MMUWrite64(PPU_STATE *ppuState, u64 EA, u64 data);
+void MMUWrite8(PPU_STATE *ppuState, u64 EA, u8 data, ePPUThread thr = ePPUThread_None);
+void MMUWrite16(PPU_STATE *ppuState, u64 EA, u16 data, ePPUThread thr = ePPUThread_None);
+void MMUWrite32(PPU_STATE *ppuState, u64 EA, u32 data, ePPUThread thr = ePPUThread_None);
+void MMUWrite64(PPU_STATE *ppuState, u64 EA, u64 data, ePPUThread thr = ePPUThread_None);
 
 } // namespace PPCInterpreter

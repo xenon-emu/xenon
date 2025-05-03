@@ -77,12 +77,25 @@ public:
 
   // GUI Helpers
   bool DebuggerActive() {
-    return gui.get() && gui.get()->ppcDebuggerActive;
+    if (!gui.get())
+      return false;
+    for (bool &a : gui.get()->ppcDebuggerActive) {
+      if (a) {
+        return true;
+      }
+    }
+    return false;
   }
 
-  void SetDebuggerActive() {
+  void SetDebuggerActive(s8 specificPPU = -1) {
     if (gui.get()) {
-      gui.get()->ppcDebuggerActive = true;
+      if (specificPPU != -1) {
+        for (bool &a : gui.get()->ppcDebuggerActive) {
+          a = true;
+        }
+      } else {
+        gui.get()->ppcDebuggerActive[specificPPU] = true;
+      }
     }
   }
 private:

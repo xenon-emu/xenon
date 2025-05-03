@@ -12,6 +12,7 @@
 #include "Base/Types.h"
 #include "Core/RAM/RAM.h"
 #include "Core/XGPU/CommandProcessor.h"
+#include "Core/XGPU/XGPUConfig.h"
 #include "Core/RootBus/HostBridge/PCIe.h"
 
 /*

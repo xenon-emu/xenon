@@ -227,16 +227,8 @@ inline struct _log {
   // Show more details on log
   bool advanced = false;
   // Show debug-only log statements
-#ifdef _DEBUG
-  bool debugOnly = true;
-#else
+#ifdef DEBUG_BUILD
   bool debugOnly = false;
-#endif
-  // Disable SoC prints, and other 'spam' debug statements
-#ifdef _DEBUG
-  bool simpleDebugLog = false;
-#else
-  bool simpleDebugLog = true;
 #endif
 
   // TOML Conversion
@@ -245,11 +237,21 @@ inline struct _log {
   bool verify_toml(toml::value &value);
 } log;
 
+enum class eConsoleRevision : u8 {
+  Falcon,
+  Jasper,
+  Trinity,
+  Corona,
+  Corona4GB,
+  Winchester
+};
+
 //
 // Highly experimental (things that can either break the emulator or drastically increase performance)
 //
 inline struct _highlyExperimental {
   s32 clocksPerInstructionBypass = 0;
+  eConsoleRevision consoleRevison = eConsoleRevision::Corona;
 
   // TOML Conversion
   void to_toml(toml::value &value);

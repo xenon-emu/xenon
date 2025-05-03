@@ -362,7 +362,20 @@ void Xe::PCIDev::SMC::smcMainThread() {
   // Timer for measuring elapsed time since last Clock Interrupt.
   std::chrono::steady_clock::time_point timerStart =
       std::chrono::steady_clock::now();
-
+  
+  // Fat consoles vs Slims have different initial values for the HANA/ANA
+  u32 *hanaState = HANA_State;
+  switch (Config::highlyExperimental.consoleRevison) {
+  case Config::eConsoleRevision::Falcon:
+  case Config::eConsoleRevision::Jasper:
+    hanaState = FAT_HANA_State;
+    break;
+  case Config::eConsoleRevision::Trinity:
+  case Config::eConsoleRevision::Corona:
+  case Config::eConsoleRevision::Corona4GB:
+    hanaState = HANA_State;
+    break;
+  }
   while (smcThreadRunning) {
     MICROPROFILE_SCOPEI("[Xe::PCI]", "SMC::Loop", MP_AUTO);
     // The System Management Controller (SMC) does the following:
@@ -496,18 +509,18 @@ void Xe::PCIDev::SMC::smcMainThread() {
           smcCoreState->fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
           smcCoreState->fifoDataBuffer[1] = 0x0;
           smcCoreState->fifoDataBuffer[3] =
-              (HANA_State[smcCoreState->fifoDataBuffer[6]] & 0xFF);
+              (hanaState[smcCoreState->fifoDataBuffer[6]] & 0xFF);
           smcCoreState->fifoDataBuffer[4] =
-              ((HANA_State[smcCoreState->fifoDataBuffer[6]] >> 8) & 0xFF);
+              ((hanaState[smcCoreState->fifoDataBuffer[6]] >> 8) & 0xFF);
           smcCoreState->fifoDataBuffer[5] =
-              ((HANA_State[smcCoreState->fifoDataBuffer[6]] >> 16) & 0xFF);
+              ((hanaState[smcCoreState->fifoDataBuffer[6]] >> 16) & 0xFF);
           smcCoreState->fifoDataBuffer[6] =
-              ((HANA_State[smcCoreState->fifoDataBuffer[6]] >> 24) & 0xFF);
+              ((hanaState[smcCoreState->fifoDataBuffer[6]] >> 24) & 0xFF);
           break;
         case 0x60: // SMC_WRITE_ANA
           smcCoreState->fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
           smcCoreState->fifoDataBuffer[1] = 0x0;
-          HANA_State[smcCoreState->fifoDataBuffer[6]] =
+          hanaState[smcCoreState->fifoDataBuffer[6]] =
               smcCoreState->fifoDataBuffer[4] |
               (smcCoreState->fifoDataBuffer[5] << 8) |
               (smcCoreState->fifoDataBuffer[6] << 16) |

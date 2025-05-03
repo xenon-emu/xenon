@@ -41,12 +41,15 @@ void FmtLogMessage(Class logClass, Level logLevel, const char *filename, u32 lin
 #define LOG_GENERIC(logClass, logLevel, ...)                                             \
   Base::Log::FmtLogMessage(logClass, logLevel, Base::Log::TrimSourcePath(__FILE__),      \
                              __LINE__, __func__, __VA_ARGS__)
-
+#ifdef DEBUG_BUILD
 #define LOG_TRACE(logClass, ...)                                                         \
 if (Config::log.debugOnly)                                                               \
   Base::Log::FmtLogMessage(Base::Log::Class::logClass, Base::Log::Level::Trace,          \
                            Base::Log::TrimSourcePath(__FILE__), __LINE__, __func__,      \
                            __VA_ARGS__)
+#else
+#define LOG_TRACE(logClass, ...) ;
+#endif
 
 #define LOG_DEBUG(logClass, ...)                                                         \
   Base::Log::FmtLogMessage(Base::Log::Class::logClass, Base::Log::Level::Debug,          \

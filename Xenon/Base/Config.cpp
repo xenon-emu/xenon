@@ -355,8 +355,9 @@ void _log::from_toml(const toml::value &value) {
   s32 tmpLevel = static_cast<s32>(currentLevel);
   tmpLevel = toml::find_or<s32&>(value, "Level", tmpLevel);
   advanced = toml::find_or<bool>(value, "Advanced", advanced);
+#ifdef DEBUG_BUILD
   debugOnly = toml::find_or<bool>(value, "EnableDebugOnly", debugOnly);
-  simpleDebugLog = toml::find_or<bool>(value, "SimpleDebugLog", simpleDebugLog);
+#endif
   currentLevel = static_cast<Base::Log::Level>(tmpLevel);
 }
 void _log::to_toml(toml::value &value) {
@@ -368,37 +369,45 @@ void _log::to_toml(toml::value &value) {
   value["Advanced"].comments().clear();
   value["Advanced"] = advanced;
   value["Advanced"].comments().push_back("# Show more details on the log (ex, debug symbols)");
+#ifdef DEBUG_BUILD
   value["EnableDebugOnly"].comments().clear();
   value["EnableDebugOnly"] = debugOnly;
   value["EnableDebugOnly"].comments().push_back("# Debug-only log options (Note: Floods the log and shows trace log options)");
-  value["SimpleDebugLog"].comments().clear();
-  value["SimpleDebugLog"] = simpleDebugLog;
-  value["SimpleDebugLog"].comments().push_back("# Disables SoC prints, and other 'spam' debug statements");
+#endif
 }
 bool _log::verify_toml(toml::value &value) {
   to_toml(value);
   cache_value(currentLevel);
   cache_value(advanced);
+#ifdef DEBUG_BUILD
   cache_value(debugOnly);
-  cache_value(simpleDebugLog);
+#endif
   from_toml(value);
   verify_value(currentLevel);
   verify_value(advanced);
+#ifdef DEBUG_BUILD
   verify_value(debugOnly);
-  verify_value(simpleDebugLog);
+#endif
   return true;
 }
 
 void _highlyExperimental::from_toml(const toml::value &value) {
+  s32 tmpConsoleRevison = static_cast<s32>(consoleRevison);
+  tmpConsoleRevison = toml::find_or<s32&>(value, "ConsoleRevison", tmpConsoleRevison);
   clocksPerInstructionBypass = toml::find_or<s32&>(value, "CPIBypass", clocksPerInstructionBypass);
+  consoleRevison = static_cast<eConsoleRevision>(tmpConsoleRevison);
 }
 void _highlyExperimental::to_toml(toml::value &value) {
   value.comments().clear();
   value.comments().push_back("# Do not touch these options unless you know what you're doing!");
   value.comments().push_back("# It can break execution! User beware");
   value["CPIBypass"].comments().clear();
-  value["CPIBypass"].comments().push_back("# Zero will use the estimated CPI for your system (view XCPU for more info)");
   value["CPIBypass"] = clocksPerInstructionBypass;
+  value["CPIBypass"].comments().push_back("# Zero will use the estimated CPI for your system (view XCPU for more info)");
+  value["ConsoleRevison"].comments().clear();
+  value["ConsoleRevison"] = static_cast<u32>(consoleRevison);
+  value["ConsoleRevison"].comments().push_back("# Console motherboard revision, used for PVR and XGPU Init");
+  value["ConsoleRevison"].comments().push_back("# Falcon = 0 | Jasper = 1 | Trinity = 2 | Corona = 3");
 }
 bool _highlyExperimental::verify_toml(toml::value &value) {
   to_toml(value);

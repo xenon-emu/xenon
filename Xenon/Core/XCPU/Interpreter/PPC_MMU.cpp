@@ -197,8 +197,10 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
 
     for (auto &tlbEntry : ppuState->TLB.tlbSet0) {
       if (mmuComparePTE(rb, tlbEntry.pte0, tlbEntry.pte1, p, _instr.l10, LP, &rpn)) {
-        if (!Config::log.simpleDebugLog)
+#ifdef DEBUG_BUILD
+        if (Config::log.advanced)
           LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: {:#x}", rpn);
+#endif
         tlbEntry.V = false;
         tlbEntry.pte0 = 0;
         tlbEntry.pte1 = 0;
@@ -206,8 +208,10 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
     }
     for (auto &tlbEntry : ppuState->TLB.tlbSet1) {
       if (mmuComparePTE(rb, tlbEntry.pte0, tlbEntry.pte1, p, _instr.l10, LP, &rpn)) {
-        if (!Config::log.simpleDebugLog)
+#ifdef DEBUG_BUILD
+        if (Config::log.advanced)
           LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: {:#x}", rpn);
+#endif
         tlbEntry.V = false;
         tlbEntry.pte0 = 0;
         tlbEntry.pte1 = 0;
@@ -215,8 +219,10 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
     }
     for (auto &tlbEntry : ppuState->TLB.tlbSet2) {
       if (mmuComparePTE(rb, tlbEntry.pte0, tlbEntry.pte1, p, _instr.l10, LP, &rpn)) {
-        if (!Config::log.simpleDebugLog)
+#ifdef DEBUG_BUILD
+        if (Config::log.advanced)
           LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: {:#x}", rpn);
+#endif
         tlbEntry.V = false;
         tlbEntry.pte0 = 0;
         tlbEntry.pte1 = 0;
@@ -225,8 +231,10 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
     for (auto &tlbEntry : ppuState->TLB.tlbSet3) {
       u64 pteAVPN = tlbEntry.pte0 & PPC_HPTE64_AVPN;
       if (mmuComparePTE(rb, tlbEntry.pte0, tlbEntry.pte1, p, _instr.l10, LP, &rpn)) {
-        if (!Config::log.simpleDebugLog)
+#ifdef DEBUG_BUILD
+        if (Config::log.advanced)
           LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: {:#x}", rpn);
+#endif
         tlbEntry.V = false;
         tlbEntry.pte0 = 0;
         tlbEntry.pte1 = 0;
@@ -254,8 +262,10 @@ void PPCInterpreter::PPCInterpreter_tlbie(PPU_STATE *ppuState) {
   // Inverse of log2, as log2 is 2^? (finding ?)
   // Example: the Log2 of 4096 is 12, because 2^12 is 4096
   u64 fullPageSize = pow(2, p);
-  if (!Config::log.simpleDebugLog)
+#ifdef DEBUG_BUILD
+  if (Config::log.advanced)
     LOG_TRACE(Xenon, "tlbie, EA:0x{:X} | PageSize:{} | Full:0x{:X},{} | LP:{}", EA, p, fullPageSize, fullPageSize, LP ? "true" : "false");
+#endif
   for (u64 i{}; i != fullPageSize; ++i) {
     curThread.iERAT.invalidateElement(EA+i);
     curThread.dERAT.invalidateElement(EA+i);
@@ -264,8 +274,10 @@ void PPCInterpreter::PPCInterpreter_tlbie(PPU_STATE *ppuState) {
 
 void PPCInterpreter::PPCInterpreter_tlbsync(PPU_STATE *ppuState) {
   // Do nothing
-  if (!Config::log.simpleDebugLog)
+#ifdef DEBUG_BUILD
+  if (Config::log.advanced)
     LOG_TRACE(Xenon, "tlbsync");
+#endif
 }
 
 // Helper function for getting Page Size (p bit).
@@ -576,7 +588,7 @@ u64 PPCInterpreter::mmuContructEndAddressFromSecEngAddr(u64 inputAddress,
 
 // Main address translation mechanism used on the XCPU.
 bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
-                                         bool memWrite) {
+                                         bool memWrite, ePPUThread thr) {
   // Every time the CPU does a load or store, it goes trough the MMU.
   // The MMU decides based on MSR, and some other regs if address translation
   // for Instr/Data is in Real Mode (EA = RA) or in Virtual Mode (Page
@@ -598,9 +610,10 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
   //
   // Current thread SPR's used in MMU..
   //
+  PPU_THREAD_REGISTERS &thread = ppuState->ppuThread[thr != ePPUThread_None ? thr : curThreadId];
 
   // Machine State Register.
-  MSRegister _msr = curThread.SPR.MSR;
+  MSRegister _msr = thread.SPR.MSR;
   // Logical Partition Control Register.
   u64 LPCR = ppuState->SPR.LPCR;
   // Hypervisor Real Mode Offset Register.
@@ -635,9 +648,9 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
   // See IBM_CBE_Handbook_v1.1 Page 82.
 
   // Search ERAT's
-  if (curThread.iFetch) {
+  if (thread.instrFetch) {
     // iERAT
-    RA = curThread.iERAT.getElement((*EA & ~0xFFF));
+    RA = thread.iERAT.getElement((*EA & ~0xFFF));
     if (RA != -1) {
       RA |= (*EA & 0xFFF);
       *EA = RA;
@@ -646,7 +659,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
   }
   else {
     // dERAT
-    RA = curThread.dERAT.getElement((*EA & ~0xFFF));
+    RA = thread.dERAT.getElement((*EA & ~0xFFF));
     if (RA != -1) {
       RA |= (*EA & 0xFFF);
       *EA = RA;
@@ -668,7 +681,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
   bool tlbSoftwareManaged = ((LPCR & 0x400) >> 10);
 
   // Instruction relocate and instruction fetch
-  if (_msr.IR && curThread.iFetch)
+  if (_msr.IR && thread.instrFetch)
     realMode = false;
   // Data fetch
   else if (_msr.DR)
@@ -723,15 +736,19 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 
     bool slbHit = false;
     // Search the SLB to get the VSID
-    for (auto &slbEntry : curThread.SLB) {
+    for (auto &slbEntry : thread.SLB) {
       if (slbEntry.V) {
-        if (!Config::log.simpleDebugLog)
+#ifdef DEBUG_BUILD
+        if (Config::log.advanced)
           LOG_TRACE(Xenon_MMU, "Checking valid SLB (V:0x{:X},LP:0x{:X},C:0x{:X},L:0x{:X},N:0x{:X},Kp:0x{:X},Ks:0x{:X},VSID:0x{:X},ESID:0x{:X},vsidReg:0x{:X},esidReg:0x{:X})", (u32)slbEntry.V, (u32)slbEntry.LP, (u32)slbEntry.C, (u32)slbEntry.L,
                                 (u32)slbEntry.N, (u32)slbEntry.Kp, (u32)slbEntry.Ks,
                                 slbEntry.VSID, slbEntry.ESID, slbEntry.vsidReg, slbEntry.esidReg);
+#endif
         if (slbEntry.ESID == ESID) {
-          if (!Config::log.simpleDebugLog)
+#ifdef DEBUG_BUILD
+          if (Config::log.advanced)
             LOG_TRACE(Xenon_MMU, "SLB Match");
+#endif
           // Entry valid & SLB->ESID = EA->VSID
           currslbEntry = slbEntry;
           VSID = slbEntry.VSID;
@@ -773,12 +790,12 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
         // TLB miss, if we are in software managed mode, generate an
         // interrupt, else do page table search
         if (tlbSoftwareManaged) {
-          if (curThread.iFetch) {
+          if (thread.instrFetch) {
             _ex |= PPU_EX_INSSTOR;
           } else {
             _ex |= PPU_EX_DATASTOR;
-            curThread.SPR.DAR = *EA;
-            curThread.SPR.DSISR = DSISR_NOPTE;
+            thread.SPR.DAR = *EA;
+            thread.SPR.DSISR = DSISR_NOPTE;
           }
           return false;
         } else {
@@ -789,12 +806,12 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 
           // Save MSR DR & IR Bits. When an exception occurs they must be reset
           // to whatever they where
-          bool msrDR = curThread.SPR.MSR.DR;
-          bool msrIR = curThread.SPR.MSR.IR;
+          bool msrDR = thread.SPR.MSR.DR;
+          bool msrIR = thread.SPR.MSR.IR;
 
           // Disable relocation
-          curThread.SPR.MSR.DR = 0;
-          curThread.SPR.MSR.IR = 0;
+          thread.SPR.MSR.DR = 0;
+          thread.SPR.MSR.IR = 0;
 
           // Get the primary and secondary hashes
           u64 hash0 = (VSID >> 28) ^ (PAGE >> p);
@@ -864,8 +881,8 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
             }
 
             // Match found. Set relocation back to whatever it was
-            curThread.SPR.MSR.DR = msrDR;
-            curThread.SPR.MSR.IR = msrIR;
+            thread.SPR.MSR.DR = msrDR;
+            thread.SPR.MSR.IR = msrIR;
 
             // Update Referenced and Change Bits if necessary
             if (!((pteg0[i].pte1 & PPC_HPTE64_R) >> 8)) {
@@ -917,8 +934,8 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
             }
 
             // Match found. Set relocation back to whatever it was
-            curThread.SPR.MSR.DR = msrDR;
-            curThread.SPR.MSR.IR = msrIR;
+            thread.SPR.MSR.DR = msrDR;
+            thread.SPR.MSR.IR = msrIR;
 
             // Update Referenced and Change Bits if necessary
             if (!((pteg1[i].pte1 & PPC_HPTE64_R) >> 8)) {
@@ -948,26 +965,26 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 
           // Set MSR to IR/DR mode before raising the interrupt to whatever they
           // were
-          curThread.SPR.MSR.DR = msrDR;
-          curThread.SPR.MSR.IR = msrIR;
+          thread.SPR.MSR.DR = msrDR;
+          thread.SPR.MSR.IR = msrIR;
 
           // Page Table Lookup Fault
           // Issue Data/Instr Storage interrupt
 
           // Instruction read
-          if (curThread.iFetch) {
+          if (thread.instrFetch) {
             _ex |= PPU_EX_INSSTOR;
 
           } else if (memWrite) {
             // Data write
             _ex |= PPU_EX_DATASTOR;
-            curThread.SPR.DAR = *EA;
-            curThread.SPR.DSISR = DSISR_NOPTE | DSISR_ISSTORE;
+            thread.SPR.DAR = *EA;
+            thread.SPR.DSISR = DSISR_NOPTE | DSISR_ISSTORE;
           } else {
             // Data read
             _ex |= PPU_EX_DATASTOR;
-            curThread.SPR.DAR = *EA;
-            curThread.SPR.DSISR = DSISR_NOPTE;
+            thread.SPR.DAR = *EA;
+            thread.SPR.DSISR = DSISR_NOPTE;
           }
           return false;
         }
@@ -979,11 +996,11 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
       }
       // SLB Miss
       // Data or Inst Segment Exception
-      if (curThread.iFetch) {
+      if (thread.instrFetch) {
         _ex |= PPU_EX_INSTSEGM;
       } else {
         _ex |= PPU_EX_DATASEGM;
-        curThread.SPR.DAR = *EA;
+        thread.SPR.DAR = *EA;
       }
       return false;
     }
@@ -995,17 +1012,14 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
   }
 
   // Save in ERAT's
-  if (curThread.iFetch) {
+  if (thread.instrFetch) {
     // iERAT
-    curThread.iERAT.putElement((*EA & ~0xFFF), (RA & ~0xFFF));
+    thread.iERAT.putElement((*EA & ~0xFFF), (RA & ~0xFFF));
   }
   else {
     // dERAT
-    curThread.dERAT.putElement((*EA & ~0xFFF), (RA & ~0xFFF));
+    thread.dERAT.putElement((*EA & ~0xFFF), (RA & ~0xFFF));
   }
-
-  if (!Config::log.simpleDebugLog)
-    LOG_TRACE(Xenon_MMU, "Final translation, 0x{:X} -> 0x{:X}", *EA, RA);
 
   *EA = RA;
   return true;
@@ -1013,10 +1027,11 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 
 // MMU Read Routine, used by the CPU
 void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE *ppuState,
-                             u64 EA, u64 byteCount, u8 *outData) {
+                             u64 EA, u64 byteCount, u8 *outData, ePPUThread thr) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMURead", MP_AUTO);
+  PPU_THREAD_REGISTERS &thread = ppuState->ppuThread[thr != ePPUThread_None ? thr : curThreadId];
   u64 oldEA = EA;
-  if (!MMUTranslateAddress(&EA, ppuState, false)) {
+  if (!MMUTranslateAddress(&EA, ppuState, false, thr)) {
     memset(outData, 0, byteCount);
     return;
   }
@@ -1036,7 +1051,7 @@ void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE *ppuState,
   }
 
   // TODO: Investigate why FSB_CONFIG_RX_STATE needs these values to work
-  switch (curThread.CIA) {
+  switch (thread.CIA) {
   case 0x1003598ULL: {
     GPR(11) = 0x0E;
   } break;
@@ -1080,12 +1095,12 @@ void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE *ppuState,
     }
 
     // Check if this read address belongs to the SoC MMIO in the PCI Bus.
-    bool nand{ EA >= 0xC8000000 && EA <= 0xCC000000 },
-      pciConfigSpace{ EA >= 0xD0000000 && EA <= 0xD1000000 },
-      pciBridge{ EA >= 0xEA000000 && EA <= 0xEA010000 },
-      xGPU{ EA >= 0xEC800000 && EA <= 0xEC810000 };
+    bool nand{ EA >= NAND_MEMORY_MAPPED_ADDR && EA <= NAND_MEMORY_MAPPED_ADDR + NAND_MEMORY_MAPPED_SIZE },
+      pciConfigSpace{ EA >= PCI_BRIDGE_CONFIG_SPACE_ADDRESS_BASE && EA <= PCI_BRIDGE_CONFIG_SPACE_ADDRESS_BASE + PCI_BRIDGE_CONFIG_SPACE_SIZE },
+      pciBridge{ EA >= PCI_BRIDGE_BASE_ADDRESS && EA <= PCI_BRIDGE_BASE_ADDRESS + PCI_BRIDGE_SIZE },
+      xGPU{ EA >= XGPU_DEVICE_BASE && EA <= XGPU_DEVICE_BASE + XGPU_DEVICE_SIZE };
     if (!nand && !pciBridge && !pciConfigSpace && !xGPU) {
-      if (!Config::log.simpleDebugLog)
+      if (Config::log.advanced)
         LOG_WARNING(Xenon_MMU, "Invalid SoC Read from {:#x}, returning 0.", EA);
       memset(outData, 0, byteCount);
       return;
@@ -1096,11 +1111,11 @@ void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE *ppuState,
 }
 // MMU Write Routine, used by the CPU
 void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
-                              const u8 *data, u64 EA, u64 byteCount) {
+                              const u8 *data, u64 EA, u64 byteCount, ePPUThread thr) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUWrite", MP_AUTO);
   u64 oldEA = EA;
 
-  if (!MMUTranslateAddress(&EA, ppuState, true))
+  if (!MMUTranslateAddress(&EA, ppuState, true, thr))
     return;
 
   // Check if it's reserved
@@ -1147,14 +1162,14 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
     }
 
     // Check if its any of the MMIO regions.
-    bool nand{ EA >= 0xC8000000 && EA <= 0xCC000000 },
-      pciConfigSpace{ EA >= 0xD0000000 && EA <= 0xD1000000 },
-      pciBridge{ EA >= 0xEA000000 && EA <= 0xEA010000 },
-      xGPU{ EA >= 0xEC800000 && EA <= 0xEC810000 };
+    bool nand{ EA >= NAND_MEMORY_MAPPED_ADDR && EA <= NAND_MEMORY_MAPPED_ADDR + NAND_MEMORY_MAPPED_SIZE },
+      pciConfigSpace{ EA >= PCI_BRIDGE_CONFIG_SPACE_ADDRESS_BASE && EA <= PCI_BRIDGE_CONFIG_SPACE_ADDRESS_BASE + PCI_BRIDGE_CONFIG_SPACE_SIZE },
+      pciBridge{ EA >= PCI_BRIDGE_BASE_ADDRESS && EA <= PCI_BRIDGE_BASE_ADDRESS + PCI_BRIDGE_SIZE },
+      xGPU{ EA >= XGPU_DEVICE_BASE && EA <= XGPU_DEVICE_BASE + XGPU_DEVICE_SIZE };
     if (!nand && !pciBridge && !pciConfigSpace && !xGPU) {
       u64 tmp = 0;
       memcpy(&tmp, data, byteCount);
-      if (!Config::log.simpleDebugLog)
+      if (Config::log.advanced)
         LOG_WARNING(Xenon_MMU, "Invalid SoC Write to {:#x} (data:{:#x})", EA, tmp);
       return;
     }
@@ -1165,23 +1180,23 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
 }
 
 void PPCInterpreter::MMUMemCpyFromHost(PPU_STATE *ppuState,
-                                       u64 EA, const void* source, u64 size) {
+                                       u64 EA, const void *source, u64 size, ePPUThread thr) {
   MMUWrite(CPUContext, ppuState, reinterpret_cast<const u8*>(source), EA, size);
 }
 
 void PPCInterpreter::MMUMemCpy(PPU_STATE *ppuState,
-                               u64 EA, u32 source, u64 size) {
+                               u64 EA, u32 source, u64 size, ePPUThread thr) {
   std::unique_ptr<u8[]> data = std::make_unique<STRIP_UNIQUE_ARR(data)>(size);
-  MMURead(CPUContext, ppuState, source, size, data.get());
-  MMUWrite(CPUContext, ppuState, data.get(), EA, size);
+  MMURead(CPUContext, ppuState, source, size, data.get(), thr);
+  MMUWrite(CPUContext, ppuState, data.get(), EA, size, thr);
   data.reset();
 }
 
 void PPCInterpreter::MMUMemSet(PPU_STATE *ppuState,
-                               u64 EA, s32 data, u64 size) {
+                               u64 EA, s32 data, u64 size, ePPUThread thr) {
   const u64 oldEA = EA;
 
-  if (MMUTranslateAddress(&EA, ppuState, true) == false)
+  if (MMUTranslateAddress(&EA, ppuState, true, thr) == false)
     return;
 
   // Check if it's reserved
@@ -1223,45 +1238,45 @@ void PPCInterpreter::MMUMemSet(PPU_STATE *ppuState,
 }
 
 // Reads 1 byte of memory
-u8 PPCInterpreter::MMURead8(PPU_STATE *ppuState, u64 EA) {
+u8 PPCInterpreter::MMURead8(PPU_STATE *ppuState, u64 EA, ePPUThread thr) {
   u8 data = 0;
-  MMURead(CPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data));
+  MMURead(CPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data), thr);
   return data;
 }
 // Reads 2 bytes of memory
-u16 PPCInterpreter::MMURead16(PPU_STATE *ppuState, u64 EA) {
+u16 PPCInterpreter::MMURead16(PPU_STATE *ppuState, u64 EA, ePPUThread thr) {
   u16 data = 0;
-  MMURead(CPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data));
+  MMURead(CPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data), thr);
   return byteswap_be<u16>(data);
 }
 // Reads 4 bytes of memory
-u32 PPCInterpreter::MMURead32(PPU_STATE *ppuState, u64 EA) {
+u32 PPCInterpreter::MMURead32(PPU_STATE *ppuState, u64 EA, ePPUThread thr) {
   u32 data = 0;
-  MMURead(CPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data));
+  MMURead(CPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data), thr);
   return byteswap_be<u32>(data);
 }
 // Reads 8 bytes of memory
-u64 PPCInterpreter::MMURead64(PPU_STATE *ppuState, u64 EA) {
+u64 PPCInterpreter::MMURead64(PPU_STATE *ppuState, u64 EA, ePPUThread thr) {
   u64 data = 0;
-  MMURead(CPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data));
+  MMURead(CPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data), thr);
   return byteswap_be<u64>(data);
 }
 // Writes 1 byte to memory
-void PPCInterpreter::MMUWrite8(PPU_STATE *ppuState, u64 EA, u8 data) {
-  MMUWrite(CPUContext, ppuState, reinterpret_cast<const u8*>(&data), EA, sizeof(data));
+void PPCInterpreter::MMUWrite8(PPU_STATE *ppuState, u64 EA, u8 data, ePPUThread thr) {
+  MMUWrite(CPUContext, ppuState, reinterpret_cast<const u8*>(&data), EA, sizeof(data), thr);
 }
 // Writes 2 bytes to memory
-void PPCInterpreter::MMUWrite16(PPU_STATE *ppuState, u64 EA, u16 data) {
+void PPCInterpreter::MMUWrite16(PPU_STATE *ppuState, u64 EA, u16 data, ePPUThread thr) {
   const u16 dataBS = byteswap_be<u16>(data);
-  MMUWrite(CPUContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data));
+  MMUWrite(CPUContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data), thr);
 }
 // Writes 4 bytes to memory
-void PPCInterpreter::MMUWrite32(PPU_STATE *ppuState, u64 EA, u32 data) {
+void PPCInterpreter::MMUWrite32(PPU_STATE *ppuState, u64 EA, u32 data, ePPUThread thr) {
   const u32 dataBS = byteswap_be<u32>(data);
-  MMUWrite(CPUContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data));
+  MMUWrite(CPUContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data), thr);
 }
 // Writes 8 bytes to memory
-void PPCInterpreter::MMUWrite64(PPU_STATE *ppuState, u64 EA, u64 data) {
+void PPCInterpreter::MMUWrite64(PPU_STATE *ppuState, u64 EA, u64 data, ePPUThread thr) {
   const u64 dataBS = byteswap_be<u64>(data);
-  MMUWrite(CPUContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data));
+  MMUWrite(CPUContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data), thr);
 }

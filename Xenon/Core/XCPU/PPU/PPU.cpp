@@ -30,8 +30,7 @@ static constexpr u64 get_cpi_value(const u64 instrPerSecond) {
   return cpi == 0 ? 1 : cpi;
 }
 
-PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PVR,
-                  u32 PIR) :
+PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PIR) :
   resetVector(resetVector)
 {
   traceFile = NULL;
@@ -109,7 +108,20 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
   }
 
   // Set PVR and PIR
-  ppuState->SPR.PVR.PVR_Hex = PVR;
+  switch (Config::highlyExperimental.consoleRevison) {
+  case Config::eConsoleRevision::Falcon: {
+    ppuState->SPR.PVR.PVR_Hex = 0x00710400;
+  } break;
+  case Config::eConsoleRevision::Jasper: {
+    ppuState->SPR.PVR.PVR_Hex = 0x00710500;
+  } break;
+  case Config::eConsoleRevision::Trinity: {
+    ppuState->SPR.PVR.PVR_Hex = 0x00710800;
+  } break;
+  case Config::eConsoleRevision::Corona: {
+    ppuState->SPR.PVR.PVR_Hex = 0x00710800;
+  } break;
+  }
   ppuState->ppuThread[ePPUThread_Zero].SPR.PIR = PIR;
   ppuState->ppuThread[ePPUThread_One].SPR.PIR = PIR + 1;
 }
@@ -187,10 +199,8 @@ void PPU::Halt(u64 haltOn, bool requestedByGuest, s8 ppuId, ePPUThread threadId)
   }
   guestHalt = requestedByGuest;
   if (guestHalt) {
-    guestHaltPPUId = ppuId;
-    guestHaltThreadId = threadId;
 #ifndef NO_GFX
-    Xe_Main->renderer->SetDebuggerActive();
+    Xe_Main->renderer->SetDebuggerActive(ppuId);
 #endif
   }
   if (ppuThreadPreviousState == eThreadState::None) // If we were told to ignore it, then do so
@@ -205,26 +215,24 @@ void PPU::Continue() {
   ppuThreadState.store(ppuThreadPreviousState.load());
   ppuThreadPreviousState = eThreadState::None;
   guestHalt = false;
-  guestHaltPPUId = -1;
-  guestHaltThreadId = ePPUThread_None;
 }
 void PPU::ContinueFromException() {
   if (ppuThreadState.load() == eThreadState::Running)
     return;
   if (ppuThreadPreviousState == eThreadState::Running)
     LOG_DEBUG(Xenon, "Jumping to exception handler");
-  if (ppuState->ppuID == guestHaltPPUId && guestHaltThreadId != ePPUThread_None) {
-    PPU_THREAD_REGISTERS &thread = ppuState->ppuThread[guestHaltThreadId];
+  if (guestHalt) {
+    PPU_THREAD_REGISTERS &thread = ppuState->ppuThread[curThreadId];
     thread.exceptReg |= PPU_EX_PROG;
     thread.exceptTrapType = EX_SRR1_TRAP_TRAP;
   }
   ppuThreadState.store(ppuThreadPreviousState.load());
   ppuThreadPreviousState = eThreadState::None;
   guestHalt = false;
-  guestHaltPPUId = -1;
-  guestHaltThreadId = ePPUThread_None;
 }
 void PPU::Step(int amount) {
+  if (ppuThreadState.load() == eThreadState::Running)
+    return;
   if (ppuThreadPreviousState == eThreadState::Running)
     LOG_DEBUG(Xenon, "Continuing PPU{} for {} Instructions", ppuState->ppuID, amount);
   ppuStepAmount = amount;
@@ -236,10 +244,8 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
   MICROPROFILE_SCOPEI("[Xe::PPU]", "PPURunInstructions", MP_AUTO);
   for (size_t instrCount = 0; instrCount < numInstrs && ppuThreadActive; ++instrCount) {
     // Halt if needed before executing the instruction
-    if (enableHalt && (ppuHaltOn && ppuHaltOn == curThread.CIA) && !guestHalt) {
-      // Halt all cores
-      // TODO(Vali0004): Change halt to be per-core or change halt continuing to be per-core
-      Xe_Main->getCPU()->Halt();
+    if (enableHalt && ppuHaltOn == curThread.CIA) {
+      Halt();
     }
 
     // Read next instruction
@@ -298,12 +304,12 @@ void PPU::ThreadStateMachine() {
     if (ppuThreadActive && !ppuThreadResetting  && (state & ePPUThreadBit_Zero)) {
       // Thread 0 is running, process instructions until we reach TTR timeout.
       curThreadId = ePPUThread_Zero;
-      PPURunInstructions(ppuState->SPR.TTR);
+      PPURunInstructions(ppuState->SPR.TTR, ppuHaltOn != 0);
     }
     if (ppuThreadActive && !ppuThreadResetting && (state & ePPUThreadBit_One)) {
       // Thread 1 is running, process instructions until we reach TTR timeout.
       curThreadId = ePPUThread_One;
-      PPURunInstructions(ppuState->SPR.TTR);
+      PPURunInstructions(ppuState->SPR.TTR, ppuHaltOn != 0);
     }
   } break;
   case eThreadState::Halted: {
@@ -488,8 +494,8 @@ u64 PPU::loadElfImage(u8* data, u64 size) {
   bool elf32 = true; // Assume little endian file
 
   // We assume elf32 header unless specified otherwise
-  elf32_hdr* header{ reinterpret_cast<decltype(header)>(data) };
-  elf64_hdr* header64{ reinterpret_cast<decltype(header64)>(data) };
+  elf32_hdr *header{ reinterpret_cast<decltype(header)>(data) };
+  elf64_hdr *header64{ reinterpret_cast<decltype(header64)>(data) };
 
   // Check header:
   if (!IS_ELF(*header)) {
@@ -575,8 +581,8 @@ u64 PPU::loadElfImage(u8* data, u64 size) {
   LOG_INFO(Xenon, "Number of entries in Section HT: {}", sectHeaderNumSections);
 
   // Get the program header table data at specified offset.
-  elf32_phdr* progHeaderTableData = reinterpret_cast<elf32_phdr*>(data + header->e_phoff);
-  elf64_phdr* progHeaderTableData64 = reinterpret_cast<elf64_phdr*>(data + header64->e_phoff);
+  elf32_phdr *progHeaderTableData = reinterpret_cast<elf32_phdr*>(data + header->e_phoff);
+  elf64_phdr *progHeaderTableData64 = reinterpret_cast<elf64_phdr*>(data + header64->e_phoff);
 
   // Load Segments from Program segment table.
   for (size_t idx = 0; idx < progHeaderNumSections; idx++) {
@@ -615,36 +621,24 @@ u64 PPU::loadElfImage(u8* data, u64 size) {
 
 // Reads the next instruction from memory and advances the NIP accordingly.
 bool PPU::PPUReadNextInstruction() {
-  PPU_THREAD_REGISTERS &thread = curThread;
-  // Update previous instruction address
-#ifndef NO_GFX
-  thread.PIA = thread.NIA - 4;
-#endif
+  ePPUThread thrId = curThreadId;
+  PPU_THREAD_REGISTERS &thread = ppuState->ppuThread[thrId];
   // Update current instruction address
   thread.CIA = thread.NIA;
   // Increase next instruction address
   thread.NIA += 4;
-  thread.iFetch = true;
+  thread.instrFetch = true;
   // Fetch the instruction from memory
-#ifndef NO_GFX
-  if (Xe_Main.get() && Xe_Main->renderer->DebuggerActive())
-    _previnstr.opcode = PPCInterpreter::MMURead32(ppuState.get(), thread.PIA);
-#endif
-  _instr.opcode = PPCInterpreter::MMURead32(ppuState.get(), thread.CIA);
-#ifndef NO_GFX
-  if (Xe_Main.get() && Xe_Main->renderer->DebuggerActive())
-    _nextinstr.opcode = PPCInterpreter::MMURead32(ppuState.get(), thread.NIA);
-#endif
+  _instr.opcode = PPCInterpreter::MMURead32(ppuState.get(), thread.CIA, thrId);
   if (_instr.opcode == 0xFFFFFFFF) {
     LOG_CRITICAL(Xenon, "PPU{} returned a invalid opcode! Halting...", ppuState->ppuID);
-    Xe_Main->getCPU()->Halt(); // Halt CPU
-    Config::imgui.debugWindow = true; // Open the debugger on bad fault
+    Halt();
     return false;
   }
   if (_ex & PPU_EX_INSSTOR || _ex & PPU_EX_INSTSEGM) {
     return false;
   }
-  thread.iFetch = false;
+  thread.instrFetch = false;
   return true;
 }
 
@@ -658,7 +652,7 @@ void PPU::PPUCheckExceptions() {
   if (exceptions != PPU_EX_NONE) {
     // Halt on any exception
     if (Config::debug.haltOnExceptions) {
-      Xe_Main->xenonCPU->Halt(); // Halt all cores
+      Halt();
     }
     // Non Maskable:
     //
@@ -828,7 +822,7 @@ void PPU::UpdateTimeBase() {
   curThread.SPR.DEC = newDec;
   // Check if Previous decrementer measurement is smaller than current and a
   // decrementer exception is not pending.
-  if (newDec > dec && ((_ex & PPU_EX_DEC) == 0)) {
+  if (newDec > dec && !(_ex & PPU_EX_DEC)) {
     // The decrementer must issue an interrupt.
     _ex |= PPU_EX_DEC;
   }

@@ -45,17 +45,25 @@ public:
   virtual void EndSwap() = 0;
 
   void Window(const std::string &title, std::function<void()> callback = {}, const ImVec2 &size = {}, ImGuiWindowFlags flags = 0, bool *conditon = nullptr, const ImVec2 &position = {}, ImGuiCond cond = ImGuiCond_Once);
+  void SimpleWindow(const std::string &title, std::function<void()> callback = {}, bool *conditon = nullptr, ImGuiWindowFlags flags = 0);
   void Child(const std::string &title, std::function<void()> callback = {}, const ImVec2 &size = {}, ImGuiChildFlags flags = 0, ImGuiWindowFlags windowFlags = 0);
   void Node(const std::string &title, std::function<void()> callback = {}, ImGuiTreeNodeFlags flags = 0);
+  void CollapsingHeader(const std::string &title, std::function<void()> callback = {}, ImGuiTreeNodeFlags flags = 0);
+  void IDGroup(const std::string &id, std::function<void()> callback = {});
+  void IDGroup(s32 id, std::function<void()> callback = {});
+  void Group(const std::string &label, std::function<void()> callback = {});
   void Separator();
   void Text(const std::string &label);
   void TextCopy(const std::string &label, const std::string &value);
-  void SameLine(float xOffset = 0.f, float spacing = -1.f);
+  void TextCopySplit(const std::string &value, const std::string &copyValue);
+  void TextCopySimple(const std::string &value);
+  void SameLine(f32 xOffset = 0.f, f32 spacing = -1.f);
   void MenuBar(std::function<void()> callback = {});
   void MenuItem(const std::string &title, std::function<void()> callback = {}, bool enabled = true, bool selected = false, const std::string &shortcut = {});
   void Menu(const std::string &title, std::function<void()> callback = {});
   void TabBar(const std::string &title, std::function<void()> callback = {}, ImGuiTabBarFlags flags = 0);
   void TabItem(const std::string &title, std::function<void()> callback = {}, bool *conditon = nullptr, ImGuiTabItemFlags flags = 0);
+  void TabItemButton(const std::string &title, std::function<void()> callback = {}, ImGuiTabItemFlags flags = 0);
   bool Button(const std::string &label, std::function<void()> callback = {}, const ImVec2 &size = {});
   bool Toggle(const std::string &label, bool *conditon = nullptr, std::function<void()> callback = {});
   std::string InputText(const std::string &title, std::string initValue = {}, size_t maxCharacters = 256,
@@ -76,8 +84,8 @@ public:
   bool styleEditor = false;
   bool demoWindow = false;
   u32 stepAmount = 1;
-  bool ppcDebuggerActive = false;
-  bool ppcDebuggerAttached = true;
+  bool ppcDebuggerActive[3]{};
+  bool ppcDebuggerDetached = false;
 };
 
 } // namespace Render

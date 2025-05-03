@@ -9,10 +9,10 @@
 #include "Core/RootBus/HostBridge/PCIe.h"
 #include "Core/XCPU/IIC/IIC.h"
 
-/*	Dev type			    Config Address		BAR
-    PCI Host Bridge		  D0008000			E0000000
-    PCI-PCI Bridge		  D0000000			EA000000
-    Display Controller	D0010000			EC800000
+/*  Dev type          Config Address    BAR
+    PCI Host Bridge     D0008000      E0000000
+    PCI-PCI Bridge      D0000000      EA000000
+    Display Controller  D0010000      EC800000
 
 */
 
@@ -21,7 +21,7 @@
 #define PCI_BRIDGE_BASE_END_ADDRESS  PCI_BRIDGE_BASE_ADDRESS + PCI_BRIDGE_BASE_SIZE
 
 #define PCI_BRIDGE_CONFIG_SPACE_ADDRESS_BASE 0xD0000000
-#define PCI_BRIDGE_CONFIG_SPACE_SIZE 0xFF // Mandatory 256 bytes of config space
+#define PCI_BRIDGE_CONFIG_SPACE_SIZE 0x1000000 // 16 Mb
 
 #define PCI_BRIDGE_SIZE 0x10000
 

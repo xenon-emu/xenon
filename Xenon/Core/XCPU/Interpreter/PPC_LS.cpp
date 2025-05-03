@@ -283,15 +283,15 @@ void PPCInterpreter::PPCInterpreter_stwcx(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  if (curThread.ppuRes->V) {
+  if (curThread.ppuRes->valid) {
     CPUContext->xenonRes.LockGuard([&] {
-      if (curThread.ppuRes->V) {
-        if (curThread.ppuRes->resAddr == RA) {
+      if (curThread.ppuRes->valid) {
+        if (curThread.ppuRes->reservedAddr == RA) {
           MMUWrite32(ppuState, EA, static_cast<u32>(GPRi(rs)));
           BSET(CR, 4, CR_BIT_EQ);
         } else {
           CPUContext->xenonRes.Decrement();
-          curThread.ppuRes->V = false;
+          curThread.ppuRes->valid = false;
         }
       }
     });
@@ -392,15 +392,15 @@ void PPCInterpreter::PPCInterpreter_stdcx(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  if (curThread.ppuRes->V) {
+  if (curThread.ppuRes->valid) {
     CPUContext->xenonRes.LockGuard([&] {
-      if (curThread.ppuRes->V) {
-        if (curThread.ppuRes->resAddr == RA) {
+      if (curThread.ppuRes->valid) {
+        if (curThread.ppuRes->reservedAddr == RA) {
           MMUWrite64(ppuState, EA, GPRi(rd));
           BSET(CR, 4, CR_BIT_EQ);
         } else {
           CPUContext->xenonRes.Decrement();
-          curThread.ppuRes->V = false;
+          curThread.ppuRes->valid = false;
         }
       }
     });
@@ -903,8 +903,8 @@ void PPCInterpreter::PPCInterpreter_lwarx(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  curThread.ppuRes->V = true;
-  curThread.ppuRes->resAddr = RA;
+  curThread.ppuRes->valid = true;
+  curThread.ppuRes->reservedAddr = RA;
   CPUContext->xenonRes.Increment();
 
   u32 data = MMURead32(ppuState, EA);
@@ -1070,8 +1070,8 @@ void PPCInterpreter::PPCInterpreter_ldarx(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  curThread.ppuRes->resAddr = RA;
-  curThread.ppuRes->V = true;
+  curThread.ppuRes->reservedAddr = RA;
+  curThread.ppuRes->valid = true;
   CPUContext->xenonRes.Increment();
 
   u64 data = MMURead64(ppuState, EA);

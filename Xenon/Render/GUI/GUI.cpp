@@ -20,12 +20,18 @@
 #define CopyCustom(g, x, fmt, ...) CustomBase(g, #x, fmt, __VA_ARGS__)
 #define HexBase(g, x, ...) CopyCustomBase(g, x, "0x{:X}", __VA_ARGS__)
 #define Hex(g, c, x) HexBase(g, #x, c.x)
+#define HexPtr(g, c, x) HexBase(g, #x, c->x)
 #define BFHex(g, c, x) HexBase(g, #x, u32(c.x));
+#define BFHexPtr(g, c, x) HexBase(g, #x, u32(c->x));
 #define U8Hex(g, c, x) HexBase(g, #x, static_cast<u32>(c.x))
+#define U8HexPtr(g, c, x) HexBase(g, #x, static_cast<u32>(c->x))
 #define HexArr(g, a, i) HexBase(g, fmt::format("[{}]", i), a[i])
 #define Dec(g, c, x) CopyCustom(g, x, "{}", c.x)
+#define DecPtr(g, c, x) CopyCustom(g, x, "{}", c->x)
 #define U8Dec(g, c, x) CopyCustom(g, x, "{}", static_cast<u32>(c.x))
+#define U8DecPtr(g, c, x) CopyCustom(g, x, "{}", static_cast<u32>(c->x))
 #define Bool(g, c, x) CopyCustom(g, x, "{}", c.x ? "true" : "false")
+#define BoolPtr(g, c, x) CopyCustom(g, x, "{}", c->x ? "true" : "false")
 
 void Render::GUI::Init(SDL_Window* window, void *context) {
   MICROPROFILE_SCOPEI("[Xe::Render::GUI]", "Init", MP_AUTO);
@@ -59,7 +65,7 @@ void Render::GUI::Init(SDL_Window* window, void *context) {
 
 bool RGH2{};
 bool storedPreviousInitSkips{};
-int initSkip1{}, initSkip2{};
+s32 initSkip1{}, initSkip2{};
 void Render::GUI::PostInit() {
   ImGuiIO &io = ImGui::GetIO();
   // It might not be a bad idea to take the Xbox 360 font and convert it to TTF
@@ -81,10 +87,19 @@ void Render::GUI::Shutdown() {
 }
 
 //TODO(Vali0004): Make Windows into callbacks, so we can create a window from a different thread.
-void Render::GUI::Window(const std::string &title, std::function<void()> callback, const ImVec2 &size, ImGuiWindowFlags flags, bool* conditon, const ImVec2 &position, ImGuiCond cond) {
+void Render::GUI::Window(const std::string &title, std::function<void()> callback, const ImVec2 &size, ImGuiWindowFlags flags, bool *conditon, const ImVec2 &position, ImGuiCond cond) {
   ImGui::SetNextWindowPos(position, cond);
   ImGui::SetNextWindowSize(size, cond);
 
+  if (ImGui::Begin(title.c_str(), conditon, flags)) {
+    if (callback) {
+      callback();
+    }
+  }
+  ImGui::End();
+}
+
+void Render::GUI::SimpleWindow(const std::string &title, std::function<void()> callback, bool *conditon, ImGuiWindowFlags flags) {
   if (ImGui::Begin(title.c_str(), conditon, flags)) {
     if (callback) {
       callback();
@@ -111,8 +126,42 @@ void Render::GUI::Node(const std::string &title, std::function<void()> callback,
   }
 }
 
+void Render::GUI::CollapsingHeader(const std::string &title, std::function<void()> callback, ImGuiTreeNodeFlags flags) {
+  if (ImGui::CollapsingHeader(title.c_str(), flags)) {
+    if (callback) {
+      callback();
+    }
+  }
+}
+
 void Render::GUI::Separator() {
   ImGui::Separator();
+}
+
+void Render::GUI::IDGroup(const std::string &id, std::function<void()> callback) {
+  ImGui::PushID(id.c_str());
+  if (callback) {
+    callback();
+  }
+  ImGui::PopID();
+}
+
+void Render::GUI::Group(const std::string &label, std::function<void()> callback) {
+  ImGui::BeginGroup();
+  if (label.empty())
+    Text(label);
+  if (callback) {
+    callback();
+  }
+  ImGui::EndGroup();
+}
+
+void Render::GUI::IDGroup(s32 id, std::function<void()> callback) {
+  ImGui::PushID(id);
+  if (callback) {
+    callback();
+  }
+  ImGui::PopID();
 }
 
 void Render::GUI::Text(const std::string &label) {
@@ -164,7 +213,34 @@ void Render::GUI::TextCopy(const std::string &label, const std::string &value) {
   }
 }
 
-void Render::GUI::SameLine(float xOffset, float spacing) {
+void Render::GUI::TextCopySimple(const std::string &value) {
+  if (ImGui::TextButton(value.data())) {
+    LOG_INFO(Debug, "{}", value.data());
+  }
+  if (ImGui::BeginPopupContextItem()) {
+    MenuItem("Copy '" + value + "'", [&] {
+      SDL_SetClipboardText(value.data());
+    });
+    ImGui::EndPopup();
+  }
+}
+
+void Render::GUI::TextCopySplit(const std::string &value, const std::string &copyValue) {
+  if (ImGui::TextButton(value.data())) {
+    LOG_INFO(Debug, "{}", value.data());
+  }
+  if (ImGui::BeginPopupContextItem()) {
+    MenuItem("Copy '" + value + "'", [&] {
+      SDL_SetClipboardText(value.data());
+    });
+    MenuItem("Copy '" + copyValue + "'", [&] {
+      SDL_SetClipboardText(copyValue.data());
+    });
+    ImGui::EndPopup();
+  }
+}
+
+void Render::GUI::SameLine(f32 xOffset, f32 spacing) {
   ImGui::SameLine(xOffset, spacing);
 }
 
@@ -203,12 +279,20 @@ void Render::GUI::TabBar(const std::string &title, std::function<void()> callbac
   }
 }
 
-void Render::GUI::TabItem(const std::string &title, std::function<void()> callback, bool* conditon, ImGuiTabItemFlags flags) {
+void Render::GUI::TabItem(const std::string &title, std::function<void()> callback, bool *conditon, ImGuiTabItemFlags flags) {
   if (ImGui::BeginTabItem(title.c_str(), conditon, flags)) {
     if (callback) {
       callback();
     }
     ImGui::EndTabItem();
+  }
+}
+
+void Render::GUI::TabItemButton(const std::string &title, std::function<void()> callback, ImGuiTabItemFlags flags) {
+  if (ImGui::TabItemButton(title.c_str(), flags)) {
+    if (callback) {
+      callback();
+    }
   }
 }
 
@@ -293,13 +377,88 @@ void Render::GUI::Tooltip(const std::string &contents, ImGuiHoveredFlags delay) 
   }
 }
 
-void PPUThread(Render::GUI *gui, PPU_STATE *PPUState, ePPUThread threadID) {
-  gui->Node(fmt::format("[{}]", static_cast<u8>(threadID)), [&] {
-    PPU_THREAD_REGISTERS &ppuRegisters = PPUState->ppuThread[threadID];
-    gui->Node("SPR", [&] {
+void RenderInstructions(Render::GUI *gui, PPU_STATE *state, ePPUThread thr, u64 numInstructions) {
+  PPU_THREAD_REGISTERS &thread = state->ppuThread[thr];
+  f32 maxLineWidth = ImGui::GetContentRegionAvail().x;
+  for (u64 i = 0; i != numInstructions; ++i) {
+    u32 instr = 0;
+    u64 addr = thread.CIA + (4 * i);
+    thread.instrFetch = true;
+    instr = PPCInterpreter::MMURead32(state, addr, thr);
+    if (thread.exceptReg & PPU_EX_INSSTOR || thread.exceptReg & PPU_EX_INSTSEGM) {
+      break;
+    }
+    thread.instrFetch = false;
+    const std::string instrName = PPCInterpreter::PPCInterpreter_getFullName(instr);
+#ifdef __LITTLE_ENDIAN__
+    const u32 b0 = static_cast<u8>((instr >> 24) & 0xFF);
+    const u32 b1 = static_cast<u8>((instr >> 16) & 0xFF);
+    const u32 b2 = static_cast<u8>((instr >> 8) & 0xFF);
+    const u32 b3 = static_cast<u8>((instr >> 0) & 0xFF);
+#else
+    const u32 b0 = static_cast<u8>((instr >> 0) & 0xFF);
+    const u32 b1 = static_cast<u8>((instr >> 8) & 0xFF);
+    const u32 b2 = static_cast<u8>((instr >> 16) & 0xFF);
+    const u32 b3 = static_cast<u8>((instr >> 24) & 0xFF);
+#endif
+    gui->TextCopySimple(fmt::format("{:08X}", addr)); gui->SameLine(0.f, 2.f);
+    gui->TextCopySplit(fmt::format("{:02X}##{}", b0, addr), fmt::format("{:08X}", instr)); gui->SameLine(0.f, 2.f);
+    gui->TextCopySimple(fmt::format("{:02X}##{}", b1, addr + 1)); gui->SameLine(0.f, 2.f);
+    gui->TextCopySimple(fmt::format("{:02X}##{}", b2, addr + 2)); gui->SameLine(0.f, 2.f);
+    gui->TextCopySimple(fmt::format("{:02X}##{}", b3, addr + 3)); gui->SameLine(0.f, maxLineWidth > 800.f ? 270.f : 120.f);
+    gui->TextCopySimple(fmt::format("{}##{}", instrName, addr));
+  }
+}
+
+void PPUThreadDiassembly(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
+  gui->SimpleWindow(fmt::format("Diassembly [{}:{}]", state->ppuName, static_cast<u8>(thr)), [&] {
+    RenderInstructions(gui, state, thr, 16);
+  });
+}
+
+void PPUThreadRegisters(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
+  gui->SimpleWindow(fmt::format("Registers [{}:{}]", state->ppuName, static_cast<u8>(thr)), [&] {
+    PPU_THREAD_REGISTERS &ppuRegisters = state->ppuThread[thr];
+    gui->Node("GPRs", [&] {
+      for (u64 i = 0; i < 32; ++i) {
+        HexArr(gui, ppuRegisters.GPR, i);
+      }
+    });
+    gui->Node("FPRs", [&] {
+      for (u64 i = 0; i < 32; ++i) {
+        FPRegister &FPR = ppuRegisters.FPR[i];
+        gui->IDGroup(i, [&] {
+          TextFmt(gui, "FPR[{}]", i);
+          Custom(gui, valueAsDouble, "{}", FPR.valueAsDouble);
+          Custom(gui, valueAsU64, "0x{:X}", FPR.valueAsU64);
+        });
+      }
+    });
+    gui->Node("SPRs", [&] {
       PPU_THREAD_SPRS &SPR = ppuRegisters.SPR;
+      gui->Node("MSRs", [&] {
+        MSRegister &MSR = SPR.MSR;
+        BFHex(gui, MSR, LE);
+        BFHex(gui, MSR, RI);
+        BFHex(gui, MSR, PMM);
+        BFHex(gui, MSR, DR);
+        BFHex(gui, MSR, IR);
+        BFHex(gui, MSR, FE1);
+        BFHex(gui, MSR, BE);
+        BFHex(gui, MSR, SE);
+        BFHex(gui, MSR, FE0);
+        BFHex(gui, MSR, ME);
+        BFHex(gui, MSR, FP);
+        BFHex(gui, MSR, PR);
+        BFHex(gui, MSR, EE);
+        BFHex(gui, MSR, ILE);
+        BFHex(gui, MSR, VXU);
+        BFHex(gui, MSR, HV);
+        BFHex(gui, MSR, TA);
+        BFHex(gui, MSR, SF);
+      }, ImGuiTreeNodeFlags_DefaultOpen);
       gui->Node("XER", [&] {
-        XERegister &XER = SPR.XER;
+        XERegister& XER = SPR.XER;
         Hex(gui, XER, XER_Hex);
         BFHex(gui, XER, ByteCount);
         BFHex(gui, XER, R0);
@@ -330,32 +489,39 @@ void PPUThread(Render::GUI *gui, PPU_STATE *PPUState, ePPUThread threadID) {
       Hex(gui, SPR, PPE_TLB_Index_Hint);
       Hex(gui, SPR, DABR);
       Hex(gui, SPR, DABRX);
-      gui->Node("MSR", [&] {
-        MSRegister &MSR = SPR.MSR;
-        BFHex(gui, MSR, LE);
-        BFHex(gui, MSR, RI);
-        BFHex(gui, MSR, PMM);
-        BFHex(gui, MSR, DR);
-        BFHex(gui, MSR, IR);
-        BFHex(gui, MSR, FE1);
-        BFHex(gui, MSR, BE);
-        BFHex(gui, MSR, SE);
-        BFHex(gui, MSR, FE0);
-        BFHex(gui, MSR, ME);
-        BFHex(gui, MSR, FP);
-        BFHex(gui, MSR, PR);
-        BFHex(gui, MSR, EE);
-        BFHex(gui, MSR, ILE);
-        BFHex(gui, MSR, VXU);
-        BFHex(gui, MSR, HV);
-        BFHex(gui, MSR, TA);
-        BFHex(gui, MSR, SF);
-      });
       Hex(gui, SPR, PIR);
     });
-    Hex(gui, ppuRegisters, CIA);
-    Hex(gui, ppuRegisters, NIA);
-    gui->Node("CI", [&] {
+    gui->Node("SLBs", [&] {
+      for (u64 i = 0; i < 64; ++i) {
+        SLBEntry &SLB = ppuRegisters.SLB[i];
+        gui->Node(fmt::format("[{}]", i), [&] {
+          U8Hex(gui, SLB, V);
+          U8Hex(gui, SLB, LP);
+          U8Hex(gui, SLB, C);
+          U8Hex(gui, SLB, L);
+          U8Hex(gui, SLB, N);
+          U8Hex(gui, SLB, Kp);
+          U8Hex(gui, SLB, Ks);
+          Hex(gui, SLB, VSID);
+          Hex(gui, SLB, ESID);
+          Hex(gui, SLB, vsidReg);
+          Hex(gui, SLB, esidReg);
+        });
+      }
+    });
+    gui->Node("GPR:CR", [&] {
+      CRegister &CR = ppuRegisters.CR;
+      Hex(gui, CR, CR_Hex);
+      BFHex(gui, CR, CR0);
+      BFHex(gui, CR, CR1);
+      BFHex(gui, CR, CR2);
+      BFHex(gui, CR, CR3);
+      BFHex(gui, CR, CR4);
+      BFHex(gui, CR, CR5);
+      BFHex(gui, CR, CR6);
+      BFHex(gui, CR, CR7);
+    });
+    gui->Node("Op:CI", [&] {
       PPCOpcode &CI = ppuRegisters.CI;
       Hex(gui, CI, opcode);
       BFHex(gui, CI, main);
@@ -410,35 +576,8 @@ void PPUThread(Render::GUI *gui, PPU_STATE *PPUState, ePPUThread threadID) {
       BFHex(gui, CI, bt14);
       BFHex(gui, CI, bt24);
     });
-    Bool(gui, ppuRegisters, iFetch);
-    gui->Node("GPRs", [&] {
-      for (u64 i = 0; i != 32; ++i) {
-        HexArr(gui, ppuRegisters.GPR, i);
-      }
-    });
-    gui->Node("FPRs", [&] {
-      for (u64 i = 0; i != 32; ++i) {
-        FPRegister &FPR = ppuRegisters.FPR[i];
-        gui->Node(fmt::format("[{}]", i), [&] {
-          Custom(gui, valueAsDouble, "{}", FPR.valueAsDouble);
-          Custom(gui, valueAsU64, "0x{:X}",FPR.valueAsU64);
-        });
-      }
-    });
-    gui->Node("CR", [&] {
-      CRegister &CR = ppuRegisters.CR;
-      Hex(gui, CR, CR_Hex);
-      BFHex(gui, CR, CR0);
-      BFHex(gui, CR, CR1);
-      BFHex(gui, CR, CR2);
-      BFHex(gui, CR, CR3);
-      BFHex(gui, CR, CR4);
-      BFHex(gui, CR, CR5);
-      BFHex(gui, CR, CR6);
-      BFHex(gui, CR, CR7);
-    });
     gui->Node("FPSCR", [&] {
-      FPSCRegister &FPSCR = ppuRegisters.FPSCR;
+      FPSCRegister& FPSCR = ppuRegisters.FPSCR;
       Hex(gui, FPSCR, FPSCR_Hex);
       BFHex(gui, FPSCR, RN);
       BFHex(gui, FPSCR, NI);
@@ -472,24 +611,15 @@ void PPUThread(Render::GUI *gui, PPU_STATE *PPUState, ePPUThread threadID) {
       BFHex(gui, FPSCR, FEX);
       BFHex(gui, FPSCR, FX);
     });
-    gui->Node("SLBs", [&] {
-      for (u64 i = 0; i != 64; ++i) {
-        SLBEntry &SLB = ppuRegisters.SLB[i];
-        gui->Node(fmt::format("[{}]", i), [&] {
-          U8Hex(gui, SLB, V);
-          U8Hex(gui, SLB, LP);
-          U8Hex(gui, SLB, C);
-          U8Hex(gui, SLB, L);
-          U8Hex(gui, SLB, N);
-          U8Hex(gui, SLB, Kp);
-          U8Hex(gui, SLB, Ks);
-          Hex(gui, SLB, VSID);
-          Hex(gui, SLB, ESID);
-          Hex(gui, SLB, vsidReg);
-          Hex(gui, SLB, esidReg);
-        });
-      }
+    gui->Node("PPU:Reserve", [&] {
+      PPU_RES *ppuRes = ppuRegisters.ppuRes.get();
+      U8HexPtr(gui, ppuRes, ppuID);
+      BoolPtr(gui, ppuRes, valid);
+      HexPtr(gui, ppuRes, reservedAddr);
     });
+    Hex(gui, ppuRegisters, CIA);
+    Hex(gui, ppuRegisters, NIA);
+    Bool(gui, ppuRegisters, instrFetch);
     Hex(gui, ppuRegisters, exceptReg);
     Bool(gui, ppuRegisters, exceptionTaken);
     Hex(gui, ppuRegisters, exceptEA);
@@ -498,50 +628,50 @@ void PPUThread(Render::GUI *gui, PPU_STATE *PPUState, ePPUThread threadID) {
     Hex(gui, ppuRegisters, intEA);
     Hex(gui, ppuRegisters, lastWriteAddress);
     Hex(gui, ppuRegisters, lastRegValue);
-    gui->Node("ppuRes", [&] {
-        PPU_RES &ppuRes = *(ppuRegisters.ppuRes.get());
-        U8Hex(gui, ppuRes, ppuID);
-        Bool(gui, ppuRes, V);
-        Hex(gui, ppuRes, resAddr);
-    });
   });
 }
 
-void RenderInstr(Render::GUI *gui, const std::string &thread, u32 addr, u32 instr) {
-  const std::string instrName = PPCInterpreter::PPCInterpreter_getFullName(instr);
-  const u32 b0 = static_cast<u8>((instr >> 24) & 0xFF);
-  const u32 b1 = static_cast<u8>((instr >> 16) & 0xFF);
-  const u32 b2 = static_cast<u8>((instr >> 8) & 0xFF);
-  const u32 b3 = static_cast<u8>((instr >> 0) & 0xFF);
-  TextFmt(gui, "[{}]  {:08X} {:02X} {:02X} {:02X} {:02X}                          {}", thread, addr, b0, b1, b2, b3, instrName);
+bool rebuildThreadDS[6]{};
+bool builtWithDisassembly[6]{};
+void PPUThreadDockSpace(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
+  gui->SimpleWindow(fmt::format("{} [{}]", static_cast<u8>(thr), state->ppuName), [&] {
+    std::string id = fmt::format("{}:{}_DS", state->ppuName, static_cast<u8>(thr));
+    PPU_THREAD_REGISTERS &thread = state->ppuThread[thr];
+    ImGuiID dsId = ImGui::GetID(id.c_str());
+    if (!ImGui::DockBuilderGetNode(dsId) || rebuildThreadDS[thread.SPR.PIR] && !builtWithDisassembly[thread.SPR.PIR]) {
+      ImGui::DockBuilderRemoveNode(dsId);
+      ImGui::DockBuilderAddNode(dsId, ImGuiDockNodeFlags_DockSpace);
+      if (thread.CIA != 0) {
+        builtWithDisassembly[thread.SPR.PIR] = true;
+        ImGuiID left, right;
+        left = ImGui::DockBuilderSplitNode(dsId, ImGuiDir_Left, 1.f, nullptr, &right);
+        std::string disassemblyId = fmt::format("Diassembly [{}:{}]", state->ppuName, static_cast<u8>(thr));
+        std::string registersId = fmt::format("Registers [{}:{}]", state->ppuName, static_cast<u8>(thr));
+        ImGui::DockBuilderDockWindow(disassemblyId.c_str(), left);
+        ImGui::DockBuilderDockWindow(registersId.c_str(), right);
+      } else {
+        std::string registersId = fmt::format("Registers [{}:{}]", state->ppuName, static_cast<u8>(thr));
+        ImGui::DockBuilderDockWindow(registersId.c_str(), dsId);
+      }
+
+      ImGui::DockBuilderFinish(dsId);
+      rebuildThreadDS[thread.SPR.PIR] = false;
+    }
+    ImGui::DockSpace(dsId);
+    
+    if (thread.CIA != 0) {
+      rebuildThreadDS[thread.SPR.PIR] = true;
+      PPUThreadDiassembly(gui, state, thr);
+    }
+    PPUThreadRegisters(gui, state, thr);
+  });
 }
 
-void PPC_PPU(Render::GUI *gui, PPU *PPU) {
-  if (!PPU) {
-    return;
-  }
-  PPU_STATE *PPUStatePtr = PPU->GetPPUState();
-  if (!PPUStatePtr)
-    return;
-  #define ppuState PPUStatePtr
-  PPU_STATE &PPUState = *PPUStatePtr;
-  gui->Node(PPUState.ppuName, [&] {
-    PPU_THREAD_REGISTERS &thr0 = ppuState->ppuThread[ePPUThread_Zero];
-    PPU_THREAD_REGISTERS &thr1 = ppuState->ppuThread[ePPUThread_One];
-    RenderInstr(gui, "Thr0", thr0.PIA, thr0.PI.opcode);
-    RenderInstr(gui, "Thr0", thr0.CIA, thr0.CI.opcode);
-    RenderInstr(gui, "Thr0", thr0.NIA, thr0.NI.opcode);
-    gui->Separator();
-    RenderInstr(gui, "Thr1", thr1.PIA, thr1.PI.opcode);
-    RenderInstr(gui, "Thr1", thr1.CIA, thr1.CI.opcode);
-    RenderInstr(gui, "Thr1", thr1.NIA, thr1.NI.opcode);
-    gui->Node("ppuThread", [&] {
-      PPUThread(gui, PPUStatePtr, ePPUThread_Zero);
-      PPUThread(gui, PPUStatePtr, ePPUThread_One);
-    });
-    U8Dec(gui, PPUState, currentThread);
+void PPURegisters(Render::GUI *gui, PPU_STATE *state) {
+  gui->SimpleWindow(fmt::format("Registers [{}]", state->ppuID), [&] {
+    Xenon *CPU = Xe_Main->getCPU();
     gui->Node("SPR", [&] {
-      PPU_STATE_SPRS &SPR = PPUState.SPR;
+      PPU_STATE_SPRS &SPR = state->SPR;
       Hex(gui, SPR, SDR1);
       Hex(gui, SPR, CTRL);
       Hex(gui, SPR, TB);
@@ -550,7 +680,7 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
         Hex(gui, PVR, PVR_Hex);
         U8Hex(gui, PVR, Revision);
         U8Hex(gui, PVR, Version);
-      });
+      }, ImGuiTreeNodeFlags_DefaultOpen);
       Hex(gui, SPR, HDEC);
       Hex(gui, SPR, RMOR);
       Hex(gui, SPR, HRMOR);
@@ -568,7 +698,7 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
       Hex(gui, SPR, HID6);
     });
     gui->Node("TLB", [&] {
-      TLB_Reg &TLB = PPUState.TLB;
+      TLB_Reg &TLB = state->TLB;
       gui->Node("tlbSet0", [&] {
         for (u64 i = 0; i != 256; ++i) {
           TLBEntry &TLBEntry = TLB.tlbSet0[i];
@@ -610,79 +740,133 @@ void PPC_PPU(Render::GUI *gui, PPU *PPU) {
         }
       });
     });
-    Bool(gui, PPUState, translationInProgress);
-    Custom(gui, ppuName, "{}", PPUState.ppuName);
-  }, ImGuiTreeNodeFlags_DefaultOpen);
+    Custom(gui, ppuName, "{}", state->ppuName);
+    U8DecPtr(gui, state, currentThread);
+    BoolPtr(gui, state, translationInProgress);
+  });
 }
-void PPCDebugger(Render::GUI *gui) {
-  ImGuiWindow *window = ImGui::GetCurrentWindow();
-  ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, 0.f);
-  ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, 0.f);
-  ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 2.f, 8.f });
-  ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { 8.f, 4.f });
-  gui->Child("##instrs", [&] {
-    Xenon *CPU = Xe_Main->getCPU();
-    gui->MenuBar([&gui, &CPU] {
-      gui->Menu("Window", [&gui, &CPU] {
-        if (!gui->ppcDebuggerActive) {
-          gui->MenuItem("Enable", [&] {
-            gui->ppcDebuggerActive = true;
-          });
-        } else {
-          gui->MenuItem(gui->ppcDebuggerAttached ? "Detach" : "Attach", [&] {
-            gui->ppcDebuggerAttached ^= true;
-          });
-          gui->MenuItem("Disable", [&] {
-            gui->ppcDebuggerActive = false;
-          });
-        }
+
+void PPUDockSpace(Render::GUI *gui, PPU *PPU) {
+  if (!PPU)
+    return;
+
+  PPU_STATE *state = PPU->GetPPUState();
+  if (!state)
+    return;
+
+  gui->SimpleWindow(state->ppuName, [&] {
+    gui->MenuBar([&] {
+      bool halted = PPU->IsHalted();
+      gui->MenuItem(halted ? "Continue" : "Pause", [&PPU, halted] {
+        if (halted)
+          PPU->Continue();
+        else
+          PPU->Halt();
       });
-      gui->Menu("Debug", [&gui, &CPU] {
-        if (!CPU->IsHalted()) {
-          gui->MenuItem("Pause", [&CPU] {
-            CPU->Halt();
-          });
-          gui->MenuItem("Exit (Soft)", [] {
-            Xe_Main->shutdown();
-          });
-          gui->MenuItem("Exit (Force)", [] {
-            exit(0);
-          });
-        } else {
-          gui->MenuItem("Continue", [&CPU] {
-            CPU->Continue();
-          });
-          if (CPU->IsHaltedByGuest()) {
-            gui->MenuItem("Continue From Exception Handler", [&CPU] {
-              CPU->ContinueFromException();
-            });
-          }
-          gui->InputInt("Amount", &gui->stepAmount);
-          gui->MenuItem("Step (F10)", [&gui, &CPU] {
-            CPU->Step(gui->stepAmount);
-          });
-        }
-      });
-      if (gui->ppcDebuggerActive) {
-        gui->MenuItem("Disable", [&] {
-          gui->ppcDebuggerActive = false;
+      if (PPU->IsHaltedByGuest()) {
+        gui->MenuItem("Continue From Exception Handler", [&PPU] {
+          PPU->ContinueFromException();
         });
       }
     });
-    if (ImGui::IsKeyPressed(ImGuiKey_F10)) {
-      CPU->Step(gui->stepAmount);
+    std::string id = fmt::format("{}_DS", state->ppuName);
+    ImGuiID dsId = ImGui::GetID(id.c_str());
+    if (!ImGui::DockBuilderGetNode(dsId)) {
+      ImGui::DockBuilderRemoveNode(dsId);
+      ImGui::DockBuilderAddNode(dsId, ImGuiDockNodeFlags_DockSpace);
+      ImGui::DockBuilderSetNodeSize(dsId, ImGui::GetMainViewport()->Size);
+      ImGuiID top, bottom;
+      ImGui::DockBuilderSplitNode(dsId, ImGuiDir_Up, 0.f, &top, &bottom);
+
+      std::string registersId = fmt::format("Registers [{}]", state->ppuID);
+      std::string thread0Id = fmt::format("{} [{}]", 0, state->ppuName);
+      std::string thread1Id = fmt::format("{} [{}]", 1, state->ppuName);
+      ImGui::DockBuilderDockWindow(registersId.c_str(), top);
+      ImGui::DockBuilderDockWindow(thread0Id.c_str(), bottom);
+      ImGui::DockBuilderDockWindow(thread1Id.c_str(), bottom);
+
+      ImGui::DockBuilderFinish(dsId);
     }
-    if (CPU) {
-      PPC_PPU(gui, CPU->GetPPU(0));
-      PPC_PPU(gui, CPU->GetPPU(1));
-      PPC_PPU(gui, CPU->GetPPU(2));
+    ImGui::DockSpace(dsId);
+
+    PPURegisters(gui, state);
+    for (u8 i = 0; i != 2; ++i) {
+      PPUThreadDockSpace(gui, state, static_cast<ePPUThread>(i));
     }
-  }, { window->Size.x - 27.5f, window->Size.y - 76.f }, ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_MenuBar);
-  ImGui::PopStyleVar(4);
+  }, &gui->ppcDebuggerActive[state->ppuID], ImGuiWindowFlags_MenuBar);
+}
+
+bool rebuildDock = false;
+u8 activeCountOnBuild = 0;
+void DebuggerDockSpace(Render::GUI *gui) {
+  u8 activeCount = 0;
+  for (u8 i = 0; i != 3; ++i) {
+    if (gui->ppcDebuggerActive[i])
+      ++activeCount;
+  }
+  if (activeCountOnBuild != activeCount && activeCount)
+    rebuildDock = true;
+
+  if (!activeCount) {
+    return;
+  }
+
+  ImGuiID dsId = ImGui::GetID("DebuggerDS");
+  if (!ImGui::DockBuilderGetNode(dsId) || rebuildDock) {
+    activeCountOnBuild = activeCount;
+    ImGui::DockBuilderRemoveNode(dsId);
+    ImGui::DockBuilderAddNode(dsId, ImGuiDockNodeFlags_DockSpace);
+    if (activeCount == 3) {
+      ImGuiID center = dsId;
+      ImGuiID left = ImGui::DockBuilderSplitNode(center, ImGuiDir_Left, 1.f, nullptr, &center);
+      ImGuiID right = ImGui::DockBuilderSplitNode(center, ImGuiDir_Right, 1.f, nullptr, &center);
+
+      ImGui::DockBuilderDockWindow("PPU0", left);
+      ImGui::DockBuilderDockWindow("PPU1", center);
+      ImGui::DockBuilderDockWindow("PPU2", right);
+    } else {
+      if (activeCount == 2) {
+        ImGuiID left, right;
+        left = ImGui::DockBuilderSplitNode(dsId, ImGuiDir_Left, 1.f, nullptr, &right);
+
+        if (gui->ppcDebuggerActive[0]) {
+          ImGui::DockBuilderDockWindow("PPU0", left);
+          if (gui->ppcDebuggerActive[1])
+            ImGui::DockBuilderDockWindow("PPU1", right);
+          else if (gui->ppcDebuggerActive[2])
+            ImGui::DockBuilderDockWindow("PPU2", right);
+        } else if (gui->ppcDebuggerActive[1]) {
+          ImGui::DockBuilderDockWindow("PPU1", left);
+          if (gui->ppcDebuggerActive[2])
+            ImGui::DockBuilderDockWindow("PPU2", right);
+        }
+      } else if (activeCount == 1) {
+        if (gui->ppcDebuggerActive[0])
+          ImGui::DockBuilderDockWindow("PPU0", dsId);
+        else if (gui->ppcDebuggerActive[1])
+          ImGui::DockBuilderDockWindow("PPU1", dsId);
+        else if (gui->ppcDebuggerActive[2])
+          ImGui::DockBuilderDockWindow("PPU2", dsId);
+      }
+    }
+    ImGui::DockBuilderFinish(dsId);
+    rebuildDock = false;
+  }
+  ImGui::DockSpace(dsId);
+
+  if (Xe_Main.get()) {
+    Xenon *CPU = Xe_Main->getCPU();
+    for (u8 ppuID = 0; ppuID != 3; ++ppuID) {
+      if (CPU && gui->ppcDebuggerActive[ppuID]) {
+        PPU *PPU = CPU->GetPPU(ppuID);
+        PPUDockSpace(gui, PPU);
+      }
+    }
+  }
 }
 
 void LogSettings(Render::GUI *gui) {
-  static int logLevel = static_cast<int>(Config::log.currentLevel);
+  static s32 logLevel = static_cast<s32>(Config::log.currentLevel);
   gui->Toggle("Advanced", &Config::log.advanced);
   gui->Tooltip("Enables more advanced logging ");
   gui->Toggle("Debug Only", &Config::log.debugOnly);
@@ -781,23 +965,64 @@ void ConfigSettings(Render::GUI *gui) {
 }
 
 void Render::GUI::OnSwap(Texture *texture) {
-  if (ppcDebuggerActive && !ppcDebuggerAttached) {
+  if (ppcDebuggerDetached) {
     Window("PPC Debugger", [this] {
-      PPCDebugger(this);
-    }, { 1200.f, 700.f }, ImGuiWindowFlags_None, &ppcDebuggerActive, { 500.f, 100.f });
+      TabBar("##debugger", [&] {
+        if (!ppcDebuggerDetached) {
+          DebuggerDockSpace(this);
+        }
+        for (u8 i = 0; i != 3; ++i) {
+          TabItemButton("PPU" + std::to_string(i), [&] {
+            rebuildDock = true;
+            ppcDebuggerActive[i] ^= true;
+          });
+          ImGui::SameLine();
+        }
+        TabItemButton("All", [&] {
+          rebuildDock = true;
+          for (bool& a : ppcDebuggerActive)
+            a ^= true;
+        });
+        Xenon *CPU = Xe_Main->getCPU();
+        bool halted = CPU->IsHalted();
+        TabItemButton(halted ? "Continue" : "Pause", [&] {
+          if (halted)
+            CPU->Continue();
+          else
+            CPU->Halt();
+        });
+      });
+    }, { 1200.f, 700.f }, ImGuiWindowFlags_None, &ppcDebuggerDetached, { 500.f, 100.f });
   }
   if (Config::imgui.debugWindow) {
     Window("Debug", [&] {
       TabBar("##main", [&] {
         TabItem("Debug", [&] {
-          if (!ppcDebuggerActive) {
-            Button("Start", [&] {
-              ppcDebuggerActive = true;
+          TabBar("##debug", [&] {
+            if (!ppcDebuggerDetached) {
+              DebuggerDockSpace(this);
+            }
+            for (u8 i = 0; i != 3; ++i) {
+              TabItemButton("PPU" + std::to_string(i), [&] {
+                rebuildDock = true;
+                ppcDebuggerActive[i] ^= true;
+              });
+              ImGui::SameLine();
+            }
+            TabItemButton("All", [&] {
+              rebuildDock = true;
+              for (bool& a : ppcDebuggerActive)
+                a ^= true;
             });
-          }
-          if (ppcDebuggerActive && ppcDebuggerAttached) {
-            PPCDebugger(this);
-          }
+            Xenon *CPU = Xe_Main->getCPU();
+            bool halted = CPU->IsHalted();
+            TabItemButton(halted ? "Continue" : "Pause", [&] {
+              if (halted)
+                CPU->Continue();
+              else
+                CPU->Halt();
+            });
+          });
         });
 #if defined(MICROPROFILE_ENABLED) && MICROPROFILE_ENABLED
         TabItem("Profiler", [&] {
@@ -808,7 +1033,7 @@ void Render::GUI::OnSwap(Texture *texture) {
             ShellExecuteA(nullptr, "open", url.data(), nullptr, nullptr, SW_SHOWNORMAL);
 #elif defined(__linux__)
             std::string command = "xdg-open " + url;
-            int result = std::system(command.c_str());
+            s32 result = std::system(command.c_str());
 #endif
           });
 #else
@@ -885,6 +1110,7 @@ void Render::GUI::OnSwap(Texture *texture) {
 void Render::GUI::Render(Texture* texture) {
   BeginSwap();
   ImGui::NewFrame();
+  ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
   if (styleEditor) {
     Window("Style Editor", [] {
       ImGui::ShowStyleEditor();
@@ -927,19 +1153,25 @@ void Render::GUI::SetStyle() {
   colors[ImGuiCol_Button] = ImColor(108, 232, 0, 255);
   colors[ImGuiCol_ButtonHovered] = ImColor(110, 210, 50, 208);
   colors[ImGuiCol_ButtonActive] = ImColor(110, 210, 50, 240);
-  colors[ImGuiCol_Header] = ImColor(94, 94, 94, 79);
-  colors[ImGuiCol_HeaderHovered] = ImColor(97, 97, 97, 94);
-  colors[ImGuiCol_HeaderActive] = ImColor(94, 94, 94, 130);
+  colors[ImGuiCol_Header] = ImColor(110, 210, 50, 79);
+  colors[ImGuiCol_HeaderHovered] = ImColor(109, 232, 0, 94);
+  colors[ImGuiCol_HeaderActive] = ImColor(108, 232, 0, 130);
   colors[ImGuiCol_Separator] = ImColor(97, 97, 97, 127);
   colors[ImGuiCol_SeparatorHovered] = ImColor(117, 117, 117, 127);
   colors[ImGuiCol_SeparatorActive] = ImColor(117, 117, 117, 163);
   colors[ImGuiCol_ResizeGrip] = ImColor(0, 0, 0, 0);
   colors[ImGuiCol_ResizeGripHovered] = ImColor(108, 232, 0, 255);
   colors[ImGuiCol_ResizeGripActive] = ImColor(111, 210, 50, 255);
-  colors[ImGuiCol_Tab] = ImColor(110, 210, 50, 208);
-  colors[ImGuiCol_TabHovered] = ImColor(109, 232, 0, 240);
-  colors[ImGuiCol_TabSelected] = ImColor(108, 232, 0, 255);
-  colors[ImGuiCol_TabSelectedOverline] = ImColor(0, 0, 0, 0);
+
+  colors[ImGuiCol_TabHovered] = colors[ImGuiCol_HeaderHovered];
+  colors[ImGuiCol_Tab] = ImLerp(colors[ImGuiCol_Header], colors[ImGuiCol_TitleBgActive], 0.8f);
+  colors[ImGuiCol_TabSelected] = ImLerp(colors[ImGuiCol_HeaderActive], colors[ImGuiCol_TitleBgActive], 0.6f);
+  colors[ImGuiCol_TabSelectedOverline] = colors[ImGuiCol_HeaderActive];
+  colors[ImGuiCol_TabDimmed] = ImLerp(colors[ImGuiCol_Tab], colors[ImGuiCol_TitleBg], 0.80f);
+  colors[ImGuiCol_TabDimmedSelected] = ImLerp(colors[ImGuiCol_TabSelected], colors[ImGuiCol_TitleBg], 0.4f);
+  colors[ImGuiCol_TabDimmedSelectedOverline] = ImVec4(135, 135, 221, 0);
+  colors[ImGuiCol_DockingPreview] = colors[ImGuiCol_Header] * ImColor(255, 255, 255, 178);
+
   colors[ImGuiCol_PlotLines] = ImColor(155, 155, 155, 255);
   colors[ImGuiCol_PlotLinesHovered] = ImColor(255, 110, 89, 255);
   colors[ImGuiCol_PlotHistogram] = ImColor(229, 179, 0, 255);

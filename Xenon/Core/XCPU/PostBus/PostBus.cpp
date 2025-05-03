@@ -3,6 +3,7 @@
 #include "PostBus.h"
 
 #include "Base/Logging/Log.h"
+#include "Core/Xe_Main.h"
 
 void Xe::XCPU::POSTBUS::POST(u64 postCode) {
   /* 1BL */
@@ -489,7 +490,7 @@ void Xe::XCPU::POSTBUS::POST(u64 postCode) {
     SYSTEM_PAUSE();
   }
   /* HYPERVISOR */
-  else if (postCode >= 0x58 && postCode <= 0x5E) {
+  else if (postCode >= 0x58 && postCode <= 0x5F) {
     switch (postCode) {
     case 0x58:
       LOG_XBOX(Xenon_PostBus, "HV > INIT_HYPERVISOR - Hypervisor Initialization begin.");
@@ -511,6 +512,9 @@ void Xe::XCPU::POSTBUS::POST(u64 postCode) {
       break;
     case 0x5E:
       LOG_XBOX(Xenon_PostBus, "HV > INIT_SOC_INT_COMPLETE - Initialization complete.");
+      break;
+    case 0x5F:
+      LOG_XBOX(Xenon_PostBus, "HV > INIT_HYPERVISOR_COMPLETE - Hypervisor Initialization end.");
       break;
     }
   }

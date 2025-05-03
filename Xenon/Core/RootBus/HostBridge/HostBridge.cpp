@@ -8,11 +8,39 @@
 HostBridge::HostBridge() {
   xGPU = nullptr;
   pciBridge = nullptr;
-  // Config HostBridge As Per Dump taken from a Jasper Console
-  // Device/Vendor ID
-  hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = 0x58301414;
-  // Device Type/Revision
-  hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = 0x06000010;
+  // TODO: Fix these to pull the right data
+  switch (Config::highlyExperimental.consoleRevison) {
+  case Config::eConsoleRevision::Falcon: {
+    // Device/Vendor ID
+    hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = 0x58301414;
+    // Device Type/Revision
+    hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = 0x06000010;
+  } break;
+  case Config::eConsoleRevision::Jasper: {
+    // Device/Vendor ID
+    hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = 0x58301414;
+    // Device Type/Revision
+    hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = 0x06000010;
+  } break;
+  case Config::eConsoleRevision::Trinity: {
+    // Device/Vendor ID
+    hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = 0x58301414;
+    // Device Type/Revision
+    hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = 0x06000010;
+  } break;
+  case Config::eConsoleRevision::Corona: {
+    // Device/Vendor ID
+    hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = 0x58301414;
+    // Device Type/Revision
+    hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = 0x06000010;
+  } break;
+  case Config::eConsoleRevision::Corona4GB: {
+    // Device/Vendor ID
+    hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = 0x58301414;
+    // Device Type/Revision
+    hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = 0x06000010;
+  } break;
+  }
 }
 
 void HostBridge::RegisterXGPU(Xe::Xenos::XGPU *newXGPU) {

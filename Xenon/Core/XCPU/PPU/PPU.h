@@ -20,8 +20,7 @@ enum class eThreadState : u8 {
 };
 class PPU {
 public:
-  PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PVR,
-                  u32 PIR);
+  PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PIR);
   ~PPU();
 
   // Start execution
@@ -69,7 +68,7 @@ public:
 
   // Checks if the thread is halted
   bool IsHaltedByGuest() {
-    return guestHalt && IsHalted() && guestHaltPPUId != -1 && guestHaltThreadId != ePPUThread_None;
+    return guestHalt && IsHalted();
   }
 
   // Returns the thread state
@@ -104,12 +103,6 @@ private:
 
   // If this is set, then the guest requested us to halt. Opens another option in the debugger
   bool guestHalt = false;
-
-  // What PPU caused guestHalt
-  s8 guestHaltPPUId = -1;
-
-  // What thread caused guestHalt
-  ePPUThread guestHaltThreadId = ePPUThread_None;
 
   // Amount of instructions to step
   u64 ppuStepAmount = 0;

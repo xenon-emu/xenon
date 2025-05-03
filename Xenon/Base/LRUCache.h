@@ -2,8 +2,9 @@
 
 #pragma once
 
-#include <unordered_map>
 #include <list>
+#include <mutex>
+#include <unordered_map>
 
 #include "Types.h"
 
@@ -13,9 +14,9 @@ private:
   std::list<u64> keys;
   // Doubly linked list storing keys for LRU tracking
   std::unordered_map<u64, std::pair<u64, std::list<u64>::iterator>> cache;
+  std::mutex cacheMutex;
 
 public:
-  explicit LRUCache(size_t size) : capacity(size) {}
   ~LRUCache() {
     keys.clear();
     cache.clear();
@@ -23,6 +24,7 @@ public:
   }
 
   void resizeCache(size_t size) {
+    std::lock_guard<std::mutex> lock(cacheMutex);
     capacity = size;
     while (keys.size() > capacity) {
       u64 lru = keys.back();
@@ -32,6 +34,7 @@ public:
   }
 
   const u64 getElement(u64 key) {
+    std::lock_guard<std::mutex> lock(cacheMutex);
     auto it = cache.find(key);
     if (it == cache.end()) {
       return static_cast<u64>(-1);
@@ -44,6 +47,7 @@ public:
   }
 
   void putElement(u64 key, u64 value) {
+    std::lock_guard<std::mutex> lock(cacheMutex);
     if (capacity == 0)
       return;
     
@@ -67,14 +71,17 @@ public:
   }
 
   void invalidateElement(u64 key) {
+    std::lock_guard<std::mutex> lock(cacheMutex);
     auto it = cache.find(key);
     if (it != cache.end()) {
-      keys.erase(it->second.second);
+      auto listIt = it->second.second;
       cache.erase(it);
+      keys.erase(listIt);
     }
   }
 
   void invalidateAll() {
+    std::lock_guard<std::mutex> lock(cacheMutex);
     if (!keys.empty()) {
       keys.clear();
     }

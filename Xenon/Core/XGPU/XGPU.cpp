@@ -22,9 +22,34 @@ Xe::Xenos::XGPU::XGPU(RAM *ram) :
 {
   memset(&xgpuConfigSpace.data, 0xF, sizeof(GENRAL_PCI_DEVICE_CONFIG_SPACE));
 
-  // Setup config space as per dump taken from a Jasper console.
   // Located at config address 0xD0010000.
   memcpy(xgpuConfigSpace.data, xgpuConfigMap, sizeof(xgpuConfigSpace.data));
+
+  u32 consoleRevison;
+  PCI_CONFIG_HDR_REG0 &revision = xgpuConfigSpace.configSpaceHeader.reg0;
+  PCI_CONFIG_HDR_REG2 &gpuRevision = xgpuConfigSpace.configSpaceHeader.reg2;
+  revision.vendorID = 0x1414;
+  switch (Config::highlyExperimental.consoleRevison) {
+  case Config::eConsoleRevision::Falcon: {
+    gpuRevision.revID = 0x10;
+    revision.deviceID = 0x5821;
+  } break;
+  case Config::eConsoleRevision::Jasper: {
+    gpuRevision.revID = 0x11;
+    revision.deviceID = 0x5831;
+  } break;
+  case Config::eConsoleRevision::Trinity: {
+    gpuRevision.revID = 0x00;
+    revision.deviceID = 0x5841;
+  } break;
+  case Config::eConsoleRevision::Corona4GB:
+  case Config::eConsoleRevision::Corona: {
+    gpuRevision.revID = 0x00;
+    revision.deviceID = 0x5841;
+  } break;
+  }
+  LOG_INFO(Xenos, "Xenos DeviceID: 0x{:X}", revision.deviceID);
+  LOG_INFO(Xenos, "Xenos RevID: 0x{:X}", gpuRevision.revID);
 
   // Set our PCI Dev Sizes
   pciDevSizes[0] = 0x20000; // BAR0

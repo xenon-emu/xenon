@@ -136,7 +136,7 @@ void XeMain::reloadFiles() {
   pciBridge->resetPCIDevice(sfcx.get());
   // Reset the NAND
   nand.reset();
-  nand = std::make_unique<STRIP_UNIQUE(nand)>("NAND", NAND_START_ADDR, NAND_END_ADDR, sfcx.get(), true);
+  nand = std::make_unique<STRIP_UNIQUE(nand)>("NAND", sfcx.get(), true);
   rootBus->ResetDevice(nand.get());
   if (!CPUStarted) {
     // Reset the CPU again to reload 1bl and fuses
@@ -227,7 +227,7 @@ void XeMain::createPCIDevices() {
     }
     {
       MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "NAND", MP_AUTO);
-      nand = std::make_unique<STRIP_UNIQUE(nand)>("NAND", NAND_START_ADDR, NAND_END_ADDR, sfcx.get(), true);
+      nand = std::make_unique<STRIP_UNIQUE(nand)>("NAND", sfcx.get(), true);
     }
   }
 }

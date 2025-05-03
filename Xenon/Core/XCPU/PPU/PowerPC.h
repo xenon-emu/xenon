@@ -623,9 +623,8 @@ union FPRegister { // Double Precision
 
 // This contains all registers that are duplicated per thread.
 struct PPU_THREAD_REGISTERS {
+  // Special purpose registers
   PPU_THREAD_SPRS SPR;
-  // Previous Instruction Address
-  u64 PIA;
   // Current Instruction Address
   u64 CIA;
   // Next Instruction Address
@@ -637,7 +636,7 @@ struct PPU_THREAD_REGISTERS {
   // Next instruction data
   PPCOpcode NI;
   // Instruction fetch flag
-  bool iFetch = false;
+  bool instrFetch = false;
   // General-Purpose Registers (32)
   u64 GPR[32]{};
   // Floating-Point Registers (32)
@@ -655,8 +654,8 @@ struct PPU_THREAD_REGISTERS {
 
   // ERAT's
 
-  LRUCache iERAT{ 0 }; // Instruction effective to real address cache.
-  LRUCache dERAT{ 0 }; // Data effective to real address cache.
+  LRUCache iERAT{}; // Instruction effective to real address cache.
+  LRUCache dERAT{}; // Data effective to real address cache.
 
   // Interrupt Register
   u16 exceptReg = 0;
@@ -682,13 +681,11 @@ struct PPU_THREAD_REGISTERS {
 struct PPU_STATE {
   ~PPU_STATE() {
     for (u8 i = 0; i < 2; ++i) {
-      ppuThread[i].iERAT = LRUCache{ 0 };
-      ppuThread[i].dERAT = LRUCache{ 0 };
       ppuThread[i].ppuRes.reset();
     }
   }
   // Thread Specific State.
-  PPU_THREAD_REGISTERS ppuThread[2]{};
+  PPU_THREAD_REGISTERS ppuThread[2] = {};
   // Current executing thread.
   ePPUThread currentThread = ePPUThread_Zero;
   // Shared Special Purpose Registers.

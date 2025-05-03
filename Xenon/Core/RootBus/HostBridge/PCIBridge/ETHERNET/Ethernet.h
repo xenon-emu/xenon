@@ -6,11 +6,12 @@
 
 #pragma once
 
-#include <thread>
-#include <mutex>
-#include <condition_variable>
 #include <atomic>
+#include <condition_variable>
+#include <mutex>
 #include <queue>
+#include <thread>
+#include <unordered_map>
 
 #include "Core/RAM/RAM.h"
 #include "Core/RootBus/HostBridge/PCIBridge/PCIBridge.h"
@@ -109,6 +110,14 @@ private:
   void MdioWrite(u32 val);
   // MDIO Thread function
   void MdioThreadFunc();
+  // TX Descriptors
+  void ProcessTxDescriptors();
+  // RX Descriptors
+  void ProcessRxDescriptors();
+  // Handle TX Packets
+  void HandleRxPacket(const u8 *data, u32 len);
+  // Handle RX Packets
+  void HandleTxPacket(const u8 *data, u32 len);
 
   // PCI Bridge pointer. Used for Interrupts.
   PCIBridge *parentBus = nullptr;
@@ -119,6 +128,8 @@ private:
   XE_PCI_STATE ethPciState = {};
   // Track PHY link transitions
   bool lastLinkState[32] = {};
+  // Track MDIO link transitions
+  std::unordered_map<s32, s32> mdioLinkReadCountdown;
   // MDIO Thread Handle
   std::thread mdioThread;
   std::atomic<bool> mdioRunning = true;
