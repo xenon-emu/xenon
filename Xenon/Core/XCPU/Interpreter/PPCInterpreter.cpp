@@ -254,9 +254,11 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
     break;
   }
   case 0x16: {
-    LOG_XBOX(Xenon, "FATAL ERROR! Halting CPU...");
-    PPU *PPU = Xe_Main->xenonCPU->GetPPU(ppuState->ppuID);
-    PPU->Halt(0, true, ppuState->ppuID, curThreadId);
+    if (Config::debug.haltOnGuestAssertion) {
+      LOG_XBOX(Xenon, "FATAL ERROR! Halting CPU...");
+      PPU *PPU = Xe_Main->xenonCPU->GetPPU(ppuState->ppuID);
+      PPU->Halt(0, true, ppuState->ppuID, curThreadId);
+    }
   } break;
   case 0x17:
     // DebugLoadImageSymbols, type signature:

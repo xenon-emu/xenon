@@ -1016,14 +1016,18 @@ void Render::GUI::OnSwap(Texture *texture) {
               for (bool& a : ppcDebuggerActive)
                 a ^= true;
             });
-            Xenon *CPU = Xe_Main->getCPU();
-            bool halted = CPU->IsHalted();
-            TabItemButton(halted ? "Continue" : "Pause", [&] {
-              if (halted)
-                CPU->Continue();
-              else
-                CPU->Halt();
-            });
+            if (Xe_Main.get()) {
+              Xenon *CPU = Xe_Main->getCPU();
+              if (CPU) {
+                bool halted = CPU->IsHalted();
+                TabItemButton(halted ? "Continue" : "Pause", [&] {
+                  if (halted)
+                    CPU->Continue();
+                  else
+                    CPU->Halt();
+                });
+              }
+            }
           });
         });
 #if defined(MICROPROFILE_ENABLED) && MICROPROFILE_ENABLED
