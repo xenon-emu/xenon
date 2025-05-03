@@ -141,6 +141,8 @@ private:
   //
 
   std::unique_ptr<PPU_JIT> ppuJIT;
+  friend class PPU_JIT;
+  friend bool callEpil(PPU* ppu);
 
   //
   // Helpers
@@ -152,7 +154,7 @@ private:
   // Read next intruction from memory
   bool PPUReadNextInstruction();
   // Checks for pending exceptions
-  void PPUCheckExceptions();
+  bool PPUCheckExceptions();
   // Checks if it should update the time base
   void CheckTimeBaseStatus();
   // Updates the current PPU's time base and decrementer based on

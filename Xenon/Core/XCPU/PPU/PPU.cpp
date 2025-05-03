@@ -69,7 +69,7 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
   // Set Thread Timeout Register
   ppuState->SPR.TTR = 0x1000; // Execute 4096 instructions
 
-  ppuJIT = std::make_unique<PPU_JIT>(ppuState.get());
+  ppuJIT = std::make_unique<PPU_JIT>(this);
 
   // Asign global Xenon context
   xenonContext = inXenonContext;
@@ -455,7 +455,9 @@ u32 PPU::GetIPS() {
   // Execute the amount of cycles we're requested
   while (auto timerEnd = std::chrono::steady_clock::now() <= timerStart + 1s) {
     if (currentExecMode != eExecutorMode::Interpreter) {
-      ppuJIT->ExecuteJITInstrs(1, ppuThreadActive);
+      ppuJIT->ExecuteJITInstrs(4, ppuThreadActive);
+      instrCount += 4;
+      continue;
     } else {
       PPUReadNextInstruction();
       PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
@@ -661,7 +663,7 @@ bool PPU::PPUReadNextInstruction() {
 }
 
 // Checks for exceptions and process them in the correct order.
-void PPU::PPUCheckExceptions() {
+bool PPU::PPUCheckExceptions() {
   PPU_THREAD_REGISTERS& thread = curThread;
   // Start Profile
   MICROPROFILE_SCOPEI("[Xe::PPU]", "CheckExceptions", MP_AUTO);
@@ -679,7 +681,7 @@ void PPU::PPUCheckExceptions() {
     if (exceptions & PPU_EX_RESET) {
       PPCInterpreter::ppcResetException(ppuState.get());
       exceptions &= ~PPU_EX_RESET;
-      return;
+      return true;
     }
     //
     // 2. Machine Check
@@ -688,7 +690,7 @@ void PPU::PPUCheckExceptions() {
       if (thread.SPR.MSR.ME) {
         PPCInterpreter::ppcResetException(ppuState.get());
         exceptions &= ~PPU_EX_MC;
-        return;
+        return true;
       } else {
         // Checkstop Mode. Hard Fault.
         LOG_CRITICAL(Xenon, "{}: CHECKSTOP!", ppuState->ppuName);
@@ -706,70 +708,70 @@ void PPU::PPUCheckExceptions() {
     if (exceptions & PPU_EX_PROG && thread.exceptTrapType == EX_SRR1_TRAP_ILL) {
       LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Illegal Instruction.", ppuState->ppuName, static_cast<u8>(curThreadId));
       exceptions &= ~PPU_EX_PROG;
-      return;
+      return true;
     }
     // B. Floating-Point Unavailable
     if (exceptions & PPU_EX_FPU) {
       PPCInterpreter::ppcFPUnavailableException(ppuState.get());
       exceptions &= ~PPU_EX_FPU;
-      return;
+      return true;
     }
     // C. Data Storage, Data Segment, or Alignment
     // Data Storage
     if (exceptions & PPU_EX_DATASTOR) {
       PPCInterpreter::ppcDataStorageException(ppuState.get());
       exceptions &= ~PPU_EX_DATASTOR;
-      return;
+      return true;
     }
     // Data Segment
     if (exceptions & PPU_EX_DATASEGM) {
       PPCInterpreter::ppcDataSegmentException(ppuState.get());
       exceptions &= ~PPU_EX_DATASEGM;
-      return;
+      return true;
     }
     // Alignment
     if (exceptions & PPU_EX_ALIGNM) {
       LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Alignment.", ppuState->ppuName, static_cast<u8>(curThreadId));
       exceptions &= ~PPU_EX_ALIGNM;
-      return;
+      return true;
     }
     // D. Trace
     if (exceptions & PPU_EX_TRACE) {
       LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Trace.", ppuState->ppuName, static_cast<u8>(curThreadId));
       exceptions &= ~PPU_EX_TRACE;
-      return;
+      return true;
     }
     // E. Program Trap, System Call, Program Priv Inst, Program Illegal Inst
     // Program Trap
     if (exceptions & PPU_EX_PROG && thread.exceptTrapType == EX_SRR1_TRAP_TRAP) {
       PPCInterpreter::ppcProgramException(ppuState.get());
       exceptions &= ~PPU_EX_PROG;
-      return;
+      return true;
     }
     // System Call
     if (exceptions & PPU_EX_SC) {
       PPCInterpreter::ppcSystemCallException(ppuState.get());
       exceptions &= ~PPU_EX_SC;
-      return;
+      return true;
     }
     // Program - Privileged Instruction
     if (exceptions & PPU_EX_PROG && thread.exceptTrapType == EX_SRR1_TRAP_PRIV) {
       LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Privileged Instruction.", ppuState->ppuName, static_cast<u8>(curThreadId));
       exceptions &= ~PPU_EX_PROG;
-      return;
+      return true;
     }
     // F. Instruction Storage and Instruction Segment
     // Instruction Storage
     if (exceptions & PPU_EX_INSSTOR) {
       PPCInterpreter::ppcInstStorageException(ppuState.get());
       exceptions &= ~PPU_EX_INSSTOR;
-      return;
+      return true;
     }
     // Instruction Segment
     if (exceptions & PPU_EX_INSTSEGM) {
       PPCInterpreter::ppcInstSegmentException(ppuState.get());
       exceptions &= ~PPU_EX_INSTSEGM;
-      return;
+      return true;
     }
     //
     // 4. Program - Imprecise Mode Floating-Point Enabled Exception
@@ -777,7 +779,7 @@ void PPU::PPUCheckExceptions() {
     if (exceptions & PPU_EX_PROG) {
       LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Imprecise Mode Floating-Point Enabled Exception.", ppuState->ppuName, static_cast<u8>(curThreadId));
       exceptions &= ~PPU_EX_PROG;
-      return;
+      return true;
     }
     //
     // 5. External, Decrementer, and Hypervisor Decrementer
@@ -786,28 +788,30 @@ void PPU::PPUCheckExceptions() {
     if (exceptions & PPU_EX_EXT && thread.SPR.MSR.EE) {
       PPCInterpreter::ppcExternalException(ppuState.get());
       exceptions &= ~PPU_EX_EXT;
-      return;
+      return true;
     }
     // Decrementer. A dec exception may be present but will only be taken when
     // the EE bit of MSR is set.
     if (exceptions & PPU_EX_DEC && thread.SPR.MSR.EE) {
       PPCInterpreter::ppcDecrementerException(ppuState.get());
       exceptions &= ~PPU_EX_DEC;
-      return;
+      return true;
     }
     // Hypervisor Decrementer
     if (exceptions & PPU_EX_HDEC) {
       LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Hypervisor Decrementer.", ppuState->ppuName, static_cast<u8>(curThreadId));
       exceptions &= ~PPU_EX_HDEC;
-      return;
+      return true;
     }
     // VX Unavailable.
     if (exceptions & PPU_EX_VXU) {
       PPCInterpreter::ppcVXUnavailableException(ppuState.get());
       exceptions &= ~PPU_EX_VXU;
-      return;
+      return true;
     }
   }
+
+  return false;
 }
 
 void PPU::CheckTimeBaseStatus() {

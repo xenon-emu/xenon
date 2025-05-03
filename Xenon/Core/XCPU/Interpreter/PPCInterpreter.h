@@ -92,7 +92,7 @@ case x: \
 
 // Condition register Update
 inline void ppcUpdateCR(PPU_STATE *ppuState, s8 crNum, u32 crValue) {
-  switch (crNum) {
+switch (crNum) {
   CR_CASE(0)
   CR_CASE(1)
   CR_CASE(2)

@@ -547,16 +547,16 @@ namespace PPCInterpreter {
 
       // Main opcodes (field 0..5)
       fillTable<instructionHandlerJIT>(jitTable, 0x00, 6, -1, {
-        { 0x0E, GET(addi) },
-        { 0x12, GET(b) },
-        { 0x15, GETRC(rlwinm) },
-        { 0x19, GET(oris) },
-        { 0x1C, GET(andi) },
+        //{ 0x0E, GET(addi) },
+        //{ 0x12, GET(b) },
+        //{ 0x15, GETRC(rlwinm) },
+        //{ 0x19, GET(oris) },
+        //{ 0x1C, GET(andi) },
       });
 
       // Group 0x1F opcodes (field 21..30)
       fillTable<instructionHandlerJIT>(jitTable, 0x1F, 10, 1, {
-        { 0x153, GET(mfspr) },
+        //{ 0x153, GET(mfspr) },
       });
 
       #undef GET_

@@ -18,7 +18,11 @@
 #include "Core/XCPU/PPU/PowerPC.h"
 #include "Core/RootBus/RootBus.h"
 
-using JITFunc = fptr<void(PPU_STATE*, PPU_THREAD_REGISTERS*)>;
+
+
+class PPU;
+using JITFunc = fptr<void(PPU*, PPU_STATE*, bool)>;
+
 
 using namespace asmjit;
 class JITBlockBuilder {
@@ -34,15 +38,18 @@ public:
   }
   u64 ppuAddr = 0; // Start Instruction Address
   u64 size = 0;   // PPC code size in bytes
+  std::unordered_map<u64, u32> opcodesDataCache = {};
 
   asmjit::CodeHolder* Code() {
     return &code;
   }
 #ifdef ARCH_X86_64
   // x86_64
-  x86::Gp ppuAddrPointer{}; // Context pointer (PPU_STATE*)
-  x86::Compiler *compiler = nullptr; // asmjit Compiler
+  x86::Gp ppu{}; // ppu argument (PPU*)
+  x86::Gp ppuState{}; // Context pointer (PPU_STATE*)
   x86::Gp threadCtx{}; // Current thread context (PPU_THREAD_REGISTERS*)
+  x86::Gp haltBool{};   // enableHalt flag
+  x86::Compiler *compiler = nullptr; // asmjit Compiler
 #endif
 private:
   asmjit::CodeHolder code{};
@@ -83,17 +90,19 @@ public:
 
 class PPU_JIT {
 public:
-  PPU_JIT(PPU_STATE *ppuState);
+  PPU_JIT(PPU *_ppu);
   ~PPU_JIT();
 
   void ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt = true);
-  u64 ExecuteJITBlock(u64 addr); // returns step count
-  void* CodeGenBlock(JITBlockBuilder *block);
+  u64 ExecuteJITBlock(u64 addr, bool enableHalt); // returns step count
   JITBlock* BuildJITBlock(u64 addr, u64 maxBlockSize);
+  void setupContext(JITBlockBuilder* b);
+  void setupProl(JITBlockBuilder* b, u64 addr);
 private:
   bool isBlockCached(u64 addr);
 
-  PPU_STATE *ppuState = nullptr;
+  PPU *ppu = nullptr;   // "linked" PPU
+  PPU_STATE* ppuState = nullptr; // for easier thread access
   asmjit::JitRuntime jitRuntime;
   std::unordered_map<u64, JITBlock*> jitBlocks = {};
 };
