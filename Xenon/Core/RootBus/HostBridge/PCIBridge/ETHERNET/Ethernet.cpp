@@ -488,7 +488,7 @@ void Xe::PCIDev::ETHERNET::HandleRxPacket(const u8 *data, u32 len) {
     return;
   }
 
-  LOG_WARNING(ETH, "RX descriptor ring full — dropped packet");
+  LOG_WARNING(ETH, "RX descriptor ring full - dropped packet");
 }
 
 void Xe::PCIDev::ETHERNET::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {

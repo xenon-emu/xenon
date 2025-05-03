@@ -869,8 +869,10 @@ void LogSettings(Render::GUI *gui) {
   static s32 logLevel = static_cast<s32>(Config::log.currentLevel);
   gui->Toggle("Advanced", &Config::log.advanced);
   gui->Tooltip("Enables more advanced logging ");
+#ifdef DEBUG_BUILD
   gui->Toggle("Debug Only", &Config::log.debugOnly);
   gui->Tooltip("Enables heavy logging for Debug purposes. Do not enable, causes extreme preformance loss");
+#endif
 }
 
 void GraphicsSettings(Render::GUI *gui) {
