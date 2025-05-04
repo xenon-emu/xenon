@@ -84,19 +84,9 @@ struct XE_PCI_STATE {
   u8 macAddress2[6];
 };
 
-struct XE_MDIO_REQ {
-  bool isRead;
-  u8 phyAddr;
-  u8 regNum;
-  u32 writeVal;
-  u32 readResult;
-  bool completed = false;
-};
-
 class ETHERNET : public PCIDevice {
 public:
   ETHERNET(const std::string &deviceName, u64 size, PCIBridge *parentPCIBridge, RAM *ram);
-  ~ETHERNET();
   void Read(u64 readAddress, u8 *data, u64 size) override;
   void Write(u64 writeAddress, const u8 *data, u64 size) override;
   void MemSet(u64 writeAddress, s32 data, u64 size) override;
@@ -105,19 +95,17 @@ public:
 
 private:
   // MDIO Read
-  u32 MdioRead();
+  u32 MdioRead(u32 addr);
   // MDIO Write
   void MdioWrite(u32 val);
-  // MDIO Thread function
-  void MdioThreadFunc();
-  // TX Descriptors
-  void ProcessTxDescriptors();
   // RX Descriptors
   void ProcessRxDescriptors();
-  // Handle TX Packets
-  void HandleRxPacket(const u8 *data, u32 len);
+  // TX Descriptors
+  void ProcessTxDescriptors();
   // Handle RX Packets
   void HandleTxPacket(const u8 *data, u32 len);
+  // Handle TX Packets
+  void HandleRxPacket(const u8* data, u32 len);
 
   // PCI Bridge pointer. Used for Interrupts.
   PCIBridge *parentBus = nullptr;
@@ -126,19 +114,8 @@ private:
   // MDIO Registers
   u16 mdioRegisters[32][32] = {};
   XE_PCI_STATE ethPciState = {};
-  // Track PHY link transitions
-  bool lastLinkState[32] = {};
-  // Track MDIO link transitions
-  std::unordered_map<s32, s32> mdioLinkReadCountdown;
-  // MDIO Thread Handle
-  std::thread mdioThread;
-  std::atomic<bool> mdioRunning = true;
-  // MDIO Mutex
-  std::mutex mdioMutex;
-  std::condition_variable mdioCV;
-  // MDIO Request
-  XE_MDIO_REQ mdioReq = {};
-  bool mdioRequestPending = false;
+  bool rxEnabled = false;
+  bool txEnabled = false;
 };
 
 } // namespace PCIDev

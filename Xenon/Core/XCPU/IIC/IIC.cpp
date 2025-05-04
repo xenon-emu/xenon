@@ -124,6 +124,7 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
 
 void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u8 *data, u64 size) {
   MICROPROFILE_SCOPEI("[Xe::IIC]", "ReadInterrupt", MP_AUTO);
+  std::scoped_lock lk(mutex);
 
   constexpr u32 mask = 0xF000;
   u8 ppeIntCtrlBlckID = static_cast<u8>((intAddress & mask) >> 12);
@@ -177,6 +178,12 @@ void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u8 *data, u64 size) 
 
 bool Xe::XCPU::IIC::XenonIIC::checkExtInterrupt(u8 ppuID) {
   MICROPROFILE_SCOPEI("[Xe::IIC]", "CheckExternalInterrupt", MP_AUTO);
+  std::scoped_lock lk(mutex);
+
+  if (ppuID >= 6) {
+    LOG_ERROR(Xenon_IIC, "Invalid PPU ID in checkExtInterrupt: {}", ppuID);
+    return false;
+  }
 
   // Check for some interrupt that was already signaled
   if (iicState.ppeIntCtrlBlck[ppuID].intSignaled) {
@@ -212,6 +219,7 @@ bool Xe::XCPU::IIC::XenonIIC::checkExtInterrupt(u8 ppuID) {
 
 void Xe::XCPU::IIC::XenonIIC::genInterrupt(u8 interruptType, u8 cpusToInterrupt) {
   MICROPROFILE_SCOPEI("[Xe::IIC]", "GenInterrupt", MP_AUTO);
+  std::scoped_lock lk(mutex);
 
   // Create our interrupt packet
   Xe_Int newInt;
@@ -233,6 +241,7 @@ void Xe::XCPU::IIC::XenonIIC::genInterrupt(u8 interruptType, u8 cpusToInterrupt)
 }
 
 void Xe::XCPU::IIC::XenonIIC::cancelInterrupt(u8 interruptType, u8 cpusInterrupted) {
+  std::scoped_lock lk(mutex);
   for (u8 ppuID = 0; ppuID < 6; ppuID++) {
     if ((cpusInterrupted & 0x1) == 1) {
 
