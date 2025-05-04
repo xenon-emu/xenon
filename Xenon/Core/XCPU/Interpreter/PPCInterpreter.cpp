@@ -91,6 +91,12 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
     LOG_INFO(Xenon, "*** VdSwap ***");
   }
 
+  // Pretend ARGON hardware is present, to avoid the call
+  if (static_cast<u32>(thread.CIA) == 0x800819E0) {
+    thread.GPR[11] |= 0x08; // Set bit 3 (ARGON present)
+    LOG_INFO(SMC, "Faked XboxHardwareInfo bit 3 to skip HalNoteArgonErrors");
+  }
+
   // This is just to set a PC breakpoint in any PPU/Thread.
   if (static_cast<u32>(thread.CIA) == 0x8009CE40) {
     u8 a = 0;

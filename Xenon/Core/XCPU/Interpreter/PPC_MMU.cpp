@@ -115,10 +115,12 @@ inline bool mmuComparePTE(u64 VA, u64 pte0, u64 pte1, u8 p, bool L, bool LP, u64
   }
 
   if (L != pteL) {
+    LOG_DEBUG(Xenon_MMU, "L mismatch: L={}, PTE[L]={}", L, pteL);
     return false;
   }
 
-  if (L && pteLP != LP) {
+  if (L && LP != pteLP) {
+    LOG_DEBUG(Xenon_MMU, "LP mismatch: LP={}, PTE[LP]={}", LP, pteLP);
     return false;
   }
 
@@ -138,6 +140,7 @@ inline bool mmuComparePTE(u64 VA, u64 pte0, u64 pte1, u8 p, bool L, bool LP, u64
         return true;
       }
     } else {
+      LOG_DEBUG(Xenon_MMU, "AVPN[q] mismatch: pte=0x{:X}, va=0x{:X}", pteAVPNMask, vaMask);
       return false;
     }
   } else {
@@ -854,9 +857,9 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
           // Get the pteg data from memory while relocation is off
           for (size_t i = 0; i < PPC_HPTES_PER_GROUP; i++) {
             pteg0[i].pte0 =
-                PPCInterpreter::MMURead64(ppuState, pteg0Addr + i * 16);
+                PPCInterpreter::MMURead64(ppuState, pteg0Addr + i * 16, thr);
             pteg0[i].pte1 =
-                PPCInterpreter::MMURead64(ppuState, pteg0Addr + i * 16 + 8);
+                PPCInterpreter::MMURead64(ppuState, pteg0Addr + i * 16 + 8, thr);
           }
 
           // We compare all pte's in order for simplicity
@@ -888,14 +891,14 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
             if (!((pteg0[i].pte1 & PPC_HPTE64_R) >> 8)) {
               // Referenced
               MMUWrite64(ppuState, pteg0Addr + i * 16 + 8,
-                         (pteg0[i].pte1 | 0x100));
+                         (pteg0[i].pte1 | 0x100), thr);
             }
             if (!((pteg0[i].pte1 & PPC_HPTE64_C) >> 7)) {
               // Access is a data write?
               if (memWrite) {
                 // Change
                 MMUWrite64(ppuState, pteg0Addr + i * 16 + 8,
-                           (pteg0[i].pte1 | 0x80));
+                           (pteg0[i].pte1 | 0x80), thr);
               }
             }
 
@@ -907,9 +910,9 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 
           for (size_t i = 0; i < PPC_HPTES_PER_GROUP; i++) {
             pteg1[i].pte0 =
-                PPCInterpreter::MMURead64(ppuState, pteg1Addr + i * 16);
+                PPCInterpreter::MMURead64(ppuState, pteg1Addr + i * 16, thr);
             pteg1[i].pte1 =
-                PPCInterpreter::MMURead64(ppuState, pteg1Addr + i * 16 + 8);
+                PPCInterpreter::MMURead64(ppuState, pteg1Addr + i * 16 + 8, thr);
           }
 
           // We compare all pte's in order for simplicity
@@ -924,12 +927,12 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
             */
 
             // H = 0?
-            if (((pteg1[i].pte0 & PPC_HPTE64_HASH) >> 1) != 0) {
+            if (((pteg1[i].pte0 & PPC_HPTE64_HASH) >> 1) != 1) {
               continue;
             }
 
             // Perform the compare
-            if (!mmuComparePTE(VA, pteg0[i].pte0, pteg0[i].pte1, p, L, LP, &RPN)) {
+            if (!mmuComparePTE(VA, pteg1[i].pte0, pteg1[i].pte1, p, L, LP, &RPN)) {
               continue;
             }
 
@@ -941,14 +944,14 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
             if (!((pteg1[i].pte1 & PPC_HPTE64_R) >> 8)) {
               // Referenced
               MMUWrite64(ppuState, pteg1Addr + i * 16 + 8,
-                         (pteg1[i].pte1 | 0x100));
+                         (pteg1[i].pte1 | 0x100), thr);
             }
             if (!((pteg1[i].pte1 & PPC_HPTE64_C) >> 7)) {
               // Access is a data write?
               if (memWrite) {
                 // Change
                 MMUWrite64(ppuState, pteg1Addr + i * 16 + 8,
-                           (pteg1[i].pte1 | 0x80));
+                           (pteg1[i].pte1 | 0x80), thr);
               }
             }
 
