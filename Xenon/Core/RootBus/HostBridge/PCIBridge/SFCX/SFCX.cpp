@@ -486,11 +486,11 @@ void Xe::PCIDev::SFCX::sfcxMainLoop() {
         break;
       default:
         LOG_ERROR(SFCX, "Unrecognized command was issued. {:#x}. Issuing interrupt if enabled.", sfcxState.commandReg);
-        if (sfcxState.configReg & CONFIG_INT_EN) {
-          parentBus->RouteInterrupt(PRIO_SFCX);
-          sfcxState.statusReg |= STATUS_INT_CP;
-        }
         break;
+      }
+      if (sfcxState.configReg & CONFIG_INT_EN) {
+        parentBus->RouteInterrupt(PRIO_SFCX);
+        sfcxState.statusReg |= STATUS_INT_CP;
       }
 
       // Clear Command Register
@@ -537,17 +537,10 @@ void Xe::PCIDev::SFCX::sfcxReadPageFromNAND(bool physical) {
 #endif // SFCX_DEBUG
 
   // Clear the page buffer
-  memset(reinterpret_cast<void*>(sfcxState.pageBuffer), 0, sizeof(sfcxState.pageBuffer));
+  memset(sfcxState.pageBuffer, 0, sizeof(sfcxState.pageBuffer));
 
   // Perform the read
-  memcpy(reinterpret_cast<char*>(sfcxState.pageBuffer), reinterpret_cast<char*>(rawImageData.data() + nandOffset),
-    physical ? sfcxState.pageSizePhys : sfcxState.pageSize);
-
-  // Issue Interrupt if interrupts are enabled in flash config
-  if (sfcxState.configReg & CONFIG_INT_EN) {
-    parentBus->RouteInterrupt(PRIO_SFCX);
-    sfcxState.statusReg |= STATUS_INT_CP;
-  }
+  memcpy(sfcxState.pageBuffer, &rawImageData[nandOffset], physical ? sfcxState.pageSizePhys : sfcxState.pageSize);
 }
 
 void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND(bool physical) {
@@ -575,11 +568,10 @@ void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND(bool physical) {
 #endif // SFCX_DEBUG
 
     // Clear the page buffer
-    memset(reinterpret_cast<void*>(sfcxState.pageBuffer), 0, sizeof(sfcxState.pageBuffer));
+    memset(sfcxState.pageBuffer, 0, sizeof(sfcxState.pageBuffer));
 
     // Get page data
-    memcpy(reinterpret_cast<char*>(sfcxState.pageBuffer), reinterpret_cast<char*>(rawImageData.data() + physAddr),
-      sfcxState.pageSizePhys);
+    memcpy(sfcxState.pageBuffer, &rawImageData[physAddr], sfcxState.pageSizePhys);
 
     // Write page and spare to RAM
     // On DMA, physical pages are split into Page data and Spare Data, and stored at different locations in memory
@@ -591,16 +583,9 @@ void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND(bool physical) {
     sparePhysAddrPtr += sfcxState.spareSize; // Spare Size
 
     // Add a small delay to simulate the time it takes to read the page.
-    // We're slow af.
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(100ns);
 
     // Increase read address
     physAddr += sfcxState.pageSizePhys;
-  }
-
-  // Issue Interrupt if interrupts are enabled in flash config
-  if (sfcxState.configReg & CONFIG_INT_EN) {
-    parentBus->RouteInterrupt(PRIO_SFCX);
-    sfcxState.statusReg |= STATUS_INT_CP;
   }
 }
