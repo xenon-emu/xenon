@@ -245,7 +245,7 @@ void IOFile::Unlink() {
 #endif
 }
 
-uintptr_t IOFile::GetFileMapping() {
+uptr IOFile::GetFileMapping() {
   if (file_mapping) {
     return file_mapping;
   }
@@ -264,7 +264,7 @@ uintptr_t IOFile::GetFileMapping() {
 
   mapping = hfile;
 
-  file_mapping = std::bit_cast<uintptr_t>(mapping);
+  file_mapping = std::bit_cast<uptr>(mapping);
   ASSERT_MSG(file_mapping, "{}", Base::GetLastErrorMsg());
   return file_mapping;
 #else

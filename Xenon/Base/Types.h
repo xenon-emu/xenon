@@ -39,6 +39,8 @@ using u32 = unsigned int;
 using ul32 = unsigned long;
 using u64 = unsigned long long;
 
+using uptr = uintptr_t;
+
 // Floating point
 using f32 = float;
 using f64 = double;

@@ -17,7 +17,7 @@ namespace Xe::XGPU {
     bool empty() const { return _readOffset == _writeOffset; }
 
     size_t readOffset() const { return _readOffset; }
-    uintptr_t readPtr() const { return uintptr_t(_buffer) + _readOffset; }
+    uptr readPtr() const { return uptr(_buffer) + _readOffset; }
     void setReadOffset(size_t offset) { _readOffset = offset % _capacity; }
     
     // Returns remaining data in buffer that's availeable to read.
@@ -28,7 +28,7 @@ namespace Xe::XGPU {
     }
 
     size_t writeOffset() const { return _writeOffset; }
-    uintptr_t writePointer() const { return uintptr_t(_buffer) + _writeOffset; }
+    uptr writePointer() const { return uptr(_buffer) + _writeOffset; }
     void setWriteOffset(size_t offset) { _writeOffset = offset % _capacity; }
     size_t writeCount() const {
       if (_readOffset == _writeOffset) { return _capacity; }

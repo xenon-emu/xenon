@@ -97,7 +97,7 @@ public:
     return file != nullptr;
   }
 
-  uintptr_t GetFileMapping();
+  uptr GetFileMapping();
 
   int Open(const std::filesystem::path& path, FileAccessMode mode,
        FileMode type = FileMode::BinaryMode,
@@ -213,7 +213,7 @@ private:
   FileMode file_type{};
 
   std::FILE* file = nullptr;
-  uintptr_t file_mapping = 0;
+  uptr file_mapping = 0;
 };
 
 u64 GetDirectorySize(const std::filesystem::path& path);
