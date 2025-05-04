@@ -47,6 +47,10 @@ Xe::Xenos::XGPU::XGPU(RAM *ram) :
     gpuRevision.revID = 0x00;
     revision.deviceID = 0x5841;
   } break;
+  case Config::eConsoleRevision::Winchester: {
+    // gpuRevision.revID = ... ;
+    // revision.deviceID = ... ;
+  } break;
   }
   LOG_INFO(Xenos, "Xenos DeviceID: 0x{:X}", revision.deviceID);
   LOG_INFO(Xenos, "Xenos RevID: 0x{:X}", gpuRevision.revID);

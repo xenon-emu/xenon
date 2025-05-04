@@ -118,8 +118,12 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
   case Config::eConsoleRevision::Trinity: {
     ppuState->SPR.PVR.PVR_Hex = 0x00710800;
   } break;
+  case Config::eConsoleRevision::Corona4GB:
   case Config::eConsoleRevision::Corona: {
     ppuState->SPR.PVR.PVR_Hex = 0x00710800;
+  } break;
+  case Config::eConsoleRevision::Winchester: {
+    // ppuState->SPR.PVR.PVR_Hex = ... ;
   } break;
   }
   ppuState->ppuThread[ePPUThread_Zero].SPR.PIR = PIR;

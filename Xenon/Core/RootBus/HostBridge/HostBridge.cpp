@@ -40,6 +40,12 @@ HostBridge::HostBridge() {
     // Device Type/Revision
     hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = 0x06000010;
   } break;
+  case Config::eConsoleRevision::Winchester: {
+    // Device/Vendor ID
+    // hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = ... ;
+    // Device Type/Revision
+    // hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = ... ;
+  } break;
   }
 }
 

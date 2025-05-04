@@ -302,7 +302,7 @@ else()
   add_compile_definitions(NO_GFX)
 endif()
 
-if (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" OR CMAKE_BUILD_TYPE STREQUAL "Debug")
+if (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" OR "Debug")
   add_compile_definitions(DEBUG_BUILD)
 endif()
 

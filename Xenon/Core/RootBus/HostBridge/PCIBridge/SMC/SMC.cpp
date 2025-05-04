@@ -373,6 +373,7 @@ void Xe::PCIDev::SMC::smcMainThread() {
   case Config::eConsoleRevision::Trinity:
   case Config::eConsoleRevision::Corona:
   case Config::eConsoleRevision::Corona4GB:
+  case Config::eConsoleRevision::Winchester:
     hanaState = HANA_State;
     break;
   }
