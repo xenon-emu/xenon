@@ -428,6 +428,8 @@ struct SLBEntry {
 // Holds a cache of the recently used PTE's.
 struct TLBEntry {
   bool V;   // Entry valid.
+  u64 VPN;  // Pre calculated VPN. We do this ahead of time for performance reasons
+            // and because of the possible use of the LVPN.
   u64 pte0; // Holds the valid bit, as well as the AVPN
   u64 pte1; // Contains the RPN.
 };
