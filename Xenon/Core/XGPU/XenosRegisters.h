@@ -7,6 +7,65 @@
 
 #include "Base/Assert.h"
 
+#define XE_FB_BASE 0x1E000000
+
+enum class XeRegister;
+
+namespace Xe::XGPU {
+
+class XenosState {
+public:
+  XenosState() :
+    internalWidth(Config::xgpu.internal.width),
+    internalHeight(Config::xgpu.internal.height) {
+    Regs = std::make_unique<STRIP_UNIQUE_ARR(Regs)>(0xFFFFF);
+    memset(Regs.get(), 0, 0xFFFFF);
+  }
+
+  ~XenosState() {
+    Regs.reset();
+  }
+
+  void WriteRegister(XeRegister reg, u32 value) {
+    value = byteswap_be(value);
+    memcpy(&Regs[static_cast<u32>(reg) * 4], &value, sizeof(value));
+  }
+
+  u32 ReadRegister(XeRegister reg) {
+    u32 value = 0;
+    switch (static_cast<u32>(reg)) {
+    // Unknown
+    case 0x3C00:
+      return 0x08100748;
+    case 0x3C04:
+      return 0x0000200E;
+    case 0x6530: // Scanline?
+      return 0x000002D0;
+    case 0x6544: // VBlank?
+      return 1;
+    case 0x6584:
+      return 0x050002D0;
+    }
+    memcpy(&value, &Regs[static_cast<u32>(reg) * 4], sizeof(value));
+    return value;
+  }
+
+  u8* GetRegisterPointer(XeRegister reg) {
+    return &Regs[static_cast<u32>(reg) * 4];
+  }
+
+  // Primary surface
+  u32 fbSurfaceAddress = XE_FB_BASE;
+  // Scratch
+  u32 scratchMask = 0;
+  u32 scratchAddr = 0;
+  // Internal rendering width/height
+  u32 internalWidth = 1280;
+  u32 internalHeight = 720;
+  // Registers
+  std::unique_ptr<u8[]> Regs;
+};
+
 // A major part of the registers were taken from:
 // 1 -> https://github.com/xenia-canary/xenia-canary/blob/canary_experimental/src/xenia/gpu/register_table.inc
 // 2 -> https://github.com/freedreno/freedreno/blob/master/includes/a2xx.xml.h
@@ -3448,6 +3507,8 @@ static const std::string GetRegisterNameById(u32 id) {
     return "UNK_REG";
   }
 }
+
+} // namespace Xe::XGPU
 
 // Xenos Registers by ID, multiply the ID by 4 to get the register offset.
 

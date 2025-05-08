@@ -19,7 +19,7 @@
 
 namespace Xe::XGPU {
   
-CommandProcessor::CommandProcessor(RAM *ramPtr) : ram(ramPtr) {
+CommandProcessor::CommandProcessor(RAM *ramPtr, XenosState * statePtr) : ram(ramPtr), state(statePtr) {
   cpWorkerThread = std::thread(&CommandProcessor::cpWorkerThreadLoop, this);
 }
 
@@ -34,6 +34,8 @@ void CommandProcessor::CPUpdateRBBase(u32 address) {
   if (address == 0)
     return;
 
+  state->WriteRegister(XeRegister::CP_RB_BASE, address);
+
   cpRingBufferBasePtr = ram->getPointerToAddress(address);
   LOG_DEBUG(Xenos, "CP: Updating RingBuffer Base Address: {:#x}", address);
   
@@ -45,11 +47,14 @@ void CommandProcessor::CPUpdateRBSize(size_t newSize) {
   if ((newSize & CP_RB_CNTL_RB_BUFSZ_MASK) == 0)
     return;
 
+  state->WriteRegister(XeRegister::CP_RB_CNTL, newSize);
+
   cpRingBufferSize = static_cast<size_t>(1u << (newSize + 3));
   LOG_DEBUG(Xenos, "CP: Updating RingBuffer Size: {:#x}", cpRingBufferSize.load());
 }
 
 void CommandProcessor::CPUpdateRBWritePointer(u32 offset) {
+  state->WriteRegister(XeRegister::CP_RB_WPTR, offset);
   cpWritePtrIndex = offset;
 }
 
@@ -111,7 +116,7 @@ void CommandProcessor::cpExecuteIndirectBuffer(u32 bufferPtr, u32 bufferSize)
 }
 
 // Executes a single packet from the ringbuffer.
-bool CommandProcessor::ExecutePacket(Xe::XGPU::RingBuffer* ringBuffer) {
+bool CommandProcessor::ExecutePacket(RingBuffer *ringBuffer) {
   // Get packet data.
   const u32 packetData = ringBuffer->ReadAndSwap<u32>();
   // Get the packet type.
@@ -129,8 +134,7 @@ bool CommandProcessor::ExecutePacket(Xe::XGPU::RingBuffer* ringBuffer) {
   }
 
   // Execute packet based on type.
-  switch (packetType)
-  {
+  switch (packetType) {
   case Xe::XGPU::CPPacketType0: return ExecutePacketType0(ringBuffer, packetData);
   case Xe::XGPU::CPPacketType1: return ExecutePacketType1(ringBuffer, packetData);
   case Xe::XGPU::CPPacketType2: return ExecutePacketType2(ringBuffer, packetData);
@@ -144,7 +148,7 @@ bool CommandProcessor::ExecutePacket(Xe::XGPU::RingBuffer* ringBuffer) {
 }
 
 // Executes a packet type 0. Description is in CPPacketType enum.
-bool CommandProcessor::ExecutePacketType0(Xe::XGPU::RingBuffer* ringBuffer, u32 packetData) {
+bool CommandProcessor::ExecutePacketType0(RingBuffer *ringBuffer, u32 packetData) {
   const u32 regCount = ((packetData >> 16) & 0x3FFF) + 1;
   
   if (ringBuffer->readCount() < regCount * sizeof(u32)) {
@@ -164,14 +168,14 @@ bool CommandProcessor::ExecutePacketType0(Xe::XGPU::RingBuffer* ringBuffer, u32 
     // Target register index.
     u32 targetRegIndex = singleRegWrite ? baseIndex : baseIndex + idx;
     LOG_TRACE(Xenos, "CP[ExecutePacketType0]: Writing register at index {:#x}, data {:#x}", targetRegIndex, registerData);
-    // Write registers.
+    state->WriteRegister(static_cast<XeRegister>(targetRegIndex), registerData);
   }
 
   return true;
 }
 
 // Executes a packet type 1. Description is in CPPacketType enum.
-bool CommandProcessor::ExecutePacketType1(Xe::XGPU::RingBuffer* ringBuffer, u32 packetData) {
+bool CommandProcessor::ExecutePacketType1(Xe::XGPU::RingBuffer *ringBuffer, u32 packetData) {
   // Get both registers index.
   const u32 regIndex0 = packetData & 0x7FF;
   const u32 regIndex1 = (packetData >> 11) & 0x7FF;
@@ -182,17 +186,19 @@ bool CommandProcessor::ExecutePacketType1(Xe::XGPU::RingBuffer* ringBuffer, u32 
   LOG_TRACE(Xenos, "CP[ExecutePacketType1]: Writing register at index {:#x}, data {:#x}", regIndex0, reg0Data);
   LOG_TRACE(Xenos, "CP[ExecutePacketType1]: Writing register at index {:#x}, data {:#x}", regIndex1, reg1Data);
   // Write registers.
+  state->WriteRegister(static_cast<XeRegister>(regIndex0), reg0Data);
+  state->WriteRegister(static_cast<XeRegister>(regIndex1), reg1Data);
   return true;
 }
 
 // Executes a packet type 2. Description is in CPPacketType enum.
-bool CommandProcessor::ExecutePacketType2(Xe::XGPU::RingBuffer* ringBuffer, u32 packetData) {
+bool CommandProcessor::ExecutePacketType2(RingBuffer *ringBuffer, u32 packetData) {
   // Type 2 is a No-op. :)
   return true;
 }
 
 // Executes a packet type 3. Description is in CPPacketType enum.
-bool CommandProcessor::ExecutePacketType3(Xe::XGPU::RingBuffer* ringBuffer, u32 packetData) {
+bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData) {
   // Current opcode we're executing.
   const CPPacketType3Opcode currentOpCode = static_cast<CPPacketType3Opcode>((packetData >> 8) & 0x7F);
   // Amount of data we're reading.
@@ -224,8 +230,7 @@ bool CommandProcessor::ExecutePacketType3(Xe::XGPU::RingBuffer* ringBuffer, u32 
 
   // PM4 Commands execution, basically the heart of the command processor.
 
-  switch (currentOpCode)
-  {
+  switch (currentOpCode) {
   case Xe::XGPU::PM4_NOP:
     result = ExecutePacketType3_NOP(ringBuffer, packetData, dataCount);
     break;

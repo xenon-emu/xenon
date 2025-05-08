@@ -180,21 +180,21 @@ void Renderer::Thread() {
     }
 
     // Framebuffer pointer from main memory
-    fbPointer = ramPointer->getPointerToAddress(Xe_Main->xenos->fbSurfaceAddress);
+    fbPointer = ramPointer->getPointerToAddress(Xe_Main->xenos->GetSurface());
 
     // Upload buffer
     if (fbPointer && Xe_Main.get() && !Xe_Main->renderHalt && inFocus) {
       // Profile
       MICROPROFILE_SCOPEI("[Xe::Render]", "Deswizle", MP_AUTO);
-      const u32* ui_fbPointer = reinterpret_cast<u32*>(fbPointer);
+      const u32 *ui_fbPointer = reinterpret_cast<u32*>(fbPointer);
       pixelSSBO->UpdateBuffer(0, pitch, ui_fbPointer);
 
       // Use the compute shader
       computeShaderProgram->Bind();
       pixelSSBO->Bind();
       if (Xe_Main.get()) {
-        computeShaderProgram->SetUniformInt("internalWidth", Xe_Main->xenos->internalWidth);
-        computeShaderProgram->SetUniformInt("internalHeight", Xe_Main->xenos->internalHeight);
+        computeShaderProgram->SetUniformInt("internalWidth", Xe_Main->xenos->GetWidth());
+        computeShaderProgram->SetUniformInt("internalHeight", Xe_Main->xenos->GetHeight());
         computeShaderProgram->SetUniformInt("resWidth", width);
         computeShaderProgram->SetUniformInt("resHeight", height);
       }

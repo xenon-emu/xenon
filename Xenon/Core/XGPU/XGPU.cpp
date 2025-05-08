@@ -15,11 +15,9 @@
 #define XE_DEBUG
 //#endif
 
-Xe::Xenos::XGPU::XGPU(RAM *ram) :
-  ramPtr(ram),
-  internalWidth(Config::xgpu.internal.width),
-  internalHeight(Config::xgpu.internal.height)
-{
+Xe::Xenos::XGPU::XGPU(RAM *ram) : ramPtr(ram) {
+  xenosState = std::make_unique<STRIP_UNIQUE(xenosState)>();
+
   memset(&xgpuConfigSpace.data, 0xF, sizeof(GENRAL_PCI_DEVICE_CONFIG_SPACE));
 
   // Located at config address 0xD0010000.
@@ -58,25 +56,19 @@ Xe::Xenos::XGPU::XGPU(RAM *ram) :
   // Set our PCI Dev Sizes
   pciDevSizes[0] = 0x20000; // BAR0
 
-  xenosState.Regs = std::make_unique<STRIP_UNIQUE_ARR(xenosState.Regs)>(0xFFFFF);
-  memset(xenosState.Regs.get(), 0, 0xFFFFF);
-
   // Set Clocks speeds.
   u32 reg = 0x09000000;
-  memcpy(&xenosState.Regs[GET_OFFSET(XeRegister::SPLL_CNTL_REG)], &reg, 4);
-  reg = 0x11000C00;
-  memcpy(&xenosState.Regs[GET_OFFSET(XeRegister::RPLL_CNTL_REG)], &reg, 4);
-  reg = 0x1A000001;
-  memcpy(&xenosState.Regs[GET_OFFSET(XeRegister::FPLL_CNTL_REG)], &reg, 4);
-  reg = 0x19100000;
-  memcpy(&xenosState.Regs[GET_OFFSET(XeRegister::MPLL_CNTL_REG)], &reg, 4);
+  xenosState->WriteRegister(XeRegister::SPLL_CNTL_REG, 0x09000000);
+  xenosState->WriteRegister(XeRegister::RPLL_CNTL_REG, 0x11000C00);
+  xenosState->WriteRegister(XeRegister::FPLL_CNTL_REG, 0x1A000001);
+  xenosState->WriteRegister(XeRegister::MPLL_CNTL_REG, 0x19100000);
 
-  commandProcessor = std::make_unique<STRIP_UNIQUE(commandProcessor)>(ramPtr);
+  commandProcessor = std::make_unique<STRIP_UNIQUE(commandProcessor)>(ramPtr, xenosState.get());
 }
 
 Xe::Xenos::XGPU::~XGPU() {
   commandProcessor.reset();
-  xenosState.Regs.reset();
+  xenosState.reset();
 }
 
 bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
@@ -84,17 +76,14 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
   if (isAddressMappedInBAR(static_cast<u32>(readAddress))) {
     THROW(size > 4);
     const u32 regIndex = (readAddress & 0xFFFFF) / 4;
+    const XeRegister reg = static_cast<XeRegister>(regIndex);
     
 #ifdef XE_DEBUG
-    LOG_DEBUG(Xenos, "Read to {}, index {:#x}", GetRegisterNameById(regIndex), regIndex);
+    LOG_DEBUG(Xenos, "Read from {}, index {:#x}", Xe::XGPU::GetRegisterNameById(regIndex), regIndex);
 #endif
 
-    LOG_TRACE(Xenos, "Read Addr = {:#x}, reg: {:#x}.", readAddress, regIndex);
-
-    const XeRegister reg = static_cast<XeRegister>(regIndex);
-
     u32 regData = 0;
-    memcpy(&regData, &xenosState.Regs[regIndex * 4], 4);
+    memcpy(&regData, &xenosState->Regs[regIndex * 4], 4);
 
     // Switch for properly return the requested amount of data
     switch (size) {
@@ -119,6 +108,11 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
     case XeRegister::XDVO_REGISTER_INDEX:
       value = 0x0;
       break;
+    // Gets past VdInitializeEngines+0x58
+    case XeRegister::RBBM_DEBUG:
+      // Just return 0xF00
+      value = 0xF00;
+      break;
     default:
       value = regData;
       memcpy(data, &value, size);
@@ -140,40 +134,66 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
     THROW(size > 4);
     const u32 regIndex = (writeAddress & 0xFFFFF) / 4;
 
-    u32 tmp = 0;
-    memcpy(&tmp, data, size);
-    tmp = byteswap_be<u32>(tmp);
+    u32 tmpOld = 0;
+    memcpy(&tmpOld, data, size);
+    u32 tmp = byteswap_be<u32>(tmpOld);
 
 #ifdef XE_DEBUG
-    LOG_DEBUG(Xenos, "Write to {} (addr: {:#x}), index {:#x}, data = {:#x}", GetRegisterNameById(regIndex), writeAddress, regIndex, tmp);
+    LOG_DEBUG(Xenos, "Write to {} (addr: {:#x}), index {:#x}, data = {:#x}", Xe::XGPU::GetRegisterNameById(regIndex), writeAddress, regIndex, tmp);
 #endif
 
     const XeRegister reg = static_cast<XeRegister>(regIndex);
 
     switch (reg) {
-    case XeRegister::D1GRPH_PRIMARY_SURFACE_ADDRESS:
-      fbSurfaceAddress = tmp;
-      break;
-    case XeRegister::D1GRPH_X_END:
-      internalWidth = tmp;
-      break;
-    case XeRegister::D1GRPH_Y_END:
-      internalHeight = tmp;
+    case XeRegister::CP_RB_BASE:
+      commandProcessor->CPUpdateRBBase(tmp);
       break;
     case XeRegister::CP_RB_CNTL:
       commandProcessor->CPUpdateRBSize(tmp);
       break;
-    case XeRegister::CP_RB_BASE:
-      commandProcessor->CPUpdateRBBase(tmp);
-      break;
     case XeRegister::CP_RB_WPTR:
       commandProcessor->CPUpdateRBWritePointer(tmp);
       break;
+    case XeRegister::SCRATCH_UMSK:
+      xenosState->scratchMask = tmp;
+      xenosState->WriteRegister(reg, tmp);
+      break;
+    case XeRegister::SCRATCH_ADDR:
+      xenosState->scratchAddr = tmp;
+      xenosState->WriteRegister(reg, tmp);
+      break;
+    case XeRegister::SCRATCH_REG0:
+    case XeRegister::SCRATCH_REG1:
+    case XeRegister::SCRATCH_REG2:
+    case XeRegister::SCRATCH_REG3:
+    case XeRegister::SCRATCH_REG4:
+    case XeRegister::SCRATCH_REG5:
+    case XeRegister::SCRATCH_REG6:
+    case XeRegister::SCRATCH_REG7: {
+      const u32 scratchRegIndex = regIndex - static_cast<u32>(XeRegister::SCRATCH_REG0);
+      // Check if writing is enabled
+      if ((1 << scratchRegIndex) & xenosState->scratchMask) {
+        const u32 memAddr = xenosState->scratchAddr + (scratchRegIndex * 4);
+        u8 *memPtr = ramPtr->getPointerToAddress(memAddr);
+        memcpy(memPtr, &tmpOld, sizeof(tmpOld));
+      }
+    } break;
+    case XeRegister::D1GRPH_PRIMARY_SURFACE_ADDRESS:
+      xenosState->fbSurfaceAddress = tmp;
+      xenosState->WriteRegister(reg, tmp);
+      break;
+    case XeRegister::D1GRPH_X_END:
+      xenosState->internalWidth = tmp;
+      xenosState->WriteRegister(reg, tmp);
+      break;
+    case XeRegister::D1GRPH_Y_END:
+      xenosState->internalHeight = tmp;
+      xenosState->WriteRegister(reg, tmp);
+      break;
     default:
+      xenosState->WriteRegister(reg, tmp);
       break;
     }
-
-    memcpy(&xenosState.Regs[regIndex * 4], data, size);
     return true;
   }
 
@@ -186,11 +206,11 @@ bool Xe::Xenos::XGPU::MemSet(u64 writeAddress, s32 data, u64 size) {
     const u32 regIndex = (writeAddress & 0xFFFFF) / 4;
 
 #ifdef XE_DEBUG
-    LOG_TRACE(Xenos, "Write to {} (addr: {:#x}), index {:#x}, data = {:#x}", GetRegisterNameById(regIndex), writeAddress, regIndex,
-      byteswap_be<u32>(data));
+    LOG_TRACE(Xenos, "Write to {} (addr: {:#x}), index {:#x}, data = {:#x}", Xe::XGPU::GetRegisterNameById(regIndex), writeAddress, regIndex, data);
 #endif
+    const XeRegister reg = static_cast<XeRegister>(regIndex);
 
-    memset(&xenosState.Regs[regIndex * 4], data, size);
+    memset(xenosState->GetRegisterPointer(reg), data, size);
     return true;
   }
 
@@ -251,7 +271,7 @@ void Xe::Xenos::XGPU::DumpFB(const std::filesystem::path &path, int pitch) {
     LOG_ERROR(Xenos, "Failed to open {} for writing", path.filename().string());
   }
   else {
-    f.write(reinterpret_cast<const char*>(ramPtr->getPointerToAddress(fbSurfaceAddress)), pitch);
+    f.write(reinterpret_cast<const char*>(ramPtr->getPointerToAddress(xenosState->fbSurfaceAddress)), pitch);
     LOG_INFO(Xenos, "Framebuffer dumped to '{}'", path.string());
   }
   f.close();

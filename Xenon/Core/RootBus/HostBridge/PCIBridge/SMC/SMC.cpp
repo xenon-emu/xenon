@@ -377,6 +377,24 @@ void Xe::PCIDev::SMC::smcMainThread() {
     hanaState = HANA_State;
     break;
   }
+  switch (Config::highlyExperimental.consoleRevison) {
+  case Config::eConsoleRevision::Falcon: {
+    reinterpret_cast<u8*>(hanaState)[0xFE] = 0x21;
+  } break;
+  case Config::eConsoleRevision::Jasper: {
+    reinterpret_cast<u8*>(hanaState)[0xFE] = 0x21;
+  } break;
+  case Config::eConsoleRevision::Trinity: {
+    reinterpret_cast<u8*>(hanaState)[0xFE] = 0x23;
+  } break;
+  case Config::eConsoleRevision::Corona4GB:
+  case Config::eConsoleRevision::Corona: {
+    reinterpret_cast<u8*>(hanaState)[0xFE] = 0x23;
+  } break;
+  case Config::eConsoleRevision::Winchester: {
+    reinterpret_cast<u8*>(hanaState)[0xFE] = 0x23;
+  } break;
+  }
   while (smcThreadRunning) {
     MICROPROFILE_SCOPEI("[Xe::PCI]", "SMC::Loop", MP_AUTO);
     // The System Management Controller (SMC) does the following:

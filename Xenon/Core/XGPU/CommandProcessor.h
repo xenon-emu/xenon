@@ -16,8 +16,10 @@
 #pragma once
 
 #include <thread>
+#include <memory>
 
 #include "Base/Logging/Log.h"
+#include "Base/Types.h"
 #include "Core/RAM/RAM.h"
 #include "Core/XGPU/RingBuffer.h"
 #include "Core/XGPU/XenosRegisters.h"
@@ -51,7 +53,7 @@ enum CPPacketType {
   // Packet type 2: Basically is a No-Op packet.
   CPPacketType2,
   // Packet type 3: Executes PM4 commands.
-  CPPacketType3,
+  CPPacketType3
 };
 
 // Opcodes for CP Packet Type 3 based on:
@@ -145,18 +147,18 @@ enum CPPacketType3Opcode {
   PM4_TEST_TWO_MEMS             = 0x71,
   PM4_MEM_TO_MEM                = 0x73,
   PM4_WIDE_REG_WRITE            = 0x74,
-  PM4_REG_WR_NO_CTXT            = 0x78,
+  PM4_REG_WR_NO_CTXT            = 0x78
 };
 
 // Microcode Type
 enum CPMicrocodeType {
   uCodeTypeME,
-  uCodeTypePFP,
+  uCodeTypePFP
 };
 
 class CommandProcessor {
 public:
-  CommandProcessor(RAM *ramPtr);
+  CommandProcessor(RAM *ramPtr, XenosState *statePtr);
   ~CommandProcessor();
 
   // Methods for R/W of the CP/PFP uCode data.
@@ -172,7 +174,10 @@ public:
 
 private:
   // RAM Poiner, for DMA ops and RingBuffer access.
-  RAM* ram{};
+  RAM *ram{};
+
+  // Xenos State, contains register data
+  XenosState *state{};
 
   // Worker Thread.
   std::thread cpWorkerThread;
@@ -224,17 +229,17 @@ private:
   static constexpr u64 binMask = 0xFFFFFFFFULL;
 
   // Execute a packet based on the Ringbuffer data.
-  bool ExecutePacket(Xe::XGPU::RingBuffer* ringBuffer);
+  bool ExecutePacket(RingBuffer *ringBuffer);
 
   // Execute the different packet types.
-  bool ExecutePacketType0(Xe::XGPU::RingBuffer* ringBuffer, u32 packetData);
-  bool ExecutePacketType1(Xe::XGPU::RingBuffer* ringBuffer, u32 packetData);
-  bool ExecutePacketType2(Xe::XGPU::RingBuffer* ringBuffer, u32 packetData);
-  bool ExecutePacketType3(Xe::XGPU::RingBuffer* ringBuffer, u32 packetData);
+  bool ExecutePacketType0(RingBuffer *ringBuffer, u32 packetData);
+  bool ExecutePacketType1(RingBuffer *ringBuffer, u32 packetData);
+  bool ExecutePacketType2(RingBuffer *ringBuffer, u32 packetData);
+  bool ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData);
 
   // Packet type 3 OpCodes definitions.
-  bool ExecutePacketType3_NOP(RingBuffer* ringBuffer, u32 packetData, u32 dataCount);
-  bool ExecutePacketType3_ME_INIT(RingBuffer* ringBuffer, u32 packetData, u32 dataCount);
-  bool ExecutePacketType3_INDIRECT_BUFFER(RingBuffer* ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_NOP(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_ME_INIT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_INDIRECT_BUFFER(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
 };
 }
