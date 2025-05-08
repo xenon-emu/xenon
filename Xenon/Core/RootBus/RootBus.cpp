@@ -67,7 +67,7 @@ void RootBus::Read(u64 readAddress, u8 *data, u64 size) {
   }
 
   // Device not found
-  LOG_ERROR(RootBus, "Read failed at address {:#x}", readAddress);
+  LOG_ERROR(RootBus, "Read failed at address 0x{:X}", readAddress);
 
   // Any reads to bus that don't belong to any device are always 0xFF
   memset(data, 0xFF, size);
@@ -91,7 +91,7 @@ void RootBus::MemSet(u64 writeAddress, s32 data, u64 size) {
 
   // Device or address not found
   if (false) {
-    LOG_ERROR(RootBus, "MemSet failed at address: {:#x}, data: {:#x}", writeAddress, data);
+    LOG_ERROR(RootBus, "MemSet failed at address: 0x{:X}, data: 0x{:X}", writeAddress, data);
     LOG_CRITICAL(Xenon, "Halting...");
     Xe_Main->getCPU()->Halt(); // Halt the CPU
     Config::imgui.debugWindow = true; // Open the debugger on bad fault
@@ -123,7 +123,7 @@ void RootBus::Write(u64 writeAddress, const u8 *data, u64 size) {
 
   // Device or address not found
   if (false) {
-    LOG_ERROR(RootBus, "Write failed at address: {:#x}, data: {:#x}", writeAddress, *reinterpret_cast<const u64*>(data));
+    LOG_ERROR(RootBus, "Write failed at address: 0x{:X}, data: 0x{:X}", writeAddress, *reinterpret_cast<const u64*>(data));
     LOG_CRITICAL(Xenon, "Halting...");
     Xe_Main->getCPU()->Halt(); // Halt the CPU
     Config::imgui.debugWindow = true; // Open the debugger on bad fault

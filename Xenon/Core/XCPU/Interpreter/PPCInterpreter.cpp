@@ -67,12 +67,6 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
     LOG_INFO(Xenon, "EDRAM Chip ID Check.");
     thread.GPR[10] = 0xD1;
   }
- 
-  // VdpHasWarmBooted. Set r11 to 0x10. Skips GPU Driver init.
-  if (static_cast<u32>(thread.CIA) == 0x801b1c38) {
-    LOG_INFO(Xenon, "VdpHasWarmBooted");
-    thread.GPR[11] = 0x10;
-  }
 
   // VdpWriteXDVOUllong. Set r10 to 1. Skips XDVO write loop.
   if (static_cast<u32>(thread.CIA) == 0x800ef7c0) {
@@ -136,7 +130,7 @@ void PPCInterpreter::ppcResetException(PPU_STATE *ppuState) {
 void PPCInterpreter::ppcDataStorageException(PPU_STATE *ppuState) {
   PPU_THREAD_REGISTERS &thread = curThread;
 
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Data Storage exception. EA: {:#x}.", ppuState->ppuName, static_cast<s8>(curThreadId), thread.SPR.DAR);
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Data Storage exception. EA: 0x{:X}.", ppuState->ppuName, static_cast<s8>(curThreadId), thread.SPR.DAR);
   thread.SPR.SRR0 = thread.CIA;
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & (QMASK(0, 32) | QMASK(37, 41) | QMASK(48, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
@@ -162,7 +156,7 @@ void PPCInterpreter::ppcDataSegmentException(PPU_STATE *ppuState) {
 void PPCInterpreter::ppcInstStorageException(PPU_STATE *ppuState) {
   PPU_THREAD_REGISTERS &thread = curThread;
 
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Instruction Storage exception. EA = {:#x}", ppuState->ppuName, static_cast<s8>(curThreadId), thread.CIA);
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Instruction Storage exception. EA = 0x{:X}", ppuState->ppuName, static_cast<s8>(curThreadId), thread.CIA);
   thread.SPR.SRR0 = thread.CIA;
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & (QMASK(0, 32) | QMASK(37, 41) | QMASK(48, 63));
   thread.SPR.SRR1 |= QMASK(33, 33);
@@ -230,7 +224,7 @@ void PPCInterpreter::ppcDecrementerException(PPU_STATE *ppuState) {
 void PPCInterpreter::ppcSystemCallException(PPU_STATE *ppuState) {
   PPU_THREAD_REGISTERS &thread = curThread;
 
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): System Call exception. Syscall ID: {:#x}", ppuState->ppuName, static_cast<s8>(curThreadId), GPR(0));
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): System Call exception. Syscall ID: 0x{:X}", ppuState->ppuName, static_cast<s8>(curThreadId), GPR(0));
   thread.SPR.SRR0 = thread.NIA;
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & (QMASK(0, 32) | QMASK(37, 41) | QMASK(48, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));

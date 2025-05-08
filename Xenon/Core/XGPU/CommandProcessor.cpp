@@ -37,7 +37,7 @@ void CommandProcessor::CPUpdateRBBase(u32 address) {
   state->WriteRegister(XeRegister::CP_RB_BASE, address);
 
   cpRingBufferBasePtr = ram->getPointerToAddress(address);
-  LOG_DEBUG(Xenos, "CP: Updating RingBuffer Base Address: {:#x}", address);
+  LOG_DEBUG(Xenos, "CP: Updating RingBuffer Base Address: 0x{:X}", address);
   
   // Reset CP Read Ptr Idx.
   cpReadPtrIndex = 0;
@@ -50,7 +50,7 @@ void CommandProcessor::CPUpdateRBSize(size_t newSize) {
   state->WriteRegister(XeRegister::CP_RB_CNTL, newSize);
 
   cpRingBufferSize = static_cast<size_t>(1u << (newSize + 3));
-  LOG_DEBUG(Xenos, "CP: Updating RingBuffer Size: {:#x}", cpRingBufferSize.load());
+  LOG_DEBUG(Xenos, "CP: Updating RingBuffer Size: 0x{:X}", cpRingBufferSize.load());
 }
 
 void CommandProcessor::CPUpdateRBWritePointer(u32 offset) {
@@ -152,7 +152,7 @@ bool CommandProcessor::ExecutePacketType0(RingBuffer *ringBuffer, u32 packetData
   const u32 regCount = ((packetData >> 16) & 0x3FFF) + 1;
   
   if (ringBuffer->readCount() < regCount * sizeof(u32)) {
-    LOG_ERROR(Xenos, "CP[ExecutePacketType0]: Data overflow, read count {:#x}, registers count {:#x})",
+    LOG_ERROR(Xenos, "CP[ExecutePacketType0]: Data overflow, read count 0x{:X}, registers count 0x{:X})",
       ringBuffer->readCount(), regCount * sizeof(u32));
     return false;
   }
@@ -167,7 +167,7 @@ bool CommandProcessor::ExecutePacketType0(RingBuffer *ringBuffer, u32 packetData
     u32 registerData = ringBuffer->ReadAndSwap<u32>();
     // Target register index.
     u32 targetRegIndex = singleRegWrite ? baseIndex : baseIndex + idx;
-    LOG_TRACE(Xenos, "CP[ExecutePacketType0]: Writing register at index {:#x}, data {:#x}", targetRegIndex, registerData);
+    LOG_TRACE(Xenos, "CP[ExecutePacketType0]: Writing register at index 0x{:X}, data 0x{:X}", targetRegIndex, registerData);
     state->WriteRegister(static_cast<XeRegister>(targetRegIndex), registerData);
   }
 
@@ -183,8 +183,8 @@ bool CommandProcessor::ExecutePacketType1(Xe::XGPU::RingBuffer *ringBuffer, u32 
   const u32 reg0Data = ringBuffer->ReadAndSwap<u32>();
   const u32 reg1Data = ringBuffer->ReadAndSwap<u32>();
   // Do the write.
-  LOG_TRACE(Xenos, "CP[ExecutePacketType1]: Writing register at index {:#x}, data {:#x}", regIndex0, reg0Data);
-  LOG_TRACE(Xenos, "CP[ExecutePacketType1]: Writing register at index {:#x}, data {:#x}", regIndex1, reg1Data);
+  LOG_TRACE(Xenos, "CP[ExecutePacketType1]: Writing register at index 0x{:X}, data 0x{:X}", regIndex0, reg0Data);
+  LOG_TRACE(Xenos, "CP[ExecutePacketType1]: Writing register at index 0x{:X}, data 0x{:X}", regIndex1, reg1Data);
   // Write registers.
   state->WriteRegister(static_cast<XeRegister>(regIndex0), reg0Data);
   state->WriteRegister(static_cast<XeRegister>(regIndex1), reg1Data);
@@ -207,7 +207,7 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
   auto data_start_offset = ringBuffer->readOffset();
   
   if (ringBuffer->readCount() < dataCount * sizeof(u32)) {
-    LOG_ERROR(Xenos, "CP[ExecutePacketType3]: Data overflow, read count {:#x}, registers count {:#x})",
+    LOG_ERROR(Xenos, "CP[ExecutePacketType3]: Data overflow, read count 0x{:X}, registers count 0x{:X})",
       ringBuffer->readCount(), dataCount * sizeof(u32));
     return false;
   }
@@ -226,7 +226,7 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
 
   bool result = false;
 
-  LOG_TRACE(Xenos, "CP[ExecutePacketType3]: Executing OpCode {:#x}", static_cast<u32>(currentOpCode));
+  LOG_TRACE(Xenos, "CP[ExecutePacketType3]: Executing OpCode 0x{:X}", static_cast<u32>(currentOpCode));
 
   // PM4 Commands execution, basically the heart of the command processor.
 
@@ -562,7 +562,7 @@ bool CommandProcessor::ExecutePacketType3_INDIRECT_BUFFER(RingBuffer *ringBuffer
   bufferSize &= 0xFFFFF;
 
   // Execute indirect buffer.
-  LOG_TRACE(Xenos, "CP[IndirectBuffer]: Executing indirect buffer at address {:#x}, size {:#x}", bufferPtr, bufferSize);
+  LOG_TRACE(Xenos, "CP[IndirectBuffer]: Executing indirect buffer at address 0x{:X}, size 0x{:X}", bufferPtr, bufferSize);
   cpExecuteIndirectBuffer(bufferPtr, bufferSize);
   return true;
 }

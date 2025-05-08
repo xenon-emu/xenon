@@ -128,7 +128,7 @@ void Xe::PCIDev::ETHERNET::Read(u64 readAddress, u8 *data, u64 size) {
     LOG_DEBUG(ETH, "[Read] ADDRESS[1][{}] = 0x{:X}", (offset - ADDRESS_1), ethPciState.macAddress2[(offset - ADDRESS_1)]);
     break;
   default:
-    LOG_ERROR(ETH, "Register '{:#x}' is unknown! Attempted to read {} bytes", static_cast<u16>(offset), size);
+    LOG_ERROR(ETH, "Register '0x{:X}' is unknown! Attempted to read {} bytes", static_cast<u16>(offset), size);
     memset(data, 0xFF, size);
     break;
   }
@@ -238,7 +238,7 @@ void Xe::PCIDev::ETHERNET::Write(u64 writeAddress, const u8 *data, u64 size) {
     LOG_DEBUG(ETH, "macAddress2[{}] = 0x{:X}", (offset - ADDRESS_1), static_cast<u32>(*data));
     break;
   default:
-    LOG_ERROR(ETH, "Register '{:#x}' is unknown! Data = {:#x} ({}b)", static_cast<u16>(offset), val, size);
+    LOG_ERROR(ETH, "Register '0x{:X}' is unknown! Data = 0x{:X} ({}b)", static_cast<u16>(offset), val, size);
     break;
   }
 }

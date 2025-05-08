@@ -61,10 +61,10 @@ void Xe::PCIDev::OHCI::Read(u64 readAddress, u8 *data, u64 size) {
     ret = HcRhDescriptorB;
     break;
   default:
-    LOG_WARNING(OHCI, "{} Read({:#x}, data)", instance, offset);
+    LOG_WARNING(OHCI, "{} Read(0x{:X}, data)", instance, offset);
   }
   ret = byteswap_le<u32>(ret);
-  LOG_DEBUG(OHCI, "{} Read({:#x}, data) == {:#x}", instance, offset, ret);
+  LOG_DEBUG(OHCI, "{} Read(0x{:X}, data) == 0x{:X}", instance, offset, ret);
   memcpy(data, &ret, size);
 }
 
@@ -79,15 +79,15 @@ void Xe::PCIDev::OHCI::Write(u64 writeAddress, const u8 *data, u64 size) {
   switch (offset) {
   case 0x0:
     HcRevision = value;
-    LOG_DEBUG(OHCI, "{} HcRevision = {:#x}, {:#x}", instance, value, writeAddress);
+    LOG_DEBUG(OHCI, "{} HcRevision = 0x{:X}, 0x{:X}", instance, value, writeAddress);
     break;
   case 0x4:
     HcControl = value;
-    LOG_DEBUG(OHCI, "{} HcControl = {:#x}", instance, value);
+    LOG_DEBUG(OHCI, "{} HcControl = 0x{:X}", instance, value);
     break;
   case 0x8:
     HcCommandStatus = value;
-    LOG_DEBUG(OHCI, "{} HcCommandStatus = {:#x}", instance, value);
+    LOG_DEBUG(OHCI, "{} HcCommandStatus = 0x{:X}", instance, value);
     break;
   case 0x10:
     HcInterruptEnable |= value;
@@ -97,30 +97,30 @@ void Xe::PCIDev::OHCI::Write(u64 writeAddress, const u8 *data, u64 size) {
     break;
   case 0x18:
     HcHCCA = value & ~0xFF;
-    LOG_DEBUG(OHCI, "{} HcHCCA = {:#x}", instance, value);
+    LOG_DEBUG(OHCI, "{} HcHCCA = 0x{:X}", instance, value);
     break;
   case 0x20:
     HcControlHeadED = value;
-    LOG_DEBUG(OHCI, "{} HcControlHeadED = {:#x}", instance, value);
+    LOG_DEBUG(OHCI, "{} HcControlHeadED = 0x{:X}", instance, value);
     break;
   case 0x28:
     HcBulkHeadED = value;
-    LOG_DEBUG(OHCI, "{} HcBulkHeadED = {:#x}", instance, value);
+    LOG_DEBUG(OHCI, "{} HcBulkHeadED = 0x{:X}", instance, value);
     break;
   case 0x34:
     HcFmInterval = value;
-    LOG_DEBUG(OHCI, "{} HcFmInterval = {:#x}", instance, value);
+    LOG_DEBUG(OHCI, "{} HcFmInterval = 0x{:X}", instance, value);
     break;
   case 0x40:
     HcPeriodicStart = value;
-    LOG_DEBUG(OHCI, "{} HcPeriodicStart = {:#x}", instance, value);
+    LOG_DEBUG(OHCI, "{} HcPeriodicStart = 0x{:X}", instance, value);
     break;
   case 0x50:
     HcRhStatus = value;
-    LOG_DEBUG(OHCI, "{} HcRhStatus = {:#x}", instance, value);
+    LOG_DEBUG(OHCI, "{} HcRhStatus = 0x{:X}", instance, value);
     break;
   default:
-    LOG_WARNING(OHCI, "{} Write({:#x}, {:#x}, {})", instance, offset, value, size);
+    LOG_WARNING(OHCI, "{} Write(0x{:X}, 0x{:X}, {})", instance, offset, value, size);
   }
 
   if (HcCommandStatus & 1) { // HCR

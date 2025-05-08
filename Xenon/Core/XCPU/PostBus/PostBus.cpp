@@ -292,7 +292,7 @@ void Xe::XCPU::POSTBUS::POST(u64 postCode) {
       LOG_ERROR(Xenon_PostBus, "CB > PANIC - UNSUPPORTED_RAM_SIZE");
       break;
     default:
-      LOG_ERROR(Xenon_PostBus, "CB > Unrecognized PANIC code {:#x}", postCode);
+      LOG_ERROR(Xenon_PostBus, "CB > Unrecognized PANIC code 0x{:X}", postCode);
       break;
     }
     SYSTEM_PAUSE();
@@ -608,6 +608,6 @@ void Xe::XCPU::POSTBUS::POST(u64 postCode) {
     }*/
   }
   else {
-    LOG_ERROR(Xenon_PostBus, "POST: Unrecognized post code: {:#x}", postCode);
+    LOG_ERROR(Xenon_PostBus, "POST: Unrecognized post code: 0x{:X}", postCode);
   }
 }

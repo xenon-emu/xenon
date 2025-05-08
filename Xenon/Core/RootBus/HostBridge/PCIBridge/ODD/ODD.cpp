@@ -146,7 +146,7 @@ void Xe::PCIDev::ODD::processSCSICommand() {
                                     sectorCount);
     break;
   default:
-    LOG_ERROR(ODD, "Unknown SCSI Command requested: {:#x}", atapiState.scsiCBD.CDB12.OperationCode);
+    LOG_ERROR(ODD, "Unknown SCSI Command requested: 0x{:X}", atapiState.scsiCBD.CDB12.OperationCode);
   }
 
   atapiState.atapiRegs.interruptReasonReg = IDE_INTERRUPT_REASON_IO;
@@ -312,7 +312,7 @@ void Xe::PCIDev::ODD::Read(u64 readAddress, u8 *data, u64 size) {
       memcpy(data, &atapiState.atapiRegs.statusReg, size);
       return;
     default:
-      LOG_ERROR(ODD, "Unknown Command Register Block register being read, command code = {:#x}", atapiCommandReg);
+      LOG_ERROR(ODD, "Unknown Command Register Block register being read, command code = 0x{:X}", atapiCommandReg);
       break;
     }
   } else {
@@ -328,7 +328,7 @@ void Xe::PCIDev::ODD::Read(u64 readAddress, u8 *data, u64 size) {
       memcpy(data, &atapiState.atapiRegs.dmaTableOffsetReg, size);
       break;
     default:
-      LOG_ERROR(ODD, "Unknown Control Register Block register being read, command code = {:#x}", atapiControlReg);
+      LOG_ERROR(ODD, "Unknown Control Register Block register being read, command code = 0x{:X}", atapiControlReg);
       break;
     }
   }
@@ -410,7 +410,7 @@ void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
         return;
       } break;
       default: {
-        LOG_ERROR(ODD, "Unknown command, command code = {:#x}", atapiState.atapiRegs.commandReg);
+        LOG_ERROR(ODD, "Unknown command, command code = 0x{:X}", atapiState.atapiRegs.commandReg);
       }  break;
       }
       return;
@@ -421,8 +421,8 @@ void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
     default: {
       u64 tmp = 0;
       memcpy(&tmp, data, size);
-      LOG_ERROR(ODD, "Unknown Command Register Block register being written, command reg = {:#x}"
-        ", write address = {:#x}, data = {:#x}", atapiCommandReg, writeAddress, tmp);
+      LOG_ERROR(ODD, "Unknown Command Register Block register being written, command reg = 0x{:X}"
+        ", write address = 0x{:X}, data = 0x{:X}", atapiCommandReg, writeAddress, tmp);
     } break;
     }
   } else {
@@ -445,7 +445,7 @@ void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
       memcpy(&atapiState.atapiRegs.dmaTableOffsetReg, data, size);
       break;
     default:
-      LOG_ERROR(ODD, "Unknown Control Register Block register being written, command code = {:#x}", atapiControlReg);
+      LOG_ERROR(ODD, "Unknown Control Register Block register being written, command code = 0x{:X}", atapiControlReg);
       break;
     }
   }
@@ -541,7 +541,7 @@ void Xe::PCIDev::ODD::MemSet(u64 writeAddress, s32 data, u64 size) {
         return;
       } break;
       default:
-        LOG_ERROR(ODD, "Unknown command, command code = {:#x}", atapiState.atapiRegs.commandReg);
+        LOG_ERROR(ODD, "Unknown command, command code = 0x{:X}", atapiState.atapiRegs.commandReg);
         break;
       }
       return;
@@ -551,8 +551,8 @@ void Xe::PCIDev::ODD::MemSet(u64 writeAddress, s32 data, u64 size) {
     default:
       u64 tmp = 0;
       memset(&tmp, data, size);
-      LOG_ERROR(ODD, "Unknown Command Register Block register being written, command reg = {:#x}"
-        ", write address = {:#x}, data = {:#x}", atapiCommandReg, writeAddress, tmp);
+      LOG_ERROR(ODD, "Unknown Command Register Block register being written, command reg = 0x{:X}"
+        ", write address = 0x{:X}, data = 0x{:X}", atapiCommandReg, writeAddress, tmp);
       break;
     }
   } else {
@@ -575,7 +575,7 @@ void Xe::PCIDev::ODD::MemSet(u64 writeAddress, s32 data, u64 size) {
       memset(&atapiState.atapiRegs.dmaTableOffsetReg, data, size);
       break;
     default:
-      LOG_ERROR(ODD, "Unknown Control Register Block register being written, command code = {:#x}", atapiControlReg);
+      LOG_ERROR(ODD, "Unknown Control Register Block register being written, command code = 0x{:X}", atapiControlReg);
       break;
     }
   }
@@ -602,12 +602,12 @@ void Xe::PCIDev::ODD::ConfigRead(u64 readAddress, u8 *data, u64 size) {
       LOG_WARNING(ODD, "SCR ConfigRead to SCR_NOTIFICATION_REG.");
       break;
     default:
-      LOG_ERROR(ODD, "SCR ConfigRead to reg {:#x}", readReg * 4);
+      LOG_ERROR(ODD, "SCR ConfigRead to reg 0x{:X}", readReg * 4);
       break;
     }
   }
   memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], size);
-  LOG_DEBUG(ODD, "ConfigRead to reg {:#x}", readReg * 4);
+  LOG_DEBUG(ODD, "ConfigRead to reg 0x{:X}", readReg * 4);
 }
 
 void Xe::PCIDev::ODD::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
@@ -639,25 +639,25 @@ void Xe::PCIDev::ODD::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
     // Write to the SATA status and control registers
     switch ((writeReg - XE_SIS_SCR_BASE) / 4) {
     case SCR_STATUS_REG:
-      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_STATUS_REG, data {:#x}", tmp);
+      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_STATUS_REG, data 0x{:X}", tmp);
       break;
     case SCR_ERROR_REG:
-      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_ERROR_REG, data {:#x}", tmp);
+      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_ERROR_REG, data 0x{:X}", tmp);
       break;
     case SCR_CONTROL_REG:
-      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_CONTROL_REG, data {:#x}", tmp);
+      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_CONTROL_REG, data 0x{:X}", tmp);
       break;
     case SCR_ACTIVE_REG:
-      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_ACTIVE_REG, data {:#x}", tmp);
+      LOG_WARNING(ODD, "SCR ConfigWrite to SCR_ACTIVE_REG, data 0x{:X}", tmp);
       break;
     case SCR_NOTIFICATION_REG:
-      LOG_WARNING(ODD, "SCR ConfigRead to SCR_NOTIFICATION_REG, data {:#x}", tmp);
+      LOG_WARNING(ODD, "SCR ConfigRead to SCR_NOTIFICATION_REG, data 0x{:X}", tmp);
       break;
     default:
-      LOG_ERROR(ODD, "SCR ConfigWrite to reg {:#x}, data {:#x}", writeReg * 4, tmp);
+      LOG_ERROR(ODD, "SCR ConfigWrite to reg 0x{:X}, data 0x{:X}", writeReg * 4, tmp);
       break;
     }
   }
   memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &tmp, size);
-  LOG_DEBUG(ODD, "ConfigWrite to reg {:#x}, data {:#x}", writeReg * 4, tmp);
+  LOG_DEBUG(ODD, "ConfigWrite to reg 0x{:X}, data 0x{:X}", writeReg * 4, tmp);
 }

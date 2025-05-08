@@ -201,7 +201,7 @@ void PPU::Reset() {
 }
 void PPU::Halt(u64 haltOn, bool requestedByGuest, s8 ppuId, ePPUThread threadId) {
   if (haltOn && !guestHalt) {
-    LOG_DEBUG(Xenon, "Halting PPU{} on address {:#x}", ppuState->ppuID, haltOn);
+    LOG_DEBUG(Xenon, "Halting PPU{} on address 0x{:X}", ppuState->ppuID, haltOn);
     ppuHaltOn = haltOn;
   }
   guestHalt = requestedByGuest;
@@ -579,7 +579,7 @@ u64 PPU::loadElfImage(u8* data, u64 size) {
 
   // ELF Entry point.
   const auto entryPoint = READ(header, ->e_entry);
-  LOG_INFO(Xenon, "ELF Entry Point: {:#x}", entryPoint);
+  LOG_INFO(Xenon, "ELF Entry Point: 0x{:X}", entryPoint);
 
   // Get the number of entries in the program header table.
   const auto progHeaderNumSections = READ(header, ->e_phnum);
@@ -612,7 +612,7 @@ u64 PPU::loadElfImage(u8* data, u64 size) {
       u64 file_offset = READ(progHeaderTableData, [idx].p_offset);
       bool physical_load = true;
       u64 target_addr = physical_load ? paddr : vaddr;
-      LOG_INFO(Xenon, "Loading {:#x} bytes from offset {:#x} in the ELF to address {:#x}",
+      LOG_INFO(Xenon, "Loading 0x{:X} bytes from offset 0x{:X} in the ELF to address 0x{:X}",
         filesize, file_offset, target_addr);
       PPCInterpreter::MMUMemCpyFromHost(ppuState.get(), target_addr, data + file_offset, filesize);
       if (memsize > filesize) { // Memory size greater than file, zero out remainder

@@ -299,7 +299,7 @@ void PPCInterpreter::PPCInterpreter_mfspr(PPU_STATE *ppuState) {
     value = curThread.SPR.PIR;
     break;
   default:
-    LOG_ERROR(Xenon, "{}(Thrd{:#d}) mfspr: Unknown SPR: {:#x}", ppuState->ppuName, static_cast<u8>(curThreadId), sprNum);
+    LOG_ERROR(Xenon, "{}(Thrd{:#d}) mfspr: Unknown SPR: 0x{:X}", ppuState->ppuName, static_cast<u8>(curThreadId), sprNum);
     break;
   }
 
@@ -425,7 +425,7 @@ void PPCInterpreter::PPCInterpreter_mtspr(PPU_STATE *ppuState) {
     curThread.SPR.DABRX = GPR(rD);
     break;
   default:
-    LOG_ERROR(Xenon, "{}(Thrd{:#d}) SPR {:#x} ={:#x}", ppuState->ppuName, static_cast<u8>(curThreadId), spr, GPR(rD));
+    LOG_ERROR(Xenon, "{}(Thrd{:#d}) SPR 0x{:X} =0x{:X}", ppuState->ppuName, static_cast<u8>(curThreadId), spr, GPR(rD));
     break;
   }
 }

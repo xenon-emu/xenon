@@ -23,13 +23,13 @@ namespace PPCInterpreter {
       Config::imgui.debugWindow = true; // Open debugger on bad fault
     }
 
-    LOG_CRITICAL(Xenon, "PPC Interpreter: Invalid instruction found! Data: {:#x} (opcode, value[s]), address: {:#x}",
+    LOG_CRITICAL(Xenon, "PPC Interpreter: Invalid instruction found! Data: 0x{:X} (opcode, value[s]), address: 0x{:X}",
       _instr.opcode,
       curThread.CIA);
   }
 
   void PPCInterpreter_known_unimplemented(const char *name, PPU_STATE *ppuState) {
-    LOG_CRITICAL(Xenon, "PPC Interpreter: {} is not implemented! Data: {:#x}, address: {:#x}",
+    LOG_CRITICAL(Xenon, "PPC Interpreter: {} is not implemented! Data: 0x{:X}, address: 0x{:X}",
       name,
       _instr.opcode,
       curThread.CIA);

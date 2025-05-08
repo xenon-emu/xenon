@@ -43,7 +43,7 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
   sfcxState.commandReg = NO_CMD;
 
   // Display Flash config
-  LOG_INFO(SFCX, "FlashConfig: {:#x}", sfcxState.configReg);
+  LOG_INFO(SFCX, "FlashConfig: 0x{:X}", sfcxState.configReg);
 
   // Load the NAND dump
   LOG_INFO(SFCX, "Loading NAND from path: {}", nandLoadPath);
@@ -100,49 +100,49 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
 
   // Display info about the loaded image header
   sfcxState.nandHeader.nandMagic = byteswap_be<u16>(sfcxState.nandHeader.nandMagic);
-  LOG_INFO(SFCX, " * NAND Magic: {:#x}", sfcxState.nandHeader.nandMagic);
+  LOG_INFO(SFCX, " * NAND Magic: 0x{:X}", sfcxState.nandHeader.nandMagic);
 
   sfcxState.nandHeader.build = byteswap_be<u16>(sfcxState.nandHeader.build);
-  LOG_INFO(SFCX, " * Build: {:#x}", sfcxState.nandHeader.build);
+  LOG_INFO(SFCX, " * Build: 0x{:X}", sfcxState.nandHeader.build);
 
   sfcxState.nandHeader.qfe = byteswap_be<u16>(sfcxState.nandHeader.qfe);
-  LOG_INFO(SFCX, " * QFE: {:#x}", sfcxState.nandHeader.qfe);
+  LOG_INFO(SFCX, " * QFE: 0x{:X}", sfcxState.nandHeader.qfe);
 
   sfcxState.nandHeader.flags = byteswap_be<u16>(sfcxState.nandHeader.flags);
-  LOG_INFO(SFCX, " * Flags: {:#x}", sfcxState.nandHeader.flags);
+  LOG_INFO(SFCX, " * Flags: 0x{:X}", sfcxState.nandHeader.flags);
 
   sfcxState.nandHeader.entry = byteswap_be<u32>(sfcxState.nandHeader.entry);
-  LOG_INFO(SFCX, " * Entry: {:#x}", sfcxState.nandHeader.entry);
+  LOG_INFO(SFCX, " * Entry: 0x{:X}", sfcxState.nandHeader.entry);
 
   sfcxState.nandHeader.size = byteswap_be<u32>(sfcxState.nandHeader.size);
-  LOG_INFO(SFCX, " * Size: {:#x}", sfcxState.nandHeader.size);
+  LOG_INFO(SFCX, " * Size: 0x{:X}", sfcxState.nandHeader.size);
 
   sfcxState.nandHeader.keyvaultSize = byteswap_be<u32>(sfcxState.nandHeader.keyvaultSize);
-  LOG_INFO(SFCX, " * Keyvault Size: {:#x}", sfcxState.nandHeader.keyvaultSize);
+  LOG_INFO(SFCX, " * Keyvault Size: 0x{:X}", sfcxState.nandHeader.keyvaultSize);
 
   sfcxState.nandHeader.sysUpdateAddr = byteswap_be<u32>(sfcxState.nandHeader.sysUpdateAddr);
-  LOG_INFO(SFCX, " * System Update Addr: {:#x}", sfcxState.nandHeader.sysUpdateAddr);
+  LOG_INFO(SFCX, " * System Update Addr: 0x{:X}", sfcxState.nandHeader.sysUpdateAddr);
 
   sfcxState.nandHeader.sysUpdateCount = byteswap_be<u16>(sfcxState.nandHeader.sysUpdateCount);
-  LOG_INFO(SFCX, " * System Update Count: {:#x}", sfcxState.nandHeader.sysUpdateCount);
+  LOG_INFO(SFCX, " * System Update Count: 0x{:X}", sfcxState.nandHeader.sysUpdateCount);
 
   sfcxState.nandHeader.keyvaultVer = byteswap_be<u16>(sfcxState.nandHeader.keyvaultVer);
-  LOG_INFO(SFCX, " * Keyvault Ver: {:#x}", sfcxState.nandHeader.keyvaultVer);
+  LOG_INFO(SFCX, " * Keyvault Ver: 0x{:X}", sfcxState.nandHeader.keyvaultVer);
 
   sfcxState.nandHeader.keyvaultAddr = byteswap_be<u32>(sfcxState.nandHeader.keyvaultAddr);
-  LOG_INFO(SFCX, " * Keyvault Addr: {:#x}", sfcxState.nandHeader.keyvaultAddr);
+  LOG_INFO(SFCX, " * Keyvault Addr: 0x{:X}", sfcxState.nandHeader.keyvaultAddr);
 
   sfcxState.nandHeader.sysUpdateSize = byteswap_be<u32>(sfcxState.nandHeader.sysUpdateSize);
-  LOG_INFO(SFCX, " * System Update Size: {:#x}", sfcxState.nandHeader.sysUpdateSize);
+  LOG_INFO(SFCX, " * System Update Size: 0x{:X}", sfcxState.nandHeader.sysUpdateSize);
 
   sfcxState.nandHeader.smcConfigAddr = byteswap_be<u32>(sfcxState.nandHeader.smcConfigAddr);
-  LOG_INFO(SFCX, " * SMC Config Addr: {:#x}", sfcxState.nandHeader.smcConfigAddr);
+  LOG_INFO(SFCX, " * SMC Config Addr: 0x{:X}", sfcxState.nandHeader.smcConfigAddr);
 
   sfcxState.nandHeader.smcBootSize = byteswap_be<u32>(sfcxState.nandHeader.smcBootSize);
-  LOG_INFO(SFCX, " * SMC Boot Size: {:#x}", sfcxState.nandHeader.smcBootSize);
+  LOG_INFO(SFCX, " * SMC Boot Size: 0x{:X}", sfcxState.nandHeader.smcBootSize);
 
   sfcxState.nandHeader.smcBootAddr = byteswap_be<u32>(sfcxState.nandHeader.smcBootAddr);
-  LOG_INFO(SFCX, " * SMC Boot Addr: {:#x}", sfcxState.nandHeader.smcBootAddr);
+  LOG_INFO(SFCX, " * SMC Boot Addr: 0x{:X}", sfcxState.nandHeader.smcBootAddr);
 
   // Get CB_A and CB_B headers
   BL_HEADER cbaHeader;
@@ -172,16 +172,16 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
 
   // Check for CB(_A) Magic
   if (cbaHeader.name[0] == 'C' && cbaHeader.name[1] == 'B') {
-    LOG_INFO(SFCX, "Found CB(_A) Header: Physical: {:#x}, LBA: {:#x}", sfcxState.nandHeader.entry, cbaOffset);
-    LOG_INFO(SFCX, " * CB Entry: {:#x}", cbaHeader.entryPoint);
-    LOG_INFO(SFCX, " * CB Lenght: {:#x}", cbaHeader.lenght);
+    LOG_INFO(SFCX, "Found CB(_A) Header: Physical: 0x{:X}, LBA: 0x{:X}", sfcxState.nandHeader.entry, cbaOffset);
+    LOG_INFO(SFCX, " * CB Entry: 0x{:X}", cbaHeader.entryPoint);
+    LOG_INFO(SFCX, " * CB Lenght: 0x{:X}", cbaHeader.lenght);
   }
 
   // Check for CB(_B) Magic
   if (cbbHeader.name[0] == 'C' && cbbHeader.name[1] == 'B') {
-    LOG_INFO(SFCX, "Found CB(_B) Header: Physical: {:#x}, LBA: {:#x}", sfcxState.nandHeader.entry + cbaHeader.lenght, cbbOffset);
-    LOG_INFO(SFCX, " * CB Entry: {:#x}", cbbHeader.entryPoint);
-    LOG_INFO(SFCX, " * CB Lenght: {:#x}", cbbHeader.lenght);
+    LOG_INFO(SFCX, "Found CB(_B) Header: Physical: 0x{:X}, LBA: 0x{:X}", sfcxState.nandHeader.entry + cbaHeader.lenght, cbbOffset);
+    LOG_INFO(SFCX, " * CB Entry: 0x{:X}", cbbHeader.entryPoint);
+    LOG_INFO(SFCX, " * CB Lenght: 0x{:X}", cbbHeader.lenght);
   }
 
   u32 cbVersion = (cbaHeader.buildNumber == cbbHeader.buildNumber) ? cbaHeader.buildNumber : cbbHeader.buildNumber;
@@ -204,24 +204,24 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
       // CB_B 6723
       case 6723:
         Config::xcpu.HW_INIT_SKIP_1 = 0x03009B10;
-        LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_1);
+        LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, Config::xcpu.HW_INIT_SKIP_1);
         Config::xcpu.HW_INIT_SKIP_2 = 0x03009BA4;
-        LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_2);
+        LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: 0x{:X}", cbVersion, Config::xcpu.HW_INIT_SKIP_2);
         break;
       // CB_B 9188, 15432
       case 9188:
       case 15432:
         Config::xcpu.HW_INIT_SKIP_1 = 0x03003DC0;
-        LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_1);
+        LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, Config::xcpu.HW_INIT_SKIP_1);
         Config::xcpu.HW_INIT_SKIP_2 = 0x03003E54;
-        LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_2);
+        LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: 0x{:X}", cbVersion, Config::xcpu.HW_INIT_SKIP_2);
         break;
       // CB_B 14352
       case 14352:
         Config::xcpu.HW_INIT_SKIP_1 = 0x03003F48;
-        LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_1);
+        LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, Config::xcpu.HW_INIT_SKIP_1);
         Config::xcpu.HW_INIT_SKIP_2 = 0x03003FDC;
-        LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_2);
+        LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: 0x{:X}", cbVersion, Config::xcpu.HW_INIT_SKIP_2);
         break;
       default:
         LOG_ERROR(SFCX, "Auto detection failed. Unimplemented CB found, version {:#d}. Please report to Xenon Devs.", cbVersion);
@@ -230,8 +230,8 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
     }
     else {
       LOG_INFO(SFCX, "Manual Hardware Init stage skip addresses set:");
-      LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_1);
-      LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: {:#x}", cbVersion, Config::xcpu.HW_INIT_SKIP_2);
+      LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, Config::xcpu.HW_INIT_SKIP_1);
+      LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: 0x{:X}", cbVersion, Config::xcpu.HW_INIT_SKIP_2);
     }
   }
   // Enter SFCX Thread
@@ -286,7 +286,7 @@ void Xe::PCIDev::SFCX::Read(u64 readAddress, u8* data, u64 size) {
     *reinterpret_cast<u32*>(data) = sfcxState.mmcIDReg;
     break;
   default:
-    LOG_ERROR(SFCX, "Read from unknown register {:#x}", reg);
+    LOG_ERROR(SFCX, "Read from unknown register 0x{:X}", reg);
     break;
   }
 }
@@ -328,7 +328,7 @@ void Xe::PCIDev::SFCX::Write(u64 writeAddress, const u8* data, u64 size) {
       memcpy(&sfcxState.dataReg, &sfcxState.pageBuffer[sfcxState.addressReg], 4);
 
 #ifdef SFCX_DEBUG
-      LOG_DEBUG(SFCX, "PAGE_BUF_TO_REG[{:#x}] = {:#x}", sfcxState.addressReg, sfcxState.dataReg);
+      LOG_DEBUG(SFCX, "PAGE_BUF_TO_REG[0x{:X}] = 0x{:X}", sfcxState.addressReg, sfcxState.dataReg);
 #endif // SFCX_DEBUG
 
       // Increase buffer pointer
@@ -364,7 +364,7 @@ void Xe::PCIDev::SFCX::Write(u64 writeAddress, const u8* data, u64 size) {
     memcpy(&sfcxState.mmcIDReg, data, size);
     break;
   default:
-    LOG_ERROR(SFCX, "Write from unknown register {:#x}", reg);
+    LOG_ERROR(SFCX, "Write from unknown register 0x{:X}", reg);
     break;
   }
 }
@@ -406,7 +406,7 @@ void Xe::PCIDev::SFCX::MemSet(u64 writeAddress, s32 data, u64 size) {
     memset(&sfcxState.mmcIDReg, data, size);
     break;
   default:
-    LOG_ERROR(SFCX, "Write from unknown register {:#x}", reg);
+    LOG_ERROR(SFCX, "Write from unknown register 0x{:X}", reg);
     break;
   }
 }
@@ -415,7 +415,7 @@ void Xe::PCIDev::SFCX::ReadRaw(u64 readAddress, u8* data, u64 size) {
   u32 offset = static_cast<u32>(readAddress & 0xFFFFFF);
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
 #ifdef NAND_DEBUG
-  LOG_DEBUG(SFCX, "Reading RAW data at {:#x} (offset {:#x}) for {:#x} bytes", readAddress, offset, size);
+  LOG_DEBUG(SFCX, "Reading RAW data at 0x{:X} (offset 0x{:X}) for 0x{:X} bytes", readAddress, offset, size);
 #endif // NAND_DEBUG
   memcpy(data, rawImageData.data() + offset, size);
 }
@@ -424,7 +424,7 @@ void Xe::PCIDev::SFCX::WriteRaw(u64 writeAddress, const u8* data, u64 size) {
   u32 offset = static_cast<u32>(writeAddress & 0xFFFFFF);
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
 #ifdef NAND_DEBUG
-  LOG_DEBUG(SFCX, "Writing RAW data at {:#x} (offset {:#x}) for {:#x} bytes", writeAddress, offset, size);
+  LOG_DEBUG(SFCX, "Writing RAW data at 0x{:X} (offset 0x{:X}) for 0x{:X} bytes", writeAddress, offset, size);
 #endif // NAND_DEBUG
   memcpy(rawImageData.data() + offset, data, size);
 }
@@ -433,7 +433,7 @@ void Xe::PCIDev::SFCX::MemSetRaw(u64 writeAddress, s32 data, u64 size) {
   u32 offset = static_cast<u32>(writeAddress & 0xFFFFFF);
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
 #ifdef NAND_DEBUG
-  LOG_DEBUG(SFCX, "Setting RAW data at {:#x} to {:#x} (offset {:#x}) for {:#x} bytes", writeAddress, data, offset, size);
+  LOG_DEBUG(SFCX, "Setting RAW data at 0x{:X} to 0x{:X} (offset 0x{:X}) for 0x{:X} bytes", writeAddress, data, offset, size);
 #endif // NAND_DEBUG
   memset(rawImageData.data() + offset, data, size);
 }
@@ -492,7 +492,7 @@ void Xe::PCIDev::SFCX::sfcxMainLoop() {
         sfcxEraseBlock();
         break;
       default:
-        LOG_ERROR(SFCX, "Unrecognized command was issued. {:#x}. Issuing interrupt if enabled.", sfcxState.commandReg);
+        LOG_ERROR(SFCX, "Unrecognized command was issued. 0x{:X}. Issuing interrupt if enabled.", sfcxState.commandReg);
         break;
       }
       if (sfcxState.configReg & CONFIG_INT_EN) {
@@ -539,7 +539,7 @@ void Xe::PCIDev::SFCX::sfcxReadPageFromNAND(bool physical) {
   nandOffset = 1 ? ((nandOffset / sfcxState.pageSize) * sfcxState.pageSizePhys) + nandOffset % sfcxState.pageSize : nandOffset;
 
 #ifdef SFCX_DEBUG
-  LOG_DEBUG(SFCX, "Reading Page[Physical = {:#d}] Logical address: {:#x}, Physical address: {:#x}",
+  LOG_DEBUG(SFCX, "Reading Page[Physical = {:#d}] Logical address: 0x{:X}, Physical address: 0x{:X}",
     physical, sfcxState.addressReg, nandOffset);
 #endif // SFCX_DEBUG
 
@@ -562,7 +562,7 @@ void Xe::PCIDev::SFCX::sfcxEraseBlock() {
   nandOffset = 1 ? ((nandOffset / sfcxState.pageSize) * sfcxState.pageSizePhys) + nandOffset % sfcxState.pageSize : nandOffset;
 
 #ifdef SFCX_DEBUG
-  LOG_DEBUG(SFCX, "Erasing page at logical address: {:#x}, physical address: {:#x}", sfcxState.addressReg, nandOffset);
+  LOG_DEBUG(SFCX, "Erasing page at logical address: 0x{:X}, physical address: 0x{:X}", sfcxState.addressReg, nandOffset);
 #endif // SFCX_DEBUG
 
   // Clear the page buffer
@@ -591,14 +591,14 @@ void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND() {
   u8* sparePhysAddrPtr = mainMemory->getPointerToAddress(sfcxState.sparePhysAddrReg);
 
 #ifdef SFCX_DEBUG
-  LOG_DEBUG(SFCX, "DMA_PHY_TO_RAM: Reading {:#x} pages. Logical Address: {:#x}, Physical Address: {:#x}, Data DMA address: {:#x}, Spare DMA address: {:#x}",
+  LOG_DEBUG(SFCX, "DMA_PHY_TO_RAM: Reading 0x{:X} pages. Logical Address: 0x{:X}, Physical Address: 0x{:X}, Data DMA address: 0x{:X}, Spare DMA address: 0x{:X}",
     dmaPagesNum, sfcxState.addressReg, physAddr, sfcxState.dataPhysAddrReg, sfcxState.sparePhysAddrReg);
 #endif // SFCX_DEBUG
 
   // Read Pages to SFCX_DATAPHYADDR_REG and page sapre to SFCX_SPAREPHYADDR_REG
   for (size_t pageNum = 0; pageNum < dmaPagesNum; pageNum++) {
 #ifdef SFCX_DEBUG
-    LOG_DEBUG(SFCX, "DMA_PHY_TO_RAM: Reading Page {:#x}. Physical Address: {:#x}", pageNum, physAddr);
+    LOG_DEBUG(SFCX, "DMA_PHY_TO_RAM: Reading Page 0x{:X}. Physical Address: 0x{:X}", pageNum, physAddr);
 #endif // SFCX_DEBUG
 
     // Clear the page buffer
@@ -638,14 +638,14 @@ void Xe::PCIDev::SFCX::sfcxDoDMAtoNAND() {
   u8 *sparePhysAddrPtr = mainMemory->getPointerToAddress(sfcxState.sparePhysAddrReg);
 
 #ifdef SFCX_DEBUG
-  LOG_DEBUG(SFCX, "DMA_RAM_TO_PHY: Writing {:#x} pages. Logical Address: {:#x}, Physical Address: {:#x}, Data DMA address: {:#x}, Spare DMA address: {:#x}",
+  LOG_DEBUG(SFCX, "DMA_RAM_TO_PHY: Writing 0x{:X} pages. Logical Address: 0x{:X}, Physical Address: 0x{:X}, Data DMA address: 0x{:X}, Spare DMA address: 0x{:X}",
     dmaPagesNum, sfcxState.addressReg, physAddr, sfcxState.dataPhysAddrReg, sfcxState.sparePhysAddrReg);
 #endif // SFCX_DEBUG
 
   // Read Pages to SFCX_DATAPHYADDR_REG and page sapre to SFCX_SPAREPHYADDR_REG
   for (size_t pageNum = 0; pageNum < dmaPagesNum; pageNum++) {
 #ifdef SFCX_DEBUG
-    LOG_DEBUG(SFCX, "DMA_RAM_TO_PHY: Writing page {:#x}. Physical Address: {:#x}", pageNum, physAddr);
+    LOG_DEBUG(SFCX, "DMA_RAM_TO_PHY: Writing page 0x{:X}. Physical Address: 0x{:X}", pageNum, physAddr);
 #endif // SFCX_DEBUG
 
     // Clear the page buffer

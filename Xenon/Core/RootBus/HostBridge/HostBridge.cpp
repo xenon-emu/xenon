@@ -99,7 +99,7 @@ bool HostBridge::Read(u64 readAddress, u8 *data, u64 size) {
       *data = biuRegs.REG_E1040000;
       break;
     default:
-      LOG_ERROR(HostBridge, "Unknown register being read at address: {:#x}",
+      LOG_ERROR(HostBridge, "Unknown register being read at address: 0x{:X}",
           readAddress);
       *data = 0;
       break;
@@ -214,7 +214,7 @@ bool HostBridge::Write(u64 writeAddress, const u8 *data, u64 size) {
     default:
       u64 tmp{};
       memcpy(&tmp, data, size);
-      LOG_ERROR(HostBridge, "Unknown register being written at address: {:#x}, data: {:#x}",
+      LOG_ERROR(HostBridge, "Unknown register being written at address: 0x{:X}, data: 0x{:X}",
                 writeAddress, tmp);
       break;
     }
@@ -314,7 +314,7 @@ bool HostBridge::MemSet(u64 writeAddress, s32 data, u64 size) {
     default:
       u64 tmp{};
       memset(&tmp, data, size);
-      LOG_ERROR(HostBridge, "Unknown register being written at address: {:#x}, data: {:#x}",
+      LOG_ERROR(HostBridge, "Unknown register being written at address: 0x{:X}, data: 0x{:X}",
                 writeAddress, tmp);
       break;
     }
@@ -356,7 +356,7 @@ void HostBridge::ConfigRead(u64 readAddress, u8 *data, u64 size) {
       xGPU->ConfigRead(readAddress, data, size);
       break;
     default:
-      LOG_ERROR(HostBridge, "BUS0: Configuration read to inexistant PCI Device at address: {:#x}", readAddress);
+      LOG_ERROR(HostBridge, "BUS0: Configuration read to inexistant PCI Device at address: 0x{:X}", readAddress);
       break;
     }
     return;
@@ -391,7 +391,7 @@ void HostBridge::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
     default:
       u64 tmp = 0;
       memcpy(&tmp, data, size);
-      LOG_ERROR(HostBridge, "BUS0: Configuration Write to inexistant PCI Device at address: {:#x}, data: {:#x}",
+      LOG_ERROR(HostBridge, "BUS0: Configuration Write to inexistant PCI Device at address: 0x{:X}, data: 0x{:X}",
                 writeAddress, tmp);
       break;
     }

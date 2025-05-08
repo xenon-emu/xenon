@@ -67,12 +67,15 @@ public:
 
   // Primary surface
   u32 fbSurfaceAddress = XE_FB_BASE;
+  // Config
+  u32 configControl = 0x00; //0x10000000
   // Scratch
   u32 scratchMask = 0;
   u32 scratchAddr = 0;
   // RBBM
   u32 rbbmDebug = 0xF0000;
-  u32 rbbmStatus = 0x10000000;
+  u32 rbbmStatus = 0;
+  u32 rbbmSoftReset = 0;
   // Internal rendering width/height
   u32 internalWidth = 1280;
   u32 internalHeight = 720;
@@ -3521,7 +3524,7 @@ static const std::string GetRegisterNameById(u32 id) {
   if (it != registerMap.end()) {
     return it->second;
   } else {
-    LOG_ERROR(Xenos, "Unknown register: {:#x}", id);
+    LOG_ERROR(Xenos, "Unknown register: 0x{:X}", id);
     return "UNK_REG";
   }
 }

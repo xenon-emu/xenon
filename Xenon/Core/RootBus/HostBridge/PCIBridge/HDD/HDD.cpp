@@ -163,7 +163,7 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
 
     memcpy(reinterpret_cast<u8*>(&ataDeviceState.ataWriteState + regOffset), data, size);
   } else {
-    LOG_ERROR(HDD, "Unknown register being accessed: (Write) {:#x}", regOffset);
+    LOG_ERROR(HDD, "Unknown register being accessed: (Write) 0x{:X}", regOffset);
   }
 }
 

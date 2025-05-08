@@ -45,7 +45,7 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
   switch (ppeIntCtrlBlckReg) {
   case Xe::XCPU::IIC::CPU_WHOAMI:
 #ifdef IIC_DEBUG
-      LOG_DEBUG(Xenon_IIC, "Control block number {:#x} beign set to PPU {:#x}",
+      LOG_DEBUG(Xenon_IIC, "Control block number 0x{:X} beign set to PPU 0x{:X}",
         ppeIntCtrlBlckID, static_cast<u8>(bsIntData));
 #endif // IIC_DEBUG
     iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].REG_CPU_WHOAMI = bsIntData;
@@ -77,7 +77,7 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
       }
 
 #ifdef IIC_DEBUG
-        LOG_DEBUG(Xenon_IIC, "EOI interrupt {} for thread {:#x} ",
+        LOG_DEBUG(Xenon_IIC, "EOI interrupt {} for thread 0x{:X} ",
           getIntName(static_cast<u8>(iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts[intIdx].interrupt)),
           ppeIntCtrlBlckID);
 #endif // IIC_DEBUG
@@ -99,7 +99,7 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
       }
 
 #ifdef IIC_DEBUG
-        LOG_DEBUG(Xenon_IIC, "EOI + Set PRIO: interrupt {} for thread {:#x}, new PRIO: {:#x}",
+        LOG_DEBUG(Xenon_IIC, "EOI + Set PRIO: interrupt {} for thread 0x{:X}, new PRIO: 0x{:X}",
           getIntName(static_cast<u8>(iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts[intIdx].interrupt)),
           ppeIntCtrlBlckID, static_cast<u8>(bsIntData));
 #endif // IIC_DEBUG
@@ -116,7 +116,7 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
     iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].REG_INT_MCACK = bsIntData;
     break;
   default:
-    LOG_ERROR(Xenon_IIC, "Unknown CPU Interrupt Ctrl Blck Reg being written: {:#x}", ppeIntCtrlBlckReg);
+    LOG_ERROR(Xenon_IIC, "Unknown CPU Interrupt Ctrl Blck Reg being written: 0x{:X}", ppeIntCtrlBlckReg);
     break;
   }
   mutex.unlock();
@@ -171,7 +171,7 @@ void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u8 *data, u64 size) 
     }
   } break;
   default:
-    LOG_ERROR(Xenon_IIC, "Unknown interrupt being read {:#x}", ppeIntCtrlBlckReg);
+    LOG_ERROR(Xenon_IIC, "Unknown interrupt being read 0x{:X}", ppeIntCtrlBlckReg);
     break;
   }
 }
@@ -206,7 +206,7 @@ bool Xe::XCPU::IIC::XenonIIC::checkExtInterrupt(u8 ppuID) {
 
   if (priorityOk) {
 #ifdef IIC_DEBUG
-    LOG_DEBUG(Xenon_IIC, "Signaling interrupt for thread {:#x} ", ppuID);
+    LOG_DEBUG(Xenon_IIC, "Signaling interrupt for thread 0x{:X} ", ppuID);
 #endif // IIC_DEBUG
     iicState.ppeIntCtrlBlck[ppuID].intSignaled = true;
     return true;

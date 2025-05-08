@@ -171,7 +171,7 @@ void HW_UART_VCOM::Init(void *uartConfig) {
     comPortDCB.StopBits = ONESTOPBIT;
     break;
   default:
-    LOG_WARNING(SMC, "SMCCore: Unknown UART config being set: ConfigValue = {:#x}", uartConfig);
+    LOG_WARNING(SMC, "SMCCore: Unknown UART config being set: ConfigValue = 0x{:X}", uartConfig);
     break;
   }
 

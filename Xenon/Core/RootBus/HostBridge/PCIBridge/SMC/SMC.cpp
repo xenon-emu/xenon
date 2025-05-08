@@ -158,7 +158,7 @@ void Xe::PCIDev::SMC::Read(u64 readAddress, u8 *data, u64 size) {
     smcCoreState->fifoBufferPos += 4;
     break;
   default:
-    LOG_ERROR(SMC, "Unknown register being read, offset {:#x}", static_cast<u16>(regOffset));
+    LOG_ERROR(SMC, "Unknown register being read, offset 0x{:X}", static_cast<u16>(regOffset));
     break;
   }
   mutex.unlock();
@@ -166,7 +166,7 @@ void Xe::PCIDev::SMC::Read(u64 readAddress, u8 *data, u64 size) {
 
 // PCI Config Read
 void Xe::PCIDev::SMC::ConfigRead(u64 readAddress, u8 *data, u64 size) {
-  LOG_INFO(SMC, "ConfigRead: Address = {:#x}, size = {:#x}.", readAddress, size);
+  LOG_INFO(SMC, "ConfigRead: Address = 0x{:X}, size = 0x{:X}.", readAddress, size);
   memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], size);
 }
 
@@ -230,7 +230,7 @@ void Xe::PCIDev::SMC::Write(u64 writeAddress, const u8 *data, u64 size) {
   default:
     u64 tmp = 0;
     memcpy(&tmp, data, size);
-    LOG_ERROR(SMC, "Unknown register being written, offset {:#x}, data {:#x}", 
+    LOG_ERROR(SMC, "Unknown register being written, offset 0x{:X}, data 0x{:X}", 
         static_cast<u16>(regOffset), tmp);
     break;
   }
@@ -289,7 +289,7 @@ void Xe::PCIDev::SMC::MemSet(u64 writeAddress, s32 data, u64 size) {
   default:
     u64 tmp = 0;
     memset(&tmp, data, size);
-    LOG_ERROR(SMC, "Unknown register being written, offset {:#x}, data {:#x}", 
+    LOG_ERROR(SMC, "Unknown register being written, offset 0x{:X}, data 0x{:X}", 
         static_cast<u16>(regOffset), tmp);
     break;
   }
@@ -301,7 +301,7 @@ void Xe::PCIDev::SMC::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   // Check if we're being scanned
   u64 tmp = 0;
   memcpy(&tmp, data, size);
-  LOG_DEBUG(SMC, "ConfigWrite: Address = {:#x}, Data = {:#x}, size = {:#x}.", writeAddress, tmp, size);
+  LOG_DEBUG(SMC, "ConfigWrite: Address = 0x{:X}, Data = 0x{:X}, size = 0x{:X}.", writeAddress, tmp, size);
   if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
     const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
@@ -550,7 +550,7 @@ void Xe::PCIDev::SMC::smcMainThread() {
               (smcCoreState->fifoDataBuffer[7] << 24);
           break;
         default:
-          LOG_WARNING(SMC, "SMC_I2C_READ_WRITE: Unimplemented command {:#x}", smcCoreState->fifoDataBuffer[1]);
+          LOG_WARNING(SMC, "SMC_I2C_READ_WRITE: Unimplemented command 0x{:X}", smcCoreState->fifoDataBuffer[1]);
           smcCoreState->fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
           smcCoreState->fifoDataBuffer[1] = 0x1; // Set R/W Failed.
         }
@@ -644,7 +644,7 @@ void Xe::PCIDev::SMC::smcMainThread() {
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_SET_9F_INT");
         break;
       default:
-        LOG_WARNING(SMC, "Unknown SMC_FIFO_CMD: ID = {:#x}", 
+        LOG_WARNING(SMC, "Unknown SMC_FIFO_CMD: ID = 0x{:X}", 
             static_cast<u16>(smcCoreState->fifoDataBuffer[0]));
         break;
       }

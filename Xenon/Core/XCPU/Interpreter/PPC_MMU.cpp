@@ -220,7 +220,7 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
       if (tlbEntry.V && ((tlbEntry.VPN & compareMask) == (rb & compareMask))) {
 #ifdef DEBUG_BUILD
         if (Config::log.advanced)
-          LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: {:#x}", rpn);
+          LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: 0x{:X}", rpn);
 #endif
         tlbEntry.V = false;
         tlbEntry.VPN = 0;
@@ -232,7 +232,7 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
       if (tlbEntry.V && ((tlbEntry.VPN & compareMask) == (rb & compareMask))) {
 #ifdef DEBUG_BUILD
         if (Config::log.advanced)
-        LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: {:#x}", rpn);
+        LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: 0x{:X}", rpn);
 #endif
         tlbEntry.V = false;
         tlbEntry.VPN = 0;
@@ -244,7 +244,7 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
       if (tlbEntry.V && ((tlbEntry.VPN & compareMask) == (rb & compareMask))) {
 #ifdef DEBUG_BUILD
         if (Config::log.advanced)
-        LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: {:#x}", rpn);
+        LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: 0x{:X}", rpn);
 #endif
         tlbEntry.V = false;
         tlbEntry.VPN = 0;
@@ -256,7 +256,7 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
       if (tlbEntry.V && ((tlbEntry.VPN & compareMask) == (rb & compareMask))) {
 #ifdef DEBUG_BUILD
         if (Config::log.advanced)
-        LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: {:#x}", rpn);
+        LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: 0x{:X}", rpn);
 #endif
         tlbEntry.V = false;
         tlbEntry.VPN = 0;
@@ -1123,7 +1123,7 @@ void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE *ppuState,
       xGPU{ EA >= XGPU_DEVICE_BASE && EA <= XGPU_DEVICE_BASE + XGPU_DEVICE_SIZE };
     if (!nand && !pciBridge && !pciConfigSpace && !xGPU) {
       if (Config::log.advanced)
-        LOG_WARNING(Xenon_MMU, "Invalid SoC Read from {:#x}, returning 0.", EA);
+        LOG_WARNING(Xenon_MMU, "Invalid SoC Read from 0x{:X}, returning 0.", EA);
       memset(outData, 0, byteCount);
       return;
     }
@@ -1192,7 +1192,7 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
       u64 tmp = 0;
       memcpy(&tmp, data, byteCount);
       if (Config::log.advanced)
-        LOG_WARNING(Xenon_MMU, "Invalid SoC Write to {:#x} (data:{:#x})", EA, tmp);
+        LOG_WARNING(Xenon_MMU, "Invalid SoC Write to 0x{:X} (data:0x{:X})", EA, tmp);
       return;
     }
   }
