@@ -113,7 +113,7 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
     const XeRegister reg = static_cast<XeRegister>(regIndex);
     
 #ifdef XE_DEBUG
-    LOG_DEBUG(Xenos, "Read from {}, index {:#x}", Xe::XGPU::GetRegisterNameById(regIndex), regIndex);
+    LOG_DEBUG(Xenos, "Read from {} (0x{:X}), index {:#x}", Xe::XGPU::GetRegisterNameById(regIndex), readAddress, regIndex);
 #endif
 
     u32 regData = xenosState->ReadRegister(reg);
