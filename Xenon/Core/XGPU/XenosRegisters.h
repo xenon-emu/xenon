@@ -3450,6 +3450,9 @@ static const std::string GetRegisterNameById(u32 id) {
 }
 
 // Xenos Registers by ID, multiply the ID by 4 to get the register offset.
+
+#define GET_OFFSET(ID) ((u32)(ID) * 4)
+
 enum class XeRegister {
   RBBM_RTL_RELEASE = 0x0000,
   RBBM_PATCH_RELEASE = 0x0001,
