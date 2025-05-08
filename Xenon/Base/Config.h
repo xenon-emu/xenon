@@ -237,6 +237,9 @@ inline struct _log {
 } log;
 
 enum class eConsoleRevision : const u8 {
+//  Xenon, - Not supported atm
+//  Opus, - Not supported atm
+  Zephyr,
   Falcon,
   Jasper,
   Trinity,

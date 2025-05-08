@@ -366,6 +366,7 @@ void Xe::PCIDev::SMC::smcMainThread() {
   // Fat consoles vs Slims have different initial values for the HANA/ANA
   u32 *hanaState = HANA_State;
   switch (Config::highlyExperimental.consoleRevison) {
+  case Config::eConsoleRevision::Zephyr:
   case Config::eConsoleRevision::Falcon:
   case Config::eConsoleRevision::Jasper:
     hanaState = FAT_HANA_State;
@@ -378,6 +379,9 @@ void Xe::PCIDev::SMC::smcMainThread() {
     break;
   }
   switch (Config::highlyExperimental.consoleRevison) {
+  case Config::eConsoleRevision::Zephyr: {
+    // reinterpret_cast<u8*>(hanaState)[0xFE] = ... ;
+  } break;
   case Config::eConsoleRevision::Falcon: {
     reinterpret_cast<u8*>(hanaState)[0xFE] = 0x21;
   } break;

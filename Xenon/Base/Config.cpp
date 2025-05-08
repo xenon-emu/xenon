@@ -407,7 +407,7 @@ void _highlyExperimental::to_toml(toml::value &value) {
   value["ConsoleRevison"].comments().clear();
   value["ConsoleRevison"] = static_cast<u32>(consoleRevison);
   value["ConsoleRevison"].comments().push_back("# Console motherboard revision, used for PVR and XGPU Init");
-  value["ConsoleRevison"].comments().push_back("# Falcon = 0 | Jasper = 1 | Trinity = 2 | Corona = 3 | Corona 4GB = 4 | Winchester = 5");
+  value["ConsoleRevison"].comments().push_back("# Zephyr = 0 | Falcon = 1 | Jasper = 2 | Trinity = 3 | Corona = 4 | Corona 4GB = 5 | Winchester = 6");
 }
 bool _highlyExperimental::verify_toml(toml::value &value) {
   to_toml(value);

@@ -10,6 +10,12 @@ HostBridge::HostBridge() {
   pciBridge = nullptr;
   // TODO: Fix these to pull the right data
   switch (Config::highlyExperimental.consoleRevison) {
+  case Config::eConsoleRevision::Zephyr: {
+      // Device/Vendor ID
+      // hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = ... ;
+      // Device Type/Revision
+      // hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = ... ;
+  } break;
   case Config::eConsoleRevision::Falcon: {
     // Device/Vendor ID
     hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = 0x58301414;

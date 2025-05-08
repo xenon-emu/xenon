@@ -28,6 +28,10 @@ Xe::Xenos::XGPU::XGPU(RAM *ram) : ramPtr(ram) {
   PCI_CONFIG_HDR_REG2 &gpuRevision = xgpuConfigSpace.configSpaceHeader.reg2;
   revision.vendorID = 0x1414;
   switch (Config::highlyExperimental.consoleRevison) {
+  case Config::eConsoleRevision::Zephyr: {
+    // gpuRevision.revID = ... ;
+    // revision.deviceID = ... ;
+  } break;
   case Config::eConsoleRevision::Falcon: {
     gpuRevision.revID = 0x10;
     revision.deviceID = 0x5821;
