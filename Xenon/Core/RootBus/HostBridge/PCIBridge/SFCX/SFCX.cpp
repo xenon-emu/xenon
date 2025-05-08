@@ -82,13 +82,14 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
   // Read NAND Image data
   nandFile.seekg(0, std::ios::beg);
   rawImageData.resize(imageSize);
-  constexpr u32 blockSize = 0x4000;
-  for (int currentBlock = 0; currentBlock < imageSize;
-    currentBlock += blockSize) {
-    nandFile.read(reinterpret_cast<char*>(rawImageData.data() + currentBlock), blockSize);
+  for (s32 b = 0; b < imageSize;  b += sfcxState.blockSize) {
+    nandFile.read(reinterpret_cast<char*>(rawImageData.data() + b), sfcxState.blockSize);
   }
   // Close the file
   nandFile.close();
+
+  // Get the block size based on the blockSize / pageSize * pageSizePhys
+  sfcxState.blockSizePhys = (sfcxState.blockSize / sfcxState.pageSize) * sfcxState.pageSizePhys;
 
   // Set our device BAR register based on the image size
   pciDevSizes[1] = imageSize; // BAR1
@@ -482,7 +483,13 @@ void Xe::PCIDev::SFCX::sfcxMainLoop() {
         sfcxReadPageFromNAND(false);
         break;
       case DMA_PHY_TO_RAM:
-        sfcxDoDMAfromNAND(true);
+        sfcxDoDMAfromNAND();
+        break;
+      case DMA_RAM_TO_PHY:
+        sfcxDoDMAtoNAND();
+        break;
+      case BLOCK_ERASE:
+        sfcxEraseBlock();
         break;
       default:
         LOG_ERROR(SFCX, "Unrecognized command was issued. {:#x}. Issuing interrupt if enabled.", sfcxState.commandReg);
@@ -529,7 +536,7 @@ bool Xe::PCIDev::SFCX::checkMagic() {
 void Xe::PCIDev::SFCX::sfcxReadPageFromNAND(bool physical) {
   // Calculate NAND offset
   u32 nandOffset = sfcxState.addressReg;
-  nandOffset = 1 ? ((nandOffset / 0x200) * 0x210) + nandOffset % 0x200 : nandOffset;
+  nandOffset = 1 ? ((nandOffset / sfcxState.pageSize) * sfcxState.pageSizePhys) + nandOffset % sfcxState.pageSize : nandOffset;
 
 #ifdef SFCX_DEBUG
   LOG_DEBUG(SFCX, "Reading Page[Physical = {:#d}] Logical address: {:#x}, Physical address: {:#x}",
@@ -543,11 +550,25 @@ void Xe::PCIDev::SFCX::sfcxReadPageFromNAND(bool physical) {
   memcpy(sfcxState.pageBuffer, &rawImageData[nandOffset], physical ? sfcxState.pageSizePhys : sfcxState.pageSize);
 }
 
-void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND(bool physical) {
+void Xe::PCIDev::SFCX::sfcxEraseBlock() {
+  // Block address, or whatever the nand register is pointing to
+  u32 nandOffset = sfcxState.addressReg;
+  // Calculate offset for the starting page
+  nandOffset = 1 ? ((nandOffset / sfcxState.pageSize) * sfcxState.pageSizePhys) + nandOffset % sfcxState.pageSize : nandOffset;
+
+#ifdef SFCX_DEBUG
+  LOG_DEBUG(SFCX, "Erasing page at logical address: {:#x}, physical address: {:#x}", sfcxState.addressReg, nandOffset);
+#endif // SFCX_DEBUG
+
+  // Perform the erase
+  memset(&rawImageData[nandOffset], 0, sfcxState.blockSizePhys);
+}
+
+void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND() {
   // Physical address when doing DMA
   u32 physAddr = sfcxState.addressReg;
   // Calculate Physical address offset for starting page
-  physAddr = 1 ? ((physAddr / 0x200) * 0x210) + physAddr % 0x200 : physAddr;
+  physAddr = 1 ? ((physAddr / sfcxState.pageSize) * sfcxState.pageSizePhys) + physAddr % sfcxState.pageSize : physAddr;
 
   // Number of pages to be transfered when doing DMA
   u32 dmaPagesNum = ((sfcxState.configReg & CONFIG_DMA_LEN) >> 6) + 1;
@@ -577,6 +598,53 @@ void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND(bool physical) {
     // On DMA, physical pages are split into Page data and Spare Data, and stored at different locations in memory
     memcpy(dataPhysAddrPtr, &sfcxState.pageBuffer, sfcxState.pageSize);
     memcpy(sparePhysAddrPtr, &sfcxState.pageBuffer[sfcxState.pageSize], sfcxState.spareSize);
+
+    // Increase buffer pointers
+    dataPhysAddrPtr += sfcxState.pageSize;   // Logical page size
+    sparePhysAddrPtr += sfcxState.spareSize; // Spare Size
+
+    // Add a small delay to simulate the time it takes to read the page.
+    std::this_thread::sleep_for(100ns);
+
+    // Increase read address
+    physAddr += sfcxState.pageSizePhys;
+  }
+}
+
+void Xe::PCIDev::SFCX::sfcxDoDMAtoNAND() {
+  // Physical address when doing DMA
+  u32 physAddr = sfcxState.addressReg;
+  // Calculate Physical address offset for starting page
+  physAddr = 1 ? ((physAddr / sfcxState.pageSize) * sfcxState.pageSizePhys) + physAddr % sfcxState.pageSize : physAddr;
+
+  // Number of pages to be transfered when doing DMA
+  u32 dmaPagesNum = ((sfcxState.configReg & CONFIG_DMA_LEN) >> 6) + 1;
+
+  // Get RAM pointers for both buffers
+  u8* dataPhysAddrPtr = mainMemory->getPointerToAddress(sfcxState.dataPhysAddrReg);
+  u8* sparePhysAddrPtr = mainMemory->getPointerToAddress(sfcxState.sparePhysAddrReg);
+
+#ifdef SFCX_DEBUG
+  LOG_DEBUG(SFCX, "DMA_RAM_TO_PHY: Writing {:#x} pages. Logical Address: {:#x}, Physical Address: {:#x}, Data DMA address: {:#x}, Spare DMA address: {:#x}",
+    dmaPagesNum, sfcxState.addressReg, physAddr, sfcxState.dataPhysAddrReg, sfcxState.sparePhysAddrReg);
+#endif // SFCX_DEBUG
+
+  // Read Pages to SFCX_DATAPHYADDR_REG and page sapre to SFCX_SPAREPHYADDR_REG
+  for (size_t pageNum = 0; pageNum < dmaPagesNum; pageNum++) {
+#ifdef SFCX_DEBUG
+    LOG_DEBUG(SFCX, "DMA_RAM_TO_PHY: Writing page {:#x}. Physical Address: {:#x}", pageNum, physAddr);
+#endif // SFCX_DEBUG
+
+    // Clear the page buffer
+    memset(sfcxState.pageBuffer, 0, sizeof(sfcxState.pageBuffer));
+
+    // Get page data
+    memcpy(sfcxState.pageBuffer, &rawImageData[physAddr], sfcxState.pageSizePhys);
+
+    // Write page and spare to NAND
+    // On DMA, physical pages are split into Page data and Spare Data, and stored at different locations in memory
+    memcpy(&sfcxState.pageBuffer, dataPhysAddrPtr, sfcxState.pageSize);
+    memcpy(&sfcxState.pageBuffer[sfcxState.pageSize], sparePhysAddrPtr, sfcxState.spareSize);
 
     // Increase buffer pointers
     dataPhysAddrPtr += sfcxState.pageSize;   // Logical page size

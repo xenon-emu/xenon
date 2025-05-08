@@ -158,6 +158,8 @@ struct SFCX_STATE {
   // Helpers
   u8 metaType = 0;
   u16 pageSize = 0x200;
+  u32 blockSize = 0x4000;
+  u32 blockSizePhys = 0x4000;
   u8 spareSize = 0x10;
   u16 pageSizePhys = static_cast<u16>(pageSize + spareSize);
   u8 pageBuffer[0x210] = {};
@@ -210,8 +212,12 @@ private:
   RAM* mainMemory;
   // Read a page from memory to page buffer.
   void sfcxReadPageFromNAND(bool physical);
+  // Erase NAND Block
+  void sfcxEraseBlock();
   // Does a DMA operation from NAND to physical memory.
-  void sfcxDoDMAfromNAND(bool physical);
+  void sfcxDoDMAfromNAND();
+  // Does a DMA operation from physical memory to NAND.
+  void sfcxDoDMAtoNAND();
   // RAW NAND Data from loaded image.
   std::vector<u8> rawImageData{};
 };

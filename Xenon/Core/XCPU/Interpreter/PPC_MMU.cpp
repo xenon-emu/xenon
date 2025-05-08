@@ -148,17 +148,13 @@ inline bool mmuComparePTE(u64 VA, u64 VPN, u64 pte0, u64 pte1, u8 p, bool L, boo
     }
   }
 
+  // Match
   if (match) {
-    // Match
-    if (L) { 
-      *RPN = pte1 & PPC_HPTE64_RPN_LP; // RPN is PTE[86:114].
-      return true; 
-    } else { 
-      *RPN = pte1 & PPC_HPTE64_RPN_NO_LP; // RPN is PTE[86:115].
-      return true; 
-    }
-  } else { return false; }
+    // RPN = PTE[86:114] : PTE[86:115].
+    *RPN = L ? pte1 & PPC_HPTE64_RPN_LP : pte1 & PPC_HPTE64_RPN_NO_LP;
+  }
 
+  return match;
 }
 
 void PPCInterpreter::PPCInterpreter_slbia(PPU_STATE *ppuState) {
