@@ -70,7 +70,8 @@ public:
   // Scratch
   u32 scratchMask = 0;
   u32 scratchAddr = 0;
-  // 
+  // RBBM
+  u32 rbbmStatus = 0;
 
   // Internal rendering width/height
   u32 internalWidth = 1280;

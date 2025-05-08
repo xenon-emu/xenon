@@ -495,24 +495,8 @@ bool CommandProcessor::ExecutePacketType3_COND_WRITE(RingBuffer *ringBuffer, u32
 
   u32 value = 0;
   if (waitInfo & 0x10) {
-    u32 addrWithFmt = static_cast<u32>(pollReg);
-    XeEndianFormat format = static_cast<XeEndianFormat>(addrWithFmt & 0x3);
-    u32 addr = addrWithFmt & ~0x3;
-    u8 *addrPtr = ram->getPointerToAddress(addr);
+    u8 *addrPtr = ram->getPointerToAddress(static_cast<u32>(pollReg));
     memcpy(&value, addrPtr, sizeof(value));
-    switch (format) {
-    case EndianFormatUnspecified:
-      break;
-    case EndianFormat8in16:
-      value = ((value << 8) & 0xFF00FF00) | ((value >> 8) & 0x00FF00FF);
-      break;
-    case EndianFormat8in32:
-      value = byteswap_be(value);
-      break;
-    case EndianFormat16in32:
-      value = ((value >> 16) & 0xFFFF) | (value << 16);
-      break;
-    }
   } else {
     value = state->ReadRegister(pollReg);
   }
@@ -546,25 +530,8 @@ bool CommandProcessor::ExecutePacketType3_COND_WRITE(RingBuffer *ringBuffer, u32
 
   if (matched) {
     if (waitInfo & 0x100) {
-      u32 addrWithFmt = static_cast<u32>(pollReg);
-      XeEndianFormat format = static_cast<XeEndianFormat>(addrWithFmt & 0x3);
-      u32 addr = addrWithFmt & ~0x3;
-      u8 *addrPtr = ram->getPointerToAddress(addr);
-      u32 rawValue = writeData;
-      switch (format) {
-      case EndianFormatUnspecified:
-        break;
-      case EndianFormat8in16:
-        rawValue = ((rawValue << 8) & 0xFF00FF00) | ((rawValue >> 8) & 0x00FF00FF);
-        break;
-      case EndianFormat8in32:
-        rawValue = byteswap_be(rawValue);
-        break;
-      case EndianFormat16in32:
-        rawValue = ((rawValue >> 16) & 0xFFFF) | (rawValue << 16);
-        break;
-      }
-      memcpy(addrPtr, &value, sizeof(value));
+      u8 *addrPtr = ram->getPointerToAddress(static_cast<u32>(writeReg));
+      memcpy(addrPtr, &writeData, sizeof(writeData));
     } else {
       state->WriteRegister(writeReg, writeData);
     }

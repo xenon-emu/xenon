@@ -86,22 +86,20 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
     LOG_DEBUG(Xenos, "Read from {}, index {:#x}", Xe::XGPU::GetRegisterNameById(regIndex), regIndex);
 #endif
 
-    u32 regData = 0;
-    memcpy(&regData, &xenosState->Regs[regIndex * 4], 4);
-
+    u32 regData = xenosState->ReadRegister(reg);
     // Switch for properly return the requested amount of data
     switch (size) {
     case 2:
-      regData = regData >> 16;
+      regData >>= 16;
       break;
     case 1:
-      regData = regData >> 24;
+      regData >>= 24;
       break;
     default:
       break;
     }
+    u32 value = regData;
 
-    u32 value = 0;
     switch (reg) {
     case XeRegister::MH_STATUS:
       value = 0x2;
@@ -114,8 +112,11 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
       break;
     // Gets past VdInitializeEngines+0x58
     case XeRegister::RBBM_DEBUG:
-      // Just return 0xF00
       value = 0xF00;
+      break;
+    // VdpHasWarmBooted expects this to be 0x10, otherwise, it waits until the GPU has intialised
+    case XeRegister::RBBM_STATUS:
+      value = xenosState->rbbmStatus;
       break;
     default:
       value = regData;
@@ -123,7 +124,7 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
       return true;
     }
 
-    value = byteswap_be(value);
+    value = byteswap_be<u32>(value);
     memcpy(data, &value, size);
 
     return true;
@@ -149,6 +150,11 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
     const XeRegister reg = static_cast<XeRegister>(regIndex);
 
     switch (reg) {
+    // VdpHasWarmBooted expects this to be 0x10, otherwise, it waits until the GPU has intialised
+    case XeRegister::RBBM_STATUS:
+      xenosState->rbbmStatus = tmp;
+      xenosState->WriteRegister(reg, tmp);
+      break;
     case XeRegister::CP_RB_BASE:
       commandProcessor->CPUpdateRBBase(tmp);
       break;
