@@ -116,9 +116,6 @@ void Xe::PCIDev::SMC::Read(u64 readAddress, u8 *data, u64 size) {
 
   mutex.lock();
   switch (regOffset) {
-  case UART_CONFIG_REG: // UART Config Register
-    memcpy(data, &smcPCIState.uartConfigReg, size);
-    break;
   case UART_BYTE_OUT_REG: // UART Data Out Register
     smcPCIState.uartOutReg = smcCoreState->uartHandle->Read();
     if (smcCoreState->uartHandle->retVal) {
@@ -136,6 +133,9 @@ void Xe::PCIDev::SMC::Read(u64 readAddress, u8 *data, u64 size) {
       setupUART(0x1E6); // 115200,8,N,1.
     }
     memcpy(data, &smcPCIState.uartStatusReg, size);
+    break;
+  case UART_CONFIG_REG: // UART Config Register
+    memcpy(data, &smcPCIState.uartConfigReg, size);
     break;
   case SMI_INT_STATUS_REG: // SMI INT Status Register
     memcpy(data, &smcPCIState.smiIntPendingReg, size);
@@ -176,6 +176,10 @@ void Xe::PCIDev::SMC::Write(u64 writeAddress, const u8 *data, u64 size) {
 
   mutex.lock();
   switch (regOffset) {
+  case UART_BYTE_IN_REG: // UART Data In Register
+    memcpy(&smcPCIState.uartInReg, data, size);
+    smcCoreState->uartHandle->Write(*data);
+    break;
   case UART_CONFIG_REG: // UART Config Register
     memcpy(&smcPCIState.uartConfigReg, data, size);
     // Check if UART is already initialized.
@@ -185,10 +189,6 @@ void Xe::PCIDev::SMC::Write(u64 writeAddress, const u8 *data, u64 size) {
       // Initialize UART.
       setupUART(tmp);
     }
-    break;
-  case UART_BYTE_IN_REG: // UART Data In Register
-    memcpy(&smcPCIState.uartInReg, data, size);
-    smcCoreState->uartHandle->Write(*data);
     break;
   case SMI_INT_STATUS_REG: // SMI INT Status Register
     memcpy(&smcPCIState.smiIntPendingReg, data, size);

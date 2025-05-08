@@ -44,12 +44,12 @@ Xe::Xenos::XGPU::XGPU(RAM *ram) :
   } break;
   case Config::eConsoleRevision::Corona4GB:
   case Config::eConsoleRevision::Corona: {
-    gpuRevision.revID = 0x00;
+    gpuRevision.revID = 0x01;
     revision.deviceID = 0x5841;
   } break;
   case Config::eConsoleRevision::Winchester: {
-    // gpuRevision.revID = ... ;
-    // revision.deviceID = ... ;
+    gpuRevision.revID = 0x01;
+    revision.deviceID = 0x5851;
   } break;
   }
   LOG_INFO(Xenos, "Xenos DeviceID: 0x{:X}", revision.deviceID);
