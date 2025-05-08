@@ -324,8 +324,10 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
   case Xe::XGPU::PM4_COND_EXEC:
     break;
   case Xe::XGPU::PM4_COND_WRITE:
+    result = ExecutePacketType3_COND_WRITE(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_EVENT_WRITE:
+    result = ExecutePacketType3_EVENT_WRITE(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_COND_REG_EXEC:
     break;
@@ -345,21 +347,26 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
   case Xe::XGPU::PM4_MEM_WRITE_CNTR:
     break;
   case Xe::XGPU::PM4_SET_BIN_MASK:
+    result = ExecutePacketType3_SET_BIN_MASK(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_SET_BIN_SELECT:
+    result = ExecutePacketType3_SET_BIN_SELECT(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_WAIT_REG_EQ:
     break;
   case Xe::XGPU::PM4_WAIT_REG_GTE:
     break;
   case Xe::XGPU::PM4_INTERRUPT:
-    //result = ExecutePacketType3_INTERRUPT(ringBuffer, packetData, dataCount);
+    result = ExecutePacketType3_INTERRUPT(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_SET_CONSTANT2:
+    result = ExecutePacketType3_SET_CONSTANT2(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_SET_SHADER_CONSTANTS:
+    result = ExecutePacketType3_SET_SHADER_CONSTANTS(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_EVENT_WRITE_SHD:
+    result = ExecutePacketType3_EVENT_WRITE_SHD(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_EVENT_WRITE_CFL:
     break;
@@ -376,12 +383,16 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
   case Xe::XGPU::PM4_SET_PROTECTED_MODE:
     break;
   case Xe::XGPU::PM4_SET_BIN_MASK_LO:
+    result = ExecutePacketType3_SET_BIN_MASK_LO(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_SET_BIN_MASK_HI:
+    result = ExecutePacketType3_SET_BIN_MASK_HI(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_SET_BIN_SELECT_LO:
+    result = ExecutePacketType3_SET_BIN_SELECT_LO(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_SET_BIN_SELECT_HI:
+    result = ExecutePacketType3_SET_BIN_SELECT_HI(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_SET_VISIBILITY_OVERRIDE:
     break;
@@ -453,6 +464,115 @@ bool CommandProcessor::ExecutePacketType3_REG_RMW(RingBuffer *ringBuffer, u32 pa
   state->WriteRawRegister(regAddr, value);
   return true;
 }
+
+bool CommandProcessor::ExecutePacketType3_EVENT_WRITE(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
+  // Generates an event that creates a write to memory when completed
+  const u32 initiator = ringBuffer->ReadAndSwap<u32>();
+
+  // Writeback
+  state->WriteRegister(XeRegister::VGT_EVENT_INITIATOR, initiator & 0x3F);
+
+  if (dataCount == 1) {
+    // Unknown what should be done here
+  } else {
+    LOG_ERROR(Xenos, "CP[EP3] | EVENT_WRITE: Invalid type!");
+    ringBuffer->AdvanceRead(dataCount - 1);
+  }
+
+  return true;
+}
+
+
+bool CommandProcessor::ExecutePacketType3_COND_WRITE(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
+  // Determines how long to wait for, and what to wait for
+  const u32 waitInfo = ringBuffer->ReadAndSwap<u32>();
+  const XeRegister pollReg = static_cast<XeRegister>(ringBuffer->ReadAndSwap<u32>());
+  const u32 ref = ringBuffer->ReadAndSwap<u32>();
+  const u32 mask = ringBuffer->ReadAndSwap<u32>();
+  // Write data
+  const XeRegister writeReg = static_cast<XeRegister>(ringBuffer->ReadAndSwap<u32>());
+  const u32 writeData = ringBuffer->ReadAndSwap<u32>();
+
+  u32 value = 0;
+  if (waitInfo & 0x10) {
+    u32 addrWithFmt = static_cast<u32>(pollReg);
+    XeEndianFormat format = static_cast<XeEndianFormat>(addrWithFmt & 0x3);
+    u32 addr = addrWithFmt & ~0x3;
+    u8 *addrPtr = ram->getPointerToAddress(addr);
+    memcpy(&value, addrPtr, sizeof(value));
+    switch (format) {
+    case EndianFormatUnspecified:
+      break;
+    case EndianFormat8in16:
+      value = ((value << 8) & 0xFF00FF00) | ((value >> 8) & 0x00FF00FF);
+      break;
+    case EndianFormat8in32:
+      value = byteswap_be(value);
+      break;
+    case EndianFormat16in32:
+      value = ((value >> 16) & 0xFFFF) | (value << 16);
+      break;
+    }
+  } else {
+    value = state->ReadRegister(pollReg);
+  }
+  bool matched = false;
+  switch (waitInfo & 0x7) {
+  case 0: // Never
+    matched = false;
+    break;
+  case 1: // Less than reference
+    matched = (value & mask) < ref;
+    break;
+  case 2: // Less than or equal to reference
+    matched = (value & mask) <= ref;
+    break;
+  case 3: // Equal to reference
+    matched = (value & mask) == ref;
+    break;
+  case 4: // Not equal to reference
+    matched = (value & mask) != ref;
+    break;
+  case 5: // Greater than or equal to reference
+    matched = (value & mask) >= ref;
+    break;
+  case 6: // Greater than reference
+    matched = (value & mask) > ref;
+    break;
+  case 7: // Always
+    matched = true;
+    break;
+  }
+
+  if (matched) {
+    if (waitInfo & 0x100) {
+      u32 addrWithFmt = static_cast<u32>(pollReg);
+      XeEndianFormat format = static_cast<XeEndianFormat>(addrWithFmt & 0x3);
+      u32 addr = addrWithFmt & ~0x3;
+      u8 *addrPtr = ram->getPointerToAddress(addr);
+      u32 rawValue = writeData;
+      switch (format) {
+      case EndianFormatUnspecified:
+        break;
+      case EndianFormat8in16:
+        rawValue = ((rawValue << 8) & 0xFF00FF00) | ((rawValue >> 8) & 0x00FF00FF);
+        break;
+      case EndianFormat8in32:
+        rawValue = byteswap_be(rawValue);
+        break;
+      case EndianFormat16in32:
+        rawValue = ((rawValue >> 16) & 0xFFFF) | (rawValue << 16);
+        break;
+      }
+      memcpy(addrPtr, &value, sizeof(value));
+    } else {
+      state->WriteRegister(writeReg, writeData);
+    }
+  }
+
+  return true;
+}
+
 bool CommandProcessor::ExecutePacketType3_INVALIDATE_STATE(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
   const u32 stateMask = ringBuffer->ReadAndSwap<u32>();
   return true;
@@ -483,6 +603,73 @@ bool CommandProcessor::ExecutePacketType3_INDIRECT_BUFFER(RingBuffer *ringBuffer
 bool CommandProcessor::ExecutePacketType3_INTERRUPT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
   // CPU(s) to interrupt
   const u32 cpuMask = ringBuffer->ReadAndSwap<u32>();
+  return true;
+}
+
+bool CommandProcessor::ExecutePacketType3_SET_CONSTANT2(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
+  // Get base index
+  const u32 offsetType = ringBuffer->ReadAndSwap<u32>();
+  const u32 index = offsetType & 0xFFFF;
+
+  // Write constants
+  for (u32 n = 0; n != dataCount - 1; ++n) {
+    const u32 data = ringBuffer->ReadAndSwap<u32>();
+    state->WriteRegister(static_cast<XeRegister>(index + n), data);
+  }
+
+  return true;
+}
+
+bool CommandProcessor::ExecutePacketType3_SET_SHADER_CONSTANTS(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
+  // Get base index
+  const u32 offsetType = ringBuffer->ReadAndSwap<u32>();
+  const u32 index = offsetType & 0xFFFF;
+
+  // Write constants
+  for (u32 n = 0; n != dataCount - 1; ++n) {
+    const u32 data = ringBuffer->ReadAndSwap<u32>();
+    state->WriteRegister(static_cast<XeRegister>(index + n), data);
+  }
+
+  return true;
+}
+
+bool CommandProcessor::ExecutePacketType3_EVENT_WRITE_SHD(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
+  // Generates a VS|PS_done event
+  const u32 initiator = ringBuffer->ReadAndSwap<u32>();
+  const u32 address = ringBuffer->ReadAndSwap<u32>();
+  const u32 value = ringBuffer->ReadAndSwap<u32>();
+  u32 addr = address & ~0x3;
+  XeEndianFormat format = static_cast<XeEndianFormat>(address & 0x3);
+
+  // Writeback
+  state->WriteRegister(XeRegister::VGT_EVENT_INITIATOR, initiator & 0x3F);
+
+  u32 writeValue = 0;
+  if ((initiator >> 31) & 0x1) {
+    writeValue = swapCount;
+  } else {
+    writeValue = value;
+  }
+
+  u32 rawValue = writeValue;
+  switch (format) {
+  case EndianFormatUnspecified:
+    break;
+  case EndianFormat8in16:
+    rawValue = ((rawValue << 8) & 0xFF00FF00) | ((rawValue >> 8) & 0x00FF00FF);
+    break;
+  case EndianFormat8in32:
+    rawValue = byteswap_be(rawValue);
+    break;
+  case EndianFormat16in32:
+    rawValue = ((rawValue >> 16) & 0xFFFF) | (rawValue << 16);
+    break;
+  }
+
+  u8 *addrPtr = ram->getPointerToAddress(addr);
+  memcpy(addrPtr, &value, sizeof(value));
+
   return true;
 }
 
@@ -568,6 +755,42 @@ bool CommandProcessor::ExecutePacketType3_WAIT_REG_MEM(RingBuffer *ringBuffer, u
       }
     }
   } while (!matched);
+  return true;
+}
+
+bool CommandProcessor::ExecutePacketType3_SET_BIN_MASK(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
+  const u32 mask = ringBuffer->ReadAndSwap<u32>();
+  binMask = mask;
+  return true;
+}
+
+bool CommandProcessor::ExecutePacketType3_SET_BIN_SELECT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
+  const u32 select = ringBuffer->ReadAndSwap<u32>();
+  binSelect = select;
+  return true;
+}
+
+bool CommandProcessor::ExecutePacketType3_SET_BIN_MASK_LO(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
+  const u32 loMask = ringBuffer->ReadAndSwap<u32>();
+  binMask = (binMask & 0xFFFFFFFF00000000ull) | loMask;
+  return true;
+}
+
+bool CommandProcessor::ExecutePacketType3_SET_BIN_MASK_HI(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
+  const u32 hiMask = ringBuffer->ReadAndSwap<u32>();
+  binMask = (binMask & 0xFFFFFFFFull) | (static_cast<u64>(hiMask) << 32);
+  return true;
+}
+
+bool CommandProcessor::ExecutePacketType3_SET_BIN_SELECT_LO(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
+  const u32 loSelect = ringBuffer->ReadAndSwap<u32>();
+  binSelect = (binSelect & 0xFFFFFFFF00000000ull) | loSelect;
+  return true;
+}
+
+bool CommandProcessor::ExecutePacketType3_SET_BIN_SELECT_HI(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
+  const u32 hiSelect = ringBuffer->ReadAndSwap<u32>();
+  binSelect = (binSelect & 0xFFFFFFFFull) | (static_cast<u64>(hiSelect) << 32);
   return true;
 }
 

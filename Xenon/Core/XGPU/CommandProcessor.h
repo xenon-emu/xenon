@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <thread>
 #include <memory>
 
@@ -237,9 +238,13 @@ private:
   // Execute indirect buffer from PM4_INDIRECT_BUFFER.
   void cpExecuteIndirectBuffer(u32 bufferPtr, u32 bufferSize);
 
-  // For tiling.
-  static constexpr u64 binSelect = 0xFFFFFFFFULL;
-  static constexpr u64 binMask = 0xFFFFFFFFULL;
+  // Handles tiling type
+  u64 binSelect = 0xFFFFFFFFULL;
+  u64 binMask = 0xFFFFFFFFULL;
+
+  // Internal swap counters
+  std::atomic<u32> swapCount;
+  std::atomic<u32> vblankCount;
 
   // Execute a packet based on the Ringbuffer data.
   bool ExecutePacket(RingBuffer *ringBuffer);
@@ -254,9 +259,20 @@ private:
   bool ExecutePacketType3_NOP(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
   bool ExecutePacketType3_INVALIDATE_STATE(RingBuffer* ringBuffer, u32 packetData, u32 dataCount);
   bool ExecutePacketType3_REG_RMW(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_COND_WRITE(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_EVENT_WRITE(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
   bool ExecutePacketType3_ME_INIT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
   bool ExecutePacketType3_INTERRUPT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_SET_CONSTANT2(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_SET_SHADER_CONSTANTS(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_EVENT_WRITE_SHD(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
   bool ExecutePacketType3_INDIRECT_BUFFER(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
   bool ExecutePacketType3_WAIT_REG_MEM(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_SET_BIN_MASK(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_SET_BIN_SELECT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_SET_BIN_MASK_LO(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_SET_BIN_MASK_HI(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_SET_BIN_SELECT_LO(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_SET_BIN_SELECT_HI(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
 };
 }
