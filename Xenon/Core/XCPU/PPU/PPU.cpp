@@ -401,10 +401,12 @@ void PPU::ThreadLoop() {
 
       // Enable thread 0 execution
       ppuState->SPR.CTRL = 0x800000;
-
-      // Issue reset
-      ppuState->ppuThread[ePPUThread_Zero].exceptReg |= PPU_EX_RESET;
-      ppuState->ppuThread[ePPUThread_One].exceptReg |= PPU_EX_RESET;
+      
+      if (!ppuThreadResetting && ppuThreadState.load() != eThreadState::Running) {
+        // Issue reset
+        ppuState->ppuThread[ePPUThread_Zero].exceptReg |= PPU_EX_RESET;
+        ppuState->ppuThread[ePPUThread_One].exceptReg |= PPU_EX_RESET;
+      }
       
       PPU_THREAD_REGISTERS &thread = curThread;
 

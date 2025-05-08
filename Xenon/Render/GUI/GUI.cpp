@@ -380,9 +380,9 @@ void Render::GUI::Tooltip(const std::string &contents, ImGuiHoveredFlags delay) 
 void RenderInstructions(Render::GUI *gui, PPU_STATE *state, ePPUThread thr, u64 numInstructions) {
   PPU_THREAD_REGISTERS &thread = state->ppuThread[thr];
   f32 maxLineWidth = ImGui::GetContentRegionAvail().x;
-  for (u64 i = 0; i != numInstructions; ++i) {
+  for (u64 i = 0; i != (numInstructions * 2) + 1; ++i) {
     u32 instr = 0;
-    u64 addr = thread.CIA + (4 * i);
+    u64 addr = (thread.CIA - (4 * numInstructions + 1)) + (4 * i);
     thread.instrFetch = true;
     instr = PPCInterpreter::MMURead32(state, addr, thr);
     if (thread.exceptReg & PPU_EX_INSSTOR || thread.exceptReg & PPU_EX_INSTSEGM) {
@@ -401,7 +401,7 @@ void RenderInstructions(Render::GUI *gui, PPU_STATE *state, ePPUThread thr, u64 
     const u32 b2 = static_cast<u8>((instr >> 16) & 0xFF);
     const u32 b3 = static_cast<u8>((instr >> 24) & 0xFF);
 #endif
-    gui->TextCopySimple(fmt::format("{:08X}", addr)); gui->SameLine(0.f, 2.f);
+    gui->TextCopySimple(fmt::format("{}{:08X}", addr == thread.CIA ? "[*] " : "", addr)); gui->SameLine(0.f, 2.f);
     gui->TextCopySplit(fmt::format("{:02X}##{}", b0, addr), fmt::format("{:08X}", instr)); gui->SameLine(0.f, 2.f);
     gui->TextCopySimple(fmt::format("{:02X}##{}", b1, addr + 1)); gui->SameLine(0.f, 2.f);
     gui->TextCopySimple(fmt::format("{:02X}##{}", b2, addr + 2)); gui->SameLine(0.f, 2.f);
