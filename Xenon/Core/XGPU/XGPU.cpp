@@ -63,13 +63,13 @@ Xe::Xenos::XGPU::XGPU(RAM *ram) :
 
   // Set Clocks speeds.
   u32 reg = 0x09000000;
-  memcpy(&xenosState.Regs[(u32)XeRegister::SPLL_CNTL_REG * 4], &reg, 4);
+  memcpy(&xenosState.Regs[GET_OFFSET(XeRegister::SPLL_CNTL_REG)], &reg, 4);
   reg = 0x11000C00;
-  memcpy(&xenosState.Regs[(u32)XeRegister::RPLL_CNTL_REG * 4], &reg, 4);
+  memcpy(&xenosState.Regs[GET_OFFSET(XeRegister::RPLL_CNTL_REG)], &reg, 4);
   reg = 0x1A000001;
-  memcpy(&xenosState.Regs[(u32)XeRegister::FPLL_CNTL_REG * 4], &reg, 4);
+  memcpy(&xenosState.Regs[GET_OFFSET(XeRegister::FPLL_CNTL_REG)], &reg, 4);
   reg = 0x19100000;
-  memcpy(&xenosState.Regs[(u32)XeRegister::MPLL_CNTL_REG * 4], &reg, 4);
+  memcpy(&xenosState.Regs[GET_OFFSET(XeRegister::MPLL_CNTL_REG)], &reg, 4);
 
   commandProcessor = std::make_unique<STRIP_UNIQUE(commandProcessor)>(ramPtr);
 }
