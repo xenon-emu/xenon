@@ -71,8 +71,8 @@ public:
   u32 scratchMask = 0;
   u32 scratchAddr = 0;
   // RBBM
-  u32 rbbmStatus = 0;
-
+  u32 rbbmDebug = 0xF0000;
+  u32 rbbmStatus = 0x10000000;
   // Internal rendering width/height
   u32 internalWidth = 1280;
   u32 internalHeight = 720;
@@ -1228,6 +1228,14 @@ static const std::unordered_map<u32, const std::string> registerMap = {
   { 0x239D, "PA_CL_UCP_5_Y" },
   { 0x239E, "PA_CL_UCP_5_Z" },
   { 0x239F, "PA_CL_UCP_5_W" },
+
+  { 0x3EFC, "AZ0_LOOPBACK_LFSR" },
+  { 0x3F00, "RB_SIDEBAND_DATA" },
+  { 0x3F04, "RB_SIDEBAND_RD_ADDR" },
+  { 0x3F08, "RB_SIDEBAND_STATUS" },
+  { 0x3F18, "RB_SIDEBAND_DAUGHTER_DATA" },
+  { 0x3F24, "RB_SIDEBAND_PARENT_DATA" },
+
   { 0x4000, "SHADER_CONSTANT_000_X" },
   { 0x4001, "SHADER_CONSTANT_000_Y" },
   { 0x4002, "SHADER_CONSTANT_000_Z" },
@@ -4791,6 +4799,13 @@ enum class XeRegister {
   PA_CL_UCP_5_Y = 0x239D,
   PA_CL_UCP_5_Z = 0x239E,
   PA_CL_UCP_5_W = 0x239F,
+
+  AZ0_LOOPBACK_LFSR = 0x3EFC,
+  RB_SIDEBAND_DATA = 0x3F00,
+  RB_SIDEBAND_RD_ADDR = 0x3F04,
+  RB_SIDEBAND_STATUS = 0x3F08,
+  RB_SIDEBAND_DAUGHTER_DATA = 0x3F18,
+  RB_SIDEBAND_PARENT_DATA = 0x3F24,
 
   SHADER_CONSTANT_000_X = 0x4000,
   SHADER_CONSTANT_000_Y = 0x4001,

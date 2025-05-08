@@ -61,11 +61,41 @@ Xe::Xenos::XGPU::XGPU(RAM *ram, PCIBridge *pciBridge) : ramPtr(ram), parentBus(p
   pciDevSizes[0] = 0x20000; // BAR0
 
   // Set Clocks speeds.
-  u32 reg = 0x09000000;
-  xenosState->WriteRegister(XeRegister::SPLL_CNTL_REG, 0x09000000);
-  xenosState->WriteRegister(XeRegister::RPLL_CNTL_REG, 0x11000C00);
-  xenosState->WriteRegister(XeRegister::FPLL_CNTL_REG, 0x1A000001);
-  xenosState->WriteRegister(XeRegister::MPLL_CNTL_REG, 0x19100000);
+
+  // TODO: Fix for Valhalla (Winchester)
+  // TODO: Fix for Slims
+  switch (Config::highlyExperimental.consoleRevison) {
+  case Config::eConsoleRevision::Zephyr:
+  case Config::eConsoleRevision::Falcon:
+  case Config::eConsoleRevision::Jasper: {
+    xenosState->WriteRegister(XeRegister::SPLL_CNTL_REG, 0x09000000);
+    xenosState->WriteRegister(XeRegister::RPLL_CNTL_REG, 0x11000C00);
+    xenosState->WriteRegister(XeRegister::FPLL_CNTL_REG, 0x1A000001);
+    xenosState->WriteRegister(XeRegister::MPLL_CNTL_REG, 0x19100000);
+  } break;
+  case Config::eConsoleRevision::Trinity: {
+    xenosState->WriteRegister(XeRegister::SPLL_CNTL_REG, 0x09000000);
+    xenosState->WriteRegister(XeRegister::RPLL_CNTL_REG, 0x11000C00);
+    xenosState->WriteRegister(XeRegister::FPLL_CNTL_REG, 0x1A000001);
+    xenosState->WriteRegister(XeRegister::MPLL_CNTL_REG, 0x19100000);
+    xenosState->WriteRegister(XeRegister::MDLL_CNTL1_REG, 0x19100000);
+  } break;
+  case Config::eConsoleRevision::Corona4GB:
+  case Config::eConsoleRevision::Corona: {
+    xenosState->WriteRegister(XeRegister::SPLL_CNTL_REG, 0x09000000);
+    xenosState->WriteRegister(XeRegister::RPLL_CNTL_REG, 0x11000C00);
+    xenosState->WriteRegister(XeRegister::FPLL_CNTL_REG, 0x1A000001);
+    xenosState->WriteRegister(XeRegister::MPLL_CNTL_REG, 0x19100000);
+    xenosState->WriteRegister(XeRegister::MDLL_CNTL1_REG, 0x19100000);
+  } break;
+  case Config::eConsoleRevision::Winchester: {
+    xenosState->WriteRegister(XeRegister::SPLL_CNTL_REG, 0x09000000);
+    xenosState->WriteRegister(XeRegister::RPLL_CNTL_REG, 0x11000C00);
+    xenosState->WriteRegister(XeRegister::FPLL_CNTL_REG, 0x1A000001);
+    xenosState->WriteRegister(XeRegister::MPLL_CNTL_REG, 0x19100000);
+    xenosState->WriteRegister(XeRegister::MDLL_CNTL1_REG, 0x19100000);
+  } break;
+  }
 
   commandProcessor = std::make_unique<STRIP_UNIQUE(commandProcessor)>(ramPtr, xenosState.get(), parentBus);
 }
@@ -102,31 +132,32 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
 
     switch (reg) {
     case XeRegister::MH_STATUS:
-      value = 0x2;
+      value = 0x2000000;
       break;
     case XeRegister::DC_LUT_AUTOFILL:
-      value = 0x2;
+      value = 0x2000000;
       break;
     case XeRegister::XDVO_REGISTER_INDEX:
       value = 0x0;
       break;
     // Gets past VdInitializeEngines+0x58
     case XeRegister::RBBM_DEBUG:
-      value = 0xF00;
+      value = xenosState->rbbmDebug;
       break;
     // VdpHasWarmBooted expects this to be 0x10, otherwise, it waits until the GPU has intialised
     case XeRegister::RBBM_STATUS:
       value = xenosState->rbbmStatus;
+      if (value == 0x10000000) {
+        xenosState->rbbmStatus = 0x10;
+        value = xenosState->rbbmStatus;
+      }
       break;
     default:
       value = regData;
-      memcpy(data, &value, size);
-      return true;
+      break;
     }
 
-    value = byteswap_be<u32>(value);
     memcpy(data, &value, size);
-
     return true;
   }
 
@@ -153,6 +184,11 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
     // VdpHasWarmBooted expects this to be 0x10, otherwise, it waits until the GPU has intialised
     case XeRegister::RBBM_STATUS:
       xenosState->rbbmStatus = tmp;
+      xenosState->WriteRegister(reg, tmp);
+      break;
+    // VdpHasWarmBooted expects this to be 0x10, otherwise, it waits until the GPU has intialised
+    case XeRegister::RBBM_DEBUG:
+      xenosState->rbbmDebug = tmp;
       xenosState->WriteRegister(reg, tmp);
       break;
     case XeRegister::CP_RB_BASE:
