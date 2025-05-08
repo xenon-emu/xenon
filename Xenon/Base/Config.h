@@ -222,7 +222,7 @@ inline struct _filepaths {
 //
 inline struct _log {
   // Current log level
-  Base::Log::Level currentLevel = Base::Log::Level::Warning;
+  Base::Log::Level currentLevel = Base::Log::Level::Info;
   // Show more details on log
   bool advanced = false;
   // Show debug-only log statements

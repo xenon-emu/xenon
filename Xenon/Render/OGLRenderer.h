@@ -37,6 +37,11 @@ private:
   u32 dummyVAO;
   // SDL Context
   SDL_GLContext context;
+
+  // OpenGL Infos
+  std::string gl_version() const;
+  std::string gl_vendor() const;
+  std::string gl_renderer() const;
 };
 
 } // namespace Render

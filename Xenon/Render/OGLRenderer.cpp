@@ -18,6 +18,27 @@ OGLRenderer::~OGLRenderer() {
   Shutdown();
 }
 
+std::string OGLRenderer::gl_version() const {
+  const GLubyte* version = glGetString(GL_VERSION);
+  const char* c_version = reinterpret_cast<const char*>(version);
+
+  return c_version;
+}
+
+std::string OGLRenderer::gl_vendor() const {
+  const GLubyte* vendor = glGetString(GL_VENDOR);
+  const char* c_vendor = reinterpret_cast<const char*>(vendor);
+
+  return c_vendor;
+}
+
+std::string OGLRenderer::gl_renderer() const {
+  const GLubyte* renderer = glGetString(GL_RENDERER);
+  const char* c_renderer = reinterpret_cast<const char*>(renderer);
+
+  return c_renderer;
+}
+
 void OGLRenderer::BackendStart() {
   // Create the resource factory
   resourceFactory = std::make_unique<OGLResourceFactory>();
@@ -63,6 +84,10 @@ void OGLRenderer::BackendSDLInit() {
   // Init GLAD
   if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress)) {
     LOG_ERROR(Render, "Failed to initialize OpenGL Loader");
+  } else {
+    LOG_INFO(Render, "OpenGL Version: {}", OGLRenderer::gl_version());
+    LOG_INFO(Render, "OpenGL Vendor: {}", OGLRenderer::gl_vendor());
+    LOG_INFO(Render, "OpenGL Renderer: {}", OGLRenderer::gl_renderer());
   }
   // Set VSYNC
   SDL_GL_SetSwapInterval(VSYNC);
