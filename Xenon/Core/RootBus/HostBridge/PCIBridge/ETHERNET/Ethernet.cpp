@@ -214,7 +214,7 @@ void Xe::PCIDev::ETHERNET::Write(u64 writeAddress, const u8 *data, u64 size) {
   case ADDRESS_0 + 4:
   case ADDRESS_0 + 5:
     memcpy(&ethPciState.macAddress[(offset - ADDRESS_0)], data, size);
-    LOG_DEBUG(ETH, "macAddress[{}] = 0x{:X}", (offset - ADDRESS_0), (u32)*data);
+    LOG_DEBUG(ETH, "macAddress[{}] = 0x{:X}", (offset - ADDRESS_0), static_cast<u32>(*data));
     break;
   case MULTICAST_HASH + 0x0:
     ethPciState.multicastHashFilter0 = val;
@@ -235,7 +235,7 @@ void Xe::PCIDev::ETHERNET::Write(u64 writeAddress, const u8 *data, u64 size) {
   case ADDRESS_1 + 4:
   case ADDRESS_1 + 5:
     memcpy(&ethPciState.macAddress2[(offset - ADDRESS_1)], data, size);
-    LOG_DEBUG(ETH, "macAddress2[{}] = 0x{:X}", (offset - ADDRESS_1), (u32)*data);
+    LOG_DEBUG(ETH, "macAddress2[{}] = 0x{:X}", (offset - ADDRESS_1), static_cast<u32>(*data));
     break;
   default:
     LOG_ERROR(ETH, "Register '{:#x}' is unknown! Data = {:#x} ({}b)", static_cast<u16>(offset), val, size);

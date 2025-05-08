@@ -47,12 +47,12 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
   }
 
   // INIT_POWER_MODE bypass 2.0.17489.0.
-  if ((u32)thread.CIA == 0x80081764) {
+  if (static_cast<u32>(thread.CIA) == 0x80081764) {
     return;
   }
 
   // XAudioRenderDriverInitialize bypass 2.0.17489.0.
-  if ((u32)thread.CIA == 0x80081830) {
+  if (static_cast<u32>(thread.CIA) == 0x80081830) {
     return;
   }
 
@@ -251,7 +251,7 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
   case 0x14:
   case 0x1A: {
     u32 strAddr = GPR(3);
-    u64 strSize = (u64)GPR(4);
+    u64 strSize = static_cast<u64>(GPR(4));
     std::unique_ptr<u8[]> buffer = std::make_unique<STRIP_UNIQUE_ARR(buffer)>(strSize+1);
     MMURead(CPUContext, ppuState, strAddr, strSize, buffer.get());
     char *dbgString = reinterpret_cast<char*>(buffer.get());

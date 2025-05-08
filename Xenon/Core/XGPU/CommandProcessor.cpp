@@ -131,7 +131,7 @@ bool CommandProcessor::ExecutePacket(RingBuffer *ringBuffer) {
     return true;
   }
 
-  LOG_DEBUG(Xenos, "Executing packet type {} (0x{:X})", (u32)packetType, packetData);
+  LOG_DEBUG(Xenos, "Executing packet type {} (0x{:X})", static_cast<u32>(packetType), packetData);
 
   // Execute packet based on type.
   switch (packetType) {

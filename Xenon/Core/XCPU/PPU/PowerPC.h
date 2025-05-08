@@ -615,7 +615,7 @@ union SFPRegister { // Single Precision
 };
 
 union FPRegister { // Double Precision
-  double valueAsDouble;
+  f64 valueAsDouble;
   u64 valueAsU64;
 };
 

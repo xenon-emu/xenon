@@ -24,11 +24,11 @@ struct addResult {
   // and out of bit[32] in 32 bit mode(of 64 bit implementations)
   addResult(T a, T b, bool sfBitMode) :
     result(a + b), carry(sfBitMode ? (result < a) :
-      (static_cast<u32>(result) < static_cast<u32>(a)))
+      (static_cast<u32>(result < a)))
   {
   }
 
-  // Straighforward ADC with flags
+  // Straightforward ADC with flags
   addResult(T a, T b, bool c, bool sfBitMode) :
     addResult(a, b, sfBitMode)
   {
@@ -36,11 +36,11 @@ struct addResult {
     result = r.result;
     carry |= r.carry;
   }
-  static addResult<T> addBits(T a, T b, bool sfBitMode) {
+  static constexpr addResult<T> addBits(T a, T b, bool sfBitMode) {
     return { a, b, sfBitMode };
   }
 
-  static addResult<T> addBits(T a, T b, bool c, bool sfBitMode) {
+  static constexpr addResult<T> addBits(T a, T b, bool c, bool sfBitMode) {
     return { a, b, c, sfBitMode };
   }
 };
@@ -901,14 +901,12 @@ void PPCInterpreter::PPCInterpreter_mullwx(PPU_STATE *ppuState) {
   }
 }
 // Multiply Low Word + OE
-void PPCInterpreter::PPCInterpreter_mullwox(PPU_STATE *ppuState)
-{
+void PPCInterpreter::PPCInterpreter_mullwox(PPU_STATE *ppuState) {
   PPCInterpreter_mullwx(ppuState);
 }
 
 // Multiply High Word (x'7C00 0096')
-void PPCInterpreter::PPCInterpreter_mulhwx(PPU_STATE *ppuState)
-{
+void PPCInterpreter::PPCInterpreter_mulhwx(PPU_STATE *ppuState) {
   /*
     prod[0-63] <- rA[32-63] * rB[32-63]
     rD[32-63] <- prod[0-31]

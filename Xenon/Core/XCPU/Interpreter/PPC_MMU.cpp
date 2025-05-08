@@ -762,8 +762,8 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
       if (slbEntry.V) {
 #ifdef DEBUG_BUILD
         if (Config::log.advanced)
-          LOG_TRACE(Xenon_MMU, "Checking valid SLB (V:0x{:X},LP:0x{:X},C:0x{:X},L:0x{:X},N:0x{:X},Kp:0x{:X},Ks:0x{:X},VSID:0x{:X},ESID:0x{:X},vsidReg:0x{:X},esidReg:0x{:X})", (u32)slbEntry.V, (u32)slbEntry.LP, (u32)slbEntry.C, (u32)slbEntry.L,
-                                (u32)slbEntry.N, (u32)slbEntry.Kp, (u32)slbEntry.Ks,
+          LOG_TRACE(Xenon_MMU, "Checking valid SLB (V:0x{:X},LP:0x{:X},C:0x{:X},L:0x{:X},N:0x{:X},Kp:0x{:X},Ks:0x{:X},VSID:0x{:X},ESID:0x{:X},vsidReg:0x{:X},esidReg:0x{:X})", static_cast<u32>(slbEntry.V), static_cast<u32>(slbEntry.LP), static_cast<u32>(slbEntry.C), static_cast<u32>(slbEntry.L),
+                                static_cast<u32>(slbEntry.N), static_cast<u32>(slbEntry.Kp), static_cast<u32>(slbEntry.Ks),
                                 slbEntry.VSID, slbEntry.ESID, slbEntry.vsidReg, slbEntry.esidReg);
 #endif
         if (slbEntry.ESID == ESID) {
