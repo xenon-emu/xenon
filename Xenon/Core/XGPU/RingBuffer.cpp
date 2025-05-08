@@ -45,16 +45,16 @@ namespace Xe::XGPU {
     }
   }
 
-  void RingBuffer::EndRead(ReadRange read_range) {
-    if (read_range.second) {
-      _readOffset = read_range.second_length;
+  void RingBuffer::EndRead(ReadRange readRange) {
+    if (readRange.second) {
+      _readOffset = readRange.secondLength;
     }
     else {
-      _readOffset += read_range.first_length;
+      _readOffset += readRange.firstLength;
     }
   }
 
-  size_t RingBuffer::Read(u8* buffer, size_t count) {
+  size_t RingBuffer::Read(u8 *buffer, size_t count) {
     count = std::min(count, _capacity);
     if (!count) {
       return 0;

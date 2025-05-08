@@ -125,12 +125,6 @@ bool PCIBridge::RouteInterrupt(u8 prio) {
         pciBridgeState.PRIO_REG_EHCI1.targetCPU);
     }
     break;
-  case PRIO_ENET:
-    if (pciBridgeState.PRIO_REG_ENET.intEnabled) {
-      xenonIIC->genInterrupt(PRIO_ENET,
-        pciBridgeState.PRIO_REG_ENET.targetCPU);
-    }
-    break;
   case PRIO_XMA:
     if (pciBridgeState.PRIO_REG_XMA.intEnabled) {
       xenonIIC->genInterrupt(PRIO_XMA,
@@ -141,6 +135,18 @@ bool PCIBridge::RouteInterrupt(u8 prio) {
     if (pciBridgeState.PRIO_REG_AUDIO.intEnabled) {
       xenonIIC->genInterrupt(PRIO_AUDIO,
         pciBridgeState.PRIO_REG_AUDIO.targetCPU);
+    }
+    break;
+  case PRIO_ENET:
+    if (pciBridgeState.PRIO_REG_ENET.intEnabled) {
+      xenonIIC->genInterrupt(PRIO_ENET,
+        pciBridgeState.PRIO_REG_ENET.targetCPU);
+    }
+    break;
+  case PRIO_GRAPHICS:
+    if (pciBridgeState.PRIO_REG_GRAPHICS.intEnabled) {
+      xenonIIC->genInterrupt(PRIO_GRAPHICS,
+        pciBridgeState.PRIO_REG_GRAPHICS.targetCPU);
     }
     break;
   case PRIO_SFCX:
@@ -206,12 +212,6 @@ void PCIBridge::CancelInterrupt(u8 prio) {
         pciBridgeState.PRIO_REG_EHCI1.targetCPU);
     }
     break;
-  case PRIO_ENET:
-    if (pciBridgeState.PRIO_REG_ENET.intEnabled) {
-      xenonIIC->cancelInterrupt(PRIO_ENET,
-        pciBridgeState.PRIO_REG_ENET.targetCPU);
-    }
-    break;
   case PRIO_XMA:
     if (pciBridgeState.PRIO_REG_XMA.intEnabled) {
       xenonIIC->cancelInterrupt(PRIO_XMA,
@@ -222,6 +222,18 @@ void PCIBridge::CancelInterrupt(u8 prio) {
     if (pciBridgeState.PRIO_REG_AUDIO.intEnabled) {
       xenonIIC->cancelInterrupt(PRIO_AUDIO,
         pciBridgeState.PRIO_REG_AUDIO.targetCPU);
+    }
+    break;
+  case PRIO_ENET:
+    if (pciBridgeState.PRIO_REG_ENET.intEnabled) {
+      xenonIIC->cancelInterrupt(PRIO_ENET,
+        pciBridgeState.PRIO_REG_ENET.targetCPU);
+    }
+    break;
+  case PRIO_GRAPHICS:
+    if (pciBridgeState.PRIO_REG_GRAPHICS.intEnabled) {
+      xenonIIC->cancelInterrupt(PRIO_GRAPHICS,
+        pciBridgeState.PRIO_REG_GRAPHICS.targetCPU);
     }
     break;
   case PRIO_SFCX:

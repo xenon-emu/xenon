@@ -19,7 +19,7 @@
 
 namespace Xe::XGPU {
   
-CommandProcessor::CommandProcessor(RAM *ramPtr, XenosState * statePtr) : ram(ramPtr), state(statePtr) {
+CommandProcessor::CommandProcessor(RAM *ramPtr, XenosState *statePtr, PCIBridge *pciBridge) : ram(ramPtr), state(statePtr), parentBus(pciBridge) {
   cpWorkerThread = std::thread(&CommandProcessor::cpWorkerThreadLoop, this);
 }
 
@@ -76,7 +76,6 @@ void CommandProcessor::cpWorkerThreadLoop() {
 }
 
 u32 CommandProcessor::cpExecutePrimaryBuffer(u32 readIndex, u32 writeIndex) {
-  
   // Create the ring buffer instance for the primary buffer.
   RingBuffer cpRingBufer(cpRingBufferBasePtr, cpRingBufferSize);
 
@@ -96,8 +95,7 @@ u32 CommandProcessor::cpExecutePrimaryBuffer(u32 readIndex, u32 writeIndex) {
   return writeIndex; // Set Read and Write index equal, signaling buffer processed.
 }
 
-void CommandProcessor::cpExecuteIndirectBuffer(u32 bufferPtr, u32 bufferSize)
-{
+void CommandProcessor::cpExecuteIndirectBuffer(u32 bufferPtr, u32 bufferSize) {
   // Create the ring buffer instance for the indirect buffer.
   RingBuffer ringBufer(ram->getPointerToAddress(bufferPtr), bufferSize * sizeof(u32));
 
@@ -132,6 +130,8 @@ bool CommandProcessor::ExecutePacket(RingBuffer *ringBuffer) {
     LOG_WARNING(Xenos, "CP[PrimaryBuffer]: found packet with uninitialized data!");
     return true;
   }
+
+  LOG_DEBUG(Xenos, "Executing packet type {} (0x{:X})", (u32)packetType, packetData);
 
   // Execute packet based on type.
   switch (packetType) {
@@ -251,6 +251,7 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
   case Xe::XGPU::PM4_PREEMPT_TOKEN:
     break;
   case Xe::XGPU::PM4_REG_RMW:
+    result = ExecutePacketType3_REG_RMW(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_DRAW_INDX:
     break;
@@ -302,8 +303,10 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
   case Xe::XGPU::PM4_COND_INDIRECT_BUFFER_PFE:
     break;
   case Xe::XGPU::PM4_INVALIDATE_STATE:
+    result = ExecutePacketType3_INVALIDATE_STATE(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_WAIT_REG_MEM:
+    result = ExecutePacketType3_WAIT_REG_MEM(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_MEM_WRITE:
     break;
@@ -350,6 +353,7 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
   case Xe::XGPU::PM4_WAIT_REG_GTE:
     break;
   case Xe::XGPU::PM4_INTERRUPT:
+    //result = ExecutePacketType3_INTERRUPT(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_SET_CONSTANT2:
     break;
@@ -408,13 +412,53 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
   return result;
 }
 
-bool CommandProcessor::ExecutePacketType3_NOP(RingBuffer* ringBuffer, u32 packetData, u32 dataCount) {
+bool CommandProcessor::ExecutePacketType3_NOP(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
   // Skips N 32-bit words to get to the next packet.
   ringBuffer->AdvanceRead(dataCount * sizeof(u32));
   return true;
 }
 
-bool CommandProcessor::ExecutePacketType3_ME_INIT(RingBuffer* ringBuffer, u32 packetData, u32 dataCount) {
+bool CommandProcessor::ExecutePacketType3_REG_RMW(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
+  const u32 rmwSetup = ringBuffer->ReadAndSwap<u32>();
+  const u32 andMask = ringBuffer->ReadAndSwap<u32>();
+  const u32 orMask = ringBuffer->ReadAndSwap<u32>();
+
+  const u32 regAddr = (rmwSetup & 0x1FFF);
+  u32 value = state->ReadRawRegister(regAddr);
+  const u32 oldValue = value;
+
+  // OR value (with reg or immediate value)
+  if ((rmwSetup >> 30) & 0x1) {
+    // | reg
+    const u32 orAddr = (orMask & 0x1FFF);
+    const u32 orValue = state->ReadRawRegister(orAddr);
+    value |= orValue;
+  } else {
+    // | imm
+    value |= orMask;
+  }
+
+  // AND value (with reg or immediate value)
+  if ((rmwSetup >> 30) & 0x1) {
+    // & reg
+    const u32 andAddr = (andMask & 0x1FFF);
+    const u32 andValue = state->ReadRawRegister(andAddr);
+    value ^= andValue;
+  } else {
+    // & imm  
+    value &= andMask;
+  }
+
+  // Wrrite the value back
+  state->WriteRawRegister(regAddr, value);
+  return true;
+}
+bool CommandProcessor::ExecutePacketType3_INVALIDATE_STATE(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
+  const u32 stateMask = ringBuffer->ReadAndSwap<u32>();
+  return true;
+}
+
+bool CommandProcessor::ExecutePacketType3_ME_INIT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
   // Initializes Command Processor's ME.
   cpME_PM4_ME_INIT_Data.clear();
   for (size_t i = 0; i < dataCount; i++) {
@@ -423,7 +467,7 @@ bool CommandProcessor::ExecutePacketType3_ME_INIT(RingBuffer* ringBuffer, u32 pa
   return true;
 }
 
-bool CommandProcessor::ExecutePacketType3_INDIRECT_BUFFER(RingBuffer* ringBuffer, u32 packetData, u32 dataCount) {
+bool CommandProcessor::ExecutePacketType3_INDIRECT_BUFFER(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
   // Indirect buffer.
   const u32 bufferPtr = ringBuffer->ReadAndSwap<u32>();
   // Get the list pointer.
@@ -433,6 +477,97 @@ bool CommandProcessor::ExecutePacketType3_INDIRECT_BUFFER(RingBuffer* ringBuffer
   // Execute indirect buffer.
   LOG_TRACE(Xenos, "CP[IndirectBuffer]: Executing indirect buffer at address {:#x}, size {:#x}", bufferPtr, bufferSize);
   cpExecuteIndirectBuffer(bufferPtr, bufferSize);
+  return true;
+}
+
+bool CommandProcessor::ExecutePacketType3_INTERRUPT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
+  // CPU(s) to interrupt
+  const u32 cpuMask = ringBuffer->ReadAndSwap<u32>();
+  return true;
+}
+
+bool CommandProcessor::ExecutePacketType3_WAIT_REG_MEM(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
+  // Determines how long to wait for, and what to wait for
+  const u32 waitInfo = ringBuffer->ReadAndSwap<u32>();
+  const XeRegister pollReg = static_cast<XeRegister>(ringBuffer->ReadAndSwap<u32>());
+  const u32 ref = ringBuffer->ReadAndSwap<u32>();
+  const u32 mask = ringBuffer->ReadAndSwap<u32>();
+  // Time to live
+  const u32 wait = ringBuffer->ReadAndSwap<u32>();
+
+  bool matched = false;
+  do {
+    u32 value = 0;
+    if (waitInfo & 0x10) {
+      u32 addrWithFmt = static_cast<u32>(pollReg);
+      XeEndianFormat format = static_cast<XeEndianFormat>(addrWithFmt & 0x3);
+      u32 addr = addrWithFmt & ~0x3;
+      u8 *addrPtr = ram->getPointerToAddress(addr);
+      memcpy(&value, addrPtr, sizeof(value));
+      switch (format) {
+      case EndianFormatUnspecified:
+        break;
+      case EndianFormat8in16:
+        value = ((value << 8) & 0xFF00FF00) | ((value >> 8) & 0x00FF00FF);
+        break;
+      case EndianFormat8in32:
+        value = byteswap_be(value);
+        break;
+      case EndianFormat16in32:
+        value = ((value >> 16) & 0xFFFF) | (value << 16);
+        break;
+      }
+    } else {
+      value = state->ReadRegister(pollReg);
+      if (pollReg == XeRegister::COHER_STATUS_HOST) {
+        const u32 statusHost = state->ReadRegister(XeRegister::COHER_STATUS_HOST);
+        const u32 baseHost = state->ReadRegister(XeRegister::COHER_BASE_HOST);
+        const u32 sizeHost = state->ReadRegister(XeRegister::COHER_SIZE_HOST);
+        if ((statusHost & 0x80000000ul)) {
+          const u32 newStatusHost = statusHost & ~0x80000000ul;
+          state->WriteRegister(XeRegister::COHER_STATUS_HOST, newStatusHost);
+          // TODO: Dirty Register & clear cache
+        }
+        value = state->ReadRegister(pollReg);
+      }
+    }
+    switch (waitInfo & 0x7) {
+    case 0: // Never
+      matched = false;
+      break;
+    case 1: // Less than reference
+      matched = (value & mask) < ref;
+      break;
+    case 2: // Less than or equal to reference
+      matched = (value & mask) <= ref;
+      break;
+    case 3: // Equal to reference
+      matched = (value & mask) == ref;
+      break;
+    case 4: // Not equal to reference
+      matched = (value & mask) != ref;
+      break;
+    case 5: // Greater than or equal to reference
+      matched = (value & mask) >= ref;
+      break;
+    case 6: // Greater than reference
+      matched = (value & mask) > ref;
+      break;
+    case 7: // Always
+      matched = true;
+      break;
+    }
+
+    if (!matched) {
+      if (wait >= 0x100) {
+        // Wait
+        std::this_thread::sleep_for(std::chrono::milliseconds(wait / 0x100));
+      } else {
+        // Yield
+        std::this_thread::yield();
+      }
+    }
+  } while (!matched);
   return true;
 }
 

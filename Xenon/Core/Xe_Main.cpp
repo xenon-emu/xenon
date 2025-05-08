@@ -17,7 +17,7 @@ XeMain::XeMain() {
 #ifndef NO_GFX
   renderer = std::make_unique<Render::OGLRenderer>(ram.get());
 #endif
-  xenos = std::make_unique<STRIP_UNIQUE(xenos)>(ram.get());
+  xenos = std::make_unique<STRIP_UNIQUE(xenos)>(ram.get(), pciBridge.get());
   createHostBridge();
   createRootBus();
   xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses);

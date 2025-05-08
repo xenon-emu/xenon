@@ -21,6 +21,7 @@
 #include "Base/Logging/Log.h"
 #include "Base/Types.h"
 #include "Core/RAM/RAM.h"
+#include "Core/RootBus/HostBridge/PCIBridge/PCIBridge.h"
 #include "Core/XGPU/RingBuffer.h"
 #include "Core/XGPU/XenosRegisters.h"
 
@@ -156,9 +157,18 @@ enum CPMicrocodeType {
   uCodeTypePFP
 };
 
+enum XeEndianFormat {
+  EndianFormatUnspecified,
+  EndianFormat8in16,
+  EndianFormat8in32,
+  EndianFormat16in32,
+  EndianFormat8in64,
+  EndianFormat8in128
+};
+
 class CommandProcessor {
 public:
-  CommandProcessor(RAM *ramPtr, XenosState *statePtr);
+  CommandProcessor(RAM *ramPtr, XenosState *statePtr, PCIBridge *pciBridge);
   ~CommandProcessor();
 
   // Methods for R/W of the CP/PFP uCode data.
@@ -173,6 +183,9 @@ public:
   void CPUpdateRBWritePointer(u32 offset);
 
 private:
+  // PCI Bridge pointer. Used for Interrupts.
+  PCIBridge *parentBus{};
+
   // RAM Poiner, for DMA ops and RingBuffer access.
   RAM *ram{};
 
@@ -239,7 +252,11 @@ private:
 
   // Packet type 3 OpCodes definitions.
   bool ExecutePacketType3_NOP(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_INVALIDATE_STATE(RingBuffer* ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_REG_RMW(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
   bool ExecutePacketType3_ME_INIT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_INTERRUPT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
   bool ExecutePacketType3_INDIRECT_BUFFER(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_WAIT_REG_MEM(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
 };
 }

@@ -15,7 +15,7 @@
 #define XE_DEBUG
 //#endif
 
-Xe::Xenos::XGPU::XGPU(RAM *ram) : ramPtr(ram) {
+Xe::Xenos::XGPU::XGPU(RAM *ram, PCIBridge *pciBridge) : ramPtr(ram), parentBus(pciBridge){
   xenosState = std::make_unique<STRIP_UNIQUE(xenosState)>();
 
   memset(&xgpuConfigSpace.data, 0xF, sizeof(GENRAL_PCI_DEVICE_CONFIG_SPACE));
@@ -67,7 +67,7 @@ Xe::Xenos::XGPU::XGPU(RAM *ram) : ramPtr(ram) {
   xenosState->WriteRegister(XeRegister::FPLL_CNTL_REG, 0x1A000001);
   xenosState->WriteRegister(XeRegister::MPLL_CNTL_REG, 0x19100000);
 
-  commandProcessor = std::make_unique<STRIP_UNIQUE(commandProcessor)>(ramPtr, xenosState.get());
+  commandProcessor = std::make_unique<STRIP_UNIQUE(commandProcessor)>(ramPtr, xenosState.get(), parentBus);
 }
 
 Xe::Xenos::XGPU::~XGPU() {
@@ -182,6 +182,10 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
         memcpy(memPtr, &tmpOld, sizeof(tmpOld));
       }
     } break;
+    case XeRegister::COHER_STATUS_HOST:
+      tmp |= 0x80000000ul;
+      xenosState->WriteRegister(reg, tmp);
+      break;
     case XeRegister::D1GRPH_PRIMARY_SURFACE_ADDRESS:
       xenosState->fbSurfaceAddress = tmp;
       xenosState->WriteRegister(reg, tmp);

@@ -26,7 +26,7 @@ namespace Xenos {
 
 class XGPU {
 public:
-  XGPU(RAM *ram);
+  XGPU(RAM *ram, PCIBridge *pciBridge);
   ~XGPU();
 
   // Memory Read/Write methods.
@@ -52,6 +52,8 @@ public:
     return xenosState->internalHeight;
   }
 private:
+  // PCI Bridge pointer. Used for Interrupts.
+  PCIBridge *parentBus{};
   // Mutex handle
   std::recursive_mutex mutex = {};
   // XGPU Config Space Data at address 0xD0010000.

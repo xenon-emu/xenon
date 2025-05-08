@@ -31,22 +31,33 @@ public:
     memcpy(&Regs[static_cast<u32>(reg) * 4], &value, sizeof(value));
   }
 
+  void WriteRawRegister(u32 addr, u32 value) {
+    value = byteswap_be(value);
+    memcpy(&Regs[addr], &value, sizeof(value));
+  }
+
   u32 ReadRegister(XeRegister reg) {
     u32 value = 0;
-    switch (static_cast<u32>(reg)) {
-    // Unknown
-    case 0x3C00:
-      return 0x08100748;
-    case 0x3C04:
-      return 0x0000200E;
-    case 0x6530: // Scanline?
-      return 0x000002D0;
-    case 0x6544: // VBlank?
-      return 1;
-    case 0x6584:
-      return 0x050002D0;
-    }
+    //switch (static_cast<u32>(reg)) {
+    //// Unknown
+    //case 0x3C00:
+    //  return 0x08100748;
+    //case 0x3C04:
+    //  return 0x0000200E;
+    //case 0x6530: // Scanline?
+    //  return 0x000002D0;
+    //case 0x6544: // VBlank?
+    //  return 1;
+    //case 0x6584:
+    //  return 0x050002D0;
+    //}
     memcpy(&value, &Regs[static_cast<u32>(reg) * 4], sizeof(value));
+    return value;
+  }
+
+  u32 ReadRawRegister(u32 addr) {
+    u32 value = 0;
+    memcpy(&value, &Regs[addr], sizeof(value));
     return value;
   }
 

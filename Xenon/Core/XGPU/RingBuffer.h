@@ -22,33 +22,37 @@ namespace Xe::XGPU {
     
     // Returns remaining data in buffer that's availeable to read.
     size_t readCount() const {
-      if (_readOffset == _writeOffset) { return 0; }
-      else if (_readOffset < _writeOffset) { return _writeOffset - _readOffset; }
-      else { return (_capacity - _readOffset) + _writeOffset; }
+      if (empty())
+        return 0;
+      return _readOffset < _writeOffset ?
+        _writeOffset - _readOffset :
+        (_capacity - _readOffset) + _writeOffset;
     }
 
     size_t writeOffset() const { return _writeOffset; }
     uptr writePointer() const { return uptr(_buffer) + _writeOffset; }
     void setWriteOffset(size_t offset) { _writeOffset = offset % _capacity; }
     size_t writeCount() const {
-      if (_readOffset == _writeOffset) { return _capacity; }
-      else if (_writeOffset < _readOffset) { return _readOffset - _writeOffset; }
-      else { return (_capacity - _writeOffset) + _readOffset; }
+      if (empty())
+        return _capacity;
+      return _writeOffset < _readOffset ?
+        _readOffset - _writeOffset :
+        (_capacity - _writeOffset) + _readOffset;
     }
 
     void AdvanceRead(size_t count);
     void AdvanceWrite(size_t count);
 
     struct ReadRange {
-      const u8* first;
-      size_t first_length;
-      const u8* second;
-      size_t second_length;
+      const u8 *first;
+      size_t firstLength;
+      const u8 *second;
+      size_t secondLength;
     };
 
     // Reads a range of memory, useful for loading large chunks of data such as shader data, etc...
     ReadRange BeginRead(size_t count);
-    void EndRead(ReadRange read_range);
+    void EndRead(ReadRange readRange);
 
     size_t Read(u8* buffer, size_t count);
     template <typename T>
