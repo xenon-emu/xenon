@@ -6,7 +6,7 @@
 #include "Base/Config.h"
 #include "Base/Thread.h"
 
-#define SFCX_DEBUG
+//#define SFCX_DEBUG
 
 // There are two SFCX Versions, pre-Jasper and post-Jasper
 Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::string &nandLoadPath, PCIBridge *parentPCIBridge, RAM *ram) :
@@ -546,6 +546,11 @@ void Xe::PCIDev::SFCX::sfcxReadPageFromNAND(bool physical) {
   // Clear the page buffer
   memset(sfcxState.pageBuffer, 0, sizeof(sfcxState.pageBuffer));
 
+#ifndef SFCX_DEBUG
+  // Simulate the time required to read
+  std::this_thread::sleep_for(10ms);
+#endif
+
   // Perform the read
   memcpy(sfcxState.pageBuffer, &rawImageData[nandOffset], physical ? sfcxState.pageSizePhys : sfcxState.pageSize);
 }
@@ -562,6 +567,11 @@ void Xe::PCIDev::SFCX::sfcxEraseBlock() {
 
   // Clear the page buffer
   memset(sfcxState.pageBuffer, 0, sizeof(sfcxState.pageBuffer));
+
+#ifndef SFCX_DEBUG
+  // Simulate the time required to erase
+  std::this_thread::sleep_for(10ms);
+#endif
 
   // Perform the erase
   memset(&rawImageData[nandOffset], 0, sfcxState.blockSizePhys);
@@ -607,7 +617,7 @@ void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND() {
     sparePhysAddrPtr += sfcxState.spareSize; // Spare Size
 
     // Add a small delay to simulate the time it takes to read the page.
-    std::this_thread::sleep_for(20ns);
+    std::this_thread::sleep_for(100ns);
 
     // Increase read address
     physAddr += sfcxState.pageSizePhys;
@@ -651,7 +661,7 @@ void Xe::PCIDev::SFCX::sfcxDoDMAtoNAND() {
     sparePhysAddrPtr += sfcxState.spareSize; // Spare Size
 
     // Add a small delay to simulate the time it takes to read the page.
-    std::this_thread::sleep_for(20ns);
+    std::this_thread::sleep_for(100ns);
 
     // Increase read address
     physAddr += sfcxState.pageSizePhys;
