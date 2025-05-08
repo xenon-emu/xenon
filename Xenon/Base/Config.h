@@ -236,7 +236,7 @@ inline struct _log {
   bool verify_toml(toml::value &value);
 } log;
 
-enum class eConsoleRevision : u8 {
+enum class eConsoleRevision : const u8 {
   Falcon,
   Jasper,
   Trinity,
