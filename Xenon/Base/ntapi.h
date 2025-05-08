@@ -4,9 +4,7 @@
 
 #ifdef _WIN32
 
-#define NTDDI_VERSION 0x0A000008
-#define _WIN32_WINNT 0x0A00
-#include <windows.h>
+#include <Windows.h>
 
 typedef enum _FILE_INFORMATION_CLASS {
   FileDirectoryInformation = 1,
@@ -508,12 +506,6 @@ typedef struct _TEB {                             /* win32/win64 */
 } TEB, *PTEB;
 //static_assert(offsetof(TEB, DeallocationStack) ==
 //              0x1478); /* The only member we care about at the moment */
-
-typedef enum _QUEUE_USER_APC_FLAGS {
-  QueueUserApcFlagsNone,
-  QueueUserApcFlagsSpecialUserApc,
-  QueueUserApcFlagsMaxValue
-} QUEUE_USER_APC_FLAGS;
 
 typedef union _USER_APC_OPTION {
   ULONG_PTR UserApcFlags;

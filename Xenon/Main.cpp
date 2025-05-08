@@ -4,6 +4,7 @@
 #include "Base/Param.h"
 #include "Base/Exit.h"
 #include "Base/Thread.h"
+#include "Base/ntapi.h"
 
 volatile int hupflag = 0;
 // Clean shutdown when we are sent by the OS to shutdown
@@ -82,6 +83,9 @@ PARAM(help, "Prints this message", false);
 #define AUTO_FLIP 1
 s32 main(s32 argc, char *argv[]) {
   MicroProfileOnThreadCreate("Main");
+#ifdef _WIN32
+  Base::NtApi::Initialize();
+#endif
   // Init params
   Base::Param::Init(argc, argv);
   // Handle help param
