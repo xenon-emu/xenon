@@ -34,6 +34,8 @@ The following projects were of great help to us in making Xenon:
 - [**Xenia-Canary**](https://github.com/xenia-canary/xenia-canary): Helped find registers and understand more about how the Xbox 360 works.
 - [**shadPS4**](https://github.com/shadps4-emu/shadPS4): A good part of the logger comes from shadPS4 and saved us a lot of time thanks to its good quality code.
 - [**RPCS3**](https://github.com/RPCS3/rpcs3): Helped us with the whole PPU part and the operation of the PowerPC architecture.
+- [**freedreno**](https://github.com/freedreno): Registers and information regarding Xenos were found here.
+- [**Rexdex Recompiler**](https://github.com/rexdex/recompiler): General Documentation regarding Xbox 360 and Xenos.
 
 # Contributing
 We need talented developers more than ever to contribute to the project and move emulation forward!
