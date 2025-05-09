@@ -161,13 +161,61 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
       value = xenosState->rbbmStatus;
       break;
     case XeRegister::MH_STATUS:
-      value = 0x2000000;
+      if (!(xenosState->mhStatus & 0x2000000)) {
+        xenosState->mhStatus |= 0x2000000;
+      }
+      value = xenosState->mhStatus;
+      break;
+    case XeRegister::D1CRTC_CONTROL:
+      value = xenosState->crtcControl;
       break;
     case XeRegister::DC_LUT_AUTOFILL:
-      value = 0x2000000;
+      value = xenosState->dcLutAutofill;
+      break;
+    case XeRegister::XDVO_ENABLE:
+      value = xenosState->xdvoEnable;
+      break;
+    case XeRegister::XDVO_BIT_DEPTH_CONTROL:
+      value = xenosState->xdvoBitDepthControl;
+      break;
+    case XeRegister::XDVO_CLOCK_INV:
+      value = xenosState->xdvoClockInv;
+      break;
+    case XeRegister::XDVO_CONTROL:
+      value = xenosState->xdvoControl;
+      break;
+    case XeRegister::XDVO_CRC_EN:
+      value = xenosState->xdvoCrcEnable;
+      break;
+    case XeRegister::XDVO_CRC_CNTL:
+      value = xenosState->xdvoCrcControl;
+      break;
+    case XeRegister::XDVO_CRC_MASK_SIG_RGB:
+      value = xenosState->xdvoCrcMaskSignalRGB;
+      break;
+    case XeRegister::XDVO_CRC_MASK_SIG_CNTL:
+      value = xenosState->xdvoCrcMaskSignalControl;
+      break;
+    case XeRegister::XDVO_CRC_SIG_RGB:
+      value = xenosState->xdvoCrcSignalRGB;
+      break;
+    case XeRegister::XDVO_CRC_SIG_CNTL:
+      value = xenosState->xdvoCrcSignalControl;
+      break;
+    case XeRegister::XDVO_STRENGTH_CONTROL:
+      value = xenosState->xdvoStrengthControl;
+      break;
+    case XeRegister::XDVO_DATA_STRENGTH_CONTROL:
+      value = xenosState->xdvoDataStrengthControl;
+      break;
+    case XeRegister::XDVO_FORCE_OUTPUT_CNTL:
+      value = xenosState->xdvoForceOutputControl;
       break;
     case XeRegister::XDVO_REGISTER_INDEX:
-      value = 0x0;
+      value = xenosState->xdvoRegisterIndex;
+      break;
+    case XeRegister::XDVO_REGISTER_DATA:
+      value = xenosState->xdvoRegisterData;
       break;
     default:
       value = regData;
@@ -204,11 +252,11 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
     // VdpHasWarmBooted expects this to be 0x10, otherwise, it waits until the GPU has intialised
     case XeRegister::CONFIG_CNTL:
       xenosState->configControl = tmp;
-      xenosState->WriteRegister(reg, tmp);
+      xenosState->WriteRegister(reg, xenosState->configControl);
       break;
     case XeRegister::RBBM_SOFT_RESET:
       xenosState->rbbmSoftReset = tmp;
-      xenosState->WriteRegister(reg, tmp);
+      xenosState->WriteRegister(reg, xenosState->rbbmSoftReset);
       break;
     case XeRegister::CP_RB_BASE:
       commandProcessor->CPUpdateRBBase(tmp);
@@ -221,15 +269,15 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
       break;
     case XeRegister::SCRATCH_UMSK:
       xenosState->scratchMask = tmp;
-      xenosState->WriteRegister(reg, tmp);
+      xenosState->WriteRegister(reg, xenosState->scratchMask);
       break;
     case XeRegister::SCRATCH_ADDR:
       xenosState->scratchAddr = tmp;
-      xenosState->WriteRegister(reg, tmp);
+      xenosState->WriteRegister(reg, xenosState->scratchAddr);
       break;
     case XeRegister::RBBM_DEBUG:
       xenosState->rbbmDebug = tmp;
-      xenosState->WriteRegister(reg, tmp);
+      xenosState->WriteRegister(reg, xenosState->rbbmDebug);
       break;
     case XeRegister::SCRATCH_REG0:
     case XeRegister::SCRATCH_REG1:
@@ -239,29 +287,107 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
     case XeRegister::SCRATCH_REG5:
     case XeRegister::SCRATCH_REG6:
     case XeRegister::SCRATCH_REG7: {
+      // Write the initial value
+      xenosState->WriteRegister(reg, tmp);
       const u32 scratchRegIndex = regIndex - static_cast<u32>(XeRegister::SCRATCH_REG0);
       // Check if writing is enabled
       if ((1 << scratchRegIndex) & xenosState->scratchMask) {
+        // Writeback
         const u32 memAddr = xenosState->scratchAddr + (scratchRegIndex * 4);
         u8 *memPtr = ramPtr->getPointerToAddress(memAddr);
         memcpy(memPtr, &tmpOld, sizeof(tmpOld));
       }
     } break;
+    case XeRegister::MH_STATUS:
+      xenosState->mhStatus = tmp;
+      if (!(xenosState->mhStatus & 0x2000000)) {
+        xenosState->mhStatus |= 0x2000000;
+      }
+      xenosState->WriteRegister(reg, xenosState->mhStatus);
+      break;
     case XeRegister::COHER_STATUS_HOST:
       tmp |= 0x80000000ul;
       xenosState->WriteRegister(reg, tmp);
       break;
+    case XeRegister::D1CRTC_CONTROL:
+      xenosState->crtcControl = tmp;
+      xenosState->WriteRegister(reg, xenosState->crtcControl);
+      break;
     case XeRegister::D1GRPH_PRIMARY_SURFACE_ADDRESS:
       xenosState->fbSurfaceAddress = tmp;
-      xenosState->WriteRegister(reg, tmp);
+      xenosState->WriteRegister(reg, xenosState->fbSurfaceAddress);
       break;
     case XeRegister::D1GRPH_X_END:
       xenosState->internalWidth = tmp;
-      xenosState->WriteRegister(reg, tmp);
+      xenosState->WriteRegister(reg, xenosState->internalWidth);
       break;
     case XeRegister::D1GRPH_Y_END:
       xenosState->internalHeight = tmp;
-      xenosState->WriteRegister(reg, tmp);
+      xenosState->WriteRegister(reg, xenosState->internalHeight);
+      break;
+    case XeRegister::DC_LUT_AUTOFILL:
+      xenosState->dcLutAutofill = tmp;
+      xenosState->WriteRegister(reg, xenosState->dcLutAutofill);
+      break;
+    case XeRegister::XDVO_ENABLE:
+      xenosState->xdvoEnable = tmp;
+      xenosState->WriteRegister(reg, xenosState->xdvoEnable);
+      break;
+    case XeRegister::XDVO_BIT_DEPTH_CONTROL:
+      xenosState->xdvoBitDepthControl = tmp;
+      xenosState->WriteRegister(reg, xenosState->xdvoBitDepthControl);
+      break;
+    case XeRegister::XDVO_CLOCK_INV:
+      xenosState->xdvoClockInv = tmp;
+      xenosState->WriteRegister(reg, xenosState->xdvoClockInv);
+      break;
+    case XeRegister::XDVO_CONTROL:
+      xenosState->xdvoControl = tmp;
+      xenosState->WriteRegister(reg, xenosState->xdvoControl);
+      break;
+    case XeRegister::XDVO_CRC_EN:
+      xenosState->xdvoCrcEnable = tmp;
+      xenosState->WriteRegister(reg, xenosState->xdvoCrcEnable);
+      break;
+    case XeRegister::XDVO_CRC_CNTL:
+      xenosState->xdvoCrcControl = tmp;
+      xenosState->WriteRegister(reg, xenosState->xdvoCrcControl);
+      break;
+    case XeRegister::XDVO_CRC_MASK_SIG_RGB:
+      xenosState->xdvoCrcMaskSignalRGB = tmp;
+      xenosState->WriteRegister(reg, xenosState->xdvoCrcMaskSignalRGB);
+      break;
+    case XeRegister::XDVO_CRC_MASK_SIG_CNTL:
+      xenosState->xdvoCrcMaskSignalControl = tmp;
+      xenosState->WriteRegister(reg, xenosState->xdvoCrcMaskSignalControl);
+      break;
+    case XeRegister::XDVO_CRC_SIG_RGB:
+      xenosState->xdvoCrcSignalRGB = tmp;
+      xenosState->WriteRegister(reg, xenosState->xdvoCrcSignalRGB);
+      break;
+    case XeRegister::XDVO_CRC_SIG_CNTL:
+      xenosState->xdvoCrcSignalControl = tmp;
+      xenosState->WriteRegister(reg, xenosState->xdvoCrcSignalControl);
+      break;
+    case XeRegister::XDVO_STRENGTH_CONTROL:
+      xenosState->xdvoStrengthControl = tmp;
+      xenosState->WriteRegister(reg, xenosState->xdvoStrengthControl);
+      break;
+    case XeRegister::XDVO_DATA_STRENGTH_CONTROL:
+      xenosState->xdvoDataStrengthControl = tmp;
+      xenosState->WriteRegister(reg, xenosState->xdvoDataStrengthControl);
+      break;
+    case XeRegister::XDVO_FORCE_OUTPUT_CNTL:
+      xenosState->xdvoForceOutputControl = tmp;
+      xenosState->WriteRegister(reg, xenosState->xdvoForceOutputControl);
+      break;
+    case XeRegister::XDVO_REGISTER_INDEX:
+      xenosState->xdvoRegisterIndex = tmp;
+      xenosState->WriteRegister(reg, xenosState->xdvoRegisterIndex);
+      break;
+    case XeRegister::XDVO_REGISTER_DATA:
+      xenosState->xdvoRegisterData = tmp;
+      xenosState->WriteRegister(reg, xenosState->xdvoRegisterData);
       break;
     default:
       xenosState->WriteRegister(reg, tmp);

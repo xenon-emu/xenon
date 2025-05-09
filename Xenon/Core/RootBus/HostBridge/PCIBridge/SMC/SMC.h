@@ -273,12 +273,6 @@ private:
   // SMC Main Thread
   void smcMainThread();
 
-  // UART Thread
-  void uartMainThread();
-
-  // UART Receive Thread
-  void uartReceiveThread();
-
   // UART/COM Port Setup
   void setupUART(u32 uartConfig);
 };
