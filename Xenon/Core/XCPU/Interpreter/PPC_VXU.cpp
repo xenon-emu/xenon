@@ -132,3 +132,14 @@ void PPCInterpreter::PPCInterpreter_vmrghw128(PPU_STATE *ppuState) {
   VR(VMX128_VD128).dword[2] = VR(VMX128_VA128).dword[1];
   VR(VMX128_VD128).dword[3] = VR(VMX128_VB128).dword[1];
 }
+
+// Vector Logical XOR (x'1000 04C4')
+void PPCInterpreter::PPCInterpreter_vxor(PPU_STATE *ppuState) {
+  /*
+  vD <- (vA) ^ (vB)
+  */
+
+  CHECK_VXU;
+
+  VRi(vd) = VRi(va) ^ VRi(vb);
+}
