@@ -502,6 +502,44 @@ void PPCInterpreter::PPCInterpreter_stfd(PPU_STATE *ppuState) {
   MMUWrite64(ppuState, EA, FPRi(frs).valueAsU64);
 }
 
+// Store Floating-Point Double with Update
+void PPCInterpreter::PPCInterpreter_stfdu(PPU_STATE *ppuState) {
+  /*
+  EA <- (rA) + EXTS(d)
+  MEM(EA, 8) <- (frS)
+  rA <- EA
+  */
+
+  CHECK_FPU;
+
+  const u64 EA = GPRi(ra) + _instr.simm16;
+  MMUWrite64(ppuState, EA, FPRi(frs).valueAsU64);
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  GPRi(ra) = EA;
+}
+
+// Store Floating-Point Double with Update Indexed
+void PPCInterpreter::PPCInterpreter_stfdux(PPU_STATE *ppuState) {
+  /*
+  EA <- (rA) + (rB)
+  MEM(EA, 8) <- (frS)
+  rA <- EA
+  */
+
+  CHECK_FPU;
+
+  const u64 EA = GPRi(ra) + GPRi(rb);
+  MMUWrite64(ppuState, EA, FPRi(frs).valueAsU64);
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  GPRi(ra) = EA;
+}
+
 // Store Floating-Point as Integer Word Indexed (x'7C00 07AE')
 void PPCInterpreter::PPCInterpreter_stfiwx(PPU_STATE *ppuState) {
   /*
