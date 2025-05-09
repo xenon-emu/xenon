@@ -32,7 +32,7 @@ void PPCInterpreter::PPCInterpreter_vand(PPU_STATE *ppuState) {
 
   CHECK_VXU;
 
-  VRi(vd) = VRi(va) | VRi(vb);
+  VRi(vd) = VRi(va) & VRi(vb);
 }
 
 // Vector Logical AND with Complement (x'1000 0444')
