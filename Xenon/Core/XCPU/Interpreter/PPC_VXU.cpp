@@ -144,6 +144,40 @@ void PPCInterpreter::PPCInterpreter_vmrghw128(PPU_STATE *ppuState) {
   VR(VMX128_VD128).dword[3] = VR(VMX128_VB128).dword[1];
 }
 
+// Vector Shift Left Integer Byte (x'1000 0104')
+void PPCInterpreter::PPCInterpreter_vslb(PPU_STATE* ppuState) {
+  /*
+  do i=0 to 127 by 8
+   sh <- (vB)i+5):i+7
+   (vD)i:i+7 <- (vA)i:i+7 << ui sh
+  end
+  */
+
+  CHECK_VXU;
+
+  for (u8 idx = 0; idx < 16; idx++) {
+    VRi(vd).bytes[idx] = VRi(va).bytes[idx] << (VRi(vb).bytes[idx] & 0x7);
+  }
+}
+
+// Vector Splat Byte (x'1000 020C')
+void PPCInterpreter::PPCInterpreter_vspltb(PPU_STATE* ppuState) {
+  /*
+   b <- UIMM*8
+  do i=0 to 127 by 8
+  (vD)i:i+7 <- (vB)b:b+7
+  end
+  */
+
+  CHECK_VXU;
+
+  u8 uimm = _instr.vuimm;
+
+  for (u8 idx = 0; idx < 16; idx++) {
+    VRi(vd).bytes[idx] = VRi(vb).bytes[uimm];
+  }
+}
+
 // Vector Splat Immediate Signed Byte (x'1000 030C')
 void PPCInterpreter::PPCInterpreter_vspltisb(PPU_STATE* ppuState) {
   /*
