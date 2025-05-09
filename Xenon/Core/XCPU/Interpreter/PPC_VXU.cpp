@@ -144,6 +144,25 @@ void PPCInterpreter::PPCInterpreter_vmrghw128(PPU_STATE *ppuState) {
   VR(VMX128_VD128).dword[3] = VR(VMX128_VB128).dword[1];
 }
 
+// Vector Splat Immediate Signed Byte (x'1000 030C')
+void PPCInterpreter::PPCInterpreter_vspltisb(PPU_STATE* ppuState) {
+  /*
+   do i = 0 to 127 by 8
+   vDi:i+7 <- SignExtend(SIMM,8)
+   end
+  */
+
+  CHECK_VXU;
+
+  u32 simm = 0;
+
+  if (_instr.vsimm) { simm = (_instr.vsimm & 0x10) ? (_instr.vsimm | 0xFFFFFFF0) : _instr.vsimm; }
+
+  for (u8 idx = 0; idx < 16; idx++) {
+    VRi(vd).bytes[idx] = static_cast<u8>(simm);
+  }
+}
+
 // Vector128 Splat Immediate Signed Word
 void PPCInterpreter::PPCInterpreter_vspltisw128(PPU_STATE* ppuState) {
   /*
@@ -154,7 +173,7 @@ void PPCInterpreter::PPCInterpreter_vspltisw128(PPU_STATE* ppuState) {
 
   u32 simm = 0;
 
-  if ((VMX128_3_IMM)) { simm = (VMX128_3_IMM & 0x10) ? (VMX128_3_IMM | 0xFFFFFFF0) : VMX128_3_IMM; }
+  if (VMX128_3_IMM) { simm = (VMX128_3_IMM & 0x10) ? (VMX128_3_IMM | 0xFFFFFFF0) : VMX128_3_IMM; }
 
   for (u8 idx = 0; idx < 4; idx++) {
     VR(VMX128_3_VD128).dword[idx] = simm;
