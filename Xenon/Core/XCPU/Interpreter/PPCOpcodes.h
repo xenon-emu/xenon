@@ -21,7 +21,6 @@ D_STUBRC(mcrfs)
 D_STUBRC(mtfsb1)
 D_STUBRC(mtfsb0)
 D_STUBRC(mtfsfi)
-D_STUBRC(fctid)
 D_STUBRC(fctiw)
 D_STUBRC(fsel)
 D_STUBRC(fres)
@@ -376,6 +375,7 @@ extern void PPCInterpreter_faddx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fabsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_faddsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fcmpu(PPU_STATE *ppuState);
+extern void PPCInterpreter_fctidx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fctidzx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fctiwzx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fcfidx(PPU_STATE *ppuState);

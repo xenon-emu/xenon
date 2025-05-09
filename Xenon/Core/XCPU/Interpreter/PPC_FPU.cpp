@@ -108,6 +108,25 @@ void PPCInterpreter::PPCInterpreter_fcmpu(PPU_STATE *ppuState) {
   ppuUpdateFPSCR(ppuState, fra, frb, true, _instr.crfd);
 }
 
+// Floating Convert to Integer Double Word(x'FC00 065C')
+void PPCInterpreter::PPCInterpreter_fctidx(PPU_STATE* ppuState) {
+  // TODO(bitsh1ft3r): Respect rounding modes!
+  // Test correct behavior.
+
+  CHECK_FPU;
+
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
+  const auto val = _mm_set_sd(FPRi(frb).valueAsDouble);
+  const auto res = _mm_xor_si128(_mm_set1_epi64x(_mm_cvtsd_si64(val)), _mm_castpd_si128(_mm_cmpge_pd(val, _mm_set1_pd(f64(1ull << 63)))));
+  FPRi(frd).valueAsDouble = std::bit_cast<f64>(_mm_cvtsi128_si64(res));
+#else
+  LOG_ERROR(Xenon, "fctiwzx: Unsupported ARCH.");
+#endif
+
+  // TODO:
+  ppuUpdateFPSCR(ppuState, 0.0, 0.0, _instr.rc);
+}
+
 // Floating Convert to Integer Double Word with Round toward Zero (x'FC00 065E')
 void PPCInterpreter::PPCInterpreter_fctidzx(PPU_STATE *ppuState) {
   // This was mostly taken from rpcs3's PPUInterpreter. 
