@@ -47,12 +47,17 @@ public:
 
   PPU *GetPPU(u8 ppuID);
 
+  u32 GetCPI() { return sharedCPI; }
+
 private:
   // System Bus
   RootBus *mainBus = nullptr;
 
   // Global Xenon CPU Content (shared between PPUs)
   XENON_CONTEXT xenonContext = {};
+
+  // The CPI shared across all cores, useful for timing
+  u32 sharedCPI = 0;
 
   // Power Processing Units, the effective execution units inside the XBox
   // 360 CPU.

@@ -106,9 +106,10 @@ void Xenon::Start(u64 resetVector) {
   ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(&xenonContext, mainBus, resetVector, 4); // Threads 4-5
   // Start execution on the main thread
   ppu0->StartExecution();
+  sharedCPI = ppu0->GetCPI();
   // Get our CPI based on the first PPU, then share it across all PPUs
-  ppu1->SetCPI(ppu0->GetCPI());
-  ppu2->SetCPI(ppu0->GetCPI());
+  ppu1->SetCPI(GetCPI());
+  ppu2->SetCPI(GetCPI());
   // Start execution on the other threads
   ppu1->StartExecution();
   ppu2->StartExecution();
