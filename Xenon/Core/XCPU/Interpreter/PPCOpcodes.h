@@ -17,9 +17,6 @@ namespace PPCInterpreter {
 extern void PPCInterpreter_invalid(PPU_STATE *ppuState);
 extern void PPCInterpreter_known_unimplemented(const char* name, PPU_STATE *ppuState);
 
-D_STUBRC(divduo)
-D_STUBRC(divdo)
-D_STUBRC(mulldo)
 D_STUBRC(mcrfs)
 D_STUBRC(mtfsb1)
 D_STUBRC(mtfsb0)
@@ -281,6 +278,8 @@ extern void PPCInterpreter_crorc(PPU_STATE *ppuState);
 extern void PPCInterpreter_crxor(PPU_STATE *ppuState);
 extern void PPCInterpreter_divdx(PPU_STATE *ppuState);
 extern void PPCInterpreter_divdux(PPU_STATE *ppuState);
+extern void PPCInterpreter_divdox(PPU_STATE *ppuState);
+extern void PPCInterpreter_divduox(PPU_STATE *ppuState);
 extern void PPCInterpreter_divwx(PPU_STATE *ppuState);
 extern void PPCInterpreter_divwox(PPU_STATE *ppuState);
 extern void PPCInterpreter_divwux(PPU_STATE *ppuState);
@@ -296,6 +295,7 @@ extern void PPCInterpreter_mftb(PPU_STATE *ppuState);
 extern void PPCInterpreter_mtocrf(PPU_STATE *ppuState);
 extern void PPCInterpreter_mulli(PPU_STATE *ppuState);
 extern void PPCInterpreter_mulldx(PPU_STATE *ppuState);
+extern void PPCInterpreter_mulldox(PPU_STATE *ppuState);
 extern void PPCInterpreter_mullwx(PPU_STATE *ppuState);
 extern void PPCInterpreter_mullwox(PPU_STATE *ppuState);
 extern void PPCInterpreter_mulhdx(PPU_STATE *ppuState);

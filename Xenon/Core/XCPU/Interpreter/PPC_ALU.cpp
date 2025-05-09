@@ -651,6 +651,53 @@ void PPCInterpreter::PPCInterpreter_divdux(PPU_STATE *ppuState) {
   }
 }
 
+// Divide Double Word (Overflow-Enabled) (x'7C00 03D2')
+void PPCInterpreter::PPCInterpreter_divdox(PPU_STATE *ppuState) {
+  /*
+    dividend[0-63] <- (rA)
+    divisor[0-63] <- (rB)
+    rD <- dividend + divisor
+  */
+
+  const s64 RA = GPRi(ra);
+  const s64 RB = GPRi(rb);
+  const bool o = RB == 0 || (RA == INT64_MIN && RB == -1);
+  GPRi(rd) = o ? 0 : RA / RB;
+
+  // _oe
+  if (_instr.oe) {
+    ppuSetXerOv(ppuState, RB == 0);
+  }
+
+  // _rc
+  if (_instr.rc) {
+    RECORD_CR0(GPRi(rd));
+  }
+}
+
+// Divide Double Word Unsigned (Overflow-Enabled) (x'7C00 0392')
+void PPCInterpreter::PPCInterpreter_divduox(PPU_STATE *ppuState) {
+  /*
+    dividend[0-63] <- (rA)
+    divisor[0-63] <- (rB)
+    rD <- dividend / divisor
+  */
+
+  const u64 RA = GPRi(ra);
+  const u64 RB = GPRi(rb);
+  GPRi(rd) = RB == 0 ? 0 : RA / RB;
+
+  // _oe
+  if (_instr.oe) {
+    ppuSetXerOv(ppuState, RB == 0);
+  }
+
+  // _rc
+  if (_instr.rc) {
+    RECORD_CR0(GPRi(rd));
+  }
+}
+
 // Divide Word (x'7C00 03D6')
 void PPCInterpreter::PPCInterpreter_divwx(PPU_STATE *ppuState) {
   /*
@@ -875,6 +922,29 @@ void PPCInterpreter::PPCInterpreter_mulldx(PPU_STATE *ppuState) {
   const s64 RA = GPRi(ra);
   const s64 RB = GPRi(rb);
   GPRi(rd) = RA * RB;
+
+  // _rc
+  if (_instr.rc) {
+    RECORD_CR0(GPRi(rd));
+  }
+}
+
+// Multiply Low Double Word (Overflow-enabled) (x'7C00 01D2')
+void PPCInterpreter::PPCInterpreter_mulldox(PPU_STATE *ppuState) {
+  /*
+    prod[0-127] <- (rA) * (rB)
+    rD <- prod[64-127]
+  */
+
+  const s64 RA = GPRi(ra);
+  const s64 RB = GPRi(rb);
+  GPRi(rd) = RA * RB;
+
+  // _oe
+  if (_instr.oe) [[unlikely]] {
+    u64 high = mulh64(RA, RB);
+    ppuSetXerOv(ppuState, high != static_cast<s64>(GPRi(rd)) >> 63);
+  }
 
   // _rc
   if (_instr.rc) {
