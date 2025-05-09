@@ -35,6 +35,17 @@ void PPCInterpreter::PPCInterpreter_vandc(PPU_STATE *ppuState) {
   VRi(vd) = VRi(va) | ~VRi(vb);
 }
 
+// Vector Logical NOR (x'1000 0504')
+void PPCInterpreter::PPCInterpreter_vnor(PPU_STATE *ppuState) {
+  /*
+  vD <- ~((vA) | (vB))
+  */
+
+  CHECK_VXU;
+
+  VRi(vd) = ~(VRi(va) | VRi(vb));
+}
+
 // Vector Logical OR (x'1000 0484')
 void PPCInterpreter::PPCInterpreter_vor(PPU_STATE *ppuState) {
   /*
