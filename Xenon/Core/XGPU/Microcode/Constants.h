@@ -517,30 +517,31 @@ struct instr_fetch_vtx_t {
 };
 
 union instr_fetch_t {
-   instr_fetch_tex_t tex;
-   instr_fetch_vtx_t vtx;
+  instr_fetch_tex_t tex;
+  instr_fetch_vtx_t vtx;
 
-   struct {
-     /* dword0: */
-     struct {
-       u32 opc : 5;  // instr_fetch_opc_t
-       u32 : 27;
-     };
+  struct {
+    /* dword0: */
+    struct {
+      u32 opc : 5;  // instr_fetch_opc_t
+      u32 : 27;
+    };
 
-     /* dword1: */
-     struct {
-       u32 : 32;
-     };
+    /* dword1: */
+    struct {
+      u32 : 32;
+    };
 
-     /* dword2: */
-     struct {
-       u32 : 32;
-     };
-   };
- };
+    /* dword2: */
+    struct {
+      u32 : 32;
+    };
+  };
+};
 
- static_assert(sizeof(instr_fetch_t) == 12, "Invalid size");
- static_assert(sizeof(instr_cf_t) == 8, "Invalid size");
+static_assert(sizeof(instr_fetch_t) == 12, "Invalid size");
+static_assert(sizeof(instr_cf_t) == 8, "Invalid size");
 
- #pragma pack(pop)
-}
+#pragma pack(pop)
+
+} // namespace Xe::UCode

@@ -35,8 +35,8 @@ public:
   StatementNode();
   virtual eStatementType GetType() const = 0;
 protected:
-  virtual ~StatementNode();
-  std::atomic<int> m_refs;
+  virtual ~StatementNode() = default;
+  std::atomic<int> references = 0;
 };
 
 } // namespace Xe::Microcode

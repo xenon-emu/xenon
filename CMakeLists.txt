@@ -169,37 +169,37 @@ set(RootBus
 )
 
 set(XCPU
+  Xenon/Core/XCPU/IIC/IIC.cpp
+  Xenon/Core/XCPU/IIC/IIC.h
+  Xenon/Core/XCPU/Interpreter/Interpreter_Helpers.cpp
+  Xenon/Core/XCPU/Interpreter/PPCInternal.h
+  Xenon/Core/XCPU/Interpreter/PPCInterpreter.cpp
+  Xenon/Core/XCPU/Interpreter/PPCInterpreter.h
+  Xenon/Core/XCPU/Interpreter/PPCOpcodes.h
+  Xenon/Core/XCPU/Interpreter/PPC_ALU.cpp
+  Xenon/Core/XCPU/Interpreter/PPC_BC.cpp
+  Xenon/Core/XCPU/Interpreter/PPC_FPU.cpp
+  Xenon/Core/XCPU/Interpreter/PPC_Instruction.cpp
+  Xenon/Core/XCPU/Interpreter/PPC_Instruction.h
+  Xenon/Core/XCPU/Interpreter/PPC_LS.cpp
+  Xenon/Core/XCPU/Interpreter/PPC_MMU.cpp
+  Xenon/Core/XCPU/Interpreter/PPC_System.cpp
+  Xenon/Core/XCPU/Interpreter/PPC_VXU.cpp
+  Xenon/Core/XCPU/PostBus/PostBus.cpp
+  Xenon/Core/XCPU/PostBus/PostBus.h
+  Xenon/Core/XCPU/PPU/PowerPC.h
+  Xenon/Core/XCPU/PPU/PPU.cpp
+  Xenon/Core/XCPU/PPU/PPU.h
+  Xenon/Core/XCPU/eFuse.h
+  Xenon/Core/XCPU/elf_abi.h
+  Xenon/Core/XCPU/UART.cpp
+  Xenon/Core/XCPU/UART.h
   Xenon/Core/XCPU/Xenon.cpp
   Xenon/Core/XCPU/Xenon.h
   Xenon/Core/XCPU/XenonSOC.h
   Xenon/Core/XCPU/XenonSOC.cpp
   Xenon/Core/XCPU/XenonReservations.cpp
   Xenon/Core/XCPU/XenonReservations.h
-  Xenon/Core/XCPU/eFuse.h
-  Xenon/Core/XCPU/UART.cpp
-  Xenon/Core/XCPU/UART.h
-  Xenon/Core/XCPU/elf_abi.h
-  Xenon/Core/XCPU/IIC/IIC.cpp
-  Xenon/Core/XCPU/IIC/IIC.h
-  Xenon/Core/XCPU/Interpreter/PPC_ALU.cpp
-  Xenon/Core/XCPU/Interpreter/PPC_FPU.cpp
-  Xenon/Core/XCPU/Interpreter/PPC_VXU.cpp
-  Xenon/Core/XCPU/Interpreter/Interpreter_Helpers.cpp
-  Xenon/Core/XCPU/Interpreter/PPC_MMU.cpp
-  Xenon/Core/XCPU/Interpreter/PPC_Instruction.cpp
-  Xenon/Core/XCPU/Interpreter/PPC_Instruction.h
-  Xenon/Core/XCPU/Interpreter/PPC_LS.cpp
-  Xenon/Core/XCPU/Interpreter/PPC_BC.cpp
-  Xenon/Core/XCPU/Interpreter/PPC_System.cpp
-  Xenon/Core/XCPU/Interpreter/PPCInterpreter.cpp
-  Xenon/Core/XCPU/Interpreter/PPCInterpreter.h
-  Xenon/Core/XCPU/Interpreter/PPCInternal.h
-  Xenon/Core/XCPU/Interpreter/PPCOpcodes.h
-  Xenon/Core/XCPU/PostBus/PostBus.cpp
-  Xenon/Core/XCPU/PostBus/PostBus.h
-  Xenon/Core/XCPU/PPU/PPU.cpp
-  Xenon/Core/XCPU/PPU/PPU.h
-  Xenon/Core/XCPU/PPU/PowerPC.h
 )
 
 if (GFX_ENABLED)
@@ -250,10 +250,10 @@ if (GFX_ENABLED)
 endif()
 set(microprofile_dir Deps/ThirdParty/microprofile)
 set(microprofile
-  Xenon/include/microprofile.config.h
   ${microprofile_dir}/microprofile.cpp
   ${microprofile_dir}/microprofile.h
   ${microprofile_dir}/microprofile_html.h
+  Xenon/include/microprofile.config.h
 )
 
 set(XGPU_AST
@@ -270,14 +270,15 @@ set(XGPU_AST
 )
 
 set(XGPU
-  Xenon/Core/XGPU/XGPU.cpp
-  Xenon/Core/XGPU/XenosRegisters.h
-  Xenon/Core/XGPU/XGPU.h
-  Xenon/Core/XGPU/XGPUConfig.h
   Xenon/Core/XGPU/CommandProcessor.h
   Xenon/Core/XGPU/CommandProcessor.cpp
   Xenon/Core/XGPU/RingBuffer.h
   Xenon/Core/XGPU/RingBuffer.cpp
+  Xenon/Core/XGPU/ShaderConstants.h
+  Xenon/Core/XGPU/XenosRegisters.h
+  Xenon/Core/XGPU/XGPU.cpp
+  Xenon/Core/XGPU/XGPU.h
+  Xenon/Core/XGPU/XGPUConfig.h
 )
 
 set(Core
