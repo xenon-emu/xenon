@@ -260,7 +260,7 @@ void PPCInterpreter::PPCInterpreter_fmrx(PPU_STATE *ppuState) {
   }
 }
 
-// Floating Multiply-Subtract Single
+// Floating Multiply-Subtract (Double-Precision)
 void PPCInterpreter::PPCInterpreter_fmsubx(PPU_STATE *ppuState) {
   /*
   frD <- ([frA * frC] - frB)
@@ -286,7 +286,7 @@ void PPCInterpreter::PPCInterpreter_fmsubsx(PPU_STATE *ppuState) {
   ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
 }
 
-// Floating Negative Multiply-Add Single
+// Floating Negative Multiply-Add (Double-Precision)
 void PPCInterpreter::PPCInterpreter_fnmaddx(PPU_STATE *ppuState) {
   /*
   frD <- - ([frA * frC] + frB)
@@ -327,7 +327,7 @@ void PPCInterpreter::PPCInterpreter_fnegx(PPU_STATE *ppuState) {
   }
 }
 
-// Floating Negative Multiply-Subtract Single
+// Floating Negative Multiply-Subtract (Double-Precision)
 void PPCInterpreter::PPCInterpreter_fnmsubx(PPU_STATE *ppuState) {
   /*
   frD <- - ([frA * frC] - frB)
