@@ -70,7 +70,6 @@ D_STUB(lvrxl)
 D_STUB(lvlxl)
 D_STUB(lwaux)
 D_STUB(lswx)
-D_STUB(lhaux)
 D_STUB(lvewx)
 D_STUB(lveb)
 D_STUB(lvebx)
@@ -475,6 +474,7 @@ extern void PPCInterpreter_lbzx(PPU_STATE *ppuState);
 // Load Halfword
 extern void PPCInterpreter_lha(PPU_STATE *ppuState);
 extern void PPCInterpreter_lhau(PPU_STATE *ppuState);
+extern void PPCInterpreter_lhaux(PPU_STATE *ppuState);
 extern void PPCInterpreter_lhax(PPU_STATE *ppuState);
 extern void PPCInterpreter_lhbrx(PPU_STATE *ppuState);
 extern void PPCInterpreter_lhz(PPU_STATE *ppuState);

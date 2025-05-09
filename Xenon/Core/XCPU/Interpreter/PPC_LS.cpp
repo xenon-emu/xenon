@@ -695,6 +695,23 @@ void PPCInterpreter::PPCInterpreter_lhau(PPU_STATE *ppuState) {
   GPRi(ra) = EA;
 }
 
+// Load Half Word Algebraic with Update
+void PPCInterpreter::PPCInterpreter_lhaux(PPU_STATE *ppuState) {
+  /*
+  EA <- (rA) + (rB)
+  rD <- EXTS(MEM(EA, 2))
+  rA <- EA
+  */
+  const u64 EA = GPRi(ra) + GPRi(rb);
+  const u16 unsignedWord = MMURead16(ppuState, EA);
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  GPRi(rd) = EXTS(unsignedWord, 16);
+  GPRi(ra) = EA;
+}
+
 // Load Half Word Algebraic Indexed (x'7C00 02AE')
 void PPCInterpreter::PPCInterpreter_lhax(PPU_STATE *ppuState) {
   /*
