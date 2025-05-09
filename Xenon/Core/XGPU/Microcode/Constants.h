@@ -99,7 +99,7 @@ typedef enum {
   FMT_DXT5A = 59,
   FMT_CTX1 = 60,
   FMT_DXT3A_AS_1_1_1_1 = 61,
-} a2xx_sq_surfaceformat;
+} instr_surf_fmt_t;
 
 /*
  * ALU instructions:
@@ -434,8 +434,6 @@ typedef enum {
   DIMENSION_3D = 2,
   DIMENSION_CUBE = 3,
 } instr_dimension_t;
-
-typedef enum a2xx_sq_surfaceformat instr_surf_fmt_t;
 
 struct instr_fetch_tex_t {
   /* dword0: */
