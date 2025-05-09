@@ -125,7 +125,7 @@ namespace PPCInterpreter {
         { 0x1D8C6, GET(vmrglw128) },
         { 0x1C8C6, GET(vmrghw128) },
         { 0x1C1C4, GET(stvlxl128) },
-        { 0x1C2C4, GET(stvlxl128) },
+        { 0x1DD06, GET(vspltisw128) },
         //{ 0x503, GET(stvlx128) },
         //{ 0x743, GET(stvrxl128) },
         //{ 0x3C3, GET(stvxl128) },
@@ -591,16 +591,16 @@ namespace PPCInterpreter {
       });
       // Special case opcodes
       fillTable<std::string>(nameTable, 0x04, 11, 11, {
-        { 0x7193, GET(stvewx128), 3 },
-        { 0x7393, GET(stvrx128), 3 },
-        { 0x73C4, GET(stvx128), 3 },
-        { 0xB705, GET(vor128), 3 },
-        { 0x30C4, GET(lvx128), 3 },
-        { 0x2405, GET(vmulfp128), 3 },
-        { 0x1D8C6, GET(vmrglw128), 3 },
-        { 0x1C8C6, GET(vmrghw128), 3 },        
-        { 0x1C1C4, GET(stvlxl128), 3 },
-        { 0x1C2C4, GET(stvlxl128), 3 },
+        { 0x7193, GET(stvewx128) },
+        { 0x7393, GET(stvrx128) },
+        { 0x73C4, GET(stvx128) },
+        { 0xB705, GET(vor128) },
+        { 0x30C4, GET(lvx128) },
+        { 0x2405, GET(vmulfp128) },
+        { 0x1D8C6, GET(vmrglw128) },
+        { 0x1C8C6, GET(vmrghw128) },        
+        { 0x1C1C4, GET(stvlxl128) },
+        { 0x1DD06, GET(vspltisw128) },
       });
       // Group 0x04 opcodes (field 21..31)
       fillTable<std::string>(nameTable, 0x04, 11, 0, {

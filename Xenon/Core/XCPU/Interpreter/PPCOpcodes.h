@@ -246,6 +246,8 @@ D_STUB(vsubshs)
 D_STUB(vsubsws)
 D_STUB(vsumsws)
 
+D_STUB(vspltisw128)
+
 // ALU
 extern void PPCInterpreter_addx(PPU_STATE *ppuState);
 extern void PPCInterpreter_addox(PPU_STATE *ppuState);
