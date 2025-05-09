@@ -256,6 +256,14 @@ set(microprofile
   ${microprofile_dir}/microprofile_html.h
 )
 
+set(XGPU_AST
+  Xenon/Core/XGPU/Microcode/ASTBlock.cpp
+  Xenon/Core/XGPU/Microcode/ASTBlock.h
+  Xenon/Core/XGPU/Microcode/ASTNode.cpp
+  Xenon/Core/XGPU/Microcode/ASTNode.h
+  Xenon/Core/XGPU/Microcode/ASTNodeBase.h
+)
+
 set(XGPU
   Xenon/Core/XGPU/XGPU.cpp
   Xenon/Core/XGPU/XenosRegisters.h
@@ -274,6 +282,7 @@ set(Core
   ${RootBus}
   ${XCPU}
   ${XGPU}
+  ${XGPU_AST}
   Xenon/Core/Xe_Main.cpp
   Xenon/Core/Xe_Main.h
 )
