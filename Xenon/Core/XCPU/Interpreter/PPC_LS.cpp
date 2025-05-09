@@ -949,6 +949,23 @@ void PPCInterpreter::PPCInterpreter_lwax(PPU_STATE *ppuState) {
   GPRi(rd) = EXTS(unsignedWord, 32);
 }
 
+// Load Word Algebraic with Update Indexed
+void PPCInterpreter::PPCInterpreter_lwaux(PPU_STATE *ppuState) {
+  /*
+  EA <- (rA) + (rB)
+  rD <- EXTS(MEM(EA, 4))
+  rA <- EA
+  */
+  const u64 EA = GPRi(ra) + GPRi(rb);
+  const u32 unsignedWord = MMURead32(ppuState, EA);
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  GPRi(rd) = EXTS(unsignedWord, 32);
+  GPRi(ra) = EA;
+}
+
 // Load Word Byte-Reverse Indexed (x'7C00 042C')
 void PPCInterpreter::PPCInterpreter_lwbrx(PPU_STATE *ppuState) {
   /*
