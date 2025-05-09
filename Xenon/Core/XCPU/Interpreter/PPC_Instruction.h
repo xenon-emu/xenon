@@ -125,6 +125,7 @@ namespace PPCInterpreter {
         { 0x1D8C6, GET(vmrglw128) },
         { 0x1C8C6, GET(vmrghw128) },
         { 0x1C1C4, GET(stvlxl128) },
+        { 0x1C2C4, GET(stvlxl128) },
         { 0x1DD06, GET(vspltisw128) },
         //{ 0x503, GET(stvlx128) },
         //{ 0x743, GET(stvrxl128) },
