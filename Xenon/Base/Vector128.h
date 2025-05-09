@@ -60,7 +60,7 @@ struct alignas(16) Vector128 {
   }
 
   constexpr friend Vector128 operator^(const Vector128 &a, const Vector128 &b) {
-    Vector128 result;
+    Vector128 result = {};
     result.vuword = a.vuword ^ b.vuword;
     return result;
   }
@@ -71,7 +71,7 @@ struct alignas(16) Vector128 {
   }
 
   constexpr friend Vector128 operator&(const Vector128 &a, const Vector128 &b) {
-    Vector128 result;
+    Vector128 result = {};
     result.vuword = a.vuword & b.vuword;
     return result;
   }
@@ -82,7 +82,7 @@ struct alignas(16) Vector128 {
   }
 
   constexpr friend Vector128 operator|(const Vector128 &a, const Vector128 &b) {
-    Vector128 result;
+    Vector128 result = {};
     result.vuword = a.vuword | b.vuword;
     return result;
   }
@@ -90,6 +90,11 @@ struct alignas(16) Vector128 {
   constexpr friend Vector128& operator|=(Vector128 &a, const Vector128 &b) {
     a.vuword |= b.vuword;
     return a;
+  }
+  constexpr Vector128 operator~() const {
+    Vector128 result = {};
+    result.vuword = ~vuword;
+    return result;
   }
 };
 

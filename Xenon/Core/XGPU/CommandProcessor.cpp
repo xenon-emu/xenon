@@ -274,6 +274,7 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
   case Xe::XGPU::PM4_IM_STORE:
     break;
   case Xe::XGPU::PM4_SET_CONSTANT:
+    result = ExecutePacketType3_SET_CONSTANT(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_LOAD_CONSTANT_CONTEXT:
     break;
@@ -554,6 +555,37 @@ bool CommandProcessor::ExecutePacketType3_ME_INIT(RingBuffer *ringBuffer, u32 pa
   return true;
 }
 
+bool CommandProcessor::ExecutePacketType3_SET_CONSTANT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
+  // Get base index
+  const u32 offsetType = ringBuffer->ReadAndSwap<u32>();
+  // PM4_REG(reg) ((0x4 << 16) | (GSL_HAL_SUBBLOCK_OFFSET(reg)))
+  const u32 index = offsetType & 0xFFFF;
+  const u32 type = (offsetType >> 16) & 0xFF;
+
+  u32 baseIndex = index;
+  switch (type) {
+  // ALU
+  case 0: baseIndex += 0x4000; break;
+  // FETCH
+  case 1: baseIndex += 0x4800; break;
+  // BOOL
+  case 2: baseIndex += 0x4900; break;
+  // LOOP
+  case 3: baseIndex += 0x4908; break;
+  // REGISTER_RAWS
+  case 4: baseIndex += 0x2000; break;
+  default: ringBuffer->AdvanceRead(dataCount - 1); return true; break;
+  }
+
+  // Write constants
+  for (u32 n = 0; n != dataCount - 1; ++n) {
+    const u32 data = ringBuffer->ReadAndSwap<u32>();
+    state->WriteRegister(static_cast<XeRegister>(index + n), data);
+  }
+
+  return true;
+}
+
 bool CommandProcessor::ExecutePacketType3_INDIRECT_BUFFER(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
   // Indirect buffer.
   const u32 bufferPtr = ringBuffer->ReadAndSwap<u32>();
@@ -606,8 +638,6 @@ bool CommandProcessor::ExecutePacketType3_EVENT_WRITE_SHD(RingBuffer *ringBuffer
   const u32 initiator = ringBuffer->ReadAndSwap<u32>();
   const u32 address = ringBuffer->ReadAndSwap<u32>();
   const u32 value = ringBuffer->ReadAndSwap<u32>();
-  u32 addr = address & ~0x3;
-  XeEndianFormat format = static_cast<XeEndianFormat>(address & 0x3);
 
   // Writeback
   state->WriteRegister(XeRegister::VGT_EVENT_INITIATOR, initiator & 0x3F);
@@ -619,23 +649,8 @@ bool CommandProcessor::ExecutePacketType3_EVENT_WRITE_SHD(RingBuffer *ringBuffer
     writeValue = value;
   }
 
-  u32 rawValue = writeValue;
-  switch (format) {
-  case EndianFormatUnspecified:
-    break;
-  case EndianFormat8in16:
-    rawValue = ((rawValue << 8) & 0xFF00FF00) | ((rawValue >> 8) & 0x00FF00FF);
-    break;
-  case EndianFormat8in32:
-    rawValue = byteswap_be(rawValue);
-    break;
-  case EndianFormat16in32:
-    rawValue = ((rawValue >> 16) & 0xFFFF) | (rawValue << 16);
-    break;
-  }
-
-  u8 *addrPtr = ram->getPointerToAddress(addr);
-  memcpy(addrPtr, &value, sizeof(value));
+  u8 *addrPtr = ram->getPointerToAddress(address);
+  memcpy(addrPtr, &writeValue, sizeof(writeValue));
 
   return true;
 }
@@ -653,24 +668,9 @@ bool CommandProcessor::ExecutePacketType3_WAIT_REG_MEM(RingBuffer *ringBuffer, u
   do {
     u32 value = 0;
     if (waitInfo & 0x10) {
-      u32 addrWithFmt = static_cast<u32>(pollReg);
-      XeEndianFormat format = static_cast<XeEndianFormat>(addrWithFmt & 0x3);
-      u32 addr = addrWithFmt & ~0x3;
+      u32 addr = static_cast<u32>(pollReg);
       u8 *addrPtr = ram->getPointerToAddress(addr);
       memcpy(&value, addrPtr, sizeof(value));
-      switch (format) {
-      case EndianFormatUnspecified:
-        break;
-      case EndianFormat8in16:
-        value = ((value << 8) & 0xFF00FF00) | ((value >> 8) & 0x00FF00FF);
-        break;
-      case EndianFormat8in32:
-        value = byteswap_be(value);
-        break;
-      case EndianFormat16in32:
-        value = ((value >> 16) & 0xFFFF) | (value << 16);
-        break;
-      }
     } else {
       value = state->ReadRegister(pollReg);
       if (pollReg == XeRegister::COHER_STATUS_HOST) {

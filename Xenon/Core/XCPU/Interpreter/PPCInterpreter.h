@@ -39,15 +39,15 @@ extern XENON_CONTEXT *CPUContext;
 #define GET_FPSCR     curThread.FPSCR.FPSCR_Hex
 #define SET_FPSCR(x)  curThread.FPSCR.FPSCR_Hex = x
 // Check for Enabled FPU.
-#define CHECK_FPU       if (!checkFpuAvailable(ppuState)) { return; }
+#define CHECK_FPU     if (!checkFpuAvailable(ppuState)) { return; }
 
 //
 // VXU Helpers
 //
 #define VR(x)         curThread.VR[x]
-#define VRi(x)         curThread.VR[_instr.x]
+#define VRi(x)        curThread.VR[_instr.x]
 // Check for Enabled VXU.
-#define CHECK_VXU       if (!checkVxuAvailable(ppuState)) { return; }
+#define CHECK_VXU     if (!checkVxuAvailable(ppuState)) { return; }
 
 
 static inline bool checkFpuAvailable(PPU_STATE *ppuState) {
