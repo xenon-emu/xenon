@@ -24,6 +24,17 @@ void PPCInterpreter::PPCInterpreter_mtvscr(PPU_STATE *ppuState) {
   curThread.VSCR.hexValue = VRi(vb).dword[3];
 }
 
+// Vector Logical AND with Complement (x'1000 0444')
+void PPCInterpreter::PPCInterpreter_vandc(PPU_STATE *ppuState) {
+  /*
+  vD <- (vA) & ~(vB)
+  */
+
+  CHECK_VXU;
+
+  VRi(vd) = VRi(va) | ~VRi(vb);
+}
+
 // Vector Logical OR (x'1000 0484')
 void PPCInterpreter::PPCInterpreter_vor(PPU_STATE *ppuState) {
   /*
