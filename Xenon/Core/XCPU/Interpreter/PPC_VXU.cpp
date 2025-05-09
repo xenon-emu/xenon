@@ -43,7 +43,7 @@ void PPCInterpreter::PPCInterpreter_vandc(PPU_STATE *ppuState) {
 
   CHECK_VXU;
 
-  VRi(vd) = VRi(va) | ~VRi(vb);
+  VRi(vd) = VRi(va) & ~VRi(vb);
 }
 
 // Vector Logical NOR (x'1000 0504')
