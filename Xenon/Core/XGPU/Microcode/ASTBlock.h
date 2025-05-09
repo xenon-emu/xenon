@@ -13,6 +13,7 @@ enum class eBlockType : u8 {
   END, // Shader end
   RET, // Function return
 };
+
 // Generalized block in the shader
 class Block {
 public:

@@ -1,4 +1,3 @@
 // Copyright 2025 Xenon Emulator Project
 
-#include "ASTBlock.h"
-
+#pragma once

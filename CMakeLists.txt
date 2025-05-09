@@ -259,9 +259,14 @@ set(microprofile
 set(XGPU_AST
   Xenon/Core/XGPU/Microcode/ASTBlock.cpp
   Xenon/Core/XGPU/Microcode/ASTBlock.h
+  Xenon/Core/XGPU/Microcode/ASTEmitter.cpp
+  Xenon/Core/XGPU/Microcode/ASTEmitter.h
   Xenon/Core/XGPU/Microcode/ASTNode.cpp
   Xenon/Core/XGPU/Microcode/ASTNode.h
   Xenon/Core/XGPU/Microcode/ASTNodeBase.h
+  Xenon/Core/XGPU/Microcode/Constants.h
+  Xenon/Core/XGPU/Microcode/Transformer.cpp
+  Xenon/Core/XGPU/Microcode/Transformer.h
 )
 
 set(XGPU
