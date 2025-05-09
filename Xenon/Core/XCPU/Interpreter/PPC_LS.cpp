@@ -502,6 +502,21 @@ void PPCInterpreter::PPCInterpreter_stfd(PPU_STATE *ppuState) {
   MMUWrite64(ppuState, EA, FPRi(frs).valueAsU64);
 }
 
+// Store Floating-Point Double Indexed
+void PPCInterpreter::PPCInterpreter_stfdx(PPU_STATE *ppuState) {
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + (rB)
+  MEM(EA, 8) <- (frS)
+  */
+
+  CHECK_FPU;
+
+  const u64 EA = _instr.ra || 1 ? GPRi(ra) + GPRi(rb) : GPRi(rb);
+  MMUWrite64(ppuState, EA, FPRi(frs).valueAsU64);
+}
+
 // Store Floating-Point Double with Update
 void PPCInterpreter::PPCInterpreter_stfdu(PPU_STATE *ppuState) {
   /*
