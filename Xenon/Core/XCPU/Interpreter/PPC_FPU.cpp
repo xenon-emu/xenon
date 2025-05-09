@@ -260,6 +260,58 @@ void PPCInterpreter::PPCInterpreter_fmrx(PPU_STATE *ppuState) {
   }
 }
 
+// Floating Multiply-Subtract Single
+void PPCInterpreter::PPCInterpreter_fmsubx(PPU_STATE *ppuState) {
+  /*
+  frD <- ([frA * frC] - frB)
+  */
+
+  CHECK_FPU;
+
+  FPRi(frd).valueAsDouble = (FPRi(fra).valueAsDouble * FPRi(frc).valueAsDouble) - FPRi(frb).valueAsDouble;
+
+  ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
+}
+
+// Floating Multiply-Subtract Single
+void PPCInterpreter::PPCInterpreter_fmsubsx(PPU_STATE *ppuState) {
+  /*
+  frD <- ([frA * frC] - frB)
+  */
+
+  CHECK_FPU;
+
+  FPRi(frd).valueAsDouble = static_cast<f32>((FPRi(fra).valueAsDouble * FPRi(frc).valueAsDouble) - FPRi(frb).valueAsDouble);
+
+  ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
+}
+
+// Floating Negative Multiply-Add Single
+void PPCInterpreter::PPCInterpreter_fnmaddx(PPU_STATE *ppuState) {
+  /*
+  frD <- - ([frA * frC] + frB)
+  */
+
+  CHECK_FPU;
+
+  FPRi(frd).valueAsDouble = -((FPRi(fra).valueAsDouble * FPRi(frc).valueAsDouble) + FPRi(frb).valueAsDouble);
+
+  ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
+}
+
+// Floating Negative Multiply-Add Single
+void PPCInterpreter::PPCInterpreter_fnmaddsx(PPU_STATE *ppuState) {
+  /*
+  frD <- - ([frA * frC] + frB)
+  */
+
+  CHECK_FPU;
+
+  FPRi(frd).valueAsDouble = static_cast<f32>(-((FPRi(fra).valueAsDouble * FPRi(frc).valueAsDouble) + FPRi(frb).valueAsDouble));
+
+  ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
+}
+
 // Floating Negate (x'FC00 0050')
 void PPCInterpreter::PPCInterpreter_fnegx(PPU_STATE *ppuState) {
   /*
@@ -273,6 +325,19 @@ void PPCInterpreter::PPCInterpreter_fnegx(PPU_STATE *ppuState) {
   if (_instr.rc) {
     ppuSetCR(ppuState, 1, curThread.FPSCR.FG, curThread.FPSCR.FL, curThread.FPSCR.FE, curThread.FPSCR.FU);
   }
+}
+
+// Floating Negative Multiply-Subtract Single
+void PPCInterpreter::PPCInterpreter_fnmsubx(PPU_STATE *ppuState) {
+  /*
+  frD <- - ([frA * frC] - frB)
+  */
+
+  CHECK_FPU;
+
+  FPRi(frd).valueAsDouble = -((FPRi(fra).valueAsDouble * FPRi(frc).valueAsDouble) - FPRi(frb).valueAsDouble);
+
+  ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
 }
 
 // Floating Negative Multiply-Subtract Single (x'EC00 003C')
