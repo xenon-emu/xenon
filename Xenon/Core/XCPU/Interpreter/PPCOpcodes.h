@@ -25,8 +25,6 @@ D_STUBRC(fctiw)
 D_STUBRC(fsel)
 D_STUBRC(fres)
 D_STUBRC(fnabs)
-D_STUBRC(fsqrt)
-D_STUBRC(fsqrts)
 D_STUBRC(frsqrte)
 D_STUB(td)
 D_STUB(dst)
@@ -37,7 +35,6 @@ D_STUB(lfsux)
 D_STUB(mfsrin)
 D_STUB(mfsr)
 D_STUB(lvsr)
-D_STUB(lvsl)
 D_STUB(lvx)
 D_STUB(stvx128)
 D_STUB(lvsl128)
@@ -393,6 +390,8 @@ extern void PPCInterpreter_fnmsubsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_frspx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fsubx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fsubsx(PPU_STATE *ppuState);
+extern void PPCInterpreter_fsqrtx(PPU_STATE *ppuState);
+extern void PPCInterpreter_fsqrtsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_mffsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_mtfsfx(PPU_STATE *ppuState);
 
@@ -521,4 +520,5 @@ extern void PPCInterpreter_lvx128(PPU_STATE *ppuState);
 extern void PPCInterpreter_lvxl(PPU_STATE *ppuState);
 extern void PPCInterpreter_lvlx(PPU_STATE *ppuState);
 extern void PPCInterpreter_lvrx(PPU_STATE *ppuState);
+extern void PPCInterpreter_lvsl(PPU_STATE *ppuState);
 }

@@ -1465,3 +1465,43 @@ void PPCInterpreter::PPCInterpreter_lvrx(PPU_STATE *ppuState) {
   VR(_instr.rd).dword[2] = byteswap_be<u32>(vector1.dword[2]);
   VR(_instr.rd).dword[3] = byteswap_be<u32>(vector1.dword[3]);
 }
+
+// Load Vector for Shift Left (x'7C00 000C')
+void PPCInterpreter::PPCInterpreter_lvsl(PPU_STATE* ppuState) {
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  10 11
+  15 16
+  20 21
+  addr[0:63] <- b + (rB)
+  sh <- addr[60:63]
+  if sh = 0x0 then vD[0-127] <- 0x000102030405060708090A0B0C0D0E0F
+  if sh = 0x1 then vD[0-127] <- 0x0102030405060708090A0B0C0D0E0F10
+  if sh = 0x2 then vD[0-127] <- 0x02030405060708090A0B0C0D0E0F1011
+  if sh = 0x3 then vD[0-127] <- 0x030405060708090A0B0C0D0E0F101112
+  if sh = 0x4 then vD[0-127] <- 0x0405060708090A0B0C0D0E0F10111213
+  if sh = 0x5 then vD[0-127] <- 0x05060708090A0B0C0D0E0F1011121314
+  if sh = 0x6 then vD[0-127] <- 0x060708090A0B0C0D0E0F101112131415
+  if sh = 0x7 then vD[0-127] <- 0x0708090A0B0C0D0E0F10111213141516
+  if sh = 0x8 then vD[0-127] <- 0x08090A0B0C0D0E0F1011121314151617
+  if sh = 0x9 then vD[0-127] <- 0x090A0B0C0D0E0F101112131415161718
+  if sh = 0xA then vD[0-127] <- 0x0A0B0C0D0E0F10111213141516171819
+  if sh = 0xB then vD[0-127] <- 0x0B0C0D0E0F101112131415161718191A
+  if sh = 0xC then vD[0-127] <- 0x0C0D0E0F101112131415161718191A1B
+  if sh = 0xD then vD[0-127] <- 0x0D0E0F101112131415161718191A1B1C
+  if sh = 0xE then vD[0-127] <- 0x0E0F101112131415161718191A1B1C1D
+  if sh = 0xF then vD[0-127] <- 0x0F101112131415161718191A1B1C1D1E
+  */
+
+  CHECK_VXU;
+
+  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
+  u8 sh = EA & 0xF;
+
+  for (int idx = 0; idx < 16; idx++)
+  {
+    const u8 regIdx = (idx & ~3) | (3 - (idx & 3));
+    VRi(vd).bytes[regIdx] = idx + sh;
+  }
+}

@@ -411,6 +411,32 @@ void PPCInterpreter::PPCInterpreter_fsubsx(PPU_STATE *ppuState) {
   ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
 }
 
+// Floating Square Root (Double-Precision) (x'FC00 002C')
+void PPCInterpreter::PPCInterpreter_fsqrtx(PPU_STATE* ppuState) {
+  /*
+  frD <- (Square_rootfrB)
+  */
+
+  CHECK_FPU;
+
+  FPRi(frd).valueAsDouble = std::sqrt(FPRi(frb).valueAsDouble);
+
+  ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
+}
+
+// Floating Square Root Single (x'EC00 002C')
+void PPCInterpreter::PPCInterpreter_fsqrtsx(PPU_STATE* ppuState) {
+  /*
+  frD <- Single(Square_rootfrB)
+  */
+
+  CHECK_FPU;
+
+  FPRi(frd).valueAsDouble = static_cast<f32>(std::sqrt(FPRi(frb).valueAsDouble));
+
+  ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
+}
+
 void PPCInterpreter::PPCInterpreter_mffsx(PPU_STATE *ppuState) {
   CHECK_FPU;
 
