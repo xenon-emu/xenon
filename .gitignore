@@ -427,5 +427,6 @@ Xenon.dir/
 Xenon.dir/*
 /Xenon/x64/*
 /Xenon/Debug/*
+/Tools/Tools/*
 result
 files
