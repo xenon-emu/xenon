@@ -50,7 +50,7 @@ void PPCInterpreter::PPCInterpreter_faddx(PPU_STATE *ppuState) {
   frD <- (frA) + (frB)
   */
 
- CHECK_FPU;
+  CHECK_FPU;
 
   FPRi(frd).valueAsDouble = FPRi(fra).valueAsDouble + FPRi(frb).valueAsDouble;
 
@@ -63,7 +63,7 @@ void PPCInterpreter::PPCInterpreter_fabsx(PPU_STATE *ppuState) {
   The contents of frB with bit [0] cleared are placed into frD.
   */
 
- CHECK_FPU;
+  CHECK_FPU;
   
   FPRi(frd).valueAsDouble = std::fabs(FPRi(frb).valueAsDouble);
 
@@ -78,7 +78,7 @@ void PPCInterpreter::PPCInterpreter_faddsx(PPU_STATE *ppuState) {
   frD <- (frA) + (frB)
   */
 
- CHECK_FPU;
+  CHECK_FPU;
 
   FPRi(frd).valueAsDouble = static_cast<f32>(FPRi(fra).valueAsDouble + FPRi(frb).valueAsDouble);
 
@@ -100,7 +100,7 @@ void PPCInterpreter::PPCInterpreter_fcmpu(PPU_STATE *ppuState) {
     VXSNAN <- 1
   */
 
- CHECK_FPU;
+  CHECK_FPU;
 
   const f64 fra = FPRi(fra).valueAsDouble;
   const f64 frb = FPRi(frb).valueAsDouble;
@@ -113,7 +113,7 @@ void PPCInterpreter::PPCInterpreter_fctidzx(PPU_STATE *ppuState) {
   // This was mostly taken from rpcs3's PPUInterpreter. 
   // TODO: Verify.
 
- CHECK_FPU;
+  CHECK_FPU;
 
 #if defined(ARCH_X86_64)
   const auto val = _mm_set_sd(FPRi(frb).valueAsDouble);
@@ -140,7 +140,7 @@ void PPCInterpreter::PPCInterpreter_fctiwzx(PPU_STATE *ppuState) {
   // This was mostly taken from rpcs3's PPUInterpreter. 
   // TODO: Verify.
 
- CHECK_FPU;
+  CHECK_FPU;
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
   const auto val = _mm_set_sd(FPRi(frb).valueAsDouble);
@@ -160,9 +160,22 @@ void PPCInterpreter::PPCInterpreter_fcfidx(PPU_STATE *ppuState) {
   frD <- signedInt64todouble(frB)
   */
 
- CHECK_FPU;
+  CHECK_FPU;
 
   FPRi(frd).valueAsDouble = static_cast<f64>(static_cast<s64>(FPRi(frb).valueAsDouble));
+
+  ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
+}
+
+// Floating Divide Double
+void PPCInterpreter::PPCInterpreter_fdivx(PPU_STATE *ppuState) {
+  /*
+  frD <- (frA) / (frB)
+  */
+
+  CHECK_FPU;
+
+  FPRi(frd).valueAsDouble = FPRi(fra).valueAsDouble / FPRi(frb).valueAsDouble;
 
   ppuUpdateFPSCR(ppuState, FPRi(frd).valueAsDouble, 0.0, _instr.rc);
 }
@@ -173,7 +186,7 @@ void PPCInterpreter::PPCInterpreter_fdivsx(PPU_STATE *ppuState) {
   frD <- f32(frA) / (frC)
   */
 
- CHECK_FPU;
+  CHECK_FPU;
 
   FPRi(frd).valueAsDouble = static_cast<f32>(FPRi(fra).valueAsDouble / FPRi(frb).valueAsDouble);
 
@@ -186,7 +199,7 @@ void PPCInterpreter::PPCInterpreter_fmaddx(PPU_STATE *ppuState) {
   frD <- (frA * frC) + frB
   */
 
- CHECK_FPU;
+  CHECK_FPU;
 
   FPRi(frd).valueAsDouble = (FPRi(fra).valueAsDouble * FPRi(frc).valueAsDouble) + FPRi(frb).valueAsDouble;
 
@@ -199,7 +212,7 @@ void PPCInterpreter::PPCInterpreter_fmaddsx(PPU_STATE *ppuState) {
   frD <- (frA * frC) + frB
   */
 
- CHECK_FPU;
+  CHECK_FPU;
 
   FPRi(frd).valueAsDouble = static_cast<f32>((FPRi(fra).valueAsDouble * FPRi(frc).valueAsDouble) + FPRi(frb).valueAsDouble);
 
@@ -212,7 +225,7 @@ void PPCInterpreter::PPCInterpreter_fmulx(PPU_STATE *ppuState) {
   frD <- (frA) * (frC)
   */
 
- CHECK_FPU;
+  CHECK_FPU;
 
   FPRi(frd).valueAsDouble = FPRi(fra).valueAsDouble * FPRi(frc).valueAsDouble;
 
@@ -225,7 +238,7 @@ void PPCInterpreter::PPCInterpreter_fmulsx(PPU_STATE *ppuState) {
   frD <- (frA) * (frC)
   */
 
- CHECK_FPU;
+  CHECK_FPU;
 
   FPRi(frd).valueAsDouble = static_cast<f32>(FPRi(fra).valueAsDouble * FPRi(frc).valueAsDouble);
 
@@ -238,7 +251,7 @@ void PPCInterpreter::PPCInterpreter_fmrx(PPU_STATE *ppuState) {
   frD <- (frB)
   */
 
- CHECK_FPU;
+  CHECK_FPU;
 
   FPRi(frd) = FPRi(frb);
 
@@ -268,7 +281,7 @@ void PPCInterpreter::PPCInterpreter_fnmsubsx(PPU_STATE *ppuState) {
   frD <- - ([frA * frC] - frB)
   */
 
- CHECK_FPU;
+  CHECK_FPU;
 
   FPRi(frd).valueAsDouble = static_cast<f32>(-((FPRi(fra).valueAsDouble * FPRi(frc).valueAsDouble) - FPRi(frb).valueAsDouble));
 
@@ -281,7 +294,7 @@ void PPCInterpreter::PPCInterpreter_frspx(PPU_STATE *ppuState) {
   frD <- Round_single( frB )
   */
 
- CHECK_FPU;
+  CHECK_FPU;
 
   FPRi(frd).valueAsDouble = static_cast<f32>(FPRi(frb).valueAsDouble);
 
@@ -294,7 +307,7 @@ void PPCInterpreter::PPCInterpreter_fsubx(PPU_STATE *ppuState) {
     frD <- (frA) - (frB)
     */
 
- CHECK_FPU;
+  CHECK_FPU;
 
   FPRi(frd).valueAsDouble = FPRi(fra).valueAsDouble - FPRi(frb).valueAsDouble;
 
@@ -307,7 +320,7 @@ void PPCInterpreter::PPCInterpreter_fsubsx(PPU_STATE *ppuState) {
   frD <- (frA) - (frB)
   */
 
- CHECK_FPU;
+  CHECK_FPU;
 
   FPRi(frd).valueAsDouble = static_cast<f32>(FPRi(fra).valueAsDouble - FPRi(frb).valueAsDouble);
 
@@ -315,7 +328,7 @@ void PPCInterpreter::PPCInterpreter_fsubsx(PPU_STATE *ppuState) {
 }
 
 void PPCInterpreter::PPCInterpreter_mffsx(PPU_STATE *ppuState) {
- CHECK_FPU;
+  CHECK_FPU;
 
   FPRi(frd).valueAsU64 = static_cast<u64>(GET_FPSCR);
 
@@ -325,7 +338,7 @@ void PPCInterpreter::PPCInterpreter_mffsx(PPU_STATE *ppuState) {
 }
 
 void PPCInterpreter::PPCInterpreter_mtfsfx(PPU_STATE *ppuState) {
- CHECK_FPU;
+  CHECK_FPU;
 
   u32 mask = 0;
   for (u32 b = 0x80; b; b >>= 1) {
