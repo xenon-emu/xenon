@@ -24,14 +24,11 @@ struct addResult {
   // and out of bit[32] in 32 bit mode(of 64 bit implementations)
   addResult(T a, T b, bool sfBitMode) :
     result(a + b), carry(sfBitMode ? (result < a) :
-      (static_cast<u32>(result < a)))
-  {
-  }
+      (static_cast<u32>(result < a))) {}
 
   // Straightforward ADC with flags
   addResult(T a, T b, bool c, bool sfBitMode) :
-    addResult(a, b, sfBitMode)
-  {
+    addResult(a, b, sfBitMode) {
     addResult r(result, c, sfBitMode);
     result = r.result;
     carry |= r.carry;
