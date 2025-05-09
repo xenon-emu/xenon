@@ -4,7 +4,9 @@
 
 #include "Base/Types.h"
 
-namespace Xe::UCode {
+#include "Core/XGPU/ShaderConstants.h"
+
+namespace Xe {
 
 // Closest AMD doc:
 // http://developer.amd.com/wordpress/media/2012/10/R600_Instruction_Set_Architecture.pdf

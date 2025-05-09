@@ -158,15 +158,6 @@ enum CPMicrocodeType {
   uCodeTypePFP
 };
 
-enum XeEndianFormat {
-  EndianFormatUnspecified,
-  EndianFormat8in16,
-  EndianFormat8in32,
-  EndianFormat16in32,
-  EndianFormat8in64,
-  EndianFormat8in128
-};
-
 class CommandProcessor {
 public:
   CommandProcessor(RAM *ramPtr, XenosState *statePtr, PCIBridge *pciBridge);
