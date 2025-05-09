@@ -24,6 +24,17 @@ void PPCInterpreter::PPCInterpreter_mtvscr(PPU_STATE *ppuState) {
   curThread.VSCR.hexValue = VRi(vb).dword[3];
 }
 
+// Vector Logical OR (x'1000 0484')
+void PPCInterpreter::PPCInterpreter_vor(PPU_STATE *ppuState) {
+  /*
+  vD <- (vA) | (vB)
+  */
+
+  CHECK_VXU;
+
+  VRi(vd) = VRi(va) | VRi(vb);
+}
+
 // Vector Splat Word (x'1000 028C')
 void PPCInterpreter::PPCInterpreter_vspltw(PPU_STATE *ppuState) {
   /*
