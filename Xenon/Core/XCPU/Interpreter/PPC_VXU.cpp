@@ -178,6 +178,25 @@ void PPCInterpreter::PPCInterpreter_vspltb(PPU_STATE* ppuState) {
   }
 }
 
+// Vector Splat Immediate Signed Halfword (x'1000 034C')
+void PPCInterpreter::PPCInterpreter_vspltish(PPU_STATE* ppuState) {
+  /*
+  do i=0 to 127 by 16
+    (vD)i:i+15 <- SignExtend(SIMM,16)
+  end
+  */
+
+  CHECK_VXU;
+
+  u32 simm = 0;
+
+  if (_instr.vsimm) { simm = (_instr.vsimm & 0x10) ? (_instr.vsimm | 0xFFFFFFF0) : _instr.vsimm; }
+
+  for (u8 idx = 0; idx < 8; idx++) {
+    VRi(vd).word[idx] = static_cast<u16>(simm);
+  }
+}
+
 // Vector Splat Immediate Signed Byte (x'1000 030C')
 void PPCInterpreter::PPCInterpreter_vspltisb(PPU_STATE* ppuState) {
   /*

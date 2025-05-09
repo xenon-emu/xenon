@@ -67,8 +67,6 @@ D_STUB(stfsu)
 D_STUB(stfsux)
 D_STUB(stvebx)
 D_STUB(fcmpo)
-D_STUB(stvrx)
-D_STUB(stvlx)
 D_STUB(stvrxl)
 D_STUB(stvlxl)
 D_STUB(stvehx)
@@ -188,7 +186,6 @@ D_STUB(vcmpgtsh)
 D_STUB(vcmpgtsh_)
 D_STUB(vmulesh)
 D_STUB(vcfsx)
-D_STUB(vspltish)
 D_STUB(vupkhpx)
 D_STUB(vaddsws)
 D_STUB(vminsw)
@@ -410,6 +407,7 @@ extern void PPCInterpreter_vmrghw128(PPU_STATE *ppuState);
 extern void PPCInterpreter_vslb(PPU_STATE *ppuState);
 extern void PPCInterpreter_vspltb(PPU_STATE *ppuState);
 extern void PPCInterpreter_vspltisb(PPU_STATE *ppuState);
+extern void PPCInterpreter_vspltish(PPU_STATE* ppuState);
 extern void PPCInterpreter_vspltisw128(PPU_STATE *ppuState);
 extern void PPCInterpreter_vxor(PPU_STATE *ppuState);
 
@@ -461,6 +459,8 @@ extern void PPCInterpreter_stfiwx(PPU_STATE *ppuState);
 
 // Store Vector
 extern void PPCInterpreter_stvx(PPU_STATE *ppuState);
+extern void PPCInterpreter_stvrx(PPU_STATE *ppuState);
+extern void PPCInterpreter_stvlx(PPU_STATE *ppuState);
 extern void PPCInterpreter_stvxl(PPU_STATE *ppuState);
 extern void PPCInterpreter_stvlxl128(PPU_STATE *ppuState);
 

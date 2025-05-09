@@ -580,6 +580,34 @@ void PPCInterpreter::PPCInterpreter_stvx(PPU_STATE *ppuState) {
   MMUWrite32(ppuState, EA + (sizeof(u32) * 3), byteswap_be<u32>(VRi(vs).dword[3]));
 }
 
+// Store Vector Right Indexed
+void PPCInterpreter::PPCInterpreter_stvrx(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
+  u8 eb = EA & 0xF;
+  EA &= ~0xF;
+  
+  for (int i = 15; i > 15 - eb; i--) {
+    LOG_WARNING(Xenon, "stvrx: Unaligned store! Check!");
+    MMUWrite8(ppuState, (EA - 16) + i, VRi(vs).bytes[i]);
+  }
+}
+
+// Store Vector Left Indexed
+void PPCInterpreter::PPCInterpreter_stvlx(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
+  u8 eb = EA & 0xF;
+  EA &= ~0xF;
+
+  for (int i = 0; i < 16 - eb; i++) {
+    LOG_WARNING(Xenon, "stvlx: Unaligned store! Check!");
+    MMUWrite8(ppuState, EA + i, VRi(vs).bytes[i]);
+  }
+}
+
 // Store Vector Indexed LRU (x'7C00 03CE')
 void PPCInterpreter::PPCInterpreter_stvxl(PPU_STATE *ppuState) {
   /*
@@ -609,17 +637,9 @@ void PPCInterpreter::PPCInterpreter_stvlxl128(PPU_STATE *ppuState) {
   u8 eb = EA & 0xF;
   EA &= ~0xF;
 
-  if (eb == 0) { // Address is aligned.
-    MMUWrite32(ppuState, EA, byteswap_be<u32>(VR(VMX128_1_VD128).dword[0]));
-    MMUWrite32(ppuState, EA + (sizeof(u32) * 1), byteswap_be<u32>(VR(VMX128_1_VD128).dword[1]));
-    MMUWrite32(ppuState, EA + (sizeof(u32) * 2), byteswap_be<u32>(VR(VMX128_1_VD128).dword[2]));
-    MMUWrite32(ppuState, EA + (sizeof(u32) * 3), byteswap_be<u32>(VR(VMX128_1_VD128).dword[3]));
-  }
-  else {
-    for (int i = 0; i < eb; ++i) {
-      LOG_WARNING(Xenon, "stvlxl128: Unaligned store! Check!");
-      MMUWrite8(ppuState, EA + i, VR(VMX128_1_VD128).bytes[(16 - eb) + i]);
-    }
+  for (int i = 0; i < 16 - eb; i++) {
+    LOG_WARNING(Xenon, "stvlxl128: Unaligned store! Check!");
+    MMUWrite8(ppuState, EA + i, VR(VMX128_1_VD128).bytes[i]);
   }
 }
 
