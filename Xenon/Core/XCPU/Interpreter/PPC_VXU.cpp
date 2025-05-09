@@ -144,6 +144,23 @@ void PPCInterpreter::PPCInterpreter_vmrghw128(PPU_STATE *ppuState) {
   VR(VMX128_VD128).dword[3] = VR(VMX128_VB128).dword[1];
 }
 
+// Vector128 Splat Immediate Signed Word
+void PPCInterpreter::PPCInterpreter_vspltisw128(PPU_STATE* ppuState) {
+  /*
+  (VRD.xyzw) <- sign_extend(uimm)
+  */
+
+  CHECK_VXU;
+
+  u32 simm = 0;
+
+  if ((VMX128_3_IMM)) { simm = (VMX128_3_IMM & 0x10) ? (VMX128_3_IMM | 0xFFFFFFF0) : VMX128_3_IMM; }
+
+  for (u8 idx = 0; idx < 4; idx++) {
+    VR(VMX128_3_VD128).dword[idx] = simm;
+  }
+}
+
 // Vector Logical XOR (x'1000 04C4')
 void PPCInterpreter::PPCInterpreter_vxor(PPU_STATE *ppuState) {
   /*
