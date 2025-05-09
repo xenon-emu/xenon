@@ -68,7 +68,6 @@ D_STUB(vsldoi128)
 D_STUB(vmrglw128)
 D_STUB(lvrxl)
 D_STUB(lvlxl)
-D_STUB(lwaux)
 D_STUB(lswx)
 D_STUB(lvewx)
 D_STUB(lveb)
@@ -491,6 +490,7 @@ extern void PPCInterpreter_lmw(PPU_STATE *ppuState);
 // Load Word
 extern void PPCInterpreter_lwa(PPU_STATE *ppuState);
 extern void PPCInterpreter_lwax(PPU_STATE *ppuState);
+extern void PPCInterpreter_lwaux(PPU_STATE *ppuState);
 extern void PPCInterpreter_lwarx(PPU_STATE *ppuState);
 extern void PPCInterpreter_lwbrx(PPU_STATE *ppuState);
 extern void PPCInterpreter_lwz(PPU_STATE *ppuState);

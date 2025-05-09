@@ -18,7 +18,7 @@ struct addResult {
 
   addResult() = default;
 
-  // Straighforward ADD with flags
+  // Straightforward ADD with flags
   // The integer arithmetic instructions, always set the XER bit [CA],
   // to reflect the carry out of bit [0] in the default 64-bit mode
   // and out of bit[32] in 32 bit mode(of 64 bit implementations)
