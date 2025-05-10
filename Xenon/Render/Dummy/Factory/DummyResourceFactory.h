@@ -12,18 +12,18 @@ namespace Render {
 
 class DummyResourceFactory : public ResourceFactory {
 public:
-    std::unique_ptr<ShaderFactory> CreateShaderFactory() override {
-        return std::make_unique<DummyShaderFactory>();
-    }
-    std::unique_ptr<Buffer> CreateBuffer() override {
-        return std::make_unique<DummyBuffer>();
-    }
-    std::unique_ptr<Texture> CreateTexture() override {
-        return std::make_unique<DummyTexture>();
-    }
-    std::unique_ptr<GUI> CreateGUI() override {
-        return std::make_unique<DummyGUI>();
-    }
+  std::unique_ptr<ShaderFactory> CreateShaderFactory() override {
+    return std::make_unique<DummyShaderFactory>();
+  }
+  std::unique_ptr<Buffer> CreateBuffer() override {
+    return std::make_unique<DummyBuffer>();
+  }
+  std::unique_ptr<Texture> CreateTexture() override {
+    return std::make_unique<DummyTexture>();
+  }
+  std::unique_ptr<GUI> CreateGUI() override {
+    return std::make_unique<DummyGUI>();
+  }
 };
 
 } // namespace Render

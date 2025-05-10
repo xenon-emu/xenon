@@ -6,16 +6,16 @@
 
 namespace Render {
 DummyRenderer::DummyRenderer(RAM *ram, SDL_Window *mainWindow) :
-    Renderer(ram, mainWindow) {
-    LOG_WARNING(Render, "Using dummy renderer!");
+  Renderer(ram, mainWindow) {
+  LOG_WARNING(Render, "Using dummy renderer!");
 }
 
 DummyRenderer::~DummyRenderer() {
-    Shutdown();
+  Shutdown();
 }
 
 void DummyRenderer::BackendStart() {
-    resourceFactory = std::make_unique<DummyResourceFactory>();
+  resourceFactory = std::make_unique<DummyResourceFactory>();
 }
 
 void DummyRenderer::BackendSDLProperties(SDL_PropertiesID properties) {}
@@ -35,11 +35,11 @@ void DummyRenderer::OnBind() {}
 void DummyRenderer::OnSwap(SDL_Window* window) {}
 
 s32 DummyRenderer::GetBackbufferFlags() {
-    return 0;
+  return 0;
 }
 
 void* DummyRenderer::GetBackendContext() {
-    return nullptr;
+  return nullptr;
 }
 
 } // namespace Render
