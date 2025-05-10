@@ -48,8 +48,8 @@ void PPCInterpreter::ppuUpdateFPSCR(PPU_STATE *ppuState, f64 op0, f64 op1, bool 
 void PPCInterpreter::PPCInterpreter_mcrfs(PPU_STATE *ppuState) {
   /*
   * CR4 * BF + 32:4 * BF + 35 <- CR4 * crS + 32:4 * crS + 35
-  * The contents of field crS (bits 4 * crS + 32–4 * crS + 35) of CR are copied to field
-  * crD (bits 4 * crD + 32–4 * crD + 35) of CR.
+  * The contents of field crS (bits 4 * crS + 32-4 * crS + 35) of CR are copied to field
+  * crD (bits 4 * crD + 32-4 * crD + 35) of CR.
   */
   CHECK_FPU;
 

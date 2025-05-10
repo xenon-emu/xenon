@@ -631,12 +631,8 @@ struct PPU_THREAD_REGISTERS {
   u64 CIA;
   // Next Instruction Address
   u64 NIA;
-  // Previous instruction data
-  PPCOpcode PI;
   // Current instruction data
   PPCOpcode CI;
-  // Next instruction data
-  PPCOpcode NI;
   // Instruction fetch flag
   bool instrFetch = false;
   // General-Purpose Registers (32)

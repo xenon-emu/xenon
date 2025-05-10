@@ -214,27 +214,42 @@ void Render::GUI::TextCopy(const std::string &label, const std::string &value) {
 }
 
 void Render::GUI::TextCopySimple(const std::string &value) {
+  u64 hashtagPos = value.find('#');
+  std::string valueSimple = hashtagPos != std::string::npos ? value.substr(0, hashtagPos) : value;
+  std::string hashTag = hashtagPos != std::string::npos ? value.substr(hashtagPos + 2) : value;
+
   if (ImGui::TextButton(value.data())) {
-    LOG_INFO(Debug, "{}", value.data());
+    LOG_INFO(Debug, "{}", valueSimple.data());
   }
   if (ImGui::BeginPopupContextItem()) {
-    MenuItem("Copy '" + value + "'", [&] {
-      SDL_SetClipboardText(value.data());
+    MenuItem("Copy '" + valueSimple + "'##" + hashTag, [&] {
+      SDL_SetClipboardText(valueSimple.data());
     });
     ImGui::EndPopup();
   }
 }
 
 void Render::GUI::TextCopySplit(const std::string &value, const std::string &copyValue) {
+  u64 hashtagPos = value.find('#');
+  u64 hashtagCopyPos = copyValue.find('#');
+  bool hasHashtag = hashtagPos != std::string::npos;
+  bool copyHasHashtag = hashtagCopyPos != std::string::npos;
+
+  std::string valueSimple = hasHashtag ? value.substr(0, hashtagPos) : value;
+  std::string hashTag = hasHashtag ? value.substr(hashtagPos+2) : value;
+
+  std::string copyValueSimple = copyHasHashtag ? copyValue.substr(0, hashtagCopyPos) : copyValue;
+  std::string copyHashTag = copyHasHashtag ? copyValue.substr(hashtagCopyPos+2) : copyValue;
+
   if (ImGui::TextButton(value.data())) {
-    LOG_INFO(Debug, "{}", value.data());
+    LOG_INFO(Debug, "{}", valueSimple);
   }
   if (ImGui::BeginPopupContextItem()) {
-    MenuItem("Copy '" + value + "'", [&] {
+    MenuItem("Copy '" + valueSimple + "'##" + hashTag, [&] {
       SDL_SetClipboardText(value.data());
     });
-    MenuItem("Copy '" + copyValue + "'", [&] {
-      SDL_SetClipboardText(copyValue.data());
+    MenuItem("Copy '" + copyValueSimple + "'##" + copyHashTag, [&] {
+      SDL_SetClipboardText(copyValueSimple.data());
     });
     ImGui::EndPopup();
   }
