@@ -18,7 +18,7 @@ namespace Render {
 
 class OGLRenderer : public Renderer {
 public:
-  OGLRenderer(RAM *ram);
+  OGLRenderer(RAM *ram, SDL_Window *mainWindow);
   ~OGLRenderer();
   void BackendSDLProperties(SDL_PropertiesID properties) override;
   void BackendStart() override;

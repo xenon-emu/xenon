@@ -15,7 +15,7 @@ XeMain::XeMain() {
   createPCIDevices();
   addPCIDevices();
 #ifndef NO_GFX
-  renderer = std::make_unique<Render::OGLRenderer>(ram.get());
+  renderer = std::make_unique<Render::OGLRenderer>(ram.get(), createWindow());
 #endif
   xenos = std::make_unique<STRIP_UNIQUE(xenos)>(ram.get(), pciBridge.get());
   createHostBridge();
@@ -146,6 +146,44 @@ void XeMain::reloadFiles() {
     pciBridge->RegisterIIC(xenonCPU->GetIICPointer());
   }
   getCPU()->Continue();
+}
+
+SDL_Window* XeMain::createWindow() {
+  // Init SDL Events, Video, Joystick, and Gamepad
+  if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
+    LOG_ERROR(Xenon, "Failed to initialize SDL: {}", SDL_GetError());
+  }
+
+  // SDL3 window properties.
+  SDL_PropertiesID props = SDL_CreateProperties();
+  const std::string title = fmt::format("Xenon {}", Base::Version);
+  SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, title.c_str());
+  // Set starting X and Y position to be centered
+  SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_CENTERED);
+  SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_Y_NUMBER, SDL_WINDOWPOS_CENTERED);
+  // Set width and height
+  SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, Config::rendering.window.width);
+  SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, Config::rendering.window.height);
+  // Allow resizing
+  SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, true);
+  // Enable HiDPI
+  SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_HIGH_PIXEL_DENSITY_BOOLEAN, true);
+  SDL_SetNumberProperty(props, "flags", SDL_WINDOW_OPENGL);
+  SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true);
+  // Create window
+  SDL_Window *mainWindow = SDL_CreateWindowWithProperties(props);
+
+  // Set min size
+  SDL_SetWindowMinimumSize(mainWindow, 640, 480);
+
+  if (!mainWindow) {
+    LOG_ERROR(Render, "Failed to create window: {}", SDL_GetError());
+  }
+
+  // Destroy (no longer used) properties
+  SDL_DestroyProperties(props);
+
+  return mainWindow;
 }
 
 void XeMain::addPCIDevices() {

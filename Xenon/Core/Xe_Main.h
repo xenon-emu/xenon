@@ -9,6 +9,7 @@
 #include "Base/Config.h"
 #include "Base/Logging/Backend.h"
 #include "Base/Logging/Log.h"
+#include "Base/Version.h"
 
 #include "Core/NAND/NAND.h"
 #include "Core/RAM/RAM.h"
@@ -48,6 +49,8 @@ public:
 
   void saveConfig();
   void loadConfig();
+
+  SDL_Window* createWindow();
 
   void addPCIDevices();
   void createHostBridge();
