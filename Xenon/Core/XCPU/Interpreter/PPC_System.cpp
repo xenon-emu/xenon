@@ -445,7 +445,7 @@ void PPCInterpreter::PPCInterpreter_mtmsr(PPU_STATE *ppuState) {
 }
 
 void PPCInterpreter::PPCInterpreter_mtmsrd(PPU_STATE *ppuState) {
-  if (_instr.l10) {
+  if (_instr.l15) {
     /*
        Bits 48 and 62 of register RS are placed into the corresponding bits
        of the MSR. The remaining bits of the MSR are unchanged
