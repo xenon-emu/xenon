@@ -35,8 +35,9 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
   // Corona 16 Megs Retail
   // 0x000043000
 
-  sfcxState.configReg = 0x000043000; // Config Reg is VERY Important. Tells info
+  // Config Reg is VERY Important. Tells info
   // about Meta/NAND Type
+  sfcxState.configReg = 0x000043000;
   sfcxState.statusReg = 0x00000600;
   sfcxState.statusReg = 0x00000600;
   sfcxState.addressReg = 0x00F70030;
