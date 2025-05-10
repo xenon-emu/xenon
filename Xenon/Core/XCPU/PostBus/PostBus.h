@@ -3,7 +3,7 @@
 #pragma once
 
 #ifdef _WIN32
-#include <windows.h>
+#include <Windows.h>
 #endif
 
 #define POST_BUS_ADDR 0x61010ULL

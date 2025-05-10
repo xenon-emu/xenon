@@ -377,7 +377,7 @@ void Render::GUI::InputInt(const std::string &label, T *value, T step, T stepFas
   } else if constexpr (std::is_same_v<T, s8>) {
     dataType = ImGuiDataType_S8;
   }
-  ImGui::InputScalar(label.c_str(), dataType, (void*)value, (void*)(step > 0 ? &step : NULL), (void*)(stepFast > 0 ? &stepFast : NULL), format);
+  ImGui::InputScalar(label.c_str(), dataType, (void*)value, (void*)(step > 0 ? &step : nullptr), (void*)(stepFast > 0 ? &stepFast : nullptr), format);
 }
 
 void Render::GUI::Tooltip(const std::string &contents, ImGuiHoveredFlags delay) {
@@ -653,7 +653,7 @@ void PPUThreadDockSpace(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
     std::string id = fmt::format("{}:{}_DS", state->ppuName, static_cast<u8>(thr));
     PPU_THREAD_REGISTERS &thread = state->ppuThread[thr];
     ImGuiID dsId = ImGui::GetID(id.c_str());
-    if (!ImGui::DockBuilderGetNode(dsId) || rebuildThreadDS[thread.SPR.PIR] && !builtWithDisassembly[thread.SPR.PIR]) {
+    if (!ImGui::DockBuilderGetNode(dsId) || (rebuildThreadDS[thread.SPR.PIR] && !builtWithDisassembly[thread.SPR.PIR])) {
       ImGui::DockBuilderRemoveNode(dsId);
       ImGui::DockBuilderAddNode(dsId, ImGuiDockNodeFlags_DockSpace);
       if (thread.CIA != 0) {

@@ -33,7 +33,7 @@ namespace Xe::XGPU {
   RingBuffer::ReadRange RingBuffer::BeginRead(size_t count) {
     count = std::min(count, _capacity);
     if (!count) {
-      return { 0 };
+      return { nullptr };
     }
     if (_readOffset + count < _capacity) {
       return { _buffer + _readOffset, count, nullptr, 0 };

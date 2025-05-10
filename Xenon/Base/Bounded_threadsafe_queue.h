@@ -53,14 +53,14 @@ private:
   enum class PushMode {
     Try,
     Wait,
-    Count,
+    Count
   };
 
   enum class PopMode {
     Try,
     Wait,
     WaitWithStopToken,
-    Count,
+    Count
   };
 
   template <PushMode Mode, typename... Args>

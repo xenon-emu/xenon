@@ -33,7 +33,7 @@ static constexpr u64 get_cpi_value(const u64 instrPerSecond) {
 PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PIR) :
   resetVector(resetVector)
 {
-  traceFile = NULL;
+  traceFile = nullptr;
 #ifdef DEBUG_BUILD
   if (Config::debug.createTraceFile) {
     char path[128];
@@ -397,7 +397,7 @@ void PPU::ThreadLoop() {
         continue;
       }
 
-      if (!ppuThreadResetting && ppuThreadState.load() == eThreadState::Halted || ppuThreadState.load() == eThreadState::Sleeping) {
+      if ((!ppuThreadResetting && ppuThreadState.load() == eThreadState::Halted) || ppuThreadState.load() == eThreadState::Sleeping) {
         LOG_DEBUG(Xenon, "{} was previously halted or sleeping, bringing online", ppuState->ppuName);
         ppuThreadState.store(eThreadState::Running);
       }

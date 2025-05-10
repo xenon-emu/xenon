@@ -9,7 +9,7 @@
 #include <mach/mach_time.h>
 #include <pthread.h>
 #elif defined(_WIN32)
-#include <windows.h>
+#include <Windows.h>
 #include "String_util.h"
 #else
 

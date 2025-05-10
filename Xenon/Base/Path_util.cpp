@@ -22,7 +22,7 @@ const fs::path GetBinaryDirectory() {
   fs::path fspath = {};
 #ifdef _WIN32
   char path[256];
-  GetModuleFileNameA(NULL, path, sizeof(path));
+  GetModuleFileNameA(nullptr, path, sizeof(path));
   fspath = path;
 #elif __linux__
   fspath = fs::canonical("/proc/self/exe");

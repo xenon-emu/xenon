@@ -3,7 +3,7 @@
 #include "Text_formatter.h"
 
 #ifdef _WIN32
-#include <windows.h>
+#include <Windows.h>
 #endif
 
 #include "Base/Assert.h"

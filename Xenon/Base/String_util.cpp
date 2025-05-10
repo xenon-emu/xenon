@@ -4,7 +4,7 @@
 
 #include "String_util.h"
 
-#include <windows.h>
+#include <Windows.h>
 
 namespace Base {
 static std::wstring CPToUTF16(u32 code_page, std::string_view input) {

@@ -36,26 +36,26 @@ enum class FileAccessMode {
    * If the file at path does not exist, it creates and opens a new empty file for both
    * reading and appending.
    */
-  ReadAppend = Read | Append,
+  ReadAppend = Read | Append
 };
 DECLARE_ENUM_FLAG_OPERATORS(FileAccessMode)
 
 enum class FileMode {
   BinaryMode,
-  TextMode,
+  TextMode
 };
 
 enum class FileShareFlag {
   ShareNone,      // Provides exclusive access to the file.
   ShareReadOnly,  // Provides read only shared access to the file.
   ShareWriteOnly, // Provides write only shared access to the file.
-  ShareReadWrite, // Provides read and write shared access to the file.
+  ShareReadWrite  // Provides read and write shared access to the file.
 };
 
 enum class SeekOrigin : u32 {
   SetOrigin,       // Seeks from the start of the file.
   CurrentPosition, // Seeks from the current file pointer position.
-  End,             // Seeks from the end of the file.
+  End              // Seeks from the end of the file.
 };
 
 class IOFile final {
