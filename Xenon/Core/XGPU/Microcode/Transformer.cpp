@@ -198,7 +198,82 @@ AST::Statement ShaderNodeWriter::EmitExec(AST::NodeWriterBase &nodeWriter, const
 }
 
 AST::Statement ShaderNodeWriter::EmitALU(AST::NodeWriterBase &nodeWriter, const instr_alu_t &alu, const bool sync) {
-  return {};
+  AST::Statement vector, scalar, predicate;
+  // Fast case, no magic stuff around
+  if (alu.vector_write_mask || (alu.export_data && alu.scalar_dest_rel)) {
+    const instr_vector_opc_t &vectorInstr = static_cast<const instr_vector_opc_t>(alu.vector_opc);
+    const u32 argCount = GetArgCount(vectorInstr);
+    // Process function depending on the argument count
+    switch (argCount) {
+    case 1: {
+      AST::Expression arg1 = EmitSrcReg(nodeWriter, alu, 0);
+      AST::Expression func = nodeWriter.EmitVectorInstruction1(vectorInstr, arg1);
+      vector = EmitVectorResult(nodeWriter, alu, func);
+    } break;
+    case 2: {
+      AST::Expression arg1 = EmitSrcReg(nodeWriter, alu, 0);
+      AST::Expression arg2 = EmitSrcReg(nodeWriter, alu, 1);
+      AST::Expression func = nodeWriter.EmitVectorInstruction2(vectorInstr, arg1, arg2);
+      vector = EmitVectorResult(nodeWriter, alu, func);
+    } break;
+    case 3: {
+      AST::Expression arg1 = EmitSrcReg(nodeWriter, alu, 0);
+      AST::Expression arg2 = EmitSrcReg(nodeWriter, alu, 1);
+      AST::Expression arg3 = EmitSrcReg(nodeWriter, alu, 2);
+      AST::Expression func = nodeWriter.EmitVectorInstruction3(vectorInstr, arg1, arg2, arg3);
+      vector = EmitVectorResult(nodeWriter, alu, func);
+    } break;
+    default: {
+      LOG_ERROR(Xenos, "[UCode::ALU] Failed to emit Vector code! Unsupported argument count '{}'", argCount);
+    } break;
+    }
+  }
+  // Additional scalar instruction
+  if (alu.scalar_write_mask || !alu.vector_write_mask) {
+    const instr_scalar_opc_t& scalarInstr = static_cast<const instr_scalar_opc_t>(alu.scalar_opc);
+    const u32 argCount = GetArgCount(scalarInstr);
+    // Process function depending on the argument count
+    switch (argCount) {
+    case 1: {
+      AST::Expression arg1 = EmitSrcReg(nodeWriter, alu, 2);
+      AST::Expression func = nodeWriter.EmitScalarInstruction1(scalarInstr, arg1);
+      if (scalarInstr == PRED_SETNEs ||
+          scalarInstr == PRED_SETEs ||
+          scalarInstr == PRED_SETGTEs ||
+          scalarInstr == PRED_SETGTs) {
+        predicate = nodeWriter.EmitSetPredicateStatement(func);
+      }
+      scalar = EmitScalarResult(nodeWriter, alu, func);
+    } break;
+    case 2: {
+      AST::Expression arg1, arg2;
+      if (scalarInstr == MUL_CONST_0 ||
+          scalarInstr == MUL_CONST_1 ||
+          scalarInstr == ADD_CONST_0 ||
+          scalarInstr == ADD_CONST_1 ||
+          scalarInstr == SUB_CONST_0 ||
+          scalarInstr == SUB_CONST_1) {
+        const u32 src3 = alu.src3_swiz & ~0x3C;
+        const u32 regB = (alu.scalar_opc & 1) | (alu.src3_swiz & 0x3C) | (alu.src3_sel << 1);
+        const s32 slot = (alu.src1_sel || alu.src2_sel) ? 1 : 0;
+        const eSwizzle a = static_cast<eSwizzle>(((src3 >> 6) - 1) & 0x3);
+        const eSwizzle b = static_cast<eSwizzle>((src3 & 0x3));
+        arg1 = nodeWriter.EmitReadSwizzle(EmitSrcReg(nodeWriter, alu, alu.src3_reg, 0, 0, alu.src3_reg_negate, 0), a, a, a, a);
+        arg2 = nodeWriter.EmitReadSwizzle(EmitSrcReg(nodeWriter, alu, regB, 1, 0, 0, slot), b, b, b, b);
+      } else {
+        arg1 = EmitSrcReg(nodeWriter, alu, 0);
+        arg2 = EmitSrcReg(nodeWriter, alu, 1);
+      }
+      AST::Expression func = nodeWriter.EmitScalarInstruction2(scalarInstr, arg1, arg2);
+      scalar = EmitScalarResult(nodeWriter, alu, func);
+    } break;
+    default: {
+      LOG_ERROR(Xenos, "[UCode::ALU] Failed to emit Scalar code! Unsupported argument count '{}'", argCount);
+    } break;
+    }
+  }
+  // Concat both operations
+  return nodeWriter.EmitMergeStatements(vector, nodeWriter.EmitMergeStatements(predicate, scalar));
 }
 
 AST::Statement ShaderNodeWriter::EmitVertexFetch(AST::NodeWriterBase &nodeWriter, const instr_fetch_vtx_t &vtx, const bool sync) {
@@ -206,7 +281,34 @@ AST::Statement ShaderNodeWriter::EmitVertexFetch(AST::NodeWriterBase &nodeWriter
 }
 
 AST::Statement ShaderNodeWriter::EmitTextureFetch(AST::NodeWriterBase &nodeWriter, const instr_fetch_tex_t &tex, const bool sync) {
-  return {};
+  const AST::Expression dest = nodeWriter.EmitWriteReg(shaderType == eShaderType::Pixel, false, tex.dst_reg);
+  const AST::Expression src = nodeWriter.EmitReadReg(tex.src_reg);
+  const eSwizzle srcX = static_cast<const eSwizzle>((tex.src_swiz >> 0) & 3);
+  const eSwizzle srcY = static_cast<const eSwizzle>((tex.src_swiz >> 2) & 3);
+  const eSwizzle srcZ = static_cast<const eSwizzle>((tex.src_swiz >> 4) & 3);
+  const eSwizzle srcW = static_cast<const eSwizzle>((tex.src_swiz >> 6) & 3);
+  const AST::Expression srcSwizzle = nodeWriter.EmitReadSwizzle(src, srcX, srcY, srcZ, srcW);
+  AST::Expression sample;
+  switch (static_cast<instr_dimension_t>(tex.dimension)) {
+  case DIMENSION_1D: {
+    sample = nodeWriter.EmitTextureSample1D(srcSwizzle, tex.const_idx);
+  } break;
+  case DIMENSION_2D: {
+    sample = nodeWriter.EmitTextureSample2D(srcSwizzle, tex.const_idx);
+  } break;
+  case DIMENSION_3D: {
+    sample = nodeWriter.EmitTextureSample3D(srcSwizzle, tex.const_idx);
+  } break;
+  case DIMENSION_CUBE: {
+    sample = nodeWriter.EmitTextureSampleCube(srcSwizzle, tex.const_idx);
+  } break;
+  }
+  // Write back swizzled
+  const eSwizzle destX = static_cast<const eSwizzle>((tex.dst_swiz >> 0) & 7);
+  const eSwizzle destY = static_cast<const eSwizzle>((tex.dst_swiz >> 3) & 7);
+  const eSwizzle destZ = static_cast<const eSwizzle>((tex.dst_swiz >> 6) & 7);
+  const eSwizzle destW = static_cast<const eSwizzle>((tex.dst_swiz >> 9) & 7);
+  return nodeWriter.EmitWriteWithSwizzleStatement(dest, sample, destX, destY, destZ, destW);
 }
 
 AST::Statement ShaderNodeWriter::EmitPredicateTest(AST::NodeWriterBase &nodeWriter, const AST::Statement &code, const bool conditional, const u32 flowPredCondition, const u32 predSelect, const u32 predCondition) {
@@ -226,12 +328,13 @@ AST::Expression ShaderNodeWriter::EmitSrcReg(AST::NodeWriterBase &nodeWriter, co
   return {};
 }
 
+#define SWIZZLE(x, y, z, w) ((x & 3) << 0) | ((y & 3) << 0) | ((z & 3) << 0) | ((w & 3) << 0)
 AST::Expression ShaderNodeWriter::EmitSrcScalarReg1(AST::NodeWriterBase &nodeWriter, const instr_alu_t &instr) {
-  return {};
+  return EmitSrcReg(nodeWriter, instr, instr.src3_reg, instr.src3_sel, SWIZZLE(0, 0, 0, 0), instr.src3_reg_negate, (instr.src1_sel || instr.src2_sel) ? 1 : 0);
 }
 
 AST::Expression ShaderNodeWriter::EmitSrcScalarReg2(AST::NodeWriterBase &nodeWriter, const instr_alu_t &instr) {
-  return {};
+  return EmitSrcReg(nodeWriter, instr, instr.src3_reg, instr.src3_sel, SWIZZLE(1, 1, 1, 1), instr.src3_reg_negate, (instr.src1_sel || instr.src2_sel) ? 1 : 0);
 }
 
 AST::Statement ShaderNodeWriter::EmitVectorResult(AST::NodeWriterBase &nodeWriter, const instr_alu_t &instr, const AST::Expression &code) {
