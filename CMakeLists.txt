@@ -246,6 +246,17 @@ if (GFX_ENABLED)
     Xenon/Render/OpenGL/OGLShader.h
     Xenon/Render/OGLRenderer.h
     Xenon/Render/OGLRenderer.cpp
+    Xenon/Render/GUI/Dummy.cpp
+    Xenon/Render/GUI/Dummy.h
+    Xenon/Render/Dummy/Factory/DummyResourceFactory.h
+    Xenon/Render/Dummy/Factory/DummyShaderFactory.cpp
+    Xenon/Render/Dummy/Factory/DummyShaderFactory.h
+    Xenon/Render/Dummy/DummyTexture.cpp
+    Xenon/Render/Dummy/DummyTexture.h
+    Xenon/Render/Dummy/DummyBuffer.cpp
+    Xenon/Render/Dummy/DummyBuffer.h
+    Xenon/Render/DummyRenderer.h
+    Xenon/Render/DummyRenderer.cpp
   )
 endif()
 set(microprofile_dir Deps/ThirdParty/microprofile)
