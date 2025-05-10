@@ -49,8 +49,8 @@ void _rendering::to_toml(toml::value &value) {
   value["PauseOnFocusLoss"] = pauseOnFocusLoss;
   value["PauseOnFocusLoss"].comments().push_back("# Pauses XeLL and GUI rendering on window focus loss");
   value["GPU"].comments().clear();
-  value["GPU"].comments().push_back("# Chooeses which GPU to use if there are multiple (Vulkan/DirectX only)");
   value["GPU"] = gpuId;
+  value["GPU"].comments().push_back("# [!NOT SUPPORTED NOW!] Chooses which GPU to use if there are multiple (Vulkan/DirectX only)");
 }
 bool _rendering::verify_toml(toml::value &value) {
   to_toml(value);
@@ -61,6 +61,7 @@ bool _rendering::verify_toml(toml::value &value) {
   cache_value(vsync);
   cache_value(quitOnWindowClosure);
   cache_value(pauseOnFocusLoss);
+  cache_value(gpuId);
   from_toml(value);
   verify_value(enable);
   verify_value(enableGui);
@@ -70,6 +71,7 @@ bool _rendering::verify_toml(toml::value &value) {
   verify_value(vsync);
   verify_value(quitOnWindowClosure);
   verify_value(pauseOnFocusLoss);
+  verify_value(gpuId);
   return true;
 }
 
@@ -132,12 +134,12 @@ void _debug::to_toml(toml::value &value) {
   value["HaltOnAddress"] = haltOnAddress;
   value["HaltOnAddress"].as_integer_fmt().fmt = toml::integer_format::hex;
   value["HaltOnAddress"].comments().push_back("# Address to halt on when the CPU executes this address");
-  value["HaltOnExceptions"].comments().clear();
-  value["HaltOnExceptions"] = haltOnExceptions;
-  value["HaltOnExceptions"].comments().push_back("# Halts on every exception (TODO: Separate toggles)");
   value["HaltOnSLBMiss"].comments().clear();
   value["HaltOnSLBMiss"] = haltOnSlbMiss;
   value["HaltOnSLBMiss"].comments().push_back("# Halts when a SLB cache misses");
+  value["HaltOnExceptions"].comments().clear();
+  value["HaltOnExceptions"] = haltOnExceptions;
+  value["HaltOnExceptions"].comments().push_back("# Halts on every exception (TODO: Separate toggles)");
   value["StartHalted"].comments().clear();
   value["StartHalted"] = startHalted;
   value["StartHalted"].comments().push_back("# Starts with the CPU halted");
@@ -166,20 +168,30 @@ bool _debug::verify_toml(toml::value &value) {
   cache_value(haltOnReadAddress);
   cache_value(haltOnWriteAddress);
   cache_value(haltOnAddress);
-  cache_value(haltOnExceptions);
   cache_value(haltOnSlbMiss);
+  cache_value(haltOnExceptions);
   cache_value(startHalted);
   cache_value(softHaltOnAssertions);
   cache_value(haltOnInvalidInstructions);
+  cache_value(haltOnGuestAssertion);
+  cache_value(autoContinueOnGuestAssertion);
+#ifdef DEBUG_BUILD
+  cache_value(createTraceFile);
+#endif
   from_toml(value);
   verify_value(haltOnReadAddress);
   verify_value(haltOnWriteAddress);
   verify_value(haltOnAddress);
-  verify_value(haltOnExceptions);
   verify_value(haltOnSlbMiss);
+  verify_value(haltOnExceptions);
   verify_value(startHalted);
   verify_value(softHaltOnAssertions);
   verify_value(haltOnInvalidInstructions);
+  verify_value(haltOnGuestAssertion);
+  verify_value(autoContinueOnGuestAssertion);
+#ifdef DEBUG_BUILD
+  verify_value(createTraceFile);
+#endif
   return true;
 }
 
@@ -239,6 +251,7 @@ bool _smc::verify_toml(toml::value &value) {
   from_toml(value);
   verify_value(avPackType);
   verify_value(powerOnReason);
+  verify_value(uartSystem);
 #ifdef _WIN32
   verify_value(comPort);
 #endif
@@ -266,8 +279,8 @@ void _xcpu::to_toml(toml::value &value) {
   value["CPI"].comments().push_back("# Note: This will mess with execution timing, and may break time-sensitive things like XeLL");
 
   value["SkipHWInit"].comments().clear();
-  value["SkipHWInit"].comments().push_back("# Enable CB/SB HW_INIT stage skip [HACK]");
   value["SkipHWInit"] = skipHWInit;
+  value["SkipHWInit"].comments().push_back("# Enable CB/SB HW_INIT stage skip [HACK]");
 
   value["HW_INIT_SKIP1"].comments().clear();
   value["HW_INIT_SKIP1"] = HW_INIT_SKIP_1;
@@ -279,7 +292,6 @@ void _xcpu::to_toml(toml::value &value) {
   value["HW_INIT_SKIP2"].comments().clear();
   value["HW_INIT_SKIP2"] = HW_INIT_SKIP_2;
   value["HW_INIT_SKIP2"].as_integer_fmt().fmt = toml::integer_format::hex;
-
   value["HW_INIT_SKIP2"].comments().push_back("# Manual Hardware Init Skip address 2 override");
   value["HW_INIT_SKIP2"].comments().push_back("# RGH3 Trinity: 0x3003FDC");
   value["HW_INIT_SKIP2"].comments().push_back("# RGH3 Corona:  0x3003E54");
@@ -326,7 +338,7 @@ void _filepaths::from_toml(const toml::value &value) {
 }
 void _filepaths::to_toml(toml::value &value) {
   value.comments().clear();
-  value.comments().push_back("# Only Fuses, OneBL, and Nand are required.");
+  value.comments().push_back("# Only Fuses, OneBL, and Nand are required");
   value.comments().push_back("# ElfBinary is used in the elf loader");
   value.comments().push_back("# ODDImage is Optical Disc Drive Image, takes a iso file for Linux");
   value["Fuses"] = fuses;
@@ -354,16 +366,15 @@ bool _filepaths::verify_toml(toml::value &value) {
 void _log::from_toml(const toml::value &value) {
   s32 tmpLevel = static_cast<s32>(currentLevel);
   tmpLevel = toml::find_or<s32&>(value, "Level", tmpLevel);
+  currentLevel = static_cast<Base::Log::Level>(tmpLevel);
   advanced = toml::find_or<bool>(value, "Advanced", advanced);
 #ifdef DEBUG_BUILD
   debugOnly = toml::find_or<bool>(value, "EnableDebugOnly", debugOnly);
 #endif
-  currentLevel = static_cast<Base::Log::Level>(tmpLevel);
 }
 void _log::to_toml(toml::value &value) {
-  s32 tmpLevel = static_cast<s32>(currentLevel);
   value["Level"].comments().clear();
-  value["Level"] = tmpLevel;
+  value["Level"] = static_cast<s32>(currentLevel);
   value["Level"].comments().push_back("# Controls the current output filter level");
   value["Level"].comments().push_back("# 0: Trace | 1: Debug | 2: Info | 3: Warning | 4: Error | 5: Critical | 6: Guest | 7: Count");
   value["Advanced"].comments().clear();
@@ -394,25 +405,27 @@ bool _log::verify_toml(toml::value &value) {
 void _highlyExperimental::from_toml(const toml::value &value) {
   s32 tmpConsoleRevison = static_cast<s32>(consoleRevison);
   tmpConsoleRevison = toml::find_or<s32&>(value, "ConsoleRevison", tmpConsoleRevison);
-  clocksPerInstructionBypass = toml::find_or<s32&>(value, "CPIBypass", clocksPerInstructionBypass);
   consoleRevison = static_cast<eConsoleRevision>(tmpConsoleRevison);
+  clocksPerInstructionBypass = toml::find_or<s32&>(value, "CPIBypass", clocksPerInstructionBypass);
 }
 void _highlyExperimental::to_toml(toml::value &value) {
+  value["ConsoleRevison"].comments().clear();
+  value["ConsoleRevison"] = static_cast<u32>(consoleRevison);
+  value["ConsoleRevison"].comments().push_back("# Console motherboard revision, used for PVR and XGPU Init");
+  value["ConsoleRevison"].comments().push_back("# Zephyr = 0 | Falcon = 1 | Jasper = 2 | Trinity = 3 | Corona = 4 | Corona 4GB = 5 | Winchester = 6");
   value.comments().clear();
   value.comments().push_back("# Do not touch these options unless you know what you're doing!");
   value.comments().push_back("# It can break execution! User beware");
   value["CPIBypass"].comments().clear();
   value["CPIBypass"] = clocksPerInstructionBypass;
   value["CPIBypass"].comments().push_back("# Zero will use the estimated CPI for your system (view XCPU for more info)");
-  value["ConsoleRevison"].comments().clear();
-  value["ConsoleRevison"] = static_cast<u32>(consoleRevison);
-  value["ConsoleRevison"].comments().push_back("# Console motherboard revision, used for PVR and XGPU Init");
-  value["ConsoleRevison"].comments().push_back("# Zephyr = 0 | Falcon = 1 | Jasper = 2 | Trinity = 3 | Corona = 4 | Corona 4GB = 5 | Winchester = 6");
 }
 bool _highlyExperimental::verify_toml(toml::value &value) {
   to_toml(value);
+  cache_value(consoleRevison);
   cache_value(clocksPerInstructionBypass);
   from_toml(value);
+  verify_value(consoleRevison);
   verify_value(clocksPerInstructionBypass);
   return true;
 }

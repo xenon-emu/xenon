@@ -18,9 +18,9 @@ namespace Config {
 //
 struct _resolution {
   // Width
-  s32 width;
+  u32 width;
   // Height
-  s32 height;
+  u32 height;
 
   // TOML Conversion
   void to_toml(toml::value& value) {
@@ -33,8 +33,8 @@ struct _resolution {
   }
   void from_toml(const std::string &key, const toml::value& value) {
     const toml::value& _key = value.at(key);
-    width = toml::find_or<s32&>(_key, "Width", width);
-    height = toml::find_or<s32&>(_key, "Height", height);
+    width = toml::find_or<u32&>(_key, "Width", width);
+    height = toml::find_or<u32&>(_key, "Height", height);
   }
 };
 
@@ -92,10 +92,10 @@ inline struct _debug {
   u64 haltOnWriteAddress = 0;
   // Halt on execution of this address
   u64 haltOnAddress = 0;
-  // Halt on an exception
-  bool haltOnExceptions = false;
   // Halt on a SLB Miss
   bool haltOnSlbMiss = false;
+  // Halt on an exception
+  bool haltOnExceptions = false;
   // Start the CPU halted
   bool startHalted = false;
   // Soft halts on assertions, otherwise, ignores them
@@ -138,16 +138,15 @@ inline struct _smc {
 #ifdef _WIN32
   // Selected vCOM Port
   s32 comPort = 2;
+
+  std::string COMPort() {
+    return "\\\\.\\COM" + std::to_string(comPort);
+  }
 #endif
   // Socket IP to listen on, default is localhost
   std::string socketIp = "127.0.0.1";
   // Socket Port to listen on, default is 7000
   u16 socketPort = 7000;
-#ifdef _WIN32
-  std::string COMPort() {
-    return "\\\\.\\COM" + std::to_string(comPort);
-  }
-#endif
 
   // TOML Conversion
   void to_toml(toml::value &value);
@@ -197,18 +196,18 @@ inline struct _filepaths {
   std::string oneBl = "1bl.bin";
   // nand.bin path
   std::string nand = "nand.bin";
-  // Elf binary path
-  std::string elfBinary = "kernel.elf";
   // ODD Image path
   std::string oddImage = "xenon.iso";
+  // Elf binary path
+  std::string elfBinary = "kernel.elf";
 
   // Corrects the paths on first time creation
   void correct(const std::filesystem::path &basePath) {
     fuses = std::filesystem::path(basePath).append(fuses).string();
     oneBl = std::filesystem::path(basePath).append(oneBl).string();
     nand = std::filesystem::path(basePath).append(nand).string();
-    elfBinary = std::filesystem::path(basePath).append(elfBinary).string();
     oddImage = std::filesystem::path(basePath).append(oddImage).string();
+    elfBinary = std::filesystem::path(basePath).append(elfBinary).string();
   }
 
   // TOML Conversion
@@ -252,8 +251,8 @@ enum class eConsoleRevision : const u8 {
 // Highly experimental (things that can either break the emulator or drastically increase performance)
 //
 inline struct _highlyExperimental {
-  s32 clocksPerInstructionBypass = 0;
   eConsoleRevision consoleRevison = eConsoleRevision::Corona;
+  s32 clocksPerInstructionBypass = 0;
 
   // TOML Conversion
   void to_toml(toml::value &value);
