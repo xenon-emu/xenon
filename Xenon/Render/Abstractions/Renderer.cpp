@@ -12,12 +12,13 @@
 
 namespace Render {
 
-Renderer::Renderer(RAM *ram) :
+Renderer::Renderer(RAM *ram, SDL_Window *mainWindow) :
   ramPointer(ram),
   width(TILE(Config::rendering.window.width)),
   height(TILE(Config::rendering.window.height)),
   VSYNC(Config::rendering.vsync),
-  fullscreen(Config::rendering.isFullscreen)
+  fullscreen(Config::rendering.isFullscreen),
+  mainWindow(mainWindow)
 {
   thread = std::thread(&Renderer::Thread, this);
   thread.detach();
@@ -25,32 +26,6 @@ Renderer::Renderer(RAM *ram) :
 
 void Renderer::Start() {
   MICROPROFILE_SCOPEI("[Xe::Render]", "Start", MP_AUTO);
-  // Init SDL Events, Video, Joystick, and Gamepad
-  if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
-    LOG_ERROR(System, "Failed to initialize SDL: {}", SDL_GetError());
-  }
-
-  // SDL3 window properties.
-  SDL_PropertiesID props = SDL_CreateProperties();
-  const std::string title = fmt::format("Xenon {}", Base::Version);
-  SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, title.c_str());
-  // Set starting X and Y position to be centered
-  SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_CENTERED);
-  SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_Y_NUMBER, SDL_WINDOWPOS_CENTERED);
-  // Set width and height
-  SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, width);
-  SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, height);
-  // Allow resizing
-  SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, true);
-  // Enable HiDPI
-  SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_HIGH_PIXEL_DENSITY_BOOLEAN, true);
-  BackendSDLProperties(props);
-  // Create window
-  mainWindow = SDL_CreateWindowWithProperties(props);
-  // Destroy (no longer used) properties
-  SDL_DestroyProperties(props);
-  // Set min size
-  SDL_SetWindowMinimumSize(mainWindow, 640, 480);
   BackendSDLInit();
   // Set if we are in fullscreen mode or not
   SDL_SetWindowFullscreen(mainWindow, fullscreen);

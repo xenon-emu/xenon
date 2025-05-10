@@ -27,7 +27,7 @@ namespace Render {
 
 class Renderer {
 public:
-  Renderer(RAM *ram);
+  Renderer(RAM *ram, SDL_Window *mainWindow);
   virtual ~Renderer() = default;
   virtual void BackendSDLProperties(SDL_PropertiesID properties) = 0;
   virtual void BackendStart() = 0;
