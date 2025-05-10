@@ -2,6 +2,28 @@
 
 #include "PPCInterpreter.h"
 
+// Data Stream Touch for Store
+void PPCInterpreter::PPCInterpreter_dss(PPU_STATE *ppuState) {
+  CHECK_VXU;
+
+  // We don't really need to do anything here, as it's handling cache. We mostly ignore it
+}
+
+
+// Data Stream Touch for Store
+void PPCInterpreter::PPCInterpreter_dst(PPU_STATE *ppuState) {
+  CHECK_VXU;
+
+  // We don't really need to do anything here, as it's handling cache. We mostly ignore it
+}
+
+// Data Stream Touch for Store
+void PPCInterpreter::PPCInterpreter_dstst(PPU_STATE *ppuState) {
+  CHECK_VXU;
+
+  // We don't really need to do anything here, as it's handling cache. We mostly ignore it
+}
+
 // Move from Vector Status and Control Register (x'1000 0604')
 void PPCInterpreter::PPCInterpreter_mfvscr(PPU_STATE *ppuState) {
   /*

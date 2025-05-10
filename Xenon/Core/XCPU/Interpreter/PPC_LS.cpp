@@ -1245,6 +1245,29 @@ void PPCInterpreter::PPCInterpreter_lfsx(PPU_STATE *ppuState) {
   FPRi(frd).valueAsDouble = static_cast<f64>(static_cast<f32>(data));
 }
 
+// Load Floating-Point Single with Update Indexed
+void PPCInterpreter::PPCInterpreter_lfsux(PPU_STATE *ppuState) {
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + (rB)
+  frD <- DOUBLE(MEM(EA, 4))
+  rA <- EA
+  */
+
+  CHECK_FPU;
+
+  const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
+  u32 data = MMURead32(ppuState, EA);
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  FPRi(frd).valueAsDouble = static_cast<f64>(static_cast<f32>(data));
+  
+  GPRi(ra) = EA;
+}
+
 // Load Floating-Point Double (x'C800 0000')
 void PPCInterpreter::PPCInterpreter_lfd(PPU_STATE *ppuState) {
   /*
@@ -1344,6 +1367,30 @@ void PPCInterpreter::PPCInterpreter_lfs(PPU_STATE *ppuState) {
     return;
 
   FPRi(frd).valueAsDouble = static_cast<f64>(singlePresFP.valueAsFloat);
+}
+
+// Load Floating-Point Single with Update
+void PPCInterpreter::PPCInterpreter_lfsu(PPU_STATE *ppuState) {
+  /*
+  if rA = 0 then b <- 0
+  else b <- (rA)
+  EA <- b + EXTS(d)
+  frD <- DOUBLE(MEM(EA, 4))
+  rA <- EA
+  */
+
+  CHECK_FPU;
+
+  const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
+  SFPRegister singlePresFP;
+  singlePresFP.valueAsU32 = MMURead32(ppuState, EA);
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  FPRi(frd).valueAsDouble = static_cast<f64>(singlePresFP.valueAsFloat);
+
+  GPRi(ra) = EA;
 }
 
 //

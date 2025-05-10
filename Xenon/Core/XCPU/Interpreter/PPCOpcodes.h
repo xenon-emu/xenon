@@ -27,11 +27,6 @@ D_STUBRC(fres)
 D_STUBRC(fnabs)
 D_STUBRC(frsqrte)
 D_STUB(td)
-D_STUB(dst)
-D_STUB(dss)
-D_STUB(dstst)
-D_STUB(lfsu)
-D_STUB(lfsux)
 D_STUB(mfsrin)
 D_STUB(mfsr)
 D_STUB(lvsr)
@@ -393,6 +388,9 @@ extern void PPCInterpreter_mtfsfx(PPU_STATE *ppuState);
 //
 // VXU
 //
+extern void PPCInterpreter_dss(PPU_STATE *ppuState);
+extern void PPCInterpreter_dst(PPU_STATE *ppuState);
+extern void PPCInterpreter_dstst(PPU_STATE *ppuState);
 extern void PPCInterpreter_mfvscr(PPU_STATE *ppuState);
 extern void PPCInterpreter_mtvscr(PPU_STATE *ppuState);
 extern void PPCInterpreter_vand(PPU_STATE *ppuState);
@@ -508,11 +506,13 @@ extern void PPCInterpreter_ldx(PPU_STATE *ppuState);
 
 // Load Floating
 extern void PPCInterpreter_lfsx(PPU_STATE *ppuState);
+extern void PPCInterpreter_lfsux(PPU_STATE *ppuState);
 extern void PPCInterpreter_lfd(PPU_STATE *ppuState);
 extern void PPCInterpreter_lfdx(PPU_STATE *ppuState);
 extern void PPCInterpreter_lfdu(PPU_STATE *ppuState);
 extern void PPCInterpreter_lfdux(PPU_STATE *ppuState);
 extern void PPCInterpreter_lfs(PPU_STATE *ppuState);
+extern void PPCInterpreter_lfsu(PPU_STATE *ppuState);
 
 
 // Load Vector
