@@ -51,7 +51,8 @@ enum class eIndexFormat : u32 {
 
 enum class eShaderType : u32 {
   Vertex,
-  Pixel
+  Pixel,
+  Unknown
 };
 
 enum class eMSAASamples : u32 {
