@@ -817,10 +817,15 @@ void PPCInterpreter::PPCInterpreter_extswx(PPU_STATE *ppuState) {
 }
 
 void PPCInterpreter::PPCInterpreter_mcrf(PPU_STATE *ppuState) {
-  XL_FORM_BF_BFA;
+  /*
+  * CR4 * BF + 32:4 * BF + 35 <- CR4 * crS + 32:4 * crS + 35
+  * The contents of field crS (bits 4 * crS + 32-4 * crS + 35) of CR are copied to field 
+  * crD (bits 4 * crD + 32-4 * crD + 35) of CR.
+  */
+  u32 BF = _instr.crfd;
+  u32 BFA = _instr.crfs;
 
-  u32 CR = DGET(curThread.CR.CR_Hex, (BFA) * 4,
-    (BFA) * 4 + 3);
+  u32 CR = DGET(curThread.CR.CR_Hex, (BFA) * 4, (BFA) * 4 + 3);
 
   ppcUpdateCR(ppuState, BF, CR);
 }

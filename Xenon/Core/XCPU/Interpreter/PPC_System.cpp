@@ -21,20 +21,18 @@ void PPCInterpreter::PPCInterpreter_sc(PPU_STATE *ppuState) {
 }
 
 void PPCInterpreter::PPCInterpreter_slbmte(PPU_STATE *ppuState) {
-  X_FORM_rS_rB;
+  u64 VSID = QGET(GPRi(rs), 0, 51);
 
-  u64 VSID = QGET(GPR(rS), 0, 51);
+  const u8 Ks = QGET(GPRi(rs), 52, 52);
+  const u8 Kp = QGET(GPRi(rs), 53, 53);
+  const u8 N = QGET(GPRi(rs), 54, 54);
+  const u8 L = QGET(GPRi(rs), 55, 55);
+  const u8 C = QGET(GPRi(rs), 56, 56);
+  const u8 LP = QGET(GPRi(rs), 57, 59);
 
-  const u8 Ks = QGET(GPR(rS), 52, 52);
-  const u8 Kp = QGET(GPR(rS), 53, 53);
-  const u8 N = QGET(GPR(rS), 54, 54);
-  const u8 L = QGET(GPR(rS), 55, 55);
-  const u8 C = QGET(GPR(rS), 56, 56);
-  const u8 LP = QGET(GPR(rS), 57, 59);
-
-  const u64 ESID = QGET(GPR(rB), 0, 35);
-  bool V = QGET(GPR(rB), 36, 36);
-  const u16 Index = QGET(GPR(rB), 52, 63);
+  const u64 ESID = QGET(GPRi(rb), 0, 35);
+  bool V = QGET(GPRi(rb), 36, 36);
+  const u16 Index = QGET(GPRi(rb), 52, 63);
 
   // VSID is VA 0-52 bit, the remaining 28 bits are adress data
   // so whe shift 28 bits left here so we only do it once per entry.
@@ -50,17 +48,15 @@ void PPCInterpreter::PPCInterpreter_slbmte(PPU_STATE *ppuState) {
   curThread.SLB[Index].L = L;
   curThread.SLB[Index].C = C;
   curThread.SLB[Index].LP = LP;
-  curThread.SLB[Index].vsidReg = GPR(rS);
-  curThread.SLB[Index].esidReg = GPR(rB);
+  curThread.SLB[Index].vsidReg = GPRi(rs);
+  curThread.SLB[Index].esidReg = GPRi(rb);
 }
 
 void PPCInterpreter::PPCInterpreter_slbie(PPU_STATE *ppuState) {
-  X_FORM_rB;
-
   // ESID
-  const u64 ESID = QGET(GPR(rB), 0, 35);
+  const u64 ESID = QGET(GPRi(rb), 0, 35);
   // Class
-  const u8 C = QGET(GPR(rB), 36, 36);
+  const u8 C = QGET(GPRi(rb), 36, 36);
 
   for (auto &slbEntry : curThread.SLB) {
     if (slbEntry.V && slbEntry.C == C && slbEntry.ESID == ESID) {
@@ -147,298 +143,301 @@ void PPCInterpreter::PPCInterpreter_rfid(PPU_STATE *ppuState) {
 }
 
 void PPCInterpreter::PPCInterpreter_tw(PPU_STATE *ppuState) {
-  X_FORM_TO_rA_rB;
+  const sl32 a = static_cast<sl32>(GPRi(ra));
+  const sl32 b = static_cast<sl32>(GPRi(rb));
 
-  const sl32 a = static_cast<sl32>(GPR(rA));
-  const sl32 b = static_cast<sl32>(GPR(rB));
-
-  if ((a < b && BGET(TO, 5, 0)) || (a > b && BGET(TO, 5, 1)) ||
-      (a == b && BGET(TO, 5, 2)) || (static_cast<u32>(a) < static_cast<u32>(b) && BGET(TO, 5, 3)) ||
-      (static_cast<u32>(a) > static_cast<u32>(b) && BGET(TO, 5, 4))) {
+  if ((a < b && (_instr.bo & 0x10)) ||
+      (a > b && (_instr.bo & 0x8)) ||
+      (a == b && (_instr.bo & 0x4)) ||
+      (static_cast<u32>(a) < static_cast<u32>(b) && (_instr.bo & 0x2)) ||
+      (static_cast<u32>(a) > static_cast<u32>(b) && (_instr.bo & 0x1))) {
     ppcInterpreterTrap(ppuState, b);
   }
 }
 
 void PPCInterpreter::PPCInterpreter_twi(PPU_STATE *ppuState) {
-  D_FORM_TO_rA_SI;
-  SI = EXTS(SI, 16);
+  s64 sA = GPRi(ra), sB = _instr.simm16;
+  u64 a = sA, b = sB;
 
-  const sl32 a = static_cast<s32>(GPR(rA));
+  if (((_instr.bo & 0x10) && sA < sB) ||
+      ((_instr.bo & 0x8) && sA > sB) ||
+      ((_instr.bo & 0x4) && sA == sB) ||
+      ((_instr.bo & 0x2) && a < b) ||
+      ((_instr.bo & 0x1) && a > b)) {
+    ppcInterpreterTrap(ppuState, static_cast<u32>(sB));
+  }
+}
 
-  if ((a < static_cast<s32>(SI) && BGET(TO, 5, 0)) || (a > static_cast<s32>(SI) && BGET(TO, 5, 1)) ||
-      (a == static_cast<s32>(SI) && BGET(TO, 5, 2)) || (static_cast<u32>(a) < SI && BGET(TO, 5, 3)) ||
-      (static_cast<u32>(a) > SI && BGET(TO, 5, 4))) {
-    ppcInterpreterTrap(ppuState, static_cast<u32>(SI));
+void PPCInterpreter::PPCInterpreter_td(PPU_STATE *ppuState) {
+  s64 sA = GPRi(ra), sB = GPRi(rb);
+  u64 a = sA, b = sB;
+
+  if (((_instr.bo & 0x10) && sA < sB) ||
+      ((_instr.bo & 0x8) && sA > sB) ||
+      ((_instr.bo & 0x4) && sA == sB) ||
+      ((_instr.bo & 0x2) && a < b) ||
+      ((_instr.bo & 0x1) && a > b)) {
+    ppcInterpreterTrap(ppuState, static_cast<u32>(sB));
   }
 }
 
 void PPCInterpreter::PPCInterpreter_tdi(PPU_STATE *ppuState) {
-  D_FORM_TO_rA_SI;
-  SI = EXTS(SI, 16);
+  s64 sA = GPRi(ra), sB = _instr.simm16;
+  u64 a = sA, b = sB;
 
-  const s64 rAReg = static_cast<s64>(GPR(rA));
-
-  if ((rAReg < static_cast<s64>(SI) && BGET(TO, 5, 0)) ||
-      (rAReg > static_cast<s64>(SI) && BGET(TO, 5, 1)) ||
-      (rAReg == static_cast<s64>(SI) && BGET(TO, 5, 2)) ||
-      (static_cast<u64>(rAReg) < SI && BGET(TO, 5, 3)) ||
-      (static_cast<u64>(rAReg) > SI && BGET(TO, 5, 4))) {
-    ppcInterpreterTrap(ppuState, static_cast<u32>(SI));
+  if (((_instr.bo & 0x10) && sA < sB) ||
+      ((_instr.bo & 0x8) && sA > sB) ||
+      ((_instr.bo & 0x4) && sA == sB) ||
+      ((_instr.bo & 0x2) && a < b) ||
+      ((_instr.bo & 0x1) && a > b)) {
+    ppcInterpreterTrap(ppuState, static_cast<u32>(sB));
   }
 }
 
 void PPCInterpreter::PPCInterpreter_mfspr(PPU_STATE *ppuState) {
-  u64 rS = 0, crm = 0;
-  PPC_OPC_TEMPL_XFX(_instr.opcode, rS, crm);
-  u32 sprNum = _instr.spr;
-  sprNum = ((sprNum & 0x1F) << 5) | ((sprNum >> 5) & 0x1F);
+  u32 spr = _instr.spr;
+  spr = ((spr & 0x1F) << 5) | ((spr >> 5) & 0x1F);
 
-  u64 value = 0;
-
-  switch (sprNum) {
+  switch (spr) {
   case SPR_XER:
-    value = curThread.SPR.XER.XER_Hex;
+    GPRi(rs) = curThread.SPR.XER.XER_Hex;
     break;
   case SPR_LR:
-    value = curThread.SPR.LR;
+    GPRi(rs) = curThread.SPR.LR;
     break;
   case SPR_CTR:
-    value = curThread.SPR.CTR;
+    GPRi(rs) = curThread.SPR.CTR;
     break;
   case SPR_DSISR:
-    value = curThread.SPR.DSISR;
+    GPRi(rs) = curThread.SPR.DSISR;
     break;
   case SPR_DAR:
-    value = curThread.SPR.DAR;
+    GPRi(rs) = curThread.SPR.DAR;
     break;
   case SPR_DEC:
-    value = curThread.SPR.DEC;
+    GPRi(rs) = curThread.SPR.DEC;
     break;
   case SPR_SDR1:
-    value = ppuState->SPR.SDR1;
+    GPRi(rs) = ppuState->SPR.SDR1;
     break;
   case SPR_SRR0:
-    value = curThread.SPR.SRR0;
+    GPRi(rs) = curThread.SPR.SRR0;
     break;
   case SPR_SRR1:
-    value = curThread.SPR.SRR1;
+    GPRi(rs) = curThread.SPR.SRR1;
     break;
   case SPR_CFAR:
-    value = curThread.SPR.CFAR;
+    GPRi(rs) = curThread.SPR.CFAR;
     break;
   case SPR_CTRLRD:
-    value = ppuState->SPR.CTRL;
+    GPRi(rs) = ppuState->SPR.CTRL;
     break;
   case SPR_VRSAVE:
-    value = curThread.SPR.VRSAVE;
+    GPRi(rs) = curThread.SPR.VRSAVE;
     break;
   case SPR_TBL_RO:
-    value = ppuState->SPR.TB;
+    GPRi(rs) = ppuState->SPR.TB;
     break;
   case SPR_TBU_RO:
-    value = (ppuState->SPR.TB & 0xFFFFFFFF00000000);
+    GPRi(rs) = (ppuState->SPR.TB & 0xFFFFFFFF00000000);
     break;
   case SPR_SPRG0:
-    value = curThread.SPR.SPRG0;
+    GPRi(rs) = curThread.SPR.SPRG0;
     break;
   case SPR_SPRG1:
-    value = curThread.SPR.SPRG1;
+    GPRi(rs) = curThread.SPR.SPRG1;
     break;
   case SPR_SPRG2:
-    value = curThread.SPR.SPRG2;
+    GPRi(rs) = curThread.SPR.SPRG2;
     break;
   case SPR_SPRG3:
-    value = curThread.SPR.SPRG3;
+    GPRi(rs) = curThread.SPR.SPRG3;
     break;
   case SPR_TB:
-    value = ppuState->SPR.TB;
+    GPRi(rs) = ppuState->SPR.TB;
     break;
   case SPR_PVR:
-    value = ppuState->SPR.PVR.PVR_Hex;
+    GPRi(rs) = ppuState->SPR.PVR.PVR_Hex;
     break;
   case SPR_HSPRG0:
-    value = curThread.SPR.HSPRG0;
+    GPRi(rs) = curThread.SPR.HSPRG0;
     break;
   case SPR_HSPRG1:
-    value = curThread.SPR.HSPRG1;
+    GPRi(rs) = curThread.SPR.HSPRG1;
     break;
   case SPR_RMOR:
-    value = ppuState->SPR.RMOR;
+    GPRi(rs) = ppuState->SPR.RMOR;
     break;
   case SPR_HRMOR:
-    value = ppuState->SPR.HRMOR;
+    GPRi(rs) = ppuState->SPR.HRMOR;
     break;
   case SPR_LPCR:
-    value = ppuState->SPR.LPCR;
+    GPRi(rs) = ppuState->SPR.LPCR;
     break;
   case SPR_TSCR:
-    value = ppuState->SPR.TSCR;
+    GPRi(rs) = ppuState->SPR.TSCR;
     break;
   case SPR_TTR:
-    value = ppuState->SPR.TTR;
+    GPRi(rs) = ppuState->SPR.TTR;
     break;
   case SPR_PpeTlbIndexHint:
-    value = curThread.SPR.PPE_TLB_Index_Hint;
+    GPRi(rs) = curThread.SPR.PPE_TLB_Index_Hint;
     break;
   case SPR_HID0:
-    value = ppuState->SPR.HID0;
+    GPRi(rs) = ppuState->SPR.HID0;
     break;
   case SPR_HID1:
-    value = ppuState->SPR.HID1;
+    GPRi(rs) = ppuState->SPR.HID1;
     break;
   case SPR_HID4:
-    value = ppuState->SPR.HID4;
+    GPRi(rs) = ppuState->SPR.HID4;
     break;
   case SPR_DABR:
-    value = curThread.SPR.DABR;
+    GPRi(rs) = curThread.SPR.DABR;
     break;
   case SPR_HID6:
-    value = ppuState->SPR.HID6;
+    GPRi(rs) = ppuState->SPR.HID6;
     break;
   case SPR_PIR:
-    value = curThread.SPR.PIR;
+    GPRi(rs) = curThread.SPR.PIR;
     break;
   default:
-    LOG_ERROR(Xenon, "{}(Thrd{:#d}) mfspr: Unknown SPR: 0x{:X}", ppuState->ppuName, static_cast<u8>(curThreadId), sprNum);
+    LOG_ERROR(Xenon, "{}(Thrd{:#d}) mfspr: Unknown SPR: 0x{:X}", ppuState->ppuName, static_cast<u8>(curThreadId), spr);
     break;
   }
-
-  GPR(rS) = value;
 }
 
 void PPCInterpreter::PPCInterpreter_mtspr(PPU_STATE *ppuState) {
-  XFX_FORM_rD_spr;
+  u32 spr = _instr.spr;
+  spr = ((spr & 0x1F) << 5) | ((spr >> 5) & 0x1F);
   switch (spr) {
   case SPR_XER:
-    curThread.SPR.XER.XER_Hex = static_cast<u32>(GPR(rD));
+    curThread.SPR.XER.XER_Hex = static_cast<u32>(GPRi(rd));
     // Clear the unused bits in XER (35:56)
     curThread.SPR.XER.XER_Hex &= 0xE000007F;
     break;
   case SPR_LR:
-    curThread.SPR.LR = GPR(rD);
+    curThread.SPR.LR = GPRi(rd);
     break;
   case SPR_CTR:
-    curThread.SPR.CTR = GPR(rD);
+    curThread.SPR.CTR = GPRi(rd);
     break;
   case SPR_DSISR:
-    curThread.SPR.DSISR = GPR(rD);
+    curThread.SPR.DSISR = GPRi(rd);
     break;
   case SPR_DAR:
-    curThread.SPR.DAR = GPR(rD);
+    curThread.SPR.DAR = GPRi(rd);
     break;
   case SPR_DEC:
-    curThread.SPR.DEC = static_cast<u32>(GPR(rD));
+    curThread.SPR.DEC = static_cast<u32>(GPRi(rd));
     break;
   case SPR_SDR1:
-    ppuState->SPR.SDR1 = GPR(rD);
+    ppuState->SPR.SDR1 = GPRi(rd);
     break;
   case SPR_SRR0:
-    curThread.SPR.SRR0 = GPR(rD);
+    curThread.SPR.SRR0 = GPRi(rd);
     break;
   case SPR_SRR1:
-    curThread.SPR.SRR1 = GPR(rD);
+    curThread.SPR.SRR1 = GPRi(rd);
     break;
   case SPR_CFAR:
-    curThread.SPR.CFAR = GPR(rD);
+    curThread.SPR.CFAR = GPRi(rd);
     break;
   case SPR_CTRLRD:
   case SPR_CTRLWR:
-    ppuState->SPR.CTRL = static_cast<u32>(GPR(rD));
+    ppuState->SPR.CTRL = static_cast<u32>(GPRi(rd));
     break;
   case SPR_VRSAVE:
-    curThread.SPR.VRSAVE = static_cast<u32>(GPR(rD));
+    curThread.SPR.VRSAVE = static_cast<u32>(GPRi(rd));
     break;
   case SPR_SPRG0:
-    curThread.SPR.SPRG0 = GPR(rD);
+    curThread.SPR.SPRG0 = GPRi(rd);
     break;
   case SPR_SPRG1:
-    curThread.SPR.SPRG1 = GPR(rD);
+    curThread.SPR.SPRG1 = GPRi(rd);
     break;
   case SPR_SPRG2:
-    curThread.SPR.SPRG2 = GPR(rD);
+    curThread.SPR.SPRG2 = GPRi(rd);
     break;
   case SPR_SPRG3:
-    curThread.SPR.SPRG3 = GPR(rD);
+    curThread.SPR.SPRG3 = GPRi(rd);
     break;
   case SPR_TBL_WO:
-    ppuState->SPR.TB = GPR(rD);
+    ppuState->SPR.TB = GPRi(rd);
     break;
   case SPR_TBU_WO:
-    ppuState->SPR.TB = ppuState->SPR.TB |= (GPR(rD) << 32);
+    ppuState->SPR.TB = ppuState->SPR.TB |= (GPRi(rd) << 32);
     break;
   case SPR_HSPRG0:
-    curThread.SPR.HSPRG0 = GPR(rD);
+    curThread.SPR.HSPRG0 = GPRi(rd);
     break;
   case SPR_HSPRG1:
-    curThread.SPR.HSPRG1 = GPR(rD);
+    curThread.SPR.HSPRG1 = GPRi(rd);
     break;
   case SPR_HDEC:
-    ppuState->SPR.HDEC = static_cast<u32>(GPR(rD));
+    ppuState->SPR.HDEC = static_cast<u32>(GPRi(rd));
     break;
   case SPR_RMOR:
-    ppuState->SPR.RMOR = GPR(rD);
+    ppuState->SPR.RMOR = GPRi(rd);
     break;
   case SPR_HRMOR:
-    ppuState->SPR.HRMOR = GPR(rD);
+    ppuState->SPR.HRMOR = GPRi(rd);
     break;
   case SPR_LPCR:
-    ppuState->SPR.LPCR = GPR(rD);
+    ppuState->SPR.LPCR = GPRi(rd);
     break;
   case SPR_LPIDR:
-    ppuState->SPR.LPIDR = static_cast<u32>(GPR(rD));
+    ppuState->SPR.LPIDR = static_cast<u32>(GPRi(rd));
     break;
   case SPR_TSCR:
-    ppuState->SPR.TSCR = static_cast<u32>(GPR(rD));
+    ppuState->SPR.TSCR = static_cast<u32>(GPRi(rd));
     break;
   case SPR_TTR:
-    ppuState->SPR.TTR = GPR(rD);
+    ppuState->SPR.TTR = GPRi(rd);
     break;
   case SPR_PpeTlbIndex:
-    ppuState->SPR.PPE_TLB_Index = GPR(rD);
+    ppuState->SPR.PPE_TLB_Index = GPRi(rd);
     break;
   case SPR_PpeTlbIndexHint:
-    curThread.SPR.PPE_TLB_Index_Hint = GPR(rD);
+    curThread.SPR.PPE_TLB_Index_Hint = GPRi(rd);
     break;
   case SPR_PpeTlbVpn:
-    ppuState->SPR.PPE_TLB_VPN = GPR(rD);
+    ppuState->SPR.PPE_TLB_VPN = GPRi(rd);
     mmuAddTlbEntry(ppuState);
     break;
   case SPR_PpeTlbRpn:
-    ppuState->SPR.PPE_TLB_RPN = GPR(rD);
+    ppuState->SPR.PPE_TLB_RPN = GPRi(rd);
     break;
   case SPR_HID0:
-    ppuState->SPR.HID0 = GPR(rD);
+    ppuState->SPR.HID0 = GPRi(rd);
     break;
   case SPR_HID1:
-    ppuState->SPR.HID1 = GPR(rD);
+    ppuState->SPR.HID1 = GPRi(rd);
     break;
   case SPR_HID4:
-    ppuState->SPR.HID4 = GPR(rD);
+    ppuState->SPR.HID4 = GPRi(rd);
     break;
   case SPR_HID6:
-    ppuState->SPR.HID6 = GPR(rD);
+    ppuState->SPR.HID6 = GPRi(rd);
     break;
   case SPR_DABR:
-    curThread.SPR.DABR = GPR(rD);
+    curThread.SPR.DABR = GPRi(rd);
     break;
   case SPR_DABRX:
-    curThread.SPR.DABRX = GPR(rD);
+    curThread.SPR.DABRX = GPRi(rd);
     break;
   default:
-    LOG_ERROR(Xenon, "{}(Thrd{:#d}) SPR 0x{:X} =0x{:X}", ppuState->ppuName, static_cast<u8>(curThreadId), spr, GPR(rD));
+    LOG_ERROR(Xenon, "{}(Thrd{:#d}) SPR 0x{:X} =0x{:X}", ppuState->ppuName, static_cast<u8>(curThreadId), spr, GPRi(rd));
     break;
   }
 }
 
 void PPCInterpreter::PPCInterpreter_mfmsr(PPU_STATE *ppuState) {
-  X_FORM_rD;
-  GPR(rD) = curThread.SPR.MSR.MSR_Hex;
+  GPRi(rd) = curThread.SPR.MSR.MSR_Hex;
 }
 
 void PPCInterpreter::PPCInterpreter_mtmsr(PPU_STATE *ppuState) {
-  X_FORM_rS;
-
-  curThread.SPR.MSR.MSR_Hex = GPR(rS);
+  curThread.SPR.MSR.MSR_Hex = GPRi(rs);
 
   // Check for 32-bit mode of operation
   if (!curThread.SPR.MSR.SF)
@@ -446,18 +445,16 @@ void PPCInterpreter::PPCInterpreter_mtmsr(PPU_STATE *ppuState) {
 }
 
 void PPCInterpreter::PPCInterpreter_mtmsrd(PPU_STATE *ppuState) {
-  X_FORM_rS_L;
-
-  if (L) {
+  if (_instr.l10) {
     /*
        Bits 48 and 62 of register RS are placed into the corresponding bits
        of the MSR. The remaining bits of the MSR are unchanged
     */
 
     // Bit 48 = MSR[EE]
-    curThread.SPR.MSR.EE = (GPR(rS) & 0x8000) == 0x8000 ? 1 : 0;
+    curThread.SPR.MSR.EE = (GPRi(rs) & 0x8000) == 0x8000 ? 1 : 0;
     // Bit 62 = MSR[RI]
-    curThread.SPR.MSR.RI = (GPR(rS) & 0x2) == 0x2 ? 1 : 0;
+    curThread.SPR.MSR.RI = (GPRi(rs) & 0x2) == 0x2 ? 1 : 0;
   } else { // L = 0
     /*
        The result of ORing bits 00 and 01 of register RS is placed into MSR0
@@ -467,7 +464,7 @@ void PPCInterpreter::PPCInterpreter_mtmsrd(PPU_STATE *ppuState) {
        Bits 1:2, 4:47, 49:50, 52:57, and 60:63 of register RS are placed into
        the corresponding bits of the MSR
     */
-    u64 regRS = GPR(rS);
+    u64 regRS = GPRi(rs);
     curThread.SPR.MSR.MSR_Hex = regRS;
 
     // MSR0 = (RS)0 | (RS)1

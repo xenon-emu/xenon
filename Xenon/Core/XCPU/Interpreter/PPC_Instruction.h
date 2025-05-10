@@ -498,7 +498,7 @@ namespace PPCInterpreter {
       // Group 0x3F opcodes (field 21..30)
       fillTable<instructionHandler>(table, 0x3F, 10, 1, {
         { 0x026, GETRC(mtfsb1) },
-        { 0x040, GETRC(mcrfs) },
+        { 0x040, GET(mcrfs) },
         { 0x046, GETRC(mtfsb0) },
         { 0x086, GETRC(mtfsfi) },
         { 0x247, GETRC(mffs) },
@@ -978,7 +978,7 @@ namespace PPCInterpreter {
       // Group 0x3F opcodes (field 21..30)
       fillTable<std::string>(nameTable, 0x3F, 10, 1, {
         { 0x026, GETRC(mtfsb1) },
-        { 0x040, GETRC(mcrfs) },
+        { 0x040, GET(mcrfs) },
         { 0x046, GETRC(mtfsb0) },
         { 0x086, GETRC(mtfsfi) },
         { 0x247, GETRC(mffs) },

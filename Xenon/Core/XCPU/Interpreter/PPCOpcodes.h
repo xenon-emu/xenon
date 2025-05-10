@@ -17,7 +17,6 @@ namespace PPCInterpreter {
 extern void PPCInterpreter_invalid(PPU_STATE *ppuState);
 extern void PPCInterpreter_known_unimplemented(const char* name, PPU_STATE *ppuState);
 
-D_STUBRC(mcrfs)
 D_STUBRC(mtfsb1)
 D_STUBRC(mtfsb0)
 D_STUBRC(mtfsfi)
@@ -26,7 +25,6 @@ D_STUBRC(fsel)
 D_STUBRC(fres)
 D_STUBRC(fnabs)
 D_STUBRC(frsqrte)
-D_STUB(td)
 D_STUB(mfsrin)
 D_STUB(mfsr)
 D_STUB(lvsr)
@@ -331,6 +329,7 @@ extern void PPCInterpreter_slbmte(PPU_STATE *ppuState);
 extern void PPCInterpreter_rfid(PPU_STATE *ppuState);
 extern void PPCInterpreter_tw(PPU_STATE *ppuState);
 extern void PPCInterpreter_twi(PPU_STATE *ppuState);
+extern void PPCInterpreter_td(PPU_STATE *ppuState);
 extern void PPCInterpreter_tdi(PPU_STATE *ppuState);
 extern void PPCInterpreter_tlbie(PPU_STATE *ppuState);
 extern void PPCInterpreter_tlbiel(PPU_STATE *ppuState);
@@ -354,6 +353,7 @@ extern void PPCInterpreter_icbi(PPU_STATE *ppuState);
 //
 // FPU
 //
+extern void PPCInterpreter_mcrfs(PPU_STATE *ppuState);
 extern void PPCInterpreter_faddx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fabsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_faddsx(PPU_STATE *ppuState);
@@ -521,4 +521,5 @@ extern void PPCInterpreter_lvxl(PPU_STATE *ppuState);
 extern void PPCInterpreter_lvlx(PPU_STATE *ppuState);
 extern void PPCInterpreter_lvrx(PPU_STATE *ppuState);
 extern void PPCInterpreter_lvsl(PPU_STATE *ppuState);
-}
+
+} // namespace PPCInterpreter
