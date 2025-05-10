@@ -325,6 +325,18 @@ AST::Expression ShaderNodeWriter::EmitSrcReg(AST::NodeWriterBase &nodeWriter, co
 }
 
 AST::Expression ShaderNodeWriter::EmitSrcReg(AST::NodeWriterBase &nodeWriter, const instr_alu_t &instr, const u32 argIndex) {
+  switch (argIndex) {
+  case 0: {
+    return EmitSrcReg(nodeWriter, instr, instr.src1_reg, instr.src1_sel, instr.src1_swiz, instr.src1_reg_negate, 0);
+  } break;
+  case 1: {
+    return EmitSrcReg(nodeWriter, instr, instr.src2_reg, instr.src2_sel, instr.src2_swiz, instr.src2_reg_negate, instr.src1_sel ? 1 : 0);
+  } break;
+  case 2: {
+    return EmitSrcReg(nodeWriter, instr, instr.src3_reg, instr.src3_sel, instr.src3_swiz, instr.src3_reg_negate, (instr.src1_sel || instr.src2_sel) ? 1 : 0);
+  } break;
+  }
+  LOG_ERROR(Xenos, "[UCode::Reg] Failed to emit a source register! Invaid arg index '{}'", argIndex);
   return {};
 }
 
@@ -338,11 +350,57 @@ AST::Expression ShaderNodeWriter::EmitSrcScalarReg2(AST::NodeWriterBase &nodeWri
 }
 
 AST::Statement ShaderNodeWriter::EmitVectorResult(AST::NodeWriterBase &nodeWriter, const instr_alu_t &instr, const AST::Expression &code) {
-  return {};
+  // Clamp value to 0-1 range
+  AST::Expression input = instr.vector_clamp ? nodeWriter.EmitSaturate(code) : code;
+  AST::Expression dest = nodeWriter.EmitWriteReg(shaderType == eShaderType::Pixel, instr.export_data, instr.vector_dest);
+  // Prepare to write swizzle
+  eSwizzle swizzle[4] = { eSwizzle::Unused, eSwizzle::Unused, eSwizzle::Unused, eSwizzle::Unused };
+  if (instr.export_data) {
+    u32 writeMask = instr.vector_write_mask;
+    u32 scalarMask = instr.scalar_write_mask;
+    for (u32 i = 0; i != 4; ++i) {
+      const u32 channelMask = 1 << i;
+      if (writeMask & channelMask) {
+        if (writeMask & scalarMask)
+          swizzle[i] = eSwizzle::One;
+        else
+          swizzle[i] = static_cast<eSwizzle>(i);
+      }
+      else if (instr.scalar_dest_rel) {
+        swizzle[i] = eSwizzle::Zero;
+      }
+    }
+  } else {
+    // Normal swizzle
+    u32 writeMask = instr.vector_write_mask;
+    for (u32 i = 0; i != 4; ++i) {
+      const u32 channelMask = 1 << i;
+      if (writeMask & channelMask)
+        swizzle[i] = static_cast<eSwizzle>(i);
+      else
+        swizzle[i] = eSwizzle::Unused;
+    }
+  }
+  return nodeWriter.EmitWriteWithSwizzleStatement(dest, input, swizzle[0], swizzle[1], swizzle[2], swizzle[3]);
 }
 
 AST::Statement ShaderNodeWriter::EmitScalarResult(AST::NodeWriterBase &nodeWriter, const instr_alu_t &instr, const AST::Expression &code) {
-  return {};
+  // Clamp value to 0-1 range
+  AST::Expression input = instr.vector_clamp ? nodeWriter.EmitSaturate(code) : code;
+  // During export scalar operation can still write into the vector, so we check if it's a pure scalar operation, or a vector operation
+  AST::Expression dest = nodeWriter.EmitWriteReg(shaderType == eShaderType::Pixel, instr.export_data, instr.export_data ? instr.vector_dest : instr.scalar_dest);
+  u32 writeMask = instr.export_data ? instr.scalar_write_mask & ~instr.vector_write_mask : instr.scalar_write_mask;
+  // Prepare to write swizzle
+  eSwizzle swizzle[4] = { eSwizzle::Unused, eSwizzle::Unused, eSwizzle::Unused, eSwizzle::Unused };
+  for (u32 i = 0; i != 4; ++i) {
+    const u32 channelMask = 1 << i;
+    if (writeMask & channelMask)
+      swizzle[i] = static_cast<eSwizzle>(i);
+    else
+      swizzle[i] = eSwizzle::Unused;
+  }
+  // Emit output
+  return nodeWriter.EmitWriteWithSwizzleStatement(dest, input, swizzle[0], swizzle[1], swizzle[2], swizzle[3]);
 }
 
 const u32 ShaderNodeWriter::GetArgCount(instr_vector_opc_t instr) {
