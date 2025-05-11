@@ -3,6 +3,7 @@
 #pragma once
 
 #include <array>
+#include <memory>
 
 #include "Core/XGPU/ShaderConstants.h"
 
@@ -11,35 +12,38 @@
 
 namespace Xe::Microcode::AST {
 
-class ShaderCodeWriter;
-class ExpressionNode;
-
-class ExpressionNodeVisitor {
-public:
-  virtual ~ExpressionNodeVisitor() = default;
-  virtual void OnExprStart(const ExpressionNode *node) = 0;
-  virtual void OnExprEnd(const ExpressionNode *node) = 0;
-};
+// Forward declare
+class ShaderCodeWriterBase;
 
 // Expression node base
-class ExpressionNode : public std::enable_shared_from_this<ExpressionNode> {
+class ExpressionNode : public NodeBase, public std::enable_shared_from_this<ExpressionNode> {
 public:
   using Ptr = std::shared_ptr<ExpressionNode>;
   using Children = std::array<Ptr, 4>;
+  class Visitor {
+  public:
+    virtual ~Visitor() = default;
+    virtual void OnExprStart(Ptr node) = 0;
+    virtual void OnExprEnd(Ptr node) = 0;
+  };
 
   virtual ~ExpressionNode() = default;
-
   virtual eExprType GetType() const { return eExprType::ALU; }
   virtual int GetRegisterIndex() const { return -1; }
-  virtual Chunk EmitShaderCode(ShaderCodeWriter&) const = 0;
+  virtual Chunk EmitShaderCode(ShaderCodeWriterBase &writer) = 0;
+  virtual std::unique_ptr<ExpressionNode> CloneExpr() const = 0;
+  std::unique_ptr<NodeBase> Clone() const override {
+    return CloneExpr();
+  }
 
-  virtual void Visit(ExpressionNodeVisitor &vistor) const {
-    vistor.OnExprStart(this);
+  virtual void Visit(Visitor &vistor) const {
+    Ptr self = std::const_pointer_cast<ExpressionNode>(shared_from_this());
+    vistor.OnExprStart(self);
     for (const auto &child : children) {
       if (child)
         child->Visit(vistor);
     }
-    vistor.OnExprEnd(this);
+    vistor.OnExprEnd(self);
   }
 
 protected:
@@ -48,22 +52,28 @@ protected:
 
 class ReadRegister : public ExpressionNode {
 public:
-  explicit ReadRegister(s32 index) :
+  ReadRegister(s32 index) :
     regIndex(index)
   {}
   s32 GetRegisterIndex() const override { return regIndex; }
-  Chunk EmitShaderCode(ShaderCodeWriter&) const override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  std::unique_ptr<ExpressionNode> CloneExpr() const override {
+    return std::make_unique<ReadRegister>(*this);
+  }
 private:
   s32 regIndex = 0;
 };
 
 class WriteRegister : public ExpressionNode {
 public:
-  explicit WriteRegister(s32 index) :
+  WriteRegister(s32 index) :
     regIndex(index)
   {}
   s32 GetRegisterIndex() const override { return regIndex; }
-  Chunk EmitShaderCode(ShaderCodeWriter&) const override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  std::unique_ptr<ExpressionNode> CloneExpr() const override {
+    return std::make_unique<WriteRegister>(*this);
+  }
 private:
   s32 regIndex = 0;
 };
@@ -71,15 +81,16 @@ private:
 // Exported Register Write
 class WriteExportRegister : public ExpressionNode {
 public:
-  explicit WriteExportRegister(eExportReg reg) :
+  WriteExportRegister(eExportReg reg) :
     exportReg(reg)
   {}
   eExprType GetType() const override { return eExprType::EXPORT; }
-  Chunk EmitShaderCode(ShaderCodeWriter&) const override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  std::unique_ptr<ExpressionNode> CloneExpr() const override {
+    return std::make_unique<WriteExportRegister>(*this);
+  }
 
   eExportReg GetExportReg() const { return exportReg; }
-  static std::string GetExporRegName(const eExportReg reg);
-  static std::string GetExporSemanticName(const eExportReg reg);
   static s32 GetExportSemanticIndex(const eExportReg reg);
   static s32 GetExportInterpolatorIndex(const eExportReg reg);
 private:
@@ -92,7 +103,10 @@ public:
   BoolConstant(bool ps, s32 idx) :
     pixelShader(ps), index(idx)
   {}
-  Chunk EmitShaderCode(ShaderCodeWriter&) const override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  std::unique_ptr<ExpressionNode> CloneExpr() const override {
+    return std::make_unique<BoolConstant>(*this);
+  }
 private:
   bool pixelShader = false;
   s32 index = 0;
@@ -104,7 +118,10 @@ public:
   FloatConstant(bool ps, s32 idx) :
     pixelShader(ps), index(idx)
   {}
-  Chunk EmitShaderCode(ShaderCodeWriter&) const override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  std::unique_ptr<ExpressionNode> CloneExpr() const override {
+    return std::make_unique<FloatConstant>(*this);
+  }
 private:
   bool pixelShader = false;
   s32 index = 0;
@@ -115,7 +132,10 @@ public:
   FloatRelativeConstant(bool ps, s32 rel) :
     pixelShader(ps), relativeOffset(rel)
   {}
-  Chunk EmitShaderCode(ShaderCodeWriter&) const override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  std::unique_ptr<ExpressionNode> CloneExpr() const override {
+    return std::make_unique<FloatRelativeConstant>(*this);
+  }
 private:
   bool pixelShader = false;
   s32 relativeOffset = 0;
@@ -124,53 +144,71 @@ private:
 // Unary Operations
 class GetPredicate : public ExpressionNode {
 public:
-  Chunk EmitShaderCode(ShaderCodeWriter&) const override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  std::unique_ptr<ExpressionNode> CloneExpr() const override {
+    return std::make_unique<GetPredicate>(*this);
+  }
 };
 
 class Abs : public ExpressionNode {
 public:
-  explicit Abs(Ptr expr)   {
+  Abs(Ptr expr)   {
     children[0] = std::move(expr);
   }
-  Chunk EmitShaderCode(ShaderCodeWriter&) const override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  std::unique_ptr<ExpressionNode> CloneExpr() const override {
+    return std::make_unique<Abs>(*this);
+  }
 };
 
 class Negate : public ExpressionNode {
 public:
-  explicit Negate(Ptr expr) {
+  Negate(Ptr expr) {
     children[0] = std::move(expr);
   }
-  Chunk EmitShaderCode(ShaderCodeWriter&) const override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  std::unique_ptr<ExpressionNode> CloneExpr() const override {
+    return std::make_unique<Negate>(*this);
+  }
 };
 
 class Not : public ExpressionNode {
 public:
-  explicit Not(Ptr expr) {
+  Not(Ptr expr) {
     children[0] = std::move(expr);
   }
-  Chunk EmitShaderCode(ShaderCodeWriter&) const override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  std::unique_ptr<ExpressionNode> CloneExpr() const override {
+    return std::make_unique<Not>(*this);
+  }
 };
 
 class Saturate : public ExpressionNode {
 public:
-  explicit Saturate(Ptr expr) {
+  Saturate(Ptr expr) {
     children[0] = std::move(expr);
   }
-  Chunk EmitShaderCode(ShaderCodeWriter&) const override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  std::unique_ptr<ExpressionNode> CloneExpr() const override {
+    return std::make_unique<Saturate>(*this);
+  }
 };
 
 class Swizzle : public ExpressionNode {
 public:
   Swizzle(Ptr base, eSwizzle x, eSwizzle y, eSwizzle z, eSwizzle w) {
     children[0] = std::move(base);
-    swizzles[0] = x;
-    swizzles[1] = y;
-    swizzles[2] = z;
-    swizzles[3] = w;
+    swizzle[0] = x;
+    swizzle[1] = y;
+    swizzle[2] = z;
+    swizzle[3] = w;
   }
-  Chunk EmitShaderCode(ShaderCodeWriter&) const override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  std::unique_ptr<ExpressionNode> CloneExpr() const override {
+    return std::make_unique<Swizzle>(*this);
+  }
 private:
-  std::array<eSwizzle, 4> swizzles = {};
+  std::array<eSwizzle, 4> swizzle = {};
 };
 
 // Vertex/Texture Fetch
@@ -183,8 +221,10 @@ public:
   }
 
   eExprType GetType() const override { return eExprType::VFETCH; }
-  Chunk EmitShaderCode(ShaderCodeWriter&) const override;
-
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  std::unique_ptr<ExpressionNode> CloneExpr() const override {
+    return std::make_unique<VertexFetch>(*this);
+  }
 private:
   u32 fetchSlot = 0, fetchOffset = 0, fetchStride = 0;
   instr_surf_fmt_t format{};
@@ -199,8 +239,10 @@ public:
   }
 
   eExprType GetType() const override { return eExprType::TFETCH; }
-  Chunk EmitShaderCode(ShaderCodeWriter&) const override;
-
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  std::unique_ptr<ExpressionNode> CloneExpr() const override {
+    return std::make_unique<TextureFetch>(*this);
+  }
 private:
   u32 fetchSlot = 0;
   instr_dimension_t textureType{};
@@ -210,56 +252,76 @@ private:
 
 class VectorFunc1 : public ExpressionNode {
 public:
-  VectorFunc1(const std::string_view &name, Ptr a) : funcName(name) {
+  VectorFunc1(instr_vector_opc_t instr, Ptr a) : vectorInstr(instr) {
     children[0] = std::move(a);
   }
-  Chunk EmitShaderCode(ShaderCodeWriter&) const override;
+
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  std::unique_ptr<ExpressionNode> CloneExpr() const override {
+    return std::make_unique<VectorFunc1>(*this);
+  }
 private:
-  std::string_view funcName = {};
+  instr_vector_opc_t vectorInstr = {};
 };
 
 class VectorFunc2 : public ExpressionNode {
 public:
-  VectorFunc2(const std::string_view &name, Ptr a, Ptr b) : funcName(name) {
+  VectorFunc2(instr_vector_opc_t instr, Ptr a, Ptr b) : vectorInstr(instr) {
     children[0] = std::move(a);
     children[1] = std::move(b);
   }
-  Chunk EmitShaderCode(ShaderCodeWriter&) const override;
+
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  std::unique_ptr<ExpressionNode> CloneExpr() const override {
+    return std::make_unique<VectorFunc2>(*this);
+  }
 private:
-  std::string_view funcName = {};
+  instr_vector_opc_t vectorInstr = {};
 };
 
 class VectorFunc3 : public ExpressionNode {
 public:
-  VectorFunc3(const std::string_view &name, Ptr a, Ptr b, Ptr c) : funcName(name) {
+  VectorFunc3(instr_vector_opc_t instr, Ptr a, Ptr b, Ptr c) : vectorInstr(instr) {
     children[0] = std::move(a);
     children[1] = std::move(b);
     children[2] = std::move(c);
   }
-  Chunk EmitShaderCode(ShaderCodeWriter&) const override;
+
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  std::unique_ptr<ExpressionNode> CloneExpr() const override {
+    return std::make_unique<VectorFunc3>(*this);
+  }
 private:
-  std::string_view funcName = {};
+  instr_vector_opc_t vectorInstr = {};
 };
 
 class ScalarFunc1 : public ExpressionNode {
 public:
-  ScalarFunc1(const std::string_view &name, Ptr a) : funcName(name) {
+  ScalarFunc1(instr_scalar_opc_t instr, Ptr a) : scalarInstr(instr) {
     children[0] = std::move(a);
   }
-  Chunk EmitShaderCode(ShaderCodeWriter&) const override;
+
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  std::unique_ptr<ExpressionNode> CloneExpr() const override {
+    return std::make_unique<ScalarFunc1>(*this);
+  }
 private:
-  std::string_view funcName = {};
+  instr_scalar_opc_t scalarInstr = {};
 };
 
 class ScalarFunc2 : public ExpressionNode {
 public:
-  ScalarFunc2(const std::string_view &name, Ptr a, Ptr b) : funcName(name) {
+  ScalarFunc2(instr_scalar_opc_t instr, Ptr a, Ptr b) : scalarInstr(instr) {
     children[0] = std::move(a);
     children[1] = std::move(b);
   }
-  Chunk EmitShaderCode(ShaderCodeWriter&) const override;
+
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  std::unique_ptr<ExpressionNode> CloneExpr() const override {
+    return std::make_unique<ScalarFunc2>(*this);
+  }
 private:
-  std::string_view funcName = {};
+  instr_scalar_opc_t scalarInstr = {};
 };
 
-} // namespace Xe::Microcode
+} // namespace Xe::Microcode::AST

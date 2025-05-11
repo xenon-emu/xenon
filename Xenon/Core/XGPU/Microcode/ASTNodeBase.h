@@ -2,19 +2,22 @@
 
 #pragma once
 
+#include <sstream>
+
 #include "Base/Types.h"
 
 namespace Xe::Microcode::AST {
 
 // Code chunk define
-using Chunk = std::stringstream;
+struct Chunk {
+  std::stringstream ss{};
+};
 
 // Node base
 class NodeBase {
 public:
   virtual ~NodeBase() = default;
   virtual std::unique_ptr<NodeBase> Clone() const = 0;
-  virtual std::string ToString() const = 0;
 
   template <typename T>
   std::unique_ptr<T> CloneAs() const {
@@ -49,4 +52,4 @@ enum class eExportReg : u8 {
   INTERP8
 };
 
-} // namespace Xe::Microcode
+} // namespace Xe::Microcode::AST

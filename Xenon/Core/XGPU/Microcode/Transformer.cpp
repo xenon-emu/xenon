@@ -13,7 +13,7 @@ ShaderNodeWriter::ShaderNodeWriter(eShaderType type) :
 ShaderNodeWriter::~ShaderNodeWriter()
 {}
 
-void ShaderNodeWriter::TransformShader(AST::NodeWriterBase &nodeWriter, const u32 *words, const u32 numWords) {
+void ShaderNodeWriter::TransformShader(AST::NodeWriter &nodeWriter, const u32 *words, const u32 numWords) {
   instr_cf_t cfa;
   instr_cf_t cfb;
 
@@ -32,7 +32,7 @@ void ShaderNodeWriter::TransformShader(AST::NodeWriterBase &nodeWriter, const u3
   }
 }
 
-void ShaderNodeWriter::TransformBlock(AST::NodeWriterBase &nodeWriter, const u32 *words, const u32 numWords, const instr_cf_t *cf, u32 &pc) {
+void ShaderNodeWriter::TransformBlock(AST::NodeWriter &nodeWriter, const u32 *words, const u32 numWords, const instr_cf_t *cf, u32 &pc) {
   const instr_cf_opc_t cfType = static_cast<instr_cf_opc_t>(cf->opc);
   switch (cfType) {
   case NOP: {
@@ -140,7 +140,7 @@ void ShaderNodeWriter::TransformBlock(AST::NodeWriterBase &nodeWriter, const u32
   }
 }
 
-AST::Statement ShaderNodeWriter::EmitExec(AST::NodeWriterBase &nodeWriter, const u32 *words, const u32 numWords, const instr_cf_exec_t &exec) {
+AST::Statement ShaderNodeWriter::EmitExec(AST::NodeWriter &nodeWriter, const u32 *words, const u32 numWords, const instr_cf_exec_t &exec) {
   // Check if execution has a condition
   const bool conditional = exec.is_cond_exec();
   // Sequence bytes
@@ -197,7 +197,7 @@ AST::Statement ShaderNodeWriter::EmitExec(AST::NodeWriterBase &nodeWriter, const
   return statement;
 }
 
-AST::Statement ShaderNodeWriter::EmitALU(AST::NodeWriterBase &nodeWriter, const instr_alu_t &alu, const bool sync) {
+AST::Statement ShaderNodeWriter::EmitALU(AST::NodeWriter &nodeWriter, const instr_alu_t &alu, const bool sync) {
   AST::Statement vector, scalar, predicate;
   // Fast case, no magic stuff around
   if (alu.vector_write_mask || (alu.export_data && alu.scalar_dest_rel)) {
@@ -276,7 +276,7 @@ AST::Statement ShaderNodeWriter::EmitALU(AST::NodeWriterBase &nodeWriter, const 
   return nodeWriter.EmitMergeStatements(vector, nodeWriter.EmitMergeStatements(predicate, scalar));
 }
 
-AST::Statement ShaderNodeWriter::EmitVertexFetch(AST::NodeWriterBase &nodeWriter, const instr_fetch_vtx_t &vtx, const bool sync) {
+AST::Statement ShaderNodeWriter::EmitVertexFetch(AST::NodeWriter &nodeWriter, const instr_fetch_vtx_t &vtx, const bool sync) {
   const u32 fetchSlot = vtx.const_index * 3 + vtx.const_index_sel;
   const u32 fetchOffset = vtx.offset;
   const u32 fetchStride = vtx.stride ? vtx.stride : lastVertexStride;
@@ -326,7 +326,7 @@ AST::Statement ShaderNodeWriter::EmitVertexFetch(AST::NodeWriterBase &nodeWriter
   return nodeWriter.EmitWriteWithSwizzleStatement(dest, fetch, swizzle[0], swizzle[1], swizzle[2], swizzle[3]);
 }
 
-AST::Statement ShaderNodeWriter::EmitTextureFetch(AST::NodeWriterBase &nodeWriter, const instr_fetch_tex_t &tex, const bool sync) {
+AST::Statement ShaderNodeWriter::EmitTextureFetch(AST::NodeWriter &nodeWriter, const instr_fetch_tex_t &tex, const bool sync) {
   const AST::Expression dest = nodeWriter.EmitWriteReg(shaderType == eShaderType::Pixel, false, tex.dst_reg);
   const AST::Expression src = nodeWriter.EmitReadReg(tex.src_reg);
   const eSwizzle srcX = static_cast<const eSwizzle>((tex.src_swiz >> 0) & 3);
@@ -357,7 +357,7 @@ AST::Statement ShaderNodeWriter::EmitTextureFetch(AST::NodeWriterBase &nodeWrite
   return nodeWriter.EmitWriteWithSwizzleStatement(dest, sample, destX, destY, destZ, destW);
 }
 
-AST::Statement ShaderNodeWriter::EmitPredicateTest(AST::NodeWriterBase &nodeWriter, const AST::Statement &code, const bool conditional, const u32 flowPredCondition, const u32 predSelect, const u32 predCondition) {
+AST::Statement ShaderNodeWriter::EmitPredicateTest(AST::NodeWriter &nodeWriter, const AST::Statement &code, const bool conditional, const u32 flowPredCondition, const u32 predSelect, const u32 predCondition) {
   if (predSelect && (!conditional || flowPredCondition != predCondition)) {
     // Get predicate register (invert if needed) and wrap in a condition
     return nodeWriter.EmitConditionalStatement(predCondition ? nodeWriter.EmitGetPredicate() : nodeWriter.EmitNot(nodeWriter.EmitGetPredicate()), code);
@@ -366,7 +366,7 @@ AST::Statement ShaderNodeWriter::EmitPredicateTest(AST::NodeWriterBase &nodeWrit
   return code;
 }
 
-AST::Expression ShaderNodeWriter::EmitSrcReg(AST::NodeWriterBase &nodeWriter, const instr_alu_t &instr, const u32 num, const u32 type, const u32 swizzle, const u32 negate, const s32 slot) {
+AST::Expression ShaderNodeWriter::EmitSrcReg(AST::NodeWriter &nodeWriter, const instr_alu_t &instr, const u32 num, const u32 type, const u32 swizzle, const u32 negate, const s32 slot) {
   AST::Expression reg = {};
   if (type) {
     // Runtime register
@@ -402,7 +402,7 @@ AST::Expression ShaderNodeWriter::EmitSrcReg(AST::NodeWriterBase &nodeWriter, co
   return reg;
 }
 
-AST::Expression ShaderNodeWriter::EmitSrcReg(AST::NodeWriterBase &nodeWriter, const instr_alu_t &instr, const u32 argIndex) {
+AST::Expression ShaderNodeWriter::EmitSrcReg(AST::NodeWriter &nodeWriter, const instr_alu_t &instr, const u32 argIndex) {
   switch (argIndex) {
   case 0: {
     return EmitSrcReg(nodeWriter, instr, instr.src1_reg, instr.src1_sel, instr.src1_swiz, instr.src1_reg_negate, 0);
@@ -419,15 +419,15 @@ AST::Expression ShaderNodeWriter::EmitSrcReg(AST::NodeWriterBase &nodeWriter, co
 }
 
 #define SWIZZLE(x, y, z, w) ((x & 3) << 0) | ((y & 3) << 0) | ((z & 3) << 0) | ((w & 3) << 0)
-AST::Expression ShaderNodeWriter::EmitSrcScalarReg1(AST::NodeWriterBase &nodeWriter, const instr_alu_t &instr) {
+AST::Expression ShaderNodeWriter::EmitSrcScalarReg1(AST::NodeWriter &nodeWriter, const instr_alu_t &instr) {
   return EmitSrcReg(nodeWriter, instr, instr.src3_reg, instr.src3_sel, SWIZZLE(0, 0, 0, 0), instr.src3_reg_negate, (instr.src1_sel || instr.src2_sel) ? 1 : 0);
 }
 
-AST::Expression ShaderNodeWriter::EmitSrcScalarReg2(AST::NodeWriterBase &nodeWriter, const instr_alu_t &instr) {
+AST::Expression ShaderNodeWriter::EmitSrcScalarReg2(AST::NodeWriter &nodeWriter, const instr_alu_t &instr) {
   return EmitSrcReg(nodeWriter, instr, instr.src3_reg, instr.src3_sel, SWIZZLE(1, 1, 1, 1), instr.src3_reg_negate, (instr.src1_sel || instr.src2_sel) ? 1 : 0);
 }
 
-AST::Statement ShaderNodeWriter::EmitVectorResult(AST::NodeWriterBase &nodeWriter, const instr_alu_t &instr, const AST::Expression &code) {
+AST::Statement ShaderNodeWriter::EmitVectorResult(AST::NodeWriter &nodeWriter, const instr_alu_t &instr, const AST::Expression &code) {
   // Clamp value to 0-1 range
   AST::Expression input = instr.vector_clamp ? nodeWriter.EmitSaturate(code) : code;
   AST::Expression dest = nodeWriter.EmitWriteReg(shaderType == eShaderType::Pixel, instr.export_data, instr.vector_dest);
@@ -462,7 +462,7 @@ AST::Statement ShaderNodeWriter::EmitVectorResult(AST::NodeWriterBase &nodeWrite
   return nodeWriter.EmitWriteWithSwizzleStatement(dest, input, swizzle[0], swizzle[1], swizzle[2], swizzle[3]);
 }
 
-AST::Statement ShaderNodeWriter::EmitScalarResult(AST::NodeWriterBase &nodeWriter, const instr_alu_t &instr, const AST::Expression &code) {
+AST::Statement ShaderNodeWriter::EmitScalarResult(AST::NodeWriter &nodeWriter, const instr_alu_t &instr, const AST::Expression &code) {
   // Clamp value to 0-1 range
   AST::Expression input = instr.vector_clamp ? nodeWriter.EmitSaturate(code) : code;
   // During export scalar operation can still write into the vector, so we check if it's a pure scalar operation, or a vector operation
