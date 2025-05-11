@@ -263,7 +263,7 @@ bool _smc::verify_toml(toml::value &value) {
 void _xcpu::from_toml(const toml::value &value) {
   elfLoader = toml::find_or<bool>(value, "ElfLoader", elfLoader);
   clocksPerInstruction = toml::find_or<s32&>(value, "CPI", clocksPerInstruction);
-  skipHWInit = toml::find_or<bool>(value, "SkipHWInit", skipHWInit);
+  overrideInitSkip = toml::find_or<bool>(value, "OverrideHWInit", overrideInitSkip);
   HW_INIT_SKIP_1 = toml::find_or<u64&>(value, "HW_INIT_SKIP1", HW_INIT_SKIP_1);
   HW_INIT_SKIP_2 = toml::find_or<u64&>(value, "HW_INIT_SKIP2", HW_INIT_SKIP_2);
 }
@@ -278,14 +278,14 @@ void _xcpu::to_toml(toml::value &value) {
   value["CPI"].comments().push_back("# If your system has a lower than average CPI, use CPI Bypass in HighlyExperimental");
   value["CPI"].comments().push_back("# Note: This will mess with execution timing, and may break time-sensitive things like XeLL");
 
-  value["SkipHWInit"].comments().clear();
-  value["SkipHWInit"] = skipHWInit;
-  value["SkipHWInit"].comments().push_back("# Enable CB/SB HW_INIT stage skip [HACK]");
+  value["OverrideHWInit"].comments().clear();
+  value["OverrideHWInit"] = overrideInitSkip;
+  value["OverrideHWInit"].comments().push_back("# Uses manual init skips below if true, otherwise, it uses the auto-detected values");
 
   value["HW_INIT_SKIP1"].comments().clear();
   value["HW_INIT_SKIP1"] = HW_INIT_SKIP_1;
   value["HW_INIT_SKIP1"].as_integer_fmt().fmt = toml::integer_format::hex;
-  value["HW_INIT_SKIP1"].comments().push_back("# Manual Hardware Init Skip address 1 override");
+  value["HW_INIT_SKIP1"].comments().push_back("# Manual Hardware Init Skip address 1 override ");
   value["HW_INIT_SKIP1"].comments().push_back("# RGH3 Trinity: 0x3003F48");
   value["HW_INIT_SKIP1"].comments().push_back("# RGH3 Corona:  0x3003DC0");
 
@@ -300,13 +300,13 @@ bool _xcpu::verify_toml(toml::value &value) {
   to_toml(value);
   cache_value(elfLoader);
   cache_value(clocksPerInstruction);
-  cache_value(skipHWInit);
+  cache_value(overrideInitSkip);
   cache_value(HW_INIT_SKIP_1);
   cache_value(HW_INIT_SKIP_2);
   from_toml(value);
   verify_value(elfLoader);
   verify_value(clocksPerInstruction);
-  verify_value(skipHWInit);
+  verify_value(overrideInitSkip);
   verify_value(HW_INIT_SKIP_1);
   verify_value(HW_INIT_SKIP_2);
   return true;

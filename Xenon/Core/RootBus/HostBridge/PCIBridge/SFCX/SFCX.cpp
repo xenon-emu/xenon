@@ -199,43 +199,42 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
     LOG_INFO(SFCX, " * CB_B Version: {:#d}", cbbHeader.buildNumber);
   }
 
-  if (Config::xcpu.skipHWInit) {
-    LOG_INFO(SFCX, "CB/SB Hardware Init stage skip enabled.");
-    if (Config::xcpu.HW_INIT_SKIP_1 == 0 && Config::xcpu.HW_INIT_SKIP_2 == 0) {
-      LOG_INFO(SFCX, "Auto-detecting Hardware Init stage skip addresses:");
-      switch (cbVersion) {
-      // CB_B 6723
-      case 6723:
-        Config::xcpu.HW_INIT_SKIP_1 = 0x03009B10;
-        LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, Config::xcpu.HW_INIT_SKIP_1);
-        Config::xcpu.HW_INIT_SKIP_2 = 0x03009BA4;
-        LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: 0x{:X}", cbVersion, Config::xcpu.HW_INIT_SKIP_2);
-        break;
-      // CB_B 9188, 15432
-      case 9188:
-      case 15432:
-        Config::xcpu.HW_INIT_SKIP_1 = 0x03003DC0;
-        LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, Config::xcpu.HW_INIT_SKIP_1);
-        Config::xcpu.HW_INIT_SKIP_2 = 0x03003E54;
-        LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: 0x{:X}", cbVersion, Config::xcpu.HW_INIT_SKIP_2);
-        break;
-      // CB_B 14352
-      case 14352:
-        Config::xcpu.HW_INIT_SKIP_1 = 0x03003F48;
-        LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, Config::xcpu.HW_INIT_SKIP_1);
-        Config::xcpu.HW_INIT_SKIP_2 = 0x03003FDC;
-        LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: 0x{:X}", cbVersion, Config::xcpu.HW_INIT_SKIP_2);
-        break;
-      default:
-        LOG_ERROR(SFCX, "Auto detection failed. Unimplemented CB found, version {:#d}. Please report to Xenon Devs.", cbVersion);
-        break;
-      }
+  if (Config::xcpu.overrideInitSkip) {
+    LOG_INFO(SFCX, "Auto-detecting Hardware Init stage skip addresses:");
+    switch (cbVersion) {
+    // CB_B 6723
+    case 6723:
+      initSkip1 = 0x03009B10;
+      LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, initSkip1);
+      initSkip2 = 0x03009BA4;
+      LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: 0x{:X}", cbVersion, initSkip2);
+      break;
+    // CB_B 9188, 15432
+    case 9188:
+    case 15432:
+      initSkip1 = 0x03003DC0;
+      LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, initSkip1);
+      initSkip2 = 0x03003E54;
+      LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: 0x{:X}", cbVersion, initSkip2);
+      break;
+    // CB_B 14352
+    case 14352:
+      initSkip1 = 0x03003F48;
+      LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, initSkip1);
+      initSkip2 = 0x03003FDC;
+      LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: 0x{:X}", cbVersion, initSkip2);
+      break;
+    default:
+      LOG_ERROR(SFCX, "Auto detection failed. Unimplemented CB found, version {:#d}. Please report to Xenon Devs.", cbVersion);
+      break;
     }
-    else {
-      LOG_INFO(SFCX, "Manual Hardware Init stage skip addresses set:");
-      LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, Config::xcpu.HW_INIT_SKIP_1);
-      LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: 0x{:X}", cbVersion, Config::xcpu.HW_INIT_SKIP_2);
-    }
+  }
+  else {
+    initSkip1 = Config::xcpu.HW_INIT_SKIP_1;
+    initSkip2 = Config::xcpu.HW_INIT_SKIP_2;
+    LOG_INFO(SFCX, "Manual Hardware Init stage skip addresses set:");
+    LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, initSkip1);
+    LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: 0x{:X}", cbVersion, initSkip2);
   }
   // Enter SFCX Thread
   sfcxThreadRunning = true;

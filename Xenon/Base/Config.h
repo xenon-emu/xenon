@@ -163,7 +163,7 @@ inline struct _xcpu {
   // CPI for your system, do not modify
   s32 clocksPerInstruction = 0;
   // CB/SB HW_INIT_SKIP
-  bool skipHWInit = true;
+  bool overrideInitSkip = false;
   u64 HW_INIT_SKIP_1 = 0;
   u64 HW_INIT_SKIP_2 = 0;
 

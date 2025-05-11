@@ -1,6 +1,7 @@
 // Copyright 2025 Xenon Emulator Project
 
 #include "Base/Config.h"
+#include "Core/Xe_Main.h"
 
 #include "PPCInterpreter.h"
 
@@ -54,11 +55,11 @@ void PPCInterpreter::PPCInterpreter_bclr(PPU_STATE *ppuState) {
   bool condOk = ((_instr.bo & 0x10) != 0 ? 1 : 0) || (CR_GET(_instr.bi) == ((_instr.bo & 0x8) != 0));
 
   // CB/SB Hardware Init step skip (hacky)
-  if (Config::xcpu.skipHWInit) {
-    if (curThread.CIA == Config::xcpu.HW_INIT_SKIP_1)
+  if (Xe_Main.get() && Xe_Main->sfcx.get() && Xe_Main->sfcx->initSkip1 && Xe_Main->sfcx->initSkip2) {
+    if (curThread.CIA == Xe_Main->sfcx->initSkip1)
       condOk = false;
 
-    if (curThread.CIA == Config::xcpu.HW_INIT_SKIP_2)
+    if (curThread.CIA == Xe_Main->sfcx->initSkip2)
       condOk = true;
   }
 
