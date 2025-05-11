@@ -9,7 +9,7 @@
 namespace Xe {
 
 // Closest AMD doc:
-// http://developer.amd.com/wordpress/media/2012/10/R600_Instruction_Set_Architecture.pdf
+// https://www.amd.com/content/dam/amd/en/documents/radeon-tech-docs/instruction-set-architectures/R600_Instruction_Set_Architecture.pdf
 // Microcode format differs, but most fields/enums are the same.
 
 // This code comes from the freedreno project:

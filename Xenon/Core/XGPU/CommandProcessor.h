@@ -133,7 +133,7 @@ enum CPPacketType3Opcode {
   PM4_SET_PROTECTED_MODE        = 0x5F,
   // Tiled rendering:
   // Display screen subsection rendering apparatus and method.
-  // https://www.google.com/patents/US20060055701
+  // https://patents.google.com/patent/US20060055701
   PM4_SET_BIN_MASK_LO           = 0x60,
   PM4_SET_BIN_MASK_HI           = 0x61,
   PM4_SET_BIN_SELECT_LO         = 0x62,

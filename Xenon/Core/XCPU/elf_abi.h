@@ -60,7 +60,7 @@ typedef s64 Elf64_Sxword;
  * - System V ABI AMD64 Architecture Processor Supplement
  *   Draft Version 0.99.4,
  *   January 13, 2010.
- *   http://www.cs.washington.edu/education/courses/cse351/12wi/supp-docs/abi.pdf
+ *   https://courses.cs.washington.edu/courses/cse351/12wi/supp-docs/abi.pdf
  */
 #define PN_XNUM 0xFFFF
 
