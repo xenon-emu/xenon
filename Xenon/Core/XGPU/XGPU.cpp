@@ -170,6 +170,9 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
       value = xenosState->crtcControl;
       break;
     case XeRegister::DC_LUT_AUTOFILL:
+      if (xenosState->dcLutAutofill == 0x1) {
+        xenosState->dcLutAutofill = 0x2000000;
+      }
       value = xenosState->dcLutAutofill;
       break;
     case XeRegister::XDVO_ENABLE:

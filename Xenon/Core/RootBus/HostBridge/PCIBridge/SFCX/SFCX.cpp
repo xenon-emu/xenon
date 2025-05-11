@@ -200,6 +200,13 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
   }
 
   if (Config::xcpu.overrideInitSkip) {
+    initSkip1 = Config::xcpu.HW_INIT_SKIP_1;
+    initSkip2 = Config::xcpu.HW_INIT_SKIP_2;
+    LOG_INFO(SFCX, "Manual Hardware Init stage skip addresses set:");
+    LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, initSkip1);
+    LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: 0x{:X}", cbVersion, initSkip2);
+  }
+  else {
     LOG_INFO(SFCX, "Auto-detecting Hardware Init stage skip addresses:");
     switch (cbVersion) {
     // CB_B 6723
@@ -228,13 +235,6 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
       LOG_ERROR(SFCX, "Auto detection failed. Unimplemented CB found, version {:#d}. Please report to Xenon Devs.", cbVersion);
       break;
     }
-  }
-  else {
-    initSkip1 = Config::xcpu.HW_INIT_SKIP_1;
-    initSkip2 = Config::xcpu.HW_INIT_SKIP_2;
-    LOG_INFO(SFCX, "Manual Hardware Init stage skip addresses set:");
-    LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, initSkip1);
-    LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: 0x{:X}", cbVersion, initSkip2);
   }
   // Enter SFCX Thread
   sfcxThreadRunning = true;
