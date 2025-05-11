@@ -277,7 +277,53 @@ AST::Statement ShaderNodeWriter::EmitALU(AST::NodeWriterBase &nodeWriter, const 
 }
 
 AST::Statement ShaderNodeWriter::EmitVertexFetch(AST::NodeWriterBase &nodeWriter, const instr_fetch_vtx_t &vtx, const bool sync) {
-  return {};
+  const u32 fetchSlot = vtx.const_index * 3 + vtx.const_index_sel;
+  const u32 fetchOffset = vtx.offset;
+  const u32 fetchStride = vtx.stride ? vtx.stride : lastVertexStride;
+  const instr_surf_fmt_t fetchFormat = (const instr_surf_fmt_t)vtx.format;
+  // Update vertex stride
+  if (vtx.stride)
+    lastVertexStride = vtx.stride;
+  // Fetch formats
+  const bool isFloat = (fetchFormat == FMT_32_FLOAT ||
+                        fetchFormat == FMT_32_32_FLOAT ||
+                        fetchFormat == FMT_32_32_32_FLOAT ||
+                        fetchFormat == FMT_32_32_32_32_FLOAT ||
+                        fetchFormat == FMT_16_FLOAT ||
+                        fetchFormat == FMT_16_16_FLOAT ||
+                        fetchFormat == FMT_16_16_16_16_FLOAT);
+  const bool isSigned = vtx.format_comp_all != 0;
+  const bool isNormalized = !vtx.num_format_all;
+  // Get the source register
+  AST::Expression source = nodeWriter.EmitReadReg(vtx.src_reg);
+  // create the value fetcher (returns single expression with fetch result)
+  const AST::Expression fetch = nodeWriter.EmitVertexFetch(source, fetchSlot, fetchOffset, fetchStride, fetchFormat, isFloat, isSigned, isNormalized);
+  const AST::Expression dest = nodeWriter.EmitWriteReg(shaderType == eShaderType::Pixel, false, vtx.dst_reg);
+  // Setup target swizzle
+  eSwizzle swizzle[4] = { eSwizzle::Unused, eSwizzle::Unused, eSwizzle::Unused, eSwizzle::Unused };
+  for (u32 i = 0; i < 4; i++) {
+    const u32 swizzleMask = (vtx.dst_swiz >> (3 * i)) & 0x7;
+    switch (swizzleMask) {
+    case 1:
+    case 2:
+    case 3: {
+      swizzle[i] = static_cast<eSwizzle>(swizzleMask);
+    } break;
+    case 4: {
+      swizzle[i] = eSwizzle::Zero;
+    } break;
+    case 5: {
+      swizzle[i] = eSwizzle::One;
+    } break;
+    case 6: {
+      swizzle[i] = eSwizzle::Ignored;
+    } break;
+    case 7: {
+      swizzle[i] = eSwizzle::Unused;
+    } break;
+    }
+  }
+  return nodeWriter.EmitWriteWithSwizzleStatement(dest, fetch, swizzle[0], swizzle[1], swizzle[2], swizzle[3]);
 }
 
 AST::Statement ShaderNodeWriter::EmitTextureFetch(AST::NodeWriterBase &nodeWriter, const instr_fetch_tex_t &tex, const bool sync) {
@@ -320,8 +366,40 @@ AST::Statement ShaderNodeWriter::EmitPredicateTest(AST::NodeWriterBase &nodeWrit
   return code;
 }
 
-AST::Expression ShaderNodeWriter::EmitSrcReg(AST::NodeWriterBase &nodeWriter, const instr_alu_t &instr, const u32 num, const u32 type, const u32 swiz, const u32 negate, const s32 slot) {
-  return {};
+AST::Expression ShaderNodeWriter::EmitSrcReg(AST::NodeWriterBase &nodeWriter, const instr_alu_t &instr, const u32 num, const u32 type, const u32 swizzle, const u32 negate, const s32 slot) {
+  AST::Expression reg = {};
+  if (type) {
+    // Runtime register
+    const u32 regIndex = num & 0x7F;
+    reg = nodeWriter.EmitReadReg(regIndex);
+    // Take abs value
+    if (num & 0x80)
+      reg = nodeWriter.EmitAbs(reg);
+  } else {
+    if ((slot == 0 && instr.const_0_rel_abs) || (slot == 1 && instr.const_1_rel_abs)) {
+      // consts[relative ? a0 + num : a0]
+      reg = nodeWriter.EmitFloatConstRel(shaderType == eShaderType::Pixel, instr.relative_addr ? num : 0);
+    } else {
+      // consts[num]
+      reg = nodeWriter.EmitFloatConst(shaderType == eShaderType::Pixel, num);
+    }
+    // Take abs value
+    if (instr.abs_constants)
+      reg = nodeWriter.EmitAbs(reg);
+  }
+  // Negate the result
+  if (negate)
+    reg = nodeWriter.EmitNegate(reg);
+  // Add swizzle select
+  if (swizzle) {
+    // NOTE: A neutral (zero) swizzle pattern represents XYZW swizzle and the whole numbering is wrapped around
+    const eSwizzle x = static_cast<const eSwizzle>(((swizzle >> 0) + 0) & 0x3);
+    const eSwizzle y = static_cast<const eSwizzle>(((swizzle >> 2) + 1) & 0x3);
+    const eSwizzle z = static_cast<const eSwizzle>(((swizzle >> 4) + 2) & 0x3);
+    const eSwizzle w = static_cast<const eSwizzle>(((swizzle >> 6) + 3) & 0x3);
+    reg = nodeWriter.EmitReadSwizzle(reg, x, y, z, w);
+  }
+  return reg;
 }
 
 AST::Expression ShaderNodeWriter::EmitSrcReg(AST::NodeWriterBase &nodeWriter, const instr_alu_t &instr, const u32 argIndex) {

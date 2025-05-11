@@ -10,96 +10,62 @@ namespace Xe::Microcode::AST {
 
 class Expression {
 public:
-  Expression() :
-    node(nullptr)
-  {}
-  Expression(const Expression&other) {
-    node = other.node ? other.node->Copy() : nullptr;
-  }
-  Expression(NodeBase *base) :
-    node(base)
-  {}
-  ~Expression() {
-    Release();
-  }
-
-  std::string ToString() {
-    return node ? node->ToString() : "<empty>";
-  }
-
-  Expression& operator=(const Expression &other) {
-    if (node != other.node) {
-      Release();
-
-      if (other.node) {
-        node = other.node;
-      }
+  Expression() = default;
+  Expression(std::unique_ptr<NodeBase> base) : node(std::move(base)) {}
+  Expression(const Expression& other)
+    : node(other.node ? other.node->Clone() : nullptr) {}
+  Expression& operator=(const Expression& other) {
+    if (this != &other) {
+      node = other.node ? other.node->Clone() : nullptr;
     }
     return *this;
   }
 
+  std::string ToString() const {
+    return node ? node->ToString() : "<empty>";
+  }
+
   template <typename T = NodeBase>
-  inline T* Get() {
-    return reinterpret_cast<T*>(node);
+  T* Get() const {
+    return static_cast<T*>(node.get());
   }
-  inline operator bool() const {
-    return node != nullptr;
+
+  explicit operator bool() const {
+    return static_cast<bool>(node);
   }
-  inline void Release() {
-    if (node) {
-      node->Release();
-      node = nullptr;
-    }
-  }
+
 private:
-  NodeBase *node = nullptr;
+  std::unique_ptr<NodeBase> node;
 };
 
 class Statement {
 public:
-  Statement() :
-    node(nullptr)
-  {}
-  Statement(const Statement &other) {
-    node = other.node ? other.node->Copy() : nullptr;
-  }
-  Statement(NodeBase *base) :
-    node(base)
-  {}
-  ~Statement() {
-    Release();
-  }
-
-  std::string ToString() {
-    return node ? node->ToString() : "<empty>";
-  }
-
-  Statement& operator=(const Statement &other) {
-    if (node != other.node) {
-      Release();
-
-      if (other.node) {
-        node = other.node;
-      }
+  Statement() = default;
+  Statement(std::unique_ptr<NodeBase> base) : node(std::move(base)) {}
+  Statement(const Statement& other)
+    : node(other.node ? other.node->Clone() : nullptr) {}
+  Statement& operator=(const Statement& other) {
+    if (this != &other) {
+      node = other.node ? other.node->Clone() : nullptr;
     }
     return *this;
   }
 
+  std::string ToString() const {
+    return node ? node->ToString() : "<empty>";
+  }
+
   template <typename T = NodeBase>
-  inline T* Get() {
-    return reinterpret_cast<T*>(node);
+  T* Get() const {
+    return static_cast<T*>(node.get());
   }
-  inline operator bool() const {
-    return node != nullptr;
+
+  explicit operator bool() const {
+    return static_cast<bool>(node);
   }
-  inline void Release() {
-    if (node) {
-      node->Release();
-      node = nullptr;
-    }
-  }
+
 private:
-  NodeBase *node = nullptr;
+  std::unique_ptr<NodeBase> node;
 };
 
 class NodeWriterBase {

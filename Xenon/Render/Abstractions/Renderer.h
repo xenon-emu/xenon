@@ -7,6 +7,7 @@
 #include <fstream>
 #ifndef NO_GFX
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_video.h>
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <backends/imgui_impl_sdl3.h>
 #endif
@@ -27,7 +28,7 @@ namespace Render {
 
 class Renderer {
 public:
-  Renderer(RAM *ram, SDL_Window *mainWindow);
+  Renderer(RAM *ram, SDL_Window *window);
   virtual ~Renderer() = default;
   virtual void BackendSDLProperties(SDL_PropertiesID properties) = 0;
   virtual void BackendStart() = 0;
@@ -40,10 +41,14 @@ public:
   virtual void OnSwap(SDL_Window *window) = 0;
   virtual s32 GetBackbufferFlags() = 0;
   virtual void* GetBackendContext() = 0;
-  void Start();
+  void SDLInit();
+
+  void Create();
   void Shutdown();
 
   void Resize(s32 x, s32 y);
+
+  void HandleEvents();
 
   void Thread();
 
@@ -54,6 +59,9 @@ public:
   // Window Resolution
   u32 width = 1280;
   u32 height = 720;
+
+  // ImGui Created
+  bool imguiCreated = false;
 
   // Vertical SYNC
   bool VSYNC = true;
@@ -93,8 +101,8 @@ public:
         for (bool &a : gui.get()->ppcDebuggerActive) {
           a = true;
         }
-      } else {
-        gui.get()->ppcDebuggerActive[specificPPU] = true;
+      } else if (specificPPU <= 3) {
+        gui.get()->ppcDebuggerActive[specificPPU - 1] = true;
       }
     }
   }

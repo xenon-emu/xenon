@@ -7,6 +7,8 @@
 #include "OpenGL/Factory/OGLResourceFactory.h"
 #include "GUI/OpenGL.h"
 
+#define SANITY_CHECK(x) if (!x) { LOG_ERROR(Xenon, "Failed to initialize SDL: {}", SDL_GetError()); }
+
 #ifndef NO_GFX
 namespace Render {
 
@@ -59,23 +61,21 @@ void OGLRenderer::BackendSDLProperties(SDL_PropertiesID properties) {
   SDL_SetBooleanProperty(properties, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true);
 }
 void OGLRenderer::BackendSDLInit() {
-  // Set min size
-  SDL_SetWindowMinimumSize(mainWindow, 640, 480);
   // Set OpenGL SDL Properties
-  SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-  SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-  SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-  SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
+  SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1));
+  SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24));
+  SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8));
+  SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1));
   // Set RGBA size (R8G8B8A8)
-  SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
-  SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
-  SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
-  SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8);
+  SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8));
+  SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8));
+  SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8));
+  SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_ALPHA_SIZE, 8));
   // Set OpenGL version to 4.3 (earliest with CS)
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
+  SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4));
+  SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3));
   // We aren't using compatibility profile
-  SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+  SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE));
   // Create OpenGL handle for SDL
   context = SDL_GL_CreateContext(mainWindow);
   if (!context) {
@@ -90,9 +90,7 @@ void OGLRenderer::BackendSDLInit() {
     LOG_INFO(Render, "OpenGL Renderer: {}", OGLRenderer::gl_renderer());
   }
   // Set VSYNC
-  SDL_GL_SetSwapInterval(VSYNC);
-  // Set if we are in fullscreen mode or not
-  SDL_SetWindowFullscreen(mainWindow, fullscreen);
+  SANITY_CHECK(SDL_GL_SetSwapInterval(VSYNC));
 }
 
 void OGLRenderer::BackendShutdown() {

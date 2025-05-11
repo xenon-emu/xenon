@@ -171,7 +171,7 @@ SDL_Window* XeMain::createWindow() {
   SDL_SetNumberProperty(props, "flags", SDL_WINDOW_OPENGL);
   SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true);
   // Create window
-  SDL_Window *mainWindow = SDL_CreateWindowWithProperties(props);
+  mainWindow = SDL_CreateWindowWithProperties(props);
 
   // Set min size
   SDL_SetWindowMinimumSize(mainWindow, 640, 480);

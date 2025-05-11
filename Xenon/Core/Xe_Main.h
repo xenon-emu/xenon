@@ -65,6 +65,8 @@ public:
   Xenon* getCPU() {
     return xenonCPU.get();
   }
+  // Window
+  SDL_Window *mainWindow = nullptr;
 private:
   // Main objects
   //  Base path

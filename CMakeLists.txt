@@ -276,6 +276,8 @@ set(XGPU_AST
   Xenon/Core/XGPU/Microcode/ASTNode.h
   Xenon/Core/XGPU/Microcode/ASTNodeBase.h
   Xenon/Core/XGPU/Microcode/ASTNodeWriterBase.h
+  Xenon/Core/XGPU/Microcode/ASTStatement.cpp
+  Xenon/Core/XGPU/Microcode/ASTStatement.h
   Xenon/Core/XGPU/Microcode/Constants.h
   Xenon/Core/XGPU/Microcode/Transformer.cpp
   Xenon/Core/XGPU/Microcode/Transformer.h

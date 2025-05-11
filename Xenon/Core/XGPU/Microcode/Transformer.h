@@ -23,7 +23,7 @@ private:
   AST::Statement EmitTextureFetch(AST::NodeWriterBase &nodeWriter, const instr_fetch_tex_t &tex, const bool sync);
   AST::Statement EmitPredicateTest(AST::NodeWriterBase &nodeWriter, const AST::Statement &code, const bool conditional, const u32 flowPredCondition, const u32 predSelect, const u32 predCondition);
 
-  AST::Expression EmitSrcReg(AST::NodeWriterBase &nodeWriter, const instr_alu_t &instr, const u32 num, const u32 type, const u32 swiz, const u32 negate, const s32 slot);
+  AST::Expression EmitSrcReg(AST::NodeWriterBase &nodeWriter, const instr_alu_t &instr, const u32 num, const u32 type, const u32 swizzle, const u32 negate, const s32 slot);
   AST::Expression EmitSrcReg(AST::NodeWriterBase &nodeWriter, const instr_alu_t &instr, const u32 argIndex);
   AST::Expression EmitSrcScalarReg1(AST::NodeWriterBase &nodeWriter, const instr_alu_t &instr);
   AST::Expression EmitSrcScalarReg2(AST::NodeWriterBase &nodeWriter, const instr_alu_t &instr);

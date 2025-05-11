@@ -12,26 +12,28 @@
 
 namespace Render {
 
-Renderer::Renderer(RAM *ram, SDL_Window *mainWindow) :
+Renderer::Renderer(RAM *ram, SDL_Window *window) :
   ramPointer(ram),
   width(TILE(Config::rendering.window.width)),
   height(TILE(Config::rendering.window.height)),
   VSYNC(Config::rendering.vsync),
   fullscreen(Config::rendering.isFullscreen),
-  mainWindow(mainWindow)
+  mainWindow(window)
 {
+  SDLInit();
   thread = std::thread(&Renderer::Thread, this);
   thread.detach();
 }
 
-void Renderer::Start() {
+void Renderer::SDLInit() {
   MICROPROFILE_SCOPEI("[Xe::Render]", "Start", MP_AUTO);
-  BackendSDLInit();
   // Set if we are in fullscreen mode or not
   SDL_SetWindowFullscreen(mainWindow, fullscreen);
   // Get current window ID
   windowID = SDL_GetWindowID(mainWindow);
+}
 
+void Renderer::Create() {
   // Create factories
   BackendStart();
   shaderFactory = resourceFactory->CreateShaderFactory();
@@ -62,6 +64,7 @@ void Renderer::Start() {
   if (Config::rendering.enableGui) {
     gui = resourceFactory->CreateGUI();
     gui->Init(mainWindow, reinterpret_cast<void*>(GetBackendContext()));
+    imguiCreated = true;
   }
 }
 
@@ -100,6 +103,42 @@ void Renderer::Resize(s32 x, s32 y) {
   LOG_DEBUG(Render, "Resized window to {}x{}", width, height);
 }
 
+void Renderer::HandleEvents() {
+  const SDL_WindowFlags flag = SDL_GetWindowFlags(Xe_Main->mainWindow);
+  if (!Config::rendering.pauseOnFocusLoss) {
+    Xe_Main->renderHalt = flag & SDL_WINDOW_INPUT_FOCUS ? false : true;
+  }
+  // Process events.
+  while (SDL_PollEvent(&windowEvent)) {
+    if (Config::rendering.enableGui && imguiCreated) {
+      ImGui_ImplSDL3_ProcessEvent(&windowEvent);
+    }
+    switch (windowEvent.type) {
+    case SDL_EVENT_WINDOW_RESIZED:
+      if (windowEvent.window.windowID == windowID) {
+        LOG_DEBUG(Render, "Resizing window...");
+        Resize(windowEvent.window.data1, windowEvent.window.data2);
+      }
+      break;
+    case SDL_EVENT_QUIT:
+      if (Config::rendering.quitOnWindowClosure) {
+        LOG_INFO(Render, "Attempting to soft shutdown...");
+        globalShutdownHandler();
+      }
+      break;
+    case SDL_EVENT_KEY_DOWN:
+      if (windowEvent.key.key == SDLK_F11) {
+        SDL_WindowFlags flag = SDL_GetWindowFlags(mainWindow);
+        bool fullscreenMode = flag & SDL_WINDOW_FULLSCREEN;
+        SDL_SetWindowFullscreen(mainWindow, !fullscreenMode);
+      }
+      break;
+    default:
+      break;
+    }
+  }
+}
+
 void Renderer::Thread() {
   // Set thread name
   Base::SetCurrentThreadName("[Xe] Render");
@@ -109,56 +148,26 @@ void Renderer::Thread() {
     return;
   }
 
-  // Start exec
-  Start();
+  // Setup SDL handles (thread-specific)
+  BackendSDLInit();
+
+  // Create all handles
+  Create();
 
   // Main loop
   while (threadRunning && XeRunning) {
     // Start Profile
     MICROPROFILE_SCOPEI("[Xe::Render]", "Loop", MP_AUTO);
-    // Process events.
-    while (SDL_PollEvent(&windowEvent)) {
-      if (Config::rendering.enableGui) {
-        ImGui_ImplSDL3_ProcessEvent(&windowEvent);
-      }
-      switch (windowEvent.type) {
-      case SDL_EVENT_WINDOW_RESIZED:
-        if (windowEvent.window.windowID == windowID) {
-          LOG_DEBUG(Render, "Resizing window...");
-          Resize(windowEvent.window.data1, windowEvent.window.data2);
-        }
-        break;
-      case SDL_EVENT_QUIT:
-        if (Config::rendering.quitOnWindowClosure) {
-          LOG_INFO(Render, "Attempting to soft shutdown...");
-          globalShutdownHandler();
-        }
-        break;
-      case SDL_EVENT_KEY_DOWN:
-        if (windowEvent.key.key == SDLK_F11) {
-          SDL_WindowFlags flag = SDL_GetWindowFlags(mainWindow);
-          bool fullscreenMode = flag & SDL_WINDOW_FULLSCREEN;
-          SDL_SetWindowFullscreen(mainWindow, !fullscreenMode);
-        }
-        break;
-      default:
-        break;
-      }
-    }
+
     // Exit early if needed
     if (!threadRunning || !XeRunning)
       break;
-    const SDL_WindowFlags flag = SDL_GetWindowFlags(mainWindow);
-    bool inFocus = flag & SDL_WINDOW_INPUT_FOCUS;
-    if (!Config::rendering.pauseOnFocusLoss) {
-      inFocus = true;
-    }
 
     // Framebuffer pointer from main memory
     fbPointer = ramPointer->getPointerToAddress(Xe_Main->xenos->GetSurface());
 
     // Upload buffer
-    if (fbPointer && Xe_Main.get() && !Xe_Main->renderHalt && inFocus) {
+    if (fbPointer && Xe_Main.get() && !Xe_Main->renderHalt) {
       // Profile
       MICROPROFILE_SCOPEI("[Xe::Render]", "Deswizle", MP_AUTO);
       const u32 *ui_fbPointer = reinterpret_cast<u32*>(fbPointer);
@@ -177,7 +186,7 @@ void Renderer::Thread() {
     }
 
     // Render the texture
-    if (inFocus) {
+    if (!Xe_Main->renderHalt) {
       MICROPROFILE_SCOPEI("[Xe::Render]", "BindTexture", MP_AUTO);
       renderShaderPrograms->Bind();
       backbuffer->Bind();
@@ -185,13 +194,13 @@ void Renderer::Thread() {
     }
 
     // Render the GUI
-    if (Config::rendering.enableGui && gui.get() && Xe_Main.get() && !Xe_Main->renderHalt && inFocus) {
+    if (Config::rendering.enableGui && gui.get() && Xe_Main.get() && !Xe_Main->renderHalt) {
       MICROPROFILE_SCOPEI("[Xe::Render::GUI]", "Render", MP_AUTO);
       gui->Render(backbuffer.get());
     }
 
     // GL Swap
-    if (Xe_Main.get() && !Xe_Main->renderHalt) {
+    if (Xe_Main.get()) {
       MICROPROFILE_SCOPEI("[Xe::Render]", "Swap", MP_AUTO);
       OnSwap(mainWindow);
     }

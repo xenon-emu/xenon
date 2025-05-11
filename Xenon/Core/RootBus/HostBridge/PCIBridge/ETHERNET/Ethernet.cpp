@@ -193,7 +193,7 @@ void Xe::PCIDev::ETHERNET::Write(u64 writeAddress, const u8 *data, u64 size) {
     LOG_DEBUG(ETH, "PHY_CONFIG = 0x{:X}", val);
     break;
   case PHY_CONTROL: {
-    MdioWrite(val);
+    //MdioWrite(val);
   } break;
   case CONFIG_1:
     ethPciState.config1Reg = val;

@@ -11,7 +11,7 @@ enum class eBlockType : u8 {
   JUMP,
   CALL,
   END, // Shader end
-  RET, // Function return
+  RET  // Function return
 };
 
 // Generalized block in the shader

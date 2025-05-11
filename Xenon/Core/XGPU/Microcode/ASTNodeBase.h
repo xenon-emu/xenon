@@ -5,20 +5,48 @@
 #include "Base/Types.h"
 
 namespace Xe::Microcode::AST {
-  
+
+// Code chunk define
+using Chunk = std::stringstream;
+
 // Node base
 class NodeBase {
-protected:
-  virtual ~NodeBase() = default;
 public:
-  virtual NodeBase* Copy() = 0;
-  virtual void Release() = 0;
+  virtual ~NodeBase() = default;
+  virtual std::unique_ptr<NodeBase> Clone() const = 0;
   virtual std::string ToString() const = 0;
 
   template <typename T>
-  T* CopyWithType() {
-    return static_cast<T*>(Copy());
+  std::unique_ptr<T> CloneAs() const {
+    return std::unique_ptr<T>(static_cast<T*>(Clone().release()));
   }
+};
+
+// General expression type
+enum class eExprType : u8 {
+  ALU,
+  VFETCH,
+  TFETCH,
+  EXPORT
+};
+
+// Export register type
+enum class eExportReg : u8 {
+  POSITION,
+  POINTSIZE,
+  COLOR0,
+  COLOR1,
+  COLOR2,
+  COLOR3,
+  INTERP0,
+  INTERP1,
+  INTERP2,
+  INTERP3,
+  INTERP4,
+  INTERP5,
+  INTERP6,
+  INTERP7,
+  INTERP8
 };
 
 } // namespace Xe::Microcode
