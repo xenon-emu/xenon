@@ -20,3 +20,12 @@
 [submodule "Deps/ThirdParty/Sirit"]
 	path = Deps/ThirdParty/Sirit
 	url = https://github.com/Vali0004/sirit.git
+[submodule "third_party/volk"]
+	path = Deps/ThirdParty/volk
+	url = https://github.com/zeux/volk
+[submodule "third_party/Vulkan-Headers"]
+	path = Deps/ThirdParty/Vulkan-Headers
+	url = https://github.com/KhronosGroup/Vulkan-Headers
+[submodule "third_party/VulkanMemoryAllocator"]
+	path = Deps/ThirdParty/VulkanMemoryAllocator
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator

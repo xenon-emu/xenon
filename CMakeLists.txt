@@ -217,6 +217,9 @@ set(XCPU
 
 if (GFX_ENABLED)
   set(ImGui_Dir Deps/ThirdParty/ImGui)
+  set(Volk_Dir Deps/ThirdParty/volk)
+  set(Vulkan-Headers_Dir Deps/ThirdParty/Vulkan-Headers/include)
+  set(VulkanMemoryAllocator_Dir Deps/ThirdParty/VulkanMemoryAllocator/include)
   set(ImGui
     ${ImGui_Dir}/backends/imgui_impl_opengl3.cpp
     ${ImGui_Dir}/backends/imgui_impl_opengl3.h
@@ -259,6 +262,8 @@ if (GFX_ENABLED)
     Xenon/Render/OpenGL/OGLShader.h
     Xenon/Render/OGLRenderer.h
     Xenon/Render/OGLRenderer.cpp
+    Xenon/Render/VulkanRenderer.h
+    Xenon/Render/VulkanRenderer.cpp
     Xenon/Render/GUI/Dummy.cpp
     Xenon/Render/GUI/Dummy.h
     Xenon/Render/Dummy/Factory/DummyResourceFactory.h
@@ -365,7 +370,12 @@ endif()
 # Add includes
 target_include_directories(Xenon PRIVATE ${microprofile_dir} Xenon/include)
 if (GFX_ENABLED)
-    target_include_directories(Xenon PRIVATE ${ImGui_Dir})
+    target_include_directories(Xenon PRIVATE
+      ${ImGui_Dir}
+      ${Volk_Dir}
+      ${Vulkan-Headers_Dir}
+      ${VulkanMemoryAllocator_Dir}
+    )
 endif()
 
 # Add fonts target
