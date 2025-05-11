@@ -9,7 +9,6 @@ void PPCInterpreter::PPCInterpreter_dss(PPU_STATE *ppuState) {
   // We don't really need to do anything here, as it's handling cache. We mostly ignore it
 }
 
-
 // Data Stream Touch for Store
 void PPCInterpreter::PPCInterpreter_dst(PPU_STATE *ppuState) {
   CHECK_VXU;
@@ -101,7 +100,7 @@ void PPCInterpreter::PPCInterpreter_vspltw(PPU_STATE *ppuState) {
 
   CHECK_VXU;
 
-  u8 b = (_instr.va & 0x3);
+  const u8 b = (_instr.va & 0x3);
 
   VRi(vd).dword[0] = VRi(vb).dword[b];
   VRi(vd).dword[1] = VRi(vb).dword[b];
@@ -193,7 +192,7 @@ void PPCInterpreter::PPCInterpreter_vspltb(PPU_STATE* ppuState) {
 
   CHECK_VXU;
 
-  u8 uimm = _instr.vuimm;
+  const u8 uimm = _instr.vuimm;
 
   for (u8 idx = 0; idx < 16; idx++) {
     VRi(vd).bytes[idx] = VRi(vb).bytes[uimm];

@@ -95,7 +95,7 @@ namespace PPCInterpreter {
     return info; // default: empty pair
   }
 
-  std::string PPCInterpreter_getFullName(u32 instr) {
+  const std::string PPCInterpreter_getFullName(u32 instr) {
     if (instr == 0x60000000) {
       return "nop";
     }

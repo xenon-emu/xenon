@@ -4,14 +4,17 @@
 
 #include "PPCInterpreter.h"
 
+// Instruction Synchronize
 void PPCInterpreter::PPCInterpreter_isync(PPU_STATE *ppuState) {
   // Do nothing
 }
 
+// Enforce In-order Execution of I/O
 void PPCInterpreter::PPCInterpreter_eieio(PPU_STATE *ppuState) {
   // Do nothing
 }
 
+// System Call
 void PPCInterpreter::PPCInterpreter_sc(PPU_STATE *ppuState) {
   SC_FORM_LEV;
 
@@ -20,6 +23,7 @@ void PPCInterpreter::PPCInterpreter_sc(PPU_STATE *ppuState) {
   curThread.exceptHVSysCall = LEV & 1;
 }
 
+// SLB Move To Entry
 void PPCInterpreter::PPCInterpreter_slbmte(PPU_STATE *ppuState) {
   u64 VSID = QGET(GPRi(rs), 0, 51);
 
@@ -52,6 +56,7 @@ void PPCInterpreter::PPCInterpreter_slbmte(PPU_STATE *ppuState) {
   curThread.SLB[Index].esidReg = GPRi(rb);
 }
 
+// SLB Invalidate Entry
 void PPCInterpreter::PPCInterpreter_slbie(PPU_STATE *ppuState) {
   // ESID
   const u64 ESID = QGET(GPRi(rb), 0, 35);
@@ -70,27 +75,26 @@ void PPCInterpreter::PPCInterpreter_slbie(PPU_STATE *ppuState) {
   curThread.dERAT.invalidateAll();
 }
 
+// Return From Interrupt Doubleword
 void PPCInterpreter::PPCInterpreter_rfid(PPU_STATE *ppuState) {
-  u64 srr1, new_msr, diff_msr;
-  u32 b3, b, usr;
 
   // Compose new MSR as per specs
-  srr1 = curThread.SPR.SRR1;
-  new_msr = 0;
+  const u64 srr1 = curThread.SPR.SRR1;
+  u64 new_msr = 0;
 
-  usr = BGET(srr1, 64, 49);
+  const u32 usr = BGET(srr1, 64, 49);
   if (usr) {
     //(("WARNING!! Cannot really do Problem mode"));
     BSET(new_msr, 64, 49);
   }
 
   // MSR.0 = SRR1.0 | SRR1.1
-  b = BGET(srr1, 64, 0) || BGET(srr1, 64, 1);
+  const u32 b = BGET(srr1, 64, 0) || BGET(srr1, 64, 1);
   if (b) {
     BSET(new_msr, 64, 0);
   }
 
-  b3 = BGET(curThread.SPR.MSR.MSR_Hex, 64, 3);
+  const u32 b3 = BGET(curThread.SPR.MSR.MSR_Hex, 64, 3);
 
   // MSR.51 = (MSR.3 & SRR1.51) | ((~MSR.3) & MSR.51)
   if ((b3 && BGET(srr1, 64, 51)) || (!b3 && BGET(curThread.SPR.MSR.MSR_Hex, 64, 51))) {
@@ -123,7 +127,7 @@ void PPCInterpreter::PPCInterpreter_rfid(PPU_STATE *ppuState) {
 
   // See what changed and take actions
   // NB: we ignore a bunch of bits..
-  diff_msr = curThread.SPR.MSR.MSR_Hex ^ new_msr;
+  const u64 diff_msr = curThread.SPR.MSR.MSR_Hex ^ new_msr;
 
   // NB: we dont do half-modes
   if (diff_msr & QMASK(58, 59)) {
@@ -142,6 +146,7 @@ void PPCInterpreter::PPCInterpreter_rfid(PPU_STATE *ppuState) {
   curThread.exceptionTaken = false;
 }
 
+// Trap Word
 void PPCInterpreter::PPCInterpreter_tw(PPU_STATE *ppuState) {
   const sl32 a = static_cast<sl32>(GPRi(ra));
   const sl32 b = static_cast<sl32>(GPRi(rb));
@@ -155,9 +160,10 @@ void PPCInterpreter::PPCInterpreter_tw(PPU_STATE *ppuState) {
   }
 }
 
+// Trap Word Immediate
 void PPCInterpreter::PPCInterpreter_twi(PPU_STATE *ppuState) {
-  s64 sA = GPRi(ra), sB = _instr.simm16;
-  u64 a = sA, b = sB;
+  const s64 sA = GPRi(ra), sB = _instr.simm16;
+  const u64 a = sA, b = sB;
 
   if (((_instr.bo & 0x10) && sA < sB) ||
       ((_instr.bo & 0x8) && sA > sB) ||
@@ -168,9 +174,10 @@ void PPCInterpreter::PPCInterpreter_twi(PPU_STATE *ppuState) {
   }
 }
 
+// Trap Doubleword
 void PPCInterpreter::PPCInterpreter_td(PPU_STATE *ppuState) {
-  s64 sA = GPRi(ra), sB = GPRi(rb);
-  u64 a = sA, b = sB;
+  const s64 sA = GPRi(ra), sB = GPRi(rb);
+  const u64 a = sA, b = sB;
 
   if (((_instr.bo & 0x10) && sA < sB) ||
       ((_instr.bo & 0x8) && sA > sB) ||
@@ -181,9 +188,10 @@ void PPCInterpreter::PPCInterpreter_td(PPU_STATE *ppuState) {
   }
 }
 
+// Trap Doubleword Immediate
 void PPCInterpreter::PPCInterpreter_tdi(PPU_STATE *ppuState) {
-  s64 sA = GPRi(ra), sB = _instr.simm16;
-  u64 a = sA, b = sB;
+  const s64 sA = GPRi(ra), sB = _instr.simm16;
+  const u64 a = sA, b = sB;
 
   if (((_instr.bo & 0x10) && sA < sB) ||
       ((_instr.bo & 0x8) && sA > sB) ||
@@ -194,6 +202,7 @@ void PPCInterpreter::PPCInterpreter_tdi(PPU_STATE *ppuState) {
   }
 }
 
+// Move From Special Purpose Register
 void PPCInterpreter::PPCInterpreter_mfspr(PPU_STATE *ppuState) {
   u32 spr = _instr.spr;
   spr = ((spr & 0x1F) << 5) | ((spr >> 5) & 0x1F);
@@ -307,9 +316,11 @@ void PPCInterpreter::PPCInterpreter_mfspr(PPU_STATE *ppuState) {
   }
 }
 
+// Move To Special Purpose Register
 void PPCInterpreter::PPCInterpreter_mtspr(PPU_STATE *ppuState) {
   u32 spr = _instr.spr;
   spr = ((spr & 0x1F) << 5) | ((spr >> 5) & 0x1F);
+
   switch (spr) {
   case SPR_XER:
     curThread.SPR.XER.XER_Hex = static_cast<u32>(GPRi(rd));
@@ -432,10 +443,12 @@ void PPCInterpreter::PPCInterpreter_mtspr(PPU_STATE *ppuState) {
   }
 }
 
+// Move From Machine State Register
 void PPCInterpreter::PPCInterpreter_mfmsr(PPU_STATE *ppuState) {
   GPRi(rd) = curThread.SPR.MSR.MSR_Hex;
 }
 
+// Move To Machine State Register
 void PPCInterpreter::PPCInterpreter_mtmsr(PPU_STATE *ppuState) {
   curThread.SPR.MSR.MSR_Hex = GPRi(rs);
 
@@ -444,6 +457,7 @@ void PPCInterpreter::PPCInterpreter_mtmsr(PPU_STATE *ppuState) {
     curThread.NIA = static_cast<u32>(curThread.NIA);
 }
 
+// Move To Machine State Register Doubleword
 void PPCInterpreter::PPCInterpreter_mtmsrd(PPU_STATE *ppuState) {
   if (_instr.l15) {
     /*
@@ -464,7 +478,7 @@ void PPCInterpreter::PPCInterpreter_mtmsrd(PPU_STATE *ppuState) {
        Bits 1:2, 4:47, 49:50, 52:57, and 60:63 of register RS are placed into
        the corresponding bits of the MSR
     */
-    u64 regRS = GPRi(rs);
+    const u64 regRS = GPRi(rs);
     curThread.SPR.MSR.MSR_Hex = regRS;
 
     // MSR0 = (RS)0 | (RS)1
@@ -485,22 +499,27 @@ void PPCInterpreter::PPCInterpreter_mtmsrd(PPU_STATE *ppuState) {
     curThread.NIA = static_cast<u32>(curThread.NIA);
 }
 
+// Synchronize
 void PPCInterpreter::PPCInterpreter_sync(PPU_STATE *ppuState) {
   // Do nothing
 }
 
+// Data Cache Block Flush
 void PPCInterpreter::PPCInterpreter_dcbf(PPU_STATE *ppuState) {
   // Do nothing
 }
 
+// Data Cache Block Invalidate
 void PPCInterpreter::PPCInterpreter_dcbi(PPU_STATE *ppuState) {
   // Do nothing
 }
 
+// Data Cache Block Touch
 void PPCInterpreter::PPCInterpreter_dcbt(PPU_STATE *ppuState) {
   // Do nothing
 }
 
+// Data Cache Block Touch for Store
 void PPCInterpreter::PPCInterpreter_dcbtst(PPU_STATE *ppuState) {
   // Do nothing
 }

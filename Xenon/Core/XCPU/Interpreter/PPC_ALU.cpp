@@ -46,17 +46,17 @@ struct addResult {
 #ifdef ARCH_X86
 inline u64 umulh64(u64 x, u64 y) {
 #if defined(_MSC_VER) || defined(__MINGW32__)
-  u32 x_lo = static_cast<u32>(x);
-  u32 x_hi = static_cast<u32>(x >> 32);
-  u32 y_lo = static_cast<u32>(y);
-  u32 y_hi = static_cast<u32>(y >> 32);
+  const u32 x_lo = static_cast<u32>(x);
+  const u32 x_hi = static_cast<u32>(x >> 32);
+  const u32 y_lo = static_cast<u32>(y);
+  const u32 y_hi = static_cast<u32>(y >> 32);
 
-  u64 lo_lo = static_cast<u64>(x_lo) * y_lo;
-  u64 hi_lo = static_cast<u64>(x_hi) * y_lo;
-  u64 lo_hi = static_cast<u64>(x_lo) * y_hi;
-  u64 hi_hi = static_cast<u64>(x_hi) * y_hi;
+  const u64 lo_lo = static_cast<u64>(x_lo) * y_lo;
+  const u64 hi_lo = static_cast<u64>(x_hi) * y_lo;
+  const u64 lo_hi = static_cast<u64>(x_lo) * y_hi;
+  const u64 hi_hi = static_cast<u64>(x_hi) * y_hi;
 
-  u64 cross = (lo_lo >> 32) + (hi_lo & 0xFFFFFFFFull) + (lo_hi & 0xFFFFFFFFull);
+  const u64 cross = (lo_lo >> 32) + (hi_lo & 0xFFFFFFFFull) + (lo_hi & 0xFFFFFFFFull);
   return hi_hi + (hi_lo >> 32) + (lo_hi >> 32) + (cross >> 32);
 #else
   return static_cast<u64>((u128{ x } *u128{ y }) >> 64);
@@ -64,10 +64,10 @@ inline u64 umulh64(u64 x, u64 y) {
 }
 inline s64 mulh64(s64 x, s64 y) {
 #if defined(_MSC_VER) || defined(__MINGW32__)
-  bool negate = (x < 0) ^ (y < 0);
-  u64 ux = static_cast<u64>(x < 0 ? -x : x);
-  u64 uy = static_cast<u64>(y < 0 ? -y : y);
-  u64 high = umulh64(ux, uy);
+  const bool negate = (x < 0) ^ (y < 0);
+  const u64 ux = static_cast<u64>(x < 0 ? -x : x);
+  const u64 uy = static_cast<u64>(y < 0 ? -y : y);
+  const u64 high = umulh64(ux, uy);
   if (negate) {
     // Perform two's complement negation for high part.
     if (ux * uy == 0) return -static_cast<s64>(high);
@@ -119,7 +119,7 @@ u64 rotl64(u64 x, u64 n) {
 
 // Duplicates a u32 value left, used in rotate instructions that duplicate the
 // lower 32 bits
-inline u64 duplicate32(u32 x) { return x | static_cast<u64>(x) << 32; }
+inline constexpr u64 duplicate32(u32 x) { return x | static_cast<u64>(x) << 32; }
 
 // Set XER[OV] bit. Overflow enable
 inline void ppuSetXerOv(PPU_STATE *ppuState, bool inbit) {
@@ -300,7 +300,6 @@ void PPCInterpreter::PPCInterpreter_addis(PPU_STATE *ppuState) {
     else rD <- (rA) + EXTS(SIMM || (16)0)
   */
 
-
   GPRi(rd) = _instr.ra ? GPRi(ra) + (_instr.simm16 * 65536) : (_instr.simm16 * 65536);
 }
 
@@ -428,6 +427,7 @@ void PPCInterpreter::PPCInterpreter_andis(PPU_STATE *ppuState) {
   RECORD_CR0(GPRi(ra))
 }
 
+// Compare
 void PPCInterpreter::PPCInterpreter_cmp(PPU_STATE *ppuState) {
   if (_instr.l10) {
     ppuSetCR<s64>(ppuState, _instr.crfd, GPRi(ra), GPRi(rb));
@@ -437,6 +437,7 @@ void PPCInterpreter::PPCInterpreter_cmp(PPU_STATE *ppuState) {
   }
 }
 
+// Compare Immediate
 void PPCInterpreter::PPCInterpreter_cmpi(PPU_STATE *ppuState) {
   if (_instr.l10) {
     ppuSetCR<s64>(ppuState, _instr.crfd, GPRi(ra), _instr.simm16);
@@ -446,6 +447,7 @@ void PPCInterpreter::PPCInterpreter_cmpi(PPU_STATE *ppuState) {
   }
 }
 
+// Compare Logical
 void PPCInterpreter::PPCInterpreter_cmpl(PPU_STATE *ppuState) {
   if (_instr.l10) {
     ppuSetCR<u64>(ppuState, _instr.crfd, GPRi(ra), GPRi(rb));
@@ -455,6 +457,7 @@ void PPCInterpreter::PPCInterpreter_cmpl(PPU_STATE *ppuState) {
   }
 }
 
+// Compare Logical Immediate
 void PPCInterpreter::PPCInterpreter_cmpli(PPU_STATE *ppuState) {
   if (_instr.l10) {
     ppuSetCR<u64>(ppuState, _instr.crfd, GPRi(ra), _instr.uimm16);
@@ -500,6 +503,7 @@ void PPCInterpreter::PPCInterpreter_cntlzwx(PPU_STATE *ppuState) {
   }
 }
 
+// Condition Register AND
 void PPCInterpreter::PPCInterpreter_crand(PPU_STATE *ppuState) {
   XL_FORM_BT_BA_BB;
 
@@ -514,6 +518,7 @@ void PPCInterpreter::PPCInterpreter_crand(PPU_STATE *ppuState) {
     BCLR(curThread.CR.CR_Hex, 32, BT);
 }
 
+// Condition Register AND with Complement
 void PPCInterpreter::PPCInterpreter_crandc(PPU_STATE *ppuState) {
   XL_FORM_BT_BA_BB;
 
@@ -528,6 +533,7 @@ void PPCInterpreter::PPCInterpreter_crandc(PPU_STATE *ppuState) {
     BCLR(curThread.CR.CR_Hex, 32, BT);
 }
 
+// Condition Register Equivalent
 void PPCInterpreter::PPCInterpreter_creqv(PPU_STATE *ppuState) {
   XL_FORM_BT_BA_BB;
 
@@ -542,6 +548,7 @@ void PPCInterpreter::PPCInterpreter_creqv(PPU_STATE *ppuState) {
     BCLR(curThread.CR.CR_Hex, 32, BT);
 }
 
+// Condition Register NAND
 void PPCInterpreter::PPCInterpreter_crnand(PPU_STATE *ppuState) {
   XL_FORM_BT_BA_BB;
 
@@ -556,6 +563,7 @@ void PPCInterpreter::PPCInterpreter_crnand(PPU_STATE *ppuState) {
     BCLR(curThread.CR.CR_Hex, 32, BT);
 }
 
+// Condition Register NOR
 void PPCInterpreter::PPCInterpreter_crnor(PPU_STATE *ppuState) {
   XL_FORM_BT_BA_BB;
 
@@ -570,6 +578,7 @@ void PPCInterpreter::PPCInterpreter_crnor(PPU_STATE *ppuState) {
     BCLR(curThread.CR.CR_Hex, 32, BT);
 }
 
+// Condition Register OR
 void PPCInterpreter::PPCInterpreter_cror(PPU_STATE *ppuState) {
   XL_FORM_BT_BA_BB;
   const u32 a = CR_GET(BA);
@@ -583,6 +592,7 @@ void PPCInterpreter::PPCInterpreter_cror(PPU_STATE *ppuState) {
     BCLR(curThread.CR.CR_Hex, 32, BT);
 }
 
+// Condition Register OR with Complement
 void PPCInterpreter::PPCInterpreter_crorc(PPU_STATE *ppuState) {
   XL_FORM_BT_BA_BB;
 
@@ -597,6 +607,7 @@ void PPCInterpreter::PPCInterpreter_crorc(PPU_STATE *ppuState) {
     BCLR(curThread.CR.CR_Hex, 32, BT);
 }
 
+// Condition Register XOR
 void PPCInterpreter::PPCInterpreter_crxor(PPU_STATE *ppuState) {
   XL_FORM_BT_BA_BB;
 
@@ -721,8 +732,7 @@ void PPCInterpreter::PPCInterpreter_divwx(PPU_STATE *ppuState) {
 }
 
 // Divide Word + OE
-void PPCInterpreter::PPCInterpreter_divwox(PPU_STATE *ppuState)
-{
+void PPCInterpreter::PPCInterpreter_divwox(PPU_STATE *ppuState) {
   PPCInterpreter_divwx(ppuState);
 }
 
@@ -816,16 +826,17 @@ void PPCInterpreter::PPCInterpreter_extswx(PPU_STATE *ppuState) {
   }
 }
 
+// Move Condition Register Field
 void PPCInterpreter::PPCInterpreter_mcrf(PPU_STATE *ppuState) {
   /*
   * CR4 * BF + 32:4 * BF + 35 <- CR4 * crS + 32:4 * crS + 35
   * The contents of field crS (bits 4 * crS + 32-4 * crS + 35) of CR are copied to field 
   * crD (bits 4 * crD + 32-4 * crD + 35) of CR.
   */
-  u32 BF = _instr.crfd;
-  u32 BFA = _instr.crfs;
+  const u32 BF = _instr.crfd;
+  const u32 BFA = _instr.crfs;
 
-  u32 CR = DGET(curThread.CR.CR_Hex, (BFA) * 4, (BFA) * 4 + 3);
+  const u32 CR = DGET(curThread.CR.CR_Hex, (BFA) * 4, (BFA) * 4 + 3);
 
   ppcUpdateCR(ppuState, BF, CR);
 }
@@ -862,6 +873,7 @@ void PPCInterpreter::PPCInterpreter_mftb(PPU_STATE *ppuState) {
   }
 }
 
+// Move From One Condition Register Field
 void PPCInterpreter::PPCInterpreter_mfocrf(PPU_STATE *ppuState) {
   if (_instr.l11) {
     // MFOCRF
@@ -890,6 +902,7 @@ void PPCInterpreter::PPCInterpreter_mfocrf(PPU_STATE *ppuState) {
   }
 }
 
+// Move To One Condition Register Field
 void PPCInterpreter::PPCInterpreter_mtocrf(PPU_STATE *ppuState) {
   // MTOCRF
   u32 crMask = 0;
@@ -944,7 +957,7 @@ void PPCInterpreter::PPCInterpreter_mulldox(PPU_STATE *ppuState) {
 
   // _oe
   if (_instr.oe) [[unlikely]] {
-    u64 high = mulh64(RA, RB);
+    const u64 high = mulh64(RA, RB);
     ppuSetXerOv(ppuState, high != static_cast<s64>(GPRi(rd)) >> 63);
   }
 
@@ -972,6 +985,7 @@ void PPCInterpreter::PPCInterpreter_mullwx(PPU_STATE *ppuState) {
     RECORD_CR0(GPRi(rd));
   }
 }
+
 // Multiply Low Word + OE
 void PPCInterpreter::PPCInterpreter_mullwox(PPU_STATE *ppuState) {
   PPCInterpreter_mullwx(ppuState);
@@ -985,8 +999,8 @@ void PPCInterpreter::PPCInterpreter_mulhwx(PPU_STATE *ppuState) {
     rD[0-31] <- undefined
   */
 
-  s32 a = static_cast<s32>(GPRi(ra));
-  s32 b = static_cast<s32>(GPRi(rb));
+  const s32 a = static_cast<s32>(GPRi(ra));
+  const s32 b = static_cast<s32>(GPRi(rb));
   GPRi(rd) = (s64{ a } *b) >> 32;
 
   // _rc
@@ -1003,8 +1017,8 @@ void PPCInterpreter::PPCInterpreter_mulhwux(PPU_STATE *ppuState) {
     rD[0-31] <- undefined
   */
 
-  u32 a = static_cast<u32>(GPRi(ra));
-  u32 b = static_cast<u32>(GPRi(rb));
+  const u32 a = static_cast<u32>(GPRi(ra));
+  const u32 b = static_cast<u32>(GPRi(rb));
   GPRi(rd) = (u64{ a } *b) >> 32;
 
   // _rc
@@ -1014,8 +1028,7 @@ void PPCInterpreter::PPCInterpreter_mulhwux(PPU_STATE *ppuState) {
 }
 
 // Multiply High Double Word (x'7C00 0092')
-void PPCInterpreter::PPCInterpreter_mulhdx(PPU_STATE *ppuState)
-{
+void PPCInterpreter::PPCInterpreter_mulhdx(PPU_STATE *ppuState) {
   /*
     prod[0-127] <- (rA) * (rB)
     rD <- prod[0-63]
@@ -1362,8 +1375,8 @@ void PPCInterpreter::PPCInterpreter_sradx(PPU_STATE *ppuState) {
     XER[CA] <- S & ((r & ~ m) | 0)
   */
 
-  s64 RS = GPRi(rs);
-  u8 shift = GPRi(rb) & 127;
+  const s64 RS = GPRi(rs);
+  const u8 shift = GPRi(rb) & 127;
   if (shift > 63)
   {
     GPRi(ra) = 0 - (RS < 0);
@@ -1392,8 +1405,8 @@ void PPCInterpreter::PPCInterpreter_sradix(PPU_STATE *ppuState) {
     XER[CA] <- S & ((r & ~m) != 0)
   */
 
-  auto sh = _instr.sh64;
-  s64 RS = GPRi(rs);
+  const auto sh = _instr.sh64;
+  const s64 RS = GPRi(rs);
   GPRi(ra) = RS >> sh;
   XER_SET_CA((RS < 0) && ((GPRi(ra) << sh) != static_cast<u64>(RS)));
 
@@ -1416,8 +1429,8 @@ void PPCInterpreter::PPCInterpreter_srawx(PPU_STATE *ppuState) {
     XER[CA] <- S & (r & ~m[32-63] != 0
   */
 
-  s32 RS = static_cast<s32>(GPRi(rs));
-  u8 shift = GPRi(rb) & 63;
+  const s32 RS = static_cast<s32>(GPRi(rs));
+  const u8 shift = GPRi(rb) & 63;
   if (shift > 31) {
     GPRi(ra) = 0 - (RS < 0);
     XER_SET_CA((RS < 0));
@@ -1444,7 +1457,7 @@ void PPCInterpreter::PPCInterpreter_srawix(PPU_STATE *ppuState) {
     XER[CA] <- S & ((r & ~m)[32-63] != 0)
   */
 
-  s32 RS = static_cast<u32>(GPRi(rs));
+  const s32 RS = static_cast<u32>(GPRi(rs));
   GPRi(ra) = RS >> _instr.sh32;
   XER_SET_CA((RS < 0) && (static_cast<u32>(GPRi(ra) << _instr.sh32)
     != static_cast<u32>(RS)));

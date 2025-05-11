@@ -129,7 +129,7 @@ u32 CRCompU(PPU_STATE *ppuState, u64 num1, u64 num2);
 u32 CRCompS32(PPU_STATE *ppuState, u32 num1, u32 num2);
 // Compare Signed 64 bits
 u32 CRCompS64(PPU_STATE *ppuState, u64 num1, u64 num2);
-// Compare Unsigned
+// Compare Signed
 u32 CRCompS(PPU_STATE *ppuState, u64 num1, u64 num2);
 
 // Single instruction execution

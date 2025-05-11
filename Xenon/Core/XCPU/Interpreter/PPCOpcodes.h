@@ -216,7 +216,9 @@ D_STUB(vsubshs)
 D_STUB(vsubsws)
 D_STUB(vsumsws)
 
+//
 // ALU
+//
 extern void PPCInterpreter_addx(PPU_STATE *ppuState);
 extern void PPCInterpreter_addox(PPU_STATE *ppuState);
 extern void PPCInterpreter_addcx(PPU_STATE *ppuState);
@@ -513,7 +515,6 @@ extern void PPCInterpreter_lfdu(PPU_STATE *ppuState);
 extern void PPCInterpreter_lfdux(PPU_STATE *ppuState);
 extern void PPCInterpreter_lfs(PPU_STATE *ppuState);
 extern void PPCInterpreter_lfsu(PPU_STATE *ppuState);
-
 
 // Load Vector
 extern void PPCInterpreter_lvx128(PPU_STATE *ppuState);

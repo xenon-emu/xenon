@@ -112,9 +112,9 @@ static constexpr u64 ExtractBits64(u32 input, u32 begin, u32 end) {
   (dw) |= ((dwSet) << (31 - (e))) & DMASK(b, e);
 
 #define IFIELD(v, b, e)                                                        \
-  u32 v = DGET(_instr.opcode, b, e);
+  const u32 v = DGET(_instr.opcode, b, e);
 #define IFIELDQ(v, b, e)                                                       \
-  u64 v = DGET(_instr.opcode, b, e);
+  const u64 v = DGET(_instr.opcode, b, e);
 
 #define I_FORM_LI_AA_LK                                                        \
   IFIELD(LI, 6, 29);                                                           \
@@ -269,7 +269,7 @@ static constexpr u64 ExtractBits64(u32 input, u32 begin, u32 end) {
   IFIELD(b, 11, 20);
 #define XFX_FORM_rD_spr                                                        \
   XFX_FORM(rD, spr_1);                                                         \
-  u32 spr = (spr_1 >> 5) | ((spr_1 << 5) & 0x3FF);
+  const u32 spr = (spr_1 >> 5) | ((spr_1 << 5) & 0x3FF);
 #define XFX_FORM_rD IFIELD(rD, 6, 10);
 #define XFX_FORM_rD_FXM_XO                                                     \
   IFIELD(rD, 6, 10);                                                           \
@@ -280,7 +280,7 @@ static constexpr u64 ExtractBits64(u32 input, u32 begin, u32 end) {
   IFIELD(FXM, 12, 19);
 #define XFX_FORM_rS_spr_XO                                                     \
   XFX_FORM(rS, spr_1);                                                         \
-  u32 spr = (spr_1 >> 5) | ((spr_1 << 5) & 0x3FF);
+  const u32 spr = (spr_1 >> 5) | ((spr_1 << 5) & 0x3FF);
 
 #define XFL_FORM_FLM_FrB_RC                                                    \
   IFIELD(FLM, 7, 14);                                                          \
@@ -294,7 +294,7 @@ static constexpr u64 ExtractBits64(u32 input, u32 begin, u32 end) {
   IFIELD(XO, 21, 29);                                                          \
   IFIELD(sh_2, 30, 30);                                                        \
   IFIELD(RC, 31, 31);                                                          \
-  u32 sh = (sh_2 << 5) | sh_1;
+  const u32 sh = (sh_2 << 5) | sh_1;
 
 #define XO_FORM_rD_rA_rB_RC                                                    \
   IFIELD(rD, 6, 10);                                                           \
@@ -358,8 +358,8 @@ static constexpr u64 ExtractBits64(u32 input, u32 begin, u32 end) {
   IFIELD(mb_2, 26, 26);                                                        \
   IFIELD(sh_2, 30, 30);                                                        \
   IFIELD(RC, 31, 31);                                                          \
-  u32 sh = (sh_2 << 5) | sh_1;                                                 \
-  u32 mb = (mb_2 << 5) | mb_1;
+  const u32 sh = (sh_2 << 5) | sh_1;                                           \
+  const u32 mb = (mb_2 << 5) | mb_1;
 #define MD_FORM_rS_rA_sh_me_RC                                                 \
   IFIELD(rS, 6, 10);                                                           \
   IFIELD(rA, 11, 15);                                                          \
@@ -368,8 +368,8 @@ static constexpr u64 ExtractBits64(u32 input, u32 begin, u32 end) {
   IFIELD(me_2, 26, 26);                                                        \
   IFIELD(sh_2, 30, 30);                                                        \
   IFIELD(RC, 31, 31);                                                          \
-  u32 sh = (sh_2 << 5) | sh_1;                                                 \
-  u32 me = (me_2 << 5) | me_1;
+  const u32 sh = (sh_2 << 5) | sh_1;                                           \
+  const u32 me = (me_2 << 5) | me_1;
 
 #define MDS_FORM_rS_rA_rB_mb_RC                                                \
   IFIELD(rS, 6, 10);                                                           \
@@ -378,7 +378,7 @@ static constexpr u64 ExtractBits64(u32 input, u32 begin, u32 end) {
   IFIELD(mb_1, 21, 25);                                                        \
   IFIELD(mb_2, 26, 26);                                                        \
   IFIELD(RC, 31, 31);                                                          \
-  u32 mb = (mb_2 << 5) | mb_1;
+  const u32 mb = (mb_2 << 5) | mb_1;
 #define MDS_FORM_rS_rA_rB_me_RC                                                \
   IFIELD(rS, 6, 10);                                                           \
   IFIELD(rA, 11, 15);                                                          \
@@ -386,7 +386,7 @@ static constexpr u64 ExtractBits64(u32 input, u32 begin, u32 end) {
   IFIELD(me_1, 21, 25);                                                        \
   IFIELD(me_2, 26, 26);                                                        \
   IFIELD(RC, 31, 31);                                                          \
-  u32 me = (me_2 << 5) | me_1;
+  const u32 me = (me_2 << 5) | me_1;
 
 #define VX_FORM(a, b, c)                                                       \
   IFIELD(a, 6, 10);                                                            \

@@ -53,10 +53,10 @@ void PPCInterpreter::PPCInterpreter_mcrfs(PPU_STATE *ppuState) {
   */
   CHECK_FPU;
 
-  u32 BF = _instr.crfd;
-  u32 BFA = _instr.crfs;
+  const u32 BF = _instr.crfd;
+  const u32 BFA = _instr.crfs;
 
-  u32 CR = DGET(curThread.CR.CR_Hex, (BFA) * 4, (BFA) * 4 + 3);
+  const u32 CR = DGET(curThread.CR.CR_Hex, (BFA) * 4, (BFA) * 4 + 3);
 
   ppuSetCR(ppuState, CR, curThread.FPSCR.FG, curThread.FPSCR.FL, curThread.FPSCR.FE, curThread.FPSCR.FU);
 }
@@ -157,7 +157,7 @@ void PPCInterpreter::PPCInterpreter_fctidzx(PPU_STATE *ppuState) {
   FPRi(frd).valueAsDouble = std::bit_cast<f64>(_mm_cvtsi128_si64(res));
 #elif defined(ARCH_X86)
   const f64 input = FPRi(frb).valueAsDouble;
-  s64 tmp = static_cast<s64>(FPRi(frb).valueAsDouble); // truncates just like _mm_cvttsd_si64
+  const s64 tmp = static_cast<s64>(FPRi(frb).valueAsDouble); // truncates just like _mm_cvttsd_si64
   const __m128i xor_mask = _mm_castpd_si128(_mm_cmpge_pd(_mm_set_sd(input), _mm_set1_pd(f64(1ull << 63))));
   const __m128i res = _mm_xor_si128(_mm_set_epi64x(0, tmp), xor_mask);
   s64 result = 0;
@@ -464,6 +464,7 @@ void PPCInterpreter::PPCInterpreter_mffsx(PPU_STATE *ppuState) {
   }
 }
 
+// Move To FPSCR Fields
 void PPCInterpreter::PPCInterpreter_mtfsfx(PPU_STATE *ppuState) {
   CHECK_FPU;
 
