@@ -4,6 +4,8 @@
 
 #include "Render/Abstractions/Factory/ShaderFactory.h"
 
+#include "Base/Logging/Log.h"
+
 namespace Render {
 
 class DummyShaderFactory : public ShaderFactory {

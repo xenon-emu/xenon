@@ -4,6 +4,8 @@
 
 #include "Render/GUI/GUI.h"
 
+#include "Base/Logging/Log.h"
+
 namespace Render {
 
 class DummyGUI : public GUI {

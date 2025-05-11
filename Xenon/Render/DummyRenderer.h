@@ -4,6 +4,8 @@
 
 #include "Abstractions/Renderer.h"
 
+#include "Base/Logging/Log.h"
+
 namespace Render {
 
 class DummyRenderer : public Renderer {

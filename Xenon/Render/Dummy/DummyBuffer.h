@@ -2,8 +2,10 @@
 
 #pragma once
 
-#include "Base/Types.h"
 #include "Render/Abstractions/Buffer.h"
+
+#include "Base/Types.h"
+#include "Base/Logging/Log.h"
 
 namespace Render {
 

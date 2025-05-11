@@ -2,10 +2,18 @@
 
 #include "Dummy.h"
 
-void Render::DummyGUI::InitBackend(void *context) {}
+void Render::DummyGUI::InitBackend(void *context) {
+  LOG_INFO(Render, "DummyGUI::InitBackend");
+}
 
-void Render::DummyGUI::ShutdownBackend() {}
+void Render::DummyGUI::ShutdownBackend() {
+  LOG_INFO(Render, "DummyGUI::ShutdownBackend");
+}
 
-void Render::DummyGUI::BeginSwap() {}
+void Render::DummyGUI::BeginSwap() {
+  LOG_INFO(Render, "DummyGUI::BeginSwap");
+}
 
-void Render::DummyGUI::EndSwap() {}
+void Render::DummyGUI::EndSwap() {
+  LOG_INFO(Render, "DummyGUI::EndSwap");
+}
