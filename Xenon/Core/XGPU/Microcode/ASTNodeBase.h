@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <memory>
 #include <sstream>
 
 #include "Base/Types.h"

@@ -35,9 +35,8 @@ s32 WriteExportRegister::GetExportSemanticIndex(const eExportReg reg) {
   case eExportReg::INTERP5: return 11;
   case eExportReg::INTERP6: return 12;
   case eExportReg::INTERP7: return 13;
+  default: return 100;
   }
-
-  return 100;
 }
 
 s32 WriteExportRegister::GetExportInterpolatorIndex(const eExportReg reg) {
@@ -50,9 +49,8 @@ s32 WriteExportRegister::GetExportInterpolatorIndex(const eExportReg reg) {
   case eExportReg::INTERP5: return 5;
   case eExportReg::INTERP6: return 6;
   case eExportReg::INTERP7: return 7;
+  default: return -1;
   }
-
-  return -1;
 }
 
 Chunk BoolConstant::EmitShaderCode(ShaderCodeWriterBase &writer) {
