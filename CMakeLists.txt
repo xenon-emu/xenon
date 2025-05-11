@@ -255,6 +255,8 @@ if (GFX_ENABLED)
     Xenon/Render/Dummy/DummyTexture.h
     Xenon/Render/Dummy/DummyBuffer.cpp
     Xenon/Render/Dummy/DummyBuffer.h
+    Xenon/Render/Dummy/DummyShader.cpp
+    Xenon/Render/Dummy/DummyShader.h
     Xenon/Render/DummyRenderer.h
     Xenon/Render/DummyRenderer.cpp
   )
