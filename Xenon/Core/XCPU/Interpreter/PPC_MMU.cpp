@@ -519,12 +519,26 @@ bool PPCInterpreter::mmuSearchTlbEntry(PPU_STATE *ppuState, u64 *RPN, u64 VA, u8
   bool tlbSoftwareManaged = ((ppuState->SPR.LPCR & 0x400) >> 10);
 
   if (tlbSoftwareManaged) {
-  u8 currentTlbSet = tlbSet;
+    u64 tlbIndexHint =
+      curThread.SPR.PPE_TLB_Index_Hint;
+    u8 currentTlbSet = tlbIndexHint & 0xF;
+    u8 currentTlbIndex = static_cast<u8>(tlbIndexHint & 0xFF0) >> 4;
+    currentTlbSet = tlbSet;
+    if (currentTlbIndex == 0xFF) {
+      if (currentTlbSet == 8) {
+        currentTlbSet = 1;
+      }
+      else {
+        currentTlbSet = currentTlbSet << 1;
+      }
+    }
 
-  if (currentTlbSet == 0)
-    currentTlbSet = 1;
+    if (currentTlbSet == 0)
+      currentTlbSet = 1;
 
-  curThread.SPR.PPE_TLB_Index_Hint = currentTlbSet;
+    tlbIndex = tlbIndex << 4;
+    tlbIndexHint = tlbIndex |= currentTlbSet;
+    curThread.SPR.PPE_TLB_Index_Hint = tlbIndexHint;
   }
   return false;
 }
