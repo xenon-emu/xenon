@@ -144,7 +144,11 @@ jobs:
 
       - name: Install Dependencies (macOS)
         run: |
-          brew install ninja
+          brew install ninja llvm
+
+      - name: Use Homebrew clang
+        run: |
+          export PATH="/opt/homebrew/opt/llvm/bin:$PATH"
 
       - name: Cache CMake Configuration
         uses: actions/cache@main
