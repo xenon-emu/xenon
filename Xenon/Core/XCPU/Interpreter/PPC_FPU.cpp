@@ -1,6 +1,10 @@
 // Copyright 2025 Xenon Emulator Project
 
+#include <emmintrin.h>
+#include <intrin.h>
+
 #include "Base/Arch.h"
+#include "Base/Types.h"
 #include "Base/Logging/Log.h"
 #include "PPCInterpreter.h"
 
@@ -132,10 +136,18 @@ void PPCInterpreter::PPCInterpreter_fctidx(PPU_STATE* ppuState) {
 
   CHECK_FPU;
 
-#if defined(ARCH_X86) || defined(ARCH_X86_64)
+#if defined(ARCH_X86_64)
   const auto val = _mm_set_sd(FPRi(frb).valueAsDouble);
   const auto res = _mm_xor_si128(_mm_set1_epi64x(_mm_cvtsd_si64(val)), _mm_castpd_si128(_mm_cmpge_pd(val, _mm_set1_pd(f64(1ull << 63)))));
   FPRi(frd).valueAsDouble = std::bit_cast<f64>(_mm_cvtsi128_si64(res));
+#elif defined(ARCH_X86)
+  const f64 val = FPRi(frb).valueAsDouble;
+  const s64 intVal = static_cast<s64>(val);
+  const f64 threshold = static_cast<f64>(1ull << 63);
+  const bool flip = val >= threshold;
+
+  s64 flippedVal = flip ? intVal ^ (1ull << 63) : intVal;
+  FPRi(frd).valueAsDouble = std::bit_cast<f64>(flippedVal);
 #else
   LOG_ERROR(Xenon, "fctiwzx: Unsupported ARCH.");
 #endif
@@ -156,15 +168,13 @@ void PPCInterpreter::PPCInterpreter_fctidzx(PPU_STATE *ppuState) {
   const auto res = _mm_xor_si128(_mm_set1_epi64x(_mm_cvttsd_si64(val)), _mm_castpd_si128(_mm_cmpge_pd(val, _mm_set1_pd(f64(1ull << 63)))));
   FPRi(frd).valueAsDouble = std::bit_cast<f64>(_mm_cvtsi128_si64(res));
 #elif defined(ARCH_X86)
-  const f64 input = FPRi(frb).valueAsDouble;
-  const s64 tmp = static_cast<s64>(FPRi(frb).valueAsDouble); // truncates just like _mm_cvttsd_si64
-  const __m128i xor_mask = _mm_castpd_si128(_mm_cmpge_pd(_mm_set_sd(input), _mm_set1_pd(f64(1ull << 63))));
-  const __m128i res = _mm_xor_si128(_mm_set_epi64x(0, tmp), xor_mask);
-  s64 result = 0;
-  memcpy(&result, &res, sizeof(result));
-  FPRi(frd).valueAsDouble = std::bit_cast<f64>(result);
-#else
-  LOG_ERROR(Xenon, "fctidzx: Unsupported ARCH.");
+  const f64 val = FPRi(frb).valueAsDouble;
+  const s64 intVal = static_cast<s64>(val); // truncates toward zero
+  const f64 threshold = static_cast<f64>(1ull << 63);
+  const bool flip = val >= threshold;
+
+  s64 flippedVal = flip ? intVal ^ (1ull << 63) : intVal;
+  FPRi(frd).valueAsDouble = std::bit_cast<f64>(flippedVal);
 #endif
 
   // TODO:
@@ -178,10 +188,17 @@ void PPCInterpreter::PPCInterpreter_fctiwzx(PPU_STATE *ppuState) {
 
   CHECK_FPU;
 
-#if defined(ARCH_X86) || defined(ARCH_X86_64)
+#if defined(ARCH_X86_64)
   const auto val = _mm_set_sd(FPRi(frb).valueAsDouble);
   const auto res = _mm_xor_si128(_mm_cvttpd_epi32(val), _mm_castpd_si128(_mm_cmpge_pd(val, _mm_set1_pd(0x80000000))));
   FPRi(frd).valueAsDouble = std::bit_cast<f64, s64>(_mm_cvtsi128_si32(res));
+#elif defined(ARCH_X86)
+  const f64 val = FPRi(frb).valueAsDouble;
+  const s32 intVal = static_cast<s32>(val);
+  const bool flip = val >= static_cast<f64>(0x80000000);
+
+  s32 flippedVal = flip ? intVal ^ 0x80000000 : intVal;
+  FPRi(frd).valueAsDouble = std::bit_cast<f64>(static_cast<s64>(flippedVal));
 #else
   LOG_ERROR(Xenon, "fctiwzx: Unsupported ARCH.");
 #endif
