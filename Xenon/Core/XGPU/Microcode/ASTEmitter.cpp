@@ -5,27 +5,27 @@
 namespace Xe::Microcode::AST {
 
 Chunk ShaderCodeWriterSirit::GetExportDest(const eExportReg reg) {
-
+  return {};
 }
 
 Chunk ShaderCodeWriterSirit::GetReg(u32 regIndex) {
-
+  return {};
 }
 
 Chunk ShaderCodeWriterSirit::GetBoolVal(const u32 boolRegIndex) {
-
+  return {};
 }
 
 Chunk ShaderCodeWriterSirit::GetFloatVal(const u32 floatRegIndex) {
-
+  return {};
 }
 
 Chunk ShaderCodeWriterSirit::GetFloatValRelative(const u32 floatRegOffset) {
-
+  return {};
 }
 
 Chunk ShaderCodeWriterSirit::GetPredicate() {
-
+  return {};
 }
 
 Chunk ShaderCodeWriterSirit::Abs(ExpressionNode *value) {
@@ -98,43 +98,43 @@ Chunk ShaderCodeWriterSirit::FetchTexture(const Chunk &src, const TextureFetch &
   } break;
   }
 
-  return Chunk();
+  return {};
 }
 
 Chunk ShaderCodeWriterSirit::FetchVertex(const Chunk &src, const VertexFetch &instr) {
-
+  return {};
 }
 
 Chunk ShaderCodeWriterSirit::VectorFunc1(instr_vector_opc_t instr, ExpressionNode *arg1) {
-
+  return {};
 }
 
 Chunk ShaderCodeWriterSirit::VectorFunc2(instr_vector_opc_t instr, ExpressionNode *arg1, ExpressionNode *arg2) {
-
+  return {};
 }
 
 Chunk ShaderCodeWriterSirit::VectorFunc3(instr_vector_opc_t instr, ExpressionNode *arg1, ExpressionNode *arg2, ExpressionNode *arg3) {
-
+  return {};
 }
 
 Chunk ShaderCodeWriterSirit::ScalarFunc1(instr_scalar_opc_t instr, ExpressionNode *arg1) {
-
+  return {};
 }
 
 Chunk ShaderCodeWriterSirit::ScalarFunc2(instr_scalar_opc_t instr, ExpressionNode *arg1, ExpressionNode *arg2) {
-
+  return {};
 }
 
 Chunk ShaderCodeWriterSirit::AllocLocalVector(const Chunk &initCode) {
-
+  return {};
 }
 
 Chunk ShaderCodeWriterSirit::AllocLocalScalar(const Chunk &initCode) {
-
+  return {};
 }
 
 Chunk ShaderCodeWriterSirit::AllocLocalBool(const Chunk &initCode) {
-
+  return {};
 }
 
 void ShaderCodeWriterSirit::BeingCondition(const Chunk &condition) {
