@@ -14,6 +14,7 @@ env:
 
 jobs:
   get-info:
+    name: Info
     runs-on: ubuntu-24.04
     outputs:
       shorthash: ${{steps.vars.outputs.shorthash}}
@@ -79,13 +80,18 @@ jobs:
         mkdir -p artifact
         cp -r ${{env.BUILD_DIR}}/Xenon artifact/xenon-clang-x64-${{env.BUILD_TYPE}}
         mkdir -p artifacts/fonts/
-        cp -r ${{github.workspace}}/Deps/fonts/* artifact/fonts/*
+        cp -r ${{github.workspace}}/Deps/fonts/ artifact/fonts/
 
     - name: Upload Linux Clang Artifact
       uses: actions/upload-artifact@main
       with:
         name: Xenon-linux-clang-x64-${{env.BUILD_TYPE}}-${{ needs.get-info.outputs.commit }}-${{needs.get-info.outputs.shorthash}}
         path: artifact/
+
+    - name: Summary
+      run: |
+        echo '### CCache Statistics' >> "$GITHUB_STEP_SUMMARY"
+        ccache --print-stats --format='- **%n**: %v' >> "$GITHUB_STEP_SUMMARY"
 
   Linux-GCC:
     name: Linux (GCC)
@@ -136,13 +142,18 @@ jobs:
         mkdir -p artifact
         cp -r ${{env.BUILD_DIR}}/Xenon artifact/xenon-gcc-x64-${{env.BUILD_TYPE}}
         mkdir -p artifacts/fonts/
-        cp -r ${{github.workspace}}/Deps/fonts/* artifact/fonts/*
+        cp -r ${{github.workspace}}/Deps/fonts/ artifact/fonts/
 
     - name: Upload Linux GCC Artifact
       uses: actions/upload-artifact@main
       with:
         name: Xenon-linux-gcc-x64-${{env.BUILD_TYPE}}-${{ needs.get-info.outputs.commit }}-${{needs.get-info.outputs.shorthash}}
         path: artifact/
+
+    - name: Summary
+      run: |
+        echo '### CCache Statistics' >> "$GITHUB_STEP_SUMMARY"
+        ccache --print-stats --format='- **%n**: %v' >> "$GITHUB_STEP_SUMMARY"
 
 
   Windows-Clang:
@@ -186,13 +197,18 @@ jobs:
         mkdir -p artifact
         cp -r ${{env.BUILD_DIR}}/Xenon.exe artifact/xenon-clang-x64-${{env.BUILD_TYPE}}.exe
         mkdir -p artifacts/fonts/
-        cp -r ${{github.workspace}}/Deps/fonts/* artifact/fonts/*
+        cp -r ${{github.workspace}}/Deps/fonts/ artifact/fonts/
 
     - name: Upload Windows Clang Artifact
       uses: actions/upload-artifact@main
       with:
         name: Xenon-win64-clang-${{env.BUILD_TYPE}}-${{ needs.get-info.outputs.commit }}-${{needs.get-info.outputs.shorthash}}
         path: artifact/
+
+    - name: Summary
+      run: |
+        echo '### CCache Statistics' >> "$GITHUB_STEP_SUMMARY"
+        ccache --print-stats --format='- **%n**: %v' >> "$GITHUB_STEP_SUMMARY"
 
   Windows-GCC:
     name: Windows (GCC via MSYS2)
@@ -250,13 +266,18 @@ jobs:
         mkdir -p artifact
         cp -r ${{env.BUILD_DIR}}/Xenon.exe artifact/xenon-gcc-x64-${{env.BUILD_TYPE}}.exe
         mkdir -p artifacts/fonts/
-        cp -r ${{github.workspace}}/Deps/fonts/* artifact/fonts/*
+        cp -r ${{github.workspace}}/Deps/fonts/ artifact/fonts/
 
     - name: Upload Windows-GCC Artifact
       uses: actions/upload-artifact@main
       with:
         name: Xenon-win64-gcc-${{env.BUILD_TYPE}}-${{needs.get-info.outputs.commit}}-${{needs.get-info.outputs.shorthash}}
         path: artifact/
+
+    - name: Summary
+      run: |
+        echo '### CCache Statistics' >> "$GITHUB_STEP_SUMMARY"
+        ccache --print-stats --format='- **%n**: %v' >> "$GITHUB_STEP_SUMMARY"
 
   linux_nix:
     name: Linux (nix)
@@ -318,10 +339,15 @@ jobs:
           mkdir -p artifact
           cp -r ${{env.BUILD_DIR}}/Xenon artifact/xenon-clang-arm64-${{env.BUILD_TYPE}}
           mkdir -p artifacts/fonts/
-          cp -r ${{github.workspace}}/Deps/fonts/* artifact/fonts/*
+          cp -r ${{github.workspace}}/Deps/fonts/ artifact/fonts/
 
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@main
         with:
           name: Xenon-macos64-${{ needs.get-info.outputs.commit }}-${{needs.get-info.outputs.shorthash}}
           path: artifact/
+
+      - name: Summary
+        run: |
+          echo '### CCache Statistics' >> "$GITHUB_STEP_SUMMARY"
+          ccache --print-stats --format='- **%n**: %v' >> "$GITHUB_STEP_SUMMARY"
