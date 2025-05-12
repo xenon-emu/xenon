@@ -26,7 +26,7 @@ let
       owner = "Vali0004";
       repo = "sirit";
       rev = "3cc6944ebb08f95aec8c9686773e49b593f430cd";
-      hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+      hash = "sha256-cBARv9H7qb+Ugl9wqmEbt4CbCYIu/H4nAQJSWj6upG8=";
     }
     else {};
   microprofile = fetchFromGitHub {
