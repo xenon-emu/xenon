@@ -62,9 +62,9 @@ jobs:
       uses: actions/cache@main
       with:
         path: ~/.ccache
-        key: Linux-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
         restore-keys: |
-          Linux-ccache-
+          ${{ runner.os }}-ccache-
 
     - name: Configure CMake (Clang)
       run: cmake -G Ninja -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
@@ -114,9 +114,9 @@ jobs:
       uses: actions/cache@main
       with:
         path: ~/.ccache
-        key: Linux-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
         restore-keys: |
-          Linux-ccache-
+          ${{ runner.os }}-ccache-
 
     - name: Configure CMake (GCC)
       run: cmake -G Ninja -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
@@ -159,9 +159,9 @@ jobs:
       uses: actions/cache@main
       with:
         path: ~/.ccache
-        key: Linux-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
         restore-keys: |
-          Linux-ccache-
+          ${{ runner.os }}-ccache-
 
     - name: Configure CMake (Clang)
       run: cmake -G Ninja -B "${{ env.BUILD_DIR }}" -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
@@ -218,9 +218,9 @@ jobs:
       uses: actions/cache@main
       with:
         path: ~/.ccache
-        key: Linux-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
         restore-keys: |
-          Linux-ccache-
+          ${{ runner.os }}-ccache-
 
     - name: Configure CMake (GCC)
       run: cmake -G Ninja -B "${{ env.BUILD_DIR }}" -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
