@@ -40,6 +40,10 @@ void DummyRenderer::BackendResize(s32 x, s32 y) {
   LOG_INFO(Render, "DummyRenderer::BackendResize: {}, {}", x, y);
 }
 
+void DummyRenderer::UpdateScissor(s32 x, s32 y, u32 width, u32 height) {
+  LOG_INFO(Render, "DummyRenderer::UpdateScissor: {}, {}, {}, {}", x, y, width, height);
+}
+
 void DummyRenderer::UpdateViewport(s32 x, s32 y, u32 width, u32 height) {
   LOG_INFO(Render, "DummyRenderer::UpdateViewport: {}, {}, {}, {}", x, y, width, height);
 }

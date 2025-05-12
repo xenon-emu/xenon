@@ -104,6 +104,10 @@ void OGLRenderer::BackendResize(s32 x, s32 y) {
   glViewport(0, 0, x, y);
 }
 
+void OGLRenderer::UpdateScissor(s32 x, s32 y, u32 width, u32 height) {
+  glScissor(x, y, width, height);
+}
+
 void OGLRenderer::UpdateViewport(s32 x, s32 y, u32 width, u32 height) {
   glViewport(x, y, width, height);
 }
