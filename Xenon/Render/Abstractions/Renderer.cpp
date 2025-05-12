@@ -105,7 +105,7 @@ void Renderer::Resize(s32 x, s32 y) {
 
 void Renderer::HandleEvents() {
   const SDL_WindowFlags flag = SDL_GetWindowFlags(Xe_Main->mainWindow);
-  if (!Config::rendering.pauseOnFocusLoss) {
+  if (Config::rendering.pauseOnFocusLoss) {
     Xe_Main->renderHalt = flag & SDL_WINDOW_INPUT_FOCUS ? false : true;
   }
   // Process events.
@@ -165,6 +165,9 @@ void Renderer::Thread() {
 
     // Framebuffer pointer from main memory
     fbPointer = ramPointer->getPointerToAddress(Xe_Main->xenos->GetSurface());
+
+    // Clear the display
+    Clear();
 
     // Upload buffer
     if (fbPointer && Xe_Main.get() && !Xe_Main->renderHalt) {

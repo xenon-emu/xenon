@@ -21,6 +21,7 @@ public:
   void UpdateScissor(s32 x, s32 y, u32 width, u32 height) override;
   void UpdateViewport(s32 x, s32 y, u32 width, u32 height) override;
   void UpdateClearColor(u8 r, u8 b, u8 g, u8 a) override;
+  void Clear() override;
   void OnCompute() override;
   void OnBind() override;
   void OnSwap(SDL_Window* window) override;
