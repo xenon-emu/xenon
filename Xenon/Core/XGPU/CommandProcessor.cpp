@@ -116,11 +116,15 @@ void CommandProcessor::cpWorkerThreadLoop() {
   while (cpWorkerThreadRunning) {
 
     u32 writePtrIndex = cpWritePtrIndex.load();
-    while (cpRingBufferBasePtr == nullptr || cpReadPtrIndex == writePtrIndex) {
+    while (cpWorkerThreadRunning && (cpRingBufferBasePtr == nullptr || cpReadPtrIndex == writePtrIndex)) {
       // Stall until we're told otherwise
-      std::this_thread::sleep_for(100ns);
+      std::this_thread::sleep_for(10ns);
       writePtrIndex = cpWritePtrIndex.load();
     }
+
+    // Shutdown if we were told to
+    if (!cpWorkerThreadRunning)
+      break;
 
     LOG_INFO(Xenos, "CP: Command processor setup.");
 

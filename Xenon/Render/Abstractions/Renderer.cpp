@@ -109,7 +109,7 @@ void Renderer::HandleEvents() {
     Xe_Main->renderHalt = flag & SDL_WINDOW_INPUT_FOCUS ? false : true;
   }
   // Process events.
-  while (SDL_PollEvent(&windowEvent)) {
+  while (XeRunning && SDL_PollEvent(&windowEvent)) {
     if (Config::rendering.enableGui && imguiCreated) {
       ImGui_ImplSDL3_ProcessEvent(&windowEvent);
     }
@@ -122,7 +122,6 @@ void Renderer::HandleEvents() {
       break;
     case SDL_EVENT_QUIT:
       if (Config::rendering.quitOnWindowClosure) {
-        LOG_INFO(Render, "Attempting to soft shutdown...");
         globalShutdownHandler();
       }
       break;
