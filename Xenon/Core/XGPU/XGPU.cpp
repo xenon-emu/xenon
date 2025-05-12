@@ -253,6 +253,36 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
     case XeRegister::RB_BLEND_ALPHA:
       value = xenosState->blendAlpha;
       break;
+    case XeRegister::PA_CL_VTE_CNTL:
+      value = xenosState->viewportControl;
+      break;
+    case XeRegister::PA_SC_WINDOW_OFFSET:
+      value = xenosState->windowOffset;
+      break;
+    case XeRegister::PA_SC_WINDOW_SCISSOR_TL:
+      value = xenosState->windowScissorTl;
+      break;
+    case XeRegister::PA_SC_WINDOW_SCISSOR_BR:
+      value = xenosState->windowScissorBr;
+      break;
+    case XeRegister::PA_CL_VPORT_XOFFSET:
+      value = xenosState->viewportXOffset;
+      break;
+    case XeRegister::PA_CL_VPORT_YOFFSET:
+      value = xenosState->viewportYOffset;
+      break;
+    case XeRegister::PA_CL_VPORT_ZOFFSET:
+      value = xenosState->viewportZOffset;
+      break;
+    case XeRegister::PA_CL_VPORT_XSCALE:
+      value = xenosState->viewportXScale;
+      break;
+    case XeRegister::PA_CL_VPORT_YSCALE:
+      value = xenosState->viewportYScale;
+      break;
+    case XeRegister::PA_CL_VPORT_ZSCALE:
+      value = xenosState->viewportZScale;
+      break;
     case XeRegister::RB_STENCILREFMASK:
       value = xenosState->stencilReferenceMask;
       break;
@@ -504,6 +534,46 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
     case XeRegister::RB_BLEND_ALPHA:
       xenosState->blendAlpha = tmp;
       xenosState->WriteRegister(reg, xenosState->blendAlpha);
+      break;
+    case XeRegister::PA_CL_VTE_CNTL:
+      xenosState->viewportControl = tmp;
+      xenosState->WriteRegister(reg, xenosState->viewportControl);
+      break;
+    case XeRegister::PA_SC_WINDOW_OFFSET:
+      xenosState->windowOffset = tmp;
+      xenosState->WriteRegister(reg, xenosState->windowOffset);
+      break;
+    case XeRegister::PA_SC_WINDOW_SCISSOR_TL:
+      xenosState->windowScissorTl = tmp;
+      xenosState->WriteRegister(reg, xenosState->windowScissorTl);
+      break;
+    case XeRegister::PA_SC_WINDOW_SCISSOR_BR:
+      xenosState->windowScissorBr = tmp;
+      xenosState->WriteRegister(reg, xenosState->windowScissorBr);
+      break;
+    case XeRegister::PA_CL_VPORT_XOFFSET:
+      xenosState->viewportXOffset = tmp;
+      xenosState->WriteRegister(reg, xenosState->viewportXOffset);
+      break;
+    case XeRegister::PA_CL_VPORT_YOFFSET:
+      xenosState->viewportYOffset = tmp;
+      xenosState->WriteRegister(reg, xenosState->viewportYOffset);
+      break;
+    case XeRegister::PA_CL_VPORT_ZOFFSET:
+      xenosState->viewportZOffset = tmp;
+      xenosState->WriteRegister(reg, xenosState->viewportZOffset);
+      break;
+    case XeRegister::PA_CL_VPORT_XSCALE:
+      xenosState->viewportXScale = tmp;
+      xenosState->WriteRegister(reg, xenosState->viewportXScale);
+      break;
+    case XeRegister::PA_CL_VPORT_YSCALE:
+      xenosState->viewportYScale = tmp;
+      xenosState->WriteRegister(reg, xenosState->viewportYScale);
+      break;
+    case XeRegister::PA_CL_VPORT_ZSCALE:
+      xenosState->viewportZScale = tmp;
+      xenosState->WriteRegister(reg, xenosState->viewportZScale);
       break;
     case XeRegister::RB_STENCILREFMASK:
       xenosState->stencilReferenceMask = tmp;
