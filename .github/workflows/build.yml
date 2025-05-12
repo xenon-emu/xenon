@@ -10,6 +10,7 @@ concurrency:
 
 env:
   BUILD_TYPE: Release
+  BUILD_DIR: ${{ github.workspace }}/build
 
 jobs:
   get-info:
@@ -29,47 +30,7 @@ jobs:
         echo "shorthash=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
         echo "commit=$(git rev-list --count HEAD)" >> $GITHUB_OUTPUT
 
-  Windows:
-    runs-on: windows-2025
-    needs: get-info
-    steps:
-    - uses: actions/checkout@main
-      with:
-        submodules: recursive
-        fetch-depth: 0
-
-    - name: Cache CMake Configuration
-      uses: actions/cache@main
-      env:
-          cache-name: ${{ runner.os }}-xenon-cache-config
-      with:
-          path: |
-            ${{github.workspace}}/build
-          key: ${{ env.cache-name }}-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
-          restore-keys: |
-            ${{ env.cache-name }}-
-
-    - name: Cache CMake Build
-      uses: hendrikmuhs/ccache-action@v1.2.18
-      env:
-          cache-name: ${{ runner.os }}-xenon-cache-build
-      with:
-        append-timestamp: false
-        key: ${{ env.cache-name }}-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
-
-    - name: Configure CMake
-      run: cmake -G Ninja -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_CXX_COMPILER_ID=Clang -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
-
-    - name: Build
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --parallel $env:NUMBER_OF_PROCESSORS
-
-    - name: Upload Windows Artifact
-      uses: actions/upload-artifact@main
-      with:
-        name: Xenon-win64-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
-        path: ${{github.workspace}}/build/Xenon.exe
-
-  Linux:
+  Linux-Clang:
     runs-on: ubuntu-24.04
     needs: get-info
     steps:
@@ -84,38 +45,154 @@ jobs:
         sudo apt install -y ninja-build clang lld cmake ccache \
                            libx11-dev libxext-dev libxrandr-dev libxcursor-dev \
                            libxi-dev libxinerama-dev libwayland-dev libxkbcommon-dev \
-                           wayland-protocols
+                           wayland-protocols git
 
-    - name: Cache CMake Configuration
-      uses: actions/cache@main
-      env:
-          cache-name: ${{ runner.os }}-xenon-cache-config
-      with:
-          path: |
-            ${{github.workspace}}/build
-          key: ${{ env.cache-name }}-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
-          restore-keys: |
-            ${{ env.cache-name }}-
+    - name: Fetch Fonts
+      run: |
+        mkdir -p Deps/fonts
+        git clone --depth=1 --filter=blob:none --sparse https://github.com/xenon-emu/xenon.git tmp-fonts
+        cd tmp-fonts
+        git sparse-checkout set Deps/fonts
+        cp -r Deps/fonts $GITHUB_WORKSPACE/Deps/
+        cd ..
+        rm -rf tmp-fonts
 
-    - name: Cache CMake Build
-      uses: hendrikmuhs/ccache-action@v1.2.18
-      env:
-          cache-name: ${{ runner.os }}-xenon-cache-build
-      with:
-        append-timestamp: false
-        key: ${{ env.cache-name }}-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
-
-    - name: Configure CMake
-      run: cmake -G Ninja -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_CXX_COMPILER_ID=Clang -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+    - name: Configure CMake (Clang)
+      run: cmake -G Ninja -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+                 -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+                 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
     - name: Build
-      run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --parallel $(nproc)
+      run: cmake --build ${{ env.BUILD_DIR }} --config ${{ env.BUILD_TYPE }} --parallel $(nproc)
 
-    - name: Upload Linux Artifact
+    - name: Upload Linux Clang Artifact
       uses: actions/upload-artifact@main
       with:
-        name: Xenon-linux64-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
-        path: ${{github.workspace}}/build/Xenon
+        name: Xenon-linux64-clang-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
+        path: ${{ env.BUILD_DIR }}/Xenon-${{ env.BUILD_TYPE }}
+
+  Linux-GCC:
+    runs-on: ubuntu-24.04
+    needs: get-info
+    steps:
+    - uses: actions/checkout@main
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Install Dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y ninja-build g++ cmake ccache \
+                           libx11-dev libxext-dev libxrandr-dev libxcursor-dev \
+                           libxi-dev libxinerama-dev libwayland-dev libxkbcommon-dev \
+                           wayland-protocols git
+
+    - name: Fetch Fonts
+      run: |
+        mkdir -p Deps/fonts
+        git clone --depth=1 --filter=blob:none --sparse https://github.com/xenon-emu/xenon.git tmp-fonts
+        cd tmp-fonts
+        git sparse-checkout set Deps/fonts
+        cp -r Deps/fonts $GITHUB_WORKSPACE/Deps/
+        cd ..
+        rm -rf tmp-fonts
+
+    - name: Configure CMake (GCC)
+      run: cmake -G Ninja -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+                 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
+                 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+    - name: Build
+      run: cmake --build ${{ env.BUILD_DIR }} --config ${{ env.BUILD_TYPE }} --parallel $(nproc)
+
+    - name: Upload Linux GCC Artifact
+      uses: actions/upload-artifact@main
+      with:
+        name: Xenon-linux64-gcc-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
+        path: ${{ env.BUILD_DIR }}/Xenon-${{ env.BUILD_TYPE }}
+
+  Windows-Clang:
+    runs-on: windows-2025
+    needs: get-info
+    steps:
+    - uses: actions/checkout@main
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Fetch Fonts
+      run: |
+        git clone --depth=1 --filter=blob:none --sparse https://github.com/xenon-emu/xenon.git tmp-fonts
+        cd tmp-fonts
+        git sparse-checkout set Deps/fonts
+        mkdir -p $env:GITHUB_WORKSPACE\Deps\fonts
+        cp -r Deps/fonts/* $env:GITHUB_WORKSPACE\Deps\fonts
+        cd ..
+        rmdir /s /q tmp-fonts
+
+    - name: Configure CMake (Clang)
+      run: cmake -G Ninja -B "${{ env.BUILD_DIR }}" -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+                 -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl \
+                 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+    - name: Build
+      run: cmake --build "${{ env.BUILD_DIR }}" --config ${{ env.BUILD_TYPE }} --parallel $env:NUMBER_OF_PROCESSORS
+
+    - name: Upload Windows Clang Artifact
+      uses: actions/upload-artifact@main
+      with:
+        name: Xenon-win64-clang-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
+        path: ${{ env.BUILD_DIR }}\Xenon-${{ env.BUILD_TYPE }}.exe
+
+  Windows-GCC:
+    name: Windows (GCC via MSYS2)
+    runs-on: windows-2025
+    defaults:
+      run:
+        shell: msys2 {0}
+    needs: get-info
+    steps:
+    - uses: actions/checkout@main
+      with:
+        submodules: recursive
+        fetch-depth: 0
+
+    - name: Fetch Fonts
+      run: |
+        git clone --depth=1 --filter=blob:none --sparse https://github.com/xenon-emu/xenon.git tmp-fonts
+        cd tmp-fonts
+        git sparse-checkout set Deps/fonts
+        mkdir -p $env:GITHUB_WORKSPACE\Deps\fonts
+        cp -r Deps/fonts/* $env:GITHUB_WORKSPACE\Deps\fonts
+        cd ..
+        rmdir /s /q tmp-fonts
+
+    - uses: msys2/setup-msys2@v2
+      with:
+        msystem: UCRT64
+        update: true
+        install: >
+          git
+          mingw-w64-ucrt-x86_64-gcc
+          mingw-w64-ucrt-x86_64-cmake
+          mingw-w64-ucrt-x86_64-ninja
+          mingw-w64-ucrt-x86_64-ccache
+          make
+
+    - name: Configure CMake (GCC)
+      run: cmake -G Ninja -B "${{ env.BUILD_DIR }}" -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+                 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
+                 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+    - name: Build
+      run: cmake --build "${{ env.BUILD_DIR }}" --config ${{ env.BUILD_TYPE }} --parallel $env:NUMBER_OF_PROCESSORS
+
+    - name: Upload Windows-GCC Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: Xenon-win64-gcc-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
+        path: ${{ env.BUILD_DIR }}\Xenon-${{ env.BUILD_TYPE }}.exe
 
   linux_nix:
     name: Linux (nix)
