@@ -79,8 +79,8 @@ jobs:
       with:
         name: Xenon-linux64-clang-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
         path: |
-          ${{ env.BUILD_DIR }}/build/Xenon-${{ env.BUILD_TYPE }}
-          ${{ env.BUILD_DIR }}/Deps/fonts/
+          ${{ env.BUILD_DIR }}/Xenon
+          ${{ github.workspace }}/Deps/fonts/
 
   Linux-GCC:
     name: Linux (GCC)
@@ -131,8 +131,8 @@ jobs:
       with:
         name: Xenon-linux64-gcc-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
         path: |
-          ${{ env.BUILD_DIR }}/build/Xenon-${{ env.BUILD_TYPE }}
-          ${{ env.BUILD_DIR }}/Deps/fonts/
+          ${{ env.BUILD_DIR }}/Xenon
+          ${{ github.workspace }}/Deps/fonts/
 
 
   Windows-Clang:
@@ -176,8 +176,8 @@ jobs:
       with:
         name: Xenon-win64-clang-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
         path: |
-          ${{ env.BUILD_DIR }}\Xenon-${{ env.BUILD_TYPE }}.exe
-          ${{ env.BUILD_DIR }}/Deps/fonts/
+          ${{ env.BUILD_DIR }}/Xenon.exe
+          ${{ github.workspace }}/Deps/fonts/
 
   Windows-GCC:
     name: Windows (GCC via MSYS2)
@@ -223,8 +223,8 @@ jobs:
           ${{ runner.os }}-${{ env.BUILD_TYPE }}-gcc-ccache-
 
     - name: Configure CMake (GCC)
-      run: cmake -G Ninja -B "${{ env.BUILD_DIR }}" -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-                 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
+      run: cmake -G Ninja -B "${{ env.BUILD_DIR }}" -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+                 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++
                  -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
     - name: Build
@@ -235,8 +235,8 @@ jobs:
       with:
         name: Xenon-win64-gcc-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
         path: |
-          ${{ env.BUILD_DIR }}\Xenon-${{ env.BUILD_TYPE }}.exe
-          ${{ env.BUILD_DIR }}/Deps/fonts/
+          ${{ env.BUILD_DIR }}/Xenon.exe
+          ${{ github.workspace }}/Deps/fonts/
 
   linux_nix:
     name: Linux (nix)

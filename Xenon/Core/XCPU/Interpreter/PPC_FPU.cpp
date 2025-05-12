@@ -1,9 +1,12 @@
 // Copyright 2025 Xenon Emulator Project
 
+#include "Base/Arch.h"
+
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
 #include <emmintrin.h>
 #include <intrin.h>
+#endif
 
-#include "Base/Arch.h"
 #include "Base/Types.h"
 #include "Base/Logging/Log.h"
 #include "PPCInterpreter.h"
