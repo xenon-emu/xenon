@@ -251,7 +251,7 @@ jobs:
         mkdir -p artifact
         cp -r "${{github.workspace}}/build/Xenon.exe" "artifact/xenon-gcc-x64-${{env.BUILD_TYPE}}.exe"
         mkdir -p artifacts/fonts/
-        cp -r ${{github.workspace}}/Deps/fonts/ artifact/fonts/
+        cp -r "${{github.workspace}}/Deps/fonts/" "artifact/fonts/"
 
     - name: Upload Windows-GCC Artifact
       uses: actions/upload-artifact@main
