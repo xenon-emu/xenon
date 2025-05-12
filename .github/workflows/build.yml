@@ -54,17 +54,17 @@ jobs:
         path: |
           build
           Deps
-        key: ${{ runner.os }}-deps-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
+        key: ${{ runner.os }}-${{ env.BUILD_TYPE }}-clang-deps-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
         restore-keys: |
-          ${{ runner.os }}-deps-
+          ${{ runner.os }}-${{ env.BUILD_TYPE }}-clang-deps-
 
     - name: Cache CCache
       uses: actions/cache@main
       with:
         path: ~/.ccache
-        key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        key: ${{ runner.os }}-${{ env.BUILD_TYPE }}-clang-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
         restore-keys: |
-          ${{ runner.os }}-ccache-
+          ${{ runner.os }}-${{ env.BUILD_TYPE }}-clang-ccache-
 
     - name: Configure CMake (Clang)
       run: cmake -G Ninja -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
@@ -106,17 +106,17 @@ jobs:
         path: |
           build
           Deps
-        key: ${{ runner.os }}-deps-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
+        key: ${{ runner.os }}-${{ env.BUILD_TYPE }}-gcc-deps-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
         restore-keys: |
-          ${{ runner.os }}-deps-
+          ${{ runner.os }}-${{ env.BUILD_TYPE }}-gcc-deps-
 
     - name: Cache CCache
       uses: actions/cache@main
       with:
         path: ~/.ccache
-        key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        key: ${{ runner.os }}-${{ env.BUILD_TYPE }}-gcc-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
         restore-keys: |
-          ${{ runner.os }}-ccache-
+          ${{ runner.os }}-${{ env.BUILD_TYPE }}-gcc-ccache-
 
     - name: Configure CMake (GCC)
       run: cmake -G Ninja -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
@@ -151,17 +151,17 @@ jobs:
         path: |
           build
           Deps
-        key: ${{ runner.os }}-deps-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
+        key: ${{ runner.os }}-${{ env.BUILD_TYPE }}-clang-deps-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
         restore-keys: |
-          ${{ runner.os }}-deps-
+          ${{ runner.os }}-${{ env.BUILD_TYPE }}-clang-deps-
 
     - name: Cache CCache
       uses: actions/cache@main
       with:
         path: ~/.ccache
-        key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        key: ${{ runner.os }}-${{ env.BUILD_TYPE }}-clang-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
         restore-keys: |
-          ${{ runner.os }}-ccache-
+          ${{ runner.os }}-${{ env.BUILD_TYPE }}-clang-ccache-
 
     - name: Configure CMake (Clang)
       run: cmake -G Ninja -B "${{ env.BUILD_DIR }}" -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
@@ -210,17 +210,17 @@ jobs:
         path: |
           build
           Deps
-        key: ${{ runner.os }}-deps-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
+        key: ${{ runner.os }}-${{ env.BUILD_TYPE }}-gcc-deps-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
         restore-keys: |
-          ${{ runner.os }}-deps-
+          ${{ runner.os }}-${{ env.BUILD_TYPE }}-gcc-deps-
 
     - name: Cache CCache
       uses: actions/cache@main
       with:
         path: ~/.ccache
-        key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        key: ${{ runner.os }}-${{ env.BUILD_TYPE }}-gcc-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
         restore-keys: |
-          ${{ runner.os }}-ccache-
+          ${{ runner.os }}-${{ env.BUILD_TYPE }}-gcc-ccache-
 
     - name: Configure CMake (GCC)
       run: cmake -G Ninja -B "${{ env.BUILD_DIR }}" -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
