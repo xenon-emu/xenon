@@ -54,7 +54,7 @@ jobs:
         path: |
           build
           Deps
-        key: ${{ runner.os }}-deps-${{ hashFiles('**/CMakeLists.txt', '**/CMakeCache.txt', '**/*.cmake') }}
+        key: ${{ runner.os }}-deps-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
         restore-keys: |
           ${{ runner.os }}-deps-
 
@@ -62,13 +62,13 @@ jobs:
       uses: actions/cache@main
       with:
         path: ~/.ccache
-        key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        key: Linux-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
         restore-keys: |
-          ${{ runner.os }}-ccache-
+          Linux-ccache-
 
     - name: Configure CMake (Clang)
-      run: cmake -G Ninja -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-                 -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+      run: cmake -G Ninja -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+                 -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
                  -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
     - name: Build
@@ -106,7 +106,7 @@ jobs:
         path: |
           build
           Deps
-        key: ${{ runner.os }}-deps-${{ hashFiles('**/CMakeLists.txt', '**/CMakeCache.txt', '**/*.cmake') }}
+        key: ${{ runner.os }}-deps-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
         restore-keys: |
           ${{ runner.os }}-deps-
 
@@ -114,13 +114,13 @@ jobs:
       uses: actions/cache@main
       with:
         path: ~/.ccache
-        key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        key: Linux-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
         restore-keys: |
-          ${{ runner.os }}-ccache-
+          Linux-ccache-
 
     - name: Configure CMake (GCC)
-      run: cmake -G Ninja -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-                 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
+      run: cmake -G Ninja -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+                 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++
                  -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
     - name: Build
@@ -151,7 +151,7 @@ jobs:
         path: |
           build
           Deps
-        key: ${{ runner.os }}-deps-${{ hashFiles('**/CMakeLists.txt', '**/CMakeCache.txt', '**/*.cmake') }}
+        key: ${{ runner.os }}-deps-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
         restore-keys: |
           ${{ runner.os }}-deps-
 
@@ -159,13 +159,13 @@ jobs:
       uses: actions/cache@main
       with:
         path: ~/.ccache
-        key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        key: Linux-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
         restore-keys: |
-          ${{ runner.os }}-ccache-
+          Linux-ccache-
 
     - name: Configure CMake (Clang)
-      run: cmake -G Ninja -B "${{ env.BUILD_DIR }}" -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
-                 -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl \
+      run: cmake -G Ninja -B "${{ env.BUILD_DIR }}" -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }}
+                 -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl
                  -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
     - name: Build
@@ -210,7 +210,7 @@ jobs:
         path: |
           build
           Deps
-        key: ${{ runner.os }}-deps-${{ hashFiles('**/CMakeLists.txt', '**/CMakeCache.txt', '**/*.cmake') }}
+        key: ${{ runner.os }}-deps-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
         restore-keys: |
           ${{ runner.os }}-deps-
 
@@ -218,9 +218,9 @@ jobs:
       uses: actions/cache@main
       with:
         path: ~/.ccache
-        key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        key: Linux-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
         restore-keys: |
-          ${{ runner.os }}-ccache-
+          Linux-ccache-
 
     - name: Configure CMake (GCC)
       run: cmake -G Ninja -B "${{ env.BUILD_DIR }}" -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \

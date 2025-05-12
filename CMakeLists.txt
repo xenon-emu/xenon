@@ -11,9 +11,18 @@ if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
+# Set compiler ID
+if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  set(msvc TRUE)
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  set(gcc TRUE)
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  set(clang TRUE)
+endif()
+
 # Optimizations
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
-if (WIN32)
+if (msvc)
   add_compile_options($<$<CONFIG:Release>:/Oi>)
   add_compile_options($<$<CONFIG:Release>:/Ot>)
 endif()
@@ -319,15 +328,6 @@ add_executable(Xenon
 )
 
 target_precompile_headers(Xenon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Xenon/Base/Types.h)
-
-# Set compiler ID
-if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-  set(msvc TRUE)
-elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  set(gcc TRUE)
-elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  set(clang TRUE)
-endif()
 
 if (GFX_ENABLED)
   add_compile_definitions(GFX_ENABLED)
