@@ -383,7 +383,7 @@ endif()
 
 # Specific to MSVC, forces system version so the autodetected 8.1 SDK isn't used
 # Also enables multi-processor (multithreaded) compiling on MSVC
-if (msvc)
+if (msvc AND NOT clang)
   set(CMAKE_GENERATOR_PLATFORM x64)
   set(CMAKE_SYSTEM_VERSION 10.0.19041.0)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
