@@ -153,7 +153,7 @@ enum CPPacketType3Opcode {
 };
 
 // Microcode Type
-enum CPMicrocodeType {
+enum eCPMicrocodeType {
   uCodeTypeME,
   uCodeTypePFP
 };
@@ -164,8 +164,11 @@ public:
   ~CommandProcessor();
 
   // Methods for R/W of the CP/PFP uCode data.
-  void CPWriteMicrocodeData(CPMicrocodeType uCodeType) { (void)uCodeType; }
-  u32 CPReadMicrocodeData(CPMicrocodeType uCodeType) { (void)uCodeType; return 0; }
+  void CPSetPFPMicrocodeAddress(u32 address) { cpPFPuCodeAdddress = address; }
+  void CPSetMEMicrocodeWriteAddress(u32 address) { cpMEuCodeWriteAdddress = address; }
+  void CPSetMEMicrocodeReadAddress(u32 address) { cpMEuCodeReadAdddress = address; }
+  void CPWriteMicrocodeData(eCPMicrocodeType uCodeType, u32 data);
+  u32 CPReadMicrocodeData(eCPMicrocodeType uCodeType);
 
   // Update RingBuffer Base Address.
   void CPUpdateRBBase(u32 address);
@@ -198,6 +201,12 @@ private:
   // Software loads ME and PFP uCode. 
   // libXenon driver loads it and after it verifies it.
   
+  // CP PFP Address (offset).
+  u32 cpPFPuCodeAdddress = 0;
+  // CP ME Write Address (offset).
+  u32 cpMEuCodeWriteAdddress = 0;
+  // CP ME Read Address (offset).
+  u32 cpMEuCodeReadAdddress = 0;
   // CP Microcode Engine data. 
   std::vector<u32> cpMEuCodeData;
   // CP PreFetch Parser data.

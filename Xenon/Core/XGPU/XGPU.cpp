@@ -319,6 +319,12 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
     case XeRegister::RB_COLOR_CLEAR_LO:
       value = xenosState->clearColorLo;
       break;
+    case XeRegister::CP_PFP_UCODE_DATA:
+      value = commandProcessor.get()->CPReadMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypePFP);
+      break;
+    case XeRegister::CP_ME_RAM_DATA:
+      value = commandProcessor.get()->CPReadMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypeME);
+      break;
     default:
       value = regData;
       break;
@@ -627,6 +633,26 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
     case XeRegister::RB_COLOR_CLEAR_LO:
       xenosState->clearColorLo = tmp;
       xenosState->WriteRegister(reg, xenosState->clearColorLo);
+      break;
+    case XeRegister::CP_PFP_UCODE_ADDR:
+      // Software is writing CP PFP uCode data address.
+      commandProcessor.get()->CPSetPFPMicrocodeAddress(tmp);
+      break;
+    case XeRegister::CP_PFP_UCODE_DATA:
+      // Software is writing CP PFP uCode data.
+      commandProcessor.get()->CPWriteMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypePFP, tmp);
+      break;
+    case XeRegister::CP_ME_RAM_WADDR:
+      // Software is writing CP Microcode Engine uCode write address.
+      commandProcessor.get()->CPSetMEMicrocodeWriteAddress(tmp);
+      break;
+    case XeRegister::CP_ME_RAM_RADDR:
+      // Software is writing CP Microcode Engine uCode read address.
+      commandProcessor.get()->CPSetMEMicrocodeReadAddress(tmp);
+      break;
+    case XeRegister::CP_ME_RAM_DATA:
+      // Software is writing CP Microcode Engine uCode data.
+      commandProcessor.get()->CPWriteMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypeME, tmp);
       break;
     default:
       xenosState->WriteRegister(reg, tmp);

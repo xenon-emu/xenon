@@ -21,6 +21,11 @@ namespace Xe::XGPU {
   
 CommandProcessor::CommandProcessor(RAM *ramPtr, XenosState *statePtr, PCIBridge *pciBridge) : ram(ramPtr), state(statePtr), parentBus(pciBridge) {
   cpWorkerThread = std::thread(&CommandProcessor::cpWorkerThreadLoop, this);
+
+  // Initialize uCode buffers.
+  // According to free60/libxenon, these are the correct uCode sizes.
+  cpMEuCodeData.resize(0x900);
+  cpPFPuCodeData.resize(0x120);
 }
 
 CommandProcessor::~CommandProcessor() {
@@ -28,6 +33,54 @@ CommandProcessor::~CommandProcessor() {
   if (cpWorkerThread.joinable()) {
     cpWorkerThread.join();
   }
+}
+
+void CommandProcessor::CPWriteMicrocodeData(eCPMicrocodeType uCodeType, u32 data) {
+  switch (uCodeType)
+  {
+  case Xe::XGPU::uCodeTypeME:
+    // Sanity Check
+    if (cpMEuCodeWriteAdddress <= cpMEuCodeData.size()) {
+      // Write elements at specified offset.
+      cpMEuCodeData[cpMEuCodeWriteAdddress] = data;
+      cpMEuCodeWriteAdddress++;
+    } else {
+      LOG_ERROR(Xenos, "[CP] ME uCode Address bigger than uCode buffer, addr = {:#x}.", cpMEuCodeWriteAdddress);
+    }
+    break;
+  case Xe::XGPU::uCodeTypePFP:
+    // Sanity Check
+    if (cpPFPuCodeAdddress <= cpMEuCodeData.size()) {
+      // Write elements at specified offset.
+      cpPFPuCodeData[cpPFPuCodeAdddress] = data;
+      cpPFPuCodeAdddress++;
+    } else {
+      LOG_ERROR(Xenos, "[CP] PFP uCode Address bigger than uCode buffer, addr = {:#x}.", cpPFPuCodeAdddress);
+    }
+    break;
+  }
+}
+
+u32 CommandProcessor::CPReadMicrocodeData(eCPMicrocodeType uCodeType) {
+  u32 tmp = 0;
+  switch (uCodeType)
+  {
+  case Xe::XGPU::uCodeTypeME:
+    // Sanity check.
+    if (cpMEuCodeReadAdddress <= cpMEuCodeData.size()) {
+      tmp = byteswap_be(cpMEuCodeData[cpMEuCodeReadAdddress]); // Data was byteswapped, so we need to reverse that.
+      cpMEuCodeReadAdddress++;
+    }
+    break;
+  case Xe::XGPU::uCodeTypePFP:
+    // Sanity check.
+    if (cpPFPuCodeAdddress <= cpPFPuCodeData.size()) {
+      tmp = byteswap_be(cpPFPuCodeData[cpPFPuCodeAdddress]); // Data was byteswapped, so we need to reverse that.
+      cpPFPuCodeAdddress++;
+    }
+    break;
+  }
+  return tmp;
 }
 
 void CommandProcessor::CPUpdateRBBase(u32 address) {
