@@ -100,6 +100,17 @@ public:
   u32 depthClear = 0;
   u32 clearColor = 0;
   u32 clearColorLo = 0;
+  // PA
+  u32 viewportControl = 0;
+  u32 windowOffset = 0;
+  u32 windowScissorTl = 0;
+  u32 windowScissorBr = 0;
+  u32 viewportXOffset = 0;
+  u32 viewportYOffset = 0;
+  u32 viewportZOffset = 0;
+  u32 viewportXScale = 0;
+  u32 viewportYScale = 0;
+  u32 viewportZScale = 0;
 
   // D1CRTC
   u32 crtcControl = 0; // Checks if the RTC is active
