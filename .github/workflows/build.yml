@@ -130,6 +130,7 @@ jobs:
   macOS:
     name: macOS (ARM)
     runs-on: macos-latest
+    needs: get-info
     steps:
       - name: Checkout repository
         uses: actions/checkout@main
