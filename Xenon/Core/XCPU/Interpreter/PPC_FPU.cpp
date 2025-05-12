@@ -4,7 +4,6 @@
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
 #include <emmintrin.h>
-#include <intrin.h>
 #endif
 
 #include "Base/Types.h"
