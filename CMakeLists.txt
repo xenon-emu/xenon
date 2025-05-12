@@ -11,9 +11,18 @@ if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
+# Set compiler ID
+if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  set(msvc TRUE)
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  set(gcc TRUE)
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  set(clang TRUE)
+endif()
+
 # Optimizations
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
-if (WIN32)
+if (msvc)
   add_compile_options($<$<CONFIG:Release>:/Oi>)
   add_compile_options($<$<CONFIG:Release>:/Ot>)
 endif()
@@ -320,15 +329,6 @@ add_executable(Xenon
 
 target_precompile_headers(Xenon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Xenon/Base/Types.h)
 
-# Set compiler ID
-if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-  set(msvc TRUE)
-elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  set(gcc TRUE)
-elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  set(clang TRUE)
-endif()
-
 if (GFX_ENABLED)
   add_compile_definitions(GFX_ENABLED)
 else()
@@ -383,7 +383,7 @@ endif()
 
 # Specific to MSVC, forces system version so the autodetected 8.1 SDK isn't used
 # Also enables multi-processor (multithreaded) compiling on MSVC
-if (msvc)
+if (msvc AND NOT clang)
   set(CMAKE_GENERATOR_PLATFORM x64)
   set(CMAKE_SYSTEM_VERSION 10.0.19041.0)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")

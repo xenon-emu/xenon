@@ -25,8 +25,8 @@ let
       fetchSubmodules = true;
       owner = "Vali0004";
       repo = "sirit";
-      rev = "a45132460519194b9594fc1a743a8a91f6b517f9";
-      hash = "sha256-jnMg9mnnEiwP4TjYxlhi3kMXKBixRubsdac6rGP+lSM=";
+      rev = "e9f33a21066234f9479383233d4883837b7ea807";
+      hash = "sha256-o/Cju5KHu1Dh+swO1K4HFRBn+dxqYvqU3CgZoUjebek=";
     }
     else {};
   microprofile = fetchFromGitHub {

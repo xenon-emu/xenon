@@ -81,14 +81,14 @@ inline s64 mulh64(s64 x, s64 y) {
 }
 #else
 inline u64 umulh64(u64 x, u64 y) {
-#if defined(_MSC_VER) || defined(__MINGW32__)
+#if defined(_MSC_VER)
   return __umulh(x, y);
 #else
   return static_cast<u64>((u128{ x } *u128{ y }) >> 64);
 #endif
 }
 inline s64 mulh64(s64 x, s64 y) {
-#if defined(_MSC_VER) || defined(__MINGW32__)
+#if defined(_MSC_VER)
   return __mulh(x, y);
 #else
   return static_cast<s64>((s128{ x } *s128{ y }) >> 64);
