@@ -48,6 +48,24 @@ jobs:
                            libxi-dev libxinerama-dev libwayland-dev libxkbcommon-dev \
                            wayland-protocols git
 
+    - name: Cache build and deps
+      uses: actions/cache@main
+      with:
+        path: |
+          build
+          Deps
+        key: ${{ runner.os }}-deps-${{ hashFiles('**/CMakeLists.txt', '**/CMakeCache.txt', '**/*.cmake') }}
+        restore-keys: |
+          ${{ runner.os }}-deps-
+
+    - name: Cache CCache
+      uses: actions/cache@main
+      with:
+        path: ~/.ccache
+        key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-
+
     - name: Configure CMake (Clang)
       run: cmake -G Ninja -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
                  -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
@@ -82,6 +100,24 @@ jobs:
                            libxi-dev libxinerama-dev libwayland-dev libxkbcommon-dev \
                            wayland-protocols git
 
+    - name: Cache build and deps
+      uses: actions/cache@main
+      with:
+        path: |
+          build
+          Deps
+        key: ${{ runner.os }}-deps-${{ hashFiles('**/CMakeLists.txt', '**/CMakeCache.txt', '**/*.cmake') }}
+        restore-keys: |
+          ${{ runner.os }}-deps-
+
+    - name: Cache CCache
+      uses: actions/cache@main
+      with:
+        path: ~/.ccache
+        key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-
+
     - name: Configure CMake (GCC)
       run: cmake -G Ninja -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
                  -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
@@ -108,6 +144,24 @@ jobs:
       with:
         submodules: recursive
         fetch-depth: 0
+
+    - name: Cache build and deps
+      uses: actions/cache@main
+      with:
+        path: |
+          build
+          Deps
+        key: ${{ runner.os }}-deps-${{ hashFiles('**/CMakeLists.txt', '**/CMakeCache.txt', '**/*.cmake') }}
+        restore-keys: |
+          ${{ runner.os }}-deps-
+
+    - name: Cache CCache
+      uses: actions/cache@main
+      with:
+        path: ~/.ccache
+        key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-
 
     - name: Configure CMake (Clang)
       run: cmake -G Ninja -B "${{ env.BUILD_DIR }}" -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
@@ -150,13 +204,31 @@ jobs:
           mingw-w64-ucrt-x86_64-ccache
           make
 
+    - name: Cache build and deps
+      uses: actions/cache@main
+      with:
+        path: |
+          build
+          Deps
+        key: ${{ runner.os }}-deps-${{ hashFiles('**/CMakeLists.txt', '**/CMakeCache.txt', '**/*.cmake') }}
+        restore-keys: |
+          ${{ runner.os }}-deps-
+
+    - name: Cache CCache
+      uses: actions/cache@main
+      with:
+        path: ~/.ccache
+        key: ${{ runner.os }}-ccache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        restore-keys: |
+          ${{ runner.os }}-ccache-
+
     - name: Configure CMake (GCC)
       run: cmake -G Ninja -B "${{ env.BUILD_DIR }}" -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
                  -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
                  -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
     - name: Build
-      run: cmake --build "${{ env.BUILD_DIR }}" --config ${{ env.BUILD_TYPE }} --parallel $env:NUMBER_OF_PROCESSORS
+      run: cmake --build "${{ env.BUILD_DIR }}" --config ${{ env.BUILD_TYPE }} --parallel
 
     - name: Upload Windows-GCC Artifact
       uses: actions/upload-artifact@main
