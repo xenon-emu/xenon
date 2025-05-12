@@ -64,6 +64,7 @@ add_compile_definitions(MICROPROFILE_USE_CONFIG)
 # Include Deps/ThirdParty and Packages
 if (GFX_ENABLED)
   find_package(SDL3 3.2.4 CONFIG)
+  find_package(sirit)
 endif()
 
 find_package(fmt 10.2.1 CONFIG)
@@ -350,7 +351,7 @@ endif()
 
 
 # Link libraries
-target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11)
+target_link_libraries(Xenon PRIVATE fmt::fmt sirit toml11::toml11)
 if (GFX_ENABLED)
   target_link_libraries(Xenon PRIVATE glad SDL3::SDL3)
 endif()

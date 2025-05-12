@@ -62,13 +62,87 @@ public:
   virtual void Assign(const Chunk &dest, const Chunk &src) = 0;
   virtual void Emit(const Chunk &src) = 0;
 
-  virtual void AssignMasked(ExpressionNode* src, ExpressionNode* dst,
+  virtual void AssignMasked(ExpressionNode *src, ExpressionNode *dst,
     std::span<const eSwizzle> dstSwizzle,
     std::span<const eSwizzle> srcSwizzle) = 0;
 
-  virtual void AssignImmediate(ExpressionNode* dst,
+  virtual void AssignImmediate(ExpressionNode *dst,
     std::span<const eSwizzle> dstSwizzle,
     std::span<const eSwizzle> immediateValues) = 0;
+};
+
+class TextureInfo {
+public:
+  u8 runtimeSlot; // Slot we are bounded to (sampler index in shader)
+  u32 fetchSlot; // Source fetch slot
+  instr_dimension_t type;
+};
+
+class ShaderCodeWriterSirit : public ShaderCodeWriterBase {
+public:
+  ShaderCodeWriterSirit() {
+    // You set up the module in the constructor or Generate method
+    module.AddCapability(spv::Capability::Shader);
+    module.SetMemoryModel(spv::AddressingModel::Logical, spv::MemoryModel::GLSL450);
+  }
+  Chunk GetExportDest(const eExportReg reg) override;
+  Chunk GetReg(u32 regIndex) override;
+  Chunk GetBoolVal(const u32 boolRegIndex) override;
+  Chunk GetFloatVal(const u32 floatRegIndex) override;
+  Chunk GetFloatValRelative(const u32 floatRegOffset) override;
+  Chunk GetPredicate() override;
+
+  Chunk Abs(ExpressionNode *value) override;
+  Chunk Negate(ExpressionNode *value) override;
+  Chunk Not(ExpressionNode *value) override;
+  Chunk Saturate(ExpressionNode *value) override;
+  Chunk Swizzle(ExpressionNode *value, std::array<eSwizzle, 4> swizzle) override;
+
+  Chunk FetchVertex(const Chunk &src, const VertexFetch &instr) override;
+  Chunk FetchTexture(const Chunk &src, const TextureFetch &instr) override;
+
+  Chunk VectorFunc1(instr_vector_opc_t instr, ExpressionNode *arg1) override;
+  Chunk VectorFunc2(instr_vector_opc_t instr, ExpressionNode *arg1, ExpressionNode *arg2) override;
+  Chunk VectorFunc3(instr_vector_opc_t instr, ExpressionNode *arg1, ExpressionNode *arg2, ExpressionNode *arg3) override;
+
+  Chunk ScalarFunc1(instr_scalar_opc_t instr, ExpressionNode *arg1) override;
+  Chunk ScalarFunc2(instr_scalar_opc_t instr, ExpressionNode *arg1, ExpressionNode *arg2) override;
+
+  Chunk AllocLocalVector(const Chunk& initCode) override;
+  Chunk AllocLocalScalar(const Chunk& initCode) override;
+  Chunk AllocLocalBool(const Chunk& initCode) override;
+
+  void BeingCondition(const Chunk& condition) override;
+  void EndCondition() override;
+
+  void BeginControlFlow(const u32 address, const bool hasJumps, const bool hasCalls, const bool called) override;
+  void EndControlFlow() override;
+
+  void BeginBlockWithAddress(const u32 address) override;
+  void EndBlockWithAddress() override;
+
+  void ControlFlowEnd() override;
+  void ControlFlowReturn(const u32 targetAddress) override;
+  void ControlFlowCall(const u32 targetAddress) override;
+  void ControlFlowJump(const u32 targetAddress) override;
+
+  void SetPredicate(const Chunk& newValue) override;
+  void PushPredicate(const Chunk& newValue) override;
+  void PopPredicate() override;
+
+  void Assign(const Chunk& dest, const Chunk& src) override;
+  void Emit(const Chunk& src) override;
+
+  void AssignMasked(ExpressionNode *src, ExpressionNode *dst,
+    std::span<const eSwizzle> dstSwizzle,
+    std::span<const eSwizzle> srcSwizzle) override;
+
+  void AssignImmediate(ExpressionNode *dst,
+    std::span<const eSwizzle> dstSwizzle,
+    std::span<const eSwizzle> immediateValues) override;
+
+  std::vector<TextureInfo> textures{};
+  Sirit::Module module;
 };
 
 } // namespace Xe::Microcode::AST

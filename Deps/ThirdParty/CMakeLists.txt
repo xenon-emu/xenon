@@ -25,6 +25,11 @@ if (GFX_ENABLED)
   endif()
 endif()
 
+# Sirit
+if (NOT TARGET sirit)
+  add_subdirectory(Sirit)
+endif()
+
 # Toml11
 if (NOT TARGET toml11::toml11)
   add_subdirectory(toml11)

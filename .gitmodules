@@ -17,3 +17,6 @@
 [submodule "third_party/microprofile"]
 	path = Deps/ThirdParty/microprofile
 	url = https://github.com/jonasmr/microprofile.git
+[submodule "Deps/ThirdParty/Sirit"]
+	path = Deps/ThirdParty/Sirit
+	url = https://github.com/shadps4-emu/sirit.git

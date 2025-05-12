@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <map>
 #include <vector>
 
 #include "Constants.h"
@@ -163,6 +164,8 @@ public:
   void EmitExportAllocPosition();
   void EmitExportAllocParam(const u32 size);
   void EmitExportAllocMemExport(const u32 size);
+  u32 GetNumCreatedBlocks() { return createdBlocks.size(); }
+  Block* GetCreatedBlock(u64 i) { return createdBlocks[i]; }
 private:
   std::vector<Block*> createdBlocks = {};
 

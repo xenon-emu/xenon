@@ -6,12 +6,28 @@
 #include <sstream>
 
 #include "Base/Types.h"
+#include <sirit/sirit.h>
 
 namespace Xe::Microcode::AST {
 
-// Code chunk define
 struct Chunk {
-  std::stringstream ss{};
+  Sirit::Id id = {};
+
+  Chunk() = default;
+  explicit Chunk(Sirit::Id v) : id(v) {}
+
+  operator u32() const { return id.value; }
+
+  operator Sirit::Id() const { return id; }
+
+  Chunk& operator=(Sirit::Id v) {
+    id.value = v.value;
+    return *this;
+  }
+
+  bool IsValid() const {
+    return id.value != 0;
+  }
 };
 
 // Node base

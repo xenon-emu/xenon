@@ -60,7 +60,7 @@ public:
   std::unique_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<ReadRegister>(*this);
   }
-private:
+
   s32 regIndex = 0;
 };
 
@@ -107,7 +107,7 @@ public:
   std::unique_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<BoolConstant>(*this);
   }
-private:
+
   bool pixelShader = false;
   s32 index = 0;
 };
@@ -122,7 +122,7 @@ public:
   std::unique_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<FloatConstant>(*this);
   }
-private:
+
   bool pixelShader = false;
   s32 index = 0;
 };
@@ -136,7 +136,7 @@ public:
   std::unique_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<FloatRelativeConstant>(*this);
   }
-private:
+
   bool pixelShader = false;
   s32 relativeOffset = 0;
 };
@@ -207,7 +207,7 @@ public:
   std::unique_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<Swizzle>(*this);
   }
-private:
+
   std::array<eSwizzle, 4> swizzle = {};
 };
 
@@ -225,7 +225,7 @@ public:
   std::unique_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<VertexFetch>(*this);
   }
-private:
+
   u32 fetchSlot = 0, fetchOffset = 0, fetchStride = 0;
   instr_surf_fmt_t format{};
   bool isFloat = false, isSigned = false, isNormalized = false;
@@ -243,7 +243,7 @@ public:
   std::unique_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<TextureFetch>(*this);
   }
-private:
+
   u32 fetchSlot = 0;
   instr_dimension_t textureType{};
 };
@@ -260,7 +260,7 @@ public:
   std::unique_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<VectorFunc1>(*this);
   }
-private:
+
   instr_vector_opc_t vectorInstr = {};
 };
 
@@ -275,7 +275,7 @@ public:
   std::unique_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<VectorFunc2>(*this);
   }
-private:
+
   instr_vector_opc_t vectorInstr = {};
 };
 
@@ -291,7 +291,7 @@ public:
   std::unique_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<VectorFunc3>(*this);
   }
-private:
+
   instr_vector_opc_t vectorInstr = {};
 };
 
@@ -305,7 +305,7 @@ public:
   std::unique_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<ScalarFunc1>(*this);
   }
-private:
+
   instr_scalar_opc_t scalarInstr = {};
 };
 
@@ -320,7 +320,7 @@ public:
   std::unique_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<ScalarFunc2>(*this);
   }
-private:
+
   instr_scalar_opc_t scalarInstr = {};
 };
 
