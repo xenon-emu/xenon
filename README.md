@@ -48,6 +48,7 @@ We need talented developers more than ever to contribute to the project and move
 # Building
 - [**Windows**](https://github.com/xenon-emu/Xenon/blob/main/Deps/Docs/Building/building-windows.md)
 - [**Linux**](https://github.com/xenon-emu/Xenon/blob/main/Deps/Docs/Building/building-linux.md)
+- [**macOS**](https://github.com/xenon-emu/Xenon/blob/main/Deps/Docs/Building/building-macos.md)
 
 # License
 - [**GPL-2.0 license**](https://github.com/xenon-emu/Xenon/blob/main/LICENSE)

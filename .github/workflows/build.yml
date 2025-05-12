@@ -247,3 +247,54 @@ jobs:
       - uses: cachix/install-nix-action@master
       - name: Build Xenon
         run: nix build .#xenon -L
+
+  macOS:
+    name: macOS (ARM)
+    runs-on: macos-latest
+    needs: get-info
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@main
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup latest Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install Dependencies (macOS)
+        run: |
+          brew install ninja llvm
+
+      - name: Cache CMake Configuration
+        uses: actions/cache@main
+        env:
+          cache-name: ${{ runner.os }}-xenon-cache-config
+        with:
+          path: |
+            ${{github.workspace}}/build
+          key: ${{ env.cache-name }}-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
+          restore-keys: |
+            ${{ env.cache-name }}-
+
+      - name: Cache CMake Build
+        uses: hendrikmuhs/ccache-action@v1.2.18
+        env:
+          cache-name: ${{ runner.os }}-xenon-cache-build
+        with:
+          append-timestamp: false
+          key: ${{ env.cache-name }}-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
+
+      - name: Configure CMake
+        run: cmake -G Ninja -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_C_COMPILER=$(brew --prefix llvm)/bin/clang -DCMAKE_CXX_COMPILER=$(brew --prefix llvm)/bin/clang++ -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+      - name: Build
+        run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --parallel $(nproc)
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@main
+        with:
+          name: Xenon-macos64-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
+          path: ${{github.workspace}}/build/Xenon
