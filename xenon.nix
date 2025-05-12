@@ -22,6 +22,7 @@ let
     else {};
   sirit = if withGraphics
     then fetchFromGitHub {
+      fetchSubmodules = true;
       owner = "shadps4-emu";
       repo = "sirit";
       rev = "6b450704f6fedb9413d0c89a9eb59d028eb1e6c0";
