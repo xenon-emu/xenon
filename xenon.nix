@@ -26,7 +26,7 @@ let
       owner = "shadps4-emu";
       repo = "sirit";
       rev = "6b450704f6fedb9413d0c89a9eb59d028eb1e6c0";
-      hash = "sha256-EurTGJMCZmtfuhHegxobFxzHlYXy1EUEydZeC1RagKY=";
+      hash = "sha256-fMTROWo14UzZKO+xCJ/3D5z+LCwl+n5Bx0WJ45C+uZI=";
     }
     else {};
   microprofile = fetchFromGitHub {
