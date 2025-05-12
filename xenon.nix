@@ -25,7 +25,7 @@ let
       fetchSubmodules = true;
       owner = "Vali0004";
       repo = "sirit";
-      rev = "be2cd0a9c718bda218c661e2887106fad9175196";
+      rev = "e9f33a21066234f9479383233d4883837b7ea807";
       hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
     }
     else {};
