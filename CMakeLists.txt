@@ -25,6 +25,8 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
 if (msvc)
   add_compile_options($<$<CONFIG:Release>:/Oi>)
   add_compile_options($<$<CONFIG:Release>:/Ot>)
+else()
+  add_compile_options($<$<CONFIG:Release>:-O3>)
 endif()
 
 project(Xenon)
