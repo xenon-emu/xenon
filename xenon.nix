@@ -20,6 +20,14 @@ let
       hash = "sha256-VYNqqpE1bo4bjzVsPQhNlOVKemWOZeQg0JaryuAu/Tk=";
     }
     else {};
+  sirit = if withGraphics
+    then fetchFromGitHub {
+      owner = "shadps4-emu";
+      repo = "sirit";
+      rev = "6b450704f6fedb9413d0c89a9eb59d028eb1e6c0";
+      hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+    }
+    else {};
   microprofile = fetchFromGitHub {
     fetchSubmodules = true;
     owner = "jonasmr";
@@ -45,8 +53,10 @@ stdenv.mkDerivation {
   postUnpack = ''
     ${lib.optionalString withGraphics ''
       echo graphics present
+      rm -rf $sourceRoot/Deps/ThirdParty/Sirit
       rm -rf $sourceRoot/Deps/ThirdParty/ImGui
       cp -r ${imgui} $sourceRoot/Deps/ThirdParty/ImGui
+      cp -r ${sirit} $sourceRoot/Deps/ThirdParty/Sirit
     ''}
     rm -rf $sourceRoot/Deps/ThirdParty/microprofile
     cp -r ${microprofile} $sourceRoot/Deps/ThirdParty/microprofile
