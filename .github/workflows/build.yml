@@ -31,6 +31,7 @@ jobs:
         echo "commit=$(git rev-list --count HEAD)" >> $GITHUB_OUTPUT
 
   Linux-Clang:
+    name: Linux (Clang)
     runs-on: ubuntu-24.04
     needs: get-info
     steps:
@@ -72,6 +73,7 @@ jobs:
         path: ${{ env.BUILD_DIR }}/Xenon-${{ env.BUILD_TYPE }}
 
   Linux-GCC:
+    name: Linux (GCC)
     runs-on: ubuntu-24.04
     needs: get-info
     steps:
@@ -113,6 +115,7 @@ jobs:
         path: ${{ env.BUILD_DIR }}/Xenon-${{ env.BUILD_TYPE }}
 
   Windows-Clang:
+    name: Windows (Clang)
     runs-on: windows-2025
     needs: get-info
     steps:
@@ -148,10 +151,10 @@ jobs:
   Windows-GCC:
     name: Windows (GCC via MSYS2)
     runs-on: windows-2025
+    needs: get-info
     defaults:
       run:
         shell: msys2 {0}
-    needs: get-info
     steps:
     - uses: actions/checkout@main
       with:
@@ -189,7 +192,7 @@ jobs:
       run: cmake --build "${{ env.BUILD_DIR }}" --config ${{ env.BUILD_TYPE }} --parallel $env:NUMBER_OF_PROCESSORS
 
     - name: Upload Windows-GCC Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@main
       with:
         name: Xenon-win64-gcc-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
         path: ${{ env.BUILD_DIR }}\Xenon-${{ env.BUILD_TYPE }}.exe
