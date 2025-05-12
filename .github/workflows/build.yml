@@ -48,16 +48,6 @@ jobs:
                            libxi-dev libxinerama-dev libwayland-dev libxkbcommon-dev \
                            wayland-protocols git
 
-    - name: Fetch Fonts
-      run: |
-        mkdir -p Deps/fonts
-        git clone --depth=1 --filter=blob:none --sparse https://github.com/xenon-emu/xenon.git tmp-fonts
-        cd tmp-fonts
-        git sparse-checkout set Deps/fonts
-        cp -r Deps/fonts $GITHUB_WORKSPACE/Deps/
-        cd ..
-        rm -rf tmp-fonts
-
     - name: Configure CMake (Clang)
       run: cmake -G Ninja -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
                  -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
@@ -70,7 +60,9 @@ jobs:
       uses: actions/upload-artifact@main
       with:
         name: Xenon-linux64-clang-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
-        path: ${{ env.BUILD_DIR }}/Xenon-${{ env.BUILD_TYPE }}
+        path: |
+          ${{ env.BUILD_DIR }}/build/Xenon-${{ env.BUILD_TYPE }}
+          ${{ env.BUILD_DIR }}/Deps/fonts/
 
   Linux-GCC:
     name: Linux (GCC)
@@ -90,16 +82,6 @@ jobs:
                            libxi-dev libxinerama-dev libwayland-dev libxkbcommon-dev \
                            wayland-protocols git
 
-    - name: Fetch Fonts
-      run: |
-        mkdir -p Deps/fonts
-        git clone --depth=1 --filter=blob:none --sparse https://github.com/xenon-emu/xenon.git tmp-fonts
-        cd tmp-fonts
-        git sparse-checkout set Deps/fonts
-        cp -r Deps/fonts $GITHUB_WORKSPACE/Deps/
-        cd ..
-        rm -rf tmp-fonts
-
     - name: Configure CMake (GCC)
       run: cmake -G Ninja -B ${{ env.BUILD_DIR }} -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
                  -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++ \
@@ -112,7 +94,10 @@ jobs:
       uses: actions/upload-artifact@main
       with:
         name: Xenon-linux64-gcc-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
-        path: ${{ env.BUILD_DIR }}/Xenon-${{ env.BUILD_TYPE }}
+        path: |
+          ${{ env.BUILD_DIR }}/build/Xenon-${{ env.BUILD_TYPE }}
+          ${{ env.BUILD_DIR }}/Deps/fonts/
+
 
   Windows-Clang:
     name: Windows (Clang)
@@ -123,16 +108,6 @@ jobs:
       with:
         submodules: recursive
         fetch-depth: 0
-
-    - name: Fetch Fonts
-      run: |
-        git clone --depth=1 --filter=blob:none --sparse https://github.com/xenon-emu/xenon.git tmp-fonts
-        cd tmp-fonts
-        git sparse-checkout set Deps/fonts
-        mkdir -p $env:GITHUB_WORKSPACE\Deps\fonts
-        cp -r Deps/fonts/* $env:GITHUB_WORKSPACE\Deps\fonts
-        cd ..
-        rmdir /s /q tmp-fonts
 
     - name: Configure CMake (Clang)
       run: cmake -G Ninja -B "${{ env.BUILD_DIR }}" -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
@@ -146,7 +121,9 @@ jobs:
       uses: actions/upload-artifact@main
       with:
         name: Xenon-win64-clang-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
-        path: ${{ env.BUILD_DIR }}\Xenon-${{ env.BUILD_TYPE }}.exe
+        path: |
+          ${{ env.BUILD_DIR }}\Xenon-${{ env.BUILD_TYPE }}.exe
+          ${{ env.BUILD_DIR }}/Deps/fonts/
 
   Windows-GCC:
     name: Windows (GCC via MSYS2)
@@ -160,16 +137,6 @@ jobs:
       with:
         submodules: recursive
         fetch-depth: 0
-
-    - name: Fetch Fonts
-      run: |
-        git clone --depth=1 --filter=blob:none --sparse https://github.com/xenon-emu/xenon.git tmp-fonts
-        cd tmp-fonts
-        git sparse-checkout set Deps/fonts
-        mkdir -p $env:GITHUB_WORKSPACE\Deps\fonts
-        cp -r Deps/fonts/* $env:GITHUB_WORKSPACE\Deps\fonts
-        cd ..
-        rmdir /s /q tmp-fonts
 
     - uses: msys2/setup-msys2@v2
       with:
@@ -195,7 +162,9 @@ jobs:
       uses: actions/upload-artifact@main
       with:
         name: Xenon-win64-gcc-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
-        path: ${{ env.BUILD_DIR }}\Xenon-${{ env.BUILD_TYPE }}.exe
+        path: |
+          ${{ env.BUILD_DIR }}\Xenon-${{ env.BUILD_TYPE }}.exe
+          ${{ env.BUILD_DIR }}/Deps/fonts/
 
   linux_nix:
     name: Linux (nix)
