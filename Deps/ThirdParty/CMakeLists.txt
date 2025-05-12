@@ -27,28 +27,6 @@ endif()
 
 # Sirit
 if (NOT TARGET sirit)
-  # Override compiler flags based on proper defines
-  if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-      set(SIRIT_CXX_FLAGS
-          /std:c++latest # CMAKE_CXX_STANDARD as no effect on MSVC until CMake 3.10.
-          /MP
-          /Zi
-          /Zo
-          /EHsc
-          /Zc:inline # Omits inline functions from object-file output
-          /DNOMINMAX)
-  else()
-      set(SIRIT_CXX_FLAGS
-          -Wall
-          -Wextra
-          -Wcast-qual
-          -pedantic
-          -pedantic-errors
-          -Wfatal-errors
-          -Wno-missing-braces
-          -Wconversion
-          -Wsign-conversion)
-  endif()
   add_subdirectory(Sirit)
 endif()
 
