@@ -78,7 +78,7 @@ jobs:
       run: |
         mkdir -p artifact
         cp -r ${{env.BUILD_DIR}}/Xenon artifact/xenon-clang-x64-${{env.BUILD_TYPE}}
-        cp ${{github.workspace}}/Deps/fonts/* artifact/
+        cp ${{github.workspace}}/Deps/fonts/ artifact/fonts/
 
     - name: Upload Linux Clang Artifact
       uses: actions/upload-artifact@main
@@ -134,7 +134,7 @@ jobs:
       run: |
         mkdir -p artifact
         cp -r ${{env.BUILD_DIR}}/Xenon artifact/xenon-gcc-x64-${{env.BUILD_TYPE}}
-        cp ${{github.workspace}}/Deps/fonts/* artifact/
+        cp ${{github.workspace}}/Deps/fonts/ artifact/fonts/
 
     - name: Upload Linux GCC Artifact
       uses: actions/upload-artifact@main
@@ -183,7 +183,7 @@ jobs:
       run: |
         mkdir -p artifact
         cp -r ${{env.BUILD_DIR}}/Xenon.exe artifact/xenon-clang-x64-${{env.BUILD_TYPE}}.exe
-        cp ${{github.workspace}}/Deps/fonts/* artifact/
+        cp ${{github.workspace}}/Deps/fonts/ artifact/fonts/
 
     - name: Upload Windows Clang Artifact
       uses: actions/upload-artifact@main
@@ -246,7 +246,7 @@ jobs:
       run: |
         mkdir -p artifact
         cp -r ${{env.BUILD_DIR}}/Xenon.exe artifact/xenon-gcc-x64-${{env.BUILD_TYPE}}.exe
-        cp ${{github.workspace}}/Deps/fonts/* artifact/
+        cp ${{github.workspace}}/Deps/fonts/ artifact/fonts/
 
     - name: Upload Windows-GCC Artifact
       uses: actions/upload-artifact@main
@@ -313,7 +313,7 @@ jobs:
         run: |
           mkdir -p artifact
           cp -r ${{env.BUILD_DIR}}/Xenon artifact/xenon-clang-arm64-${{env.BUILD_TYPE}}
-          cp ${{github.workspace}}/Deps/fonts/* artifact/
+          cp ${{github.workspace}}/Deps/fonts/ artifact/fonts/
 
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@main
