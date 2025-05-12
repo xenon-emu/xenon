@@ -64,9 +64,7 @@ if (NOT TARGET sirit)
           -Wfatal-errors
           -Wno-missing-braces
           -Wconversion
-          -Wsign-conversion
-          -Wshadow
-          -Werror)
+          -Wsign-conversion)
   endif()
   add_subdirectory(Sirit)
 endif()
