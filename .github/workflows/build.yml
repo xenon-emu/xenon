@@ -91,7 +91,7 @@ jobs:
     - name: Summary
       run: |
         echo '### CCache Statistics' >> "$GITHUB_STEP_SUMMARY"
-        ccache --print-stats --format='- **%n**: %v' >> "$GITHUB_STEP_SUMMARY"
+        ccache --print-stats --format="**%n**: %v" >> "$GITHUB_STEP_SUMMARY"
 
   Linux-GCC:
     name: Linux (GCC)
@@ -153,7 +153,7 @@ jobs:
     - name: Summary
       run: |
         echo '### CCache Statistics' >> "$GITHUB_STEP_SUMMARY"
-        ccache --print-stats --format='- **%n**: %v' >> "$GITHUB_STEP_SUMMARY"
+        ccache --print-stats --format="**%n**: %v" >> "$GITHUB_STEP_SUMMARY"
 
 
   Windows-Clang:
@@ -208,7 +208,7 @@ jobs:
     - name: Summary
       run: |
         echo '### CCache Statistics' >> "$GITHUB_STEP_SUMMARY"
-        ccache --print-stats --format='- **%n**: %v' >> "$GITHUB_STEP_SUMMARY"
+        ccache --print-stats --format="**%n**: %v" >> "$GITHUB_STEP_SUMMARY"
 
   Windows-GCC:
     name: Windows (GCC via MSYS2)
@@ -277,7 +277,7 @@ jobs:
     - name: Summary
       run: |
         echo '### CCache Statistics' >> "$GITHUB_STEP_SUMMARY"
-        ccache --print-stats --format='- **%n**: %v' >> "$GITHUB_STEP_SUMMARY"
+        ccache --print-stats --format="**%n**: %v" >> "$GITHUB_STEP_SUMMARY"
 
   linux_nix:
     name: Linux (nix)
@@ -344,10 +344,10 @@ jobs:
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@main
         with:
-          name: Xenon-macos64-${{ needs.get-info.outputs.commit }}-${{needs.get-info.outputs.shorthash}}
+          name: Xenon-${{runner.os}}-clang-arm64-${{ needs.get-info.outputs.commit }}-${{needs.get-info.outputs.shorthash}}
           path: artifact/
 
       - name: Summary
         run: |
           echo '### CCache Statistics' >> "$GITHUB_STEP_SUMMARY"
-          ccache --print-stats --format='- **%n**: %v' >> "$GITHUB_STEP_SUMMARY"
+          ccache --print-stats --format="**%n**: %v" >> "$GITHUB_STEP_SUMMARY"
