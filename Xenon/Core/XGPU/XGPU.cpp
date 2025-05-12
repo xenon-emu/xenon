@@ -131,6 +131,9 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
     case XeRegister::CONFIG_CNTL:
       value = xenosState->configControl;
       break;
+    case XeRegister::RBBM_CNTL:
+      value = xenosState->rbbmControl;
+      break;
     case XeRegister::RBBM_SOFT_RESET:
       value = xenosState->rbbmSoftReset;
       if (xenosState->rbbmSoftReset == 0) {
@@ -220,6 +223,72 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
     case XeRegister::XDVO_REGISTER_DATA:
       value = xenosState->xdvoRegisterData;
       break;
+    case XeRegister::RB_SURFACE_INFO:
+      value = xenosState->surfaceInfo;
+      break;
+    case XeRegister::RB_COLOR_INFO:
+      value = xenosState->colorInfo;
+      break;
+    case XeRegister::RB_DEPTH_INFO:
+      value = xenosState->depthInfo;
+      break;
+    case XeRegister::RB_COLOR1_INFO:
+      value = xenosState->color1Info;
+      break;
+    case XeRegister::RB_COLOR2_INFO:
+      value = xenosState->color2Info;
+      break;
+    case XeRegister::RB_COLOR3_INFO:
+      value = xenosState->color3Info;
+      break;
+    case XeRegister::RB_BLEND_RED:
+      value = xenosState->blendRed;
+      break;
+    case XeRegister::RB_BLEND_GREEN:
+      value = xenosState->blendGreen;
+      break;
+    case XeRegister::RB_BLEND_BLUE:
+      value = xenosState->blendBlue;
+      break;
+    case XeRegister::RB_BLEND_ALPHA:
+      value = xenosState->blendAlpha;
+      break;
+    case XeRegister::RB_STENCILREFMASK:
+      value = xenosState->stencilReferenceMask;
+      break;
+    case XeRegister::RB_DEPTHCONTROL:
+      value = xenosState->depthControl;
+      break;
+    case XeRegister::RB_BLENDCONTROL0:
+      value = xenosState->blendControl0;
+      break;
+    case XeRegister::RB_TILECONTROL:
+      value = xenosState->tileControl;
+      break;
+    case XeRegister::RB_MODECONTROL:
+      value = xenosState->modeControl;
+      break;
+    case XeRegister::RB_BLENDCONTROL1:
+      value = xenosState->blendControl1;
+      break;
+    case XeRegister::RB_BLENDCONTROL2:
+      value = xenosState->blendControl2;
+      break;
+    case XeRegister::RB_BLENDCONTROL3:
+      value = xenosState->blendControl3;
+      break;
+    case XeRegister::RB_COPY_CONTROL:
+      value = xenosState->copyControl;
+      break;
+    case XeRegister::RB_DEPTH_CLEAR:
+      value = xenosState->depthClear;
+      break;
+    case XeRegister::RB_COLOR_CLEAR:
+      value = xenosState->clearColor;
+      break;
+    case XeRegister::RB_COLOR_CLEAR_LO:
+      value = xenosState->clearColorLo;
+      break;
     default:
       value = regData;
       break;
@@ -256,6 +325,11 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
     case XeRegister::CONFIG_CNTL:
       xenosState->configControl = tmp;
       xenosState->WriteRegister(reg, xenosState->configControl);
+      break;
+    case XeRegister::RBBM_CNTL:
+      xenosState->rbbmControl = byteswap_be<u32>(tmp);
+      xenosState->WriteRegister(reg, xenosState->rbbmControl);
+      SYSTEM_PAUSE();
       break;
     case XeRegister::RBBM_SOFT_RESET:
       xenosState->rbbmSoftReset = tmp;
@@ -391,6 +465,99 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
     case XeRegister::XDVO_REGISTER_DATA:
       xenosState->xdvoRegisterData = tmp;
       xenosState->WriteRegister(reg, xenosState->xdvoRegisterData);
+      break;
+    case XeRegister::RB_SURFACE_INFO:
+      xenosState->surfaceInfo = tmp;
+      xenosState->WriteRegister(reg, xenosState->surfaceInfo);
+      break;
+    case XeRegister::RB_COLOR_INFO:
+      xenosState->colorInfo = tmp;
+      xenosState->WriteRegister(reg, xenosState->colorInfo);
+      break;
+    case XeRegister::RB_DEPTH_INFO:
+      xenosState->depthInfo = tmp;
+      xenosState->WriteRegister(reg, xenosState->depthInfo);
+      break;
+    case XeRegister::RB_COLOR1_INFO:
+      xenosState->color1Info = tmp;
+      xenosState->WriteRegister(reg, xenosState->color1Info);
+      break;
+    case XeRegister::RB_COLOR2_INFO:
+      xenosState->color2Info = tmp;
+      xenosState->WriteRegister(reg, xenosState->color2Info);
+      break;
+    case XeRegister::RB_COLOR3_INFO:
+      xenosState->color3Info = tmp;
+      xenosState->WriteRegister(reg, xenosState->color3Info);
+      break;
+    case XeRegister::RB_BLEND_RED:
+      xenosState->blendRed = tmp;
+      xenosState->WriteRegister(reg, xenosState->blendRed);
+      break;
+    case XeRegister::RB_BLEND_GREEN:
+      xenosState->blendGreen = tmp;
+      xenosState->WriteRegister(reg, xenosState->blendGreen);
+      break;
+    case XeRegister::RB_BLEND_BLUE:
+      xenosState->blendBlue = tmp;
+      xenosState->WriteRegister(reg, xenosState->blendBlue);
+      break;
+    case XeRegister::RB_BLEND_ALPHA:
+      xenosState->blendAlpha = tmp;
+      xenosState->WriteRegister(reg, xenosState->blendAlpha);
+      break;
+    case XeRegister::RB_STENCILREFMASK:
+      xenosState->stencilReferenceMask = tmp;
+      xenosState->WriteRegister(reg, xenosState->stencilReferenceMask);
+      break;
+    case XeRegister::RB_DEPTHCONTROL:
+      xenosState->depthControl = tmp;
+      xenosState->WriteRegister(reg, xenosState->depthControl);
+      break;
+    case XeRegister::RB_BLENDCONTROL0:
+      xenosState->blendControl0 = tmp;
+      xenosState->WriteRegister(reg, xenosState->blendControl0);
+      break;
+    case XeRegister::RB_TILECONTROL:
+      xenosState->tileControl = tmp;
+      xenosState->WriteRegister(reg, xenosState->tileControl);
+      break;
+    case XeRegister::RB_MODECONTROL:
+      xenosState->modeControl = tmp;
+      xenosState->WriteRegister(reg, xenosState->modeControl);
+      break;
+    case XeRegister::RB_BLENDCONTROL1:
+      xenosState->blendControl1 = tmp;
+      xenosState->WriteRegister(reg, xenosState->blendControl1);
+      break;
+    case XeRegister::RB_BLENDCONTROL2:
+      xenosState->blendControl2 = tmp;
+      xenosState->WriteRegister(reg, xenosState->blendControl2);
+      break;
+    case XeRegister::RB_BLENDCONTROL3:
+      xenosState->blendControl3 = tmp;
+      xenosState->WriteRegister(reg, xenosState->blendControl3);
+      break;
+    case XeRegister::RB_COPY_CONTROL:
+      xenosState->copyControl = tmp;
+      xenosState->WriteRegister(reg, xenosState->copyControl);
+      break;
+    case XeRegister::RB_DEPTH_CLEAR:
+      xenosState->depthClear = tmp;
+      xenosState->WriteRegister(reg, xenosState->depthClear);
+      break;
+    case XeRegister::RB_COLOR_CLEAR: {
+      xenosState->clearColor = tmp;
+      u8 a = (xenosState->clearColor >> 24) & 0xFF;
+      u8 r = (xenosState->clearColor >> 16) & 0xFF;
+      u8 g = (xenosState->clearColor >> 8) & 0xFF;
+      u8 b = (xenosState->clearColor >> 0) & 0xFF;
+      Xe_Main->renderer->UpdateClearColor(r, g, b, a);
+      xenosState->WriteRegister(reg, xenosState->clearColor);
+    } break;
+    case XeRegister::RB_COLOR_CLEAR_LO:
+      xenosState->clearColorLo = tmp;
+      xenosState->WriteRegister(reg, xenosState->clearColorLo);
       break;
     default:
       xenosState->WriteRegister(reg, tmp);

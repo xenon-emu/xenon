@@ -73,9 +73,34 @@ public:
   u32 scratchMask = 0;
   u32 scratchAddr = 0;
   // RBBM
+  u32 rbbmControl = 0;
   u32 rbbmDebug = 0xF0000;
   u32 rbbmStatus = 0;
   u32 rbbmSoftReset = 0;
+  // RB
+  u32 surfaceInfo = 0;
+  u32 colorInfo = 0;
+  u32 depthInfo = 0;
+  u32 color1Info = 0;
+  u32 color2Info = 0;
+  u32 color3Info = 0;
+  u32 blendRed = 0;
+  u32 blendGreen = 0;
+  u32 blendBlue = 0;
+  u32 blendAlpha = 0;
+  u32 stencilReferenceMask = 0;
+  u32 depthControl = 0;
+  u32 blendControl0 = 0;
+  u32 tileControl = 0;
+  u32 modeControl = 0;
+  u32 blendControl1 = 0;
+  u32 blendControl2 = 0;
+  u32 blendControl3 = 0;
+  u32 copyControl = 0;
+  u32 depthClear = 0;
+  u32 clearColor = 0;
+  u32 clearColorLo = 0;
+
   // D1CRTC
   u32 crtcControl = 0; // Checks if the RTC is active
   // D1MODE

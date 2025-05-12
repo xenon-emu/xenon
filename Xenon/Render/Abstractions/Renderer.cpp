@@ -168,25 +168,27 @@ void Renderer::Thread() {
 
     // Upload buffer
     if (fbPointer && Xe_Main.get() && !Xe_Main->renderHalt) {
-      // Profile
-      MICROPROFILE_SCOPEI("[Xe::Render]", "Deswizle", MP_AUTO);
-      const u32 *ui_fbPointer = reinterpret_cast<u32*>(fbPointer);
-      pixelSSBO->UpdateBuffer(0, pitch, ui_fbPointer);
+      if (Xe_Main->xenos->RenderingTo2DFramebuffer()) {
+        // Profile
+        MICROPROFILE_SCOPEI("[Xe::Render]", "Deswizle", MP_AUTO);
+        const u32 *ui_fbPointer = reinterpret_cast<u32*>(fbPointer);
+        pixelSSBO->UpdateBuffer(0, pitch, ui_fbPointer);
 
-      // Use the compute shader
-      computeShaderProgram->Bind();
-      pixelSSBO->Bind();
-      if (Xe_Main.get()) {
-        computeShaderProgram->SetUniformInt("internalWidth", Xe_Main->xenos->GetWidth());
-        computeShaderProgram->SetUniformInt("internalHeight", Xe_Main->xenos->GetHeight());
-        computeShaderProgram->SetUniformInt("resWidth", width);
-        computeShaderProgram->SetUniformInt("resHeight", height);
+        // Use the compute shader
+        computeShaderProgram->Bind();
+        pixelSSBO->Bind();
+        if (Xe_Main.get()) {
+          computeShaderProgram->SetUniformInt("internalWidth", Xe_Main->xenos->GetWidth());
+          computeShaderProgram->SetUniformInt("internalHeight", Xe_Main->xenos->GetHeight());
+          computeShaderProgram->SetUniformInt("resWidth", width);
+          computeShaderProgram->SetUniformInt("resHeight", height);
+        }
+        OnCompute();
       }
-      OnCompute();
     }
 
     // Render the texture
-    if (!Xe_Main->renderHalt) {
+    if (!Xe_Main->renderHalt && Xe_Main->xenos->RenderingTo2DFramebuffer()) {
       MICROPROFILE_SCOPEI("[Xe::Render]", "BindTexture", MP_AUTO);
       renderShaderPrograms->Bind();
       backbuffer->Bind();

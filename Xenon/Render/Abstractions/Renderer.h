@@ -38,6 +38,7 @@ public:
   virtual void BackendResize(s32 x, s32 y) = 0;
   virtual void OnCompute() = 0;
   virtual void OnBind() = 0;
+  virtual void UpdateClearColor(u8 r, u8 b, u8 g, u8 a) = 0;
   virtual void OnSwap(SDL_Window *window) = 0;
   virtual s32 GetBackbufferFlags() = 0;
   virtual void* GetBackendContext() = 0;
@@ -45,7 +46,6 @@ public:
 
   void Create();
   void Shutdown();
-
   void Resize(s32 x, s32 y);
 
   void HandleEvents();

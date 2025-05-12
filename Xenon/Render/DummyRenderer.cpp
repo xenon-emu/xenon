@@ -40,6 +40,10 @@ void DummyRenderer::BackendResize(s32 x, s32 y) {
   LOG_INFO(Render, "DummyRenderer::BackendResize: {}, {}", x, y);
 }
 
+void DummyRenderer::UpdateClearColor(u8 r, u8 b, u8 g, u8 a) {
+  LOG_INFO(Render, "DummyRenderer::UpdateClearColor: {}, {}, {}, {}", r, g, b, a);
+}
+
 void DummyRenderer::OnCompute() {
   LOG_INFO(Render, "DummyRenderer::OnCompute");
 }

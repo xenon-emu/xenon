@@ -104,6 +104,10 @@ void OGLRenderer::BackendResize(s32 x, s32 y) {
   glViewport(0, 0, x, y);
 }
 
+void OGLRenderer::UpdateClearColor(u8 r, u8 b, u8 g, u8 a) {
+  glClearColor((static_cast<f32>(r) / 255.f), (static_cast<f32>(g) / 255.f), (static_cast<f32>(b) / 255.f), (static_cast<f32>(a) / 255.f));
+}
+
 void OGLRenderer::OnCompute() {
   glDispatchCompute(width / 16, height / 16, 1);
   glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT | GL_TEXTURE_UPDATE_BARRIER_BIT | GL_TEXTURE_FETCH_BARRIER_BIT);
