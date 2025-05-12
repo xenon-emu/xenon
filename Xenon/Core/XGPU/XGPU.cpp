@@ -329,7 +329,6 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
     case XeRegister::RBBM_CNTL:
       xenosState->rbbmControl = byteswap_be<u32>(tmp);
       xenosState->WriteRegister(reg, xenosState->rbbmControl);
-      SYSTEM_PAUSE();
       break;
     case XeRegister::RBBM_SOFT_RESET:
       xenosState->rbbmSoftReset = tmp;
