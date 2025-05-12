@@ -104,6 +104,10 @@ void OGLRenderer::BackendResize(s32 x, s32 y) {
   glViewport(0, 0, x, y);
 }
 
+void OGLRenderer::UpdateViewport(s32 x, s32 y, u32 width, u32 height) {
+  glViewport(x, y, width, height);
+}
+
 void OGLRenderer::UpdateClearColor(u8 r, u8 b, u8 g, u8 a) {
   glClearColor((static_cast<f32>(r) / 255.f), (static_cast<f32>(g) / 255.f), (static_cast<f32>(b) / 255.f), (static_cast<f32>(a) / 255.f));
 }
