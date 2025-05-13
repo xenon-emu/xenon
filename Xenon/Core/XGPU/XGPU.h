@@ -10,9 +10,10 @@
 #include <vector>
 
 #include "Core/RAM/RAM.h"
-#include "Core/XGPU/CommandProcessor.h"
+#include "Core/XGPU/EDRAM.h"
 #include "Core/XGPU/XGPUConfig.h"
 #include "Core/XGPU/XenosRegisters.h"
+#include "Core/XGPU/CommandProcessor.h"
 #include "Core/RootBus/HostBridge/PCIe.h"
 
 /*
@@ -69,6 +70,9 @@ private:
 
   // GPU State
   std::unique_ptr<Xe::XGPU::XenosState> xenosState = {};
+
+  // EDRAM
+  std::unique_ptr<Xe::XGPU::EDRAM> edram = {};
 
   // Command Processor
   std::unique_ptr<Xe::XGPU::CommandProcessor> commandProcessor = {};

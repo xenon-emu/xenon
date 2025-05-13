@@ -98,11 +98,13 @@ Xe::Xenos::XGPU::XGPU(RAM *ram, PCIBridge *pciBridge) : ramPtr(ram), parentBus(p
   }
 
   commandProcessor = std::make_unique<STRIP_UNIQUE(commandProcessor)>(ramPtr, xenosState.get(), parentBus);
+  edram = std::make_unique<STRIP_UNIQUE(edram)>();
 }
 
 Xe::Xenos::XGPU::~XGPU() {
   commandProcessor.reset();
   xenosState.reset();
+  edram.reset();
 }
 
 bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
@@ -325,12 +327,20 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
     case XeRegister::CP_ME_RAM_DATA:
       value = commandProcessor.get()->CPReadMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypeME);
       break;
+    case XeRegister::RB_SIDEBAND_BUSY:
+      // Checks if the EDRAM is currently busy doing work.
+      value = static_cast<u32>(edram.get()->isEdramBusy());
+      break;
+    case XeRegister::RB_SIDEBAND_DATA:
+      // Checks if the EDRAM is currently busy doing work.
+      value = edram.get()->ReadReg();
+      break;
     default:
       value = regData;
       break;
     }
 #ifdef XE_DEBUG
-    LOG_DEBUG(Xenos, "Read from {} (0x{:X}), index 0x{:X}, value 0x{:X}", Xe::XGPU::GetRegisterNameById(regIndex), readAddress, regIndex, value);
+    LOG_DEBUG(Xenos, "Read from {} ({:#x}), index: {:#x}, value: {:#x}, size: {:#x}", Xe::XGPU::GetRegisterNameById(regIndex), readAddress, regIndex, value, size);
 #endif
 
     memcpy(data, &value, size);
@@ -653,6 +663,18 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
     case XeRegister::CP_ME_RAM_DATA:
       // Software is writing CP Microcode Engine uCode data.
       commandProcessor.get()->CPWriteMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypeME, tmp);
+      break;
+    case XeRegister::RB_SIDEBAND_RD_ADDR:
+      // Software is writing the address (index) of the edram reg it wants to write.
+      edram.get()->SetRWRegIndex(Xe::XGPU::eRegIndexType::readIndex, tmp);
+      break;
+    case XeRegister::RB_SIDEBAND_WR_ADDR:
+      // Software is writing the address (index) of the edram reg it wants to read.
+      edram.get()->SetRWRegIndex(Xe::XGPU::eRegIndexType::writeIndex, tmp);
+      break;
+    case XeRegister::RB_SIDEBAND_DATA:
+      // Software is writing the data of the edram reg previously specified.
+      edram.get()->WriteReg(tmpOld); // NOTE: We want data to not be byteswapped.
       break;
     default:
       xenosState->WriteRegister(reg, tmp);

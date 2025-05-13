@@ -309,6 +309,8 @@ set(XGPU
   Xenon/Core/XGPU/XGPU.cpp
   Xenon/Core/XGPU/XGPU.h
   Xenon/Core/XGPU/XGPUConfig.h
+  Xenon/Core/XGPU/EDRAM.h
+  Xenon/Core/XGPU/EDRAM.cpp
 )
 
 set(Core
