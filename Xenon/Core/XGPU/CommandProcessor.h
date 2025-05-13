@@ -277,5 +277,8 @@ private:
   bool ExecutePacketType3_SET_BIN_MASK_HI(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
   bool ExecutePacketType3_SET_BIN_SELECT_LO(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
   bool ExecutePacketType3_SET_BIN_SELECT_HI(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packetData, u32 dataCount, u32 vizQueryCondition, const char *opCodeName);
+  bool ExecutePacketType3_DRAW_INDX(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_DRAW_INDX_2(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
 };
 }

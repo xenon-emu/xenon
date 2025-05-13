@@ -315,6 +315,7 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
     result = ExecutePacketType3_REG_RMW(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_DRAW_INDX:
+    result = ExecutePacketType3_DRAW_INDX(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_VIZ_QUERY:
     break;
@@ -356,6 +357,7 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
   case Xe::XGPU::PM4_DRAW_INDX_2_BIN:
     break;
   case Xe::XGPU::PM4_DRAW_INDX_2:
+    result = ExecutePacketType3_DRAW_INDX_2(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_INDIRECT_BUFFER_PFD:
     result = ExecutePacketType3_INDIRECT_BUFFER(ringBuffer, packetData, dataCount);
@@ -966,6 +968,55 @@ bool CommandProcessor::ExecutePacketType3_SET_BIN_SELECT_HI(RingBuffer *ringBuff
   const u32 hiSelect = ringBuffer->ReadAndSwap<u32>();
   binSelect = (binSelect & 0xFFFFFFFFull) | (static_cast<u64>(hiSelect) << 32);
   return true;
+}
+
+bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer* ringBuffer, u32 packetData, u32 dataCount, u32 vizQueryCondition, const char* opCodeName)
+{
+  // Sanity check.
+  if (!dataCount) {
+    LOG_ERROR(Xenos, "[CP, PT3]: Packet too small, can't read VGT_DRAW_INITIATOR, OpCode {}.", opCodeName);
+    return false;
+  }
+
+  // Get our VGT register data.
+  VGT_DRAW_INITIATOR_REG vgtReg;
+  vgtReg.hexValue = ringBuffer->ReadAndSwap<u32>();
+  dataCount--;
+
+  // Write the VGT_DRAW_INITIATOR register.
+  state->WriteRegister(XeRegister::VGT_DRAW_INITIATOR, vgtReg.hexValue);
+
+  // TODO(vali004): How do you wanna do Draw state?...
+  // TODO(Vali004): Do draw on backend.
+
+  return false;
+}
+
+bool CommandProcessor::ExecutePacketType3_DRAW_INDX(RingBuffer* ringBuffer, u32 packetData, u32 dataCount) {
+  // Initiate fetch of index buffer and draw.
+  // Generally used by Xbox 360 Direct3D 9 for kDMA and kAutoIndex sources.
+  // With a VIZ Query token as the first one.
+  
+  u32 dataCountRemaining = dataCount;
+
+  if (!dataCountRemaining) {
+    LOG_ERROR(Xenos, "[CP,PT3]: PM4_DRAW_INDX: Packet too small, can't read the VIZ Query token.");
+    return false;
+  }
+
+  // Get our VIZ Query Conditon.
+  u32 vizQueryCondition = ringBuffer->ReadAndSwap<u32>();
+  --dataCountRemaining;
+
+  return ExecutePacketType3_DRAW(ringBuffer, packetData, dataCountRemaining, vizQueryCondition, "PM4_DRAW_INDX");
+}
+
+bool CommandProcessor::ExecutePacketType3_DRAW_INDX_2(RingBuffer* ringBuffer, u32 packetData, u32 dataCount) {
+  // Draw using supplied indices in packet.
+  // Generally used by Xbox 360 Direct3D 9 for kAutoIndex source.
+  // No VIZ query token.
+
+  return ExecutePacketType3_DRAW(ringBuffer, packetData, dataCount, 0, "PM4_DRAW_INDX_2");
 }
 
 } // namespace Xe::XGPU

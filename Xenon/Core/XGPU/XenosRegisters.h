@@ -6,6 +6,7 @@
 #include <unordered_map>
 
 #include "Base/Assert.h"
+#include "Xenos.h"
 
 #define XE_FB_BASE 0x1E000000
 
@@ -7186,4 +7187,24 @@ enum class XeRegister {
   SHADER_CONSTANT_FLUSH_FETCH_0 = 0x5000,
   SHADER_CONSTANT_FLUSH_FETCH_1 = 0x5001,
   SHADER_CONSTANT_FLUSH_FETCH_2 = 0x5002
+};
+
+//
+// Registers Definitions
+//
+
+// Vertex Group Tesellator Draw Initiator Register.
+union alignas(u32) VGT_DRAW_INITIATOR_REG {
+  u32 hexValue;
+  // Different than on A2xx and R6xx/R7xx.
+  struct {
+    ePrimitiveType primitiveType : 6;   // +0
+    eSourceSelect sourceSelect : 2;     // +6
+    eMajorMode majorMode : 2;           // +8
+    u32 res0 : 1;                       // +10
+    eIndexFormat indexSize : 1;         // +11
+    u32 notEndOfPacket : 1;             // +12
+    u32 res1 : 3;                       // +13
+    u32 numIndices : 16;                // +16
+  };
 };
