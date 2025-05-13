@@ -694,9 +694,9 @@ std::pair<u32, std::vector<u32>> LoadShader(eShaderType shaderType, const std::v
   fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "cache" };
   std::string typeString = shaderType == Xe::eShaderType::Pixel ? "pixel" : "vertex";
   std::string baseString = fmt::format("{}_shader_{:X}", typeString, crc);
+  fs::path path{ shaderPath / (baseString + ".spv") };
   std::vector<u32> code{};
   {
-    fs::path path{ shaderPath / (baseString + ".spv") };
     std::ifstream file{ path, std::ios::in | std::ios::binary };
     std::error_code error;
     if (fs::exists(path, error) && file.is_open()) {
@@ -718,6 +718,9 @@ std::pair<u32, std::vector<u32>> LoadShader(eShaderType shaderType, const std::v
   writer.BeginMain();
   writer.EndMain();
   code = writer.module.Assemble();
+  std::ofstream f{ shaderPath / (baseString + ".spv"), std::ios::out | std::ios::binary };
+  f.write(reinterpret_cast<char*>(code.data()), code.size() * 4);
+  f.close();
   return { crc, code };
 }
 
