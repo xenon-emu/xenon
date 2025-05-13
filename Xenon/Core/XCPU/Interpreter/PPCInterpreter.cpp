@@ -62,12 +62,6 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
     return;
   }
 
-  // EDRAM Chip ID Check. r10 = 0xD1.
-  if (static_cast<u32>(thread.CIA) == 0x800FC140) {
-    LOG_INFO(Xenon, "EDRAM Chip ID Check.");
-    thread.GPR[10] = 0xD1;
-  }
-
   // VdpWriteXDVOUllong. Set r10 to 1. Skips XDVO write loop.
   if (static_cast<u32>(thread.CIA) == 0x800ef7c0) {
     LOG_INFO(Xenon, "VdpWriteXDVOUllong");
