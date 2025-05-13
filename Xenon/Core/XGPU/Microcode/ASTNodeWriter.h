@@ -40,7 +40,7 @@ public:
 
   template <typename T = NodeBase>
   std::shared_ptr<T> Get() {
-    return std::dynamic_pointer_cast<T>(shared_from_this());
+    return std::dynamic_pointer_cast<T>(node);
   }
 
   explicit operator bool() const {
@@ -51,7 +51,7 @@ private:
   std::shared_ptr<NodeBase> node;
 };
 
-class Statement : public std::enable_shared_from_this<Expression> {
+class Statement : public std::enable_shared_from_this<Statement> {
 public:
   using Ptr = std::shared_ptr<NodeBase>;
 
@@ -76,7 +76,7 @@ public:
 
   template <typename T = NodeBase>
   std::shared_ptr<T> Get() {
-    return std::dynamic_pointer_cast<T>(shared_from_this());
+    return std::dynamic_pointer_cast<T>(node);
   }
 
   explicit operator bool() const {

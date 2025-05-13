@@ -1,5 +1,7 @@
 // Copyright 2025 Xenon Emulator Project
 
+#include <algorithm>
+
 #include "Base/Logging/Log.h"
 
 #include "ASTBlock.h"
@@ -71,7 +73,8 @@ ControlFlowGraph* ControlFlowGraph::DecompileMicroCode(const void *code, u32 cod
   NodeWriter blockTranslator;
   transformer.TransformShader(blockTranslator, reinterpret_cast<const u32*>(code), codeLength / 4);
 
-  if (blockTranslator.GetNumCreatedBlocks() == 0) return nullptr;
+  if (!blockTranslator.GetNumCreatedBlocks())
+    return nullptr;
 
   ControlFlowGraph *graph = new ControlFlowGraph();
   const u32 numBlocks = blockTranslator.GetNumCreatedBlocks();
@@ -123,11 +126,11 @@ ControlFlowGraph* ControlFlowGraph::DecompileMicroCode(const void *code, u32 cod
 
   graph->roots.push_back(graph->blocks[0]);
   graph->roots.insert(graph->roots.end(), functionRoots.begin(), functionRoots.end());
-
+  transformer;
   return graph;
 }
 
-void ControlFlowGraph::EmitShaderCode(AST::ShaderCodeWriterBase& writer) const {
+void ControlFlowGraph::EmitShaderCode(AST::ShaderCodeWriterBase &writer) const {
   for (Block *root : roots) {
     u32 entryAddr = root->GetAddress();
 

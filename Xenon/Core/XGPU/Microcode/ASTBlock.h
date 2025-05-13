@@ -36,6 +36,9 @@ public:
   inline Block* GetTarget() const { return target; }
   inline std::vector<Block*> GetSources() const { return sources; }
   inline Block* GetContinuation() const { return continuation; }
+  inline AST::ExpressionNode* GetCondition() const { return condition.get(); }
+  inline AST::StatementNode* GetCode() const { return codeStatement.get(); }
+  inline AST::StatementNode* GetPreamble() const { return preambleStatement.get(); }
   inline u32 GetAddress() const { return address; }
   inline u32 GetTargetAddress() const { return targetAddress; }
   inline eBlockType GetType() const { return type; }
@@ -47,11 +50,11 @@ private:
   // Target address - only for JUMP and CALL
   u32 targetAddress = 0;
   // Condition for this block of code
-  std::unique_ptr<AST::ExpressionNode> condition = nullptr;
+  std::shared_ptr<AST::ExpressionNode> condition = nullptr;
   // Code for this block (executed inside conditional branch)
-  std::unique_ptr<AST::StatementNode> codeStatement = nullptr;
+  std::shared_ptr<AST::StatementNode> codeStatement = nullptr;
   // Part of code executed outside the conditional branch
-  std::unique_ptr<AST::StatementNode> preambleStatement = nullptr;
+  std::shared_ptr<AST::StatementNode> preambleStatement = nullptr;
   // Blocks jumping to this block
   std::vector<Block*> sources = {};
   // Resolved target block, only for JUMP and CALL

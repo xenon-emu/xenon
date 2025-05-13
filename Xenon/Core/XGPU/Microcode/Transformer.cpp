@@ -1,6 +1,7 @@
 // Copyright 2025 Xenon Emulator Project
 
 #include "Base/Assert.h"
+#include "Base/Logging/Log.h"
 
 #include "Transformer.h"
 
@@ -14,32 +15,34 @@ ShaderNodeWriter::~ShaderNodeWriter()
 {}
 
 void ShaderNodeWriter::TransformShader(AST::NodeWriter &nodeWriter, const u32 *words, const u32 numWords) {
-  instr_cf_t cfa;
-  instr_cf_t cfb;
-
   u32 pc = 0;
   for (u32 i = 0; i != numWords; i += 3) {
-    cfa.dword_0 = words[i];
-    cfa.dword_1 = words[i+1] & 0xFFFF;
-    cfb.dword_0 = (words[i+1] >> 16) | (words[i+2] << 16);
-    cfb.dword_1 = words[i+2] >> 16;
+    instr_cf_t cfa;
+    instr_cf_t cfb;
 
-    TransformBlock(nodeWriter, words, numWords, &cfa, pc);
-    TransformBlock(nodeWriter, words, numWords, &cfb, pc);
+    cfa.dword_0 = words[i];
+    cfb.dword_0 = (words[i+1] >> 16) | (words[i+2] << 16);
+    cfa.dword_1 = words[i+1] & 0xFFFF;
+    cfb.dword_1 = words[i+2] >> 16;
+    LOG_DEBUG(Xenos, "[ShaderNodeWriter::TransformShader] Opcode: 0x{:02X}", static_cast<u32>(cfa.opc));
+    LOG_DEBUG(Xenos, "[ShaderNodeWriter::TransformShader] Opcode: 0x{:02X}", static_cast<u32>(cfb.opc));
+
+    TransformBlock(nodeWriter, words, numWords, cfa, pc);
+    TransformBlock(nodeWriter, words, numWords, cfb, pc);
 
     if (cfa.opc == EXEC_END || cfb.opc == EXEC_END)
       break;
   }
 }
 
-void ShaderNodeWriter::TransformBlock(AST::NodeWriter &nodeWriter, const u32 *words, const u32 numWords, const instr_cf_t *cf, u32 &pc) {
-  const instr_cf_opc_t cfType = static_cast<instr_cf_opc_t>(cf->opc);
+void ShaderNodeWriter::TransformBlock(AST::NodeWriter &nodeWriter, const u32 *words, const u32 numWords, const instr_cf_t &cf, u32 &pc) {
+  const instr_cf_opc_t cfType = static_cast<instr_cf_opc_t>(cf.opc);
   switch (cfType) {
   case NOP: {
     nodeWriter.EmitNop();
   } break;
   case ALLOC: {
-    const instr_cf_alloc_t &alloc = cf->alloc;
+    const instr_cf_alloc_t &alloc = cf.alloc;
     switch (alloc.buffer_select) {
     case 1: {
       nodeWriter.EmitExportAllocPosition();
@@ -60,7 +63,7 @@ void ShaderNodeWriter::TransformBlock(AST::NodeWriter &nodeWriter, const u32 *wo
   case COND_PRED_EXEC_END:
   case COND_EXEC_PRED_CLEAN:
   case COND_EXEC_PRED_CLEAN_END: {
-    const instr_cf_exec_t &exec = cf->exec;
+    const instr_cf_exec_t &exec = cf.exec;
     // Condition argument
     AST::Statement preamble = {};
     // Evaluate condition
@@ -87,7 +90,7 @@ void ShaderNodeWriter::TransformBlock(AST::NodeWriter &nodeWriter, const u32 *wo
   // Execution block
   case EXEC:
   case EXEC_END: {
-    const instr_cf_exec_t &exec = cf->exec;
+    const instr_cf_exec_t &exec = cf.exec;
     // Blank statements
     AST::Statement preamble = {};
     AST::Expression condition = {};
@@ -101,7 +104,7 @@ void ShaderNodeWriter::TransformBlock(AST::NodeWriter &nodeWriter, const u32 *wo
   // Conditional flow control change
   case COND_CALL:
   case COND_JMP: {
-    const instr_cf_jmp_call_t &jmp = cf->jmp_call;
+    const instr_cf_jmp_call_t &jmp = cf.jmp_call;
     u32 targetAddr = jmp.address;
     if (jmp.address_mode != ABSOLUTE_ADDR) {
       if (jmp.direction == 0) {
@@ -135,7 +138,7 @@ void ShaderNodeWriter::TransformBlock(AST::NodeWriter &nodeWriter, const u32 *wo
   case LOOP_START:
   case LOOP_END:
   case MARK_VS_FETCH_DONE:
-    LOG_ERROR(Xenos, "[UCode] Failed to translate block! Unsupported control flow '{}'", cf->opc);
+    LOG_ERROR(Xenos, "[UCode] Failed to translate block! Unsupported control flow '{}'", cf.opc);
     break;
   }
 }

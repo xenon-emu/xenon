@@ -14,7 +14,11 @@
 */
 
 #include "CommandProcessor.h"
+#include "ShaderConstants.h"
+#include "Microcode/ASTBlock.h"
+#include "Microcode/ASTNodeWriter.h"
 
+#include "Base/CRCHash.h"
 #include "Base/Thread.h"
 
 namespace Xe::XGPU {
@@ -321,12 +325,14 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
   case Xe::XGPU::PM4_WAIT_FOR_IDLE:
     break;
   case Xe::XGPU::PM4_IM_LOAD:
+    result = ExecutePacketType3_IM_LOAD(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_DRAW_INDIRECT:
     break;
   case Xe::XGPU::PM4_DRAW_INDX_INDIRECT:
     break;
   case Xe::XGPU::PM4_IM_LOAD_IMMEDIATE:
+    result = ExecutePacketType3_IM_LOAD_IMMEDIATE(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_IM_STORE:
     break;
@@ -609,6 +615,150 @@ bool CommandProcessor::ExecutePacketType3_ME_INIT(RingBuffer *ringBuffer, u32 pa
   for (size_t i = 0; i < dataCount; i++) {
     cpME_PM4_ME_INIT_Data.push_back(ringBuffer->ReadAndSwap<u32>());
   }
+  return true;
+}
+
+bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
+  // Load sequencer instruction memory (pointer-based)
+  const u32 addrType = ringBuffer->ReadAndSwap<u32>();
+  const eShaderType shaderType = static_cast<eShaderType>(addrType & 0x3);
+  const u32 addr = addrType & ~0x3;
+  const u32 startSize = ringBuffer->ReadAndSwap<u32>();
+  const u32 start = startSize >> 16;
+  const u64 size = (startSize & 0xFFFF) * 4;
+  u8 *addrPtr = ram->getPointerToAddress(addr);
+
+  std::vector<u32> data{};
+  for (u64 i = 0; i != size; ++i) {
+    u32 value = 0;
+    memcpy(&value, &addrPtr[i], sizeof(value));
+    data.push_back(value);
+  }
+  u32 crc = CRC32::CRC32::calc(reinterpret_cast<u8*>(data.data()), data.size() * 4);
+  switch (shaderType) {
+  case eShaderType::Pixel:{
+    LOG_DEBUG(Xenos, "[CP::IM_LOAD] PixelShader CRC: 0x{:08X}", crc);
+  } break;
+  case eShaderType::Vertex:{
+    LOG_DEBUG(Xenos, "[CP::IM_LOAD] VertexShader CRC: 0x{:08X}", crc);
+  } break;
+  }
+
+  return true;
+}
+
+class GlobalInstructionExtractor : public Microcode::AST::ExpressionNode::Visitor {
+public:
+  virtual void OnExprStart(Microcode::AST::ExpressionNode::Ptr n) override final {
+    if (n->GetType() == Microcode::AST::eExprType::VFETCH) {
+      vfetch.push_back(static_cast<Microcode::AST::VertexFetch::Ptr>(n));
+    }
+    else if (n->GetType() == Microcode::AST::eExprType::TFETCH) {
+      tfetch.push_back(static_cast<Microcode::AST::TextureFetch::Ptr>(n));
+    }
+    else if (n->GetType() == Microcode::AST::eExprType::EXPORT) {
+      exports.push_back(static_cast<Microcode::AST::WriteExportRegister::Ptr>(n));
+    }
+    else {
+      const s32 regIndex = n->GetRegisterIndex();
+      if (regIndex != -1) {
+        usedRegisters.insert((u32)regIndex);
+      }
+    }
+  }
+
+  virtual void OnExprEnd(Microcode::AST::ExpressionNode::Ptr n) override final
+  {}
+
+  std::vector<Microcode::AST::VertexFetch::Ptr> vfetch;
+  std::vector<Microcode::AST::TextureFetch::Ptr> tfetch;
+  std::vector<Microcode::AST::WriteExportRegister::Ptr> exports;
+  std::set<u32> usedRegisters;
+};
+
+class AllExpressionVisitor : public Microcode::AST::StatementNode::Visitor {
+public:
+  AllExpressionVisitor(Microcode::AST::ExpressionNode::Visitor *vistor)
+    : exprVisitor(vistor)
+  {}
+
+  virtual void OnWrite(Microcode::AST::ExpressionNode::Ptr dest, Microcode::AST::ExpressionNode::Ptr src, std::array<eSwizzle, 4> mask) override final {
+    dest->Visit(*exprVisitor);
+    src->Visit(*exprVisitor);
+  }
+  
+  virtual void OnConditionPush(Microcode::AST::ExpressionNode::Ptr condition) override final {
+    condition->Visit(*exprVisitor);
+  }
+
+  virtual void OnConditionPop() override final
+  {}
+
+private:
+  Microcode::AST::ExpressionNode::Visitor *exprVisitor;
+};
+
+void VisitAll(const Microcode::AST::Block *b, Microcode::AST::StatementNode::Visitor &v) {
+  if (b->GetCondition())
+    v.OnConditionPush(b->GetCondition()->shared_from_this());
+
+  if (b->GetCode())
+    b->GetCode()->Visit(v);
+
+  if (b->GetCondition())
+    v.OnConditionPop();
+}
+
+void VisitAll(const Microcode::AST::ControlFlowGraph *cf, Microcode::AST::StatementNode::Visitor &v) {
+  for (u32 i = 0; i < cf->GetNumBlocks(); ++i) {
+    const Microcode::AST::Block *b = cf->GetBlock(i);
+    VisitAll(b, v);
+  }
+}
+
+bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
+  // Load sequencer instruction memory (pointer-based)
+  const u32 shaderTypeValue = ringBuffer->ReadAndSwap<u32>();
+  const eShaderType shaderType = static_cast<eShaderType>(shaderTypeValue);
+  const u32 startSize = ringBuffer->ReadAndSwap<u32>();
+  const u32 start = startSize >> 16;
+  const u64 sizeDwords = (startSize & 0xFFFF);
+  
+  std::vector<u32> data{};
+  data.resize(sizeDwords);
+  ringBuffer->Read(data.data(), data.size());
+  u32 crc = CRC32::CRC32::calc(reinterpret_cast<u8*>(data.data()), data.size() * 4);
+  //fs::path shaderPath{ "C:/Users/Vali/Desktop/shaders" };
+  //for (u32 &value : data) {
+  //  value = byteswap_be(value);
+  //}
+  switch (shaderType) {
+  case eShaderType::Pixel:{
+    //std::ofstream f{ shaderPath / fmt::format("pixel_shader_{:X}.bin", crc), std::ios::out | std::ios::binary };
+    //f.write(reinterpret_cast<char*>(data.data()), data.size() * 4);
+    //f.close();
+    Microcode::AST::ControlFlowGraph *cf = Microcode::AST::ControlFlowGraph::DecompileMicroCode(reinterpret_cast<u8*>(data.data()), data.size() * 4, shaderType);
+    if (cf) {
+      GlobalInstructionExtractor instructionExtractor;
+      AllExpressionVisitor vistor(&instructionExtractor);
+      VisitAll(cf, vistor);
+    }
+    LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] PixelShader CRC: 0x{:08X}", crc);
+  } break;
+  case eShaderType::Vertex:{
+    //std::ofstream f{ shaderPath / fmt::format("vertex_shader_{:X}.bin", crc), std::ios::out | std::ios::binary };
+    //f.write(reinterpret_cast<char*>(data.data()), data.size() * 4);
+    //f.close();
+    Microcode::AST::ControlFlowGraph *cf = Microcode::AST::ControlFlowGraph::DecompileMicroCode(reinterpret_cast<u8*>(data.data()), data.size() * 4, shaderType);
+    if (cf) {
+      GlobalInstructionExtractor instructionExtractor;
+      AllExpressionVisitor vistor(&instructionExtractor);
+      VisitAll(cf, vistor);
+    }
+    LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] VertexShader CRC: 0x{:08X}", crc);
+  } break;
+  }
+
   return true;
 }
 

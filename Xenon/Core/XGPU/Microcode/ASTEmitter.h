@@ -80,11 +80,7 @@ public:
 
 class ShaderCodeWriterSirit : public ShaderCodeWriterBase {
 public:
-  ShaderCodeWriterSirit() {
-    // You set up the module in the constructor or Generate method
-    module.AddCapability(spv::Capability::Shader);
-    module.SetMemoryModel(spv::AddressingModel::Logical, spv::MemoryModel::GLSL450);
-  }
+  ShaderCodeWriterSirit();
   Chunk GetExportDest(const eExportReg reg) override;
   Chunk GetReg(u32 regIndex) override;
   Chunk GetBoolVal(const u32 boolRegIndex) override;
@@ -143,6 +139,8 @@ public:
 
   std::vector<TextureInfo> textures{};
   Sirit::Module module;
+private:
+  Sirit::Id gpr_var = { 0 };
 };
 
 } // namespace Xe::Microcode::AST

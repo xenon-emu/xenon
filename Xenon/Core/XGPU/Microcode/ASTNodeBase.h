@@ -34,11 +34,11 @@ struct Chunk {
 class NodeBase {
 public:
   virtual ~NodeBase() = default;
-  virtual std::unique_ptr<NodeBase> Clone() const = 0;
+  virtual std::shared_ptr<NodeBase> Clone() const = 0;
 
   template <typename T>
-  std::unique_ptr<T> CloneAs() const {
-    return std::unique_ptr<T>(static_cast<T*>(Clone().release()));
+  std::shared_ptr<T> CloneAs() const {
+    return std::dynamic_pointer_cast<T>(Clone());
   }
 };
 

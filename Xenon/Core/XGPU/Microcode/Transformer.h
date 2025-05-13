@@ -15,7 +15,7 @@ public:
   ~ShaderNodeWriter();
   void TransformShader(AST::NodeWriter &nodeWriter, const u32 *words, const u32 numWords);
 private:
-  void TransformBlock(AST::NodeWriter &nodeWriter, const u32 *words, const u32 numWords, const instr_cf_t *cf, u32 &pc);
+  void TransformBlock(AST::NodeWriter &nodeWriter, const u32 *words, const u32 numWords, const instr_cf_t &cf, u32 &pc);
 
   AST::Statement EmitExec(AST::NodeWriter &nodeWriter, const u32 *words, const u32 numWords, const instr_cf_exec_t &exec);
   AST::Statement EmitALU(AST::NodeWriter &nodeWriter, const instr_alu_t &alu, const bool sync);

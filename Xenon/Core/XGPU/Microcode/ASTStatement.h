@@ -5,7 +5,7 @@
 #include <array>
 #include <span>
 
-#include "Core/XGPU/ShaderConstants.h"
+#include "../ShaderConstants.h"
 
 #include "ASTNodeBase.h"
 #include "ASTEmitter.h"
@@ -37,8 +37,8 @@ public:
   virtual eStatementType GetType() const = 0;
   virtual void Visit(Visitor &vistor) const = 0;
   virtual void EmitShaderCode(ShaderCodeWriterBase &writer) = 0;
-  virtual std::unique_ptr<StatementNode> CloneStatement() const = 0;
-  std::unique_ptr<NodeBase> Clone() const override {
+  virtual std::shared_ptr<StatementNode> CloneStatement() const = 0;
+  std::shared_ptr<NodeBase> Clone() const override {
     return CloneStatement();
   }
 };
@@ -52,7 +52,7 @@ public:
   eStatementType GetType() const override final { return eStatementType::List; }
   void Visit(Visitor &vistor) const override;
   void EmitShaderCode(ShaderCodeWriterBase &writer) override;
-  std::unique_ptr<StatementNode> CloneStatement() const override {
+  std::shared_ptr<StatementNode> CloneStatement() const override {
     return std::make_unique<ListStatement>(*this);
   }
 protected:
@@ -69,7 +69,7 @@ public:
   eStatementType GetType() const override final { return eStatementType::Conditional; }
   void Visit(Visitor &vistor) const override;
   void EmitShaderCode(ShaderCodeWriterBase &writer) override;
-  std::unique_ptr<StatementNode> CloneStatement() const override {
+  std::shared_ptr<StatementNode> CloneStatement() const override {
     return std::make_unique<ConditionalStatement>(*this);
   }
 protected:
@@ -85,7 +85,7 @@ public:
   eStatementType GetType() const override final { return eStatementType::Write; }
   void Visit(Visitor &vistor) const override;
   void EmitShaderCode(ShaderCodeWriterBase &writer) override;
-  std::unique_ptr<StatementNode> CloneStatement() const override {
+  std::shared_ptr<StatementNode> CloneStatement() const override {
     return std::make_unique<SetPredicateStatement>(*this);
   }
 protected:
@@ -105,7 +105,7 @@ public:
   eStatementType GetType() const override final { return eStatementType::Write; }
   void Visit(Visitor &vistor) const override;
   void EmitShaderCode(ShaderCodeWriterBase &writer) override;
-  std::unique_ptr<StatementNode> CloneStatement() const override {
+  std::shared_ptr<StatementNode> CloneStatement() const override {
     return std::make_unique<WriteWithMaskStatement>(*this);
   }
 protected:

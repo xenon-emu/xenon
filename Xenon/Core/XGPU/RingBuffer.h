@@ -54,9 +54,9 @@ namespace Xe::XGPU {
     ReadRange BeginRead(size_t count);
     void EndRead(ReadRange readRange);
 
-    size_t Read(u8* buffer, size_t count);
+    size_t Read(u8 *buffer, size_t count);
     template <typename T>
-    size_t Read(T* buffer, size_t count) { return Read(reinterpret_cast<u8*>(buffer), count); }
+    size_t Read(T *buffer, size_t count) { return Read(reinterpret_cast<u8*>(buffer), count * sizeof(T)); }
 
     // Performs a read at current buffer position.
     template <typename T>
@@ -79,9 +79,9 @@ namespace Xe::XGPU {
       return imm;
     }
 
-    size_t Write(const u8* buffer, size_t count);
+    size_t Write(const u8 *buffer, size_t count);
     template <typename T>
-    size_t Write(const T* buffer, size_t count) { return Write(reinterpret_cast<const u8*>(buffer), count); }
+    size_t Write(const T *buffer, size_t count) { return Write(reinterpret_cast<const u8*>(buffer), count); }
 
     template <typename T>
     size_t Write(T& data) { return Write(reinterpret_cast<const u8*>(&data), sizeof(T)); }

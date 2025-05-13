@@ -121,7 +121,6 @@ Statement NodeWriter::EmitWriteWithSwizzleStatement(Expression dest, Expression 
 Statement NodeWriter::EmitSetPredicateStatement(Expression value) {
   if (!value)
     return {};
-  return {};
   return { std::make_shared<SetPredicateStatement>(value.Get<ExpressionNode>()) };
 }
 

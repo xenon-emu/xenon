@@ -106,6 +106,7 @@ set(Base
   Xenon/Base/Bounded_threadsafe_queue.h
   Xenon/Base/Config.cpp
   Xenon/Base/Config.h
+  Xenon/Base/CRCHash.h
   Xenon/Base/Error.cpp
   Xenon/Base/Error.h
   Xenon/Base/Enum.h
