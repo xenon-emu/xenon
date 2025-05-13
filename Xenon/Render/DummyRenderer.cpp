@@ -78,4 +78,9 @@ void* DummyRenderer::GetBackendContext() {
   return nullptr;
 }
 
+u32 DummyRenderer::GetBackendID() {
+  LOG_INFO(Render, "DummyRenderer::GetBackendContext");
+  return "Dummy"_j;
+}
+
 } // namespace Render

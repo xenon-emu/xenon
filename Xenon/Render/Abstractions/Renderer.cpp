@@ -40,17 +40,40 @@ void Renderer::Create() {
 
   // TODO(Vali0004): Pull shaders from a file, as right now, this will only pull the OpenGL Shaders
   // Init shader handles
-  computeShaderProgram = shaderFactory->LoadFromSource("XeFbConvert", {
-    { eShaderType::Compute, computeShaderSource }
-  });
-  renderShaderPrograms = shaderFactory->LoadFromSource("Render", {
-    { eShaderType::Vertex, vertexShaderSource },
-    { eShaderType::Fragment, fragmentShaderSource }
-  });
+  if (GetBackendID() == "OpenGL"_j) {
+    fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "opengl" };
+    computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
+      { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
+    });
+    if (!computeShaderProgram) {
+      std::ofstream f{ shaderPath / "fb_deswizzle.comp" };
+      f.write(computeShaderSource, sizeof(computeShaderSource));
+      f.close();
+      computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
+        { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
+      });
+    }
+    renderShaderPrograms = shaderFactory->LoadFromFiles("Render", {
+      { eShaderType::Vertex, shaderPath / "framebuffer.vert" },
+      { eShaderType::Fragment, shaderPath / "framebuffer.frag" }
+    });
+    if (!renderShaderPrograms) {
+      std::ofstream vert{ shaderPath / "framebuffer.vert" };
+      vert.write(vertexShaderSource, sizeof(vertexShaderSource));
+      vert.close();
+      std::ofstream frag{ shaderPath / "framebuffer.frag" };
+      frag.write(fragmentShaderSource, sizeof(fragmentShaderSource));
+      frag.close();
+      renderShaderPrograms = shaderFactory->LoadFromFiles("Render", {
+        { eShaderType::Vertex, shaderPath / "framebuffer.vert" },
+        { eShaderType::Fragment, shaderPath / "framebuffer.frag" }
+      });
+    }
+  }
 
   // Create our backbuffer
   backbuffer = resourceFactory->CreateTexture();
-  // Init GL texture
+  // Init texture
   backbuffer->CreateTextureHandle(width, height, GetBackbufferFlags());
 
   // Init pixel buffer

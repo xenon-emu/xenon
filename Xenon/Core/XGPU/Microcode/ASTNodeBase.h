@@ -11,22 +11,27 @@
 namespace Xe::Microcode::AST {
 
 struct Chunk {
-  Sirit::Id id = {};
+  Sirit::Id id = {};   // SSA value (result of OpLoad, etc.)
+  Sirit::Id ptr = {};  // Pointer to value (from AddLocalVariable, OpAccessChain, etc.)
 
   Chunk() = default;
   explicit Chunk(Sirit::Id v) : id(v) {}
+  Chunk(Sirit::Id id_, Sirit::Id ptr_) : id(id_), ptr(ptr_) {}
 
   operator u32() const { return id.value; }
-
   operator Sirit::Id() const { return id; }
 
   Chunk& operator=(Sirit::Id v) {
-    id.value = v.value;
+    id = v;
     return *this;
   }
 
   bool IsValid() const {
     return id.value != 0;
+  }
+
+  bool HasPointer() const {
+    return ptr.value != 0;
   }
 };
 

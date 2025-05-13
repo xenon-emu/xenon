@@ -2,8 +2,6 @@
 
 #include "OGLRenderer.h"
 
-#include "Base/Version.h"
-
 #include "OpenGL/Factory/OGLResourceFactory.h"
 #include "GUI/OpenGL.h"
 
@@ -143,6 +141,10 @@ s32 OGLRenderer::GetBackbufferFlags() {
 
 void* OGLRenderer::GetBackendContext() {
   return reinterpret_cast<void*>(context);
+}
+
+u32 OGLRenderer::GetBackendID() {
+  return "OpenGL"_j;
 }
 
 } //namespace Render

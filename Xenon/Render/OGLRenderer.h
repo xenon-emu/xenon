@@ -9,6 +9,8 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <backends/imgui_impl_opengl3.h>
 
+#include "Base/Version.h"
+#include "Base/Hash.h"
 #include "Core/RAM/RAM.h"
 #include "Core/RootBus/HostBridge/PCIe.h"
 #include "Render/Abstractions/Factory/ResourceFactory.h"
@@ -36,6 +38,7 @@ public:
   void OnSwap(SDL_Window* window) override;
   s32 GetBackbufferFlags() override;
   void* GetBackendContext() override;
+  u32 GetBackendID() override;
 private:
   // OpenGL Handles
   // Dummy VAO

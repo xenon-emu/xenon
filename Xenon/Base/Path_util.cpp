@@ -65,11 +65,19 @@ static auto UserPaths = [] {
     insert_path(PathType::RootDir, currentDir);
     insert_path(PathType::ConsoleDir, currentDir / CONSOLE_DIR);
     insert_path(PathType::LogDir, currentDir / LOG_DIR);
+    insert_path(PathType::ShaderDir, currentDir / SHADER_DIR);
+    fs::create_directory(currentDir / SHADER_DIR / "cache");
+    fs::create_directory(currentDir / SHADER_DIR / "spirv");
+    fs::create_directory(currentDir / SHADER_DIR / "opengl");
   }
   else {
     insert_path(PathType::RootDir, currentDir, false);
     insert_path(PathType::ConsoleDir, binaryDir / CONSOLE_DIR);
     insert_path(PathType::LogDir, binaryDir / LOG_DIR);
+    insert_path(PathType::ShaderDir, binaryDir / SHADER_DIR);
+    fs::create_directory(binaryDir / SHADER_DIR / "cache");
+    fs::create_directory(binaryDir / SHADER_DIR / "spirv");
+    fs::create_directory(binaryDir / SHADER_DIR / "opengl");
   }
   fs::path fontDir = binaryDir / FONT_DIR;
   // Check if fonts are in ../share/FONT_DIR

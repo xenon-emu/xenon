@@ -28,4 +28,9 @@ std::shared_ptr<Shader> DummyShaderFactory::LoadFromFile(const std::string &name
   return std::make_unique<DummyShader>();
 }
 
+std::shared_ptr<Shader> DummyShaderFactory::LoadFromFiles(const std::string &name, const std::unordered_map<eShaderType, fs::path> &sources) {
+  LOG_INFO(Render, "DummyShaderFactory::LoadFromFiles: {}", name);
+  return std::make_unique<DummyShader>();
+}
+
 } // namespace Render

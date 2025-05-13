@@ -126,7 +126,7 @@ ControlFlowGraph* ControlFlowGraph::DecompileMicroCode(const void *code, u32 cod
 
   graph->roots.push_back(graph->blocks[0]);
   graph->roots.insert(graph->roots.end(), functionRoots.begin(), functionRoots.end());
-  transformer;
+
   return graph;
 }
 
@@ -165,7 +165,7 @@ void ControlFlowGraph::EmitShaderCode(AST::ShaderCodeWriterBase &writer) const {
       const Block *base = addrBlocks[i];
       const Block *next = (i + 1 < addrBlocks.size()) ? addrBlocks[i + 1] : nullptr;
 
-      if (!base || !next)
+      if (!base)
         continue;
 
       if (base)

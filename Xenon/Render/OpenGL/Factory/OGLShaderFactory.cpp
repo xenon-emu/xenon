@@ -53,8 +53,9 @@ eShaderType GetShaderType(const std::string &line) {
 
 std::shared_ptr<Shader> OGLShaderFactory::LoadFromFile(const std::string &name, const fs::path &path) {
   std::ifstream file(path);
-  if (!file.is_open()) {
-    LOG_ERROR(System, "Failed to open shader file: {}", path.string());
+  std::error_code error;
+  if (!fs::exists(path, error) || !file.is_open()) {
+    LOG_ERROR(System, "Failed to open shader '{}'", path.string());
     return nullptr;
   }
 
@@ -84,6 +85,33 @@ std::shared_ptr<Shader> OGLShaderFactory::LoadFromFile(const std::string &name, 
   }
 
   return LoadFromSource(name, shaderSources);
+}
+
+std::shared_ptr<Shader> OGLShaderFactory::LoadFromFiles(const std::string &name,
+  const std::unordered_map<eShaderType, fs::path> &sources) {
+  bool deadFile = false;
+  auto shader = std::make_shared<OGLShader>();
+  for (const auto& [type, path] : sources) {
+    std::ifstream f{ path, std::ios::in };
+    if (!fs::exists(path) || !f.is_open()) {
+      LOG_ERROR(System, "Failed to open shader '{}'", path.string());
+      deadFile = true;
+      continue;
+    }
+    u64 fileSize = fs::file_size(path);
+    std::vector<char> src{};
+    src.resize(fileSize);
+    f.read(src.data(), src.size());
+    f.close();
+    shader->CompileFromSource(type, src.data());
+  }
+  if (deadFile) {
+    shader.reset();
+    return nullptr;
+  }
+  shader->Link();
+  Shaders[name] = shader;
+  return shader;
 }
 
 } // namespace Render

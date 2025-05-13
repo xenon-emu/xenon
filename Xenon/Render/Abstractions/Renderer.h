@@ -45,6 +45,7 @@ public:
   virtual void OnSwap(SDL_Window *window) = 0;
   virtual s32 GetBackbufferFlags() = 0;
   virtual void* GetBackendContext() = 0;
+  virtual u32 GetBackendID() = 0;
   void SDLInit();
 
   void Create();
@@ -127,7 +128,7 @@ private:
 
 // Shaders
 
-inline constexpr const char* vertexShaderSource = R"glsl(
+inline constexpr const char vertexShaderSource[] = R"glsl(
 #version 430 core
 
 out vec2 o_texture_coord;
@@ -137,7 +138,7 @@ void main() {
   gl_Position = vec4(o_texture_coord * vec2(2.0f, -2.0f) + vec2(-1.0f, 1.0f), 0.0f, 1.0f);
 })glsl";
 
-inline constexpr const char* fragmentShaderSource = R"glsl(
+inline constexpr const char fragmentShaderSource[] = R"glsl(
 #version 430 core
 
 in vec2 o_texture_coord;
@@ -155,7 +156,7 @@ void main() {
   o_color = vec4(r, g, b, a);
 })glsl";
 
-inline constexpr const char* computeShaderSource = R"glsl(
+inline constexpr const char computeShaderSource[] = R"glsl(
 #version 430 core
 
 layout (local_size_x = 16, local_size_y = 16) in;

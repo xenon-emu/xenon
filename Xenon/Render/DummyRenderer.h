@@ -4,6 +4,7 @@
 
 #include "Abstractions/Renderer.h"
 
+#include "Base/Hash.h"
 #include "Base/Logging/Log.h"
 
 namespace Render {
@@ -27,6 +28,7 @@ public:
   void OnSwap(SDL_Window* window) override;
   s32 GetBackbufferFlags() override;
   void* GetBackendContext() override;
+  u32 GetBackendID() override;
 };
 
 } // namespace Render
