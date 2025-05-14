@@ -970,14 +970,16 @@ bool CommandProcessor::ExecutePacketType3_WAIT_REG_MEM(RingBuffer *ringBuffer, u
 }
 
 bool CommandProcessor::ExecutePacketType3_SET_BIN_MASK(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
-  const u32 mask = ringBuffer->ReadAndSwap<u32>();
-  binMask = mask;
+  const uint64_t maskHigh = ringBuffer->ReadAndSwap<u32>();
+  const uint64_t maskLow = ringBuffer->ReadAndSwap<u32>();
+  binMask = (maskHigh << 32) | maskLow;
   return true;
 }
 
 bool CommandProcessor::ExecutePacketType3_SET_BIN_SELECT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
-  const u32 select = ringBuffer->ReadAndSwap<u32>();
-  binSelect = select;
+  const uint64_t selectHigh = ringBuffer->ReadAndSwap<u32>();
+  const uint64_t selectlow = ringBuffer->ReadAndSwap<u32>();
+  binSelect = (selectHigh << 32) | selectlow;
   return true;
 }
 
