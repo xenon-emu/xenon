@@ -52,8 +52,6 @@ void VulkanRenderer::BackendStart() {
 
   volkLoadInstance(instance);
 
-  LOG_ERROR(Render, "SUCCESS!!!");
-
   VmaVulkanFunctions vmaFunctions = {};
   vmaFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
   vmaFunctions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
@@ -157,11 +155,34 @@ void VulkanRenderer::UpdateClearColor(u8 r, u8 b, u8 g, u8 a) {
   rgba[3] = static_cast<f32>(a) / 255.0f;
   attachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
   // attachment.colorAttachment = 0;
+
   // vkCmdClearAttachments(commandBuffer, 1, &attachment, 1, &clearRect);
 }
 
 void VulkanRenderer::OnCompute() {
+  VkPipelineShaderStageCreateInfo stageInfo = {};
+  stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
 
+  VkComputePipelineCreateInfo pipelineInfo = {};
+  pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+  pipelineInfo.stage = stageInfo;
+
+  VkPipeline computePipeline;
+  VkResult res = vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &computePipeline);
+  if (res != VK_SUCCESS) {
+    LOG_ERROR(Render, "vkCreateComputePipelines failed with error code 0x{:x}", static_cast<u32>(res));
+    return;
+  }
+
+  // vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
+  // vkCmdDispatch(commandBuffer, width / 16, height / 16, 1);
+  // vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 0, nullptr);
+
+  // TODO: Pipeline Caching
+  if (computePipeline != VK_NULL_HANDLE) {
+    vkDestroyPipeline(device, computePipeline, nullptr);
+  }
 }
 
 void VulkanRenderer::OnBind() {
