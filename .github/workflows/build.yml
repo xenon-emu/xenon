@@ -162,17 +162,17 @@ jobs:
         path: |
           build
           Deps
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-x64-deps-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-win64-deps-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
         restore-keys: |
-          ${{runner.os}}-${{env.BUILD_TYPE}}-clang-x64-deps-
+          ${{runner.os}}-${{env.BUILD_TYPE}}-clang-win64-deps-
 
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.18
       env:
-        cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-x64-cache
+        cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-win64-cache
       with:
         append-timestamp: false
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-x64-cache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-win64-cache-${{ hashFiles('**/*.cpp', '**/*.h') }}
 
     - name: Configure CMake (Clang)
       run: cmake -G Ninja -B "${{env.BUILD_DIR}}" -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
@@ -226,17 +226,17 @@ jobs:
         path: |
           build
           Deps
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-x64-deps-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-win64-deps-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
         restore-keys: |
-          ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-x64-deps-
+          ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-win64-deps-
 
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.18
       env:
-        cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-x64-cache
+        cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-win64-cache
       with:
         append-timestamp: false
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-x64-cache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-win64-cache-${{ hashFiles('**/*.cpp', '**/*.h') }}
 
     - name: Configure CMake (GCC)
       run: cmake -G Ninja -B "${{env.BUILD_DIR}}" -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
