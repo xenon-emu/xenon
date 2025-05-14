@@ -56,6 +56,19 @@ void DummyRenderer::Clear() {
   LOG_INFO(Render, "DummyRenderer::Clear");
 }
 
+void DummyRenderer::Draw() {
+  LOG_INFO(Render, "DummyRenderer::Draw");
+}
+
+void DummyRenderer::DrawIndexed(Xe::XGPU::XeIndexBufferInfo indexBufferInfo) {
+  LOG_INFO(Render, "DummyRenderer::DrawIndexed: {}, {}, {}, {}, {}",
+    indexBufferInfo.count,
+    static_cast<u32>(indexBufferInfo.endianness),
+    indexBufferInfo.guestBase,
+    static_cast<u32>(indexBufferInfo.indexFormat),
+    indexBufferInfo.length);
+}
+
 void DummyRenderer::OnCompute() {
   LOG_INFO(Render, "DummyRenderer::OnCompute");
 }

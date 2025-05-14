@@ -20,6 +20,7 @@
 
 #include "Base/CRCHash.h"
 #include "Base/Thread.h"
+#include "Core/Xe_Main.h"
 
 namespace Xe::XGPU {
   
@@ -1026,7 +1027,7 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer* ringBuffer, u32 packe
   // TODO(Vali004): Do draw on backend.
 
   bool isIndexedDraw = false;
-  bool drawOk = false;
+  bool drawOk = true;
 
   // Our Index Buffer info for indexed draws.
   XeIndexBufferInfo indexBufferInfo;
@@ -1099,7 +1100,11 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer* ringBuffer, u32 packe
   ringBuffer->AdvanceRead(dataCount * sizeof(u32));
 
   if (drawOk) {
-    // TODO(bitsh1ft3r): Issue DRAW in backend.
+    if (isIndexedDraw) {
+      Xe_Main->renderer->DrawIndexed(indexBufferInfo);
+    } else {
+      Xe_Main->renderer->Draw();
+    }
   }
 
   return true;

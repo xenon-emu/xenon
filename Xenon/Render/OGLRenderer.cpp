@@ -114,6 +114,14 @@ void OGLRenderer::Clear() {
   glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 }
 
+void OGLRenderer::Draw() {
+  // TODO: Draws
+}
+
+void OGLRenderer::DrawIndexed(Xe::XGPU::XeIndexBufferInfo indexBufferInfo) {
+ // TODO: Draws
+}
+
 void OGLRenderer::UpdateClearColor(u8 r, u8 b, u8 g, u8 a) {
   glClearColor((static_cast<f32>(r) / 255.f), (static_cast<f32>(g) / 255.f), (static_cast<f32>(b) / 255.f), (static_cast<f32>(a) / 255.f));
 }
