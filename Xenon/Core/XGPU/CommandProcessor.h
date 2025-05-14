@@ -164,8 +164,8 @@ enum eCPMicrocodeType {
 struct XeIndexBufferInfo {
   eIndexFormat indexFormat = eIndexFormat::xeInt16;
   eEndian endianness = eEndian::xeNone;
-  uint32_t count = 0;
-  uint32_t guestBase = 0;
+  u32 count = 0;
+  u32 guestBase = 0;
   size_t length = 0;
 };
 
@@ -259,6 +259,8 @@ private:
   // Internal swap counters
   std::atomic<u32> swapCount;
   std::atomic<u32> vblankCount;
+
+  std::string getPacketType3OpCodeName(u8 opcodeIdx);
 
   // Execute a packet based on the Ringbuffer data.
   bool ExecutePacket(RingBuffer *ringBuffer);
