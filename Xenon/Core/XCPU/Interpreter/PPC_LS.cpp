@@ -606,8 +606,9 @@ void PPCInterpreter::PPCInterpreter_stvrx(PPU_STATE* ppuState) {
   const u8 eb = EA & 0xF;
   EA &= ~0xF;
   
-  for (int i = 15; i > 15 - eb; i--) {
-    LOG_WARNING(Xenon, "stvrx: Unaligned store! Check!");
+  for (s32 i = 15; i > 15 - eb; i--) {
+    if (Config::log.advanced)
+      LOG_WARNING(Xenon, "stvrx: Unaligned store! Check!");
     MMUWrite8(ppuState, (EA - 16) + i, VRi(vs).bytes[i]);
   }
 }
@@ -620,8 +621,9 @@ void PPCInterpreter::PPCInterpreter_stvlx(PPU_STATE* ppuState) {
   const u8 eb = EA & 0xF;
   EA &= ~0xF;
 
-  for (int i = 0; i < 16 - eb; i++) {
-    LOG_WARNING(Xenon, "stvlx: Unaligned store! Check!");
+  for (s32 i = 0; i < 16 - eb; i++) {
+    if (Config::log.advanced)
+      LOG_WARNING(Xenon, "stvlx: Unaligned store! Check!");
     MMUWrite8(ppuState, EA + i, VRi(vs).bytes[i]);
   }
 }
@@ -655,8 +657,9 @@ void PPCInterpreter::PPCInterpreter_stvlxl128(PPU_STATE *ppuState) {
   const u8 eb = EA & 0xF;
   EA &= ~0xF;
 
-  for (int i = 0; i < 16 - eb; i++) {
-    LOG_WARNING(Xenon, "stvlxl128: Unaligned store! Check!");
+  for (s32 i = 0; i < 16 - eb; i++) {
+    if (Config::log.advanced)
+      LOG_WARNING(Xenon, "stvlxl128: Unaligned store! Check!");
     MMUWrite8(ppuState, EA + i, VR(VMX128_1_VD128).bytes[i]);
   }
 }
@@ -1486,15 +1489,16 @@ void PPCInterpreter::PPCInterpreter_lvlx(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  if (eb != 0) {
+  if (eb != 0 && Config::log.advanced) {
     LOG_WARNING(Xenon, "lvlx: Unaligned load! Check!");
   }
 
-  int i = 0;
+  s32 i = 0;
 
   for (i = 0; i < 16 - eb; ++i)
     vector1.bytes[i] = vector0.bytes[i + eb];
 
+  i = 0;
   while (i < 16)
     vector1.bytes[i++] = 0;
 
@@ -1528,20 +1532,18 @@ void PPCInterpreter::PPCInterpreter_lvrx(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  if (eb != 0) {
+  if (eb != 0 && Config::log.advanced) {
     LOG_WARNING(Xenon, "lvrx: Unaligned load! Check!");
   }
 
-  int i = 0;
+  s32 i = 0;
 
-  while (i < (16 - eb))
-  {
+  while (i < (16 - eb)) {
     vector1.bytes[i] = 0;
     ++i;
   }
 
-  while (i < 16)
-  {
+  while (i < 16) {
     vector1.bytes[i] = vector0.bytes[i - (16 - eb)];
     ++i;
   }
@@ -1585,8 +1587,7 @@ void PPCInterpreter::PPCInterpreter_lvsl(PPU_STATE* ppuState) {
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
   const u8 sh = EA & 0xF;
 
-  for (int idx = 0; idx < 16; idx++)
-  {
+  for (s32 idx = 0; idx < 16; idx++) {
     const u8 regIdx = (idx & ~3) | (3 - (idx & 3));
     VRi(vd).bytes[regIdx] = idx + sh;
   }
