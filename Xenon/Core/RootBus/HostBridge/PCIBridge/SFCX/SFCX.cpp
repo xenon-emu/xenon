@@ -549,6 +549,8 @@ void Xe::PCIDev::SFCX::sfcxReadPageFromNAND(bool physical) {
   // Clear the page buffer
   memset(sfcxState.pageBuffer, 0, sizeof(sfcxState.pageBuffer));
 
+  if (cpi == 0 && Xe_Main.get() && Xe_Main->xenonCPU)
+    cpi = Xe_Main->xenonCPU->GetCPI();
 #ifndef SFCX_DEBUG
   // Simulate the time required to read
   std::this_thread::sleep_for(std::chrono::milliseconds(2 * cpi));
@@ -571,6 +573,8 @@ void Xe::PCIDev::SFCX::sfcxEraseBlock() {
   // Clear the page buffer
   memset(sfcxState.pageBuffer, 0, sizeof(sfcxState.pageBuffer));
 
+  if (cpi == 0 && Xe_Main.get() && Xe_Main->xenonCPU)
+    cpi = Xe_Main->xenonCPU->GetCPI();
 #ifndef SFCX_DEBUG
   // Simulate the time required to erase
   std::this_thread::sleep_for(std::chrono::milliseconds(2 * cpi));
@@ -619,6 +623,9 @@ void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND() {
     dataPhysAddrPtr += sfcxState.pageSize;   // Logical page size
     sparePhysAddrPtr += sfcxState.spareSize; // Spare Size
 
+    if (cpi == 0 && Xe_Main.get() && Xe_Main->xenonCPU)
+      cpi = Xe_Main->xenonCPU->GetCPI();
+
     // Add a small delay to simulate the time it takes to read the page.
     std::this_thread::sleep_for(std::chrono::nanoseconds(100 * cpi));
 
@@ -663,6 +670,8 @@ void Xe::PCIDev::SFCX::sfcxDoDMAtoNAND() {
     dataPhysAddrPtr += sfcxState.pageSize;   // Logical page size
     sparePhysAddrPtr += sfcxState.spareSize; // Spare Size
 
+    if (cpi == 0 && Xe_Main.get() && Xe_Main->xenonCPU)
+      cpi = Xe_Main->xenonCPU->GetCPI();
     // Add a small delay to simulate the time it takes to read the page.
     std::this_thread::sleep_for(std::chrono::nanoseconds(100 * cpi));
 

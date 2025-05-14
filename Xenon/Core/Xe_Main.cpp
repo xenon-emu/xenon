@@ -246,8 +246,7 @@ void XeMain::createPCIDevices() {
     }
     {
       MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "SFCX", MP_AUTO);
-      u32 cpi = xenonCPU->GetCPI();
-      sfcx = std::make_unique<STRIP_UNIQUE(sfcx)>("SFCX", SFCX_DEV_SIZE, Config::filepaths.nand, cpi, pciBridge.get(), ram.get());
+      sfcx = std::make_unique<STRIP_UNIQUE(sfcx)>("SFCX", SFCX_DEV_SIZE, Config::filepaths.nand, 0, pciBridge.get(), ram.get());
     }
     {
       MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "XMA", MP_AUTO);
