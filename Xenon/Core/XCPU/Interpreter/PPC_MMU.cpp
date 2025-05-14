@@ -1032,7 +1032,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
       }
     } else {
       // Debug tools
-      if (Config::debug.haltOnSlbMiss) {
+      if (Config::debug.haltOnSlbMiss && Xe_Main.get()) {
         Xe_Main->xenonCPU->Halt();
       }
       // SLB Miss
@@ -1086,7 +1086,7 @@ void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE *ppuState,
     socRead = true;
 
   // Debugger halt
-  if (EA && EA == Config::debug.haltOnReadAddress) {
+  if (EA && EA == Config::debug.haltOnReadAddress && Xe_Main.get()) {
     Xe_Main->getCPU()->Halt(); // Halt the CPU
     Config::imgui.debugWindow = true; // Open the debugger after halting
   }
@@ -1173,7 +1173,7 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
     socWrite = true;
 
   // Debugger halt
-  if (EA && EA == Config::debug.haltOnWriteAddress) {
+  if (EA && EA == Config::debug.haltOnWriteAddress && Xe_Main.get()) {
     Xe_Main->getCPU()->Halt(); // Halt the CPU
     Config::imgui.debugWindow = true; // Open the debugger after halting
   }

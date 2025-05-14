@@ -11,8 +11,9 @@
 //#define SFCX_DEBUG
 
 // There are two SFCX Versions, pre-Jasper and post-Jasper
-Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::string &nandLoadPath, PCIBridge *parentPCIBridge, RAM *ram) :
+Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::string &nandLoadPath, u32 cpi, PCIBridge *parentPCIBridge, RAM *ram) :
   PCIDevice(deviceName, size),
+  cpi(cpi),
   parentBus(parentPCIBridge), mainMemory(ram)
 {
   // Set PCI Properties
@@ -550,10 +551,7 @@ void Xe::PCIDev::SFCX::sfcxReadPageFromNAND(bool physical) {
 
 #ifndef SFCX_DEBUG
   // Simulate the time required to read
-  if (Xe_Main.get() && Xe_Main->xenonCPU)
-    std::this_thread::sleep_for(std::chrono::milliseconds(2 * Xe_Main->xenonCPU->GetCPI()));
-  else
-    std::this_thread::sleep_for(10ms);
+  std::this_thread::sleep_for(std::chrono::milliseconds(2 * cpi));
 #endif
 
   // Perform the read
@@ -575,10 +573,7 @@ void Xe::PCIDev::SFCX::sfcxEraseBlock() {
 
 #ifndef SFCX_DEBUG
   // Simulate the time required to erase
-  if (Xe_Main.get() && Xe_Main->xenonCPU)
-    std::this_thread::sleep_for(std::chrono::milliseconds(2 * Xe_Main->xenonCPU->GetCPI()));
-  else
-    std::this_thread::sleep_for(10ms);
+  std::this_thread::sleep_for(std::chrono::milliseconds(2 * cpi));
 #endif
 
   // Perform the erase
@@ -625,10 +620,7 @@ void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND() {
     sparePhysAddrPtr += sfcxState.spareSize; // Spare Size
 
     // Add a small delay to simulate the time it takes to read the page.
-    if (Xe_Main.get() && Xe_Main->xenonCPU)
-      std::this_thread::sleep_for(std::chrono::nanoseconds(100 * Xe_Main->xenonCPU->GetCPI()));
-    else
-      std::this_thread::sleep_for(2ms);
+    std::this_thread::sleep_for(std::chrono::nanoseconds(100 * cpi));
 
     // Increase read address
     physAddr += sfcxState.pageSizePhys;
@@ -672,10 +664,7 @@ void Xe::PCIDev::SFCX::sfcxDoDMAtoNAND() {
     sparePhysAddrPtr += sfcxState.spareSize; // Spare Size
 
     // Add a small delay to simulate the time it takes to read the page.
-    if (Xe_Main.get() && Xe_Main->xenonCPU)
-      std::this_thread::sleep_for(std::chrono::nanoseconds(100 * Xe_Main->xenonCPU->GetCPI()));
-    else
-      std::this_thread::sleep_for(2ms);
+    std::this_thread::sleep_for(std::chrono::nanoseconds(100 * cpi));
 
     // Increase read address
     physAddr += sfcxState.pageSizePhys;

@@ -19,13 +19,14 @@
 #include "Core/XGPU/CommandProcessor.h"
 #include "Render/Abstractions/Factory/ResourceFactory.h"
 #include "Render/Abstractions/Factory/ShaderFactory.h"
-#include "Render/GUI/GUI.h"
 
 #ifndef NO_GFX
 // ARGB (Console is BGRA)
 #define COLOR(r, g, b, a) ((a) << 24 | (r) << 16 | (g) << 8 | (b) << 0)
 #define TILE(x) ((x + 31) >> 5) << 5
 namespace Render {
+
+class GUI;
 
 class Renderer {
 public:
@@ -93,28 +94,9 @@ public:
   std::unique_ptr<Texture> backbuffer{};
 
   // GUI Helpers
-  bool DebuggerActive() {
-    if (!gui.get())
-      return false;
-    for (bool &a : gui.get()->ppcDebuggerActive) {
-      if (a) {
-        return true;
-      }
-    }
-    return false;
-  }
+  bool DebuggerActive();
 
-  void SetDebuggerActive(s8 specificPPU = -1) {
-    if (gui.get()) {
-      if (specificPPU != -1) {
-        for (bool &a : gui.get()->ppcDebuggerActive) {
-          a = true;
-        }
-      } else if (specificPPU <= 3) {
-        gui.get()->ppcDebuggerActive[specificPPU - 1] = true;
-      }
-    }
-  }
+  void SetDebuggerActive(s8 specificPPU = -1);
 private:
   // Thread handle
   std::thread thread;

@@ -20,6 +20,8 @@
  *	XGPU.h Basic Xenos implementation.
  */
 
+class Render::Renderer;
+
 namespace Xe {
 namespace Xenos {
 
@@ -27,7 +29,7 @@ namespace Xenos {
 
 class XGPU {
 public:
-  XGPU(RAM *ram, PCIBridge *pciBridge);
+  XGPU(Render::Renderer *renderer, RAM *ram, PCIBridge *pciBridge);
   ~XGPU();
 
   // Memory Read/Write methods.
@@ -57,7 +59,7 @@ public:
   }
 private:
   // PCI Bridge pointer. Used for Interrupts.
-  PCIBridge *parentBus{};
+  PCIBridge *parentBus = nullptr;
   // Mutex handle
   std::recursive_mutex mutex = {};
   // XGPU Config Space Data at address 0xD0010000.
@@ -67,6 +69,9 @@ private:
 
   // RAM Pointer
   RAM *ramPtr = nullptr;
+
+  // Render handle
+  Render::Renderer *render = nullptr;
 
   // GPU State
   std::unique_ptr<Xe::XGPU::XenosState> xenosState = {};

@@ -15,12 +15,14 @@
 #define XE_DEBUG
 //#endif
 
-Xe::Xenos::XGPU::XGPU(RAM *ram, PCIBridge *pciBridge) : ramPtr(ram), parentBus(pciBridge){
+Xe::Xenos::XGPU::XGPU(Render::Renderer *renderer, RAM *ram, PCIBridge *pciBridge) :
+  render(renderer),
+  ramPtr(ram), parentBus(pciBridge) {
   xenosState = std::make_unique<STRIP_UNIQUE(xenosState)>();
 
   memset(&xgpuConfigSpace.data, 0xF, sizeof(GENRAL_PCI_DEVICE_CONFIG_SPACE));
 
-  // Located at config address 0xD0010000.
+  // Located at config address 0xD0010000
   memcpy(xgpuConfigSpace.data, xgpuConfigMap, sizeof(xgpuConfigSpace.data));
 
   u32 consoleRevison;
@@ -97,7 +99,7 @@ Xe::Xenos::XGPU::XGPU(RAM *ram, PCIBridge *pciBridge) : ramPtr(ram), parentBus(p
   } break;
   }
 
-  commandProcessor = std::make_unique<STRIP_UNIQUE(commandProcessor)>(ramPtr, xenosState.get(), parentBus);
+  commandProcessor = std::make_unique<STRIP_UNIQUE(commandProcessor)>(ramPtr, xenosState.get(), render, parentBus);
   edram = std::make_unique<STRIP_UNIQUE(edram)>();
 }
 
@@ -637,7 +639,7 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
       u8 r = (xenosState->clearColor >> 16) & 0xFF;
       u8 g = (xenosState->clearColor >> 8) & 0xFF;
       u8 b = (xenosState->clearColor >> 0) & 0xFF;
-      Xe_Main->renderer->UpdateClearColor(r, g, b, a);
+      render->UpdateClearColor(r, g, b, a);
       xenosState->WriteRegister(reg, xenosState->clearColor);
     } break;
     case XeRegister::RB_COLOR_CLEAR_LO:

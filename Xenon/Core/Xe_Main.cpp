@@ -17,7 +17,7 @@ XeMain::XeMain() {
 #ifndef NO_GFX
   renderer = std::make_unique<Render::OGLRenderer>(ram.get(), createWindow());
 #endif
-  xenos = std::make_unique<STRIP_UNIQUE(xenos)>(ram.get(), pciBridge.get());
+  xenos = std::make_unique<STRIP_UNIQUE(xenos)>(renderer.get(), ram.get(), pciBridge.get());
   createHostBridge();
   createRootBus();
   xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses);
@@ -132,7 +132,8 @@ void XeMain::reloadFiles() {
   getCPU()->Halt();
   // Reset the SFCX
   sfcx.reset();
-  sfcx = std::make_unique<STRIP_UNIQUE(sfcx)>("SFCX", SFCX_DEV_SIZE, Config::filepaths.nand, pciBridge.get(), ram.get());
+  u32 cpi = xenonCPU->GetCPI();
+  sfcx = std::make_unique<STRIP_UNIQUE(sfcx)>("SFCX", SFCX_DEV_SIZE, Config::filepaths.nand, cpi, pciBridge.get(), ram.get());
   pciBridge->resetPCIDevice(sfcx.get());
   // Reset the NAND
   nand.reset();
@@ -245,7 +246,8 @@ void XeMain::createPCIDevices() {
     }
     {
       MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "SFCX", MP_AUTO);
-      sfcx = std::make_unique<STRIP_UNIQUE(sfcx)>("SFCX", SFCX_DEV_SIZE, Config::filepaths.nand, pciBridge.get(), ram.get());
+      u32 cpi = xenonCPU->GetCPI();
+      sfcx = std::make_unique<STRIP_UNIQUE(sfcx)>("SFCX", SFCX_DEV_SIZE, Config::filepaths.nand, cpi, pciBridge.get(), ram.get());
     }
     {
       MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "XMA", MP_AUTO);

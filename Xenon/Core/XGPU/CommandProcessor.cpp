@@ -20,11 +20,15 @@
 
 #include "Base/CRCHash.h"
 #include "Base/Thread.h"
-#include "Core/Xe_Main.h"
+
+#include "Render/Abstractions/Renderer.h"
 
 namespace Xe::XGPU {
   
-CommandProcessor::CommandProcessor(RAM *ramPtr, XenosState *statePtr, PCIBridge *pciBridge) : ram(ramPtr), state(statePtr), parentBus(pciBridge) {
+CommandProcessor::CommandProcessor(RAM *ramPtr, XenosState *statePtr, Render::Renderer *renderer, PCIBridge *pciBridge) :
+  ram(ramPtr),
+  state(statePtr), render(renderer),
+  parentBus(pciBridge) {
   cpWorkerThread = std::thread(&CommandProcessor::cpWorkerThreadLoop, this);
 
   // Initialize uCode buffers.
@@ -41,8 +45,7 @@ CommandProcessor::~CommandProcessor() {
 }
 
 void CommandProcessor::CPWriteMicrocodeData(eCPMicrocodeType uCodeType, u32 data) {
-  switch (uCodeType)
-  {
+  switch (uCodeType) {
   case Xe::XGPU::uCodeTypeME:
     // Sanity Check
     if (cpMEuCodeWriteAdddress <= cpMEuCodeData.size()) {
@@ -68,8 +71,7 @@ void CommandProcessor::CPWriteMicrocodeData(eCPMicrocodeType uCodeType, u32 data
 
 u32 CommandProcessor::CPReadMicrocodeData(eCPMicrocodeType uCodeType) {
   u32 tmp = 0;
-  switch (uCodeType)
-  {
+  switch (uCodeType) {
   case Xe::XGPU::uCodeTypeME:
     // Sanity check.
     if (cpMEuCodeReadAdddress <= cpMEuCodeData.size()) {
@@ -89,7 +91,7 @@ u32 CommandProcessor::CPReadMicrocodeData(eCPMicrocodeType uCodeType) {
 }
 
 void CommandProcessor::CPUpdateRBBase(u32 address) {
-  if (address == 0)
+  if (!address)
     return;
 
   state->WriteRegister(XeRegister::CP_RB_BASE, address);
@@ -102,7 +104,7 @@ void CommandProcessor::CPUpdateRBBase(u32 address) {
 }
 
 void CommandProcessor::CPUpdateRBSize(size_t newSize) {
-  if ((newSize & CP_RB_CNTL_RB_BUFSZ_MASK) == 0)
+  if (!(newSize & CP_RB_CNTL_RB_BUFSZ_MASK))
     return;
 
   state->WriteRegister(XeRegister::CP_RB_CNTL, newSize);
@@ -119,7 +121,6 @@ void CommandProcessor::CPUpdateRBWritePointer(u32 offset) {
 void CommandProcessor::cpWorkerThreadLoop() {
   Base::SetCurrentThreadName("[Xe] Command Processor");
   while (cpWorkerThreadRunning) {
-
     u32 writePtrIndex = cpWritePtrIndex.load();
     while (cpWorkerThreadRunning && (cpRingBufferBasePtr == nullptr || cpReadPtrIndex == writePtrIndex)) {
       // Stall until we're told otherwise
@@ -147,7 +148,7 @@ u32 CommandProcessor::cpExecutePrimaryBuffer(u32 readIndex, u32 writeIndex) {
 
   do {
     if (!ExecutePacket(&cpRingBufer)) {
-      // TODO(bitsh1ft3r): Check wheter this should be a fatal crash.
+      // TODO(bitsh1ft3r): Check whether this should be a fatal crash.
       LOG_ERROR(Xenos, "CP[PrimaryBuffer]: Failed to execute a packet.");
       assert(true);
       break;
@@ -166,7 +167,7 @@ void CommandProcessor::cpExecuteIndirectBuffer(u32 bufferPtr, u32 bufferSize) {
 
   do {
     if (!ExecutePacket(&ringBufer)) {
-      // TODO(bitsh1ft3r): Check wheter this should be a fatal crash.
+      // TODO(bitsh1ft3r): Check whether this should be a fatal crash.
       LOG_ERROR(Xenos, "CP[IndirectRingBuffer]: Failed to execute a packet.");
       assert(true);
       break;
@@ -182,8 +183,8 @@ bool CommandProcessor::ExecutePacket(RingBuffer *ringBuffer) {
   // Get the packet type.
   const CPPacketType packetType = static_cast<CPPacketType>(packetData >> 30);
   
-  // TODO: Check this.
-  if (packetData == 0) {
+  // TODO: Check if we should actually return if it's a nul-packet
+  if (!packetData) {
     LOG_WARNING(Xenos, "CP[PrimaryBuffer]: found packet with zero data!");
     return true;
   }
@@ -1024,7 +1025,7 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer* ringBuffer, u32 packe
   // Write the VGT_DRAW_INITIATOR register.
   state->WriteRegister(XeRegister::VGT_DRAW_INITIATOR, vgtDrawInitiator.hexValue);
 
-  // TODO(Vali004): Do draw on backend.
+  // TODO(Vali004): Do draw on backend
 
   bool isIndexedDraw = false;
   bool drawOk = true;
@@ -1032,8 +1033,7 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer* ringBuffer, u32 packe
   // Our Index Buffer info for indexed draws.
   XeIndexBufferInfo indexBufferInfo;
 
-  switch (vgtDrawInitiator.sourceSelect)
-  {
+  switch (vgtDrawInitiator.sourceSelect) {
   case eSourceSelect::xeDMA:
   {
     // Indexed draw.
@@ -1101,9 +1101,9 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer* ringBuffer, u32 packe
 
   if (drawOk) {
     if (isIndexedDraw) {
-      Xe_Main->renderer->DrawIndexed(indexBufferInfo);
+      render->DrawIndexed(indexBufferInfo);
     } else {
-      Xe_Main->renderer->Draw();
+      render->Draw();
     }
   }
 

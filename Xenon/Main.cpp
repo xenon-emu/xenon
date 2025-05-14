@@ -118,7 +118,8 @@ s32 main(s32 argc, char *argv[]) {
 #if MICROPROFILE_ENABLED == 1 && AUTO_FLIP == 0
     MicroProfileFlip(nullptr);
 #endif
-    Xe_Main->renderer->HandleEvents();
+    if (Xe_Main.get() && Xe_Main->renderer.get())
+      Xe_Main->renderer->HandleEvents();
     std::this_thread::sleep_for(100ns);
   }
   // Shutdown

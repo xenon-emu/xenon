@@ -30,6 +30,8 @@
 // Handles all commands sent to the Xenos via the RingBuffer.
 // The RingBuffer is a dedicated area of memory used as storage for CP packets.
 
+namespace Render { class Renderer; }
+
 namespace Xe::XGPU {
 
 // Masks for RingBuffer registers.
@@ -169,7 +171,7 @@ struct XeIndexBufferInfo {
 
 class CommandProcessor {
 public:
-  CommandProcessor(RAM *ramPtr, XenosState *statePtr, PCIBridge *pciBridge);
+  CommandProcessor(RAM *ramPtr, XenosState *statePtr, Render::Renderer *renderer, PCIBridge *pciBridge);
   ~CommandProcessor();
 
   // Methods for R/W of the CP/PFP uCode data.
@@ -192,6 +194,9 @@ private:
 
   // RAM Poiner, for DMA ops and RingBuffer access.
   RAM *ram{};
+
+  // Render handle
+  Render::Renderer *render;
 
   // Xenos State, contains register data
   XenosState *state{};

@@ -10,6 +10,8 @@
 #include "Core/XGPU/XGPU.h"
 #include "Core/Xe_Main.h"
 
+#include "Render/GUI/GUI.h"
+
 namespace Render {
 
 Renderer::Renderer(RAM *ram, SDL_Window *window) :
@@ -39,8 +41,6 @@ void Renderer::Create() {
   shaderFactory = resourceFactory->CreateShaderFactory();
 
   // Init shader handles
-  if (GetBackendID() == "OpenGL"_j) {
-  }
   switch (GetBackendID()) {
   case "OpenGL"_j: {
     fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "opengl" };
@@ -140,9 +140,11 @@ void Renderer::Resize(s32 x, s32 y) {
 }
 
 void Renderer::HandleEvents() {
-  const SDL_WindowFlags flag = SDL_GetWindowFlags(Xe_Main->mainWindow);
-  if (Config::rendering.pauseOnFocusLoss) {
-    Xe_Main->renderHalt = flag & SDL_WINDOW_INPUT_FOCUS ? false : true;
+  if (Xe_Main.get()) {
+    const SDL_WindowFlags flag = SDL_GetWindowFlags(Xe_Main->mainWindow);
+    if (Config::rendering.pauseOnFocusLoss) {
+      Xe_Main->renderHalt = flag & SDL_WINDOW_INPUT_FOCUS ? false : true;
+    }
   }
   // Process events.
   while (XeRunning && SDL_PollEvent(&windowEvent)) {
@@ -226,7 +228,7 @@ void Renderer::Thread() {
     }
 
     // Render the texture
-    if (!Xe_Main->renderHalt && Xe_Main->xenos->RenderingTo2DFramebuffer()) {
+    if (Xe_Main.get() && !Xe_Main->renderHalt && Xe_Main->xenos->RenderingTo2DFramebuffer()) {
       MICROPROFILE_SCOPEI("[Xe::Render]", "BindTexture", MP_AUTO);
       renderShaderPrograms->Bind();
       backbuffer->Bind();
@@ -243,6 +245,29 @@ void Renderer::Thread() {
     if (Xe_Main.get()) {
       MICROPROFILE_SCOPEI("[Xe::Render]", "Swap", MP_AUTO);
       OnSwap(mainWindow);
+    }
+  }
+}
+
+bool Renderer::DebuggerActive() {
+  if (!gui.get())
+    return false;
+  for (bool &a : gui.get()->ppcDebuggerActive) {
+    if (a) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void Renderer::SetDebuggerActive(s8 specificPPU) {
+  if (gui.get()) {
+    if (specificPPU != -1) {
+      for (bool &a : gui.get()->ppcDebuggerActive) {
+        a = true;
+      }
+    } else if (specificPPU <= 3) {
+      gui.get()->ppcDebuggerActive[specificPPU - 1] = true;
     }
   }
 }

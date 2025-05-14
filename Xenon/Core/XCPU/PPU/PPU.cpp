@@ -205,7 +205,7 @@ void PPU::Halt(u64 haltOn, bool requestedByGuest, s8 ppuId, ePPUThread threadId)
     ppuHaltOn = haltOn;
   }
   guestHalt = requestedByGuest;
-  if (guestHalt) {
+  if (guestHalt && Xe_Main.get() && Xe_Main->renderer) {
 #ifndef NO_GFX
     Xe_Main->renderer->SetDebuggerActive(ppuId);
 #endif

@@ -173,7 +173,7 @@ struct SFCX_STATE {
 // Secure Flash Controller for Xbox Device.
 class SFCX : public PCIDevice {
 public:
-  SFCX(const std::string &deviceName, u64 size, const std::string &nandLoadPath,
+  SFCX(const std::string &deviceName, u64 size, const std::string &nandLoadPath, u32 cpi,
     PCIBridge *parentPCIBridge, RAM *ram);
   ~SFCX();
 
@@ -210,7 +210,9 @@ private:
   // Mutex for thread-safe behavior.
   std::recursive_mutex mutex;
   // RAM pointer. Used for DMA.
-  RAM* mainMemory;
+  RAM *mainMemory = nullptr;
+  // CPI, used for timing
+  u32 cpi = 0;
   // Read a page from memory to page buffer.
   void sfcxReadPageFromNAND(bool physical);
   // Erase NAND Block

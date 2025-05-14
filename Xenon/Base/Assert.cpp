@@ -34,7 +34,8 @@ void throw_fail_impl() {
 
 void assert_fail_impl() {
   if (Config::debug.softHaltOnAssertions) {
-    Xe_Main->getCPU()->Halt();
+    if (Xe_Main.get() && Xe_Main->getCPU())
+      Xe_Main->getCPU()->Halt();
     fmt::print("Assertion Failed! Soft halting emulator...\n");
   }
 }
