@@ -157,12 +157,14 @@ public:
   Sirit::Id main_label = { 0 };
 
   std::vector<TextureInfo> textures{};
-  Sirit::Module module;
+  Sirit::Module module{ 0x00010000 };
 private:
   Sirit::Id gpr_var = { 0 };
   Sirit::Id predicate_var = { 0 };
 
   Sirit::Id current_function = { 0 };
+
+  Sirit::Id entry_dispatch_func = { 0 };
 
   Sirit::Id merge_label = { 0 };
   Sirit::Id true_label = { 0 };

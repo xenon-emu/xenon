@@ -798,7 +798,8 @@ std::pair<u32, std::vector<u32>> LoadShader(eShaderType shaderType, const std::v
   std::string baseString = fmt::format("{}_shader_{:X}", typeString, crc);
   fs::path path{ shaderPath / (baseString + ".spv") };
   std::vector<u32> code{};
-  {
+  // Vali: Temporarily disable cache, emitting isn't 100% yet
+  /*{
     std::ifstream file{ path, std::ios::in | std::ios::binary };
     std::error_code error;
     if (fs::exists(path, error) && file.is_open()) {
@@ -809,7 +810,7 @@ std::pair<u32, std::vector<u32>> LoadShader(eShaderType shaderType, const std::v
       return { crc, code };
     }
     file.close();
-  }
+  }*/
   Microcode::AST::ShaderCodeWriterSirit writer{ shaderType };
   Microcode::AST::ControlFlowGraph *cf = Microcode::AST::ControlFlowGraph::DecompileMicroCode(reinterpret_cast<const u8*>(data.data()), data.size() * 4, shaderType);
   if (cf) {

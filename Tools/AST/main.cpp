@@ -129,7 +129,7 @@ void Run(u32 hash) {
     }
   }
 
-  AST::ShaderCodeWriterSirit writer{};
+  AST::ShaderCodeWriterSirit writer{ shaderType };
   AST::ControlFlowGraph *cf = AST::ControlFlowGraph::DecompileMicroCode(reinterpret_cast<u8*>(data.data()), data.size() * 4, shaderType);
   if (cf) {
     GlobalInstructionExtractor instructionExtractor;
@@ -137,7 +137,18 @@ void Run(u32 hash) {
     VisitAll(cf, vistor);
     cf->EmitShaderCode(writer);
   }
+  writer.BeginMain();
+  writer.EndMain();
   std::vector<u32> code{ writer.module.Assemble() };
+
+  std::string typeString = shaderType == Xe::eShaderType::Pixel ? "pixel" : "vertex";
+  std::string baseString = std::format("{}_shader_{:X}", typeString, hash);
+  {
+    std::ofstream f{ shaderPath / (baseString + ".spv"), std::ios::out | std::ios::binary };
+    f.write(reinterpret_cast<char*>(code.data()), code.size() * 4);
+    f.close();
+  }
+
   LOG_INFO(Base, "SPIR-V data:");
   {
     u32 lastR = -1;
@@ -176,7 +187,9 @@ s32 main(s32 argc, char *argv[]) {
   }
   u32 crcHash = PARAM_crc.Get<u32>();
   if (crcHash == 0) {
-    crcHash = 0x862E284E;
+    // Vertex: 0x888C0D57
+    // Pixel: 0x208AE75D
+    crcHash = 0x888C0D57;
   }
   Xe::Microcode::Run(crcHash);
   return 0;

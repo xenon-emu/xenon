@@ -430,3 +430,5 @@ Xenon.dir/*
 /Tools/Tools/*
 result
 files
+# Specific to Xenon tooling
+Tools/AST/Deps/ThirdParty/Sirit/*
