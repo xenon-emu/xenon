@@ -38,9 +38,11 @@ void Renderer::Create() {
   BackendStart();
   shaderFactory = resourceFactory->CreateShaderFactory();
 
-  // TODO(Vali0004): Pull shaders from a file, as right now, this will only pull the OpenGL Shaders
   // Init shader handles
   if (GetBackendID() == "OpenGL"_j) {
+  }
+  switch (GetBackendID()) {
+  case "OpenGL"_j: {
     fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "opengl" };
     computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
       { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
@@ -69,6 +71,17 @@ void Renderer::Create() {
         { eShaderType::Fragment, shaderPath / "framebuffer.frag" }
       });
     }
+  } break;
+  case "Dummy"_j: {
+    fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "dummy" };
+    computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
+      { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
+    });
+    renderShaderPrograms = shaderFactory->LoadFromFiles("Render", {
+      { eShaderType::Vertex, shaderPath / "framebuffer.vert" },
+      { eShaderType::Fragment, shaderPath / "framebuffer.frag" }
+    });
+  } break;
   }
 
   // Create our backbuffer
