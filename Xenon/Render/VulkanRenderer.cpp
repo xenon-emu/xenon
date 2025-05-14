@@ -115,11 +115,25 @@ void VulkanRenderer::BackendResize(s32 x, s32 y) {
 }
 
 void VulkanRenderer::UpdateScissor(s32 x, s32 y, u32 width, u32 height) {
+  VkRect2D scissor = {};
+  scissor.extent.width = width;
+  scissor.extent.height = height;
+  scissor.offset.x = x;
+  scissor.offset.y = y;
 
+  // vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 }
 
 void VulkanRenderer::UpdateViewport(s32 x, s32 y, u32 width, u32 height) {
+  VkViewport viewport = {};
+  viewport.x = static_cast<f32>(x);
+  viewport.y = static_cast<f32>(y);
+  viewport.width = static_cast<f32>(width);
+  viewport.height = static_cast<f32>(height);
+  viewport.minDepth = 0.0f;
+  viewport.maxDepth = 1.0f;
 
+  // vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 }
 
 void VulkanRenderer::Clear() {
@@ -135,7 +149,15 @@ void VulkanRenderer::DrawIndexed(Xe::XGPU::XeIndexBufferInfo indexBufferInfo) {
 }
 
 void VulkanRenderer::UpdateClearColor(u8 r, u8 b, u8 g, u8 a) {
-
+  VkClearAttachment attachment = {};
+  auto &rgba = attachment.clearValue.color.float32;
+  rgba[0] = static_cast<f32>(r) / 255.0f;
+  rgba[1] = static_cast<f32>(g) / 255.0f;
+  rgba[2] = static_cast<f32>(b) / 255.0f;
+  rgba[3] = static_cast<f32>(a) / 255.0f;
+  attachment.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+  // attachment.colorAttachment = 0;
+  // vkCmdClearAttachments(commandBuffer, 1, &attachment, 1, &clearRect);
 }
 
 void VulkanRenderer::OnCompute() {
