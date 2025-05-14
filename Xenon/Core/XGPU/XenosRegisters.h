@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <mutex>
 #include <string>
 #include <unordered_map>
 
@@ -28,16 +29,25 @@ public:
   }
 
   void WriteRegister(XeRegister reg, u32 value) {
+    // Set a lock.
+    std::lock_guard lck(mutex);
+
     value = byteswap_be(value);
     memcpy(&Regs[static_cast<u32>(reg) * 4], &value, sizeof(value));
   }
 
   void WriteRawRegister(u32 addr, u32 value) {
+    // Set a lock.
+    std::lock_guard lck(mutex);
+
     value = byteswap_be(value);
     memcpy(&Regs[addr], &value, sizeof(value));
   }
 
   u32 ReadRegister(XeRegister reg) {
+    // Set a lock.
+    std::lock_guard lck(mutex);
+
     u32 value = 0;
     switch (static_cast<u32>(reg)) {
     // Unknown
@@ -57,6 +67,9 @@ public:
   }
 
   u32 ReadRawRegister(u32 addr) {
+    // Set a lock.
+    std::lock_guard lck(mutex);
+
     u32 value = 0;
     memcpy(&value, &Regs[addr], sizeof(value));
     return value;
@@ -65,6 +78,9 @@ public:
   u8* GetRegisterPointer(XeRegister reg) {
     return &Regs[static_cast<u32>(reg) * 4];
   }
+
+  // Mutex.
+  std::recursive_mutex mutex;
 
   // Primary surface
   u32 fbSurfaceAddress = XE_FB_BASE;
