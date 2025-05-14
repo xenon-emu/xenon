@@ -2,9 +2,10 @@
 
 #pragma once
 
-#include <thread>
-#include <vector>
 #include <fstream>
+#include <thread>
+#include <unordered_map>
+#include <vector>
 #ifndef NO_GFX
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_video.h>
@@ -97,6 +98,9 @@ public:
   bool DebuggerActive();
 
   void SetDebuggerActive(s8 specificPPU = -1);
+  
+  // Recompiled shaders
+  std::unordered_map<u32, std::shared_ptr<Shader>> convertedShaderPrograms{};
 private:
   // Thread handle
   std::thread thread;

@@ -34,6 +34,24 @@ void Render::OGLShader::CompileFromSource(eShaderType type, const char *source) 
   AttachedShaders.push_back(shader);
 }
 
+void Render::OGLShader::CompileFromBinary(eShaderType type, const u8 *data, u64 size) {
+  u32 shader = glCreateShader(ToGLShaderType(type));
+  glShaderBinary(1, &shader, GL_SHADER_BINARY_FORMAT_SPIR_V_ARB, data, size);
+  glSpecializeShaderARB(shader, "main", 0, 0, 0);
+  
+  s32 success = 0;
+  glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+  if (!success) {
+    char log[1024];
+    glGetShaderInfoLog(shader, sizeof(log), nullptr, log);
+    LOG_ERROR(System, "Shader compilation failed:\n{}", log);
+    glDeleteShader(shader);
+    return;
+  }
+
+  AttachedShaders.push_back(shader);
+}
+
 s32 Render::OGLShader::GetUniformLocation(const std::string &name) {
   auto it = UniformCache.find(name);
   if (it != UniformCache.end()) {
@@ -65,7 +83,7 @@ void Render::OGLShader::Link() {
   if (!success) {
     char log[1024];
     glGetProgramInfoLog(Program, sizeof(log), nullptr, log);
-    UNREACHABLE_MSG("Shader link failed:\n{}", log);
+    LOG_CRITICAL(System, "Shader link failed:\n{}", log);
   }
 
   for (auto shader : AttachedShaders) {

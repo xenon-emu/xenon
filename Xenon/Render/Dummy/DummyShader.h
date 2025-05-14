@@ -14,6 +14,7 @@ public:
   ~DummyShader() override { Destroy(); }
 
   void CompileFromSource(eShaderType type, const char *source) override;
+  void CompileFromBinary(eShaderType type, const u8 *data, u64 size) override;
   s32 GetUniformLocation(const std::string &name) override;
   void SetUniformInt(const std::string &name, s32 value) override;
   void SetUniformFloat(const std::string &name, f32 value) override;

@@ -33,4 +33,9 @@ std::shared_ptr<Shader> DummyShaderFactory::LoadFromFiles(const std::string &nam
   return std::make_unique<DummyShader>();
 }
 
+std::shared_ptr<Shader> DummyShaderFactory::LoadFromBinary(const std::string &name, const std::unordered_map<eShaderType, std::vector<u32>> &sources) {
+  LOG_INFO(Render, "DummyShaderFactory::LoadFromBinary: {}", name);
+  return std::make_unique<DummyShader>();
+}
+
 } // namespace Render

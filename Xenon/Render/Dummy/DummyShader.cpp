@@ -6,6 +6,10 @@ void Render::DummyShader::CompileFromSource(eShaderType type, const char *source
   LOG_INFO(Render, "DummyShader::CompileFromSource: {}", static_cast<u8>(type));
 }
 
+void Render::DummyShader::CompileFromBinary(eShaderType type, const u8 *data, u64 size) {
+  LOG_INFO(Render, "DummyShader::CompileFromBinary: {}", static_cast<u8>(type));
+}
+
 s32 Render::DummyShader::GetUniformLocation(const std::string &name) {
   LOG_INFO(Render, "DummyShader::GetUniformLocation: {}", name);
   return 0;

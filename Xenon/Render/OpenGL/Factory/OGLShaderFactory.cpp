@@ -41,6 +41,17 @@ std::shared_ptr<Shader> OGLShaderFactory::LoadFromSource(const std::string &name
   return shader;
 }
 
+std::shared_ptr<Shader> OGLShaderFactory::LoadFromBinary(const std::string &name,
+  const std::unordered_map<eShaderType, std::vector<u32>> &sources) {
+  auto shader = std::make_shared<OGLShader>();
+  for (const auto& [type, src] : sources) {
+    shader->CompileFromBinary(type, reinterpret_cast<const u8*>(src.data()), src.size() * sizeof(u32));
+  }
+  shader->Link();
+  Shaders[name] = shader;
+  return shader;
+}
+
 eShaderType GetShaderType(const std::string &line) {
   switch (Base::joaatStringHash(line)) {
   case "#vertex"_j: return eShaderType::Vertex;

@@ -816,6 +816,7 @@ std::pair<u32, std::vector<u32>> LoadShader(eShaderType shaderType, const std::v
     GlobalInstructionExtractor instructionExtractor;
     AllExpressionVisitor vistor(&instructionExtractor);
     VisitAll(cf, vistor);
+    cf->EmitShaderCode(writer);
   }
   writer.BeginMain();
   writer.EndMain();
@@ -855,9 +856,17 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
 
   switch (shaderType) {
   case eShaderType::Pixel:{
+    std::shared_ptr<Render::Shader> compiledShader = render->shaderFactory->LoadFromBinary(baseString, {
+      { Render::eShaderType::Fragment, shader.second }
+    });
+    render->convertedShaderPrograms.insert({ shader.first, compiledShader });
     LOG_DEBUG(Xenos, "[CP::IM_LOAD] PixelShader CRC: 0x{:08X}", shader.first);
   } break;
   case eShaderType::Vertex:{
+    std::shared_ptr<Render::Shader> compiledShader = render->shaderFactory->LoadFromBinary(baseString, {
+      { Render::eShaderType::Vertex, shader.second }
+    });
+    render->convertedShaderPrograms.insert({ shader.first, compiledShader });
     LOG_DEBUG(Xenos, "[CP::IM_LOAD] VertexShader CRC: 0x{:08X}", shader.first);
   } break;
   }
@@ -889,11 +898,20 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuff
     f.write(reinterpret_cast<char*>(data.data()), data.size() * 4);
     f.close();
   }
+
   switch (shaderType) {
   case eShaderType::Pixel:{
+    std::shared_ptr<Render::Shader> compiledShader = render->shaderFactory->LoadFromBinary(baseString, {
+      { Render::eShaderType::Fragment, shader.second }
+    });
+    render->convertedShaderPrograms.insert({ shader.first, compiledShader });
     LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] PixelShader CRC: 0x{:08X}", shader.first);
   } break;
   case eShaderType::Vertex:{
+    std::shared_ptr<Render::Shader> compiledShader = render->shaderFactory->LoadFromBinary(baseString, {
+      { Render::eShaderType::Vertex, shader.second }
+    });
+    render->convertedShaderPrograms.insert({ shader.first, compiledShader });
     LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] VertexShader CRC: 0x{:08X}", shader.first);
   } break;
   }
@@ -1134,8 +1152,7 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer* ringBuffer, u32 packe
   XeIndexBufferInfo indexBufferInfo;
 
   switch (vgtDrawInitiator.sourceSelect) {
-  case eSourceSelect::xeDMA:
-  {
+  case eSourceSelect::xeDMA: {
     // Indexed draw.
     isIndexedDraw = true;
 

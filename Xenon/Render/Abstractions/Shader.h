@@ -18,6 +18,7 @@ class Shader {
 public:
   virtual ~Shader() = default;
   virtual void CompileFromSource(eShaderType type, const char *source) = 0;
+  virtual void CompileFromBinary(eShaderType type, const u8 *data, u64 size) = 0;
   virtual s32 GetUniformLocation(const std::string &name) = 0;
   virtual void SetUniformInt(const std::string &name, s32 value) = 0;
   virtual void SetUniformFloat(const std::string &name, f32 value) = 0;
