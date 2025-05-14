@@ -16,6 +16,7 @@
 
 #include "Core/RAM/RAM.h"
 #include "Core/RootBus/HostBridge/PCIe.h"
+#include "Core/XGPU/CommandProcessor.h"
 #include "Render/Abstractions/Factory/ResourceFactory.h"
 #include "Render/Abstractions/Factory/ShaderFactory.h"
 #include "Render/GUI/GUI.h"
@@ -40,6 +41,10 @@ public:
   virtual void UpdateViewport(s32 x, s32 y, u32 width, u32 height) = 0;
   virtual void UpdateClearColor(u8 r, u8 b, u8 g, u8 a) = 0;
   virtual void Clear() = 0;
+
+  virtual void Draw() = 0;
+  virtual void DrawIndexed(Xe::XGPU::XeIndexBufferInfo indexBufferInfo) = 0;
+
   virtual void OnCompute() = 0;
   virtual void OnBind() = 0;
   virtual void OnSwap(SDL_Window *window) = 0;
