@@ -114,6 +114,30 @@ void VulkanRenderer::BackendResize(s32 x, s32 y) {
 
 }
 
+void VulkanRenderer::UpdateScissor(s32 x, s32 y, u32 width, u32 height) {
+
+}
+
+void VulkanRenderer::UpdateViewport(s32 x, s32 y, u32 width, u32 height) {
+
+}
+
+void VulkanRenderer::Clear() {
+
+}
+
+void VulkanRenderer::Draw() {
+
+}
+
+void VulkanRenderer::DrawIndexed(Xe::XGPU::XeIndexBufferInfo indexBufferInfo) {
+
+}
+
+void VulkanRenderer::UpdateClearColor(u8 r, u8 b, u8 g, u8 a) {
+
+}
+
 void VulkanRenderer::OnCompute() {
 
 }
@@ -134,6 +158,9 @@ void *VulkanRenderer::GetBackendContext() {
   return nullptr;
 }
 
+u32 VulkanRenderer::GetBackendID() {
+  return "Vulkan"_j;
+}
 
 } // namespace Render
 #endif
