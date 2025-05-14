@@ -20,7 +20,7 @@
  *	XGPU.h Basic Xenos implementation.
  */
 
-class Render::Renderer;
+namespace Render { class Renderer; }
 
 namespace Xe {
 namespace Xenos {
