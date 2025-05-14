@@ -44,11 +44,6 @@ enum class ePrimitiveType : u32 {
   QuadStrip
 };
 
-enum class eIndexFormat : u32 {
-  I16,
-  I32
-};
-
 enum class eShaderType : u32 {
   Vertex,
   Pixel,

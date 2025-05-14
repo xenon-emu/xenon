@@ -1014,17 +1014,93 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer* ringBuffer, u32 packe
   }
 
   // Get our VGT register data.
-  VGT_DRAW_INITIATOR_REG vgtReg;
-  vgtReg.hexValue = ringBuffer->ReadAndSwap<u32>();
+  VGT_DRAW_INITIATOR_REG vgtDrawInitiator;
+  vgtDrawInitiator.hexValue = ringBuffer->ReadAndSwap<u32>();
   dataCount--;
 
   // Write the VGT_DRAW_INITIATOR register.
-  state->WriteRegister(XeRegister::VGT_DRAW_INITIATOR, vgtReg.hexValue);
+  state->WriteRegister(XeRegister::VGT_DRAW_INITIATOR, vgtDrawInitiator.hexValue);
 
-  // TODO(vali004): How do you wanna do Draw state?...
   // TODO(Vali004): Do draw on backend.
 
-  return false;
+  bool isIndexedDraw = false;
+  bool drawOk = false;
+
+  // Our Index Buffer info for indexed draws.
+  XeIndexBufferInfo indexBufferInfo;
+
+  switch (vgtDrawInitiator.sourceSelect)
+  {
+  case eSourceSelect::xeDMA:
+  {
+    // Indexed draw.
+    isIndexedDraw = true;
+
+    // Read VGT_DMA_BASE from data.
+    // Sanity check.
+    if (!dataCount) {
+      LOG_ERROR(Xenos, "[CP, PT3]: DRAW failed, not enough data for VGT_DMA_BASE.");
+      return false; // Failed.
+    }
+
+    u32 vgtDMABase = ringBuffer->ReadAndSwap<u32>();
+    dataCount--;
+
+    // Write the VGT_DMA_BASE register.
+    state->WriteRegister(XeRegister::VGT_DMA_BASE, vgtDMABase);
+
+    // Get our VGT_DMA_SIZE reg data.
+    VGT_DMA_SIZE_REG vgtDMASize;
+
+    // Sanity check, again.
+    if (!dataCount) {
+      LOG_ERROR(Xenos, "[CP, PT3]: DRAW failed, not enough data for VGT_DMA_SIZE.");
+      return false; // Failed.
+    }
+
+    vgtDMASize.hexValue = ringBuffer->ReadAndSwap<u32>();
+    dataCount--;
+
+    // Write the VGT_DMA_SIZE register.
+    state->WriteRegister(XeRegister::VGT_DMA_SIZE, vgtDMASize.hexValue);
+
+    // Get our index size from VGT_DRAW_INITIATOR size in bytes.
+    u32 indexSizeInBytes = vgtDrawInitiator.indexSize == eIndexFormat::xeInt16 ? sizeof(u16) : sizeof(u32);
+
+    // The base address must already be word-aligned according to the R6xx documentation.
+    indexBufferInfo.guestBase = vgtDMABase & ~(indexSizeInBytes - 1);
+    indexBufferInfo.endianness = vgtDMASize.swapMode;
+    indexBufferInfo.indexFormat = vgtDrawInitiator.indexSize;
+    indexBufferInfo.length = vgtDMASize.numWords * indexSizeInBytes;
+    indexBufferInfo.count = vgtDrawInitiator.numIndices;
+  }
+    break;
+  case eSourceSelect::xeImmediate:
+    // TODO(bitshift3r): Do VGT_IMMED_DATA if any ocurrences are to be found.
+    LOG_ERROR(Xenos, "[CP, PT3]{}: Is using immediate vertex indices, which are currently unsupported. "
+      "Please submit an issue in Xenon github.", opCodeName);
+    drawOk = false;
+    break;
+  case eSourceSelect::xeAutoIndex:
+    // Auto draw.
+    indexBufferInfo.guestBase = 0;
+    indexBufferInfo.length = 0;
+    break;
+  default:
+    // Unhandled or invalid source selection.
+    drawOk = false;
+    LOG_ERROR(Xenos, "[CP, PT3]: DRAW failed, invalid source select.");
+    break;
+  }
+
+  // Skip to the next command, if there are immediate indexes that we don't support yet.
+  ringBuffer->AdvanceRead(dataCount * sizeof(u32));
+
+  if (drawOk) {
+    // TODO(bitsh1ft3r): Issue DRAW in backend.
+  }
+
+  return true;
 }
 
 bool CommandProcessor::ExecutePacketType3_DRAW_INDX(RingBuffer* ringBuffer, u32 packetData, u32 dataCount) {

@@ -158,6 +158,15 @@ enum eCPMicrocodeType {
   uCodeTypePFP
 };
 
+// Index Buffer info for DRAW_INDX_* PM4 commands.
+struct XeIndexBufferInfo {
+  eIndexFormat indexFormat = eIndexFormat::xeInt16;
+  eEndian endianness = eEndian::xeNone;
+  uint32_t count = 0;
+  uint32_t guestBase = 0;
+  size_t length = 0;
+};
+
 class CommandProcessor {
 public:
   CommandProcessor(RAM *ramPtr, XenosState *statePtr, PCIBridge *pciBridge);

@@ -74,3 +74,10 @@ enum class eIndexFormat : u32 {
   // Not very common, but used for some world draws in 545407E0.
   xeInt32,
 };
+
+enum class eEndian : u32 {
+  xeNone = 0,
+  xe8in16 = 1,
+  xe8in32 = 2,
+  xe16in32 = 3,
+};

@@ -7193,7 +7193,17 @@ enum class XeRegister {
 // Registers Definitions
 //
 
-// Vertex Group Tesellator Draw Initiator Register.
+
+union alignas(u32) VGT_DMA_SIZE_REG {
+  u32 hexValue;
+  struct {
+    u32 numWords : 24;      // +0
+    u32 res0 : 6;           // +24
+    eEndian swapMode : 2;   // +30
+  };
+};
+
+// Vertex Grouper and Tesellator Draw Initiator Register.
 union alignas(u32) VGT_DRAW_INITIATOR_REG {
   u32 hexValue;
   // Different than on A2xx and R6xx/R7xx.
