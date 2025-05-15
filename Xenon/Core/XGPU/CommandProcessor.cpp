@@ -1126,8 +1126,7 @@ bool CommandProcessor::ExecutePacketType3_SET_BIN_SELECT_HI(RingBuffer *ringBuff
   return true;
 }
 
-bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer* ringBuffer, u32 packetData, u32 dataCount, u32 vizQueryCondition, const char* opCodeName)
-{
+bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer* ringBuffer, u32 packetData, u32 dataCount, u32 vizQueryCondition, const char *opCodeName) {
   // Sanity check.
   if (!dataCount) {
     LOG_ERROR(Xenos, "[CP, PT3]: Packet too small, can't read VGT_DRAW_INITIATOR, OpCode {}.", opCodeName);
@@ -1221,9 +1220,10 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer* ringBuffer, u32 packe
     } else {
       render->Draw();
     }
+    state->ClearDirtyState();
   }
 
-  return true;
+  return drawOk;
 }
 
 bool CommandProcessor::ExecutePacketType3_DRAW_INDX(RingBuffer* ringBuffer, u32 packetData, u32 dataCount) {

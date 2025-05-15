@@ -15,8 +15,7 @@ Xe::XGPU::EDRAM::~EDRAM() {
 }
 
 void Xe::XGPU::EDRAM::SetRWRegIndex(eRegIndexType indexType, u32 index) {
-  switch (indexType)
-  {
+  switch (indexType) {
   case Xe::XGPU::readIndex:
     edramState.get()->readRegisterIndex = index;
     break;
@@ -60,8 +59,7 @@ void Xe::XGPU::EDRAM::WriteReg(u32 data) {
   // Sanity Check.
   if (regIdx <= edramState.get()->edramRegs.size()) {
     edramState.get()->edramRegs[regIdx] = byteswap_be<u32>(data);
-  }
-  else {
+  } else {
     LOG_ERROR(Xenos, "[EDRAM]: Write register index is bigger than MAX_EDRAM_REGS, index = {:#x}",
       edramState.get()->writeRegisterIndex);
   }

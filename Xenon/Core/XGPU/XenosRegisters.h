@@ -22,6 +22,7 @@ public:
     internalHeight(Config::xgpu.internal.height) {
     Regs = std::make_unique<STRIP_UNIQUE_ARR(Regs)>(0xFFFFF);
     memset(Regs.get(), 0, 0xFFFFF);
+    memset(RegMask, 0, sizeof(RegMask));
   }
 
   ~XenosState() {
@@ -29,15 +30,35 @@ public:
   }
 
   void WriteRegister(XeRegister reg, u32 value) {
-    // Set a lock.
+    // Set a lock
     std::lock_guard lck(mutex);
 
+    // Swap then write value
     value = byteswap_be(value);
-    memcpy(&Regs[static_cast<u32>(reg) * 4], &value, sizeof(value));
+    u64 index = static_cast<u32>(reg) * 4;
+    memcpy(&Regs[index], &value, sizeof(value));
+    // Set dirty state
+    const u64 mask = 1ull << ((index * 4) % BitCount);
+    RegMask[index / BitCount] |= mask;
+  }
+
+  bool RegisterDirty(XeRegister reg) {
+    std::lock_guard lck(mutex);
+    u64 index = static_cast<u32>(reg) * 4;
+    const u64 mask = 1ull << (index % BitCount);
+    return (RegMask[index / BitCount] & mask) != 0;
+  }
+
+  void ClearDirtyState() {
+    memset(RegMask, 0, sizeof(RegMask));
+  }
+
+  void SetDirtyState() {
+    memset(RegMask, 0xFF, sizeof(RegMask));
   }
 
   void WriteRawRegister(u32 addr, u32 value) {
-    // Set a lock.
+    // Set a lock
     std::lock_guard lck(mutex);
 
     value = byteswap_be(value);
@@ -45,12 +66,12 @@ public:
   }
 
   u32 ReadRegister(XeRegister reg) {
-    // Set a lock.
+    // Set a lock
     std::lock_guard lck(mutex);
 
     u32 value = 0;
     switch (static_cast<u32>(reg)) {
-    // Unknown
+    // Unknown (returns dummy values)
     case 0x3C00:
       return 0x08100748;
     case 0x3C04:
@@ -62,12 +83,13 @@ public:
     case 0x6584:
       return 0x050002D0;
     }
+    // Read value
     memcpy(&value, &Regs[static_cast<u32>(reg) * 4], sizeof(value));
     return value;
   }
 
   u32 ReadRawRegister(u32 addr) {
-    // Set a lock.
+    // Set a lock
     std::lock_guard lck(mutex);
 
     u32 value = 0;
@@ -79,8 +101,8 @@ public:
     return &Regs[static_cast<u32>(reg) * 4];
   }
 
-  // Mutex.
-  std::recursive_mutex mutex;
+  // Mutex
+  std::recursive_mutex mutex{};
 
   // Primary surface
   u32 fbSurfaceAddress = XE_FB_BASE;
@@ -159,6 +181,10 @@ public:
   u32 internalHeight = 720;
   // Registers
   std::unique_ptr<u8[]> Regs;
+  static constexpr u32 NumRegs = 0x5004;
+  static constexpr u32 BitCount = sizeof(u64) * 8;
+  static constexpr u32 BlockCount = (NumRegs + BitCount - 1) / BitCount;
+  u64 RegMask[BlockCount] = {};
 };
 
 // A major part of the registers were taken from:
