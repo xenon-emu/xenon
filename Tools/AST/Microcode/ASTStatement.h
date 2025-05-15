@@ -5,7 +5,7 @@
 #include <array>
 #include <span>
 
-#include "../ShaderConstants.h"
+#include "Core/XGPU/ShaderConstants.h"
 
 #include "ASTNodeBase.h"
 #include "ASTEmitter.h"

@@ -22,10 +22,12 @@ void Render::OGLBuffer::UpdateBuffer(u32 offset, u32 size, const void *data) {
   glBindBuffer(GLTarget, 0);
 }
 
-void Render::OGLBuffer::Bind() {
+void Render::OGLBuffer::Bind(u32 binding) {
   // Storage buffers use bind base
   if (GLTarget == GL_SHADER_STORAGE_BUFFER) {
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, BufferHandle);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, binding, BufferHandle);
+  } else if (GLTarget == GL_UNIFORM_BUFFER) {
+    glBindBufferBase(GL_UNIFORM_BUFFER, binding, BufferHandle);
   } else {
     glBindBuffer(GLTarget, BufferHandle);
   }

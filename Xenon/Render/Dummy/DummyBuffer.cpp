@@ -10,7 +10,7 @@ void Render::DummyBuffer::UpdateBuffer(u32 offset, u32 size, const void *data) {
   LOG_INFO(Render, "DummyBuffer::UpdateBuffer: {}, {}", offset, size);
 }
 
-void Render::DummyBuffer::Bind() {
+void Render::DummyBuffer::Bind(u32 binding) {
   LOG_INFO(Render, "DummyBuffer::Bind");
 }
 

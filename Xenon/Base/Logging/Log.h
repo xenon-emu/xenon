@@ -2,6 +2,8 @@
 
 #pragma once
 
+#ifndef TOOL
+
 #include <algorithm>
 #include <fmt/format.h>
 
@@ -75,3 +77,28 @@ if (Config::log.debugOnly)                                                      
   Base::Log::FmtLogMessage(Base::Log::Class::logClass, Base::Log::Level::Guest,          \
                            Base::Log::TrimSourcePath(__FILE__), __LINE__, __func__,      \
                            __VA_ARGS__)
+#else
+
+#include <format>
+#include <iostream>
+#include <filesystem>
+
+namespace fs = std::filesystem;
+#include "Base/Types.h"
+
+#define THROW_MSG(x, ...) if (x) { LOG_ERROR(Assert, "Assertion! " __VA_ARGS__); }
+
+#define LOG_BASE(x, s, ...) std::cout << "[" #x "] <" #s "> " << std::format(__VA_ARGS__)
+#define LOG_INFO_BASE(x, ...) LOG_BASE(x, Info, __VA_ARGS__)
+#define LOG_ERROR_BASE(x, ...) LOG_BASE(x, Error, __VA_ARGS__)
+#define LOG_CRITICAL_BASE(x, ...) LOG_BASE(x, Critical, __VA_ARGS__)
+#define LOG_DEBUG_BASE(x, ...) LOG_BASE(x, Debug, __VA_ARGS__)
+#define LOG_XBOX_BASE(x, ...) LOG_BASE(x, Xbox, __VA_ARGS__)
+
+#define LOG_INFO(x, ...) LOG_INFO_BASE(x, __VA_ARGS__) << std::endl
+#define LOG_ERROR(x, ...) LOG_ERROR_BASE(x, __VA_ARGS__) << std::endl
+#define LOG_CRITICAL(x, ...) LOG_CRITICAL_BASE(x, __VA_ARGS__) << std::endl
+#define LOG_DEBUG(x, ...) LOG_DEBUG_BASE(x, __VA_ARGS__) << std::endl
+#define LOG_XBOX(x, ...) LOG_XBOX_BASE(x, __VA_ARGS__) << std::endl
+
+#endif

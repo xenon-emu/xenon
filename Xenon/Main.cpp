@@ -89,7 +89,7 @@ s32 main(s32 argc, char *argv[]) {
   // Init params
   Base::Param::Init(argc, argv);
   // Handle help param
-  if (PARAM_help.IsSet()) {
+  if (PARAM_help.Present()) {
     ::Base::Param::Help();
     return 0;
   }

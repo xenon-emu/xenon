@@ -177,6 +177,134 @@ void Renderer::HandleEvents() {
   }
 }
 
+void Renderer::UpdateConstants(Xe::XGPU::XenosState *state) {
+  XeShaderFloatConsts &psConsts = state->psConsts;
+  XeShaderFloatConsts &vsConsts = state->vsConsts;
+  XeShaderBoolConsts &boolConsts = state->boolConsts;
+
+  // Pixel shader constants
+  for (u32 begin = static_cast<u32>(XeRegister::SHADER_CONSTANT_256_X),
+    end = static_cast<u32>(XeRegister::SHADER_CONSTANT_511_W),
+    idx = begin; idx != end; idx += 64) {
+    const u32 base = (idx - begin);
+    const u64 mask = state->GetDirtyBlock(idx);
+    if (mask) {
+      f32 *ptr = reinterpret_cast<f32*>(state->GetRegisterPointer(static_cast<XeRegister>(idx)));
+      f32 *dest = &psConsts.values[base];
+      memcpy(dest, ptr, sizeof(f32) * 16);
+    }
+  }
+
+  // Vertex shader constants
+  for (u32 begin = static_cast<u32>(XeRegister::SHADER_CONSTANT_000_X),
+    end = static_cast<u32>(XeRegister::SHADER_CONSTANT_255_W),
+    idx = begin; idx != end; idx += 64) {
+    const u32 base = (idx - begin);
+    const u64 mask = state->GetDirtyBlock(idx);
+    if (mask) {
+      f32 *ptr = reinterpret_cast<f32*>(state->GetRegisterPointer(static_cast<XeRegister>(idx)));
+      f32 *dest = &vsConsts.values[base];
+      memcpy(dest, ptr, sizeof(f32) * 16);
+    }
+  }
+  // Boolean shader constants
+  {
+    //SHADER_CONSTANT_BOOL_000_031 - SHADER_CONSTANT_BOOL_224_255
+    u32 begin = static_cast<u32>(XeRegister::SHADER_CONSTANT_BOOL_000_031);
+    const u64 mask = state->GetDirtyBlock(begin);
+    if (mask & 0xFF) {
+      u32 *ptr = reinterpret_cast<u32 *>(state->GetRegisterPointer(static_cast<XeRegister>(begin)));
+      u32 *dest = &boolConsts.values[begin];
+      memcpy(dest, ptr, sizeof(u32) * 8);
+    }
+  }
+
+  Render::BufferLoadJob pixelBufferJob = {
+    "PixelConsts"_j,
+    std::vector<u8>(
+      reinterpret_cast<u8*>(&psConsts),
+      reinterpret_cast<u8*>(&psConsts) + sizeof(psConsts)
+    ),
+    Render::eBufferType::Uniform,
+    Render::eBufferUsage::DynamicDraw
+  };
+  Render::BufferLoadJob vertexBufferJob = {
+    "VertexConsts"_j,
+    std::vector<u8>(
+      reinterpret_cast<u8*>(&vsConsts),
+      reinterpret_cast<u8*>(&vsConsts) + sizeof(vsConsts)
+    ),
+    Render::eBufferType::Uniform,
+    Render::eBufferUsage::DynamicDraw
+  };
+  Render::BufferLoadJob boolBufferJob = {
+    "CommonBoolConsts"_j,
+    std::vector<u8>(
+      reinterpret_cast<u8*>(&boolConsts),
+      reinterpret_cast<u8*>(&boolConsts) + sizeof(boolConsts)
+    ),
+    Render::eBufferType::Uniform,
+    Render::eBufferUsage::DynamicDraw
+  };
+
+  bufferLoadQueue.push(pixelBufferJob);
+  bufferLoadQueue.push(vertexBufferJob);
+  bufferLoadQueue.push(boolBufferJob);
+}
+
+bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
+  // Master register
+  const u32 copyCtrl = state->copyControl;
+  // Which render targets are affected (0-3 = colorRT, 4=depth)
+  const u32 copyRT = (copyCtrl & 0x7);
+  // Should we clear after copy?
+  const bool colorClearEnabled = (copyCtrl >> 8) & 1;
+  const bool depthClearEnabled = (copyCtrl >> 9) & 1;
+  // Actual copy command
+  const Xe::eCopyCommand copyCommand = static_cast<Xe::eCopyCommand>((copyCtrl >> 20) & 3);
+  // Target memory and format for the copy operation
+  const u32 destInfo = state->copyDestInfo;
+  const Xe::eEndianFormat endianFormat = static_cast<Xe::eEndianFormat>(destInfo & 7);
+  const u32 destArray = (destInfo >> 3) & 1;
+  const u32 destSlice = (destInfo >> 4) & 1;
+  const Xe::eColorFormat destformat = static_cast<Xe::eColorFormat>((destInfo >> 7) & 0x3F);
+  if (destformat == Xe::eColorFormat::Unknown) {
+    LOG_ERROR(Xenos, "[CP] Invalid color format");
+    return true;
+  }
+  const u32 destNumber = (destInfo >> 13) & 7;
+  const u32 destBias = (destInfo >> 16) & 0x3F;
+  const u32 destSwap = (destInfo >> 25) & 1;
+
+  const u32 destBase = state->copyDestBase;
+  const u32 destPitchRaw = state->copyDestPitch;
+  const u32 destPitch = destPitchRaw & 0x3FFF;
+  const u32 destHeight = (destPitchRaw >> 16) & 0x3FFF;
+  // TODO: Actually pull the data
+  const u32 copyVertexFetchSlot = 0;
+  Xe::VertexFetchData vertexData{};
+  vertexData.dword0 = state->ReadRegister(XeRegister::SHADER_CONSTANT_FETCH_00_0);
+  vertexData.dword1 = state->ReadRegister(XeRegister::SHADER_CONSTANT_FETCH_00_1);
+  u32 address = vertexData.address << 2;
+  LOG_DEBUG(Xenos, "[CP] Copy state to EDRAM (address: 0x{:X}, size {})", address, vertexData.size);
+  // Clear
+  if (colorClearEnabled) {
+    u8 a = (state->clearColor >> 24) & 0xFF;
+    u8 r = (state->clearColor >> 16) & 0xFF;
+    u8 g = (state->clearColor >> 8) & 0xFF;
+    u8 b = (state->clearColor >> 0) & 0xFF;
+    UpdateClearColor(r, g, b, a);
+    LOG_DEBUG(Xenos, "[CP] Clear color: {}, {}, {}, {}", r, g, b, a);
+  }
+  if (depthClearEnabled) {
+    const f32 clearDepthValue = (state->depthClear & 0xFFFFFF00) / (f32)0xFFFFFF00;
+    LOG_DEBUG(Xenos, "[CP] Clear depth: {}", clearDepthValue);
+    UpdateClearDepth(clearDepthValue);
+  }
+  UpdateConstants(state);
+  return true;
+}
+
 void Renderer::Thread() {
   // Set thread name
   Base::SetCurrentThreadName("[Xe] Render");
@@ -215,6 +343,17 @@ void Renderer::Thread() {
 
       convertedShaderPrograms.insert({ job.shaderCRC, compiledShader });
       LOG_DEBUG(Xenos, "Compiled {} shader (CRC: 0x{:08X})", job.name, job.shaderCRC);
+    }
+
+    while (!bufferLoadQueue.empty()) {
+      BufferLoadJob job = bufferLoadQueue.front();
+      bufferLoadQueue.pop();
+
+      std::shared_ptr<Buffer> buffer = resourceFactory->CreateBuffer();
+      buffer->CreateBuffer(static_cast<u32>(job.data.size()), job.data.data(), job.usage, job.type);
+
+      createdBuffers[job.name] = buffer;
+      LOG_DEBUG(Xenos, "Created buffer '{}', size: {}", job.name, job.data.size());
     }
 
     // Framebuffer pointer from main memory

@@ -4,7 +4,7 @@
 
 #include "Base/Types.h"
 
-#include "../ShaderConstants.h"
+#include "Core/XGPU/ShaderConstants.h"
 
 namespace Xe {
 

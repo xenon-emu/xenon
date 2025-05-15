@@ -6,20 +6,33 @@
 #include <string>
 #include <unordered_map>
 
-#include "Base/Assert.h"
 #include "Xenos.h"
 
 #define XE_FB_BASE 0x1E000000
 
 enum class XeRegister;
 
+struct XeShaderFloatConsts {
+  f32 values[256 * 4] = {};
+};
+
+struct XeShaderBoolConsts {
+  u32 values[8 * 4] = {};
+};
+
 namespace Xe::XGPU {
 
 class XenosState {
 public:
   XenosState() :
+#ifndef TOOL
     internalWidth(Config::xgpu.internal.width),
-    internalHeight(Config::xgpu.internal.height) {
+    internalHeight(Config::xgpu.internal.height)
+#else
+    internalWidth(1280),
+    internalHeight(720)
+#endif
+  {
     Regs = std::make_unique<STRIP_UNIQUE_ARR(Regs)>(0xFFFFF);
     memset(Regs.get(), 0, 0xFFFFF);
     memset(RegMask, 0, sizeof(RegMask));
@@ -57,6 +70,10 @@ public:
     memset(RegMask, 0xFF, sizeof(RegMask));
   }
 
+  u64 GetDirtyBlock(const u32 firstIndex) {
+    return RegMask[firstIndex / BitCount];
+  }
+
   void WriteRawRegister(u32 addr, u32 value) {
     // Set a lock
     std::lock_guard lck(mutex);
@@ -70,19 +87,6 @@ public:
     std::lock_guard lck(mutex);
 
     u32 value = 0;
-    switch (static_cast<u32>(reg)) {
-    // Unknown (returns dummy values)
-    case 0x3C00:
-      return 0x08100748;
-    case 0x3C04:
-      return 0x0000200E;
-    case 0x6530: // Scanline?
-      return 0x000002D0;
-    case 0x6544: // VBlank?
-      return 1;
-    case 0x6584:
-      return 0x050002D0;
-    }
     // Read value
     memcpy(&value, &Regs[static_cast<u32>(reg) * 4], sizeof(value));
     return value;
@@ -111,6 +115,9 @@ public:
   // Scratch
   u32 scratchMask = 0;
   u32 scratchAddr = 0;
+  // EDRAM
+  u32 edramTiming = 0;
+  u32 edramInfo = 0;
   // RBBM
   u32 rbbmControl = 0;
   u32 rbbmDebug = 0xF0000;
@@ -160,8 +167,9 @@ public:
   // D1CRTC
   u32 crtcControl = 0; // Checks if the RTC is active
   // D1MODE
-  u32 modeViewportSize = 0;
-  u32 vCounter = 0;
+  u32 modeViewportSize = 0x050002D0;
+  u32 vCounter = 720;
+  u32 vblankVlineStatus = 1;
   // MH
   u32 mhStatus = 0;
   // DC
@@ -185,6 +193,10 @@ public:
   // Internal rendering width/height
   u32 internalWidth = 1280;
   u32 internalHeight = 720;
+  // Internal buffers
+  XeShaderFloatConsts vsConsts = {};
+  XeShaderFloatConsts psConsts = {};
+  XeShaderBoolConsts boolConsts = {};
   // Registers
   std::unique_ptr<u8[]> Regs;
   static constexpr u32 NumRegs = 0x5004;

@@ -1,26 +1,44 @@
-#include <iostream>
-#include <stdint.h>
-#include <bit>
-#define HEX(x) "0x" << std::hex << std::uppercase << (x) << std::dec
+// Copyright 2025 Xenon Emulator Project
 
-using u64 = uint64_t;
-using u32 = uint32_t;
-using u16 = uint16_t;
-using u8 = uint8_t;
+#include "Base/Logging/Log.h"
+#include "Base/Param.h"
+#include "Base/Types.h"
 
-int main(int argc, char *argv[]) {
-  if (argc <= 2) {
-    std::cout << "Invalid args" << std::endl;
-    return -1;
+#include "Core/XGPU/XenosRegisters.h"
+
+REQ_PARAM(value, "Value to byteswap");
+PARAM(testValue, "Value to test against");
+PARAM(testSwapped, "Includes extra tests against the value, including byteswapping the result");
+s32 ToolMain() {
+  u64 value = PARAM_value.Get<u64>();
+  u64 valueSwapped = std::byteswap<u32>(value);
+  LOG_INFO(Main, "Value: 0x{:08X}", value);
+  LOG_INFO(Main, " Swapped: 0x{:08X}", valueSwapped);
+  if (!PARAM_testValue.Present()) {
+    return 0;
   }
-  const char *value = argv[1];
-  const char *testValue = argv[2];
-  u64 v = strtoull(value, 0, 16);
-  u64 testV = strtoull(testValue, 0, 16);
-  u64 vBS = std::byteswap<u32>(v);
-  std::cout << "Value: " << HEX(v) << std::endl;
-  std::cout << "Test Value: " << HEX(testV) << std::endl;
-  std::cout << "Byteswapped value: " << HEX(vBS) << std::endl;
-  std::cout << "Test Result: " << HEX(vBS & testV) << std::endl;
+  bool swap = PARAM_testSwapped.Present();
+  u64 testValue = PARAM_testValue.Get<u64>();
+  LOG_INFO(Main, " Test: 0x{:08X}", testValue);
+  LOG_INFO(Main, " Result: 0x{:08X}", value & testValue);
+  if (swap) {
+    LOG_INFO(Main, " Result (Value Swapped): 0x{:08X}", valueSwapped & testValue);
+    testValue = std::byteswap<u64>(testValue);
+    LOG_INFO(Main, " Result (Test Swapped): 0x{:08X}", std::byteswap<u64>(value & testValue));
+    LOG_INFO(Main, " Result (Both Swapped): 0x{:08X}", std::byteswap<u64>(valueSwapped & testValue));
+  }
   return 0;
+}
+
+extern s32 ToolMain();
+PARAM(help, "Prints this message", false);
+s32 main(s32 argc, char *argv[]) {
+  // Init params
+  Base::Param::Init(argc, argv);
+  // Handle help param
+  if (PARAM_help.Present()) {
+    ::Base::Param::Help();
+    return 0;
+  }
+  return ToolMain();
 }

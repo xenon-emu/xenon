@@ -13,6 +13,7 @@
 #include <backends/imgui_impl_sdl3.h>
 #endif
 
+#include "Base/Hash.h"
 #include "Base/Types.h"
 
 #include "Core/RAM/RAM.h"
@@ -35,6 +36,13 @@ struct ShaderLoadJob {
   u32 shaderCRC = 0;
   std::string name = {};
   std::vector<u32> binary = {};
+};
+
+struct BufferLoadJob {
+  u32 name;
+  std::vector<u8> data;
+  eBufferType type;
+  eBufferUsage usage;
 };
 
 class Renderer {
@@ -67,6 +75,10 @@ public:
   void Create();
   void Shutdown();
   void Resize(s32 x, s32 y);
+
+  void UpdateConstants(Xe::XGPU::XenosState *state);
+
+  bool IssueCopy(Xe::XGPU::XenosState *state);
 
   void HandleEvents();
 
@@ -105,6 +117,8 @@ public:
 
   // Shader texture queue
   std::queue<ShaderLoadJob> shaderLoadQueue{};
+  std::queue<BufferLoadJob> bufferLoadQueue;
+  std::unordered_map<u32, std::shared_ptr<Buffer>> createdBuffers;
 
   // GUI Helpers
   bool DebuggerActive();

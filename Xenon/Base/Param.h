@@ -2,22 +2,21 @@
 
 #pragma once
 
-#include <iostream>
-#include <string_view>
 #include <cstring>
 #include <format>
+#include <iostream>
+#include <string_view>
+#include <vector>
 
 namespace Base {
 
-#define LOG(x, f, ...) std::cout << "[" << #x << "]" << std::format(f, __VA_ARGS__)
 #define LOG_SECTIONLESS(...) std::cout << std::format(__VA_ARGS__)
 
 class Param {
 public:
-  Param(const std::string_view& _name, bool _required, const std::string_view& _desc, bool _hasValue = true) :
-    name(_name), desc(_desc), required(_required), hasValue(_hasValue)
+  Param(const std::string_view& _name, bool _required, const std::string_view& _desc, bool _hasValue = true, bool _array = false) :
+    name(_name), desc(_desc), required(_required), hasValue(_hasValue), isArray(_array)
   {
-    value = nullptr;
     next = First;
     First = this;
   }
@@ -42,29 +41,55 @@ public:
       } else {
         key = arg + 1;
       }
-
+      
       for (Param *p = First; p; p = p->next) {
         if (p->name == key) {
           if (p->hasValue) {
-            if (equal) {
-              // Already parsed 'val'
-            } else if (i + 1 < argc && argv[i + 1][0] != '-') {
-              val = argv[++i];
+            std::vector<std::string> tokens = {};
+
+            if (!equal && i + 1 < argc && argv[i + 1][0] != '-') {
+              ++i;
+              tokens.emplace_back(argv[i]);
+            } else if (equal) {
+              tokens.emplace_back(std::string(equal + 1));
             } else {
               LOG_SECTIONLESS("Missing value for parameter: -{}\n", p->name);
               Help();
               std::exit(1);
             }
 
-            // Strip surrounding quotes if present
-            if (!val.empty() && val.front() == '"' && val.back() == '"' && val.size() >= 2) {
-              val = val.substr(1, val.size() - 2);
+            while (i + 1 < argc && argv[i + 1][0] != '-') {
+              tokens.emplace_back(argv[++i]);
             }
 
-            p->value = val.data();
+            for (const std::string &token : tokens) {
+              std::string working = token;
+
+              // Strip surrounding quotes
+              if (!working.empty() && working.front() == '"' && working.back() == '"' && working.size() >= 2)
+                working = working.substr(1, working.size() - 2);
+
+              size_t start = 0;
+              while (start < working.size()) {
+                // Allow both comma and space as delimiters, skip over duplicates
+                while (start < working.size() && (working[start] == ',' || working[start] == ' '))
+                  ++start;
+                if (start >= working.size()) break;
+
+                size_t end = start;
+                while (end < working.size() && working[end] != ',' && working[end] != ' ')
+                  ++end;
+
+                std::string val = working.substr(start, end - start);
+                if (!val.empty())
+                  p->values.emplace_back(std::move(val));
+
+                start = end;
+              }
+            }
           } else {
-            // This is a flag - presence means enabled
-            p->value = "true";
+            // Flag: mark as present
+            p->values = { "true" };
           }
           break;
         }
@@ -73,7 +98,7 @@ public:
 
     // Check required parameters
     for (Param *p = First; p; p = p->next) {
-      if (p->required && p->hasValue && !p->value) {
+      if (p->required && p->hasValue && !p->Present()) {
         LOG_SECTIONLESS("Missing required parameter: -{}\n", p->name);
         Help();
         std::exit(1);
@@ -99,7 +124,7 @@ public:
         if (!p->required) {
           if (!printedOptionalParams) {
             if (printedRequiredParams)
-              fmt::print("\n");
+              std::cout << std::endl;
             LOG_SECTIONLESS("Optional parameters:\n");
             printedOptionalParams = true;
           }
@@ -108,13 +133,53 @@ public:
       }
     }
   }
+  
+  template <typename T>
+    requires (std::is_integral_v<T> && std::is_unsigned_v<T>)
+  T Get(u64 i = 0) const {
+    if (!Present() || i >= values.size())
+      return 0;
+    return static_cast<T>(strtoull(values[i].c_str(), nullptr, 16));
+  }
 
-  const char *Get() const {
-    return value;
+  template <typename T>
+    requires (std::is_integral_v<T> && std::is_signed_v<T>)
+  T Get(u64 i = 0) const {
+    if (!Present() || i >= values.size())
+      return 0;
+    return static_cast<T>(strtoll(values[i].c_str(), nullptr, 10));
   }
-  bool IsSet() const {
-    return value != nullptr;
+
+  template <typename T = bool>
+    requires (std::_Is_character_or_bool<T>::value)
+  T Get(u64 i = 0) const {
+    if (!Present() || i >= values.size())
+      return 0;
+    const std::string &str = values[i];
+    if (str.length() == 1) {
+      return !str.compare("1");
+    } else if (str.length() >= 4) {
+      return !str.compare("true");
+    }
+    return false;
   }
+
+  std::string Get(u64 i = 0) const {
+    return (i < values.size()) ? values[i] : "";
+  }
+
+  const std::vector<std::string> &GetAll() const {
+    return values;
+  }
+
+  size_t Count() const {
+    return values.size();
+  }
+
+  bool Present() const {
+    return !values.empty();
+  }
+
   bool HasValue() {
     return hasValue;
   }
@@ -122,8 +187,9 @@ private:
   static bool Initialized;
   std::string_view name{};
   std::string_view desc{};
-  const char *value = nullptr;
+  std::vector<std::string> values{};
   bool hasValue = true;
+  bool isArray = true;
   bool required = false;
   static Param *First;
   Param *next = nullptr;

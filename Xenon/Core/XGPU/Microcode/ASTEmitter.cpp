@@ -10,26 +10,31 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType) : type(shad
   module.AddCapability(spv::Capability::Shader);
   module.SetMemoryModel(spv::AddressingModel::Logical, spv::MemoryModel::GLSL450);
 
+  std::string shaderTypeName = type == eShaderType::Pixel ? "Pixel" : "Vertex";
   if (type == eShaderType::Pixel) {
     for (u32 i = 0; i != 4; ++i) {
+      auto &var = output_vars[static_cast<eExportReg>(static_cast<u32>(eExportReg::COLOR0) + i)];
       Sirit::Id vec4_type = module.TypeVector(module.TypeFloat(32), 4);
       Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
-      output_vars[static_cast<eExportReg>(static_cast<u32>(eExportReg::COLOR0) + i)] =
-        module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
+      var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
+      module.Name(var, std::format("COLOR{}", i));
     }
   } else {
     Sirit::Id vec4_type = module.TypeVector(module.TypeFloat(32), 4);
     Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
     output_vars[eExportReg::POSITION] =
       module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
+    module.Name(output_vars[eExportReg::POSITION], "POSITION");
     Sirit::Id float_ptr_output = module.TypePointer(spv::StorageClass::Output, module.TypeFloat(32));
     output_vars[eExportReg::POINTSIZE] = module.AddGlobalVariable(float_ptr_output, spv::StorageClass::Output);
+    module.Name(output_vars[eExportReg::POINTSIZE], "POINTSIZE");
     for (u32 i = 0; i != 8; ++i) {
+      auto &var = output_vars[static_cast<eExportReg>(static_cast<u32>(eExportReg::INTERP0) + i)];
       Sirit::Id float_type = module.TypeFloat(32);
       Sirit::Id vec4_type = module.TypeVector(float_type, 4);
       Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
-      output_vars[static_cast<eExportReg>(static_cast<u32>(eExportReg::INTERP0) + i)] =
-        module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
+      var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
+      module.Name(var, std::format("INTERP{}", i));
     }
   }
 
@@ -38,32 +43,41 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType) : type(shad
   Sirit::Id false_val = module.ConstantFalse(bool_type);
   predicate_var = module.AddGlobalVariable(bool_ptr_type, spv::StorageClass::Private, false_val);
 
-  // Types
-  Sirit::Id vec4_type = module.TypeVector(module.TypeFloat(32), 4);
-  Sirit::Id vec4_array_256 = module.TypeArray(vec4_type, module.Constant(module.TypeInt(32, false), 256));
-
-  // VertexConsts
+  // Declare types
+  Sirit::Id float_type = module.TypeFloat(32);
+  Sirit::Id uint_type = module.TypeInt(32, false);
+  Sirit::Id vec4_type = module.TypeVector(float_type, 4);
+ 
+  // Vertex Constants
+  Sirit::Id const_256 = module.Constant(uint_type, 256);
+  Sirit::Id vec4_array_256 = module.TypeArray(vec4_type, const_256);
+  // Struct and UBO
   Sirit::Id ubo_struct_v = module.TypeStruct(vec4_array_256);
-  module.Decorate(ubo_struct_v, spv::Decoration::Block);
-  module.MemberDecorate(ubo_struct_v, 0, spv::Decoration::Offset, 0);
-
+  module.Name(ubo_struct_v, shaderTypeName + "Consts");
+  module.MemberName(ubo_struct_v, 0, "FloatConsts");
   ubo_type_v = module.TypePointer(spv::StorageClass::Uniform, ubo_struct_v);
   ubo_var_v = module.AddGlobalVariable(ubo_type_v, spv::StorageClass::Uniform);
-  module.Decorate(ubo_var_v, spv::Decoration::DescriptorSet, 0);
-  module.Decorate(ubo_var_v, spv::Decoration::Binding, 0);
-  module.Name(ubo_var_v, "VertexConsts");
+  // For vec4 array inside struct
+  module.Decorate(vec4_array_256, spv::Decoration::ArrayStride, 16);
+  module.MemberDecorate(ubo_struct_v, 0, spv::Decoration::Offset, 0);
 
-  // BoolConsts
-  Sirit::Id uint_array_32 = module.TypeArray(module.TypeInt(32, false), module.Constant(module.TypeInt(32, false), 32));
+  // For uint array inside struct
+  Sirit::Id const_32 = module.Constant(uint_type, 32);
+  Sirit::Id uint_array_32 = module.TypeArray(uint_type, const_32);
   Sirit::Id ubo_struct_b = module.TypeStruct(uint_array_32);
-  module.Decorate(ubo_struct_b, spv::Decoration::Block);
-  module.MemberDecorate(ubo_struct_b, 0, spv::Decoration::Offset, 0);
-
+  module.Name(ubo_struct_b, "CommonBoolConsts");
+  module.MemberName(ubo_struct_b, 0, "BoolConsts");
   ubo_type_b = module.TypePointer(spv::StorageClass::Uniform, ubo_struct_b);
   ubo_var_b = module.AddGlobalVariable(ubo_type_b, spv::StorageClass::Uniform);
+  module.Decorate(uint_array_32, spv::Decoration::ArrayStride, 4);
+  module.MemberDecorate(ubo_struct_b, 0, spv::Decoration::Offset, 0);
+
+  // Decorate UBO variable (binding, descriptor set)
+  module.Decorate(ubo_var_v, spv::Decoration::DescriptorSet, 0);
+  module.Decorate(ubo_var_v, spv::Decoration::Binding, 0);
+
   module.Decorate(ubo_var_b, spv::Decoration::DescriptorSet, 0);
   module.Decorate(ubo_var_b, spv::Decoration::Binding, 1);
-  module.Name(ubo_var_b, "CommonBoolConsts");
 }
 
 void ShaderCodeWriterSirit::BeginMain() {

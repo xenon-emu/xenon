@@ -6,7 +6,7 @@
 #include "Base/Logging/Log.h"
 #include "Base/Param.h"
 
-#include "ShaderConstants.h"
+#include "Core/XGPU/ShaderConstants.h"
 
 #include "Microcode/ASTBlock.h"
 #include "Microcode/ASTNodeWriter.h"
@@ -179,7 +179,7 @@ s32 main(s32 argc, char *argv[]) {
   // Init params
   Base::Param::Init(argc, argv);
   // Handle help param
-  if (PARAM_help.IsSet()) {
+  if (PARAM_help.Present()) {
     ::Base::Param::Help();
     return 0;
   }

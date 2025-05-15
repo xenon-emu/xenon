@@ -112,7 +112,7 @@ void ShaderCodeWriterSirit::FinalizeEntryPoint() {
     module.AddExecutionMode(main_func, spv::ExecutionMode::PixelCenterInteger);
     module.AddEntryPoint(spv::ExecutionModel::Fragment, main_func, "main", interface_vars);
   } else {
-    for (const auto& name : {"VertexID", "InstanceID"}) {
+    for (const auto &name : { "VertexID", "InstanceID" }) {
       if (input_vars.count(name)) {
         spv::BuiltIn builtin = name == std::string("VertexID") ? spv::BuiltIn::VertexIndex : spv::BuiltIn::InstanceIndex;
         module.Decorate(input_vars[name], spv::Decoration::BuiltIn, builtin);

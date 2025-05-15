@@ -2,6 +2,8 @@
 
 cmake_minimum_required(VERSION 3.22)
 
+set(Project XenonTools)
+
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED TRUE)
@@ -11,17 +13,80 @@ if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
-# Optimizations
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
-if (WIN32)
-  add_compile_options($<$<CONFIG:Release>:/Oi>)
-  add_compile_options($<$<CONFIG:Release>:/Ot>)
+# Set compiler ID
+if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  set(msvc TRUE)
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  set(gcc TRUE)
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  set(clang TRUE)
 endif()
 
-project(Xenon-Tools)
+# Optimizations
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+if (msvc)
+  add_compile_options($<$<CONFIG:Release>:/Oi>)
+  add_compile_options($<$<CONFIG:Release>:/Ot>)
+else()
+  add_compile_options($<$<CONFIG:Release>:-O3>)
+endif()
 
-add_executable(Byteswap "byteswap.cpp")
+project(${Project})
 
-add_executable(Get_IDX "get_idx.cpp")
+# Provides a dead-simple logger, designed to avoid threading for tools
+file(GLOB_RECURSE SimpleBase ../Base/*.cpp ../Base/*.h)
 
-add_executable(Get_Opcode "get_opcode.cpp")
+# Registers for the XGPU
+set(Xenon
+  ../../Xenon/Core/XGPU/PM4Opcodes.h
+  ../../Xenon/Core/XGPU/ShaderConstants.h
+  ../../Xenon/Core/XGPU/Xenos.h
+  ../../Xenon/Core/XGPU/XenosRegisters.h
+)
+
+# Basics to get types, param, and hashe algos
+set(XenonBase
+  ../../Xenon/Base/Logging/Log.h
+  ../../Xenon/Base/Arch.h
+  ../../Xenon/Base/CRCHash.h
+  ../../Xenon/Base/Exit.h
+  ../../Xenon/Base/Hash.h
+  ../../Xenon/Base/Param.h
+  ../../Xenon/Base/Types.h
+)
+
+# Sets as tool, and disables the logger
+add_compile_definitions(TOOL)
+
+add_executable(Byteswap
+  byteswap.cpp
+  ${SimpleBase}
+  ${XenonBase}
+)
+
+target_include_directories(Byteswap PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ../Xenon
+)
+
+add_executable(Get_IDX
+  get_idx.cpp
+  ${SimpleBase}
+  ${XenonBase}
+)
+
+target_include_directories(Get_IDX PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ../Xenon
+)
+
+add_executable(Get_Opcode
+  get_opcode.cpp
+  ${SimpleBase}
+  ${XenonBase}
+)
+
+target_include_directories(Get_Opcode PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ../Xenon
+)

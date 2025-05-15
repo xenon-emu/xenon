@@ -21,7 +21,7 @@ public:
 
   void CreateBuffer(u32 size, const void *data, eBufferUsage usage, eBufferType type) override;
   void UpdateBuffer(u32 offset, u32 size, const void *data) override;
-  void Bind() override;
+  void Bind(u32 binding) override;
   void Unbind() override;
   void DestroyBuffer() override;
 private:

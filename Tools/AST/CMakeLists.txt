@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-set(projectname AST)
+set(Project AST)
 
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_CXX_STANDARD 23)
@@ -11,43 +11,71 @@ if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
+# Set compiler ID
+if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+  set(msvc TRUE)
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+  set(gcc TRUE)
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  set(clang TRUE)
+endif()
+
+# Optimizations
 set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+if (msvc)
+  add_compile_options($<$<CONFIG:Release>:/Oi>)
+  add_compile_options($<$<CONFIG:Release>:/Ot>)
+else()
+  add_compile_options($<$<CONFIG:Release>:-O3>)
+endif()
 
-project(${projectname})
+project(${Project})
 
-add_executable(${projectname})
+add_executable(${Project})
 
-target_sources(${projectname} PRIVATE
-  Base/Logging/Log.h
-  Base/CRCHash.h
-  Base/Hash.h
-  Base/Param.h
-  Base/Types.h
-  Microcode/ASTBlock.cpp
-  Microcode/ASTBlock.h
-  Microcode/ASTEmitter.cpp
-  Microcode/ASTEmitter.h
-  Microcode/ASTNode.cpp
-  Microcode/ASTNode.h
-  Microcode/ASTNodeBase.h
-  Microcode/ASTNodeWriter.cpp
-  Microcode/ASTNodeWriter.h
-  Microcode/ASTStatement.cpp
-  Microcode/ASTStatement.h
-  Microcode/Constants.h
-  Microcode/Transformer.cpp
-  Microcode/Transformer.h
-  main.cpp
-  ShaderConstants.h
-  XenosRegisters.h)
+file(GLOB_RECURSE Microcode Microcode/*.cpp Microcode/*.h)
 
-target_link_libraries(${projectname} PRIVATE sirit)
+file(GLOB Main *.cpp *.h)
 
-target_include_directories(${projectname} PRIVATE
+# Provides a dead-simple logger, designed to avoid threading for tools
+file(GLOB_RECURSE SimpleBase ../Base/*.cpp ../Base/*.h)
+
+# Registers for the XGPU
+set(Xenon
+  ../../Xenon/Core/XGPU/PM4Opcodes.h
+  ../../Xenon/Core/XGPU/ShaderConstants.h
+  ../../Xenon/Core/XGPU/Xenos.h
+  ../../Xenon/Core/XGPU/XenosRegisters.h
+)
+
+# Basics to get types, param, and hashe algos
+set(XenonBase
+  ../../Xenon/Base/Arch.h
+  ../../Xenon/Base/CRCHash.h
+  ../../Xenon/Base/Exit.h
+  ../../Xenon/Base/Hash.h
+  ../../Xenon/Base/Param.h
+  ../../Xenon/Base/Types.h
+)
+
+# Sets as tool, and disables the logger
+add_compile_definitions(TOOL)
+
+target_sources(${Project} PRIVATE
+  ${Main}
+  ${Microcode}
+  ${SimpleBase}
+  ${Xenon}
+  ${XenonBase}
+)
+
+target_link_libraries(${Project} PRIVATE sirit)
+
+target_include_directories(${Project} BEFORE PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}
-  Base
+  ../../Xenon
 )
 
 add_subdirectory(Deps/ThirdParty)
 
-target_link_options(${projectname} PRIVATE -static)
+target_link_options(${Project} PRIVATE -static)

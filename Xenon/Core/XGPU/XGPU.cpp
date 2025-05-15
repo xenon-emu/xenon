@@ -173,6 +173,12 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
       }
       value = xenosState->mhStatus;
       break;
+    case XeRegister::RB_EDRAM_TIMING:
+      value = xenosState->edramTiming;
+      break;
+    case XeRegister::RB_EDRAM_INFO:
+      value = xenosState->edramInfo;
+      break;
     case XeRegister::D1CRTC_CONTROL:
       value = xenosState->crtcControl;
       break;
@@ -181,6 +187,15 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
         xenosState->dcLutAutofill = 0x2000000;
       }
       value = xenosState->dcLutAutofill;
+      break;
+    case XeRegister::D1MODE_V_COUNTER:
+      value = xenosState->vCounter;
+      break;
+    case XeRegister::D1MODE_VBLANK_VLINE_STATUS:
+      value = xenosState->vblankVlineStatus;
+      break;
+    case XeRegister::D1MODE_VIEWPORT_SIZE:
+      value = xenosState->modeViewportSize;
       break;
     case XeRegister::XDVO_ENABLE:
       value = xenosState->xdvoEnable;
@@ -360,7 +375,7 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
       break;
     }
 #ifdef XE_DEBUG
-    LOG_DEBUG(Xenos, "Read from {} ({:#x}), index: {:#x}, value: {:#x}, size: {:#x}", Xe::XGPU::GetRegisterNameById(regIndex), readAddress, regIndex, value, size);
+    LOG_DEBUG(Xenos, "Read from {} (0x{:X}), index: 0x{:X}, value: 0x{:X}, size: 0x{:X}", Xe::XGPU::GetRegisterNameById(regIndex), readAddress, regIndex, value, size);
 #endif
 
     memcpy(data, &value, size);
@@ -451,6 +466,17 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
       tmp |= 0x80000000ul;
       xenosState->WriteRegister(reg, tmp);
       break;
+    case XeRegister::RB_EDRAM_TIMING:
+      xenosState->edramTiming = tmp;
+      if ((xenosState->edramTiming & 0x60000) < 0x400) {
+        xenosState->edramTiming |= 0x60000;
+      }
+      xenosState->WriteRegister(reg, xenosState->edramTiming);
+      break;
+    case XeRegister::RB_EDRAM_INFO:
+      xenosState->edramInfo = tmp;
+      xenosState->WriteRegister(reg, xenosState->edramInfo);
+      break;
     case XeRegister::D1CRTC_CONTROL:
       xenosState->crtcControl = tmp;
       xenosState->WriteRegister(reg, xenosState->crtcControl);
@@ -470,6 +496,18 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
     case XeRegister::DC_LUT_AUTOFILL:
       xenosState->dcLutAutofill = tmp;
       xenosState->WriteRegister(reg, xenosState->dcLutAutofill);
+      break;
+    case XeRegister::D1MODE_V_COUNTER:
+      xenosState->vCounter = tmp;
+      xenosState->WriteRegister(reg, xenosState->vCounter);
+      break;
+    case XeRegister::D1MODE_VBLANK_VLINE_STATUS:
+      xenosState->vblankVlineStatus = tmp;
+      xenosState->WriteRegister(reg, xenosState->vblankVlineStatus);
+      break;
+    case XeRegister::D1MODE_VIEWPORT_SIZE:
+      xenosState->modeViewportSize = tmp;
+      xenosState->WriteRegister(reg, xenosState->modeViewportSize);
       break;
     case XeRegister::XDVO_ENABLE:
       xenosState->xdvoEnable = tmp;

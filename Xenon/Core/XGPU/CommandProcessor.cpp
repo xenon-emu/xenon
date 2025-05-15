@@ -176,106 +176,6 @@ void CommandProcessor::cpExecuteIndirectBuffer(u32 bufferPtr, u32 bufferSize) {
   return;
 }
 
-// Returns the OpCode name from a PT3 as a string.
-std::string CommandProcessor::getPacketType3OpCodeName(u8 opcodeIdx) {
-  std::string opcodeName = "";
-
-  static const std::unordered_map<u8, const std::string> opcodeNames {
-  { 0x10, "PM4_NOP" },
-  { 0x11, "PM4_RECORD_PFP_TIMESTAMP" },
-  { 0x12, "PM4_WAIT_MEM_WRITES" },
-  { 0x13, "PM4_WAIT_FOR_ME" },
-  { 0x19, "PM4_UNKNOWN_19" },
-  { 0x1A, "PM4_UNKNOWN_1A" },
-  { 0x1C, "PM4_PREEMPT_ENABLE" },
-  { 0x1D, "PM4_SKIP_IB2_ENABLE_GLOBAL" },
-  { 0x1E, "PM4_PREEMPT_TOKEN" },
-  { 0x21, "PM4_REG_RMW" },
-  { 0x22, "PM4_DRAW_INDX" },
-  { 0x23, "PM4_VIZ_QUERY" },
-  { 0x24, "PM4_DRAW_AUTO" },
-  { 0x25, "PM4_SET_STATE" },
-  { 0x26, "PM4_WAIT_FOR_IDLE" },
-  { 0x27, "PM4_IM_LOAD" },
-  { 0x28, "PM4_DRAW_INDIRECT" },
-  { 0x29, "PM4_DRAW_INDX_INDIRECT" },
-  { 0x2B, "PM4_IM_LOAD_IMMEDIATE" },
-  { 0x2C, "PM4_IM_STORE" },
-  { 0x2D, "PM4_SET_CONSTANT" },
-  { 0x2E, "PM4_LOAD_CONSTANT_CONTEXT" },
-  { 0x2F, "PM4_LOAD_ALU_CONSTANT" },
-  { 0x30, "PM4_LOAD_STATE" },
-  { 0x31, "PM4_RUN_OPENCL" },
-  { 0x32, "PM4_COND_INDIRECT_BUFFER_PFD" },
-  { 0x33, "PM4_EXEC_CS" },
-  { 0x34, "PM4_DRAW_INDX_BIN" },
-  { 0x35, "PM4_DRAW_INDX_2_BIN" },
-  { 0x36, "PM4_DRAW_INDX_2" },
-  { 0x37, "PM4_INDIRECT_BUFFER_PFD" },
-  { 0x38, "PM4_DRAW_INDX_OFFSET" },
-  { 0x39, "PM4_UNK_39" },
-  { 0x3A, "PM4_COND_INDIRECT_BUFFER_PFE" },
-  { 0x3B, "PM4_INVALIDATE_STATE" },
-  { 0x3C, "PM4_WAIT_REG_MEM" },
-  { 0x3D, "PM4_MEM_WRITE" },
-  { 0x3E, "PM4_REG_TO_MEM" },
-  { 0x3F, "PM4_INDIRECT_BUFFER" },
-  { 0x41, "PM4_EXEC_CS_INDIRECT" },
-  { 0x42, "PM4_MEM_TO_REG" },
-  { 0x43, "PM4_SET_DRAW_STATE" },
-  { 0x44, "PM4_COND_EXEC" },
-  { 0x45, "PM4_COND_WRITE" },
-  { 0x46, "PM4_EVENT_WRITE" },
-  { 0x47, "PM4_COND_REG_EXEC" },
-  { 0x48, "PM4_ME_INIT" },
-  { 0x4A, "PM4_SET_SHADER_BASES" },
-  { 0x4B, "PM4_SET_BIN_BASE_OFFSET" },
-  { 0x4C, "PM4_SET_BIN" },
-  { 0x4D, "PM4_SCRATCH_TO_REG" },
-  { 0x4E, "PM4_UNKNOWN_4E" },
-  { 0x4F, "PM4_MEM_WRITE_CNTR" },
-  { 0x50, "PM4_SET_BIN_MASK" },
-  { 0x51, "PM4_SET_BIN_SELECT" },
-  { 0x52, "PM4_WAIT_REG_EQ" },
-  { 0x53, "PM4_WAIT_REG_GTE" },
-  { 0x54, "PM4_INTERRUPT" },
-  { 0x55, "PM4_SET_CONSTANT2" },
-  { 0x56, "PM4_SET_SHADER_CONSTANTS" },
-  { 0x58, "PM4_EVENT_WRITE_SHD" },
-  { 0x59, "PM4_EVENT_WRITE_CFL" },
-  { 0x5A, "PM4_EVENT_WRITE_EXT" },
-  { 0x5B, "PM4_EVENT_WRITE_ZPD" },
-  { 0x5C, "PM4_WAIT_UNTIL_READ" },
-  { 0x5D, "PM4_WAIT_IB_PFD_COMPLETE" },
-  { 0x5E, "PM4_CONTEXT_UPDATE" },
-  { 0x5F, "PM4_SET_PROTECTED_MODE" },
-  { 0x60, "PM4_SET_BIN_MASK_LO" },
-  { 0x61, "PM4_SET_BIN_MASK_HI" },
-  { 0x62, "PM4_SET_BIN_SELECT_LO" },
-  { 0x63, "PM4_SET_BIN_SELECT_HI" },
-  { 0x64, "PM4_SET_VISIBILITY_OVERRIDE" },
-  { 0x66, "PM4_SET_SECURE_MODE" },
-  { 0x69, "PM4_PREEMPT_ENABLE_GLOBAL" },
-  { 0x6A, "PM4_PREEMPT_ENABLE_LOCAL" },
-  { 0x6B, "PM4_CONTEXT_SWITCH_YIELD" },
-  { 0x6C, "PM4_SET_RENDER_MODE" },
-  { 0x6E, "PM4_COMPUTE_CHECKPOINT" },
-  { 0x71, "PM4_TEST_TWO_MEMS" },
-  { 0x73, "PM4_MEM_TO_MEM" },
-  { 0x74, "PM4_WIDE_REG_WRITE" },
-  { 0x78, "PM4_REG_WR_NO_CTXT" }
-  };
-
-  auto it = opcodeNames.find(opcodeIdx);
-  if (it != opcodeNames.end()) {
-    return it->second;
-  }
-  else {
-    LOG_ERROR(Xenos, "[CP,PT3] Unknowkn OPCODE: {:#x}", opcodeIdx);
-    return "UNK_OP";
-  }
-}
-
 // Executes a single packet from the ringbuffer.
 bool CommandProcessor::ExecutePacket(RingBuffer *ringBuffer) {
   // Get packet data.
@@ -389,7 +289,7 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
 
   bool result = false;
 
-  LOG_TRACE(Xenos, "CP[ExecutePacketType3]: Executing OpCode {}", getPacketType3OpCodeName(static_cast<u8>(currentOpCode)));
+  LOG_TRACE(Xenos, "CP[ExecutePacketType3]: Executing OpCode {}", GetPM4Opcode(static_cast<u8>(currentOpCode)));
 
   // PM4 Commands execution, basically the heart of the command processor.
 
@@ -1233,54 +1133,7 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
       return true;
     } else if (modeControl == eModeControl::Copy) {
       // Copy to eDRAM, and clear if needed
-
-      // Master register
-      const u32 copyCtrl = state->copyControl;
-      // Which render targets are affected (0-3 = colorRT, 4=depth)
-      const u32 copyRT = (copyCtrl & 0x7);
-      // Should we clear after copy?
-      const bool colorClearEnabled = (copyCtrl >> 8) & 1;
-      const bool depthClearEnabled = (copyCtrl >> 9) & 1;
-      // Actual copy command
-      const eCopyCommand copyCommand = static_cast<eCopyCommand>((copyCtrl >> 20) & 3);
-      // Target memory and format for the copy operation
-      const u32 destInfo = state->copyDestInfo;
-      const eEndianFormat endianFormat = static_cast<eEndianFormat>(destInfo & 7);
-      const u32 destArray = (destInfo >> 3) & 1;
-      const u32 destSlice = (destInfo >> 4) & 1;
-      const eColorFormat destformat = static_cast<eColorFormat>((destInfo >> 7) & 0x3F);
-      if (destformat == eColorFormat::Unknown) {
-        LOG_ERROR(Xenos, "[CP] Invalid color format");
-        return true;
-      }
-      const u32 destNumber = (destInfo >> 13) & 7;
-      const u32 destBias = (destInfo >> 16) & 0x3F;
-      const u32 destSwap = (destInfo >> 25) & 1;
-
-      const u32 destBase = state->copyDestBase;
-      const u32 destPitchRaw = state->copyDestPitch;
-      const u32 destPitch = destPitchRaw & 0x3FFF;
-      const u32 destHeight = (destPitchRaw >> 16) & 0x3FFF;
-      // TODO: Actually pull the data
-      const u32 copyVertexFetchSlot = 0;
-      VertexFetchData vertexData{};
-      vertexData.dword0 = state->ReadRegister(XeRegister::SHADER_CONSTANT_FETCH_00_0);
-      vertexData.dword1 = state->ReadRegister(XeRegister::SHADER_CONSTANT_FETCH_00_1);
-      u32 address = vertexData.address << 2;
-      LOG_DEBUG(Xenos, "[CP] Copy state to EDRAM (address: 0x{:X}, size {})", address, vertexData.size);
-      // Clear
-      if (colorClearEnabled) {
-        u8 a = (state->clearColor >> 24) & 0xFF;
-        u8 r = (state->clearColor >> 16) & 0xFF;
-        u8 g = (state->clearColor >> 8) & 0xFF;
-        u8 b = (state->clearColor >> 0) & 0xFF;
-        render->UpdateClearColor(r, g, b, a);
-      }
-      if (depthClearEnabled) {
-        const f32 clearDepthValue = (state->depthClear & 0xFFFFFF00) / (f32)0xFFFFFF00;
-        render->UpdateClearDepth(clearDepthValue);
-      }
-      // TODO: Update shader constants here via buffers
+      render->IssueCopy(state);
       return true;
     }
 
