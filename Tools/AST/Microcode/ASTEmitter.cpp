@@ -10,11 +10,6 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType) : type(shad
   module.AddCapability(spv::Capability::Shader);
   module.SetMemoryModel(spv::AddressingModel::Logical, spv::MemoryModel::GLSL450);
 
-  Sirit::Id vec4_type = module.TypeVector(module.TypeFloat(32), 4);
-  Sirit::Id const_128 = module.Constant(module.TypeInt(32, false), 128);
-
-  Sirit::Id gpr_array_type = module.TypeArray(vec4_type, const_128);
-  Sirit::Id gpr_array_ptr_type = module.TypePointer(spv::StorageClass::Private, gpr_array_type);
 
   if (type == eShaderType::Pixel) {
     for (u32 i = 0; i != 4; ++i) {
@@ -39,7 +34,6 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType) : type(shad
     }
   }
 
-  gpr_var = module.AddGlobalVariable(gpr_array_ptr_type, spv::StorageClass::Private);
   Sirit::Id bool_type = module.TypeBool();
   Sirit::Id bool_ptr_type = module.TypePointer(spv::StorageClass::Private, bool_type);
   Sirit::Id false_val = module.ConstantFalse(bool_type);
@@ -52,6 +46,13 @@ void ShaderCodeWriterSirit::BeginMain() {
   main_func = module.OpFunction(module.TypeVoid(), spv::FunctionControlMask::MaskNone, func_type);
   main_label = module.OpLabel();
   module.AddLabel(main_label);
+
+  Sirit::Id vec4_type = module.TypeVector(module.TypeFloat(32), 4);
+  Sirit::Id const_128 = module.Constant(module.TypeInt(32, false), 128);
+
+  Sirit::Id gpr_array_type = module.TypeArray(vec4_type, const_128);
+  Sirit::Id gpr_ptr_type = module.TypePointer(spv::StorageClass::Function, gpr_array_type);
+  gpr_var = module.AddLocalVariable(gpr_ptr_type, spv::StorageClass::Function);
 
   if (type == eShaderType::Vertex) {
     for (auto name : { "VertexID", "InstanceID" }) {
@@ -111,8 +112,9 @@ void ShaderCodeWriterSirit::FinalizeEntryPoint() {
 
 void ShaderCodeWriterSirit::EndMain() {
   LOG_DEBUG(Xenos, "[AST::Sirit] EndMain()");
+  gpr_var_current = gpr_var;
   if (entry_dispatch_func.value) {
-    module.OpFunctionCall(module.TypeVoid(), entry_dispatch_func, {});
+    module.OpFunctionCall(module.TypeVoid(), entry_dispatch_func, gpr_var);
   }
   module.OpReturn();
   module.OpFunctionEnd();
@@ -149,9 +151,9 @@ Chunk ShaderCodeWriterSirit::GetReg(u32 regIndex) {
   LOG_DEBUG(Xenos, "[AST::Sirit] GetReg({})", regIndex);
 
   Sirit::Id vec4_type = module.TypeVector(module.TypeFloat(32), 4);
-  Sirit::Id vec4_ptr_type = module.TypePointer(spv::StorageClass::Private, vec4_type);
+  Sirit::Id vec4_ptr_type = module.TypePointer(spv::StorageClass::Function, vec4_type);
   Sirit::Id index_id = module.Constant(module.TypeInt(32, false), regIndex);
-  Sirit::Id reg_ptr = module.OpAccessChain(vec4_ptr_type, gpr_var, index_id);
+  Sirit::Id reg_ptr = module.OpAccessChain(vec4_ptr_type, gpr_var_current, index_id);
   Sirit::Id reg_val = module.OpLoad(vec4_type, reg_ptr);
   return Chunk(reg_val, reg_ptr);
 }
@@ -163,7 +165,7 @@ Chunk ShaderCodeWriterSirit::GetBoolVal(const u32 boolRegIndex) {
 
   Sirit::Id uint_type = module.TypeInt(32, false);
   Sirit::Id index_id = module.Constant(uint_type, boolRegIndex);
-  Sirit::Id reg_ptr = module.OpAccessChain(bool_ptr_type, gpr_var, index_id);
+  Sirit::Id reg_ptr = module.OpAccessChain(bool_ptr_type, gpr_var_current, index_id);
 
   Sirit::Id reg_val = module.OpLoad(module.TypeBool(), reg_ptr);
   return Chunk(reg_val, reg_ptr);
@@ -174,8 +176,8 @@ Chunk ShaderCodeWriterSirit::GetFloatVal(const u32 floatRegIndex) {
   Sirit::Id uint_type = module.TypeInt(32, false);
 
   Sirit::Id index_id = module.Constant(uint_type, floatRegIndex);
-  Sirit::Id vec4_ptr_type = module.TypePointer(spv::StorageClass::Private, module.TypeVector(module.TypeFloat(32), 4));
-  Sirit::Id reg_ptr = module.OpAccessChain(vec4_ptr_type, gpr_var, index_id);
+  Sirit::Id vec4_ptr_type = module.TypePointer(spv::StorageClass::Function, module.TypeVector(module.TypeFloat(32), 4));
+  Sirit::Id reg_ptr = module.OpAccessChain(vec4_ptr_type, gpr_var_current, index_id);
   Sirit::Id reg_val = module.OpLoad(module.TypeVector(module.TypeFloat(32), 4), reg_ptr);
 
   // Extract .x (index 0)
@@ -185,16 +187,15 @@ Chunk ShaderCodeWriterSirit::GetFloatVal(const u32 floatRegIndex) {
 
 Chunk ShaderCodeWriterSirit::GetFloatValRelative(const u32 floatRegOffset) {
   LOG_DEBUG(Xenos, "[AST::Sirit] GetFloatValRelative({})", floatRegOffset);
-  Sirit::Id vec4_type = module.TypeVector(module.TypeFloat(32), 4);
-  Sirit::Id base_ptr_type = module.TypePointer(spv::StorageClass::Private, vec4_type);
+  Sirit::Id vec4_ptr_type = module.TypePointer(spv::StorageClass::Function, module.TypeVector(module.TypeFloat(32), 4));
 
   Sirit::Id uint_type = module.TypeInt(32, false);
   Sirit::Id offset_id = module.Constant(uint_type, floatRegOffset);
 
-  Sirit::Id reg_ptr = module.OpAccessChain(base_ptr_type, gpr_var, offset_id);
+  Sirit::Id reg_ptr = module.OpAccessChain(vec4_ptr_type, gpr_var_current, offset_id);
 
   // Load the value (A0 + offset)
-  Sirit::Id reg_val = module.OpLoad(vec4_type, reg_ptr);
+  Sirit::Id reg_val = module.OpLoad(module.TypeVector(module.TypeFloat(32), 4), reg_ptr);
 
   Sirit::Id x_value = module.OpCompositeExtract(module.TypeFloat(32), reg_val, 0);
 
@@ -479,8 +480,18 @@ void ShaderCodeWriterSirit::BeginControlFlow(const u32 address, const bool hasJu
   LOG_DEBUG(Xenos, "[AST::Sirit] BeginControlFlow(0x{:X}, {}, {}, {})", address, hasJumps, hasCalls, called);
 
   // Create function type and function
-  Sirit::Id func_type = module.TypeFunction(module.TypeVoid());
+  Sirit::Id vec4_type = module.TypeVector(module.TypeFloat(32), 4);
+  Sirit::Id const_128 = module.Constant(module.TypeInt(32, false), 128);
+  Sirit::Id gpr_array_type = module.TypeArray(vec4_type, const_128);
+  Sirit::Id gpr_ptr_type = module.TypePointer(spv::StorageClass::Function, gpr_array_type);
+  Sirit::Id func_type = module.TypeFunction(module.TypeVoid(), gpr_ptr_type);
   current_function = module.OpFunction(module.TypeVoid(), spv::FunctionControlMask::MaskNone, func_type);
+
+  // Declare parameter
+  Sirit::Id param_gpr = module.OpFunctionParameter(gpr_ptr_type);
+
+  // Set the gpr_var inside this function to the parameter
+  gpr_var_current = param_gpr;
 
   // Save the first control flow function to call from main
   if (!entry_dispatch_func.value) {
@@ -637,16 +648,16 @@ void ShaderCodeWriterSirit::AssignImmediate(ExpressionNode *dst,
   }
 
   for (u64 i = 0; i != dstSwizzle.size(); ++i) {
-    float value = 0.f;
+    f32 value = 0.f;
     switch (immediateValues[i]) {
-      case eSwizzle::One: value = 1.f; break;
-      case eSwizzle::Zero: value = 0.f; break;
-      case eSwizzle::Unused: value = 0.f; break;
-      default:
-        LOG_ERROR(Xenos, "[AST::Sirit] Invalid immediate swizzle");
-        continue;
+    case eSwizzle::One: value = 1.f; break;
+    case eSwizzle::Zero: value = 0.f; break;
+    case eSwizzle::Unused: value = 0.f; break;
+    default:
+      LOG_ERROR(Xenos, "[AST::Sirit] Invalid immediate swizzle");
+      continue;
     }
-
+      
     Sirit::Id imm = module.Constant(module.TypeFloat(32), value);
     u32 dstIndex = static_cast<u32>(dstSwizzle[i]);
     components[dstIndex] = imm;
@@ -657,4 +668,4 @@ void ShaderCodeWriterSirit::AssignImmediate(ExpressionNode *dst,
   module.OpStore(dstChunk.ptr, newVec);
 }
 
-} // namespace Xe::Microcode::AST
+} // namespace Xe::Microcode::AST 

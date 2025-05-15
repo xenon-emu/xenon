@@ -137,8 +137,6 @@ void Run(u32 hash) {
     VisitAll(cf, vistor);
     cf->EmitShaderCode(writer);
   }
-  writer.BeginMain();
-  writer.EndMain();
   std::vector<u32> code{ writer.module.Assemble() };
 
   std::string typeString = shaderType == Xe::eShaderType::Pixel ? "pixel" : "vertex";
@@ -192,5 +190,6 @@ s32 main(s32 argc, char *argv[]) {
     crcHash = 0x888C0D57;
   }
   Xe::Microcode::Run(crcHash);
+  Xe::Microcode::Run(0x208AE75D);
   return 0;
 }

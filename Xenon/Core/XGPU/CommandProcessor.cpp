@@ -819,8 +819,6 @@ std::pair<u32, std::vector<u32>> LoadShader(eShaderType shaderType, const std::v
     VisitAll(cf, vistor);
     cf->EmitShaderCode(writer);
   }
-  writer.BeginMain();
-  writer.EndMain();
   code = writer.module.Assemble();
   std::ofstream f{ shaderPath / (baseString + ".spv"), std::ios::out | std::ios::binary };
   f.write(reinterpret_cast<char*>(code.data()), code.size() * 4);

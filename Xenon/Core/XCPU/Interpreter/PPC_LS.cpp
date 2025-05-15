@@ -605,12 +605,9 @@ void PPCInterpreter::PPCInterpreter_stvrx(PPU_STATE* ppuState) {
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
   const u8 eb = EA & 0xF;
   EA &= ~0xF;
-  
-  for (s32 i = 15; i > 15 - eb; i--) {
-    if (Config::log.advanced)
-      LOG_WARNING(Xenon, "stvrx: Unaligned store! Check!");
-    MMUWrite8(ppuState, (EA - 16) + i, VRi(vs).bytes[i]);
-  }
+
+  auto bytes = VRi(vs).bytes;
+  MMUWrite(CPUContext, ppuState, bytes.data() + (bytes.size() - eb), EA - eb, eb);
 }
 
 // Store Vector Left Indexed
@@ -621,11 +618,8 @@ void PPCInterpreter::PPCInterpreter_stvlx(PPU_STATE* ppuState) {
   const u8 eb = EA & 0xF;
   EA &= ~0xF;
 
-  for (s32 i = 0; i < 16 - eb; i++) {
-    if (Config::log.advanced)
-      LOG_WARNING(Xenon, "stvlx: Unaligned store! Check!");
-    MMUWrite8(ppuState, EA + i, VRi(vs).bytes[i]);
-  }
+  auto bytes = VRi(vs).bytes;
+  MMUWrite(CPUContext, ppuState, bytes.data() + (bytes.size() - eb), EA - eb, eb);
 }
 
 // Store Vector Indexed LRU (x'7C00 03CE')
@@ -657,11 +651,8 @@ void PPCInterpreter::PPCInterpreter_stvlxl128(PPU_STATE *ppuState) {
   const u8 eb = EA & 0xF;
   EA &= ~0xF;
 
-  for (s32 i = 0; i < 16 - eb; i++) {
-    if (Config::log.advanced)
-      LOG_WARNING(Xenon, "stvlxl128: Unaligned store! Check!");
-    MMUWrite8(ppuState, EA + i, VR(VMX128_1_VD128).bytes[i]);
-  }
+  auto bytes = VRi(vs).bytes;
+  MMUWrite(CPUContext, ppuState, bytes.data() + (bytes.size() - eb), EA - eb, eb);
 }
 
 //
@@ -1484,7 +1475,7 @@ void PPCInterpreter::PPCInterpreter_lvlx(PPU_STATE *ppuState) {
   const u8 eb = EA & 0xF;
   EA &= ~0xF;
 
-  MMURead(CPUContext, ppuState, EA, 16, vector0.bytes.data());
+  MMURead(CPUContext, ppuState, EA, vector0.bytes.size(), vector0.bytes.data());
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1536,16 +1527,10 @@ void PPCInterpreter::PPCInterpreter_lvrx(PPU_STATE *ppuState) {
     LOG_WARNING(Xenon, "lvrx: Unaligned load! Check!");
   }
 
-  s32 i = 0;
+  memset(vector1.bytes.data(), 0, vector1.bytes.size() - eb);
 
-  while (i < (16 - eb)) {
-    vector1.bytes[i] = 0;
-    ++i;
-  }
-
-  while (i < 16) {
-    vector1.bytes[i] = vector0.bytes[i - (16 - eb)];
-    ++i;
+  for (s32 i = 0; i != vector1.bytes.size(); ++i) {
+    vector1.bytes[i] = vector0.bytes[i - (vector0.bytes.size() - eb)];
   }
 
   VR(_instr.rd).dword[0] = byteswap_be<u32>(vector1.dword[0]);

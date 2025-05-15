@@ -183,6 +183,8 @@ void ControlFlowGraph::EmitShaderCode(AST::ShaderCodeWriterBase &writer) const {
 
     writer.EndControlFlow();
   }
+  writer.BeginMain();
+  writer.EndMain();
 }
 
 void ControlFlowGraph::ExtractBlocks(const Block *block, std::vector<const Block*>& out, std::set<const Block*> &visited) {

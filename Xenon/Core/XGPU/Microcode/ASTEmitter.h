@@ -162,6 +162,7 @@ private:
   Sirit::Id gpr_var = { 0 };
   Sirit::Id predicate_var = { 0 };
 
+  Sirit::Id gpr_var_current = { 0 };
   Sirit::Id current_function = { 0 };
 
   Sirit::Id entry_dispatch_func = { 0 };
