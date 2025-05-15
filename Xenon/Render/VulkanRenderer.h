@@ -4,9 +4,6 @@
 
 #include "Abstractions/Renderer.h"
 
-#include <volk.h>
-#include <vk_mem_alloc.h>
-
 #if defined(_WIN64)
 #define VK_USE_PLATFORM_WIN32_KHR
 #elif defined(__linux__)
@@ -15,7 +12,11 @@
 #define VK_USE_PLATFORM_METAL_EXT
 #endif
 
+// For VK_KHR_portability_subset
 #define VK_ENABLE_BETA_EXTENSIONS
+
+#include <volk.h>
+#include <vk_mem_alloc.h>
 
 #ifndef NO_GFX
 

@@ -5,8 +5,33 @@
 
 #include "VulkanRenderer.h"
 
+#include <unordered_set>
+
 #ifndef NO_GFX
 namespace Render {
+  static const std::unordered_set<std::string> RequiredInstanceExtensions = {
+    VK_KHR_SURFACE_EXTENSION_NAME,
+  #   if defined(_WIN64)
+        VK_KHR_WIN32_SURFACE_EXTENSION_NAME,
+  #   elif defined(__linux__)
+        VK_KHR_XLIB_SURFACE_EXTENSION_NAME,
+  #   elif defined(__APPLE__)
+        VK_EXT_METAL_SURFACE_EXTENSION_NAME,
+  #   endif
+  };
+
+  static const std::unordered_set<std::string> OptionalInstanceExtensions = {
+#   if defined(__APPLE__)
+    // Tells the system Vulkan loader to enumerate portability drivers, if supported.
+    VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME,
+#   endif
+};
+
+static const std::unordered_set<std::string> RequiredDeviceExtensions = {
+  VK_EXT_ROBUSTNESS_2_EXTENSION_NAME,
+};
+
+static const std::unordered_set<std::string> OptionalDeviceExtensions = {};
 
 VulkanRenderer::VulkanRenderer(RAM *ram, SDL_Window *mainWindow) :
   Renderer(ram, mainWindow)
@@ -36,9 +61,47 @@ void VulkanRenderer::BackendStart() {
   createInfo.pApplicationInfo = &appInfo;
   createInfo.ppEnabledLayerNames = nullptr;
   createInfo.enabledLayerCount = 0;
-  // TODO: Add extension support
-  createInfo.ppEnabledExtensionNames = nullptr;
-  createInfo.enabledExtensionCount = 0;
+
+  u32 extensionCount;
+  vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+
+  std::vector<VkExtensionProperties> availableExtensions(extensionCount);
+  vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, availableExtensions.data());
+
+  std::unordered_set<std::string> requiredExtensions = RequiredInstanceExtensions;
+  std::unordered_set<std::string> supportedOptionalExtensions;
+
+  std::unordered_set<std::string> missingRequiredExtensions = requiredExtensions;
+
+  for (uint32_t i = 0; i < extensionCount; i++) {
+    const std::string extensionName(availableExtensions[i].extensionName);
+    missingRequiredExtensions.erase(extensionName);
+
+    if (OptionalInstanceExtensions.find(extensionName) != OptionalInstanceExtensions.end()) {
+      supportedOptionalExtensions.insert(extensionName);
+    }
+  }
+
+  if (!missingRequiredExtensions.empty()) {
+    for (const std::string &extension : missingRequiredExtensions) {
+      LOG_ERROR(Render, "Missing required Vulkan extension: {}", extension);
+    }
+
+    LOG_ERROR(Render, "Unable to create instance. Required extensions are missing");
+    return;
+  }
+
+  std::vector<const char *> enabledExtensions;
+  for (const std::string &extension : requiredExtensions) {
+    enabledExtensions.push_back(extension.c_str());
+  }
+
+  for (const std::string &extension : supportedOptionalExtensions) {
+    enabledExtensions.push_back(extension.c_str());
+  }
+
+  createInfo.ppEnabledExtensionNames = enabledExtensions.data();
+  createInfo.enabledExtensionCount = uint32_t(enabledExtensions.size());
 
 #ifdef __APPLE__
   createInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
@@ -51,6 +114,99 @@ void VulkanRenderer::BackendStart() {
   }
 
   volkLoadInstance(instance);
+
+
+  uint32_t deviceCount = 0;
+  vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+  if (deviceCount == 0) {
+    LOG_ERROR(Render, "Unable to find devices that support Vulkan.");
+    return;
+  }
+
+  std::vector<VkPhysicalDevice> physicalDevices(deviceCount);
+  vkEnumeratePhysicalDevices(instance, &deviceCount, physicalDevices.data());
+
+  uint32_t currentDeviceTypeScore = 0;
+  uint32_t deviceTypeScoreTable[] = {
+    0,  // VK_PHYSICAL_DEVICE_TYPE_OTHER
+    3,  // VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU
+    4,  // VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU
+    2,  // VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU
+    1   // VK_PHYSICAL_DEVICE_TYPE_CPU
+  };
+
+  VkPhysicalDevice physicalDevice;
+
+  for (uint32_t i = 0; i < deviceCount; i++) {
+    VkPhysicalDeviceProperties deviceProperties;
+    vkGetPhysicalDeviceProperties(physicalDevices[i], &deviceProperties);
+
+    uint32_t deviceTypeIndex = deviceProperties.deviceType;
+    if (deviceTypeIndex > 4) {
+      continue;
+    }
+
+    std::string deviceName(deviceProperties.deviceName);
+    uint32_t deviceTypeScore = deviceTypeScoreTable[deviceTypeIndex];
+    bool preferDeviceTypeScore = (deviceTypeScore > currentDeviceTypeScore);
+
+    if (preferDeviceTypeScore) {
+      physicalDevice = physicalDevices[i];
+      currentDeviceTypeScore = deviceTypeScore;
+    }
+  }
+
+  if (physicalDevice == VK_NULL_HANDLE) {
+    LOG_ERROR(Render, "Unable to find a device with the required features.");
+    return;
+  }
+
+  // Check for extensions.
+  vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, nullptr);
+
+  std::vector<VkExtensionProperties> availableDeviceExtensions(extensionCount);
+  vkEnumerateDeviceExtensionProperties(physicalDevice, nullptr, &extensionCount, availableDeviceExtensions.data());
+
+  std::unordered_set<std::string> missingRequiredDeviceExtensions = RequiredDeviceExtensions;
+  std::unordered_set<std::string> supportedOptionalDeviceExtensions;
+
+  for (uint32_t i = 0; i < extensionCount; i++) {
+    const std::string extensionName(availableExtensions[i].extensionName);
+    missingRequiredDeviceExtensions.erase(extensionName);
+
+    if (OptionalDeviceExtensions.find(extensionName) != OptionalDeviceExtensions.end()) {
+      supportedOptionalDeviceExtensions.insert(extensionName);
+    }
+  }
+
+  if (!missingRequiredDeviceExtensions.empty()) {
+    for (const std::string &extension : missingRequiredDeviceExtensions) {
+      LOG_ERROR(Render, "Missing required Vulkan extension: {}", extension);
+    }
+
+    LOG_ERROR(Render, "Unable to create device. Required extensions are missing");
+    return;
+  }
+
+  std::vector<const char *> enabledDeviceExtensions;
+  for (const std::string &extension : RequiredDeviceExtensions) {
+    enabledDeviceExtensions.push_back(extension.c_str());
+  }
+
+  for (const std::string &extension : supportedOptionalExtensions) {
+    enabledDeviceExtensions.push_back(extension.c_str());
+  }
+
+  VkDeviceCreateInfo createDeviceInfo = {};
+  createDeviceInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+  createInfo.ppEnabledExtensionNames = enabledExtensions.data();
+  createInfo.enabledExtensionCount = uint32_t(enabledExtensions.size());
+
+  res = vkCreateDevice(physicalDevice, &createDeviceInfo, nullptr, &device);
+  if (res != VK_SUCCESS) {
+    LOG_ERROR(Render, "vkCreateDevice failed with error code 0x{:x}", static_cast<u32>(res));
+    return;
+  }
 
   VmaVulkanFunctions vmaFunctions = {};
   vmaFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
@@ -75,8 +231,8 @@ void VulkanRenderer::BackendStart() {
 
   VmaAllocatorCreateInfo allocatorInfo = {};
   allocatorInfo.flags = 0;
-  allocatorInfo.physicalDevice = nullptr;
-  allocatorInfo.device = nullptr;
+  allocatorInfo.physicalDevice = physicalDevice;
+  allocatorInfo.device = device;
   allocatorInfo.pVulkanFunctions = &vmaFunctions;
   allocatorInfo.instance = instance;
   allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_2;
