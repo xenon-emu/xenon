@@ -49,9 +49,20 @@ public:
   void *GetBackendContext() override;
   u32 GetBackendID() override;
 
-  VmaAllocator allocator = nullptr;
-  VkInstance instance = nullptr;
-  VkDevice device = nullptr;
+  void CreateCommandBuffer();
+  void EndCommandBuffer();
+
+  void CheckActiveRenderPass();
+  void EndActiveRenderPass();
+
+  VmaAllocator allocator = VK_NULL_HANDLE;
+  VkInstance instance = VK_NULL_HANDLE;
+  VkDevice device = VK_NULL_HANDLE;
+
+  VkCommandPool commandPool = VK_NULL_HANDLE;
+  VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+  VkRenderPass renderPass = VK_NULL_HANDLE;
+  VkFramebuffer framebuffer = VK_NULL_HANDLE;
 };
 
 } // namespace Render

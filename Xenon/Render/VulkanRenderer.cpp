@@ -28,7 +28,7 @@ namespace Render {
 };
 
 static const std::unordered_set<std::string> RequiredDeviceExtensions = {
-  VK_EXT_ROBUSTNESS_2_EXTENSION_NAME,
+  // VK_EXT_ROBUSTNESS_2_EXTENSION_NAME,
 };
 
 static const std::unordered_set<std::string> OptionalDeviceExtensions = {};
@@ -242,6 +242,8 @@ void VulkanRenderer::BackendStart() {
     LOG_ERROR(Render, "vmaCreateAllocator failed with error code 0x{:x}", static_cast<u32>(res));
     return;
   }
+
+  CreateCommandBuffer();
 }
 
 void VulkanRenderer::BackendSDLProperties(SDL_PropertiesID properties) {
@@ -254,9 +256,81 @@ void VulkanRenderer::BackendSDLInit() {
 
 }
 
+void VulkanRenderer::CreateCommandBuffer() {
+  VkCommandPoolCreateInfo poolInfo = {};
+  poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+  poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+  // TODO: Properly do queues
+  poolInfo.queueFamilyIndex = 0;
+
+  VkResult res = vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool);
+  if (res != VK_SUCCESS) {
+    LOG_ERROR(Render, "vkCreateCommandPool failed with error code 0x{:x}", static_cast<u32>(res));
+    return;
+  }
+
+  VkCommandBufferAllocateInfo allocInfo = {};
+  allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+  allocInfo.commandPool = commandPool;
+  allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+  allocInfo.commandBufferCount = 1;
+
+  res = vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+  if (res != VK_SUCCESS) {
+    LOG_ERROR(Render, "vkAllocateCommandBuffers failed with error code 0x{:x}", static_cast<u32>(res));
+    return;
+  }
+
+  VkCommandBufferBeginInfo beginInfo = {};
+  beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+  res = vkBeginCommandBuffer(commandBuffer, &beginInfo);
+  if (res != VK_SUCCESS) {
+    LOG_ERROR(Render, "vkBeginCommandBuffer failed with error code 0x{:x}", static_cast<u32>(res));
+    return;
+  }
+}
+
+void VulkanRenderer::EndCommandBuffer() {
+  VkResult res = vkEndCommandBuffer(commandBuffer);
+  if (res != VK_SUCCESS) {
+    LOG_ERROR(Render, "vkEndCommandBuffer failed with error code 0x{:x}", static_cast<u32>(res));
+    return;
+  }
+}
+
+void VulkanRenderer::CheckActiveRenderPass() {
+  EndActiveRenderPass();
+
+  if (renderPass != VK_NULL_HANDLE) {
+    VkRenderPassBeginInfo beginInfo = {};
+    beginInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    beginInfo.renderPass = renderPass;
+    beginInfo.framebuffer = framebuffer;
+    beginInfo.renderArea.extent.width = width;
+    beginInfo.renderArea.extent.height = height;
+    vkCmdBeginRenderPass(commandBuffer, &beginInfo, VK_SUBPASS_CONTENTS_INLINE);
+  }
+}
+
+void VulkanRenderer::EndActiveRenderPass() {
+  if (renderPass != VK_NULL_HANDLE) {
+    vkCmdEndRenderPass(commandBuffer);
+    renderPass = VK_NULL_HANDLE;
+  }
+}
+
 void VulkanRenderer::BackendShutdown() {
-  if (instance != nullptr) {
+  if (instance != VK_NULL_HANDLE) {
     vkDestroyInstance(instance, nullptr);
+  }
+
+  if (commandBuffer != VK_NULL_HANDLE) {
+    vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+  }
+
+  if (commandPool != VK_NULL_HANDLE) {
+    vkDestroyCommandPool(device, commandPool, nullptr);
   }
 }
 
@@ -275,7 +349,7 @@ void VulkanRenderer::UpdateScissor(s32 x, s32 y, u32 width, u32 height) {
   scissor.offset.x = x;
   scissor.offset.y = y;
 
-  // vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+  vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 }
 
 void VulkanRenderer::UpdateViewport(s32 x, s32 y, u32 width, u32 height) {
@@ -287,7 +361,7 @@ void VulkanRenderer::UpdateViewport(s32 x, s32 y, u32 width, u32 height) {
   viewport.minDepth = 0.0f;
   viewport.maxDepth = 1.0f;
 
-  // vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+  vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 }
 
 void VulkanRenderer::Clear() {
@@ -295,11 +369,12 @@ void VulkanRenderer::Clear() {
 }
 
 void VulkanRenderer::Draw() {
-
+  // TODO: Vertex count
+  // vkCmdDraw(commandBuffer, 0, 1, 0, 0);
 }
 
 void VulkanRenderer::DrawIndexed(Xe::XGPU::XeIndexBufferInfo indexBufferInfo) {
-
+  vkCmdDrawIndexed(commandBuffer, indexBufferInfo.count, 1, 0, 0, 0);
 }
 
 void VulkanRenderer::UpdateClearColor(u8 r, u8 b, u8 g, u8 a) {
@@ -331,9 +406,9 @@ void VulkanRenderer::OnCompute() {
     return;
   }
 
-  // vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
-  // vkCmdDispatch(commandBuffer, width / 16, height / 16, 1);
-  // vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 0, nullptr);
+  vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, computePipeline);
+  vkCmdDispatch(commandBuffer, width / 16, height / 16, 1);
+  vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 0, nullptr);
 
   // TODO: Pipeline Caching
   if (computePipeline != VK_NULL_HANDLE) {
