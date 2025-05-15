@@ -85,27 +85,6 @@ void Renderer::Create() {
   } break;
   }
 
-  std::vector<u32> code{};
-  u32 crc = 0x888C0D57;
-  fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "cache" };
-  std::string baseString = fmt::format("vertex_shader_{:X}", crc);
-  fs::path path{ shaderPath / (baseString + ".spv") };
-  {
-    std::ifstream file{ path, std::ios::in | std::ios::binary };
-    std::error_code error;
-    if (fs::exists(path, error) && file.is_open())
-    {
-      u64 fileSize = fs::file_size(path);
-      code.resize(fileSize / 4);
-      file.read(reinterpret_cast<char*>(code.data()), fileSize);
-    }
-    file.close();
-  }
-  std::shared_ptr<Render::Shader> compiledShader = shaderFactory->LoadFromBinary(baseString, {
-    { Render::eShaderType::Vertex, code }
-  });
-  convertedShaderPrograms.insert({ crc, compiledShader });
-
   // Create our backbuffer
   backbuffer = resourceFactory->CreateTexture();
   // Init texture
