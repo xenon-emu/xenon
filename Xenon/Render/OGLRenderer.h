@@ -34,8 +34,8 @@ public:
   void UpdateClearColor(u8 r, u8 b, u8 g, u8 a) override;
   void Clear() override;
 
-  void Draw() override;
-  void DrawIndexed(Xe::XGPU::XeIndexBufferInfo indexBufferInfo) override;
+  void Draw(Xe::XGPU::XenosState *state) override;
+  void DrawIndexed(Xe::XGPU::XenosState *state, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) override;
 
   void OnCompute() override;
   void OnBind() override;

@@ -114,11 +114,11 @@ void OGLRenderer::Clear() {
   glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 }
 
-void OGLRenderer::Draw() {
+void OGLRenderer::Draw(Xe::XGPU::XenosState *state) {
   // TODO: Draws
 }
 
-void OGLRenderer::DrawIndexed(Xe::XGPU::XeIndexBufferInfo indexBufferInfo) {
+void OGLRenderer::DrawIndexed(Xe::XGPU::XenosState *state, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) {
  // TODO: Draws
 }
 

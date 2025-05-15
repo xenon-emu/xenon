@@ -44,8 +44,8 @@ public:
   virtual void UpdateClearColor(u8 r, u8 b, u8 g, u8 a) = 0;
   virtual void Clear() = 0;
 
-  virtual void Draw() = 0;
-  virtual void DrawIndexed(Xe::XGPU::XeIndexBufferInfo indexBufferInfo) = 0;
+  virtual void Draw(Xe::XGPU::XenosState *state) = 0;
+  virtual void DrawIndexed(Xe::XGPU::XenosState *state, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) = 0;
 
   virtual void OnCompute() = 0;
   virtual void OnBind() = 0;

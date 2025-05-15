@@ -1126,7 +1126,7 @@ bool CommandProcessor::ExecutePacketType3_SET_BIN_SELECT_HI(RingBuffer *ringBuff
   return true;
 }
 
-bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer* ringBuffer, u32 packetData, u32 dataCount, u32 vizQueryCondition, const char *opCodeName) {
+bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packetData, u32 dataCount, u32 vizQueryCondition, const char *opCodeName) {
   // Sanity check.
   if (!dataCount) {
     LOG_ERROR(Xenos, "[CP, PT3]: Packet too small, can't read VGT_DRAW_INITIATOR, OpCode {}.", opCodeName);
@@ -1216,9 +1216,9 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer* ringBuffer, u32 packe
 
   if (drawOk) {
     if (isIndexedDraw) {
-      render->DrawIndexed(indexBufferInfo);
+      render->DrawIndexed(state, indexBufferInfo);
     } else {
-      render->Draw();
+      render->Draw(state);
     }
     state->ClearDirtyState();
   }
@@ -1226,7 +1226,7 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer* ringBuffer, u32 packe
   return drawOk;
 }
 
-bool CommandProcessor::ExecutePacketType3_DRAW_INDX(RingBuffer* ringBuffer, u32 packetData, u32 dataCount) {
+bool CommandProcessor::ExecutePacketType3_DRAW_INDX(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
   // Initiate fetch of index buffer and draw.
   // Generally used by Xbox 360 Direct3D 9 for kDMA and kAutoIndex sources.
   // With a VIZ Query token as the first one.
@@ -1245,7 +1245,7 @@ bool CommandProcessor::ExecutePacketType3_DRAW_INDX(RingBuffer* ringBuffer, u32 
   return ExecutePacketType3_DRAW(ringBuffer, packetData, dataCountRemaining, vizQueryCondition, "PM4_DRAW_INDX");
 }
 
-bool CommandProcessor::ExecutePacketType3_DRAW_INDX_2(RingBuffer* ringBuffer, u32 packetData, u32 dataCount) {
+bool CommandProcessor::ExecutePacketType3_DRAW_INDX_2(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
   // Draw using supplied indices in packet.
   // Generally used by Xbox 360 Direct3D 9 for kAutoIndex source.
   // No VIZ query token.

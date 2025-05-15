@@ -56,11 +56,11 @@ void DummyRenderer::Clear() {
   LOG_INFO(Render, "DummyRenderer::Clear");
 }
 
-void DummyRenderer::Draw() {
+void DummyRenderer::Draw(Xe::XGPU::XenosState *state) {
   LOG_INFO(Render, "DummyRenderer::Draw");
 }
 
-void DummyRenderer::DrawIndexed(Xe::XGPU::XeIndexBufferInfo indexBufferInfo) {
+void DummyRenderer::DrawIndexed(Xe::XGPU::XenosState *state, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) {
   LOG_INFO(Render, "DummyRenderer::DrawIndexed: {}, {}, {}, {}, {}",
     indexBufferInfo.count,
     static_cast<u32>(indexBufferInfo.endianness),
