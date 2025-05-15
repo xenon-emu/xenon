@@ -136,9 +136,15 @@ public:
   u32 blendControl2 = 0;
   u32 blendControl3 = 0;
   u32 copyControl = 0;
+  u32 copyDestBase = 0;
+  u32 copyDestPitch = 0;
+  u32 copyDestInfo = 0;
   u32 depthClear = 0;
   u32 clearColor = 0;
   u32 clearColorLo = 0;
+  u32 copyFunction = 0;
+  u32 copyReference = 0;
+  u32 copyMask = 0;
   // PA
   u32 viewportControl = 0;
   u32 windowOffset = 0;

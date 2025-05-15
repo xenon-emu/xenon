@@ -314,6 +314,15 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
     case XeRegister::RB_COPY_CONTROL:
       value = xenosState->copyControl;
       break;
+    case XeRegister::RB_COPY_DEST_BASE:
+      value = xenosState->copyDestBase;
+      break;
+    case XeRegister::RB_COPY_DEST_PITCH:
+      value = xenosState->copyDestPitch;
+      break;
+    case XeRegister::RB_COPY_DEST_INFO:
+      value = xenosState->copyDestInfo;
+      break;
     case XeRegister::RB_DEPTH_CLEAR:
       value = xenosState->depthClear;
       break;
@@ -322,6 +331,15 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
       break;
     case XeRegister::RB_COLOR_CLEAR_LO:
       value = xenosState->clearColorLo;
+      break;
+    case XeRegister::RB_COPY_FUNC:
+      value = xenosState->copyFunction;
+      break;
+    case XeRegister::RB_COPY_REF:
+      value = xenosState->copyReference;
+      break;
+    case XeRegister::RB_COPY_MASK:
+      value = xenosState->copyMask;
       break;
     case XeRegister::CP_PFP_UCODE_DATA:
       value = commandProcessor.get()->CPReadMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypePFP);
@@ -629,22 +647,41 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
       xenosState->copyControl = tmp;
       xenosState->WriteRegister(reg, xenosState->copyControl);
       break;
+    case XeRegister::RB_COPY_DEST_BASE:
+      xenosState->copyDestBase = tmp;
+      xenosState->WriteRegister(reg, xenosState->copyDestBase);
+      break;
+    case XeRegister::RB_COPY_DEST_PITCH:
+      xenosState->copyDestPitch = tmp;
+      xenosState->WriteRegister(reg, xenosState->copyDestPitch);
+      break;
+    case XeRegister::RB_COPY_DEST_INFO:
+      xenosState->copyDestInfo = tmp;
+      xenosState->WriteRegister(reg, xenosState->copyDestInfo);
+      break;
     case XeRegister::RB_DEPTH_CLEAR:
       xenosState->depthClear = tmp;
       xenosState->WriteRegister(reg, xenosState->depthClear);
       break;
     case XeRegister::RB_COLOR_CLEAR: {
       xenosState->clearColor = tmp;
-      u8 a = (xenosState->clearColor >> 24) & 0xFF;
-      u8 r = (xenosState->clearColor >> 16) & 0xFF;
-      u8 g = (xenosState->clearColor >> 8) & 0xFF;
-      u8 b = (xenosState->clearColor >> 0) & 0xFF;
-      render->UpdateClearColor(r, g, b, a);
       xenosState->WriteRegister(reg, xenosState->clearColor);
     } break;
     case XeRegister::RB_COLOR_CLEAR_LO:
       xenosState->clearColorLo = tmp;
       xenosState->WriteRegister(reg, xenosState->clearColorLo);
+      break;
+    case XeRegister::RB_COPY_FUNC:
+      xenosState->copyFunction = tmp;
+      xenosState->WriteRegister(reg, xenosState->copyFunction);
+      break;
+    case XeRegister::RB_COPY_REF:
+      xenosState->copyReference = tmp;
+      xenosState->WriteRegister(reg, xenosState->copyReference);
+      break;
+    case XeRegister::RB_COPY_MASK:
+      xenosState->copyMask = tmp;
+      xenosState->WriteRegister(reg, xenosState->copyMask);
       break;
     case XeRegister::CP_PFP_UCODE_ADDR:
       // Software is writing CP PFP uCode data address.

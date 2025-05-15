@@ -8,6 +8,7 @@
 #include "Base/Thread.h"
 
 #include "Core/XGPU/XGPU.h"
+#include "Core/XGPU/ShaderConstants.h"
 #include "Core/Xe_Main.h"
 
 #include "Render/GUI/GUI.h"
@@ -83,6 +84,27 @@ void Renderer::Create() {
     });
   } break;
   }
+
+  std::vector<u32> code{};
+  u32 crc = 0x888C0D57;
+  fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "cache" };
+  std::string baseString = fmt::format("vertex_shader_{:X}", crc);
+  fs::path path{ shaderPath / (baseString + ".spv") };
+  {
+    std::ifstream file{ path, std::ios::in | std::ios::binary };
+    std::error_code error;
+    if (fs::exists(path, error) && file.is_open())
+    {
+      u64 fileSize = fs::file_size(path);
+      code.resize(fileSize / 4);
+      file.read(reinterpret_cast<char*>(code.data()), fileSize);
+    }
+    file.close();
+  }
+  std::shared_ptr<Render::Shader> compiledShader = shaderFactory->LoadFromBinary(baseString, {
+    { Render::eShaderType::Vertex, code }
+  });
+  convertedShaderPrograms.insert({ crc, compiledShader });
 
   // Create our backbuffer
   backbuffer = resourceFactory->CreateTexture();
@@ -199,6 +221,22 @@ void Renderer::Thread() {
     // Exit early if needed
     if (!threadRunning || !XeRunning)
       break;
+
+    while (!shaderLoadQueue.empty()) {
+      ShaderLoadJob job = shaderLoadQueue.front();
+      shaderLoadQueue.pop();
+
+      Render::eShaderType shaderType = job.shaderType == Xe::eShaderType::Pixel
+        ? Render::eShaderType::Fragment
+        : Render::eShaderType::Vertex;
+
+      std::shared_ptr<Shader> compiledShader = shaderFactory->LoadFromBinary(job.name, {
+        { shaderType, job.binary }
+      });
+
+      convertedShaderPrograms.insert({ job.shaderCRC, compiledShader });
+      LOG_DEBUG(Xenos, "Compiled {} shader (CRC: 0x{:08X})", job.name, job.shaderCRC);
+    }
 
     // Framebuffer pointer from main memory
     fbPointer = ramPointer->getPointerToAddress(Xe_Main->xenos->GetSurface());

@@ -18,6 +18,7 @@
 #include "Core/RAM/RAM.h"
 #include "Core/RootBus/HostBridge/PCIe.h"
 #include "Core/XGPU/CommandProcessor.h"
+#include "Core/XGPU/ShaderConstants.h"
 #include "Render/Abstractions/Factory/ResourceFactory.h"
 #include "Render/Abstractions/Factory/ShaderFactory.h"
 
@@ -28,6 +29,13 @@
 namespace Render {
 
 class GUI;
+
+struct ShaderLoadJob {
+  Xe::eShaderType shaderType = Xe::eShaderType::Unknown;
+  u32 shaderCRC = 0;
+  std::string name = {};
+  std::vector<u32> binary = {};
+};
 
 class Renderer {
 public:
@@ -42,6 +50,7 @@ public:
   virtual void UpdateScissor(s32 x, s32 y, u32 width, u32 height) = 0;
   virtual void UpdateViewport(s32 x, s32 y, u32 width, u32 height) = 0;
   virtual void UpdateClearColor(u8 r, u8 b, u8 g, u8 a) = 0;
+  virtual void UpdateClearDepth(f64 depth) = 0;
   virtual void Clear() = 0;
 
   virtual void Draw(Xe::XGPU::XenosState *state) = 0;
@@ -93,6 +102,9 @@ public:
 
   // Backbuffer texture
   std::unique_ptr<Texture> backbuffer{};
+
+  // Shader texture queue
+  std::queue<ShaderLoadJob> shaderLoadQueue{};
 
   // GUI Helpers
   bool DebuggerActive();

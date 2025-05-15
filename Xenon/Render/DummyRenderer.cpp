@@ -52,6 +52,10 @@ void DummyRenderer::UpdateClearColor(u8 r, u8 b, u8 g, u8 a) {
   LOG_INFO(Render, "DummyRenderer::UpdateClearColor: {}, {}, {}, {}", r, g, b, a);
 }
 
+void DummyRenderer::UpdateClearDepth(f64 depth) {
+  LOG_INFO(Render, "DummyRenderer::UpdateClearDepth: {}", depth);
+}
+
 void DummyRenderer::Clear() {
   LOG_INFO(Render, "DummyRenderer::Clear");
 }

@@ -853,19 +853,18 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
     f.close();
   }
 
+  render->shaderLoadQueue.push({
+    shaderType,
+    shader.first,
+    baseString,
+    shader.second
+  });
+
   switch (shaderType) {
   case eShaderType::Pixel:{
-    std::shared_ptr<Render::Shader> compiledShader = render->shaderFactory->LoadFromBinary(baseString, {
-      { Render::eShaderType::Fragment, shader.second }
-    });
-    render->convertedShaderPrograms.insert({ shader.first, compiledShader });
     LOG_DEBUG(Xenos, "[CP::IM_LOAD] PixelShader CRC: 0x{:08X}", shader.first);
   } break;
   case eShaderType::Vertex:{
-    std::shared_ptr<Render::Shader> compiledShader = render->shaderFactory->LoadFromBinary(baseString, {
-      { Render::eShaderType::Vertex, shader.second }
-    });
-    render->convertedShaderPrograms.insert({ shader.first, compiledShader });
     LOG_DEBUG(Xenos, "[CP::IM_LOAD] VertexShader CRC: 0x{:08X}", shader.first);
   } break;
   }
@@ -898,19 +897,18 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuff
     f.close();
   }
 
+  render->shaderLoadQueue.push({
+    shaderType,
+    shader.first,
+    baseString,
+    shader.second
+  });
+
   switch (shaderType) {
   case eShaderType::Pixel:{
-    std::shared_ptr<Render::Shader> compiledShader = render->shaderFactory->LoadFromBinary(baseString, {
-      { Render::eShaderType::Fragment, shader.second }
-    });
-    render->convertedShaderPrograms.insert({ shader.first, compiledShader });
     LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] PixelShader CRC: 0x{:08X}", shader.first);
   } break;
   case eShaderType::Vertex:{
-    std::shared_ptr<Render::Shader> compiledShader = render->shaderFactory->LoadFromBinary(baseString, {
-      { Render::eShaderType::Vertex, shader.second }
-    });
-    render->convertedShaderPrograms.insert({ shader.first, compiledShader });
     LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] VertexShader CRC: 0x{:08X}", shader.first);
   } break;
   }
@@ -1214,7 +1212,71 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
   // Skip to the next command, if there are immediate indexes that we don't support yet.
   ringBuffer->AdvanceRead(dataCount * sizeof(u32));
 
+  const eModeControl modeControl = static_cast<eModeControl>(state->modeControl & 0x7);
   if (drawOk) {
+    // Get surface info
+    const u32 surfaceInfo = state->surfaceInfo;
+    const u32 surfacePitch = surfaceInfo & 0x3FFF;
+    // Don't render, pitch is zero
+    if (surfacePitch == 0) {
+      return true;
+    }
+    // Get surface MSAA
+    const eMSAASamples surfaceMSAA = static_cast<eMSAASamples>((surfaceInfo >> 16) & 0x3);
+    // Check the state of things
+    if (modeControl == eModeControl::Ignore) {
+      // Well, we were told to ignore!
+      return true;
+    } else if (modeControl == eModeControl::Copy) {
+      // Copy to eDRAM, and clear if needed
+
+      // Master register
+      const u32 copyCtrl = state->copyControl;
+      // Which render targets are affected (0-3 = colorRT, 4=depth)
+      const u32 copyRT = (copyCtrl & 0x7);
+      // Should we clear after copy?
+      const bool colorClearEnabled = (copyCtrl >> 8) & 1;
+      const bool depthClearEnabled = (copyCtrl >> 9) & 1;
+      // Actual copy command
+      const eCopyCommand copyCommand = static_cast<eCopyCommand>((copyCtrl >> 20) & 3);
+      // Target memory and format for the copy operation
+      const u32 destInfo = state->copyDestInfo;
+      const eEndianFormat endianFormat = static_cast<eEndianFormat>(destInfo & 7);
+      const u32 destArray = (destInfo >> 3) & 1;
+      const u32 destSlice = (destInfo >> 4) & 1;
+      const eColorFormat destformat = static_cast<eColorFormat>((destInfo >> 7) & 0x3F);
+      if (destformat == eColorFormat::Unknown)
+        return true;
+      const u32 destNumber = (destInfo >> 13) & 7;
+      const u32 destBias = (destInfo >> 16) & 0x3F;
+      const u32 destSwap = (destInfo >> 25) & 1;
+
+      const u32 destBase = state->copyDestBase;
+      const u32 destPitchRaw = state->copyDestPitch;
+      const u32 destPitch = destPitchRaw & 0x3FFF;
+      const u32 destHeight = (destPitchRaw >> 16) & 0x3FFF;
+      // TODO: Actually pull the data
+      const u32 copyVertexFetchSlot = 0;
+      VertexFetchData vertexData{};
+      vertexData.dword0 = state->ReadRegister(XeRegister::SHADER_CONSTANT_FETCH_00_0);
+      vertexData.dword1 = state->ReadRegister(XeRegister::SHADER_CONSTANT_FETCH_00_1);
+      u32 address = vertexData.address << 2;
+      LOG_DEBUG(Xenos, "[CP] Copy state to EDRAM (address: 0x{:X}, size {})", address, vertexData.size);
+      // Clear
+      if (colorClearEnabled) {
+        u8 a = (state->clearColor >> 24) & 0xFF;
+        u8 r = (state->clearColor >> 16) & 0xFF;
+        u8 g = (state->clearColor >> 8) & 0xFF;
+        u8 b = (state->clearColor >> 0) & 0xFF;
+        render->UpdateClearColor(r, g, b, a);
+      }
+      if (depthClearEnabled) {
+        const f32 clearDepthValue = (state->depthClear & 0xFFFFFF00) / (f32)0xFFFFFF00;
+        render->UpdateClearDepth(clearDepthValue);
+      }
+      return true;
+    }
+
     if (isIndexedDraw) {
       render->DrawIndexed(state, indexBufferInfo);
     } else {
