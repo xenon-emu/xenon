@@ -85,252 +85,39 @@ include_directories(Xenon)
 add_subdirectory(Deps/ThirdParty)
 
 # Include Files
-set(Logging
-  Xenon/Base/Logging/Backend.cpp
-  Xenon/Base/Logging/Backend.h
-  Xenon/Base/Logging/Filter.cpp
-  Xenon/Base/Logging/Filter.h
-  Xenon/Base/Logging/Log.h
-  Xenon/Base/Logging/Log_entry.h
-  Xenon/Base/Logging/Log_types.h
-  Xenon/Base/Logging/Text_formatter.cpp
-  Xenon/Base/Logging/Text_formatter.h
-)
+file(GLOB_RECURSE Base Xenon/Base/*.cpp Xenon/Base/*.h)
 
-set(Base
-  ${Logging}
-  Xenon/Base/Arch.h
-  Xenon/Base/Assert.cpp
-  Xenon/Base/Assert.h
-  Xenon/Base/Bitfield.h
-  Xenon/Base/Bounded_threadsafe_queue.h
-  Xenon/Base/Config.cpp
-  Xenon/Base/Config.h
-  Xenon/Base/CRCHash.h
-  Xenon/Base/Error.cpp
-  Xenon/Base/Error.h
-  Xenon/Base/Enum.h
-  Xenon/Base/Exit.h
-  Xenon/Base/Hash.h
-  Xenon/Base/io_file.cpp
-  Xenon/Base/io_file.h
-  Xenon/Base/LRUCache.h
-  Xenon/Base/ntapi.cpp
-  Xenon/Base/ntapi.h
-  Xenon/Base/Param.h
-  Xenon/Base/Path_util.cpp
-  Xenon/Base/Path_util.h
-  Xenon/Base/Polyfill_thread.h
-  Xenon/Base/String_util.cpp
-  Xenon/Base/String_util.h
-  Xenon/Base/SystemDevice.h
-  Xenon/Base/Thread.cpp
-  Xenon/Base/Thread.h
-  Xenon/Base/Vector128.h
-  Xenon/Base/Version.h
-)
-
-set(NAND
-  Xenon/Core/NAND/NAND.cpp
-  Xenon/Core/NAND/NAND.h
-)
-
-set(RAM
-  Xenon/Core/RAM/RAM.cpp
-  Xenon/Core/RAM/RAM.h
-)
-
-set(RootBus
-  Xenon/Core/RootBus/RootBus.cpp
-  Xenon/Core/RootBus/RootBus.h
-  Xenon/Core/RootBus/HostBridge/HostBridge.cpp
-  Xenon/Core/RootBus/HostBridge/HostBridge.h
-  Xenon/Core/RootBus/HostBridge/PCIe.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/AUDIOCTRLLR/AudioController.cpp
-  Xenon/Core/RootBus/HostBridge/PCIBridge/AUDIOCTRLLR/AudioController.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI/EHCI.cpp
-  Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI/EHCI.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI/EHCI0.cpp
-  Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI/EHCI0.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI/EHCI1.cpp
-  Xenon/Core/RootBus/HostBridge/PCIBridge/EHCI/EHCI1.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/ETHERNET/Ethernet.cpp
-  Xenon/Core/RootBus/HostBridge/PCIBridge/ETHERNET/Ethernet.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/HDD/HDD.cpp
-  Xenon/Core/RootBus/HostBridge/PCIBridge/HDD/HDD.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/ODD/ODD.cpp
-  Xenon/Core/RootBus/HostBridge/PCIBridge/ODD/ODD.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI/OHCI.cpp
-  Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI/OHCI.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI/OHCI0.cpp
-  Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI/OHCI0.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI/OHCI1.cpp
-  Xenon/Core/RootBus/HostBridge/PCIBridge/OHCI/OHCI1.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/PCIBridge.cpp
-  Xenon/Core/RootBus/HostBridge/PCIBridge/PCIBridge.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/PCIBridgeConfig.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/PCIDevice.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/SFCX/SFCX.cpp
-  Xenon/Core/RootBus/HostBridge/PCIBridge/SFCX/SFCX.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/SATA.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/SMC.cpp
-  Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/SMC.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/HANA_State.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/SMC/SMC_Config.h
-  Xenon/Core/RootBus/HostBridge/PCIBridge/XMA/XMA.cpp
-  Xenon/Core/RootBus/HostBridge/PCIBridge/XMA/XMA.h
-)
-
-set(XCPU
-  Xenon/Core/XCPU/IIC/IIC.cpp
-  Xenon/Core/XCPU/IIC/IIC.h
-  Xenon/Core/XCPU/Interpreter/Interpreter_Helpers.cpp
-  Xenon/Core/XCPU/Interpreter/PPCInternal.h
-  Xenon/Core/XCPU/Interpreter/PPCInterpreter.cpp
-  Xenon/Core/XCPU/Interpreter/PPCInterpreter.h
-  Xenon/Core/XCPU/Interpreter/PPCOpcodes.h
-  Xenon/Core/XCPU/Interpreter/PPC_ALU.cpp
-  Xenon/Core/XCPU/Interpreter/PPC_BC.cpp
-  Xenon/Core/XCPU/Interpreter/PPC_FPU.cpp
-  Xenon/Core/XCPU/Interpreter/PPC_Instruction.cpp
-  Xenon/Core/XCPU/Interpreter/PPC_Instruction.h
-  Xenon/Core/XCPU/Interpreter/PPC_LS.cpp
-  Xenon/Core/XCPU/Interpreter/PPC_MMU.cpp
-  Xenon/Core/XCPU/Interpreter/PPC_System.cpp
-  Xenon/Core/XCPU/Interpreter/PPC_VXU.cpp
-  Xenon/Core/XCPU/PostBus/PostBus.cpp
-  Xenon/Core/XCPU/PostBus/PostBus.h
-  Xenon/Core/XCPU/PPU/PowerPC.h
-  Xenon/Core/XCPU/PPU/PPU.cpp
-  Xenon/Core/XCPU/PPU/PPU.h
-  Xenon/Core/XCPU/eFuse.h
-  Xenon/Core/XCPU/elf_abi.h
-  Xenon/Core/XCPU/UART.cpp
-  Xenon/Core/XCPU/UART.h
-  Xenon/Core/XCPU/Xenon.cpp
-  Xenon/Core/XCPU/Xenon.h
-  Xenon/Core/XCPU/XenonSOC.h
-  Xenon/Core/XCPU/XenonSOC.cpp
-  Xenon/Core/XCPU/XenonReservations.cpp
-  Xenon/Core/XCPU/XenonReservations.h
-)
+file(GLOB_RECURSE Core Xenon/Core/*.cpp Xenon/Core/*.h)
 
 if (GFX_ENABLED)
-  set(ImGui_Dir Deps/ThirdParty/ImGui)
-  set(ImGui
-    ${ImGui_Dir}/backends/imgui_impl_opengl3.cpp
-    ${ImGui_Dir}/backends/imgui_impl_opengl3.h
-    ${ImGui_Dir}/backends/imgui_impl_sdl3.cpp
-    ${ImGui_Dir}/backends/imgui_impl_sdl3.h
-    ${ImGui_Dir}/imconfig.h
-    ${ImGui_Dir}/imgui.cpp
-    ${ImGui_Dir}/imgui.h
-    ${ImGui_Dir}/imgui_demo.cpp
-    ${ImGui_Dir}/imgui_internal.h
-    ${ImGui_Dir}/imgui_draw.cpp
-    ${ImGui_Dir}/imgui_tables.cpp
-    ${ImGui_Dir}/imgui_widgets.cpp
-    ${ImGui_Dir}/imstb_rectpack.h
-    ${ImGui_Dir}/imstb_textedit.h
-    ${ImGui_Dir}/imstb_truetype.h
+  set(ImGuiDir Deps/ThirdParty/ImGui)
+  set(ImGuiBackends
+    ${ImGuiDir}/backends/imgui_impl_opengl3.cpp
+    ${ImGuiDir}/backends/imgui_impl_opengl3.h
+    ${ImGuiDir}/backends/imgui_impl_sdl3.cpp
+    ${ImGuiDir}/backends/imgui_impl_sdl3.h
   )
-
+  file(GLOB ImGui ${ImGuiDir}/*.cpp ${ImGuiDir}/*.h)
+  file(GLOB_RECURSE XenonRender Xenon/Render/*.cpp Xenon/Render/*.h)
   set(Render
+    ${ImGuiBackends}
     ${ImGui}
-    Xenon/Render/Abstractions/Factory/ResourceFactory.h
-    Xenon/Render/Abstractions/Factory/ShaderFactory.h
-    Xenon/Render/Abstractions/Buffer.h
-    Xenon/Render/Abstractions/Renderer.cpp
-    Xenon/Render/Abstractions/Renderer.h
-    Xenon/Render/Abstractions/Shader.h
-    Xenon/Render/Abstractions/Texture.h
-    Xenon/Render/GUI/GUI.cpp
-    Xenon/Render/GUI/GUI.h
-    Xenon/Render/GUI/OpenGL.cpp
-    Xenon/Render/GUI/OpenGL.h
-    Xenon/Render/OpenGL/Factory/OGLResourceFactory.h
-    Xenon/Render/OpenGL/Factory/OGLShaderFactory.cpp
-    Xenon/Render/OpenGL/Factory/OGLShaderFactory.h
-    Xenon/Render/OpenGL/OGLTexture.cpp
-    Xenon/Render/OpenGL/OGLTexture.h
-    Xenon/Render/OpenGL/OGLBuffer.cpp
-    Xenon/Render/OpenGL/OGLBuffer.h
-    Xenon/Render/OpenGL/OGLShader.cpp
-    Xenon/Render/OpenGL/OGLShader.h
-    Xenon/Render/OGLRenderer.h
-    Xenon/Render/OGLRenderer.cpp
-    Xenon/Render/GUI/Dummy.cpp
-    Xenon/Render/GUI/Dummy.h
-    Xenon/Render/Dummy/Factory/DummyResourceFactory.h
-    Xenon/Render/Dummy/Factory/DummyShaderFactory.cpp
-    Xenon/Render/Dummy/Factory/DummyShaderFactory.h
-    Xenon/Render/Dummy/DummyTexture.cpp
-    Xenon/Render/Dummy/DummyTexture.h
-    Xenon/Render/Dummy/DummyBuffer.cpp
-    Xenon/Render/Dummy/DummyBuffer.h
-    Xenon/Render/Dummy/DummyShader.cpp
-    Xenon/Render/Dummy/DummyShader.h
-    Xenon/Render/DummyRenderer.h
-    Xenon/Render/DummyRenderer.cpp
+    ${XenonRender}
   )
 endif()
+
+file(GLOB_RECURSE include Xenon/include/*.cpp Xenon/include/*.h)
+
 set(microprofile_dir Deps/ThirdParty/microprofile)
-set(microprofile
-  ${microprofile_dir}/microprofile.cpp
-  ${microprofile_dir}/microprofile.h
-  ${microprofile_dir}/microprofile_html.h
-  Xenon/include/microprofile.config.h
-)
-
-set(XGPU_AST
-  Xenon/Core/XGPU/Microcode/ASTBlock.cpp
-  Xenon/Core/XGPU/Microcode/ASTBlock.h
-  Xenon/Core/XGPU/Microcode/ASTEmitter.cpp
-  Xenon/Core/XGPU/Microcode/ASTEmitter.h
-  Xenon/Core/XGPU/Microcode/ASTNode.cpp
-  Xenon/Core/XGPU/Microcode/ASTNode.h
-  Xenon/Core/XGPU/Microcode/ASTNodeBase.h
-  Xenon/Core/XGPU/Microcode/ASTNodeWriter.cpp
-  Xenon/Core/XGPU/Microcode/ASTNodeWriter.h
-  Xenon/Core/XGPU/Microcode/ASTStatement.cpp
-  Xenon/Core/XGPU/Microcode/ASTStatement.h
-  Xenon/Core/XGPU/Microcode/Constants.h
-  Xenon/Core/XGPU/Microcode/Transformer.cpp
-  Xenon/Core/XGPU/Microcode/Transformer.h
-)
-
-set(XGPU
-  Xenon/Core/XGPU/CommandProcessor.h
-  Xenon/Core/XGPU/CommandProcessor.cpp
-  Xenon/Core/XGPU/RingBuffer.h
-  Xenon/Core/XGPU/RingBuffer.cpp
-  Xenon/Core/XGPU/ShaderConstants.h
-  Xenon/Core/XGPU/XenosRegisters.h
-  Xenon/Core/XGPU/XGPU.cpp
-  Xenon/Core/XGPU/XGPU.h
-  Xenon/Core/XGPU/XGPUConfig.h
-  Xenon/Core/XGPU/EDRAM.h
-  Xenon/Core/XGPU/EDRAM.cpp
-  Xenon/Core/XGPU/Xenos.h
-)
-
-set(Core
-  ${NAND}
-  ${RAM}
-  ${Render}
-  ${RootBus}
-  ${XCPU}
-  ${XGPU}
-  ${XGPU_AST}
-  Xenon/Core/Xe_Main.cpp
-  Xenon/Core/Xe_Main.h
-)
+file(GLOB microprofile ${microprofile_dir}/*.cpp ${microprofile_dir}/*.h)
 
 add_executable(Xenon
   ${Base}
   ${Core}
+  ${Render}
+  ${include}
   ${microprofile}
-  "Xenon/Main.cpp"
+  Xenon/Main.cpp
 )
 
 target_precompile_headers(Xenon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Xenon/Base/Types.h)
@@ -365,7 +152,7 @@ endif()
 # Add includes
 target_include_directories(Xenon PRIVATE ${microprofile_dir} Xenon/include)
 if (GFX_ENABLED)
-    target_include_directories(Xenon PRIVATE ${ImGui_Dir})
+    target_include_directories(Xenon PRIVATE ${ImGuiDir})
 endif()
 
 # Add fonts target
