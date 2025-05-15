@@ -42,13 +42,16 @@ void Render::OGLShader::CompileFromBinary(eShaderType type, const u8 *data, u64 
   s32 success = 0;
   glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
   if (!success) {
-    char log[1024];
-    glGetShaderInfoLog(shader, sizeof(log), nullptr, log);
-    LOG_ERROR(System, "Shader compilation failed:\n{}", log);
-    glDeleteShader(shader);
+    s32 logLength = 0;
+    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &logLength);
+    if (logLength > 1) {
+      std::vector<char> log(logLength);
+      glGetShaderInfoLog(shader, logLength, NULL, log.data());
+      LOG_CRITICAL(System, "Shader compilation failed! {}", log.data());
+    }
+    LOG_CRITICAL(System, "Shader compilation failed! No message present, likely SPIR-V");
     return;
   }
-
   AttachedShaders.push_back(shader);
 }
 
@@ -81,9 +84,17 @@ void Render::OGLShader::Link() {
   s32 success = 0;
   glGetProgramiv(Program, GL_LINK_STATUS, &success);
   if (!success) {
-    char log[1024];
-    glGetProgramInfoLog(Program, sizeof(log), nullptr, log);
-    LOG_CRITICAL(System, "Shader link failed:\n{}", log);
+    s32 logLength = 0;
+    glGetProgramiv(Program, GL_INFO_LOG_LENGTH, &logLength);
+    if (logLength > 1) {
+      std::vector<char> log(logLength);
+      glGetProgramInfoLog(Program, logLength, NULL, log.data());
+      LOG_CRITICAL(System, "Shader linking failed! {}", log.data());
+      return;
+    }
+    LOG_CRITICAL(System, "Shader linking failed! No message present, likely SPIR-V");
+  } else if (AttachedShaders.empty()) {
+    LOG_CRITICAL(System, "Shader linking failed! No shaders to link!");
   }
 
   for (auto shader : AttachedShaders) {

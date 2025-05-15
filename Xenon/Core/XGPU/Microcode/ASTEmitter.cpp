@@ -5,11 +5,10 @@
 #include "ASTEmitter.h"
 
 namespace Xe::Microcode::AST {
-  
+
 ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType) : type(shaderType) {
   module.AddCapability(spv::Capability::Shader);
   module.SetMemoryModel(spv::AddressingModel::Logical, spv::MemoryModel::GLSL450);
-
 
   if (type == eShaderType::Pixel) {
     for (u32 i = 0; i != 4; ++i) {
@@ -87,6 +86,9 @@ void ShaderCodeWriterSirit::FinalizeEntryPoint() {
       }
     }
     for (const auto& [reg, var] : output_vars) {
+      // Only use what's needed
+      if (!used_exports.count(reg))
+        continue;
       switch (reg) {
       case eExportReg::POSITION:
         module.Decorate(var, spv::Decoration::BuiltIn, spv::BuiltIn::Position);
@@ -112,8 +114,28 @@ void ShaderCodeWriterSirit::FinalizeEntryPoint() {
 
 void ShaderCodeWriterSirit::EndMain() {
   LOG_DEBUG(Xenos, "[AST::Sirit] EndMain()");
+  gpr_var_current = gpr_var;
   if (entry_dispatch_func.value) {
     module.OpFunctionCall(module.TypeVoid(), entry_dispatch_func, gpr_var);
+  }
+  if (type == eShaderType::Vertex) {
+    for (auto& [reg, var] : output_vars) {
+      // Only use what's needed
+      if (!used_exports.count(reg))
+        continue;
+      if (reg == eExportReg::POINTSIZE) {
+        module.OpStore(var, module.Constant(module.TypeFloat(32), 1.f)); // Default point size
+      } else {
+        Sirit::Id vec4_type = module.TypeVector(module.TypeFloat(32), 4);
+        std::vector<Sirit::Id> constants = {
+          module.Constant(module.TypeFloat(32), 0.0f),
+          module.Constant(module.TypeFloat(32), 0.0f),
+          module.Constant(module.TypeFloat(32), 0.0f),
+          module.Constant(module.TypeFloat(32), 0.0f),
+        };
+        module.OpStore(var, module.ConstantComposite(vec4_type, constants));
+      }
+    }
   }
   module.OpReturn();
   module.OpFunctionEnd();
@@ -122,6 +144,7 @@ void ShaderCodeWriterSirit::EndMain() {
 
 Chunk ShaderCodeWriterSirit::GetExportDest(const eExportReg reg) {
   LOG_DEBUG(Xenos, "[AST::Sirit] GetExportDest({})", (u32)reg);
+  used_exports.insert(reg);
   auto it = output_vars.find(reg);
   if (it == output_vars.end()) {
     LOG_ERROR(Xenos, "[AST::Sirit] Unknown export register used in GetExportDest!");
