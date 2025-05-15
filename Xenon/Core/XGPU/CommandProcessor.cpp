@@ -314,7 +314,7 @@ bool CommandProcessor::ExecutePacket(RingBuffer *ringBuffer) {
 bool CommandProcessor::ExecutePacketType0(RingBuffer *ringBuffer, u32 packetData) {
   const u32 regCount = ((packetData >> 16) & 0x3FFF) + 1;
   
-  if (ringBuffer->readCount() < regCount * sizeof(u32)) {
+  if (ringBuffer->readCount() < (regCount * sizeof(u32))) {
     LOG_ERROR(Xenos, "CP[ExecutePacketType0]: Data overflow, read count 0x{:X}, registers count 0x{:X})",
       ringBuffer->readCount(), regCount * sizeof(u32));
     return false;
@@ -325,13 +325,13 @@ bool CommandProcessor::ExecutePacketType0(RingBuffer *ringBuffer, u32 packetData
   // Tells wheter the write is to one or multiple regs starting at specified register at base index.
   const u32 singleRegWrite = (packetData >> 15) & 0x1;
 
-  for (size_t idx = 0; idx < regCount; idx++) {
+  for (u64 idx = 0; idx < regCount; idx++) {
     // Get the data to be written to the (internal) Register.
     u32 registerData = ringBuffer->ReadAndSwap<u32>();
     // Target register index.
     u32 targetRegIndex = singleRegWrite ? baseIndex : baseIndex + idx;
-    LOG_TRACE(Xenos, "CP[ExecutePacketType0]: Writing register at index 0x{:X}, data 0x{:X}", targetRegIndex, registerData);
-    state->WriteRegister(static_cast<XeRegister>(targetRegIndex), registerData);
+    LOG_DEBUG(Xenos, "CP[ExecutePacketType0]: Writing to 0x{:X}, data 0x{:X}", targetRegIndex, registerData);
+    state->WriteRegister(static_cast<XeRegister>(targetRegIndex), registerData);  
   }
 
   return true;
@@ -1041,7 +1041,7 @@ bool CommandProcessor::ExecutePacketType3_WAIT_REG_MEM(RingBuffer *ringBuffer, u
         if ((statusHost & 0x80000000ul)) {
           const u32 newStatusHost = statusHost & ~0x80000000ul;
           state->WriteRegister(XeRegister::COHER_STATUS_HOST, newStatusHost);
-          // TODO: Dirty Register & clear cache
+          state->ClearDirtyState();
         }
         value = state->ReadRegister(pollReg);
       }
@@ -1219,12 +1219,16 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
     const u32 surfacePitch = surfaceInfo & 0x3FFF;
     // Don't render, pitch is zero
     if (surfacePitch == 0) {
+      LOG_DEBUG(Xenos, "[CP] Surface Pitch is Zero");
       return true;
+    } else {
+      LOG_DEBUG(Xenos, "[CP] Surface pitch: {}", surfacePitch);
     }
     // Get surface MSAA
     const eMSAASamples surfaceMSAA = static_cast<eMSAASamples>((surfaceInfo >> 16) & 0x3);
     // Check the state of things
     if (modeControl == eModeControl::Ignore) {
+      LOG_DEBUG(Xenos, "[CP] ModeControl is telling us to ignore this draw");
       // Well, we were told to ignore!
       return true;
     } else if (modeControl == eModeControl::Copy) {
@@ -1245,8 +1249,10 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
       const u32 destArray = (destInfo >> 3) & 1;
       const u32 destSlice = (destInfo >> 4) & 1;
       const eColorFormat destformat = static_cast<eColorFormat>((destInfo >> 7) & 0x3F);
-      if (destformat == eColorFormat::Unknown)
+      if (destformat == eColorFormat::Unknown) {
+        LOG_ERROR(Xenos, "[CP] Invalid color format");
         return true;
+      }
       const u32 destNumber = (destInfo >> 13) & 7;
       const u32 destBias = (destInfo >> 16) & 0x3F;
       const u32 destSwap = (destInfo >> 25) & 1;
@@ -1274,15 +1280,20 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
         const f32 clearDepthValue = (state->depthClear & 0xFFFFFF00) / (f32)0xFFFFFF00;
         render->UpdateClearDepth(clearDepthValue);
       }
+      // TODO: Update shader constants here via buffers
       return true;
     }
 
     if (isIndexedDraw) {
+      LOG_DEBUG(Xenos, "[CP] DrawIndexed");
       render->DrawIndexed(state, indexBufferInfo);
     } else {
+      LOG_DEBUG(Xenos, "[CP] Draw");
       render->Draw(state);
     }
     state->ClearDirtyState();
+  } else {
+    LOG_ERROR(Xenos, "[CP] Invalid draw");
   }
 
   return drawOk;

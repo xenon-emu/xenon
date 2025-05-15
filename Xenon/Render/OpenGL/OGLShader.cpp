@@ -73,6 +73,18 @@ void Render::OGLShader::SetUniformFloat(const std::string &name, f32 value) {
   glUniform1f(GetUniformLocation(name), value);
 }
 
+void Render::OGLShader::SetVertexShaderConsts(u32 baseVector, u32 count, const f32 *data) {
+
+}
+
+void Render::OGLShader::SetPixelShaderConsts(u32 baseVector, u32 count, const f32 *data) {
+
+}
+
+void Render::OGLShader::SetBooleanConstants(const u32 *data) {
+
+}
+
 void Render::OGLShader::Link() {
   Program = glCreateProgram();
   for (auto shader : AttachedShaders) {

@@ -163,6 +163,12 @@ private:
   Sirit::Id gpr_var = { 0 };
   Sirit::Id predicate_var = { 0 };
 
+  Sirit::Id ubo_type_v = { 0 };
+  Sirit::Id ubo_var_v = { 0 };
+
+  Sirit::Id ubo_type_b = { 0 };
+  Sirit::Id ubo_var_b = { 0 };
+
   Sirit::Id gpr_var_current = { 0 };
   Sirit::Id current_function = { 0 };
 

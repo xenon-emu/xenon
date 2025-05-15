@@ -35,7 +35,7 @@ namespace Render { class Renderer; }
 namespace Xe::XGPU {
 
 // Masks for RingBuffer registers.
-#define CP_RB_CNTL_RB_BUFSZ_MASK  0x0000003fL
+#define CP_RB_CNTL_RB_BUFSZ_MASK  0x0000003FL
 
 // Represents a CommandProcessor data packet.
 typedef u32 CPPacket;
@@ -103,7 +103,7 @@ enum CPPacketType3Opcode {
   PM4_WAIT_REG_MEM              = 0x3C, // Wait until a register or memory location is a specific value.
   PM4_MEM_WRITE                 = 0x3D, // Write N 32-bit words to memory.
   PM4_REG_TO_MEM                = 0x3E, // Reads register in chip and writes to memory.
-  PM4_INDIRECT_BUFFER           = 0x3F, // Indirect buffer dispatch.  prefetch parser uses this packet type to determine whether to pre-fetch the IB . 
+  PM4_INDIRECT_BUFFER           = 0x3F, // Indirect buffer dispatch. Prefetch parser uses this packet type to determine whether to pre-fetch the IB.
   PM4_EXEC_CS_INDIRECT          = 0x41,
   PM4_MEM_TO_REG                = 0x42,
   PM4_SET_DRAW_STATE            = 0x43,

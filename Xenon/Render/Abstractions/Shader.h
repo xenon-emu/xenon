@@ -22,6 +22,9 @@ public:
   virtual s32 GetUniformLocation(const std::string &name) = 0;
   virtual void SetUniformInt(const std::string &name, s32 value) = 0;
   virtual void SetUniformFloat(const std::string &name, f32 value) = 0;
+  virtual void SetVertexShaderConsts(u32 baseVector, u32 count, const f32 *data) = 0;
+  virtual void SetPixelShaderConsts(u32 baseVector, u32 count, const f32 *data) = 0;
+  virtual void SetBooleanConstants(const u32 *data) = 0;
   virtual void Link() = 0;
   virtual void Bind() = 0;
   virtual void Unbind() = 0;

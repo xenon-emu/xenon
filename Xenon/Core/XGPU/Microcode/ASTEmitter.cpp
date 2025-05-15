@@ -37,6 +37,33 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType) : type(shad
   Sirit::Id bool_ptr_type = module.TypePointer(spv::StorageClass::Private, bool_type);
   Sirit::Id false_val = module.ConstantFalse(bool_type);
   predicate_var = module.AddGlobalVariable(bool_ptr_type, spv::StorageClass::Private, false_val);
+
+  // Types
+  Sirit::Id vec4_type = module.TypeVector(module.TypeFloat(32), 4);
+  Sirit::Id vec4_array_256 = module.TypeArray(vec4_type, module.Constant(module.TypeInt(32, false), 256));
+
+  // VertexConsts
+  Sirit::Id ubo_struct_v = module.TypeStruct(vec4_array_256);
+  module.Decorate(ubo_struct_v, spv::Decoration::Block);
+  module.MemberDecorate(ubo_struct_v, 0, spv::Decoration::Offset, 0);
+
+  ubo_type_v = module.TypePointer(spv::StorageClass::Uniform, ubo_struct_v);
+  ubo_var_v = module.AddGlobalVariable(ubo_type_v, spv::StorageClass::Uniform);
+  module.Decorate(ubo_var_v, spv::Decoration::DescriptorSet, 0);
+  module.Decorate(ubo_var_v, spv::Decoration::Binding, 0);
+  module.Name(ubo_var_v, "VertexConsts");
+
+  // BoolConsts
+  Sirit::Id uint_array_32 = module.TypeArray(module.TypeInt(32, false), module.Constant(module.TypeInt(32, false), 32));
+  Sirit::Id ubo_struct_b = module.TypeStruct(uint_array_32);
+  module.Decorate(ubo_struct_b, spv::Decoration::Block);
+  module.MemberDecorate(ubo_struct_b, 0, spv::Decoration::Offset, 0);
+
+  ubo_type_b = module.TypePointer(spv::StorageClass::Uniform, ubo_struct_b);
+  ubo_var_b = module.AddGlobalVariable(ubo_type_b, spv::StorageClass::Uniform);
+  module.Decorate(ubo_var_b, spv::Decoration::DescriptorSet, 0);
+  module.Decorate(ubo_var_b, spv::Decoration::Binding, 1);
+  module.Name(ubo_var_b, "CommonBoolConsts");
 }
 
 void ShaderCodeWriterSirit::BeginMain() {
@@ -171,40 +198,42 @@ Chunk ShaderCodeWriterSirit::GetExportDest(const eExportReg reg) {
 
 Chunk ShaderCodeWriterSirit::GetReg(u32 regIndex) {
   LOG_DEBUG(Xenos, "[AST::Sirit] GetReg({})", regIndex);
-
+  Sirit::Id uint_type = module.TypeInt(32, false);
   Sirit::Id vec4_type = module.TypeVector(module.TypeFloat(32), 4);
-  Sirit::Id vec4_ptr_type = module.TypePointer(spv::StorageClass::Function, vec4_type);
+  Sirit::Id vec4_ptr_type = module.TypePointer(spv::StorageClass::Uniform, vec4_type);
+
   Sirit::Id index_id = module.Constant(module.TypeInt(32, false), regIndex);
-  Sirit::Id reg_ptr = module.OpAccessChain(vec4_ptr_type, gpr_var_current, index_id);
-  Sirit::Id reg_val = module.OpLoad(vec4_type, reg_ptr);
-  return Chunk(reg_val, reg_ptr);
+  Sirit::Id ptr = module.OpAccessChain(vec4_ptr_type, ubo_var_v, module.Constant(module.TypeInt(32, false), 0), index_id);
+  Sirit::Id val = module.OpLoad(vec4_type, ptr);
+  return Chunk(val, ptr);
 }
 
 Chunk ShaderCodeWriterSirit::GetBoolVal(const u32 boolRegIndex) {
   LOG_DEBUG(Xenos, "[AST::Sirit] GetBoolVal({})", boolRegIndex);
-
-  Sirit::Id bool_ptr_type = module.TypePointer(spv::StorageClass::Private, module.TypeBool());
-
   Sirit::Id uint_type = module.TypeInt(32, false);
-  Sirit::Id index_id = module.Constant(uint_type, boolRegIndex);
-  Sirit::Id reg_ptr = module.OpAccessChain(bool_ptr_type, gpr_var_current, index_id);
+  Sirit::Id bool_type = module.TypeBool();
+  Sirit::Id int_const_32 = module.Constant(uint_type, 32);
 
-  Sirit::Id reg_val = module.OpLoad(module.TypeBool(), reg_ptr);
-  return Chunk(reg_val, reg_ptr);
+  Sirit::Id reg_idx = module.Constant(uint_type, boolRegIndex);
+  Sirit::Id word_idx = module.OpUDiv(uint_type, reg_idx, int_const_32);
+  Sirit::Id bit_idx = module.OpUMod(uint_type, reg_idx, int_const_32);
+  Sirit::Id bit_mask = module.OpShiftLeftLogical(uint_type, module.Constant(uint_type, 1), bit_idx);
+
+  Sirit::Id ptr_type = module.TypePointer(spv::StorageClass::Uniform, uint_type);
+  Sirit::Id word_ptr = module.OpAccessChain(ptr_type, ubo_var_b, module.Constant(uint_type, 0), word_idx);
+  Sirit::Id word_val = module.OpLoad(uint_type, word_ptr);
+
+  Sirit::Id and_val = module.OpBitwiseAnd(uint_type, word_val, bit_mask);
+  Sirit::Id result = module.OpINotEqual(bool_type, and_val, module.Constant(uint_type, 0));
+  return Chunk(result, word_ptr);
 }
 
 Chunk ShaderCodeWriterSirit::GetFloatVal(const u32 floatRegIndex) {
   LOG_DEBUG(Xenos, "[AST::Sirit] GetFloatVal({})", floatRegIndex);
-  Sirit::Id uint_type = module.TypeInt(32, false);
-
-  Sirit::Id index_id = module.Constant(uint_type, floatRegIndex);
-  Sirit::Id vec4_ptr_type = module.TypePointer(spv::StorageClass::Function, module.TypeVector(module.TypeFloat(32), 4));
-  Sirit::Id reg_ptr = module.OpAccessChain(vec4_ptr_type, gpr_var_current, index_id);
-  Sirit::Id reg_val = module.OpLoad(module.TypeVector(module.TypeFloat(32), 4), reg_ptr);
-
-  // Extract .x (index 0)
-  Sirit::Id x_value = module.OpCompositeExtract(module.TypeFloat(32), reg_val, 0);
-  return Chunk(x_value, reg_ptr);
+  Chunk chunk = GetReg(floatRegIndex);
+  Sirit::Id float_type = module.TypeFloat(32);
+  Sirit::Id x_val = module.OpCompositeExtract(float_type, chunk.id, 0);
+  return Chunk(x_val, chunk.ptr);
 }
 
 Chunk ShaderCodeWriterSirit::GetFloatValRelative(const u32 floatRegOffset) {

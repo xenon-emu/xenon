@@ -23,6 +23,18 @@ void Render::DummyShader::SetUniformFloat(const std::string &name, f32 value) {
   LOG_INFO(Render, "DummyShader::SetUniformFloat: {}, {}", name, value);
 }
 
+void Render::DummyShader::SetVertexShaderConsts(u32 baseVector, u32 count, const f32 *data) {
+  LOG_INFO(Render, "DummyShader::SetVertexShaderConsts: {}, {}", baseVector, count);
+}
+
+void Render::DummyShader::SetPixelShaderConsts(u32 baseVector, u32 count, const f32 *data) {
+  LOG_INFO(Render, "DummyShader::SetPixelShaderConsts: {}, {}", baseVector, count);
+}
+
+void Render::DummyShader::SetBooleanConstants(const u32 *data) {
+  LOG_INFO(Render, "DummyShader::SetBooleanConstants");
+}
+
 void Render::DummyShader::Link() {
   LOG_INFO(Render, "DummyShader::Link");
 }
