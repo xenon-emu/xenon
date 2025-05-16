@@ -202,12 +202,12 @@ inline struct _filepaths {
   std::string elfBinary = "kernel.elf";
 
   // Corrects the paths on first time creation
-  void correct(const std::filesystem::path &basePath) {
-    fuses = std::filesystem::path(basePath).append(fuses).string();
-    oneBl = std::filesystem::path(basePath).append(oneBl).string();
-    nand = std::filesystem::path(basePath).append(nand).string();
-    oddImage = std::filesystem::path(basePath).append(oddImage).string();
-    elfBinary = std::filesystem::path(basePath).append(elfBinary).string();
+  void correct(const fs::path &basePath) {
+    fuses = fs::path(basePath / fuses).string();
+    oneBl = fs::path(basePath / oneBl).string();
+    nand = fs::path(basePath / nand).string();
+    oddImage = fs::path(basePath / oddImage).string();
+    elfBinary = fs::path(basePath / elfBinary).string();
   }
 
   // TOML Conversion
@@ -264,7 +264,7 @@ inline struct _highlyExperimental {
   bool verify_toml(toml::value &value);
 } highlyExperimental;
 
-void loadConfig(const std::filesystem::path &path);
-void saveConfig(const std::filesystem::path &path);
+void loadConfig(const fs::path &path);
+void saveConfig(const fs::path &path);
 
 } // namespace Config

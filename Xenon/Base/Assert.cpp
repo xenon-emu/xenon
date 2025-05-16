@@ -28,7 +28,7 @@
 #endif // _MSVC_VER
 
 void throw_fail_impl() {
-  std::fflush(stdout);
+  ::fflush(stdout);
   Crash();
 }
 
@@ -41,7 +41,7 @@ void assert_fail_impl() {
 }
 
 [[noreturn]] void unreachable_impl() {
-  std::fflush(stdout);
+  ::fflush(stdout);
   Crash();
   throw std::runtime_error("Unreachable code");
 }

@@ -1108,6 +1108,10 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
     if (modeControl == eModeControl::Copy) {
       // Copy to eDRAM, and clear if needed
       render->copyQueue.push(state);
+      while (!render->copyQueue.empty()) {
+        // We don't want the state to change in the middle of a copy, so just wait for a bit.
+        std::this_thread::sleep_for(1ns);
+      }
       return true;
     }
     auto vertexShader = render->convertedShaderPrograms.find(render->currentVertexShader);

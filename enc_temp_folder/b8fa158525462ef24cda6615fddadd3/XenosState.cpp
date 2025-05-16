@@ -114,8 +114,8 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
       coherencyStatusHost &= ~0x80000000ul;
       LOG_DEBUG(Xenos, "[Xe] Flushing 0x{:X} with a size of 0x{:X}", coherencyBaseHost, coherencySizeHost);
       if (coherencyBaseHost == fbSurfaceAddress) {
-        //LOG_DEBUG(Xenos, "[CP] Flushing FB");
-        //framebufferDisable = true;
+        LOG_DEBUG(Xenos, "[CP] Flushing FB");
+        framebufferDisable = true;
       }
       ClearDirtyState();
     }

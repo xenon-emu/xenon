@@ -268,7 +268,7 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
   const u32 destSlice = (destInfo >> 4) & 1;
   const Xe::eColorFormat destformat = static_cast<Xe::eColorFormat>((destInfo >> 7) & 0x3F);
   if (destformat == Xe::eColorFormat::Unknown) {
-    LOG_ERROR(Xenos, "[CP] Invalid color format");
+    LOG_ERROR(Xenos, "[CP] Invalid color format! 0x{:X}", destInfo);
     return true;
   }
   const u32 destNumber = (destInfo >> 13) & 7;
@@ -358,6 +358,12 @@ void Renderer::Thread() {
 
     // Framebuffer pointer from main memory
     fbPointer = ramPointer->getPointerToAddress(Xe_Main->xenos->GetSurface());
+
+    if (!copyQueue.empty()) {
+      auto job = copyQueue.front();
+      IssueCopy(job);
+      copyQueue.pop();
+    }
 
     // Clear the display
     Clear();

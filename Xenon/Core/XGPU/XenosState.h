@@ -29,6 +29,7 @@ class CommandProcessor;
 
 class XenosState {
 public:
+  XenosState() = default;
   XenosState(RAM *ram, EDRAM *edramPtr, CommandProcessor *commandProcessorPtr);
 
   ~XenosState();
@@ -87,6 +88,7 @@ public:
 
   // Primary surface
   u32 fbSurfaceAddress = XE_FB_BASE;
+  bool framebufferDisable = false;
 
   // Config
   u32 configControl = 0x00; //0x10000000 - Set to always be warm boot, but we never setup our states so we should always cold boot
@@ -139,8 +141,8 @@ public:
   u32 multiPrimitiveIndexBufferResetIndex = 0;
   u32 currentBinIdMin = 0;
 
-  VGT_DRAW_INITIATOR_REG vgtDrawInitiator;
-  VGT_DMA_SIZE_REG vgtDMASize;
+  VGT_DRAW_INITIATOR_REG vgtDrawInitiator = {};
+  VGT_DMA_SIZE_REG vgtDMASize = {};
 
   // PA
   u32 viewportControl = 0;

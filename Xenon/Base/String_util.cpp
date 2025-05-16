@@ -6,8 +6,8 @@ namespace Base {
 
 #ifdef _WIN32
 static std::wstring CPToUTF16(u32 code_page, std::string_view input) {
-  const auto size =
-    MultiByteToWideChar(code_page, 0, input.data(), static_cast<int>(input.size()), nullptr, 0);
+  const s32 size =
+    ::MultiByteToWideChar(code_page, 0, input.data(), static_cast<s32>(input.size()), nullptr, 0);
 
   if (size == 0) {
     return {};
@@ -15,8 +15,8 @@ static std::wstring CPToUTF16(u32 code_page, std::string_view input) {
 
   std::wstring output(size, L'\0');
 
-  if (size != MultiByteToWideChar(code_page, 0, input.data(), static_cast<int>(input.size()),
-                  &output[0], static_cast<int>(output.size()))) {
+  if (size != ::MultiByteToWideChar(code_page, 0, input.data(), static_cast<s32>(input.size()),
+                  &output[0], static_cast<s32>(output.size()))) {
     output.clear();
   }
 
@@ -26,7 +26,7 @@ static std::wstring CPToUTF16(u32 code_page, std::string_view input) {
 
 std::string UTF16ToUTF8(const std::wstring_view &input) {
 #ifdef _WIN32
-  const auto size = WideCharToMultiByte(CP_UTF8, 0, input.data(), static_cast<int>(input.size()),
+  const s32 size = ::WideCharToMultiByte(CP_UTF8, 0, input.data(), static_cast<s32>(input.size()),
                       nullptr, 0, nullptr, nullptr);
   if (size == 0) {
     return {};
@@ -34,8 +34,8 @@ std::string UTF16ToUTF8(const std::wstring_view &input) {
 
   std::string output(size, '\0');
 
-  if (size != WideCharToMultiByte(CP_UTF8, 0, input.data(), static_cast<int>(input.size()),
-                  &output[0], static_cast<int>(output.size()), nullptr,
+  if (size != ::WideCharToMultiByte(CP_UTF8, 0, input.data(), static_cast<s32>(input.size()),
+                  &output[0], static_cast<s32>(output.size()), nullptr,
                   nullptr)) {
     output.clear();
   }
@@ -57,7 +57,7 @@ std::wstring UTF8ToUTF16W(const std::string_view &input) {
 
 std::string ToLower(const std::string_view &str) {
   std::string out = {};
-  std::transform(str.begin(), str.end(), out.begin(), tolower);
+  std::transform(str.begin(), str.end(), out.begin(), ::tolower);
   return out;
 }
 

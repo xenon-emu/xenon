@@ -176,10 +176,10 @@ int IOFile::Open(const fs::path& path, FileAccessMode mode, FileMode type, FileS
 
 #ifdef _WIN32
   if (flag != FileShareFlag::ShareNone) {
-    file = _wfsopen(path.c_str(), AccessModeToWStr(mode, type), ToWindowsFileShareFlag(flag));
+    file = ::_wfsopen(path.c_str(), AccessModeToWStr(mode, type), ToWindowsFileShareFlag(flag));
     result = errno;
   } else {
-    result = _wfopen_s(&file, path.c_str(), AccessModeToWStr(mode, type));
+    result = ::_wfopen_s(&file, path.c_str(), AccessModeToWStr(mode, type));
   }
 #else
   file = std::fopen(path.c_str(), AccessModeToStr(mode, type));
@@ -202,9 +202,9 @@ void IOFile::Close() {
 
   errno = 0;
 
-  const auto close_result = std::fclose(file) == 0;
+  const bool closeResult = ::fclose(file) == 0;
 
-  if (!close_result) {
+  if (!closeResult) {
     const auto ec = std::error_code{errno, std::generic_category()};
     LOG_ERROR(Base_Filesystem, "Failed to close the file at path={}, ec_message={}",
               PathToUTF8String(file_path), ec.message());
@@ -214,7 +214,7 @@ void IOFile::Close() {
 
 #ifdef _WIN64
   if (file_mapping && file_access_mode == FileAccessMode::ReadWrite) {
-    CloseHandle(std::bit_cast<HANDLE>(file_mapping));
+    ::CloseHandle(std::bit_cast<HANDLE>(file_mapping));
   }
 #endif
 }
@@ -230,11 +230,11 @@ void IOFile::Unlink() {
   FILE_DISPOSITION_INFORMATION disposition;
   IO_STATUS_BLOCK iosb;
 
-  const int fd = fileno(file);
-  const HANDLE hfile = reinterpret_cast<HANDLE>(_get_osfhandle(fd));
+  const s32 fd = fileno(file);
+  const HANDLE hfile = reinterpret_cast<HANDLE>(::_get_osfhandle(fd));
 
   disposition.DeleteFile = true;
-  NtSetInformationFile(hfile, &iosb, &disposition, sizeof(disposition),
+  ::NtSetInformationFile(hfile, &iosb, &disposition, sizeof(disposition),
                        FileDispositionInformation);
 #else
   if (unlink(file_path.c_str()) != 0) {
@@ -250,9 +250,9 @@ uptr IOFile::GetFileMapping() {
     return file_mapping;
   }
 #ifdef _WIN64
-  const int fd = fileno(file);
+  const s32 fd = fileno(file);
 
-  HANDLE hfile = reinterpret_cast<HANDLE>(_get_osfhandle(fd));
+  HANDLE hfile = reinterpret_cast<HANDLE>(::_get_osfhandle(fd));
   HANDLE mapping = nullptr;
 
 /*  if (file_access_mode == FileAccessMode::ReadWrite) {
@@ -276,10 +276,10 @@ uptr IOFile::GetFileMapping() {
 std::string IOFile::ReadString(size_t length) const {
   std::vector<char> string_buffer(length);
 
-  const auto chars_read = ReadSpan<char>(string_buffer);
-  const auto string_size = chars_read != length ? chars_read : length;
+  const u64 charsRead = ReadSpan<char>(string_buffer);
+  const auto stringSize = charsRead != length ? charsRead : length;
 
-  return std::string{string_buffer.data(), string_size};
+  return std::string{ string_buffer.data(), stringSize };
 }
 
 bool IOFile::Flush() const {
@@ -289,15 +289,15 @@ bool IOFile::Flush() const {
 
   errno = 0;
 
-  const auto flush_result = std::fflush(file) == 0;
+  const bool flushResult = ::fflush(file) == 0;
 
-  if (!flush_result) {
-    const auto ec = std::error_code{errno, std::generic_category()};
+  if (!flushResult) {
+    const std::error_code ec = { errno, std::generic_category() };
     LOG_ERROR(Base_Filesystem, "Failed to flush the file at path={}, ec_message={}",
               PathToUTF8String(file_path), ec.message());
   }
 
-  return flush_result;
+  return flushResult;
 }
 
 bool IOFile::Commit() const {
@@ -307,19 +307,20 @@ bool IOFile::Commit() const {
 
   errno = 0;
 
+  bool commitResult = ::fflush(file) == 0;
 #ifdef _WIN32
-  const auto commit_result = std::fflush(file) == 0 && _commit(fileno(file)) == 0;
+  commitResult = commitResult && _commit(fileno(file)) == 0;
 #else
-  const auto commit_result = std::fflush(file) == 0 && fsync(fileno(file)) == 0;
+  commitResult = commitResult && fsync(fileno(file)) == 0;
 #endif
 
-  if (!commit_result) {
-    const auto ec = std::error_code{errno, std::generic_category()};
+  if (!commitResult) {
+    const std::error_code ec = { errno, std::generic_category() };
     LOG_ERROR(Base_Filesystem, "Failed to commit the file at path={}, ec_message={}",
               PathToUTF8String(file_path), ec.message());
   }
 
-  return commit_result;
+  return commitResult;
 }
 
 bool IOFile::SetSize(u64 size) const {
@@ -330,18 +331,18 @@ bool IOFile::SetSize(u64 size) const {
   errno = 0;
 
 #ifdef _WIN32
-  const auto set_size_result = _chsize_s(fileno(file), static_cast<s64>(size)) == 0;
+  const bool setSizeResult = _chsize_s(fileno(file), static_cast<s64>(size)) == 0;
 #else
-  const auto set_size_result = ftruncate(fileno(file), static_cast<s64>(size)) == 0;
+  const auto setSizeResult = ftruncate(fileno(file), static_cast<s64>(size)) == 0;
 #endif
 
-  if (!set_size_result) {
-    const auto ec = std::error_code{errno, std::generic_category()};
+  if (!setSizeResult) {
+    const std::error_code ec = { errno, std::generic_category() };
     LOG_ERROR(Base_Filesystem, "Failed to resize the file at path={}, size={}, ec_message={}",
               PathToUTF8String(file_path), size, ec.message());
   }
 
-  return set_size_result;
+  return setSizeResult;
 }
 
 u64 IOFile::GetSize() const {
@@ -356,7 +357,7 @@ u64 IOFile::GetSize() const {
   u64 fSize = 0;
   // fs::file_size can cause a exception if it is not a valid file
   try {
-    std::error_code ec;
+    std::error_code ec{};
     fSize = fs::file_size(file_path, ec);
     if (fSize == -1 || !fSize) {
       LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of path={}, ec_message={}",
@@ -393,16 +394,16 @@ bool IOFile::Seek(s64 offset, SeekOrigin origin) const {
 
   errno = 0;
 
-  const auto seek_result = fseeko(file, offset, ToSeekOrigin(origin)) == 0;
+  const s32 seekResult = fseeko(file, offset, ToSeekOrigin(origin)) == 0;
 
-  if (!seek_result) {
-    const auto ec = std::error_code{errno, std::generic_category()};
+  if (!seekResult) {
+    const std::error_code ec = { errno, std::generic_category() };
     LOG_ERROR(Base_Filesystem,
               "Failed to seek the file at path={}, offset={}, origin={}, ec_message={}",
               PathToUTF8String(file_path), offset, static_cast<u32>(origin), ec.message());
   }
 
-  return seek_result;
+  return seekResult;
 }
 
 s64 IOFile::Tell() const {
@@ -425,7 +426,7 @@ u64 GetDirectorySize(const std::filesystem::path& path) {
     if (fs::is_regular_file(entry.path())) {
       // fs::file_size can cause a exception if it is not a valid file
       try {
-        std::error_code ec;
+        std::error_code ec{};
         u64 fSize = fs::file_size(entry.path(), ec);
         if (fSize != -1 && fSize) {
           total += fSize;

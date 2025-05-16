@@ -8,7 +8,7 @@ namespace Base {
 
 // Like GetLastErrorMsg(), but passing an explicit error code.
 // Defined in error.cpp.
-[[nodiscard]] std::string NativeErrorToString(const int e);
+[[nodiscard]] std::string NativeErrorToString(const s32 e);
 
 // Generic function to get last error message.
 // Call directly after the command or use the error num.

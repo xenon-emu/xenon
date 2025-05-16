@@ -118,7 +118,7 @@ public:
 
   // Shader texture queue
   std::queue<ShaderLoadJob> shaderLoadQueue{};
-  std::queue<BufferLoadJob> bufferLoadQueue;
+  std::queue<BufferLoadJob> bufferLoadQueue{};
   std::unordered_map<u32, std::shared_ptr<Buffer>> createdBuffers;
 
   // GUI Helpers
@@ -130,6 +130,7 @@ public:
   std::unordered_map<u32, std::shared_ptr<Shader>> convertedShaderPrograms{};
   u32 currentVertexShader = 0;
   u32 currentPixelShader = 0;
+  std::queue<Xe::XGPU::XenosState*> copyQueue{};
 private:
   // Thread handle
   std::thread thread;
