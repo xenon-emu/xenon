@@ -151,7 +151,7 @@ public:
   }
 
   template <typename T = bool>
-    requires (std::_Is_character_or_bool<T>::value)
+    requires (std::is_same_v<T, bool>)
   T Get(u64 i = 0) const {
     if (!Present() || i >= values.size())
       return 0;
