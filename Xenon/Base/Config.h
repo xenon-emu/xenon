@@ -58,6 +58,8 @@ inline struct _rendering {
   bool pauseOnFocusLoss = false;
   // GPU ID Selection (Only for Vulkan/DirectX)
   s32 gpuId = -1;
+  // Backend selection
+  std::string backend = "OpenGL";
 
   // TOML Conversion
   void to_toml(toml::value &value);
