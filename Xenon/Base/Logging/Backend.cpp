@@ -231,21 +231,19 @@ private:
   void StartBackendThread() {
     backendThread = std::jthread([this](std::stop_token stop_token) {
       Base::SetCurrentThreadName("[Xe] Log");
-      Entry entry;
-      const auto write_logs = [this, &entry]() {
+      Entry entry = {};
+      const auto writeLogs = [this, &entry]() {
         ForEachBackend([&entry](BaseBackend* backend) { backend->Write(entry); });
       };
       while (!stop_token.stop_requested()) {
         messageQueue.PopWait(entry, stop_token);
-        if (entry.filename != nullptr) {
-          write_logs();
-        }
+        writeLogs();
       }
       // Drain the logging queue. Only writes out up to MAX_LOGS_TO_WRITE to prevent a
       // case where a system is repeatedly spamming logs even on close.
-      int max_logs_to_write = filter.IsDebug() ? std::numeric_limits<s32>::max() : 100;
-      while (max_logs_to_write-- && messageQueue.TryPop(entry)) {
-        write_logs();
+      s32 maxLogsToWrite = filter.IsDebug() ? std::numeric_limits<s32>::max() : 100;
+      while (maxLogsToWrite-- && messageQueue.TryPop(entry)) {
+        writeLogs();
       }
     });
   }
