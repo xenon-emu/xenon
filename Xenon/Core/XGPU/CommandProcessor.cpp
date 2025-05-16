@@ -94,8 +94,6 @@ void CommandProcessor::CPUpdateRBBase(u32 address) {
   if (!address)
     return;
 
-  state->WriteRegister(XeRegister::CP_RB_BASE, address);
-
   cpRingBufferBasePtr = ram->getPointerToAddress(address);
   LOG_DEBUG(Xenos, "CP: Updating RingBuffer Base Address: 0x{:X}", address);
   
@@ -107,14 +105,11 @@ void CommandProcessor::CPUpdateRBSize(size_t newSize) {
   if (!(newSize & CP_RB_CNTL_RB_BUFSZ_MASK))
     return;
 
-  state->WriteRegister(XeRegister::CP_RB_CNTL, newSize);
-
   cpRingBufferSize = static_cast<size_t>(1u << (newSize + 3));
   LOG_DEBUG(Xenos, "CP: Updating RingBuffer Size: 0x{:X}", cpRingBufferSize.load());
 }
 
 void CommandProcessor::CPUpdateRBWritePointer(u32 offset) {
-  state->WriteRegister(XeRegister::CP_RB_WPTR, offset);
   cpWritePtrIndex = offset;
 }
 
