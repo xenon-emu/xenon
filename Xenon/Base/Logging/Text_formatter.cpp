@@ -24,16 +24,12 @@ std::string FormatLogMessage(const Entry &entry) {
 
 #define ESC "\x1b"
 void PrintMessage(const std::string &color, const Entry &entry) {
-  const std::string str = color + entry.message + ESC "[0m";
+  std::string msg = entry.formatted ? FormatLogMessage(entry) : entry.message;
+  const std::string str = color + msg.append(ESC "[0m") + (entry.formatted ? "\n" : "");
   fputs(str.c_str(), stdout);
 }
 
-void PrintMessageFmt(const std::string &color, const Entry &entry) {
-  const std::string str = color + FormatLogMessage(entry).append(ESC "[0m\n");
-  fputs(str.c_str(), stdout);
-}
-
-void PrintColoredMessage(const Entry &entry, bool withFmt) {
+void PrintColoredMessage(const Entry &entry) {
   // NOTE: Custom colors can be achieved
   // std::format("\x1b[{};2;{};{};{}m", color.bg ? 48 : 38, color.r, color.g, color.b)
   const char *color = "";
@@ -63,10 +59,7 @@ void PrintColoredMessage(const Entry &entry, bool withFmt) {
     UNREACHABLE();
   }
 
-  if (withFmt)
-    PrintMessageFmt(color, entry);
-  else
-    PrintMessage(color, entry);
+  PrintMessage(color, entry);
 }
 #undef ESC
 

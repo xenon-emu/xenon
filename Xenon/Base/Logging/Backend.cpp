@@ -26,7 +26,7 @@ using namespace Base::FS;
 class BaseBackend {
 public:
   virtual ~BaseBackend() = default;
-  virtual void Write(const Entry &entry, bool formatted = true) = 0;
+  virtual void Write(const Entry &entry) = 0;
   virtual void Flush() = 0;
 };
 
@@ -38,9 +38,9 @@ public:
 
   ~ColorConsoleBackend() = default;
 
-  void Write(const Entry &entry, bool formatted) override {
+  void Write(const Entry &entry) override {
     if (enabled.load(std::memory_order_relaxed)) {
-      PrintColoredMessage(entry, formatted);
+      PrintColoredMessage(entry);
     }
   }
 
@@ -67,12 +67,12 @@ public:
     file.Close();
   }
 
-  void Write(const Entry &entry, bool formatted) override {
+  void Write(const Entry &entry) override {
     if (!enabled) {
       return;
     }
 
-    if (formatted) {
+    if (entry.formatted) {
       bytesWritten += file.WriteString(FormatLogMessage(entry).append(1, '\n'));
     }
     else {
@@ -194,6 +194,7 @@ public:
       .logClass = logClass,
       .logLevel = logLevel,
       .message = message,
+      .formatted = false
     };
     if (Base::JoaatStringHash(Config::log.type) == "async"_j) {
       messageQueue.EmplaceWait(entry);

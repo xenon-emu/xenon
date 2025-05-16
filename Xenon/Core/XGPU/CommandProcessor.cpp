@@ -1121,14 +1121,14 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
     params.multiPrimitiveIndexBufferResetIndex = state->multiPrimitiveIndexBufferResetIndex;
     params.currentBinIdMin = state->currentBinIdMin;
     Render::DrawJob drawJob = {};
-    drawJob.state = state;
     drawJob.params = params;
     drawJob.indexed = isIndexedDraw;
     drawJob.shaderPS = render->currentPixelShader;
     drawJob.shaderVS = render->currentVertexShader;
-    state->ClearDirtyState();
     // Queue off to the Renderer
     render->drawQueue.push(drawJob);
+    LOG_DEBUG(Xenos, "[CP] Draw{}", isIndexedDraw ? "Indexed" : "");
+    state->ClearDirtyState();
   } else {
     LOG_ERROR(Xenos, "[CP] Invalid draw");
   }

@@ -21,6 +21,7 @@ struct Entry {
   u32 lineNum = 0;
   std::string function = {};
   std::string message = {};
+  bool formatted = true;
 };
 
 } // namespace Log

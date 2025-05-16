@@ -76,8 +76,8 @@ public:
   virtual void Clear() = 0;
 
   virtual void UpdateViewportFromState(const Xe::XGPU::XenosState *state) = 0;
-  virtual void Draw(Xe::XGPU::XenosState *state) = 0;
-  virtual void DrawIndexed(Xe::XGPU::XenosState *state, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) = 0;
+  virtual void Draw(Xe::XGPU::XeDrawParams params) = 0;
+  virtual void DrawIndexed(Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) = 0;
 
   virtual void OnCompute() = 0;
   virtual void OnBind() = 0;

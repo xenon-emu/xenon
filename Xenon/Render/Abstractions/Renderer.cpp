@@ -419,10 +419,10 @@ void Renderer::Thread() {
         }
 
         if (job.indexed) {
-          DrawIndexed(job.state, job.params.indexBufferInfo);
+          DrawIndexed(job.params, job.params.indexBufferInfo);
         }
         else {
-          Draw(job.state);
+          Draw(job.params);
         }
 
         job.state->ClearDirtyState();  // Clear after draw

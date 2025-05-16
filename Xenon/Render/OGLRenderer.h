@@ -36,8 +36,8 @@ public:
   void UpdateViewportFromState(const Xe::XGPU::XenosState *state) override;
   void Clear() override;
 
-  void Draw(Xe::XGPU::XenosState *state) override;
-  void DrawIndexed(Xe::XGPU::XenosState *state, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) override;
+  void Draw(Xe::XGPU::XeDrawParams params) override;
+  void DrawIndexed(Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) override;
 
   void OnCompute() override;
   void OnBind() override;

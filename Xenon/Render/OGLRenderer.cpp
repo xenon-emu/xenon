@@ -125,12 +125,12 @@ GLenum ConvertToGLPrimitive(ePrimitiveType prim) {
   }
 }
 
-void OGLRenderer::Draw(Xe::XGPU::XenosState *state) {
-  // TODO: Draws
+void OGLRenderer::Draw(Xe::XGPU::XeDrawParams params) {
+  // TODO: Draw
 }
 
-void OGLRenderer::DrawIndexed(Xe::XGPU::XenosState *state, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) {
- // TODO: Draws
+void OGLRenderer::DrawIndexed(Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) {
+  // TODO: Draw
 }
 
 void OGLRenderer::UpdateViewportFromState(const Xe::XGPU::XenosState *state) {
