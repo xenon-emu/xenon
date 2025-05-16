@@ -35,8 +35,9 @@ void Render::DummyShader::SetBooleanConstants(const u32 *data) {
   LOG_INFO(Render, "DummyShader::SetBooleanConstants");
 }
 
-void Render::DummyShader::Link() {
+bool Render::DummyShader::Link() {
   LOG_INFO(Render, "DummyShader::Link");
+  return true;
 }
 
 void Render::DummyShader::Bind() {

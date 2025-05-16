@@ -1114,13 +1114,10 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
       }
       return true;
     }
-    auto vertexShader = render->convertedShaderPrograms.find(render->currentVertexShader);
-    if (vertexShader != render->convertedShaderPrograms.end()) {
-      vertexShader->second->Bind();
-    }
-    auto pixelShader = render->convertedShaderPrograms.find(render->currentPixelShader);
-    if (pixelShader != render->convertedShaderPrograms.end()) {
-      pixelShader->second->Bind();
+    u64 combinedHash = (static_cast<u64>(render->currentVertexShader) << 32) | render->currentPixelShader;
+    auto shader = render->linkedShaderPrograms.find(combinedHash);
+    if (shader != render->linkedShaderPrograms.end()) {
+      shader->second->Bind();
     }
     if (isIndexedDraw) {
       LOG_DEBUG(Xenos, "[CP] DrawIndexed");

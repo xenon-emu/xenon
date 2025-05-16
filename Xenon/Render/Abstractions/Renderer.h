@@ -39,8 +39,14 @@ struct ShaderLoadJob {
 };
 
 struct BufferLoadJob {
-  u32 name;
-  std::vector<u8> data;
+  BufferLoadJob(const std::string &name, const std::vector<u8> &data, const eBufferType type, const eBufferUsage usage) :
+    name(name), data(data),
+    type(type), usage(usage) {
+    hash = Base::JoaatStringHash(name);
+  }
+  std::string name = {};
+  u32 hash = 0;
+  std::vector<u8> data = {};
   eBufferType type;
   eBufferUsage usage;
 };
@@ -127,7 +133,9 @@ public:
   void SetDebuggerActive(s8 specificPPU = -1);
   
   // Recompiled shaders
-  std::unordered_map<u32, std::shared_ptr<Shader>> convertedShaderPrograms{};
+  std::unordered_map<u32, std::vector<u32>> pendingVertexShaders{};
+  std::unordered_map<u32, std::vector<u32>> pendingPixelShaders{};
+  std::unordered_map<u64, std::shared_ptr<Shader>> linkedShaderPrograms{};
   u32 currentVertexShader = 0;
   u32 currentPixelShader = 0;
   std::queue<Xe::XGPU::XenosState*> copyQueue{};

@@ -219,7 +219,7 @@ void Renderer::UpdateConstants(Xe::XGPU::XenosState *state) {
   }
 
   Render::BufferLoadJob pixelBufferJob = {
-    "PixelConsts"_j,
+    "PixelConsts",
     std::vector<u8>(
       reinterpret_cast<u8*>(&psConsts),
       reinterpret_cast<u8*>(&psConsts) + sizeof(psConsts)
@@ -228,7 +228,7 @@ void Renderer::UpdateConstants(Xe::XGPU::XenosState *state) {
     Render::eBufferUsage::DynamicDraw
   };
   Render::BufferLoadJob vertexBufferJob = {
-    "VertexConsts"_j,
+    "VertexConsts",
     std::vector<u8>(
       reinterpret_cast<u8*>(&vsConsts),
       reinterpret_cast<u8*>(&vsConsts) + sizeof(vsConsts)
@@ -237,7 +237,7 @@ void Renderer::UpdateConstants(Xe::XGPU::XenosState *state) {
     Render::eBufferUsage::DynamicDraw
   };
   Render::BufferLoadJob boolBufferJob = {
-    "CommonBoolConsts"_j,
+    "CommonBoolConsts",
     std::vector<u8>(
       reinterpret_cast<u8*>(&boolConsts),
       reinterpret_cast<u8*>(&boolConsts) + sizeof(boolConsts)
@@ -337,12 +337,30 @@ void Renderer::Thread() {
         ? Render::eShaderType::Fragment
         : Render::eShaderType::Vertex;
 
-      std::shared_ptr<Shader> compiledShader = shaderFactory->LoadFromBinary(job.name, {
-        { shaderType, job.binary }
-      });
+      if (shaderType == Render::eShaderType::Vertex) {
+        pendingVertexShaders[job.shaderCRC] = job.binary;
+      } else {
+        pendingPixelShaders[job.shaderCRC] = job.binary;
+      }
 
-      convertedShaderPrograms.insert({ job.shaderCRC, compiledShader });
-      LOG_DEBUG(Xenos, "Compiled {} shader (CRC: 0x{:08X})", job.name, job.shaderCRC);
+      // See if we have both shaders now
+      if (currentVertexShader != 0 && currentPixelShader != 0) {
+        auto vsIt = pendingVertexShaders.find(currentVertexShader);
+        auto fsIt = pendingPixelShaders.find(currentPixelShader);
+
+        if (vsIt != pendingVertexShaders.end() && fsIt != pendingPixelShaders.end()) {
+          u64 combinedHash = (static_cast<u64>(currentVertexShader) << 32) | currentPixelShader;
+          std::shared_ptr<Shader> shader = shaderFactory->LoadFromBinary(job.name, {
+            { shaderType, job.binary }
+          });
+          if (shader) {
+            linkedShaderPrograms.insert({ combinedHash, shader });
+            LOG_DEBUG(Xenos, "Linked shader program: VS: 0x{:08X}, PS: 0x{:08X}", currentVertexShader, currentPixelShader);
+          } else {
+            LOG_ERROR(Xenos, "Failed to link shader programs.");
+          }
+        }
+      }
     }
 
     while (!bufferLoadQueue.empty()) {
@@ -352,7 +370,7 @@ void Renderer::Thread() {
       std::shared_ptr<Buffer> buffer = resourceFactory->CreateBuffer();
       buffer->CreateBuffer(static_cast<u32>(job.data.size()), job.data.data(), job.usage, job.type);
 
-      createdBuffers[job.name] = buffer;
+      createdBuffers[job.hash] = buffer;
       LOG_DEBUG(Xenos, "Created buffer '{}', size: {}", job.name, job.data.size());
     }
 

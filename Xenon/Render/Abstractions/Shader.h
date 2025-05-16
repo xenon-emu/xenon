@@ -25,7 +25,7 @@ public:
   virtual void SetVertexShaderConsts(u32 baseVector, u32 count, const f32 *data) = 0;
   virtual void SetPixelShaderConsts(u32 baseVector, u32 count, const f32 *data) = 0;
   virtual void SetBooleanConstants(const u32 *data) = 0;
-  virtual void Link() = 0;
+  virtual bool Link() = 0;
   virtual void Bind() = 0;
   virtual void Unbind() = 0;
   virtual void Destroy() = 0;

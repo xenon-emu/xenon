@@ -27,15 +27,15 @@ public:
   void SetVertexShaderConsts(u32 baseVector, u32 count, const f32 *data) override;
   void SetPixelShaderConsts(u32 baseVector, u32 count, const f32 *data) override;
   void SetBooleanConstants(const u32 *data) override;
-  void Link() override;
+  bool Link() override;
   void Bind() override;
   void Unbind() override;
   void Destroy() override;
   void SetProgram(u32 prog) { Program = prog; }
 private:
   u32 Program = 0;
-  std::vector<u32> AttachedShaders;
-  std::unordered_map<std::string, s32> UniformCache;
+  std::vector<u32> AttachedShaders = {};
+  std::unordered_map<std::string, s32> UniformCache{};
 
   u32 ToGLShaderType(eShaderType type);
 };

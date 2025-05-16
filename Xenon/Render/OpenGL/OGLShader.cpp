@@ -47,7 +47,10 @@ void Render::OGLShader::CompileFromBinary(eShaderType type, const u8 *data, u64 
     if (logLength > 1) {
       std::vector<char> log(logLength);
       glGetShaderInfoLog(shader, logLength, NULL, log.data());
-      LOG_CRITICAL(System, "Shader compilation failed! {}", log.data());
+      log.pop_back(); // Remove nul-term
+      log.pop_back(); // Remove newline
+      log.push_back('\0'); // Add nul-term
+      LOG_CRITICAL(System, "Shader: {}", log.data());
     }
     LOG_CRITICAL(System, "Shader compilation failed! No message present, likely SPIR-V");
     return;
@@ -85,7 +88,7 @@ void Render::OGLShader::SetBooleanConstants(const u32 *data) {
 
 }
 
-void Render::OGLShader::Link() {
+bool Render::OGLShader::Link() {
   Program = glCreateProgram();
   for (auto shader : AttachedShaders) {
     glAttachShader(Program, shader);
@@ -101,8 +104,11 @@ void Render::OGLShader::Link() {
     if (logLength > 1) {
       std::vector<char> log(logLength);
       glGetProgramInfoLog(Program, logLength, NULL, log.data());
-      LOG_CRITICAL(System, "Shader linking failed! {}", log.data());
-      return;
+      log.pop_back(); // Remove nul-term
+      log.pop_back(); // Remove newline
+      log.push_back('\0'); // Add nul-term
+      LOG_CRITICAL(System, "Link: {}", log.data());
+      return false;
     }
     LOG_CRITICAL(System, "Shader linking failed! No message present, likely SPIR-V");
   } else if (AttachedShaders.empty()) {
@@ -113,6 +119,8 @@ void Render::OGLShader::Link() {
     glDeleteShader(shader);
   }
   AttachedShaders.clear();
+
+  return true;
 }
 
 void Render::OGLShader::Bind() {

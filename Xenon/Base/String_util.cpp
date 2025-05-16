@@ -55,9 +55,9 @@ std::wstring UTF8ToUTF16W(const std::string_view &input) {
 #endif // ifdef _WIN32
 }
 
-std::string ToLower(const std::string_view &str) {
-  std::string out = {};
-  std::transform(str.begin(), str.end(), out.begin(), ::tolower);
+std::string ToLower(const std::string &str) {
+  std::string out = str;
+  std::transform(str.begin(), str.end(), out.data(), ::tolower);
   return out;
 }
 

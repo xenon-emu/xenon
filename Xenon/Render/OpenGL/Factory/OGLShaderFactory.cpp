@@ -47,7 +47,9 @@ std::shared_ptr<Shader> OGLShaderFactory::LoadFromBinary(const std::string &name
   for (const auto& [type, src] : sources) {
     shader->CompileFromBinary(type, reinterpret_cast<const u8*>(src.data()), src.size() * sizeof(u32));
   }
-  shader->Link();
+  if (!shader->Link()) {
+    return nullptr;
+  }
   Shaders[name] = shader;
   return shader;
 }
