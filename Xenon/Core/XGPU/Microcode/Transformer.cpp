@@ -24,8 +24,8 @@ void ShaderNodeWriter::TransformShader(AST::NodeWriter &nodeWriter, const u32 *w
     cfb.dword_0 = (words[i+1] >> 16) | (words[i+2] << 16);
     cfa.dword_1 = words[i+1] & 0xFFFF;
     cfb.dword_1 = words[i+2] >> 16;
-    LOG_DEBUG(Xenos, "[ShaderNodeWriter::TransformShader] Opcode: 0x{:02X}", static_cast<u32>(cfa.opc));
-    LOG_DEBUG(Xenos, "[ShaderNodeWriter::TransformShader] Opcode: 0x{:02X}", static_cast<u32>(cfb.opc));
+    LOG_DEBUG(Xenos, "[ShaderNodeWriter::TransformShader] Opcode: {}, 0x{:02X}", GetCFOpcodeName(static_cast<instr_cf_opc_t>(cfa.opc)), cfa.opc);
+    LOG_DEBUG(Xenos, "[ShaderNodeWriter::TransformShader] Opcode: {}, 0x{:02X}", GetCFOpcodeName(static_cast<instr_cf_opc_t>(cfb.opc)), cfb.opc);
 
     TransformBlock(nodeWriter, words, numWords, cfa, pc);
     TransformBlock(nodeWriter, words, numWords, cfb, pc);
@@ -43,15 +43,18 @@ void ShaderNodeWriter::TransformBlock(AST::NodeWriter &nodeWriter, const u32 *wo
   } break;
   case ALLOC: {
     const instr_cf_alloc_t &alloc = cf.alloc;
-    switch (alloc.buffer_select) {
-    case 1: {
+    switch (static_cast<instr_alloc_type_t>(alloc.buffer_select)) {
+    case SQ_NO_ALLOC: {
+      LOG_ERROR(Xenos, "[AST::TransformBlock] ALLOC with NO_ALLOC, what.");
+    } break;
+    case SQ_POSITION: {
       nodeWriter.EmitExportAllocPosition();
     } break;
-    case 2: {
+    case SQ_PARAMETER_PIXEL: {
       u32 count = 1 + alloc.size;
       nodeWriter.EmitExportAllocParam(count);
     } break;
-    case 3: {
+    case SQ_MEMORY: {
       u32 count = 1 + alloc.size;
       nodeWriter.EmitExportAllocMemExport(count);
     } break;

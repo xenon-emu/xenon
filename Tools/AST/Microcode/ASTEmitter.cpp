@@ -488,7 +488,7 @@ Chunk ShaderCodeWriterSirit::ScalarFunc1(instr_scalar_opc_t instr, ExpressionNod
     LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc1(FLOORs)");
     return Chunk(module.OpFloor(module.TypeFloat(32), a.id)); // floor(a)
   default:
-    LOG_ERROR(Xenos, "[AST::Emitter] Unsupported scalar unary op!");
+    LOG_ERROR(Xenos, "[AST::Emitter] Unsupported scalar unary op '{}'!", static_cast<u32>(instr));
     return {};
   }
 }

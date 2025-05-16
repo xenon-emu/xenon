@@ -41,6 +41,7 @@ void Block::ConnectTarget(Block *targetBlock) {
 void Block::ConnectContinuation(Block *nextBlock) {
   continuation = nextBlock;
 }
+
 void Block::EmitShaderCode(ShaderCodeWriterBase &writer) const {
   // Emit preamble (outside the conditional block)
   if (preambleStatement)
@@ -103,7 +104,8 @@ ControlFlowGraph* ControlFlowGraph::DecompileMicroCode(const void *code, u32 cod
 
     if (type != eBlockType::END && type != eBlockType::RET) {
       if (type == eBlockType::JUMP || type == eBlockType::CALL) {
-
+        if (curr->IsUnconditional())
+          continue;
       }
       curr->ConnectContinuation(next);
     }

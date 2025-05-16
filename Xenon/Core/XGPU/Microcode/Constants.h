@@ -258,6 +258,22 @@ typedef enum {
   MARK_VS_FETCH_DONE = 15,
 } instr_cf_opc_t;
 
+inline std::string GetCFOpcodeName(instr_cf_opc_t op) {
+  #define CASE(x) case x: return #x
+  switch (op) {
+  CASE(NOP);
+  CASE(EXEC); CASE(EXEC_END);
+  CASE(COND_EXEC); CASE(COND_EXEC_END);
+  CASE(COND_PRED_EXEC); CASE(COND_PRED_EXEC_END);
+  CASE(LOOP_START); CASE(LOOP_END);
+  CASE(COND_CALL); CASE(COND_JMP); CASE(RETURN);
+  CASE(ALLOC);
+  CASE(COND_EXEC_PRED_CLEAN); CASE(COND_EXEC_PRED_CLEAN_END);
+  CASE(MARK_VS_FETCH_DONE);
+  }
+  return {};
+}
+
 typedef enum {
   RELATIVE_ADDR = 0,
   ABSOLUTE_ADDR = 1,

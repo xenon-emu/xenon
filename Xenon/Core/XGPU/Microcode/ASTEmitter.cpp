@@ -11,14 +11,16 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType, Shader *sha
   module.AddCapability(spv::Capability::Shader);
   module.SetMemoryModel(spv::AddressingModel::Logical, spv::MemoryModel::GLSL450);
 
-  for (const auto &tex : shader->usedTextures) {
-    Sirit::Id sampled_type = GetSampledImageType(tex.type); // We'll define this next
-    Sirit::Id ptr_type = module.TypePointer(spv::StorageClass::UniformConstant, sampled_type);
-    Sirit::Id var = module.AddGlobalVariable(ptr_type, spv::StorageClass::UniformConstant);
-    module.Decorate(var, spv::Decoration::DescriptorSet, 0);
-    module.Decorate(var, spv::Decoration::Binding, tex.slot);
-    module.Name(var, std::format("TextureSlot{}", tex.slot));
-    texture_vars[tex.slot] = var;
+  if (shader) {
+    for (const auto &tex : shader->usedTextures) {
+      Sirit::Id sampled_type = GetSampledImageType(tex.type);
+      Sirit::Id ptr_type = module.TypePointer(spv::StorageClass::UniformConstant, sampled_type);
+      Sirit::Id var = module.AddGlobalVariable(ptr_type, spv::StorageClass::UniformConstant);
+      module.Decorate(var, spv::Decoration::DescriptorSet, 0);
+      module.Decorate(var, spv::Decoration::Binding, tex.slot);
+      module.Name(var, std::format("TextureSlot{}", tex.slot));
+      texture_vars[tex.slot] = var;
+    }
   }
 
   std::string shaderTypeName = type == eShaderType::Pixel ? "Pixel" : "Vertex";
@@ -490,7 +492,7 @@ Chunk ShaderCodeWriterSirit::ScalarFunc1(instr_scalar_opc_t instr, ExpressionNod
     LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc1(FLOORs)");
     return Chunk(module.OpFloor(module.TypeFloat(32), a.id)); // floor(a)
   default:
-    LOG_ERROR(Xenos, "[AST::Emitter] Unsupported scalar unary op!");
+    LOG_ERROR(Xenos, "[AST::Emitter] Unsupported scalar unary op '{}'!", static_cast<u32>(instr));
     return {};
   }
 }

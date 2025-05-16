@@ -46,6 +46,7 @@ public:
   inline u32 GetAddress() const { return address; }
   inline u32 GetTargetAddress() const { return targetAddress; }
   inline eBlockType GetType() const { return type; }
+  inline bool IsUnconditional() const { return !condition; }
 private:
   // Block type
   eBlockType type;
