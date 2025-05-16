@@ -55,7 +55,6 @@ D_STUB(lvebx)
 D_STUB(lvehx)
 D_STUB(stdbrx)
 D_STUB(stswx)
-D_STUB(stfsu)
 D_STUB(stfsux)
 D_STUB(stvebx)
 D_STUB(fcmpo)
@@ -450,6 +449,7 @@ extern void PPCInterpreter_stdx(PPU_STATE *ppuState);
 
 // Store Floating
 extern void PPCInterpreter_stfs(PPU_STATE *ppuState);
+extern void PPCInterpreter_stfsu(PPU_STATE *ppuState);
 extern void PPCInterpreter_stfsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_stfd(PPU_STATE *ppuState);
 extern void PPCInterpreter_stfdx(PPU_STATE *ppuState);
