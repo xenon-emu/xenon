@@ -760,6 +760,10 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
     render->currentVertexShader = crc;
     LOG_DEBUG(Xenos, "[CP::IM_LOAD] VertexShader CRC: 0x{:08X}", crc);
   } break;
+  case eShaderType::Unknown:
+  default: {
+    LOG_DEBUG(Xenos, "[CP::IM_LOAD] Unknown shader type '{}'", static_cast<u32>(shaderType));
+  } break;
   }
 
   return true;
@@ -807,6 +811,10 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuff
   case eShaderType::Vertex:{
     render->currentVertexShader = crc;
     LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] VertexShader CRC: 0x{:08X}", crc);
+  } break;
+  case eShaderType::Unknown:
+  default: {
+    LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] Unknown shader type '{}'", static_cast<u32>(shaderType));
   } break;
   }
 
