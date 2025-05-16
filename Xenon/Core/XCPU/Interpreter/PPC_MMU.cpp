@@ -1,4 +1,4 @@
-// Copyright 2025 Xenon Emulator Project
+// Copyright 2025 Xenon Emulator Project. All rights reserved.
 
 #include "PPCInterpreter.h"
 #include "Core/Xe_Main.h"

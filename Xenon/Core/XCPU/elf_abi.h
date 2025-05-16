@@ -1,5 +1,5 @@
 /* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
-// Copyright 2025 Xenon Emulator Project
+// Copyright 2025 Xenon Emulator Project. All rights reserved.
 
 #pragma once
 

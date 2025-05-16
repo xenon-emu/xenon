@@ -1,3 +1,7 @@
+// Copyright 2025 Xenon Emulator Project. All rights reserved.
+
+#pragma once
+
 #include "Base/Types.h"
 
 // Contains Xenos related enums and structures.

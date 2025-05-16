@@ -1,4 +1,4 @@
-// Copyright 2025 Xenon Emulator Project
+// Copyright 2025 Xenon Emulator Project. All rights reserved.
 
 #include <algorithm>
 

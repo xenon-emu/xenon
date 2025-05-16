@@ -26,6 +26,8 @@
 #include "Core/XGPU/PM4Opcodes.h"
 #include "Core/XGPU/RingBuffer.h"
 #include "Core/XGPU/XenosRegisters.h"
+#include "Core/XGPU/Xenos.h"
+#include "Core/XGPU/XenosState.h"
 
 // Xenos GPU Command Processor.
 // Handles all commands sent to the Xenos via the RingBuffer.
