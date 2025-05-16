@@ -26,6 +26,7 @@ void _rendering::from_toml(const toml::value &value) {
   pauseOnFocusLoss =
     toml::find_or<bool>(value, "PauseOnFocusLoss", pauseOnFocusLoss);
   gpuId = toml::find_or<s32&>(value, "GPU", gpuId);
+  backend = toml::find_or<std::string>(value, "Backend", backend);
 }
 void _rendering::to_toml(toml::value &value) {
   value["Enable"].comments().clear();
@@ -52,6 +53,9 @@ void _rendering::to_toml(toml::value &value) {
   value["GPU"].comments().clear();
   value["GPU"] = gpuId;
   value["GPU"].comments().push_back("# [!NOT SUPPORTED NOW!] Chooses which GPU to use if there are multiple (Vulkan/DirectX only)");
+  value["Backend"].comments().clear();
+  value["Backend"] = backend;
+  value["Backend"].comments().push_back("# Graphics API used for rendering (OpenGL/Dummy)");
 }
 bool _rendering::verify_toml(toml::value &value) {
   to_toml(value);
@@ -63,6 +67,7 @@ bool _rendering::verify_toml(toml::value &value) {
   cache_value(quitOnWindowClosure);
   cache_value(pauseOnFocusLoss);
   cache_value(gpuId);
+  cache_value(backend);
   from_toml(value);
   verify_value(enable);
   verify_value(enableGui);
@@ -73,6 +78,7 @@ bool _rendering::verify_toml(toml::value &value) {
   verify_value(quitOnWindowClosure);
   verify_value(pauseOnFocusLoss);
   verify_value(gpuId);
+  verify_value(backend);
   return true;
 }
 
@@ -225,7 +231,7 @@ void _smc::to_toml(toml::value &value) {
   value["UARTSystem"] = uartSystem;
   value["UARTSystem"].comments().push_back("# UART System");
   value["UARTSystem"].comments().push_back("# vcom is vCOM, only present on Windows");
-  value["UARTSystem"].comments().push_back("# socket is Socket, avaliable via Netcat/Socat (netcat -lvnp 7000)");
+  value["UARTSystem"].comments().push_back("# socket is Socket, available via Netcat/Socat (netcat -lvnp 7000)");
   value["UARTSystem"].comments().push_back("# print is Printf, directly to log");
 #ifdef _WIN32
   value["COMPort"].comments().clear();
@@ -279,7 +285,7 @@ void _xcpu::to_toml(toml::value &value) {
   value["CPI"] = clocksPerInstruction;
   value["CPI"].comments().push_back("# [DO NOT MODIFY] Clocks Per Instruction [DO NOT MODIFY]");
   value["CPI"].comments().push_back("# If your system has a lower than average CPI, use CPI Bypass in HighlyExperimental");
-  value["CPI"].comments().push_back("# Note: This will mess with execution timing, and may break time-sensitive things like XeLL");
+  value["CPI"].comments().push_back("# Note: This will mess with execution timing and may break time-sensitive things like XeLL");
 
   value["OverrideHWInit"].comments().clear();
   value["OverrideHWInit"] = overrideInitSkip;
@@ -343,7 +349,7 @@ void _filepaths::to_toml(toml::value &value) {
   value.comments().clear();
   value.comments().push_back("# Only Fuses, OneBL, and Nand are required");
   value.comments().push_back("# ElfBinary is used in the elf loader");
-  value.comments().push_back("# ODDImage is Optical Disc Drive Image, takes a iso file for Linux");
+  value.comments().push_back("# ODDImage is Optical Disc Drive Image, takes an ISO file for Linux");
   value["Fuses"] = fuses;
   value["OneBL"] = oneBl;
   value["Nand"] = nand;
