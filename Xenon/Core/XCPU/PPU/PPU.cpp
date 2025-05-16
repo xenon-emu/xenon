@@ -400,26 +400,23 @@ void PPU::ThreadLoop() {
       if ((!ppuThreadResetting && ppuThreadState.load() == eThreadState::Halted) || ppuThreadState.load() == eThreadState::Sleeping) {
         LOG_DEBUG(Xenon, "{} was previously halted or sleeping, bringing online", ppuState->ppuName);
         ppuThreadState.store(eThreadState::Running);
-      }
+        // Enable thread 0 execution
+        ppuState->SPR.CTRL = 0x800000;
 
-      // Enable thread 0 execution
-      ppuState->SPR.CTRL = 0x800000;
-      
-      if (!ppuThreadResetting && ppuThreadState.load() != eThreadState::Running) {
         // Issue reset
         ppuState->ppuThread[ePPUThread_Zero].exceptReg |= PPU_EX_RESET;
         ppuState->ppuThread[ePPUThread_One].exceptReg |= PPU_EX_RESET;
+
+        PPU_THREAD_REGISTERS& thread = curThread;
+
+        thread.SPR.SRR1 = 0x200000; // Set SRR1[42:44] = 100
+
+        // ACK and EOI the interrupt
+        u64 intData = 0;
+        xenonContext->xenonIIC.readInterrupt(thread.SPR.PIR * 0x1000 + 0x50050, reinterpret_cast<u8*>(&intData), sizeof(intData));
+        intData = 0;
+        xenonContext->xenonIIC.writeInterrupt(thread.SPR.PIR * 0x1000 + 0x50060, reinterpret_cast<u8*>(&intData), sizeof(intData));
       }
-      
-      PPU_THREAD_REGISTERS &thread = curThread;
-
-      thread.SPR.SRR1 = 0x200000; // Set SRR1[42:44] = 100
-
-      // ACK and EOI the interrupt
-      u64 intData = 0;
-      xenonContext->xenonIIC.readInterrupt(thread.SPR.PIR * 0x1000 + 0x50050, reinterpret_cast<u8*>(&intData), sizeof(intData));
-      intData = 0;
-      xenonContext->xenonIIC.writeInterrupt(thread.SPR.PIR * 0x1000 + 0x50060, reinterpret_cast<u8*>(&intData), sizeof(intData));
     }
   }
   // Thread is done executing, just tell it to exit
