@@ -29,7 +29,7 @@ public:
 
   virtual ~ExpressionNode() = default;
   virtual eExprType GetType() const { return eExprType::ALU; }
-  virtual int GetRegisterIndex() const { return -1; }
+  virtual s32 GetRegisterIndex() const { return -1; }
   virtual Chunk EmitShaderCode(ShaderCodeWriterBase &writer) = 0;
   virtual std::shared_ptr<ExpressionNode> CloneExpr() const = 0;
   std::shared_ptr<NodeBase> Clone() const override {

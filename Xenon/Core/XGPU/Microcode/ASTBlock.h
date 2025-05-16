@@ -36,9 +36,9 @@ public:
   inline Block* GetTarget() const { return target; }
   inline std::vector<Block*> GetSources() const { return sources; }
   inline Block* GetContinuation() const { return continuation; }
-  inline AST::ExpressionNode* GetCondition() const { return condition.get(); }
-  inline AST::StatementNode* GetCode() const { return codeStatement.get(); }
-  inline AST::StatementNode* GetPreamble() const { return preambleStatement.get(); }
+  inline AST::ExpressionNode::Ptr GetCondition() const { return condition; }
+  inline AST::StatementNode::Ptr GetCode() const { return codeStatement; }
+  inline AST::StatementNode::Ptr GetPreamble() const { return preambleStatement; }
   inline u32 GetAddress() const { return address; }
   inline u32 GetTargetAddress() const { return targetAddress; }
   inline eBlockType GetType() const { return type; }
@@ -67,7 +67,7 @@ class ControlFlowGraph {
 public:
   ControlFlowGraph() = default;
   ~ControlFlowGraph() {
-    for (auto* block : blocks) {
+    for (auto *block : blocks) {
       delete block;
     }
   }
@@ -88,6 +88,31 @@ private:
   std::vector<Block*> roots;
 
   static void ExtractBlocks(const Block* block, std::vector<const Block*>& out, std::set<const Block*>& visited);
+};
+
+struct TextureRef {
+  instr_dimension_t type;
+  u32 slot;
+};
+
+class Shader {
+public:
+  ~Shader();
+
+  static Shader* DecompileMicroCode(const void *code, const u32 codeLength, eShaderType shaderType);
+
+  void EmitShaderCode(AST::ShaderCodeWriterBase &writer) const;
+
+  ControlFlowGraph *controlFlow = nullptr;
+  
+  std::vector<const VertexFetch*> vertexFetches{};
+  std::vector<const WriteExportRegister*> exports{};
+
+  std::vector<u32> usedRegisters{};
+  std::vector<TextureRef> usedTextures{};
+
+  u32 numUsedInterpolators = 0;
+  u32 textureFetchSlotMask = 0;
 };
 
 } // namespace Xe::Microcode

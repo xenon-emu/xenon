@@ -42,45 +42,6 @@ public:
   std::set<u32> usedRegisters;
 };
 
-class AllExpressionVisitor : public Microcode::AST::StatementNode::Visitor {
-public:
-  AllExpressionVisitor(Microcode::AST::ExpressionNode::Visitor *vistor)
-    : exprVisitor(vistor)
-  {}
-
-  virtual void OnWrite(Microcode::AST::ExpressionNode::Ptr dest, Microcode::AST::ExpressionNode::Ptr src, std::array<eSwizzle, 4> mask) override final {
-    dest->Visit(*exprVisitor);
-    src->Visit(*exprVisitor);
-  }
-  
-  virtual void OnConditionPush(Microcode::AST::ExpressionNode::Ptr condition) override final {
-    condition->Visit(*exprVisitor);
-  }
-
-  virtual void OnConditionPop() override final
-  {}
-
-private:
-  Microcode::AST::ExpressionNode::Visitor* exprVisitor;
-};
-
-void VisitAll(const Microcode::AST::Block *b, Microcode::AST::StatementNode::Visitor &v) {
-  if (b->GetCondition())
-    v.OnConditionPush(b->GetCondition()->shared_from_this());
-
-  if (b->GetCode())
-    b->GetCode()->Visit(v);
-
-  if (b->GetCondition())
-    v.OnConditionPop();
-}
-
-void VisitAll(const Microcode::AST::ControlFlowGraph* cf, Microcode::AST::StatementNode::Visitor &v) {
-  for (u32 i = 0; i < cf->GetNumBlocks(); ++i) {
-    const Microcode::AST::Block *b = cf->GetBlock(i);
-    VisitAll(b, v);
-  }
-}
 
 void Run(u32 hash) {
   eShaderType shaderType = eShaderType::Unknown;
@@ -129,16 +90,12 @@ void Run(u32 hash) {
     }
   }
 
-  AST::ShaderCodeWriterSirit writer{ shaderType };
-  AST::ControlFlowGraph *cf = AST::ControlFlowGraph::DecompileMicroCode(reinterpret_cast<u8*>(data.data()), data.size() * 4, shaderType);
-  if (cf) {
-    GlobalInstructionExtractor instructionExtractor;
-    AllExpressionVisitor vistor(&instructionExtractor);
-    VisitAll(cf, vistor);
-    cf->EmitShaderCode(writer);
+  AST::Shader *shader = AST::Shader::DecompileMicroCode(reinterpret_cast<u8*>(data.data()), data.size() * 4, shaderType);
+  AST::ShaderCodeWriterSirit writer{ shaderType, shader };
+  if (shader) {
+    shader->EmitShaderCode(writer);
   }
   std::vector<u32> code{ writer.module.Assemble() };
-
   std::string typeString = shaderType == Xe::eShaderType::Pixel ? "pixel" : "vertex";
   std::string baseString = std::format("{}_shader_{:X}", typeString, hash);
   {
@@ -185,11 +142,11 @@ s32 main(s32 argc, char *argv[]) {
   }
   u32 crcHash = PARAM_crc.Get<u32>();
   if (crcHash == 0) {
-    // Vertex: 0xA9F9365A
-    // Pixel: 0x93F4ACA8
+    // Vertex: 0x2F4DC4B6
+    // Pixel: 0x65924BD7
     crcHash = 0x2F4DC4B6;
   }
   Xe::Microcode::Run(crcHash);
-  //Xe::Microcode::Run(0x93F4ACA8);
+  Xe::Microcode::Run(0x65924BD7);
   return 0;
 }

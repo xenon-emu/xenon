@@ -2,13 +2,24 @@
 
 #include "Base/Logging/Log.h"
 
+#include "ASTBlock.h"
 #include "ASTEmitter.h"
 
 namespace Xe::Microcode::AST {
 
-ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType) : type(shaderType) {
+ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType, Shader *shader) : type(shaderType) {
   module.AddCapability(spv::Capability::Shader);
   module.SetMemoryModel(spv::AddressingModel::Logical, spv::MemoryModel::GLSL450);
+
+  for (const auto &tex : shader->usedTextures) {
+    Sirit::Id sampled_type = GetSampledImageType(tex.type); // We'll define this next
+    Sirit::Id ptr_type = module.TypePointer(spv::StorageClass::UniformConstant, sampled_type);
+    Sirit::Id var = module.AddGlobalVariable(ptr_type, spv::StorageClass::UniformConstant);
+    module.Decorate(var, spv::Decoration::DescriptorSet, 0);
+    module.Decorate(var, spv::Decoration::Binding, tex.slot);
+    module.Name(var, std::format("TextureSlot{}", tex.slot));
+    texture_vars[tex.slot] = var;
+  }
 
   std::string shaderTypeName = type == eShaderType::Pixel ? "Pixel" : "Vertex";
   if (type == eShaderType::Pixel) {
@@ -323,33 +334,43 @@ Chunk ShaderCodeWriterSirit::Swizzle(ExpressionNode *value, std::array<eSwizzle,
   return Chunk(module.OpVectorShuffle(vec4_type, input.id, input.id, components[0], components[1], components[2], components[3]));
 }
 
+Sirit::Id ShaderCodeWriterSirit::GetSampledImageType(instr_dimension_t dim) {
+  Sirit::Id float_type = module.TypeFloat(32);
+  Sirit::Id image_type = {};
+  switch (dim) {
+  case DIMENSION_1D:
+    image_type = module.TypeImage(float_type, spv::Dim::Dim1D, 0, 0, 0, 1, spv::ImageFormat::Unknown);
+    break;
+  case DIMENSION_2D:
+    image_type = module.TypeImage(float_type, spv::Dim::Dim2D, 0, 0, 0, 1, spv::ImageFormat::Unknown);
+    break;
+  case DIMENSION_3D:
+    image_type = module.TypeImage(float_type, spv::Dim::Dim3D, 0, 0, 0, 1, spv::ImageFormat::Unknown);
+    break;
+  case DIMENSION_CUBE:
+    image_type = module.TypeImage(float_type, spv::Dim::Cube, 0, 0, 0, 1, spv::ImageFormat::Unknown);
+    break;
+  default:
+    LOG_ERROR(Xenos, "[AST::Emitter] Unsupported texture sample '{}'!", static_cast<u32>(dim));
+    return {};
+  }
+  return module.TypeSampledImage(image_type);
+}
+
 Chunk ShaderCodeWriterSirit::FetchTexture(const Chunk &src, const TextureFetch &instr) {
   const u32 slot = instr.fetchSlot;
   Sirit::Id coord = src.id;
   LOG_DEBUG(Xenos, "[AST::Sirit] FetchTexture({}, {})", coord.value, slot);
 
-  // Load the sampled image (pointer is to OpTypeSampledImage)
-
-  // Determine coordinate type and dimensionality
-  Sirit::Id coord_type = { 0 };
-  spv::Dim dim{};
-  bool is_array = false;
-  switch (instr.textureType) {
-  case DIMENSION_1D: {
-
-  } break;
-  case DIMENSION_2D: {
-
-  } break;
-  case DIMENSION_3D: {
-   
-  } break;
-  case DIMENSION_CUBE: {
-   
-  } break;
+  auto it = texture_vars.find(slot);
+  if (it == texture_vars.end()) {
+    LOG_ERROR(Xenos, "[AST::Emitter] Texture slot '{}' isn't registered!", slot);
+    return {};
   }
 
-  return {};
+  Sirit::Id sampled_image = it->second;
+  Sirit::Id sampled_result = module.OpImageSampleImplicitLod(module.TypeVector(module.TypeFloat(32), 4), sampled_image, coord);
+  return Chunk(sampled_result, { 0 });
 }
 
 Chunk ShaderCodeWriterSirit::FetchVertex(const Chunk &src, const VertexFetch &instr) {

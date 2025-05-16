@@ -200,5 +200,134 @@ void ControlFlowGraph::ExtractBlocks(const Block *block, std::vector<const Block
     ExtractBlocks(block->GetContinuation(), out, visited);
 }
 
+class AllExpressionVisitor : public StatementNode::Visitor {
+public:
+  AllExpressionVisitor(ExpressionNode::Visitor *exprVisitor)
+    : exprVisitor(exprVisitor)
+  {}
+
+  virtual void OnWrite(ExpressionNode::Ptr dest, ExpressionNode::Ptr src, std::array<eSwizzle, 4> mask) override final {
+    dest->Visit(*exprVisitor);
+    src->Visit(*exprVisitor);
+  }
+
+  virtual void OnConditionPush(Microcode::AST::ExpressionNode::Ptr condition) override final {
+    condition->Visit(*exprVisitor);
+  }
+
+  virtual void OnConditionPop() override final {}
+
+private:
+  ExpressionNode::Visitor *exprVisitor = nullptr;
+};
+
+class GlobalInstructionExtractor : public ExpressionNode::Visitor {
+public:
+  virtual void OnExprStart(const ExpressionNode::Ptr n) override final {
+    if (n->GetType() == eExprType::VFETCH) {
+      vfetch.push_back(reinterpret_cast<const VertexFetch*>(n.get()));
+    }
+    else if (n->GetType() == eExprType::TFETCH) {
+      tfetch.push_back(reinterpret_cast<const TextureFetch *>(n.get()));
+    }
+    else if (n->GetType() == eExprType::EXPORT) {
+      exports.push_back(reinterpret_cast<const WriteExportRegister *>(n.get()));
+    }
+    else {
+      const s32 regIndex = n->GetRegisterIndex();
+      if (regIndex != -1) {
+        usedRegisters.insert(static_cast<u32>(regIndex));
+      }
+    }
+  }
+
+  virtual void OnExprEnd(const ExpressionNode::Ptr n) override final
+  {}
+
+  std::vector<const VertexFetch*> vfetch{};
+  std::vector<const TextureFetch*> tfetch{};
+  std::vector<const WriteExportRegister*> exports{};
+  std::set<u32> usedRegisters{};
+};
+
+void VisitAll(const Block *b, StatementNode::Visitor &v) {
+  if (b->GetCondition())
+    v.OnConditionPush(b->GetCondition());
+
+  if (b->GetCode())
+    b->GetCode()->Visit(v);
+
+  if (b->GetCondition())
+    v.OnConditionPop();
+}
+
+void VisitAll(const ControlFlowGraph *cf, StatementNode::Visitor &v) {
+  for (u32 i = 0; i != cf->GetNumBlocks(); ++i) {
+    const Block *b = cf->GetBlock(i);
+    VisitAll(b, v);
+  }
+}
+
+Shader::~Shader() {
+  if (controlFlow) {
+    controlFlow->~ControlFlowGraph();
+  }
+}
+
+Shader* Shader::DecompileMicroCode(const void *code, const u32 codeLength, eShaderType shaderType) {
+  ControlFlowGraph *cf = ControlFlowGraph::DecompileMicroCode(code, codeLength, shaderType);
+  if (!cf)
+    return nullptr;
+  Shader *shader = new Shader();
+  shader->controlFlow = cf;
+
+  GlobalInstructionExtractor instructionExtractor;
+  AllExpressionVisitor vistor{ &instructionExtractor };
+  VisitAll(cf, vistor);
+
+  shader->vertexFetches = std::move(instructionExtractor.vfetch);
+  shader->exports = std::move(instructionExtractor.exports);
+
+  shader->textureFetchSlotMask = 0;
+  for (auto &tfetch : instructionExtractor.tfetch) {
+    // find in existing list
+    bool found = false;
+    for (const auto &usedTexture : shader->usedTextures) {
+      if (usedTexture.slot == tfetch->fetchSlot) {
+        found = true;
+        break;
+      }
+    }
+
+    // New texture
+    if (!found) {
+      TextureRef ref = {};
+      ref.slot = tfetch->fetchSlot;
+      ref.type = tfetch->textureType;
+      shader->usedTextures.push_back(ref);
+      // Merge the fetch slot mask
+      shader->textureFetchSlotMask |= (1 << ref.slot);
+    }
+  }
+  // Extract used registers
+  shader->usedRegisters.reserve(instructionExtractor.usedRegisters.size());
+  for (const u32 reg : instructionExtractor.usedRegisters)
+    shader->usedRegisters.push_back(reg);
+  std::sort(shader->usedRegisters.begin(), shader->usedRegisters.end());
+  // Scan exports
+  shader->numUsedInterpolators = 0;
+  for (const auto &exp : shader->exports) {
+    const s32 index = exp->GetExportInterpolatorIndex(exp->GetExportReg());
+    if (index >= 0) {
+      shader->numUsedInterpolators = std::max(static_cast<u32>(index + 1), shader->numUsedInterpolators);
+    }
+  }
+  return shader;
+}
+
+void Shader::EmitShaderCode(AST::ShaderCodeWriterBase &writer) const {
+  controlFlow->EmitShaderCode(writer);
+}
+
 
 } // namespace Xe::Microcode

@@ -703,13 +703,10 @@ std::vector<u32> LoadShader(eShaderType shaderType, const std::vector<u32> &data
     }
     file.close();
   }*/
-  Microcode::AST::ShaderCodeWriterSirit writer{ shaderType };
-  Microcode::AST::ControlFlowGraph *cf = Microcode::AST::ControlFlowGraph::DecompileMicroCode(reinterpret_cast<const u8*>(data.data()), data.size() * 4, shaderType);
-  if (cf) {
-    GlobalInstructionExtractor instructionExtractor;
-    AllExpressionVisitor vistor(&instructionExtractor);
-    VisitAll(cf, vistor);
-    cf->EmitShaderCode(writer);
+  Microcode::AST::Shader *shader = Microcode::AST::Shader::DecompileMicroCode(reinterpret_cast<const u8*>(data.data()), data.size() * 4, shaderType);
+  Microcode::AST::ShaderCodeWriterSirit writer{ shaderType, shader };
+  if (shader) {
+    shader->EmitShaderCode(writer);
   }
   code = writer.module.Assemble();
   std::ofstream f{ shaderPath / (baseString + ".spv"), std::ios::out | std::ios::binary };

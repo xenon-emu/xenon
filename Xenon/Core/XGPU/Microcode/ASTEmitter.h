@@ -80,9 +80,11 @@ public:
   instr_dimension_t type;
 };
 
+class Shader;
+
 class ShaderCodeWriterSirit : public ShaderCodeWriterBase {
 public:
-  ShaderCodeWriterSirit(eShaderType shaderType);
+  ShaderCodeWriterSirit(eShaderType shaderType, Shader *shader);
 
   void BeginMain() override;
 
@@ -102,6 +104,8 @@ public:
   Chunk Not(ExpressionNode *value) override;
   Chunk Saturate(ExpressionNode *value) override;
   Chunk Swizzle(ExpressionNode *value, std::array<eSwizzle, 4> swizzle) override;
+
+  Sirit::Id GetSampledImageType(instr_dimension_t dim);
 
   Chunk FetchVertex(const Chunk &src, const VertexFetch &instr) override;
   Chunk FetchTexture(const Chunk &src, const TextureFetch &instr) override;
@@ -150,6 +154,8 @@ public:
 
   eShaderType type{};
 
+  std::unordered_map<u32, Sirit::Id> texture_vars{};
+
   std::unordered_map<u32, Sirit::Id> vertex_input_vars{};
   std::unordered_set<eExportReg> used_exports{};
   std::unordered_map<std::string, Sirit::Id> input_vars{};
@@ -158,7 +164,6 @@ public:
   Sirit::Id main_func = { 0 };
   Sirit::Id main_label = { 0 };
 
-  std::vector<TextureInfo> textures{};
   Sirit::Module module{ 0x00010000 };
 private:
   Sirit::Id gpr_var = { 0 };
