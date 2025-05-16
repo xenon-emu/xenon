@@ -187,9 +187,9 @@ s32 main(s32 argc, char *argv[]) {
   if (crcHash == 0) {
     // Vertex: 0xA9F9365A
     // Pixel: 0x93F4ACA8
-    crcHash = 0xA9F9365A;
+    crcHash = 0x2F4DC4B6;
   }
   Xe::Microcode::Run(crcHash);
-  Xe::Microcode::Run(0x93F4ACA8);
+  //Xe::Microcode::Run(0x93F4ACA8);
   return 0;
 }

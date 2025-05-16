@@ -150,6 +150,7 @@ public:
 
   eShaderType type{};
 
+  std::unordered_map<u32, Sirit::Id> vertex_input_vars{};
   std::unordered_set<eExportReg> used_exports{};
   std::unordered_map<std::string, Sirit::Id> input_vars{};
   std::unordered_map<eExportReg, Sirit::Id> output_vars{};

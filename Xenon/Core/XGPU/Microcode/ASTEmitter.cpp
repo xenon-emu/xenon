@@ -354,9 +354,23 @@ Chunk ShaderCodeWriterSirit::FetchTexture(const Chunk &src, const TextureFetch &
 
 Chunk ShaderCodeWriterSirit::FetchVertex(const Chunk &src, const VertexFetch &instr) {
   const u32 slot = instr.fetchSlot;
-  Sirit::Id coord = src.id;
-  LOG_DEBUG(Xenos, "[AST::Sirit] FetchVertex({}, {})", coord.value, slot);
-  return {};
+  const u32 location = slot;
+
+  if (!vertex_input_vars.contains(slot)) {
+    Sirit::Id vec4_type = module.TypeVector(module.TypeFloat(32), 4);
+    Sirit::Id vec4_ptr_input = module.TypePointer(spv::StorageClass::Input, vec4_type);
+    Sirit::Id input_var = module.AddGlobalVariable(vec4_ptr_input, spv::StorageClass::Input);
+    module.Decorate(input_var, spv::Decoration::Location, location);
+
+    vertex_input_vars[slot] = input_var;
+  }
+
+  Sirit::Id var = vertex_input_vars[slot];
+  Sirit::Id val = module.OpLoad(module.TypeVector(module.TypeFloat(32), 4), var);
+
+  // TODO: Apply format decoding here based on instr.format, isFloat, isSigned, isNormalized, etc.
+
+  return Chunk(val, var);
 }
 
 Chunk ShaderCodeWriterSirit::VectorFunc1(instr_vector_opc_t instr, ExpressionNode *arg1) {
