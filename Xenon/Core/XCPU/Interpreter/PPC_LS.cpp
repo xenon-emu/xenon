@@ -626,7 +626,9 @@ void PPCInterpreter::PPCInterpreter_stvrx(PPU_STATE* ppuState) {
   EA &= ~0xF;
 
   auto bytes = VRi(vs).bytes;
-  MMUWrite(CPUContext, ppuState, bytes.data() + (bytes.size() - eb), EA - eb, eb);
+  for (s32 i = (bytes.size() - 1); i > (bytes.size() - 1) - eb; i--) {
+    MMUWrite8(ppuState, (EA - bytes.size()) + i, bytes[i]);
+  }
 }
 
 // Store Vector Left Indexed
