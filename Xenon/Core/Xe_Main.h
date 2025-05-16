@@ -31,6 +31,7 @@
 #include "Core/XGPU/XGPU.h"
 
 #include "Render/OGLRenderer.h"
+#include "Render/DummyRenderer.h"
 
 // Global thread state
 inline std::atomic<bool> XeRunning{ true };

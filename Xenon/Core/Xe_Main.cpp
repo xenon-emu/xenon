@@ -15,7 +15,17 @@ XeMain::XeMain() {
   createPCIDevices();
   addPCIDevices();
 #ifndef NO_GFX
-  renderer = std::make_unique<Render::OGLRenderer>(ram.get(), createWindow());
+  switch (Base::JoaatStringHash(Config::rendering.backend, false)) {
+  case "OpenGL"_j:
+    renderer = std::make_unique<Render::OGLRenderer>(ram.get(), createWindow());
+    break;
+  case "Dummy"_j:
+    renderer = std::make_unique<Render::DummyRenderer>(ram.get(), createWindow());
+    break;
+  default:
+    LOG_ERROR(Render, "Invalid renderer backend: {}", Config::rendering.backend);
+    break;
+  }
 #endif
   xenos = std::make_unique<STRIP_UNIQUE(xenos)>(renderer.get(), ram.get(), pciBridge.get());
   createHostBridge();
