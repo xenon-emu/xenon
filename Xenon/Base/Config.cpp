@@ -2,6 +2,7 @@
 
 #include "Config.h"
 #include "Path_util.h"
+#include "String_util.h"
 
 #include "Logging/Log.h"
 
@@ -204,6 +205,8 @@ void _smc::from_toml(const toml::value &value) {
 #endif
   socketIp = toml::find_or<std::string>(value, "SocketIP", socketIp);
   socketPort = toml::find_or<u16&>(value, "SocketPort", socketPort);
+  // Ensure it's lowercase
+  uartSystem = Base::ToLower(uartSystem);
 }
 void _smc::to_toml(toml::value &value) {
   value["AvPackType"].comments().clear();
@@ -372,6 +375,8 @@ void _log::from_toml(const toml::value &value) {
 #ifdef DEBUG_BUILD
   debugOnly = toml::find_or<bool>(value, "EnableDebugOnly", debugOnly);
 #endif
+  // Ensure it's lowercase
+  type = Base::ToLower(type);
 }
 void _log::to_toml(toml::value &value) {
   value["Level"].comments().clear();
@@ -379,7 +384,7 @@ void _log::to_toml(toml::value &value) {
   value["Level"].comments().push_back("# Controls the current output filter level");
   value["Level"].comments().push_back("# 0: Trace | 1: Debug | 2: Info | 3: Warning | 4: Error | 5: Critical | 6: Guest | 7: Count");
   value["Type"].comments().clear();
-  value["Type"] = type;
+  value["Type"] = Base::ToLower(type);
   value["Type"].comments().push_back("# Determines how log is handled");
   value["Type"].comments().push_back("# Types:");
   value["Type"].comments().push_back("# async - (Recommended) Pushes to a queue and handles in a different thread");

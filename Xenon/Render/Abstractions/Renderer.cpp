@@ -356,9 +356,7 @@ void Renderer::Thread() {
       LOG_DEBUG(Xenos, "Created buffer '{}', size: {}", job.name, job.data.size());
     }
 
-    // Framebuffer pointer from main memory
-    fbPointer = ramPointer->getPointerToAddress(Xe_Main->xenos->GetSurface());
-
+    // Handle issue copy (OpenGL things, needs to be in the same thread)
     if (!copyQueue.empty()) {
       auto job = copyQueue.front();
       IssueCopy(job);
@@ -369,7 +367,9 @@ void Renderer::Thread() {
     Clear();
 
     // Upload buffer
-    if (fbPointer && Xe_Main.get() && !Xe_Main->renderHalt) {
+    if (Xe_Main.get() && !Xe_Main->renderHalt) {
+      // Framebuffer pointer from main memory
+      fbPointer = ramPointer->getPointerToAddress(Xe_Main->xenos->GetSurface());
       if (Xe_Main->xenos->RenderingTo2DFramebuffer()) {
         // Profile
         MICROPROFILE_SCOPEI("[Xe::Render]", "Deswizle", MP_AUTO);

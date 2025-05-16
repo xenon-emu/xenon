@@ -220,7 +220,7 @@ struct SMC_CORE_STATE {
   u8 fifoBufferPos = 0;
 
   // UART system
-  std::string currentUARTSytem = {};
+  u32 currentUARTSystem = {};
   // vCOM Port
   std::string currentCOMPort = {};
   // Socket IP

@@ -275,7 +275,7 @@ void XeMain::createSMCState() {
   MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "SMCState", MP_AUTO);
   // Initialize several settings from the struct.
   smcCoreState = std::make_unique<STRIP_UNIQUE(smcCoreState)>();
-  smcCoreState->currentUARTSytem = Config::smc.uartSystem;
+  smcCoreState->currentUARTSystem = Base::JoaatStringHash(Config::smc.uartSystem);
 #ifdef _WIN32
   smcCoreState->currentCOMPort = Config::smc.COMPort();
 #endif

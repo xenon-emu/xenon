@@ -7,6 +7,7 @@
 #include <map>
 
 #include "Base/Bounded_threadsafe_queue.h"
+#include "Base/Hash.h"
 #include "Base/io_file.h"
 #include "Base/Path_util.h"
 #include "Base/String_util.h"
@@ -58,7 +59,7 @@ private:
 // Backend that writes to a file passed into the constructor
 class FileBackend : public BaseBackend {
 public:
-  explicit FileBackend(const std::filesystem::path &filename)
+  explicit FileBackend(const fs::path &filename)
     : file(filename, FS::FileAccessMode::Write, FS::FileMode::TextMode)
   {}
 
@@ -169,10 +170,9 @@ public:
       .filename = filename,
       .lineNum = lineNum,
       .function = function,
-      .message = std::move(message),
+      .message = message,
     };
-    messageQueue.EmplaceWait(entry);
-    if (ToLower(Config::log.type) == "async") {
+    if (Base::JoaatStringHash(Config::log.type) == "async"_j) {
       messageQueue.EmplaceWait(entry);
     } else {
       ForEachBackend([&entry](BaseBackend* backend) { if (backend) { backend->Write(entry); } });
@@ -193,9 +193,9 @@ public:
       .timestamp = duration_cast<microseconds>(steady_clock::now() - timeOrigin),
       .logClass = logClass,
       .logLevel = logLevel,
-      .message = std::move(message),
+      .message = message,
     };
-    if (Config::log.type == "async") {
+    if (Base::JoaatStringHash(Config::log.type) == "async"_j) {
       messageQueue.EmplaceWait(entry);
     } else {
       ForEachBackend([&entry](BaseBackend* backend) { if (backend) { backend->Write(entry); } });
@@ -204,7 +204,7 @@ public:
   }
 
 private:
-  Impl(const std::filesystem::path &fileBackendFilename, const Filter &filter) :
+  Impl(const fs::path &fileBackendFilename, const Filter &filter) :
     filter(filter) {
 #ifdef _WIN32
     HANDLE conOut = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -267,7 +267,7 @@ private:
     delete ptr;
   }
 
-  static inline std::unique_ptr<Impl, decltype(&Deleter)> instance{nullptr, Deleter};
+  static inline std::unique_ptr<Impl, decltype(&Deleter)> instance{ nullptr, Deleter };
 
   Filter filter;
   std::unique_ptr<ColorConsoleBackend> colorConsoleBackend = {};
@@ -278,9 +278,9 @@ private:
   std::jthread backendThread;
 };
 
-std::vector<std::filesystem::path> filepaths{};
+std::vector<fs::path> filepaths{};
 
-void DeleteOldLogs(const std::filesystem::path& path, u64 num_logs, const u16 logLimit) {
+void DeleteOldLogs(const fs::path& path, u64 num_logs, const u16 logLimit) {
   const std::string filename = path.filename().string();
   const std::chrono::time_point Now = std::chrono::system_clock::now();
   const time_t timeNow = std::chrono::system_clock::to_time_t(Now);
@@ -288,7 +288,7 @@ void DeleteOldLogs(const std::filesystem::path& path, u64 num_logs, const u16 lo
   // We want to get rid of anything that isn't that current day's date
   const std::string currentDate = fmt::format("{}-{}-{}", time->tm_mon + 1, time->tm_mday, 1900 + time->tm_year);
   if (filename.find(currentDate) == std::string::npos) {
-    std::filesystem::remove_all(path);
+    fs::remove_all(path);
     return;
   }
   // We want to delete in date of creation, so just add it to a array
@@ -318,13 +318,13 @@ u64 CreateIntegralTimestamp(const std::string &date) {
   return std::stoull(timestamp);
 }
 
-void CleanupOldLogs(const std::string_view &logFileBase, const std::filesystem::path &logDir, const u16 logLimit) {
-  const std::filesystem::path LogFile = logFileBase;
+void CleanupOldLogs(const std::string_view &logFileBase, const fs::path &logDir, const u16 logLimit) {
+  const fs::path LogFile = logFileBase;
   // Track how many logs we have
   size_t numLogs = 0;
-  for (auto &entry : std::filesystem::directory_iterator(logDir)) {
+  for (auto &entry : fs::directory_iterator(logDir)) {
     if (entry.is_regular_file()) {
-      const std::filesystem::path path = entry.path();
+      const fs::path path = entry.path();
       const std::string ext = path.extension().string();
       if (!path.has_extension()) {
         // Skip anything that isn't a log file
@@ -345,14 +345,14 @@ void CleanupOldLogs(const std::string_view &logFileBase, const std::filesystem::
     return;
   }
   u64 numToDelete{ logLimit };
-  std::map<u64, std::filesystem::path> date_sorted_paths{};
+  std::map<u64, fs::path> date_sorted_paths{};
   for (const auto &path : filepaths) {
     const std::string stem = path.stem().string();
     u64 basePos = stem.find('_');
     // If we cannot get the base, just delete it
     if (basePos == std::string::npos) {
       numToDelete--;
-      std::filesystem::remove_all(path);
+      fs::remove_all(path);
     } else {
       const std::string base = stem.substr(0, basePos);
       const u64 datePos = base.find('_', basePos+1);
@@ -361,14 +361,14 @@ void CleanupOldLogs(const std::string_view &logFileBase, const std::filesystem::
       if (datePos == std::string::npos) {
         // If we cannot find the date, just delete it
         numToDelete--;
-        std::filesystem::remove_all(path);
+        fs::remove_all(path);
       } else {
         const u64 timePos = base.find('_', datePos+1);
         const std::string time = base.substr(timePos+1);
         const u64 timestamp = CreateIntegralTimestamp(time);
         if (!timestamp) {
           numToDelete--;
-          std::filesystem::remove_all(path);
+          fs::remove_all(path);
           continue;
         }
         date_sorted_paths.insert({ dateInt + timestamp, path });
@@ -377,16 +377,16 @@ void CleanupOldLogs(const std::string_view &logFileBase, const std::filesystem::
   }
   // Start deleting based off timestamp
   for (const auto &entry : date_sorted_paths) {
-    std::filesystem::remove_all(entry.second);
+    fs::remove_all(entry.second);
   }
 }
 
 void Initialize(const std::string_view &logFile) {
-  // Create directory vars to so we can use std::filesystem::path::stem
-  const std::filesystem::path LogDir = GetUserPath(PathType::LogDir);
-  const std::filesystem::path LogFile = LOG_FILE;
-  const std::filesystem::path LogFileStem = LogFile.stem();
-  const std::filesystem::path LogFileName = LogFile.filename();
+  // Create directory vars to so we can use fs::path::stem
+  const fs::path LogDir = GetUserPath(PathType::LogDir);
+  const fs::path LogFile = LOG_FILE;
+  const fs::path LogFileStem = LogFile.stem();
+  const fs::path LogFileName = LogFile.filename();
   // This is to make string_view happy
   const std::string LogFileStemStr = LogFileStem.string();
   const std::string LogFileNameStr = LogFileName.string();

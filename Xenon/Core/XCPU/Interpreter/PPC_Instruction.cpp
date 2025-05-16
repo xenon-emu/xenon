@@ -105,7 +105,7 @@ namespace PPCInterpreter {
     u32 decodedInstr = PPCDecode(instr);
     std::string baseName = ppcDecoder.getNameTable()[decodedInstr];
 
-    switch (Base::joaatStringHash(baseName)) {
+    switch (Base::JoaatStringHash(baseName)) {
     case "cmpi"_j: {
       return op.l10 ? "cmpdi" : "cmpwi";
     } break;

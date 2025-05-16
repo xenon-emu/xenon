@@ -10,7 +10,7 @@ inline constexpr char jTolower(char const c) {
   return (c >= 'A' && c <= 'Z') ? c + ('a' - 'A') : c;
 }
 
-inline constexpr u32 joaatStringHash(const std::string_view string, bool const forceLowercase = true) {
+inline constexpr u32 JoaatStringHash(const std::string_view string, bool const forceLowercase = true) {
   u32 hash = 0;
 
   const char *str = string.data();
@@ -27,7 +27,7 @@ inline constexpr u32 joaatStringHash(const std::string_view string, bool const f
   return hash;
 }
 
-inline constexpr u32 joaatDataHash(const char *data, size_t size, const u32 initValue) {
+inline constexpr u32 JoaatDataHash(const char *data, size_t size, const u32 initValue) {
   u32 key = initValue;
   
   for (size_t i = 0; i != size; ++i) {
@@ -45,5 +45,9 @@ inline constexpr u32 joaatDataHash(const char *data, size_t size, const u32 init
 } // namespace Base
 
 inline consteval u32 operator ""_j(const char *data, size_t size) {
-  return Base::joaatDataHash(data, size, 0);
+  return Base::JoaatDataHash(data, size, 0);
+}
+
+inline consteval u32 operator ""_jLower(const char *data, size_t size) {
+  return Base::JoaatStringHash(data);
 }

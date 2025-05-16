@@ -53,7 +53,7 @@ std::shared_ptr<Shader> OGLShaderFactory::LoadFromBinary(const std::string &name
 }
 
 eShaderType GetShaderType(const std::string &line) {
-  switch (Base::joaatStringHash(line)) {
+  switch (Base::JoaatStringHash(line)) {
   case "#vertex"_j: return eShaderType::Vertex;
   case "#fragment"_j: return eShaderType::Fragment;
   case "#compute"_j: return eShaderType::Compute;

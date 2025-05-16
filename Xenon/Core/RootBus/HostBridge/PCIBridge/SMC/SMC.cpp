@@ -82,7 +82,7 @@ Xe::PCIDev::SMC::SMC(const std::string &deviceName, u64 size,
   pciDevSizes[0] = 0x100; // BAR0
 
   // Create UART handle
-  bool socket = smcCoreState->currentUARTSytem == "vcom" ? false : true;
+  bool socket = smcCoreState->currentUARTSystem == "vcom"_j ? false : true;
   if (socket) {
     smcCoreState->uartHandle = std::make_unique<HW_UART_SOCK>();
   }
@@ -328,12 +328,12 @@ void Xe::PCIDev::SMC::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
 // Setups the UART Communication at a given configuration.
 void Xe::PCIDev::SMC::setupUART(u32 uartConfig) {
   LOG_INFO(UART, "Initializing...");
-  bool socket = smcCoreState->currentUARTSytem == "vcom" ? false : true;
+  bool socket = smcCoreState->currentUARTSystem == "vcom"_j ? false : true;
   if (socket) {
     HW_UART_SOCK_CONFIG *config = new HW_UART_SOCK_CONFIG();
     strncpy(config->ip, smcCoreState->socketIp.c_str(), sizeof(config->ip));
     config->port = smcCoreState->socketPort;
-    config->usePrint = smcCoreState->currentUARTSytem == "print";
+    config->usePrint = smcCoreState->currentUARTSystem == "print"_j;
     smcCoreState->uartHandle->Init(config);
   } else {
 #ifdef _WIN32
