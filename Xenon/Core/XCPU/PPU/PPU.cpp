@@ -389,34 +389,37 @@ void PPU::ThreadLoop() {
     if (!ppuThreadActive)
       break;
 
+    // Check if we are allowed to enable thread zero if the thread is sleeping...
+    bool WEXT = (ppuState->SPR.TSCR & 0x100000) >> 20;
+
     // Check for external interrupts that enable execution
-    if (ppuThreadActive && xenonContext->xenonIIC.checkExtInterrupt(curThread.SPR.PIR)) {
-      // Check if we should actually enable the thread or not
-      bool WEXT = (ppuState->SPR.TSCR & 0x100000) >> 20;
-      if (!WEXT) {
+    if (ppuThreadActive && !ppuThreadResetting && (ppuThreadState.load() == eThreadState::Halted 
+      || ppuThreadState.load() == eThreadState::Sleeping) && WEXT) {
+      
+      // Check for an external interrupt that enables execution.
+      if (!xenonContext->xenonIIC.checkExtInterrupt(curThread.SPR.PIR)) {
         continue;
       }
 
-      if ((!ppuThreadResetting && ppuThreadState.load() == eThreadState::Halted) || ppuThreadState.load() == eThreadState::Sleeping) {
-        LOG_DEBUG(Xenon, "{} was previously halted or sleeping, bringing online", ppuState->ppuName);
-        ppuThreadState.store(eThreadState::Running);
-        // Enable thread 0 execution
-        ppuState->SPR.CTRL = 0x800000;
+      // Proceed.
+      LOG_DEBUG(Xenon, "{} was previously halted or sleeping, bringing online", ppuState->ppuName);
+      ppuThreadState.store(eThreadState::Running);
+      // Enable thread 0 execution
+      ppuState->SPR.CTRL = 0x800000;
 
-        // Issue reset
-        ppuState->ppuThread[ePPUThread_Zero].exceptReg |= PPU_EX_RESET;
-        ppuState->ppuThread[ePPUThread_One].exceptReg |= PPU_EX_RESET;
+      // Issue reset
+      ppuState->ppuThread[ePPUThread_Zero].exceptReg |= PPU_EX_RESET;
+      ppuState->ppuThread[ePPUThread_One].exceptReg |= PPU_EX_RESET;
 
-        PPU_THREAD_REGISTERS& thread = curThread;
+      PPU_THREAD_REGISTERS& thread = curThread;
 
-        thread.SPR.SRR1 = 0x200000; // Set SRR1[42:44] = 100
+      thread.SPR.SRR1 = 0x200000; // Set SRR1[42:44] = 100
 
-        // ACK and EOI the interrupt
-        u64 intData = 0;
-        xenonContext->xenonIIC.readInterrupt(thread.SPR.PIR * 0x1000 + 0x50050, reinterpret_cast<u8*>(&intData), sizeof(intData));
-        intData = 0;
-        xenonContext->xenonIIC.writeInterrupt(thread.SPR.PIR * 0x1000 + 0x50060, reinterpret_cast<u8*>(&intData), sizeof(intData));
-      }
+      // ACK and EOI the interrupt
+      u64 intData = 0;
+      xenonContext->xenonIIC.readInterrupt(thread.SPR.PIR * 0x1000 + 0x50050, reinterpret_cast<u8*>(&intData), sizeof(intData));
+      intData = 0;
+      xenonContext->xenonIIC.writeInterrupt(thread.SPR.PIR * 0x1000 + 0x50060, reinterpret_cast<u8*>(&intData), sizeof(intData));
     }
   }
   // Thread is done executing, just tell it to exit
