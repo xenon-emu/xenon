@@ -15,10 +15,13 @@ void HW_UART_SOCK::uartMainThread() {
     std::unique_lock<std::mutex> lock(uartMutex);
     if (!uartTxBuffer.empty()) {
       char c = uartTxBuffer.front();
-      if (socketCreated)
+      if (socketCreated) {
         send(sockHandle, &c, 1, 0);
-      else
-        fmt::print("{}", c);
+      }
+      else {
+        if (c != -1 && c != '\0')
+          printf("%c", c);
+      }
       uartTxBuffer.pop();
     }
     lock.unlock();
