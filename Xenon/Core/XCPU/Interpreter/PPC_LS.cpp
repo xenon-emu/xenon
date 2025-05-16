@@ -494,6 +494,25 @@ void PPCInterpreter::PPCInterpreter_stfsu(PPU_STATE* ppuState) {
   GPRi(ra) = EA;
 }
 
+// Store Floating-Point Single with Update Indexed
+void PPCInterpreter::PPCInterpreter_stfsux(PPU_STATE* ppuState) {
+  /*
+  EA <- (rA) + (rB)
+  MEM(EA, 4) <-  SINGLE(frS)
+  rA <-  EA
+  */
+
+  CHECK_FPU;
+
+  const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
+  MMUWrite32(ppuState, EA, static_cast<f32>(FPRi(frs).valueAsDouble));
+  
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  GPRi(ra) = EA;
+}
+
 // Store Floating-Point Single Indexed (x'7C00 052E')
 void PPCInterpreter::PPCInterpreter_stfsx(PPU_STATE *ppuState) {
   /*
