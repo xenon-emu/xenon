@@ -14,7 +14,7 @@ std::string FormatLogMessage(const Entry &entry) {
   const char *className = GetLogClassName(entry.logClass);
   const char *levelName = GetLevelName(entry.logLevel);
 
-  if (Config::log.advanced) {
+  if (Config::log.advanced && entry.filename) {
     return fmt::format("[{}] <{}> {}:{}:{}: {}", className, levelName, entry.filename,
       entry.function, entry.lineNum, entry.message);
   } else {
