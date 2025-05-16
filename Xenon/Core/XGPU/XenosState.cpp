@@ -380,7 +380,7 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
       // Writeback
       const u32 memAddr = scratchAddr + (scratchRegIndex * 4);
       u8 *memPtr = ramPtr->getPointerToAddress(memAddr);
-      memcpy(memPtr, &tmp, sizeof(tmp));
+      memcpy(memPtr, &value, sizeof(value));
     }
   } break;
   case XeRegister::MH_STATUS:
