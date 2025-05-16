@@ -934,17 +934,6 @@ bool CommandProcessor::ExecutePacketType3_WAIT_REG_MEM(RingBuffer *ringBuffer, u
       memcpy(&value, addrPtr, sizeof(value));
     } else {
       value = state->ReadRegister(pollReg);
-      if (pollReg == XeRegister::COHER_STATUS_HOST) {
-        const u32 statusHost = state->ReadRegister(XeRegister::COHER_STATUS_HOST);
-        const u32 baseHost = state->ReadRegister(XeRegister::COHER_BASE_HOST);
-        const u32 sizeHost = state->ReadRegister(XeRegister::COHER_SIZE_HOST);
-        if ((statusHost & 0x80000000ul)) {
-          const u32 newStatusHost = statusHost & ~0x80000000ul;
-          state->WriteRegister(XeRegister::COHER_STATUS_HOST, newStatusHost);
-          state->ClearDirtyState();
-        }
-        value = state->ReadRegister(pollReg);
-      }
     }
     switch (waitInfo & 0x7) {
     case 0: // Never

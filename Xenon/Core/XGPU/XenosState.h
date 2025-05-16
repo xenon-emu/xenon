@@ -92,10 +92,10 @@ public:
   u32 scratchMask = 0;
   u32 scratchAddr = 0;
 
-  // EDRAM
-  EDRAM *edram = nullptr;
-  u32 edramTiming = 0;
-  u32 edramInfo = 0;
+  /*
+        const u32 statusHost = state->ReadRegister(XeRegister::COHER_STATUS_HOST);
+        const u32 baseHost = state->ReadRegister(XeRegister::COHER_BASE_HOST);
+        const u32 sizeHost = state->ReadRegister(XeRegister::COHER_SIZE_HOST);*/
 
   // RBBM
   u32 rbbmControl = 0;
@@ -155,6 +155,16 @@ public:
 
   // MH
   u32 mhStatus = 0;
+
+  // Coherency
+  u32 coherencySizeHost = 0;
+  u32 coherencyBaseHost = 0;
+  u32 coherencyStatusHost = 0;
+
+  // EDRAM
+  EDRAM *edram = nullptr;
+  u32 edramTiming = 0;
+  u32 edramInfo = 0;
 
   // DC
   u32 dcLutAutofill = 0x2000000;

@@ -91,6 +91,20 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
     }
     value = mhStatus;
     break;
+  case XeRegister::COHER_STATUS_HOST:
+    if ((coherencyStatusHost & 0x80000000ul)) {
+      coherencyStatusHost &= ~0x80000000ul;
+      LOG_DEBUG(Xenos, "[Xe] Flushing 0x{:X} with a size of 0x{:X}", coherencyBaseHost, coherencySizeHost);
+      ClearDirtyState();
+    }
+    value = coherencyStatusHost;
+    break;
+  case XeRegister::COHER_SIZE_HOST:
+    value = coherencySizeHost;
+    break;
+  case XeRegister::COHER_BASE_HOST:
+    value = coherencyBaseHost;
+    break;
   case XeRegister::RB_EDRAM_TIMING:
     value = edramTiming;
     break;
@@ -319,8 +333,28 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
   case XeRegister::SCRATCH_ADDR:
     scratchAddr = value;
     break;
+  case XeRegister::CP_ME_RAM_WADDR:
+    // Software is writing CP Microcode Engine uCode write address.
+    commandProcessor->CPSetMEMicrocodeWriteAddress(value);
+    break;
+  case XeRegister::CP_ME_RAM_RADDR:
+    // Software is writing CP Microcode Engine uCode read address.
+    commandProcessor->CPSetMEMicrocodeReadAddress(value);
+    break;
+  case XeRegister::CP_ME_RAM_DATA:
+    // Software is writing CP Microcode Engine uCode data.
+    commandProcessor->CPWriteMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypeME, value);
+    break;
   case XeRegister::RBBM_DEBUG:
     rbbmDebug = value;
+    break;
+  case XeRegister::CP_PFP_UCODE_ADDR:
+    // Software is writing CP PFP uCode data address.
+    commandProcessor->CPSetPFPMicrocodeAddress(value);
+    break;
+  case XeRegister::CP_PFP_UCODE_DATA:
+    // Software is writing CP PFP uCode data.
+    commandProcessor->CPWriteMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypePFP, value);
     break;
   case XeRegister::SCRATCH_REG0:
   case XeRegister::SCRATCH_REG1:
@@ -348,7 +382,17 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
     value = mhStatus;
     break;
   case XeRegister::COHER_STATUS_HOST:
-    value |= 0x80000000ul;
+    coherencyStatusHost = value;
+    if (!(coherencyStatusHost & 0x80000000ul)) {
+      coherencyStatusHost |= 0x80000000ul;
+    }
+    value = coherencyStatusHost;
+    break;
+  case XeRegister::COHER_SIZE_HOST:
+    coherencySizeHost = value;
+    break;
+  case XeRegister::COHER_BASE_HOST:
+    coherencyBaseHost = value;
     break;
   case XeRegister::RB_EDRAM_TIMING:
     edramTiming = value;
@@ -459,9 +503,6 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
   case XeRegister::RB_BLEND_ALPHA:
     blendAlpha = value;
     break;
-  case XeRegister::PA_CL_VTE_CNTL:
-    viewportControl = value;
-    break;
   case XeRegister::PA_SC_WINDOW_OFFSET:
     windowOffset = value;
     break;
@@ -501,6 +542,9 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
   case XeRegister::RB_TILECONTROL:
     tileControl = value;
     break;
+  case XeRegister::PA_CL_VTE_CNTL:
+    viewportControl = value;
+    break;
   case XeRegister::RB_MODECONTROL:
     modeControl = value;
     break;
@@ -528,9 +572,9 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
   case XeRegister::RB_DEPTH_CLEAR:
     depthClear = value;
     break;
-  case XeRegister::RB_COLOR_CLEAR: {
+  case XeRegister::RB_COLOR_CLEAR:
     clearColor = value;
-  } break;
+    break;
   case XeRegister::RB_COLOR_CLEAR_LO:
     clearColorLo = value;
     break;
@@ -554,26 +598,6 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
   case XeRegister::RB_SIDEBAND_DATA:
     // Software is writing the data of the edram reg previously specified.
     edram->WriteReg(tmp); // NOTE: We want data to not be byteswapped.
-    break;
-  case XeRegister::CP_PFP_UCODE_ADDR:
-    // Software is writing CP PFP uCode data address.
-    commandProcessor->CPSetPFPMicrocodeAddress(value);
-    break;
-  case XeRegister::CP_PFP_UCODE_DATA:
-    // Software is writing CP PFP uCode data.
-    commandProcessor->CPWriteMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypePFP, value);
-    break;
-  case XeRegister::CP_ME_RAM_WADDR:
-    // Software is writing CP Microcode Engine uCode write address.
-    commandProcessor->CPSetMEMicrocodeWriteAddress(value);
-    break;
-  case XeRegister::CP_ME_RAM_RADDR:
-    // Software is writing CP Microcode Engine uCode read address.
-    commandProcessor->CPSetMEMicrocodeReadAddress(value);
-    break;
-  case XeRegister::CP_ME_RAM_DATA:
-    // Software is writing CP Microcode Engine uCode data.
-    commandProcessor->CPWriteMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypeME, value);
     break;
   default:
     // Do nothing here, just continue to write
