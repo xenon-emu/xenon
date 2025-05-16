@@ -557,23 +557,23 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
     break;
   case XeRegister::CP_PFP_UCODE_ADDR:
     // Software is writing CP PFP uCode data address.
-    commandProcessor->CPSetPFPMicrocodeAddress(tmp);
+    commandProcessor->CPSetPFPMicrocodeAddress(value);
     break;
   case XeRegister::CP_PFP_UCODE_DATA:
     // Software is writing CP PFP uCode data.
-    commandProcessor->CPWriteMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypePFP, tmp);
+    commandProcessor->CPWriteMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypePFP, value);
     break;
   case XeRegister::CP_ME_RAM_WADDR:
     // Software is writing CP Microcode Engine uCode write address.
-    commandProcessor->CPSetMEMicrocodeWriteAddress(tmp);
+    commandProcessor->CPSetMEMicrocodeWriteAddress(value);
     break;
   case XeRegister::CP_ME_RAM_RADDR:
     // Software is writing CP Microcode Engine uCode read address.
-    commandProcessor->CPSetMEMicrocodeReadAddress(tmp);
+    commandProcessor->CPSetMEMicrocodeReadAddress(value);
     break;
   case XeRegister::CP_ME_RAM_DATA:
     // Software is writing CP Microcode Engine uCode data.
-    commandProcessor->CPWriteMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypeME, tmp);
+    commandProcessor->CPWriteMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypeME, value);
     break;
   default:
     // Do nothing here, just continue to write
