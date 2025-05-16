@@ -426,8 +426,6 @@ void Renderer::Thread() {
         else {
           Draw(job.params);
         }
-
-        job.state->ClearDirtyState();  // Clear after draw
       }
     }
 

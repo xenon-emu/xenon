@@ -33,7 +33,6 @@ class GUI;
 
 struct DrawJob {
   bool indexed = false;
-  Xe::XGPU::XenosState *state = nullptr;
   Xe::XGPU::XeDrawParams params = {};
   u32 shaderVS = 0;
   u32 shaderPS = 0;
