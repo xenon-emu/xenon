@@ -150,7 +150,7 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
     s64 frame_position = micros % frame_time_us;
 
     bool in_vblank = frame_position < vblank_duration_us;
-    vblankStatus = in_vblank ? 0x1000 : 0x0000;
+    vblankStatus = in_vblank ? 0xFFFFFFFF : 0x00000000;
     value = vblankStatus;
   } break;
   case XeRegister::D1MODE_VBLANK_VLINE_STATUS:
