@@ -24,9 +24,6 @@ namespace Xe::XGPU {
 // Masks for RingBuffer registers.
 #define CP_RB_CNTL_RB_BUFSZ_MASK  0x0000003FL
 
-// Represents a CommandProcessor data packet.
-using CPPacket = u32;
-
 // The Command Processor has 4 types of packets.
 // The type of packet can be extracted from the packet data, as it's the upper 2 bits.
 // So Packet type = CPPacket >> 30.
