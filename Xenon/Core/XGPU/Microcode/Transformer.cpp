@@ -134,9 +134,38 @@ void ShaderNodeWriter::TransformBlock(AST::NodeWriter &nodeWriter, const u32 *wo
     else
       nodeWriter.EmitJump(targetAddr, preamble, condition);
   } break;
+  case LOOP_START: {
+    const instr_cf_loop_t &loop = cf.loop;
+
+    // Compute loop target address
+    u32 targetAddr = loop.address;
+    if (loop.address_mode != ABSOLUTE_ADDR)
+      targetAddr += pc;
+
+    // Optional predicate check
+    AST::Expression condition = {};
+    AST::Statement preamble = {};
+    if (loop.pred_break) {
+      // Conditional loop start
+      const bool pixelShader = (shaderType == eShaderType::Pixel);
+      condition = nodeWriter.EmitBoolConst(pixelShader, loop.condition);
+      preamble = nodeWriter.EmitSetPredicateStatement(condition);
+    }
+    nodeWriter.EmitLoopStart(targetAddr, preamble, condition);
+  } break;
+  case LOOP_END: {
+    const instr_cf_loop_t &loop = cf.loop;
+
+    AST::Expression condition = {};
+    if (loop.pred_break) {
+      condition = nodeWriter.EmitGetPredicate();
+      if (!loop.condition)
+        condition = nodeWriter.EmitNot(condition);
+    }
+
+    nodeWriter.EmitLoopEnd(loop.address, condition);
+  } break;
   case RETURN:
-  case LOOP_START:
-  case LOOP_END:
   case MARK_VS_FETCH_DONE:
     LOG_ERROR(Xenos, "[UCode] Failed to translate block! Unsupported control flow '{}'", cf.opc);
     break;

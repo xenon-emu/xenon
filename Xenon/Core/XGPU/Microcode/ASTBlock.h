@@ -3,6 +3,7 @@
 #pragma once
 
 #include <set>
+#include <stack>
 #include <vector>
 
 #include "Base/Types.h"
@@ -18,6 +19,8 @@ enum class eBlockType : u8 {
   EXEC,
   JUMP,
   CALL,
+  LOOP_BEGIN, // Loop begin
+  LOOP_END, // Loop end
   END, // Shader end
   RET  // Function return
 };
@@ -26,6 +29,7 @@ enum class eBlockType : u8 {
 class Block {
 public:
   Block(u32 address, StatementNode::Ptr preamble, StatementNode::Ptr code, ExpressionNode::Ptr cond);
+  Block(ExpressionNode::Ptr cond, StatementNode::Ptr preamble, u32 target, eBlockType type);
   Block(ExpressionNode::Ptr cond, u32 target, eBlockType type);
   ~Block();
   // JMP/CALL target

@@ -28,7 +28,7 @@ if (msvc)
 elseif(clang AND WIN32)
   add_compile_options($<$<CONFIG:Release>:-Ofast>)
 else()
-  add_compile_options($<$<CONFIG:Release>:WIN32>)
+  add_compile_options($<$<CONFIG:Release>:-O3>)
 endif()
 
 project(Xenon)

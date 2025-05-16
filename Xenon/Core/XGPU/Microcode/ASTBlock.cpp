@@ -18,6 +18,12 @@ Block::Block(u32 address, StatementNode::Ptr preamble, StatementNode::Ptr code, 
   preambleStatement = preamble ? preamble->CloneAs<StatementNode>() : nullptr;
 }
 
+Block::Block(ExpressionNode::Ptr cond, StatementNode::Ptr preamble, u32 target, eBlockType type) :
+  targetAddress(target), type(type) {
+  condition = cond ? cond->CloneAs<ExpressionNode>() : nullptr;
+  preambleStatement = preamble ? preamble->CloneAs<StatementNode>() : nullptr;
+}
+
 Block::Block(ExpressionNode::Ptr cond, u32 target, eBlockType type) :
   targetAddress(target), type(type) {
   condition = cond ? cond->CloneAs<ExpressionNode>() : nullptr;
@@ -122,6 +128,28 @@ ControlFlowGraph* ControlFlowGraph::DecompileMicroCode(const void *code, u32 cod
         functionRoots.insert(target);
       }
     }
+  }
+
+  std::stack<Block*> loopStartStack = {};
+  for (u32 i = 0; i < numBlocks; ++i) {
+    Block* block = graph->blocks[i];
+    if (block->GetType() == eBlockType::LOOP_BEGIN) {
+      loopStartStack.push(block);
+    } else if (block->GetType() == eBlockType::LOOP_END) {
+      if (loopStartStack.empty()) {
+        LOG_ERROR(Render, "[AST::CFG] Unmatched LOOP_END at block {}", i);
+        return nullptr;
+      }
+      Block* start = loopStartStack.top();
+      loopStartStack.pop();
+      block->ConnectTarget(start); // Back-edge
+      start->ConnectTarget(block); // Optional: fallthrough or structural
+    }
+  }
+
+  if (!loopStartStack.empty()) {
+    LOG_ERROR(Render, "[AST::CFG] Unmatched LOOP_START ({} blocks unclosed)", loopStartStack.size());
+    return nullptr;
   }
 
   graph->roots.push_back(graph->blocks[0]);

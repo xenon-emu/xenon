@@ -173,6 +173,25 @@ void NodeWriter::EmitJump(const u32 addr, Statement preamble, Expression conditi
   createdBlocks.push_back(block);
 }
 
+void NodeWriter::EmitLoopStart(const u32 addr, Statement preamble, Expression condition) {
+  Block *block = new Block(
+    condition ? condition.Get<ExpressionNode>() : nullptr,
+    preamble ? preamble.Get<StatementNode>() : nullptr,
+    addr,
+    eBlockType::LOOP_BEGIN
+  );
+  createdBlocks.push_back(block);
+}
+
+void NodeWriter::EmitLoopEnd(const u32 addr, Expression condition) {
+  Block *block = new Block(
+    condition ? condition.Get<ExpressionNode>() : nullptr,
+    addr,
+    eBlockType::LOOP_END
+  );
+  createdBlocks.push_back(block);
+}
+
 void NodeWriter::EmitCall(const u32 addr, Statement preamble, Expression condition) {
   Block *block = new Block(condition.Get<ExpressionNode>(), addr, eBlockType::JUMP);
   createdBlocks.push_back(block);

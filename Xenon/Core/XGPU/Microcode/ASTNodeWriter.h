@@ -157,6 +157,8 @@ public:
   void EmitExec(const u32 addr, instr_cf_opc_t type, Statement preamble, Statement code, Expression condition, const bool endOfShader);
   void EmitJump(const u32 addr, Statement preamble, Expression condition);
   void EmitCall(const u32 addr, Statement preamble, Expression condition);
+  void EmitLoopStart(const u32 addr, Statement preamble, Expression condition);
+  void EmitLoopEnd(const u32 addr, Expression condition);
 
   //
   // Exports
