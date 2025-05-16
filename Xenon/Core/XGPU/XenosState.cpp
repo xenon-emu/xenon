@@ -327,6 +327,15 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
   case XeRegister::RBBM_SOFT_RESET:
     rbbmSoftReset = value;
     break;
+  case XeRegister::CP_RB_BASE:
+    commandProcessor->CPUpdateRBBase(value);
+    break;
+  case XeRegister::CP_RB_CNTL:
+    commandProcessor->CPUpdateRBSize(value);
+    break;
+  case XeRegister::CP_RB_WPTR:
+    commandProcessor->CPUpdateRBWritePointer(value);
+    break;
   case XeRegister::SCRATCH_UMSK:
     scratchMask = value;
     break;
