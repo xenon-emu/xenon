@@ -1099,13 +1099,7 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
     // Get surface info
     const u32 surfaceInfo = state->surfaceInfo;
     const u32 surfacePitch = surfaceInfo & 0x3FFF;
-    // Don't render, pitch is zero
-    if (surfacePitch == 0) {
-      LOG_DEBUG(Xenos, "[CP] Surface Pitch is Zero");
-      return true;
-    } else {
-      LOG_DEBUG(Xenos, "[CP] Surface pitch: {}", surfacePitch);
-    }
+    bool hasRT = surfacePitch != 0;
     // Get surface MSAA
     const eMSAASamples surfaceMSAA = static_cast<eMSAASamples>((surfaceInfo >> 16) & 0x3);
     // Check the state of things
