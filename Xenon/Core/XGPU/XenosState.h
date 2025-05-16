@@ -91,11 +91,7 @@ public:
   // Scratch
   u32 scratchMask = 0;
   u32 scratchAddr = 0;
-
-  /*
-        const u32 statusHost = state->ReadRegister(XeRegister::COHER_STATUS_HOST);
-        const u32 baseHost = state->ReadRegister(XeRegister::COHER_BASE_HOST);
-        const u32 sizeHost = state->ReadRegister(XeRegister::COHER_SIZE_HOST);*/
+  u32 scratch[8] = {};
 
   // RBBM
   u32 rbbmControl = 0;

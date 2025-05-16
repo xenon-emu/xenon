@@ -222,11 +222,11 @@ bool CommandProcessor::ExecutePacketType0(RingBuffer *ringBuffer, u32 packetData
 
   for (u64 idx = 0; idx < regCount; idx++) {
     // Get the data to be written to the (internal) Register.
-    u32 registerData = ringBuffer->ReadAndSwap<u32>();
+    u32 registerData = ringBuffer->Read<u32>();
     // Target register index.
     u32 targetRegIndex = singleRegWrite ? baseIndex : baseIndex + idx;
-    LOG_DEBUG(Xenos, "CP[ExecutePacketType0]: Writing to 0x{:X}, data 0x{:X}", targetRegIndex, registerData);
-    state->WriteRegister(static_cast<XeRegister>(targetRegIndex), registerData);  
+    LOG_DEBUG(Xenos, "CP[ExecutePacketType0]: Writing to {} (0x{:X}), data 0x{:X}", Xe::XGPU::GetRegisterNameById(targetRegIndex), targetRegIndex, registerData);
+    state->WriteRegister(static_cast<XeRegister>(targetRegIndex), registerData);
   }
 
   return true;
@@ -238,8 +238,8 @@ bool CommandProcessor::ExecutePacketType1(Xe::XGPU::RingBuffer *ringBuffer, u32 
   const u32 regIndex0 = packetData & 0x7FF;
   const u32 regIndex1 = (packetData >> 11) & 0x7FF;
   // Get both registers data.
-  const u32 reg0Data = ringBuffer->ReadAndSwap<u32>();
-  const u32 reg1Data = ringBuffer->ReadAndSwap<u32>();
+  const u32 reg0Data = ringBuffer->Read<u32>();
+  const u32 reg1Data = ringBuffer->Read<u32>();
   // Do the write.
   LOG_TRACE(Xenos, "CP[ExecutePacketType1]: Writing register at index 0x{:X}, data 0x{:X}", regIndex0, reg0Data);
   LOG_TRACE(Xenos, "CP[ExecutePacketType1]: Writing register at index 0x{:X}, data 0x{:X}", regIndex1, reg1Data);
@@ -284,7 +284,7 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
 
   bool result = false;
 
-  LOG_TRACE(Xenos, "CP[ExecutePacketType3]: Executing OpCode {}", GetPM4Opcode(static_cast<u8>(currentOpCode)));
+  LOG_TRACE(Xenos, "CP[ExecutePacketType3]: Executing {}", GetPM4Opcode(static_cast<u8>(currentOpCode)));
 
   // PM4 Commands execution, basically the heart of the command processor.
 
@@ -1100,14 +1100,14 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
     const u32 surfaceInfo = state->surfaceInfo;
     const u32 surfacePitch = surfaceInfo & 0x3FFF;
     bool hasRT = surfacePitch != 0;
+    if (!hasRT) {
+      LOG_DEBUG(Xenos, "[CP] No render target");
+      return true;
+    }
     // Get surface MSAA
     const eMSAASamples surfaceMSAA = static_cast<eMSAASamples>((surfaceInfo >> 16) & 0x3);
     // Check the state of things
-    if (modeControl == eModeControl::Ignore) {
-      LOG_DEBUG(Xenos, "[CP] ModeControl is telling us to ignore this draw");
-      // Well, we were told to ignore!
-      return true;
-    } else if (modeControl == eModeControl::Copy) {
+    if (modeControl == eModeControl::Copy) {
       // Copy to eDRAM, and clear if needed
       render->IssueCopy(state);
       return true;
