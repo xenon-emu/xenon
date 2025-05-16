@@ -62,14 +62,17 @@ public:
   }
 
   void ClearDirtyState() {
+    std::lock_guard lck(mutex);
     memset(RegMask, 0, sizeof(RegMask));
   }
 
   void SetDirtyState() {
+    std::lock_guard lck(mutex);
     memset(RegMask, 0xFF, sizeof(RegMask));
   }
 
   u64 GetDirtyBlock(const u32 firstIndex) {
+    std::lock_guard lck(mutex);
     return RegMask[firstIndex / BitCount];
   }
 
@@ -128,6 +131,16 @@ public:
   u32 copyFunction = 0;
   u32 copyReference = 0;
   u32 copyMask = 0;
+
+  // VGT
+  u32 maxVertexIndex = 0;
+  u32 minVertexIndex = 0;
+  u32 indexOffset = 0;
+  u32 multiPrimitiveIndexBufferResetIndex = 0;
+  u32 currentBinIdMin = 0;
+
+  VGT_DRAW_INITIATOR_REG vgtDrawInitiator;
+  VGT_DMA_SIZE_REG vgtDMASize;
 
   // PA
   u32 viewportControl = 0;

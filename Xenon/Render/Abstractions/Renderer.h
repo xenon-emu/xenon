@@ -61,6 +61,7 @@ public:
   virtual void UpdateClearDepth(f64 depth) = 0;
   virtual void Clear() = 0;
 
+  virtual void UpdateViewportFromState(const Xe::XGPU::XenosState *state) = 0;
   virtual void Draw(Xe::XGPU::XenosState *state) = 0;
   virtual void DrawIndexed(Xe::XGPU::XenosState *state, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) = 0;
 
@@ -127,6 +128,8 @@ public:
   
   // Recompiled shaders
   std::unordered_map<u32, std::shared_ptr<Shader>> convertedShaderPrograms{};
+  u32 currentVertexShader = 0;
+  u32 currentPixelShader = 0;
 private:
   // Thread handle
   std::thread thread;

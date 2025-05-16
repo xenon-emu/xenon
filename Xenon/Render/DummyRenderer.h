@@ -25,6 +25,7 @@ public:
   void UpdateClearDepth(f64 depth) override;
   void Clear() override;
 
+  void UpdateViewportFromState(const Xe::XGPU::XenosState *state) override;
   void Draw(Xe::XGPU::XenosState *state) override;
   void DrawIndexed(Xe::XGPU::XenosState *state, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) override;
 

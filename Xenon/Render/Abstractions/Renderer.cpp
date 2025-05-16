@@ -183,30 +183,29 @@ void Renderer::UpdateConstants(Xe::XGPU::XenosState *state) {
   XeShaderBoolConsts &boolConsts = state->boolConsts;
 
   // Pixel shader constants
-  for (u32 begin = static_cast<u32>(XeRegister::SHADER_CONSTANT_256_X),
-    end = static_cast<u32>(XeRegister::SHADER_CONSTANT_511_W),
-    idx = begin; idx != end; idx += 64) {
+  for (u32 begin = static_cast<u32>(XeRegister::SHADER_CONSTANT_256_X), end = static_cast<u32>(XeRegister::SHADER_CONSTANT_511_W),
+    idx = begin; idx != end; ++idx) {
     const u32 base = (idx - begin);
     const u64 mask = state->GetDirtyBlock(idx);
     if (mask) {
       f32 *ptr = reinterpret_cast<f32*>(state->GetRegisterPointer(static_cast<XeRegister>(idx)));
       f32 *dest = &psConsts.values[base];
-      memcpy(dest, ptr, sizeof(f32) * 16);
+      memcpy(dest, ptr, sizeof(f32));
     }
   }
 
   // Vertex shader constants
-  for (u32 begin = static_cast<u32>(XeRegister::SHADER_CONSTANT_000_X),
-    end = static_cast<u32>(XeRegister::SHADER_CONSTANT_255_W),
-    idx = begin; idx != end; idx += 64) {
+  for (u32 begin = static_cast<u32>(XeRegister::SHADER_CONSTANT_000_X), end = static_cast<u32>(XeRegister::SHADER_CONSTANT_255_W),
+    idx = begin; idx != end; ++idx) {
     const u32 base = (idx - begin);
     const u64 mask = state->GetDirtyBlock(idx);
     if (mask) {
       f32 *ptr = reinterpret_cast<f32*>(state->GetRegisterPointer(static_cast<XeRegister>(idx)));
       f32 *dest = &vsConsts.values[base];
-      memcpy(dest, ptr, sizeof(f32) * 16);
+      memcpy(dest, ptr, sizeof(f32));
     }
   }
+
   // Boolean shader constants
   {
     //SHADER_CONSTANT_BOOL_000_031 - SHADER_CONSTANT_BOOL_224_255
@@ -286,7 +285,7 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
   vertexData.dword0 = state->ReadRegister(XeRegister::SHADER_CONSTANT_FETCH_00_0);
   vertexData.dword1 = state->ReadRegister(XeRegister::SHADER_CONSTANT_FETCH_00_1);
   u32 address = vertexData.address << 2;
-  LOG_DEBUG(Xenos, "[CP] Copy state to EDRAM (address: 0x{:X}, size {})", address, vertexData.size);
+  LOG_DEBUG(Xenos, "[CP] Copy state to EDRAM (address: 0x{:X}, size 0x{:X})", address, vertexData.size);
   // Clear
   if (colorClearEnabled) {
     u8 a = (state->clearColor >> 24) & 0xFF;
@@ -302,6 +301,7 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
     UpdateClearDepth(clearDepthValue);
   }
   UpdateConstants(state);
+  UpdateViewportFromState(state);
   return true;
 }
 

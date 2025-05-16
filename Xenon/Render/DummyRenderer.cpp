@@ -60,6 +60,10 @@ void DummyRenderer::Clear() {
   LOG_INFO(Render, "DummyRenderer::Clear");
 }
 
+void DummyRenderer::UpdateViewportFromState(const Xe::XGPU::XenosState *state) {
+  LOG_INFO(Render, "DummyRenderer::UpdateViewportFromState");
+}
+
 void DummyRenderer::Draw(Xe::XGPU::XenosState *state) {
   LOG_INFO(Render, "DummyRenderer::Draw");
 }

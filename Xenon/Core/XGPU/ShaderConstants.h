@@ -81,7 +81,7 @@ enum class eModeControl : u32 {
   ColorDepth,
   Depth,
   Copy
-};
+};  
 
 enum class eCopyCommand : u32 {
   Raw,

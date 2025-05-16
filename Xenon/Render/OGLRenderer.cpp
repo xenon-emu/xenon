@@ -114,12 +114,52 @@ void OGLRenderer::Clear() {
   glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 }
 
+GLenum ConvertToGLPrimitive(ePrimitiveType prim) {
+  switch (prim) {
+    case ePrimitiveType::xePointList: return GL_POINTS;
+    case ePrimitiveType::xeLineList: return GL_LINES;
+    case ePrimitiveType::xeLineStrip: return GL_LINE_STRIP;
+    case ePrimitiveType::xeTriangleList: return GL_TRIANGLES;
+    case ePrimitiveType::xeTriangleStrip: return GL_TRIANGLE_STRIP;
+    default: return GL_TRIANGLES; // Fallback
+  }
+}
+
 void OGLRenderer::Draw(Xe::XGPU::XenosState *state) {
   // TODO: Draws
 }
 
 void OGLRenderer::DrawIndexed(Xe::XGPU::XenosState *state, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) {
  // TODO: Draws
+}
+
+void OGLRenderer::UpdateViewportFromState(const Xe::XGPU::XenosState *state) {
+  auto f = [](u32 val) {
+    f32 fval;
+    memcpy(&fval, &val, sizeof(f32));
+    return fval;
+  };
+
+  f32 xscale = f(state->viewportXScale);
+  f32 xoffset = f(state->viewportXOffset);
+  f32 yscale = f(state->viewportYScale);
+  f32 yoffset = f(state->viewportYOffset);
+  f32 zscale = f(state->viewportZScale);
+  f32 zoffset = f(state->viewportZOffset);
+
+  // Compute viewport rectangle
+  s32 x = static_cast<s32>(xoffset - xscale);
+  s32 y = static_cast<s32>(yoffset - yscale);
+  s32 width = static_cast<s32>(xscale * 2);
+  s32 height = static_cast<s32>(yscale * 2);
+
+  glViewport(x, y, width, height);
+
+  // Clamp to valid ranges (just in case)
+  f32 nearZ = std::max(0.f, std::min(1.f, zoffset));
+  f32 farZ = std::max(nearZ, std::min(1.f, zoffset + zscale));
+
+  glDepthRangef(nearZ, farZ);
 }
 
 void OGLRenderer::UpdateClearColor(u8 r, u8 b, u8 g, u8 a) {
