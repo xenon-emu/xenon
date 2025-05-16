@@ -1,5 +1,6 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
+#include "Base/Assert.h"
 #include "Base/Logging/Log.h"
 
 #include "Transformer.h"

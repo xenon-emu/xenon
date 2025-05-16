@@ -160,6 +160,7 @@ public:
   std::vector<TextureInfo> textures{};
   Sirit::Module module{ 0x00010000 };
 private:
+  Sirit::Id gpr_var = { 0 };
   Sirit::Id predicate_var = { 0 };
 
   Sirit::Id ubo_type_v = { 0 };
@@ -168,6 +169,7 @@ private:
   Sirit::Id ubo_type_b = { 0 };
   Sirit::Id ubo_var_b = { 0 };
 
+  Sirit::Id gpr_var_current = { 0 };
   Sirit::Id current_function = { 0 };
 
   Sirit::Id entry_dispatch_func = { 0 };

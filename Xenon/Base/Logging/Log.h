@@ -86,8 +86,6 @@ if (Config::log.debugOnly)                                                      
 namespace fs = std::filesystem;
 #include "Base/Types.h"
 
-#define THROW_MSG(x, ...) if (x) { LOG_ERROR(Assert, "Assertion! " __VA_ARGS__); }
-
 #define LOG_BASE(x, s, ...) std::cout << "[" #x "] <" #s "> " << std::format(__VA_ARGS__)
 #define LOG_INFO_BASE(x, ...) LOG_BASE(x, Info, __VA_ARGS__)
 #define LOG_ERROR_BASE(x, ...) LOG_BASE(x, Error, __VA_ARGS__)

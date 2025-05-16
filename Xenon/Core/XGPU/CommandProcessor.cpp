@@ -686,11 +686,8 @@ void VisitAll(const Microcode::AST::ControlFlowGraph *cf, Microcode::AST::Statem
   }
 }
 
-std::pair<u32, std::vector<u32>> LoadShader(eShaderType shaderType, const std::vector<u32> &data) {
-  u32 crc = CRC32::CRC32::calc(reinterpret_cast<const u8*>(data.data()), data.size() * 4);
+std::vector<u32> LoadShader(eShaderType shaderType, const std::vector<u32> &data, std::string baseString) {
   fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "cache" };
-  std::string typeString = shaderType == Xe::eShaderType::Pixel ? "pixel" : "vertex";
-  std::string baseString = fmt::format("{}_shader_{:X}", typeString, crc);
   fs::path path{ shaderPath / (baseString + ".spv") };
   std::vector<u32> code{};
   // Vali: Temporarily disable cache, emitting isn't 100% yet
@@ -702,7 +699,7 @@ std::pair<u32, std::vector<u32>> LoadShader(eShaderType shaderType, const std::v
       code.resize(fileSize / 4);
       file.read(reinterpret_cast<char*>(code.data()), fileSize);
       file.close();
-      return { crc, code };
+      return code;
     }
     file.close();
   }*/
@@ -718,7 +715,7 @@ std::pair<u32, std::vector<u32>> LoadShader(eShaderType shaderType, const std::v
   std::ofstream f{ shaderPath / (baseString + ".spv"), std::ios::out | std::ios::binary };
   f.write(reinterpret_cast<char*>(code.data()), code.size() * 4);
   f.close();
-  return { crc, code };
+  return code;
 }
 
 bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
@@ -737,30 +734,32 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
     memcpy(&value, &addrPtr[i], sizeof(value));
     data.push_back(value);
   }
-
-  std::pair<u32, std::vector<u32>> shader = LoadShader(shaderType, data);
+  
   fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "cache" };
   std::string typeString = shaderType == Xe::eShaderType::Pixel ? "pixel" : "vertex";
-  std::string baseString = fmt::format("{}_shader_{:X}", typeString, shader.first);
+  u32 crc = CRC32::CRC32::calc(reinterpret_cast<const u8 *>(data.data()), data.size() * 4);
+  std::string baseString = fmt::format("{}_shader_{:X}", typeString, crc);
   {
     std::ofstream f{ shaderPath / (baseString + ".bin"), std::ios::out | std::ios::binary };
-    f.write(reinterpret_cast<char*>(data.data()), data.size() * 4);
+    f.write(reinterpret_cast<char *>(data.data()), data.size() * 4);
     f.close();
   }
 
+  std::vector<u32> shader = LoadShader(shaderType, data, baseString);
+
   render->shaderLoadQueue.push({
     shaderType,
-    shader.first,
+    crc,
     baseString,
-    shader.second
+    shader
   });
 
   switch (shaderType) {
   case eShaderType::Pixel:{
-    LOG_DEBUG(Xenos, "[CP::IM_LOAD] PixelShader CRC: 0x{:08X}", shader.first);
+    LOG_DEBUG(Xenos, "[CP::IM_LOAD] PixelShader CRC: 0x{:08X}", crc);
   } break;
   case eShaderType::Vertex:{
-    LOG_DEBUG(Xenos, "[CP::IM_LOAD] VertexShader CRC: 0x{:08X}", shader.first);
+    LOG_DEBUG(Xenos, "[CP::IM_LOAD] VertexShader CRC: 0x{:08X}", crc);
   } break;
   }
 
@@ -782,29 +781,31 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuff
     value = byteswap_be(value);
   }
 
-  std::pair<u32, std::vector<u32>> shader = LoadShader(shaderType, data);
   fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "cache" };
   std::string typeString = shaderType == Xe::eShaderType::Pixel ? "pixel" : "vertex";
-  std::string baseString = fmt::format("{}_shader_{:X}", typeString, shader.first);
+  u32 crc = CRC32::CRC32::calc(reinterpret_cast<const u8 *>(data.data()), data.size() * 4);
+  std::string baseString = fmt::format("{}_shader_{:X}", typeString, crc);
   {
     std::ofstream f{ shaderPath / (baseString + ".bin"), std::ios::out | std::ios::binary };
-    f.write(reinterpret_cast<char*>(data.data()), data.size() * 4);
+    f.write(reinterpret_cast<char *>(data.data()), data.size() * 4);
     f.close();
   }
 
+  std::vector<u32> shader = LoadShader(shaderType, data, baseString);
+
   render->shaderLoadQueue.push({
     shaderType,
-    shader.first,
+    crc,
     baseString,
-    shader.second
+    shader
   });
 
   switch (shaderType) {
   case eShaderType::Pixel:{
-    LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] PixelShader CRC: 0x{:08X}", shader.first);
+    LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] PixelShader CRC: 0x{:08X}", crc);
   } break;
   case eShaderType::Vertex:{
-    LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] VertexShader CRC: 0x{:08X}", shader.first);
+    LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] VertexShader CRC: 0x{:08X}", crc);
   } break;
   }
 

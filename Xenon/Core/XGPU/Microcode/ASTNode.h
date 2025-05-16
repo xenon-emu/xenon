@@ -5,7 +5,7 @@
 #include <array>
 #include <memory>
 
-#include "../ShaderConstants.h"
+#include "Core/XGPU/ShaderConstants.h"
 
 #include "ASTNodeBase.h"
 #include "Constants.h"

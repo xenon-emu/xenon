@@ -87,6 +87,13 @@ void ShaderCodeWriterSirit::BeginMain() {
   main_label = module.OpLabel();
   module.AddLabel(main_label);
 
+  Sirit::Id vec4_type = module.TypeVector(module.TypeFloat(32), 4);
+  Sirit::Id const_128 = module.Constant(module.TypeInt(32, false), 128);
+
+  Sirit::Id gpr_array_type = module.TypeArray(vec4_type, const_128);
+  Sirit::Id gpr_ptr_type = module.TypePointer(spv::StorageClass::Function, gpr_array_type);
+  gpr_var = module.AddLocalVariable(gpr_ptr_type, spv::StorageClass::Function);
+
   if (type == eShaderType::Vertex) {
     for (auto name : { "VertexID", "InstanceID" }) {
       Sirit::Id uint_type = module.TypeInt(32, false);
@@ -112,7 +119,7 @@ void ShaderCodeWriterSirit::FinalizeEntryPoint() {
     module.AddExecutionMode(main_func, spv::ExecutionMode::PixelCenterInteger);
     module.AddEntryPoint(spv::ExecutionModel::Fragment, main_func, "main", interface_vars);
   } else {
-    for (const auto &name : { "VertexID", "InstanceID" }) {
+    for (const auto& name : {"VertexID", "InstanceID"}) {
       if (input_vars.count(name)) {
         spv::BuiltIn builtin = name == std::string("VertexID") ? spv::BuiltIn::VertexIndex : spv::BuiltIn::InstanceIndex;
         module.Decorate(input_vars[name], spv::Decoration::BuiltIn, builtin);
@@ -148,8 +155,9 @@ void ShaderCodeWriterSirit::FinalizeEntryPoint() {
 
 void ShaderCodeWriterSirit::EndMain() {
   LOG_DEBUG(Xenos, "[AST::Sirit] EndMain()");
+  gpr_var_current = gpr_var;
   if (entry_dispatch_func.value) {
-    module.OpFunctionCall(module.TypeVoid(), entry_dispatch_func);
+    module.OpFunctionCall(module.TypeVoid(), entry_dispatch_func, gpr_var);
   }
   if (type == eShaderType::Vertex) {
     for (auto& [reg, var] : output_vars) {
@@ -244,31 +252,17 @@ Chunk ShaderCodeWriterSirit::GetFloatVal(const u32 floatRegIndex) {
 
 Chunk ShaderCodeWriterSirit::GetFloatValRelative(const u32 floatRegOffset) {
   LOG_DEBUG(Xenos, "[AST::Sirit] GetFloatValRelative({})", floatRegOffset);
-  // Types
-  Sirit::Id float_type = module.TypeFloat(32);
-  Sirit::Id vec4_type = module.TypeVector(float_type, 4);
-  Sirit::Id uint_type = module.TypeInt(32, false);
-  Sirit::Id zero = module.Constant(uint_type, 0);
+  Sirit::Id vec4_ptr_type = module.TypePointer(spv::StorageClass::Function, module.TypeVector(module.TypeFloat(32), 4));
 
-  // Constant idx for the offset in the array
+  Sirit::Id uint_type = module.TypeInt(32, false);
   Sirit::Id offset_id = module.Constant(uint_type, floatRegOffset);
 
-  // Access the vec4 inside the UBO uniform buffer:
-  // ubo_var_v points to a struct with one member: an array of vec4[256]
-  // So first index = 0 to access the struct member (FloatConsts)
-  // Second index = floatRegOffset for element in the array
-  Sirit::Id reg_ptr = module.OpAccessChain(
-    module.TypePointer(spv::StorageClass::Uniform, vec4_type), // pointer type to vec4 in uniform storage
-    ubo_var_v, // the uniform block variable
-    zero,      // first struct member index = 0
-    offset_id // index into the vec4 array
-  );
+  Sirit::Id reg_ptr = module.OpAccessChain(vec4_ptr_type, gpr_var_current, offset_id);
 
-  // Load the vec4 value from the UBO
-  Sirit::Id reg_val = module.OpLoad(vec4_type, reg_ptr);
+  // Load the value (A0 + offset)
+  Sirit::Id reg_val = module.OpLoad(module.TypeVector(module.TypeFloat(32), 4), reg_ptr);
 
-  // Extract .x component (index 0) as a float
-  Sirit::Id x_value = module.OpCompositeExtract(float_type, reg_val, 0);
+  Sirit::Id x_value = module.OpCompositeExtract(module.TypeFloat(32), reg_val, 0);
 
   return Chunk(x_value, reg_ptr);
 }
@@ -551,8 +545,18 @@ void ShaderCodeWriterSirit::BeginControlFlow(const u32 address, const bool hasJu
   LOG_DEBUG(Xenos, "[AST::Sirit] BeginControlFlow(0x{:X}, {}, {}, {})", address, hasJumps, hasCalls, called);
 
   // Create function type and function
-  Sirit::Id func_type = module.TypeFunction(module.TypeVoid());
+  Sirit::Id vec4_type = module.TypeVector(module.TypeFloat(32), 4);
+  Sirit::Id const_128 = module.Constant(module.TypeInt(32, false), 128);
+  Sirit::Id gpr_array_type = module.TypeArray(vec4_type, const_128);
+  Sirit::Id gpr_ptr_type = module.TypePointer(spv::StorageClass::Function, gpr_array_type);
+  Sirit::Id func_type = module.TypeFunction(module.TypeVoid(), gpr_ptr_type);
   current_function = module.OpFunction(module.TypeVoid(), spv::FunctionControlMask::MaskNone, func_type);
+
+  // Declare parameter
+  Sirit::Id param_gpr = module.OpFunctionParameter(gpr_ptr_type);
+
+  // Set the gpr_var inside this function to the parameter
+  gpr_var_current = param_gpr;
 
   // Save the first control flow function to call from main
   if (!entry_dispatch_func.value) {

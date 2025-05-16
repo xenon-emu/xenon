@@ -185,11 +185,11 @@ s32 main(s32 argc, char *argv[]) {
   }
   u32 crcHash = PARAM_crc.Get<u32>();
   if (crcHash == 0) {
-    // Vertex: 0x888C0D57
-    // Pixel: 0x208AE75D
-    crcHash = 0x888C0D57;
+    // Vertex: 0xA9F9365A
+    // Pixel: 0x93F4ACA8
+    crcHash = 0xA9F9365A;
   }
   Xe::Microcode::Run(crcHash);
-  Xe::Microcode::Run(0x208AE75D);
+  Xe::Microcode::Run(0x93F4ACA8);
   return 0;
 }
