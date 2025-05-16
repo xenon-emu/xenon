@@ -31,6 +31,14 @@ namespace Render {
 
 class GUI;
 
+struct DrawJob {
+  bool indexed = false;
+  Xe::XGPU::XenosState *state = nullptr;
+  Xe::XGPU::XeDrawParams params = {};
+  u32 shaderVS = 0;
+  u32 shaderPS = 0;
+};
+
 struct ShaderLoadJob {
   Xe::eShaderType shaderType = Xe::eShaderType::Unknown;
   u32 shaderCRC = 0;
@@ -102,6 +110,8 @@ public:
   // ImGui Created
   bool imguiCreated = false;
 
+  // Render Lost Lost
+  bool focusLost = false;
   // Vertical SYNC
   bool VSYNC = true;
   // Is Fullscreen
@@ -123,6 +133,9 @@ public:
   std::unique_ptr<Texture> backbuffer{};
 
   // Shader texture queue
+  std::queue<DrawJob> drawQueue{};
+
+  // Shader load queue
   std::queue<ShaderLoadJob> shaderLoadQueue{};
   std::queue<BufferLoadJob> bufferLoadQueue{};
   std::unordered_map<u32, std::shared_ptr<Buffer>> createdBuffers;

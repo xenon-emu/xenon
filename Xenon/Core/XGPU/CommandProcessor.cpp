@@ -1069,24 +1069,23 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
     indexBufferInfo.indexFormat = state->vgtDrawInitiator.indexSize;
     indexBufferInfo.length = state->vgtDMASize.numWords * indexSizeInBytes;
     indexBufferInfo.count = state->vgtDrawInitiator.numIndices;
-  }
-    break;
-  case eSourceSelect::xeImmediate:
+  } break;
+  case eSourceSelect::xeImmediate: {
     // TODO(bitshift3r): Do VGT_IMMED_DATA if any ocurrences are to be found.
     LOG_ERROR(Xenos, "[CP, PT3]{}: Is using immediate vertex indices, which are currently unsupported. "
       "Please submit an issue in Xenon github.", opCodeName);
     drawOk = false;
-    break;
-  case eSourceSelect::xeAutoIndex:
+  } break;
+  case eSourceSelect::xeAutoIndex: {
     // Auto draw.
     indexBufferInfo.guestBase = 0;
     indexBufferInfo.length = 0;
-    break;
-  default:
+  } break;
+  default: {
     // Unhandled or invalid source selection.
     drawOk = false;
     LOG_ERROR(Xenos, "[CP, PT3]: DRAW failed, invalid source select.");
-    break;
+  } break;
   }
 
   // Skip to the next command, if there are immediate indexes that we don't support yet.
@@ -1114,19 +1113,22 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
       }
       return true;
     }
-    u64 combinedHash = (static_cast<u64>(render->currentVertexShader) << 32) | render->currentPixelShader;
-    auto shader = render->linkedShaderPrograms.find(combinedHash);
-    if (shader != render->linkedShaderPrograms.end()) {
-      shader->second->Bind();
-    }
-    if (isIndexedDraw) {
-      LOG_DEBUG(Xenos, "[CP] DrawIndexed");
-      render->DrawIndexed(state, indexBufferInfo);
-    } else {
-      LOG_DEBUG(Xenos, "[CP] Draw");
-      render->Draw(state);
-    }
+    XeDrawParams params = {};
+    params.indexBufferInfo = indexBufferInfo;
+    params.maxVertexIndex = state->maxVertexIndex;
+    params.minVertexIndex = state->minVertexIndex;
+    params.indexOffset = state->indexOffset;
+    params.multiPrimitiveIndexBufferResetIndex = state->multiPrimitiveIndexBufferResetIndex;
+    params.currentBinIdMin = state->currentBinIdMin;
+    Render::DrawJob drawJob = {};
+    drawJob.state = state;
+    drawJob.params = params;
+    drawJob.indexed = isIndexedDraw;
+    drawJob.shaderPS = render->currentPixelShader;
+    drawJob.shaderVS = render->currentVertexShader;
     state->ClearDirtyState();
+    // Queue off to the Renderer
+    render->drawQueue.push(drawJob);
   } else {
     LOG_ERROR(Xenos, "[CP] Invalid draw");
   }

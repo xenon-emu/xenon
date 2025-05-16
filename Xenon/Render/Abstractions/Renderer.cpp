@@ -144,7 +144,7 @@ void Renderer::HandleEvents() {
   if (Xe_Main.get()) {
     const SDL_WindowFlags flag = SDL_GetWindowFlags(Xe_Main->mainWindow);
     if (Config::rendering.pauseOnFocusLoss) {
-      Xe_Main->renderHalt = flag & SDL_WINDOW_INPUT_FOCUS ? false : true;
+      focusLost = flag & SDL_WINDOW_INPUT_FOCUS ? false : true;
     }
   }
   // Process events.
@@ -384,48 +384,60 @@ void Renderer::Thread() {
     // Clear the display
     Clear();
 
-    // Upload buffer
-    if (Xe_Main.get() && !Xe_Main->renderHalt) {
+    if (Xe_Main.get() && Xe_Main->xenos->RenderingTo2DFramebuffer() && !focusLost) {
+      // Upload buffer
       // Framebuffer pointer from main memory
       fbPointer = ramPointer->getPointerToAddress(Xe_Main->xenos->GetSurface());
-      if (Xe_Main->xenos->RenderingTo2DFramebuffer()) {
-        // Profile
-        MICROPROFILE_SCOPEI("[Xe::Render]", "Deswizle", MP_AUTO);
-        const u32 *ui_fbPointer = reinterpret_cast<u32*>(fbPointer);
-        pixelSSBO->UpdateBuffer(0, pitch, ui_fbPointer);
+      // Profile
+      MICROPROFILE_SCOPEI("[Xe::Render]", "Deswizle", MP_AUTO);
+      const u32 *ui_fbPointer = reinterpret_cast<u32 *>(fbPointer);
+      pixelSSBO->UpdateBuffer(0, pitch, ui_fbPointer);
 
-        // Use the compute shader
-        computeShaderProgram->Bind();
-        pixelSSBO->Bind();
-        if (Xe_Main.get()) {
-          computeShaderProgram->SetUniformInt("internalWidth", Xe_Main->xenos->GetWidth());
-          computeShaderProgram->SetUniformInt("internalHeight", Xe_Main->xenos->GetHeight());
-          computeShaderProgram->SetUniformInt("resWidth", width);
-          computeShaderProgram->SetUniformInt("resHeight", height);
-        }
-        OnCompute();
-      }
-    }
+      // Use the compute shader
+      computeShaderProgram->Bind();
+      pixelSSBO->Bind();
+      computeShaderProgram->SetUniformInt("internalWidth", Xe_Main->xenos->GetWidth());
+      computeShaderProgram->SetUniformInt("internalHeight", Xe_Main->xenos->GetHeight());
+      computeShaderProgram->SetUniformInt("resWidth", width);
+      computeShaderProgram->SetUniformInt("resHeight", height);
+      OnCompute();
 
-    // Render the texture
-    if (Xe_Main.get() && !Xe_Main->renderHalt && Xe_Main->xenos->RenderingTo2DFramebuffer()) {
+      // Render the texture
       MICROPROFILE_SCOPEI("[Xe::Render]", "BindTexture", MP_AUTO);
       renderShaderPrograms->Bind();
       backbuffer->Bind();
       OnBind();
     }
+    else {
+      while (!drawQueue.empty()) {
+        DrawJob job = drawQueue.front();
+        drawQueue.pop();
+        u64 combinedHash = (static_cast<u64>(job.shaderVS) << 32) | job.shaderPS;
+        auto shader = linkedShaderPrograms.find(combinedHash);
+        if (shader != linkedShaderPrograms.end()) {
+          shader->second->Bind();
+        }
+
+        if (job.indexed) {
+          DrawIndexed(job.state, job.params.indexBufferInfo);
+        }
+        else {
+          Draw(job.state);
+        }
+
+        job.state->ClearDirtyState();  // Clear after draw
+      }
+    }
 
     // Render the GUI
-    if (Config::rendering.enableGui && gui.get() && Xe_Main.get() && !Xe_Main->renderHalt) {
+    if (Config::rendering.enableGui && gui.get() && !focusLost) {
       MICROPROFILE_SCOPEI("[Xe::Render::GUI]", "Render", MP_AUTO);
       gui->Render(backbuffer.get());
     }
 
     // GL Swap
-    if (Xe_Main.get()) {
-      MICROPROFILE_SCOPEI("[Xe::Render]", "Swap", MP_AUTO);
-      OnSwap(mainWindow);
-    }
+    MICROPROFILE_SCOPEI("[Xe::Render]", "Swap", MP_AUTO);
+    OnSwap(mainWindow);
   }
 }
 

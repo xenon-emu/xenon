@@ -83,7 +83,6 @@ public:
 #ifndef NO_GFX
   // Render thread
   std::unique_ptr<Render::Renderer> renderer{};
-  bool renderHalt = false;
 #endif
   // CPU started flag
   bool CPUStarted = false;

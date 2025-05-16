@@ -46,6 +46,15 @@ struct XeIndexBufferInfo {
   size_t length = 0;
 };
 
+struct XeDrawParams {
+  XeIndexBufferInfo indexBufferInfo;
+  u32 maxVertexIndex = 0;
+  u32 minVertexIndex = 0;
+  u32 indexOffset = 0;
+  u32 multiPrimitiveIndexBufferResetIndex = 0;
+  u32 currentBinIdMin = 0;
+};
+
 class CommandProcessor {
 public:
   CommandProcessor(RAM *ramPtr, XenosState *statePtr, Render::Renderer *renderer, PCIBridge *pciBridge);
