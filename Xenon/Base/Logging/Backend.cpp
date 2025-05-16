@@ -2,10 +2,6 @@
 
 #include "Backend.h"
 
-#ifdef _WIN32
-#include <Windows.h>
-#endif
-
 #include <fmt/format.h>
 #include <functional>
 #include <map>
@@ -13,6 +9,7 @@
 #include "Base/Bounded_threadsafe_queue.h"
 #include "Base/io_file.h"
 #include "Base/Path_util.h"
+#include "Base/String_util.h"
 #include "Base/Thread.h"
 
 #include "Log.h"
@@ -174,14 +171,13 @@ public:
       .function = function,
       .message = std::move(message),
     };
-    ForEachBackend([&entry](BaseBackend* backend) { if (backend) { backend->Write(entry); } });
-    std::fflush(stdout);
-    /*if (Config::getLogType() == "async") {
+    messageQueue.EmplaceWait(entry);
+    if (ToLower(Config::log.type) == "async") {
       messageQueue.EmplaceWait(entry);
     } else {
       ForEachBackend([&entry](BaseBackend* backend) { if (backend) { backend->Write(entry); } });
       std::fflush(stdout);
-    }*/
+    }
   }
 
   void PushEntryNoFmt(Class logClass, Level logLevel, const std::string &message) {
@@ -199,14 +195,12 @@ public:
       .logLevel = logLevel,
       .message = std::move(message),
     };
-    ForEachBackend([&entry](BaseBackend* backend) { if (backend) { backend->Write(entry, false); } });
-    std::fflush(stdout);
-    /*if (Config::getLogType() == "async") {
+    if (Config::log.type == "async") {
       messageQueue.EmplaceWait(entry);
     } else {
       ForEachBackend([&entry](BaseBackend* backend) { if (backend) { backend->Write(entry); } });
       std::fflush(stdout);
-    }*/
+    }
   }
 
 private:

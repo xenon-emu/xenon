@@ -222,6 +222,10 @@ inline struct _filepaths {
 inline struct _log {
   // Current log level
   Base::Log::Level currentLevel = Base::Log::Level::Info;
+  // Log type
+  // async = Queues message
+  // sync = waits for log to finish
+  std::string type = "async";
   // Show more details on log
   bool advanced = false;
   // Show debug-only log statements

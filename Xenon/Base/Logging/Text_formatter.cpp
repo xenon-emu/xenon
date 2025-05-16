@@ -2,10 +2,6 @@
 
 #include "Text_formatter.h"
 
-#ifdef _WIN32
-#include <Windows.h>
-#endif
-
 #include "Base/Assert.h"
 #include "Base/Config.h"
 #include "Filter.h"
@@ -26,18 +22,18 @@ std::string FormatLogMessage(const Entry &entry) {
   }
 }
 
-void PrintMessage(const Entry &entry) {
-  const auto str = entry.message;
+#define ESC "\x1b"
+void PrintMessage(const std::string &color, const Entry &entry) {
+  const std::string str = color + entry.message + ESC "[0m";
   fputs(str.c_str(), stdout);
 }
 
-void PrintMessageFmt(const Entry &entry) {
-  const auto str = FormatLogMessage(entry).append(1, '\n');
+void PrintMessageFmt(const std::string &color, const Entry &entry) {
+  const std::string str = color + FormatLogMessage(entry).append(ESC "[0m\n");
   fputs(str.c_str(), stdout);
 }
 
 void PrintColoredMessage(const Entry &entry, bool withFmt) {
-  #define ESC "\x1b"
   // NOTE: Custom colors can be achieved
   // std::format("\x1b[{};2;{};{};{}m", color.bg ? 48 : 38, color.r, color.g, color.b)
   const char *color = "";
@@ -67,16 +63,12 @@ void PrintColoredMessage(const Entry &entry, bool withFmt) {
     UNREACHABLE();
   }
 
-  fputs(color, stdout);
-
   if (withFmt)
-    PrintMessageFmt(entry);
+    PrintMessageFmt(color, entry);
   else
-    PrintMessage(entry);
-  
-  fputs(ESC "[0m", stdout);
-  #undef ESC
+    PrintMessage(color, entry);
 }
+#undef ESC
 
 } // namespace Log
 } // namespace Base

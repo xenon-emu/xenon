@@ -285,7 +285,7 @@ void _xcpu::to_toml(toml::value &value) {
   value["HW_INIT_SKIP1"].comments().clear();
   value["HW_INIT_SKIP1"] = HW_INIT_SKIP_1;
   value["HW_INIT_SKIP1"].as_integer_fmt().fmt = toml::integer_format::hex;
-  value["HW_INIT_SKIP1"].comments().push_back("# Manual Hardware Init Skip address 1 override ");
+  value["HW_INIT_SKIP1"].comments().push_back("# Manual Hardware Init Skip address 1 override");
   value["HW_INIT_SKIP1"].comments().push_back("# RGH3 Trinity: 0x3003F48");
   value["HW_INIT_SKIP1"].comments().push_back("# RGH3 Corona:  0x3003DC0");
 
@@ -367,6 +367,7 @@ void _log::from_toml(const toml::value &value) {
   s32 tmpLevel = static_cast<s32>(currentLevel);
   tmpLevel = toml::find_or<s32&>(value, "Level", tmpLevel);
   currentLevel = static_cast<Base::Log::Level>(tmpLevel);
+  type = toml::find_or<std::string>(value, "Type", type);
   advanced = toml::find_or<bool>(value, "Advanced", advanced);
 #ifdef DEBUG_BUILD
   debugOnly = toml::find_or<bool>(value, "EnableDebugOnly", debugOnly);
@@ -377,6 +378,12 @@ void _log::to_toml(toml::value &value) {
   value["Level"] = static_cast<s32>(currentLevel);
   value["Level"].comments().push_back("# Controls the current output filter level");
   value["Level"].comments().push_back("# 0: Trace | 1: Debug | 2: Info | 3: Warning | 4: Error | 5: Critical | 6: Guest | 7: Count");
+  value["Type"].comments().clear();
+  value["Type"] = type;
+  value["Type"].comments().push_back("# Determines how log is handled");
+  value["Type"].comments().push_back("# Types:");
+  value["Type"].comments().push_back("# async - (Recommended) Pushes to a queue and handles in a different thread");
+  value["Type"].comments().push_back("# sync - Waits for the log to be completed in the same thread");
   value["Advanced"].comments().clear();
   value["Advanced"] = advanced;
   value["Advanced"].comments().push_back("# Show more details on the log (ex, debug symbols)");
