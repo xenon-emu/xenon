@@ -643,6 +643,6 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
     memcpy(&Regs[addr], &tmp, sizeof(tmp));
   }
   // Set dirty state
-  const u64 mask = 1ull << ((addr * 4) % BitCount);
-  RegMask[addr / BitCount] |= mask;
+  const u64 mask = 1ull << (addr % BitCount);
+  RegMask[(addr / 4) / BitCount] |= mask;
 }
