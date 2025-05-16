@@ -4,6 +4,7 @@
 
 #include <array>
 #include <span>
+#include <stack>
 
 #include "ASTNodeBase.h"
 #include "ASTNode.h"
@@ -56,6 +57,8 @@ public:
   virtual void ControlFlowReturn(const u32 targetAddress) = 0;
   virtual void ControlFlowCall(const u32 targetAddress) = 0;
   virtual void ControlFlowJump(const u32 targetAddress) = 0;
+  virtual void LoopBegin(const u32 targetAddress) = 0;
+  virtual void LoopEnd(const u32 targetAddress) = 0;
 
   virtual void SetPredicate(const Chunk &newValue) = 0;
   virtual void PushPredicate(const Chunk &newValue) = 0;
@@ -136,6 +139,8 @@ public:
   void ControlFlowReturn(const u32 targetAddress) override;
   void ControlFlowCall(const u32 targetAddress) override;
   void ControlFlowJump(const u32 targetAddress) override;
+  void LoopBegin(const u32 targetAddress) override;
+  void LoopEnd(const u32 targetAddress) override;
 
   void SetPredicate(const Chunk &newValue) override;
   void PushPredicate(const Chunk &newValue) override;
@@ -179,6 +184,8 @@ private:
   Sirit::Id current_function = { 0 };
 
   Sirit::Id entry_dispatch_func = { 0 };
+
+  std::stack<std::pair<Sirit::Id, Sirit::Id>> loop_stack{};
 
   Sirit::Id merge_label = { 0 };
   Sirit::Id true_label = { 0 };

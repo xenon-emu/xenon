@@ -65,6 +65,12 @@ void Block::EmitShaderCode(ShaderCodeWriterBase &writer) const {
   case eBlockType::EXEC: {
     codeStatement->EmitShaderCode(writer);
   } break;
+  case eBlockType::LOOP_BEGIN: {
+    writer.LoopBegin(target->GetAddress());
+  } break;
+  case eBlockType::LOOP_END: {
+    writer.LoopEnd(target->GetAddress());
+  } break;
   }
   // Each block can have condition
   if (condition)

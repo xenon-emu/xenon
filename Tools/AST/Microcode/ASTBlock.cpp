@@ -35,6 +35,7 @@ void Block::ConnectTarget(Block *targetBlock) {
 void Block::ConnectContinuation(Block *nextBlock) {
   continuation = nextBlock;
 }
+
 void Block::EmitShaderCode(ShaderCodeWriterBase &writer) const {
   // Emit preamble (outside the conditional block)
   if (preambleStatement)

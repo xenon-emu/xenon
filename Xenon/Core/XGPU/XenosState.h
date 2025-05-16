@@ -160,6 +160,7 @@ public:
   // D1MODE
   u32 modeViewportSize = 0x050002D0;
   u32 vCounter = 720;
+  u32 vblankStatus = 0x1000;
   u32 vblankVlineStatus = 1;
 
   // MH

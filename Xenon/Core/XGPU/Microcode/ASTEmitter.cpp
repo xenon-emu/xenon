@@ -64,6 +64,7 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType, Shader *sha
   Sirit::Id vec4_array_256 = module.TypeArray(vec4_type, const_256);
   // Struct and UBO
   Sirit::Id ubo_struct_v = module.TypeStruct(vec4_array_256);
+  module.Decorate(ubo_struct_v, spv::Decoration::Block);
   module.Name(ubo_struct_v, shaderTypeName + "Consts");
   module.MemberName(ubo_struct_v, 0, "FloatConsts");
   ubo_type_v = module.TypePointer(spv::StorageClass::Uniform, ubo_struct_v);
@@ -76,6 +77,7 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType, Shader *sha
   Sirit::Id const_32 = module.Constant(uint_type, 32);
   Sirit::Id uint_array_32 = module.TypeArray(uint_type, const_32);
   Sirit::Id ubo_struct_b = module.TypeStruct(uint_array_32);
+  module.Decorate(ubo_struct_b, spv::Decoration::Block);
   module.Name(ubo_struct_b, "CommonBoolConsts");
   module.MemberName(ubo_struct_b, 0, "BoolConsts");
   ubo_type_b = module.TypePointer(spv::StorageClass::Uniform, ubo_struct_b);
@@ -675,6 +677,36 @@ void ShaderCodeWriterSirit::ControlFlowJump(const u32 targetAddress) {
     target = module.OpLabel();
   }
   module.OpBranch(current_block_label);
+}
+
+void ShaderCodeWriterSirit::LoopBegin(const u32 targetAddress) {
+  LOG_DEBUG(Xenos, "[AST::Sirit] LoopBegin(0x{:X})", targetAddress);
+  Sirit::Id merge_label = module.OpLabel();
+  Sirit::Id continue_label = module.OpLabel();
+  Sirit::Id loop_label = module.OpLabel();
+
+  loop_stack.push({ merge_label, continue_label });
+
+  module.AddLabel(loop_label);
+
+  // Declare as a loop merge block (continue and merge)
+  module.OpLoopMerge(merge_label, continue_label, spv::LoopControlMask::MaskNone);
+  module.OpBranch(continue_label);
+
+  // Add the continue block (begin of the loop body)
+  module.AddLabel(continue_label);
+}
+
+void ShaderCodeWriterSirit::LoopEnd(const u32 targetAddress) {
+  LOG_DEBUG(Xenos, "[AST::Sirit] LoopEnd(0x{:X})", targetAddress);
+  auto [merge_label, continue_label] = loop_stack.top();
+  loop_stack.pop();
+
+  // Jump back to loop label
+  module.OpBranch(continue_label);
+
+  // Add the merge label for exiting the loop
+  module.AddLabel(merge_label);
 }
 
 void ShaderCodeWriterSirit::SetPredicate(const Chunk &newValue) {

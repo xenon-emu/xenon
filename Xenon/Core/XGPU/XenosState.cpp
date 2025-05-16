@@ -141,6 +141,18 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
   case XeRegister::D1MODE_V_COUNTER:
     value = vCounter;
     break;
+  case XeRegister::D1MODE_VBLANK_STATUS: {
+    auto now = std::chrono::high_resolution_clock::now();
+    constexpr s32 frame_time_us = 1000000 / 60; // ~16,667 us for 60Hz
+    constexpr s32 vblank_duration_us = 500; // simulate 500 us of vblank
+
+    auto micros = std::chrono::duration_cast<std::chrono::microseconds>(now.time_since_epoch()).count();
+    s64 frame_position = micros % frame_time_us;
+
+    bool in_vblank = frame_position < vblank_duration_us;
+    vblankStatus = in_vblank ? 0x1000 : 0x0000;
+    value = vblankStatus;
+  } break;
   case XeRegister::D1MODE_VBLANK_VLINE_STATUS:
     value = vblankVlineStatus;
     break;
@@ -453,6 +465,9 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
     break;
   case XeRegister::D1MODE_V_COUNTER:
     vCounter = value;
+    break;
+  case XeRegister::D1MODE_VBLANK_STATUS:
+    vblankStatus = value;
     break;
   case XeRegister::D1MODE_VBLANK_VLINE_STATUS:
     vblankVlineStatus = value;

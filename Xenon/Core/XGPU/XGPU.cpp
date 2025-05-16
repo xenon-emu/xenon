@@ -120,7 +120,8 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
     u32 value = xenosState->ReadRegister(reg, size);
     memcpy(data, &value, size);
 #ifdef XE_DEBUG
-    LOG_DEBUG(Xenos, "Read from {} (0x{:X}), index: 0x{:X}, value: 0x{:X}, size: 0x{:X}", Xe::XGPU::GetRegisterNameById(regIndex), readAddress, regIndex, value, size);
+    if (reg != XeRegister::D1MODE_VBLANK_STATUS)
+      LOG_DEBUG(Xenos, "Read from {} (0x{:X}), index: 0x{:X}, value: 0x{:X}, size: 0x{:X}", Xe::XGPU::GetRegisterNameById(regIndex), readAddress, regIndex, value, size);
 #endif
     return true;
   }
