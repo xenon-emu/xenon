@@ -313,6 +313,12 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
   case XeRegister::RB_SIDEBAND_DATA:
     value = edram->ReadReg();
     break;
+  case XeRegister::RB_AZ0_BC_CRC: // CRC's for EDRAM.
+    value = edram->ReadCRC_AZ0_BC();
+    break;
+  case XeRegister::RB_AZ1_BC_CRC:
+    value = edram->ReadCRC_AZ1_BC();
+    break;
   default:
     break;
   }

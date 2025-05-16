@@ -46,6 +46,19 @@ struct EDRAMState {
   u32 readData = 0;
   // Register set.
   std::vector<u32> edramRegs = {};
+  // CRC's registers indexes.
+  u32 az0BCRegIndex = 0;
+  u32 az1BCRegIndex = 0;
+  u32 reg41Index = 0;
+  u32 reg1041Index = 0;
+  // CRC AZ0 Data.
+  std::vector<u32> az0Data = {};
+  // CRC AZ1 Data.
+  std::vector<u32> az1Data = {};
+  // CRC Reg @ 0x41 Data.
+  std::vector<u32> reg41Data = {};
+  // CRC Reg @ 0x1041 Data.
+  std::vector<u32> reg1041Data = {};
 };
 
 // Specifies wich register index to modify, either read index or write index.
@@ -62,6 +75,9 @@ public:
   void SetRWRegIndex(eRegIndexType indexType, u32 index);
   u32 ReadReg();
   void WriteReg(u32 data);
+  // CRC regs.
+  u32 ReadCRC_AZ0_BC();
+  u32 ReadCRC_AZ1_BC();
 
   // Returns true if the edram is currently busy with work.
   bool isEdramBusy() { return edramState.get()->edramBusy; };
