@@ -5,6 +5,7 @@
 #include <array>
 #include <span>
 #include <stack>
+#include <unordered_set>
 
 #include "ASTNodeBase.h"
 #include "ASTNode.h"
@@ -24,21 +25,22 @@ public:
   virtual Chunk GetFloatValRelative(const u32 floatRegOffset) = 0;
   virtual Chunk GetPredicate() = 0;
 
-  virtual Chunk Abs(ExpressionNode *value) = 0;
-  virtual Chunk Negate(ExpressionNode *value) = 0;
-  virtual Chunk Not(ExpressionNode *value) = 0;
-  virtual Chunk Saturate(ExpressionNode *value) = 0;
-  virtual Chunk Swizzle(ExpressionNode *value, std::array<eSwizzle, 4> swizzle) = 0;
+  virtual Chunk Abs(const Chunk &value) = 0;
+  virtual Chunk Negate(const Chunk &value) = 0;
+  virtual Chunk Not(const Chunk &value) = 0;
+  virtual Chunk Saturate(const Chunk &value) = 0;
+  virtual Chunk Swizzle(const Chunk &value, std::array<eSwizzle, 4> swizzle) = 0;
 
   virtual Chunk FetchVertex(const Chunk &src, const VertexFetch &instr) = 0;
   virtual Chunk FetchTexture(const Chunk &src, const TextureFetch &instr) = 0;
 
-  virtual Chunk VectorFunc1(instr_vector_opc_t instr, ExpressionNode *arg1) = 0;
-  virtual Chunk VectorFunc2(instr_vector_opc_t instr, ExpressionNode *arg1, ExpressionNode *arg2) = 0;
-  virtual Chunk VectorFunc3(instr_vector_opc_t instr, ExpressionNode *arg1, ExpressionNode *arg2, ExpressionNode *arg3) = 0;
+  virtual Chunk VectorFunc1(instr_vector_opc_t instr, const Chunk &a) = 0;
+  virtual Chunk VectorFunc2(instr_vector_opc_t instr, const Chunk &a, const Chunk &b) = 0;
+  virtual Chunk VectorFunc3(instr_vector_opc_t instr, const Chunk &a, const Chunk &b, const Chunk &c) = 0;
 
-  virtual Chunk ScalarFunc1(instr_scalar_opc_t instr, ExpressionNode *arg1) = 0;
-  virtual Chunk ScalarFunc2(instr_scalar_opc_t instr, ExpressionNode *arg1, ExpressionNode *arg2) = 0;
+  virtual Chunk ScalarFunc0(instr_scalar_opc_t instr) = 0;
+  virtual Chunk ScalarFunc1(instr_scalar_opc_t instr, const Chunk &a) = 0;
+  virtual Chunk ScalarFunc2(instr_scalar_opc_t instr, const Chunk &a, const Chunk &b) = 0;
 
   virtual Chunk AllocLocalVector(const Chunk &initCode) = 0;
   virtual Chunk AllocLocalScalar(const Chunk &initCode) = 0;
@@ -67,11 +69,11 @@ public:
   virtual void Assign(const Chunk &dest, const Chunk &src) = 0;
   virtual void Emit(const Chunk &src) = 0;
 
-  virtual void AssignMasked(ExpressionNode *src, ExpressionNode *dst,
+  virtual void AssignMasked(const Chunk &src, const Chunk &dst,
     std::span<const eSwizzle> dstSwizzle,
     std::span<const eSwizzle> srcSwizzle) = 0;
 
-  virtual void AssignImmediate(ExpressionNode *dst,
+  virtual void AssignImmediate(const Chunk &dst,
     std::span<const eSwizzle> dstSwizzle,
     std::span<const eSwizzle> immediateValues) = 0;
 };
@@ -102,23 +104,24 @@ public:
   Chunk GetFloatValRelative(const u32 floatRegOffset) override;
   Chunk GetPredicate() override;
 
-  Chunk Abs(ExpressionNode *value) override;
-  Chunk Negate(ExpressionNode *value) override;
-  Chunk Not(ExpressionNode *value) override;
-  Chunk Saturate(ExpressionNode *value) override;
-  Chunk Swizzle(ExpressionNode *value, std::array<eSwizzle, 4> swizzle) override;
+  Chunk Abs(const Chunk &value) override;
+  Chunk Negate(const Chunk &value) override;
+  Chunk Not(const Chunk &value) override;
+  Chunk Saturate(const Chunk &value) override;
+  Chunk Swizzle(const Chunk &value, std::array<eSwizzle, 4> swizzle) override;
 
   Sirit::Id GetSampledImageType(instr_dimension_t dim);
 
   Chunk FetchVertex(const Chunk &src, const VertexFetch &instr) override;
   Chunk FetchTexture(const Chunk &src, const TextureFetch &instr) override;
 
-  Chunk VectorFunc1(instr_vector_opc_t instr, ExpressionNode *arg1) override;
-  Chunk VectorFunc2(instr_vector_opc_t instr, ExpressionNode *arg1, ExpressionNode *arg2) override;
-  Chunk VectorFunc3(instr_vector_opc_t instr, ExpressionNode *arg1, ExpressionNode *arg2, ExpressionNode *arg3) override;
+  Chunk VectorFunc1(instr_vector_opc_t instr, const Chunk &a) override;
+  Chunk VectorFunc2(instr_vector_opc_t instr, const Chunk &a, const Chunk &b) override;
+  Chunk VectorFunc3(instr_vector_opc_t instr, const Chunk &a, const Chunk &b, const Chunk &c) override;
 
-  Chunk ScalarFunc1(instr_scalar_opc_t instr, ExpressionNode *arg1) override;
-  Chunk ScalarFunc2(instr_scalar_opc_t instr, ExpressionNode *arg1, ExpressionNode *arg2) override; 
+  Chunk ScalarFunc0(instr_scalar_opc_t instr) override;
+  Chunk ScalarFunc1(instr_scalar_opc_t instr, const Chunk &a) override;
+  Chunk ScalarFunc2(instr_scalar_opc_t instr, const Chunk &a, const Chunk &b) override; 
 
   Chunk AllocLocalImpl(Sirit::Id type, const Chunk &initCode);
 
@@ -149,11 +152,11 @@ public:
   void Assign(const Chunk &dest, const Chunk &src) override;
   void Emit(const Chunk &src) override;
 
-  void AssignMasked(ExpressionNode *src, ExpressionNode *dst,
+  void AssignMasked(const Chunk &src, const Chunk &dst,
     std::span<const eSwizzle> dstSwizzle,
     std::span<const eSwizzle> srcSwizzle) override;
 
-  void AssignImmediate(ExpressionNode *dst,
+  void AssignImmediate(const Chunk &dst,
     std::span<const eSwizzle> dstSwizzle,
     std::span<const eSwizzle> immediateValues) override;
 
@@ -162,6 +165,7 @@ public:
   std::unordered_map<u32, Sirit::Id> texture_vars{};
 
   std::unordered_map<u32, Sirit::Id> vertex_input_vars{};
+  std::unordered_set<u32> used_vertex_slots{};
   std::unordered_set<eExportReg> used_exports{};
   std::unordered_map<std::string, Sirit::Id> input_vars{};
   std::unordered_map<eExportReg, Sirit::Id> output_vars{};

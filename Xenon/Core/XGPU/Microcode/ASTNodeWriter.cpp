@@ -142,6 +142,10 @@ Expression NodeWriter::EmitVectorInstruction3(instr_vector_opc_t instr, Expressi
   return { std::make_shared<VectorFunc3>(instr, a.Get<ExpressionNode>(), b.Get<ExpressionNode>(), c.Get<ExpressionNode>()) };
 }
 
+Expression NodeWriter::EmitScalarInstruction0(instr_scalar_opc_t instr) {
+  return { std::make_shared<ScalarFunc0>(instr) };
+}
+
 Expression NodeWriter::EmitScalarInstruction1(instr_scalar_opc_t instr, Expression a) {
   if (!a)
     return {};

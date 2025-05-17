@@ -70,23 +70,28 @@ Chunk GetPredicate::EmitShaderCode(ShaderCodeWriterBase &writer) {
 }
 
 Chunk Abs::EmitShaderCode(ShaderCodeWriterBase &writer) {
-  return writer.Abs(children[0].get());
+  Chunk src = children[0]->EmitShaderCode(writer);
+  return writer.Abs(src);
 }
 
 Chunk Negate::EmitShaderCode(ShaderCodeWriterBase &writer) {
-  return writer.Negate(children[0].get());
+  Chunk src = children[0]->EmitShaderCode(writer);
+  return writer.Negate(src);
 }
 
 Chunk Not::EmitShaderCode(ShaderCodeWriterBase &writer) {
-  return writer.Not(children[0].get());
+  Chunk src = children[0]->EmitShaderCode(writer);
+  return writer.Not(src);
 }
 
 Chunk Saturate::EmitShaderCode(ShaderCodeWriterBase &writer) {
-  return writer.Saturate(children[0].get());
+  Chunk src = children[0]->EmitShaderCode(writer);
+  return writer.Saturate(src);
 }
 
 Chunk Swizzle::EmitShaderCode(ShaderCodeWriterBase &writer) {
-  return writer.Swizzle(children[0].get(), swizzle);
+  Chunk src = children[0]->EmitShaderCode(writer);
+  return writer.Swizzle(src, swizzle);
 }
 
 Chunk VertexFetch::EmitShaderCode(ShaderCodeWriterBase &writer) {
@@ -100,23 +105,36 @@ Chunk TextureFetch::EmitShaderCode(ShaderCodeWriterBase &writer) {
 }
 
 Chunk VectorFunc1::EmitShaderCode(ShaderCodeWriterBase &writer) {
-  return writer.VectorFunc1(vectorInstr, children[0].get());
+  Chunk a = children[0]->EmitShaderCode(writer);
+  return writer.VectorFunc1(vectorInstr, a);
 }
 
 Chunk VectorFunc2::EmitShaderCode(ShaderCodeWriterBase &writer) {
-  return writer.VectorFunc2(vectorInstr, children[0].get(), children[1].get());
+  Chunk a = children[0]->EmitShaderCode(writer);
+  Chunk b = children[1]->EmitShaderCode(writer);
+  return writer.VectorFunc2(vectorInstr, a, b);
 }
 
 Chunk VectorFunc3::EmitShaderCode(ShaderCodeWriterBase &writer) {
-  return writer.VectorFunc3(vectorInstr, children[0].get(), children[1].get(), children[2].get());
+  Chunk a = children[0]->EmitShaderCode(writer);
+  Chunk b = children[1]->EmitShaderCode(writer);
+  Chunk c = children[2]->EmitShaderCode(writer);
+  return writer.VectorFunc3(vectorInstr, a, b, c);
+}
+
+Chunk ScalarFunc0::EmitShaderCode(ShaderCodeWriterBase &writer) {
+  return writer.ScalarFunc0(scalarInstr);
 }
 
 Chunk ScalarFunc1::EmitShaderCode(ShaderCodeWriterBase &writer) {
-  return writer.ScalarFunc1(scalarInstr, children[0].get());
+  Chunk a = children[0]->EmitShaderCode(writer);
+  return writer.ScalarFunc1(scalarInstr, a);
 }
 
 Chunk ScalarFunc2::EmitShaderCode(ShaderCodeWriterBase &writer) {
-  return writer.ScalarFunc2(scalarInstr, children[0].get(), children[1].get());
+  Chunk a = children[0]->EmitShaderCode(writer);
+  Chunk b = children[1]->EmitShaderCode(writer);
+  return writer.ScalarFunc2(scalarInstr, a, b);
 }
 
 } // namespace Xe::Microcode::AST

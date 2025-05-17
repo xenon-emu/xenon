@@ -279,13 +279,11 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
   const u32 destPitchRaw = state->copyDestPitch;
   const u32 destPitch = destPitchRaw & 0x3FFF;
   const u32 destHeight = (destPitchRaw >> 16) & 0x3FFF;
-  // TODO: Actually pull the data
   const u32 copyVertexFetchSlot = 0;
-  Xe::VertexFetchData vertexData{};
-  vertexData.dword0 = state->ReadRegister(XeRegister::SHADER_CONSTANT_FETCH_00_0);
-  vertexData.dword1 = state->ReadRegister(XeRegister::SHADER_CONSTANT_FETCH_00_1);
-  u32 address = vertexData.address << 2;
-  LOG_DEBUG(Xenos, "[CP] Copy state to EDRAM (address: 0x{:X}, size 0x{:X})", address, vertexData.size);
+  state->vertexData.dword0 = state->ReadRegister(XeRegister::SHADER_CONSTANT_FETCH_00_0);
+  state->vertexData.dword1 = state->ReadRegister(XeRegister::SHADER_CONSTANT_FETCH_00_1);
+  u32 address = state->vertexData.address;
+  LOG_DEBUG(Xenos, "[CP] Copy state to EDRAM (address: 0x{:X}, size 0x{:X})", address, state->vertexData.size);
   // Clear
   if (colorClearEnabled) {
     u8 a = (state->clearColor >> 24) & 0xFF;
@@ -338,9 +336,9 @@ void Renderer::Thread() {
         : Render::eShaderType::Vertex;
 
       if (shaderType == Render::eShaderType::Vertex) {
-        pendingVertexShaders[job.shaderCRC] = job.binary;
+        pendingVertexShaders[job.shaderCRC] = std::make_pair(job.shaderTree, job.binary);
       } else {
-        pendingPixelShaders[job.shaderCRC] = job.binary;
+        pendingPixelShaders[job.shaderCRC] = std::make_pair(job.shaderTree, job.binary);
       }
 
       // See if we have both shaders now
@@ -351,10 +349,15 @@ void Renderer::Thread() {
         if (vsIt != pendingVertexShaders.end() && fsIt != pendingPixelShaders.end()) {
           u64 combinedHash = (static_cast<u64>(currentVertexShader) << 32) | currentPixelShader;
           std::shared_ptr<Shader> shader = shaderFactory->LoadFromBinary(job.name, {
-            { shaderType, job.binary }
+            { Render::eShaderType::Vertex, fsIt->second.second },
+            { Render::eShaderType::Fragment, fsIt->second.second },
           });
           if (shader) {
-            linkedShaderPrograms.insert({ combinedHash, shader });
+            Xe::XGPU::XeShader xeShader{};
+            xeShader.program = std::move(shader);
+            xeShader.pixelShader = fsIt->second.first;
+            xeShader.vertexShader = fsIt->second.first;
+            linkedShaderPrograms.insert({ combinedHash, xeShader });
             LOG_DEBUG(Xenos, "Linked shader program: VS: 0x{:08X}, PS: 0x{:08X}", currentVertexShader, currentPixelShader);
           } else {
             LOG_ERROR(Xenos, "Failed to link shader programs.");
@@ -417,7 +420,7 @@ void Renderer::Thread() {
         u64 combinedHash = (static_cast<u64>(job.shaderVS) << 32) | job.shaderPS;
         auto shader = linkedShaderPrograms.find(combinedHash);
         if (shader != linkedShaderPrograms.end()) {
-          shader->second->Bind();
+          shader->second.program->Bind();
         }
 
         if (job.indexed) {

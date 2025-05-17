@@ -199,6 +199,7 @@ void PPU::Reset() {
   // Tell the thread to reset it
   ppuThreadResetting = true;
 }
+
 void PPU::Halt(u64 haltOn, bool requestedByGuest, s8 ppuId, ePPUThread threadId) {
   if (haltOn && !guestHalt) {
     LOG_DEBUG(Xenon, "Halting PPU{} on address 0x{:X}", ppuState->ppuID, haltOn);

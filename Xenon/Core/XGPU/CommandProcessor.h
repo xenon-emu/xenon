@@ -23,11 +23,13 @@
 #include "Base/Types.h"
 #include "Core/RAM/RAM.h"
 #include "Core/RootBus/HostBridge/PCIBridge/PCIBridge.h"
+#include "Core/XGPU/Microcode/ASTBlock.h"
 #include "Core/XGPU/PM4Opcodes.h"
 #include "Core/XGPU/RingBuffer.h"
 #include "Core/XGPU/XenosRegisters.h"
 #include "Core/XGPU/Xenos.h"
 #include "Core/XGPU/XenosState.h"
+#include "Render/Abstractions/Shader.h"
 
 // Xenos GPU Command Processor.
 // Handles all commands sent to the Xenos via the RingBuffer.
@@ -43,11 +45,22 @@ struct XeIndexBufferInfo {
   eEndian endianness = eEndian::xeNone;
   u32 count = 0;
   u32 guestBase = 0;
-  size_t length = 0;
+  u8 *elements = 0;
+  u64 length = 0;
+};
+
+struct XeShader {
+  Microcode::AST::Shader *vertexShader = nullptr;
+  Microcode::AST::Shader *pixelShader = nullptr;
+  std::shared_ptr<Render::Shader> program = {};
 };
 
 struct XeDrawParams {
-  XeIndexBufferInfo indexBufferInfo;
+  XenosState *state = nullptr;
+  XeIndexBufferInfo indexBufferInfo = {};
+  VGT_DRAW_INITIATOR_REG vgtDrawInitiator = {};
+  XeShader shader;
+  u8 *vertexBufferPtr = nullptr;
   u32 maxVertexIndex = 0;
   u32 minVertexIndex = 0;
   u32 indexOffset = 0;

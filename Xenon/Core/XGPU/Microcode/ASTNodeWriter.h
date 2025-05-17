@@ -144,6 +144,8 @@ public:
   // Wrapper for function evaluation
   Expression EmitVectorInstruction3(instr_vector_opc_t instr, Expression a, Expression b, Expression c);
   // Wrapper for function evaluation
+  Expression EmitScalarInstruction0(instr_scalar_opc_t instr);
+  // Wrapper for function evaluation
   Expression EmitScalarInstruction1(instr_scalar_opc_t instr, Expression a);
   // Wrapper for function evaluation
   Expression EmitScalarInstruction2(instr_scalar_opc_t instr, Expression a, Expression b);

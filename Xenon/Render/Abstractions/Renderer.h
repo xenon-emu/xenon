@@ -18,6 +18,7 @@
 
 #include "Core/RAM/RAM.h"
 #include "Core/RootBus/HostBridge/PCIe.h"
+#include "Core/XGPU/Microcode/ASTBlock.h"
 #include "Core/XGPU/CommandProcessor.h"
 #include "Core/XGPU/ShaderConstants.h"
 #include "Render/Abstractions/Factory/ResourceFactory.h"
@@ -34,14 +35,15 @@ class GUI;
 struct DrawJob {
   bool indexed = false;
   Xe::XGPU::XeDrawParams params = {};
-  u32 shaderVS = 0;
-  u32 shaderPS = 0;
+  u32 shaderVS = 0, shaderPS = 0;
+  u64 shaderHash = 0;
 };
 
 struct ShaderLoadJob {
   Xe::eShaderType shaderType = Xe::eShaderType::Unknown;
   u32 shaderCRC = 0;
   std::string name = {};
+  Xe::Microcode::AST::Shader *shaderTree = nullptr;
   std::vector<u32> binary = {};
 };
 
@@ -145,9 +147,9 @@ public:
   void SetDebuggerActive(s8 specificPPU = -1);
   
   // Recompiled shaders
-  std::unordered_map<u32, std::vector<u32>> pendingVertexShaders{};
-  std::unordered_map<u32, std::vector<u32>> pendingPixelShaders{};
-  std::unordered_map<u64, std::shared_ptr<Shader>> linkedShaderPrograms{};
+  std::unordered_map<u32, std::pair<Xe::Microcode::AST::Shader*, std::vector<u32>>> pendingVertexShaders{};
+  std::unordered_map<u32, std::pair<Xe::Microcode::AST::Shader*, std::vector<u32>>> pendingPixelShaders{};
+  std::unordered_map<u64, Xe::XGPU::XeShader> linkedShaderPrograms{};
   u32 currentVertexShader = 0;
   u32 currentPixelShader = 0;
   std::queue<Xe::XGPU::XenosState*> copyQueue{};

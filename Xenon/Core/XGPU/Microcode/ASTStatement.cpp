@@ -39,7 +39,9 @@ void SetPredicateStatement::Visit(Visitor &visitor) const
 {}
 
 void SetPredicateStatement::EmitShaderCode(ShaderCodeWriterBase &writer) {
-  writer.SetPredicate(expression->EmitShaderCode(writer));
+  Chunk value = expression->EmitShaderCode(writer);
+  LOG_DEBUG(Xenos, "[AST::Sirit] SetPredicateStatement::EmitShaderCode({})", value.id.value);
+  writer.SetPredicate(value);
 }
 
 void WriteWithMaskStatement::Visit(Visitor &visitor) const {
@@ -87,7 +89,9 @@ void WriteWithMaskStatement::EmitShaderCode(ShaderCodeWriterBase &writer) {
   if (numSourceSwizzles > 0) {
     std::span<const eSwizzle> dstSpan(dest.data(), numSourceSwizzles);
     std::span<const eSwizzle> srcSpan(src.data(), numSourceSwizzles);
-    writer.AssignMasked(source.get(), target.get(), dstSpan, srcSpan);
+    Chunk src = source->EmitShaderCode(writer);
+    Chunk dst = target->EmitShaderCode(writer);
+    writer.AssignMasked(src, dst, dstSpan, srcSpan);
   }
 
   if (numSpecialChannels > 0) {
@@ -103,7 +107,8 @@ void WriteWithMaskStatement::EmitShaderCode(ShaderCodeWriterBase &writer) {
       }
     }
 
-    writer.AssignImmediate(target.get(),
+    Chunk dst = target->EmitShaderCode(writer);
+    writer.AssignImmediate(dst,
                            std::span(destImmediateSwizzle.data(), index),
                            std::span(immediateSwizzle.data(), index));
   }

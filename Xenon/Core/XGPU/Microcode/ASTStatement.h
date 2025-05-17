@@ -53,11 +53,11 @@ public:
   void Visit(Visitor &vistor) const override;
   void EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<StatementNode> CloneStatement() const override {
-    return std::make_unique<ListStatement>(*this);
+    return std::make_unique<ListStatement>(statementA, statementB);
   }
 protected:
-  std::shared_ptr<StatementNode> statementA = nullptr;
-  std::shared_ptr<StatementNode> statementB = nullptr;
+  StatementNode::Ptr statementA = nullptr;
+  StatementNode::Ptr statementB = nullptr;
 };
 
 class ConditionalStatement : public StatementNode {
@@ -70,11 +70,11 @@ public:
   void Visit(Visitor &vistor) const override;
   void EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<StatementNode> CloneStatement() const override {
-    return std::make_unique<ConditionalStatement>(*this);
+    return std::make_unique<ConditionalStatement>(statement, condition);
   }
 protected:
-  std::shared_ptr<StatementNode> statement = nullptr;
-  std::shared_ptr<ExpressionNode> condition = nullptr;
+  StatementNode::Ptr statement = nullptr;
+  ExpressionNode::Ptr condition = nullptr;
 };
 
 class SetPredicateStatement : public StatementNode {
@@ -86,10 +86,10 @@ public:
   void Visit(Visitor &vistor) const override;
   void EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<StatementNode> CloneStatement() const override {
-    return std::make_unique<SetPredicateStatement>(*this);
+    return std::make_unique<SetPredicateStatement>(expression);
   }
 protected:
-  std::shared_ptr<ExpressionNode> expression = nullptr;
+  ExpressionNode::Ptr expression = nullptr;
 };
 
 class WriteWithMaskStatement : public StatementNode {
@@ -106,11 +106,11 @@ public:
   void Visit(Visitor &vistor) const override;
   void EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<StatementNode> CloneStatement() const override {
-    return std::make_unique<WriteWithMaskStatement>(*this);
+    return std::make_unique<WriteWithMaskStatement>(target, source, mask[0],  mask[1],  mask[2],  mask[3]);
   }
 protected:
-  std::shared_ptr<ExpressionNode> target = nullptr;
-  std::shared_ptr<ExpressionNode> source = nullptr;
+  ExpressionNode::Ptr target = nullptr;
+  ExpressionNode::Ptr source = nullptr;
   std::array<eSwizzle, 4> mask = {};
 };
 

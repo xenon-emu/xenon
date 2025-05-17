@@ -114,7 +114,7 @@ void OGLRenderer::Clear() {
   glClear(GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
 }
 
-GLenum ConvertToGLPrimitive(ePrimitiveType prim) {
+s32 ConvertToGLPrimitive(ePrimitiveType prim) {
   switch (prim) {
     case ePrimitiveType::xePointList: return GL_POINTS;
     case ePrimitiveType::xeLineList: return GL_LINES;
@@ -127,10 +127,42 @@ GLenum ConvertToGLPrimitive(ePrimitiveType prim) {
 
 void OGLRenderer::Draw(Xe::XGPU::XeDrawParams params) {
   // TODO: Draw
+  ePrimitiveType type = params.vgtDrawInitiator.primitiveType;
+  s32 glPrimitive = ConvertToGLPrimitive(params.vgtDrawInitiator.primitiveType);
+  u32 numIndices = params.vgtDrawInitiator.numIndices;
+  glDrawArrays(glPrimitive, 0, params.vgtDrawInitiator.numIndices);
 }
 
 void OGLRenderer::DrawIndexed(Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) {
   // TODO: Draw
+  ePrimitiveType type = params.vgtDrawInitiator.primitiveType;
+  s32 glPrimitive = ConvertToGLPrimitive(params.vgtDrawInitiator.primitiveType);
+  u32 numIndices = params.vgtDrawInitiator.numIndices;
+  s32 indexType = indexBufferInfo.indexFormat == eIndexFormat::xeInt16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
+  const u32 destInfo = params.state->copyDestInfo;
+  const Xe::eEndianFormat endianFormat = static_cast<Xe::eEndianFormat>(destInfo & 7);
+  const u32 destArray = (destInfo >> 3) & 1;
+  const u32 destSlice = (destInfo >> 4) & 1;
+  const Xe::eColorFormat destformat = static_cast<Xe::eColorFormat>((destInfo >> 7) & 0x3F);
+  if (params.shader.vertexShader) {
+    for (const auto *fetch : params.shader.vertexShader->vertexFetches) {
+      u32 slot = fetch->fetchSlot;
+      u32 offset = fetch->fetchOffset;
+
+      // Fetch float constants from cN (2 registers per slot)
+      const u32 *dwords = reinterpret_cast<const u32 *>(&params.state->vsConsts.values[slot * 8]); // 8 floats = 2 cN vec4s
+
+      // Bind vertex buffer (simplified for now: no VBO reuse, just raw pointer)
+      glBindBuffer(GL_ARRAY_BUFFER, 0); // No VBO
+      u32 stride = params.state->vertexData.size;
+      const u8 *basePtr = params.vertexBufferPtr + params.minVertexIndex * stride + offset;
+
+      // Assume format is float4
+      glEnableVertexAttribArray(slot);
+      glVertexAttribPointer(slot, 4, GL_FLOAT, GL_FALSE, stride, (const void *)basePtr);
+    }
+  }
+  glDrawElements(glPrimitive, numIndices, indexType, (void*)indexBufferInfo.elements);
 }
 
 void OGLRenderer::UpdateViewportFromState(const Xe::XGPU::XenosState *state) {

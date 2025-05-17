@@ -4,15 +4,23 @@
 
 #include <atomic>
 #include <bit>
-#include <format>
 #include <type_traits>
+#ifndef TOOL
+#include <fmt/format.h>
+#else
+#include <format>
+#endif
 
 // Vali0004: Helper macro to make me sane when doing RAII
 #define STRIP_UNIQUE(x) std::remove_pointer_t<decltype(x.get())>
 #define STRIP_UNIQUE_ARR(x) std::remove_pointer_t<decltype(x.get())>[]
 
+#ifndef TOOL
 namespace Base { extern std::atomic<bool> gSafeTerm; }
 #define SYSTEM_PAUSE() { Base::gSafeTerm = false; fmt::print("Press Enter to continue..."); (void)getchar(); }
+#else
+#define SYSTEM_PAUSE() { printf("Press Enter to continue..."); (void)getchar(); }
+#endif
 
 // Compile time macros to get endianess
 #ifdef _MSC_VER
@@ -141,7 +149,11 @@ template <typename cT, typename T>
   // Associative container
   size_t cSize = c.size();
   if (cSize <= idx) [[unlikely]] {
+#ifndef TOOL
+    throw_fail_debug_msg(fmt::format("Range check failed! (index: {}{})", idx, cSize != max_v<size_t> ? fmt::format(", size: {}", cSize) : ""));
+#else
     throw_fail_debug_msg(std::format("Range check failed! (index: {}{})", idx, cSize != max_v<size_t> ? std::format(", size: {}", cSize) : ""));
+#endif
   }
   auto it = std::begin(std::forward<cT>(c));
   std::advance(it, idx);
@@ -157,7 +169,11 @@ template <typename cT, typename T>
   if constexpr ((requires() { c.size(); }))
     cSize = c.size();
   if (found == c.end()) [[unlikely]] {
+#ifndef TOOL
+    throw_fail_debug_msg(fmt::format("Range check failed! (index: {}{})", idx, cSize != max_v<size_t> ? fmt::format(", size: {}", cSize) : ""));
+#else
     throw_fail_debug_msg(std::format("Range check failed! (index: {}{})", idx, cSize != max_v<size_t> ? std::format(", size: {}", cSize) : ""));
+#endif
   }
   return found->second;
 }

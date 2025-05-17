@@ -268,8 +268,33 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
   case XeRegister::PA_CL_VPORT_ZSCALE:
     value = viewportZScale;
     break;
+  case XeRegister::VGT_MAX_VTX_INDX:
+    value = maxVertexIndex;
+    break;
+  case XeRegister::VGT_MIN_VTX_INDX:
+    value = minVertexIndex;
+    break;
+  case XeRegister::VGT_INDX_OFFSET:
+    value = indexOffset;
+    break;
+  case XeRegister::VGT_MULTI_PRIM_IB_RESET_INDX:
+    value = multiPrimitiveIndexBufferResetIndex;
+    break;
+    break;
+  case XeRegister::VGT_CURRENT_BIN_ID_MIN:
+    value = currentBinIdMin;
+    break;
   case XeRegister::RB_STENCILREFMASK:
     value = stencilReferenceMask;
+    break;
+  case XeRegister::VGT_DMA_BASE:
+    value = vgtDMABase;
+    break;
+  case XeRegister::VGT_DMA_SIZE:
+    value = vgtDMASize.hexValue;
+    break;
+  case XeRegister::VGT_DRAW_INITIATOR:
+    value = vgtDrawInitiator.hexValue;
     break;
   case XeRegister::RB_DEPTHCONTROL:
     value = depthControl;
@@ -581,8 +606,33 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
   case XeRegister::PA_CL_VPORT_ZSCALE:
     viewportZScale = value;
     break;
+  case XeRegister::VGT_MAX_VTX_INDX:
+    maxVertexIndex = value;
+    break;
+  case XeRegister::VGT_MIN_VTX_INDX:
+    minVertexIndex = value;
+    break;
+  case XeRegister::VGT_INDX_OFFSET:
+    indexOffset = value;
+    break;
+  case XeRegister::VGT_MULTI_PRIM_IB_RESET_INDX:
+    multiPrimitiveIndexBufferResetIndex = value;
+    break;
+    break;
+  case XeRegister::VGT_CURRENT_BIN_ID_MIN:
+    currentBinIdMin = value;
+    break;
   case XeRegister::RB_STENCILREFMASK:
     stencilReferenceMask = value;
+    break;
+  case XeRegister::VGT_DMA_BASE:
+    vgtDMABase = value;
+    break;
+  case XeRegister::VGT_DMA_SIZE:
+    vgtDMASize.hexValue = value;
+    break;
+  case XeRegister::VGT_DRAW_INITIATOR:
+    vgtDrawInitiator.hexValue = value;
     break;
   case XeRegister::RB_DEPTHCONTROL:
     depthControl = value;

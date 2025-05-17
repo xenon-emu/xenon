@@ -269,6 +269,10 @@ AST::Statement ShaderNodeWriter::EmitALU(AST::NodeWriter &nodeWriter, const inst
     const u32 argCount = GetArgCount(scalarInstr);
     // Process function depending on the argument count
     switch (argCount) {
+  case 0: {
+    AST::Expression func = nodeWriter.EmitScalarInstruction0(scalarInstr);
+    scalar = EmitScalarResult(nodeWriter, alu, func);
+  } break;
     case 1: {
       AST::Expression arg1 = EmitSrcReg(nodeWriter, alu, 2);
       AST::Expression func = nodeWriter.EmitScalarInstruction1(scalarInstr, arg1);

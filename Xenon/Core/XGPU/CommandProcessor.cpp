@@ -533,7 +533,7 @@ bool CommandProcessor::ExecutePacketType3_EVENT_WRITE(RingBuffer *ringBuffer, u3
   const u32 initiator = ringBuffer->ReadAndSwap<u32>();
 
   // Writeback
-  state->WriteRegister(XeRegister::VGT_EVENT_INITIATOR, initiator & 0x3F);
+  state->vgtDrawInitiator.hexValue = initiator & 0x3F;
 
   if (dataCount == 1) {
     // Unknown what should be done here
@@ -686,12 +686,13 @@ void VisitAll(const Microcode::AST::ControlFlowGraph *cf, Microcode::AST::Statem
   }
 }
 
-std::vector<u32> LoadShader(eShaderType shaderType, const std::vector<u32> &data, std::string baseString) {
+std::pair<Microcode::AST::Shader*, std::vector<u32>> LoadShader(eShaderType shaderType, const std::vector<u32> &data, std::string baseString) {
   fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "cache" };
   fs::path path{ shaderPath / (baseString + ".spv") };
   std::vector<u32> code{};
   // Vali: Temporarily disable cache, emitting isn't 100% yet
-  {
+  // Plus, I need to figure Shader ptr out
+  /*{
     std::ifstream file{ path, std::ios::in | std::ios::binary };
     std::error_code error;
     if (fs::exists(path, error) && file.is_open()) {
@@ -702,7 +703,7 @@ std::vector<u32> LoadShader(eShaderType shaderType, const std::vector<u32> &data
       return code;
     }
     file.close();
-  }
+  }*/
   Microcode::AST::Shader *shader = Microcode::AST::Shader::DecompileMicroCode(reinterpret_cast<const u8*>(data.data()), data.size() * 4, shaderType);
   Microcode::AST::ShaderCodeWriterSirit writer{ shaderType, shader };
   if (shader) {
@@ -712,7 +713,7 @@ std::vector<u32> LoadShader(eShaderType shaderType, const std::vector<u32> &data
   std::ofstream f{ shaderPath / (baseString + ".spv"), std::ios::out | std::ios::binary };
   f.write(reinterpret_cast<char*>(code.data()), code.size() * 4);
   f.close();
-  return code;
+  return { shader, code };
 }
 
 bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
@@ -742,13 +743,14 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
     f.close();
   }
 
-  std::vector<u32> shader = LoadShader(shaderType, data, baseString);
+  std::pair<Microcode::AST::Shader*, std::vector<u32>> shader = LoadShader(shaderType, data, baseString);
 
   render->shaderLoadQueue.push({
     shaderType,
     crc,
     baseString,
-    shader
+    shader.first,
+    shader.second
   });
 
   switch (shaderType) {
@@ -793,14 +795,15 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuff
     f.write(reinterpret_cast<char *>(data.data()), data.size() * 4);
     f.close();
   }
-
-  std::vector<u32> shader = LoadShader(shaderType, data, baseString);
+  
+  std::pair<Microcode::AST::Shader*, std::vector<u32>> shader = LoadShader(shaderType, data, baseString);
 
   render->shaderLoadQueue.push({
     shaderType,
     crc,
     baseString,
-    shader
+    shader.first,
+    shader.second
   });
 
   switch (shaderType) {
@@ -906,7 +909,7 @@ bool CommandProcessor::ExecutePacketType3_EVENT_WRITE_SHD(RingBuffer *ringBuffer
   const u32 value = ringBuffer->ReadAndSwap<u32>();
 
   // Writeback
-  state->WriteRegister(XeRegister::VGT_EVENT_INITIATOR, initiator & 0x3F);
+  state->vgtDrawInitiator.hexValue = initiator & 0x3F;
 
   u32 writeValue = 0;
   if ((initiator >> 31) & 0x1) {
@@ -1021,58 +1024,52 @@ bool CommandProcessor::ExecutePacketType3_SET_BIN_SELECT_HI(RingBuffer *ringBuff
 bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packetData, u32 dataCount, u32 vizQueryCondition, const char *opCodeName) {
   // Sanity check.
   if (!dataCount) {
-    LOG_ERROR(Xenos, "[CP, PT3]: Packet too small, can't read VGT_DRAW_INITIATOR, OpCode {}.", opCodeName);
+    LOG_ERROR(Xenos, "[CP, PT3]: Packet too small, can't read VGT_DRAW_INITIATOR");
     return false;
   }
 
-  // Get our VGT register data.
+  // Get our VGT register data
   state->vgtDrawInitiator.hexValue = ringBuffer->ReadAndSwap<u32>();
   dataCount--;
-
-  // Write the VGT_DRAW_INITIATOR register.
-  state->WriteRegister(XeRegister::VGT_DRAW_INITIATOR, state->vgtDrawInitiator.hexValue);
 
   bool isIndexedDraw = false;
   bool drawOk = true;
 
-  // Our Index Buffer info for indexed draws.
+  // Our Index Buffer info for indexed draws
   XeIndexBufferInfo indexBufferInfo;
 
   switch (state->vgtDrawInitiator.sourceSelect) {
   case eSourceSelect::xeDMA: {
-    // Indexed draw.
+    // Indexed draw
     isIndexedDraw = true;
 
-    // Read VGT_DMA_BASE from data.
-    // Sanity check.
+    // Read VGT_DMA_BASE from data
+    // Sanity check
     if (!dataCount) {
       LOG_ERROR(Xenos, "[CP, PT3]: DRAW failed, not enough data for VGT_DMA_BASE.");
-      return false; // Failed.
+      return false; // Failed
     }
 
-    u32 vgtDMABase = ringBuffer->ReadAndSwap<u32>();
+    // Write the VGT_DMA_BASE register
+    state->vgtDMABase = ringBuffer->ReadAndSwap<u32>();
     dataCount--;
 
-    // Write the VGT_DMA_BASE register.
-    state->WriteRegister(XeRegister::VGT_DMA_BASE, vgtDMABase);
-
-    // Sanity check, again.
+    // Sanity check, again
     if (!dataCount) {
       LOG_ERROR(Xenos, "[CP, PT3]: DRAW failed, not enough data for VGT_DMA_SIZE.");
-      return false; // Failed.
+      return false; // Failed
     }
 
+    // Write the VGT_DMA_SIZE register
     state->vgtDMASize.hexValue = ringBuffer->ReadAndSwap<u32>();
     dataCount--;
-
-    // Write the VGT_DMA_SIZE register.
-    state->WriteRegister(XeRegister::VGT_DMA_SIZE, state->vgtDMASize.hexValue);
 
     // Get our index size from VGT_DRAW_INITIATOR size in bytes.
     u32 indexSizeInBytes = state->vgtDrawInitiator.indexSize == eIndexFormat::xeInt16 ? sizeof(u16) : sizeof(u32);
 
     // The base address must already be word-aligned according to the R6xx documentation.
-    indexBufferInfo.guestBase = vgtDMABase & ~(indexSizeInBytes - 1);
+    indexBufferInfo.guestBase = state->vgtDMABase & ~(indexSizeInBytes - 1);
+    indexBufferInfo.elements = ram->getPointerToAddress(indexBufferInfo.guestBase);
     indexBufferInfo.endianness = state->vgtDMASize.swapMode;
     indexBufferInfo.indexFormat = state->vgtDrawInitiator.indexSize;
     indexBufferInfo.length = state->vgtDMASize.numWords * indexSizeInBytes;
@@ -1122,7 +1119,12 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
       return true;
     }
     XeDrawParams params = {};
+    u32 combinedShaderHash = (static_cast<u64>(render->currentVertexShader) << 32) | render->currentPixelShader;
+    params.state = state;
     params.indexBufferInfo = indexBufferInfo;
+    params.vgtDrawInitiator = state->vgtDrawInitiator;
+    params.shader = render->linkedShaderPrograms[combinedShaderHash];
+    params.vertexBufferPtr = ram->getPointerToAddress(state->vertexData.address);
     params.maxVertexIndex = state->maxVertexIndex;
     params.minVertexIndex = state->minVertexIndex;
     params.indexOffset = state->indexOffset;
@@ -1133,6 +1135,7 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
     drawJob.indexed = isIndexedDraw;
     drawJob.shaderPS = render->currentPixelShader;
     drawJob.shaderVS = render->currentVertexShader;
+    drawJob.shaderHash = combinedShaderHash;
     // Queue off to the Renderer
     render->drawQueue.push(drawJob);
     LOG_DEBUG(Xenos, "[CP] Draw{}", isIndexedDraw ? "Indexed" : "");
