@@ -55,7 +55,7 @@ public:
     return xenosState->internalHeight;
   }
   bool RenderingTo2DFramebuffer() {
-    return xenosState->rbbmControl != 0xFFFF0000 && false;
+    return xenosState->rbbmControl != 0xFFFF0000 && !xenosState->framebufferDisable;
   }
 private:
   // PCI Bridge pointer. Used for Interrupts.
