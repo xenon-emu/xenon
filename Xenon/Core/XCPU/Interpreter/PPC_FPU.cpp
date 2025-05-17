@@ -184,14 +184,14 @@ void PPCInterpreter::PPCInterpreter_fctidzx(PPU_STATE *ppuState) {
   FPRi(frd).valueAsDouble = std::bit_cast<f64>(flippedVal);
 #elif defined(ARCH_AARCH64)
   const float64x2_t val = vsetq_lane_f64(FPRi(frb).valueAsDouble, vdupq_n_f64(0), 0);
-  const int32x2_t intVal = vcvt_s32_f64(vget_low_f64(val));
+  const int32x4_t intVal = vcvtq_s32_f64(val);
   const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(0x80000000));
-  const uint64x2_t cmpMask = vcgeq_f64(val, threshold);
-
+  const uint64x2_t cmpMask64 = vcgeq_f64(val, threshold);
   // Narrow 64-bit mask to 32-bit
-  const uint32_t flip = vgetq_lane_u64(cmpMask, 0) ? 0xFFFFFFFF : 0;
-  const int32_t raw = vget_lane_s32(intVal, 0);
-  const int32_t result = raw ^ static_cast<int32_t>(flip & 0xFFFFFFFF);
+  const uint32_t flip = vgetq_lane_u64(cmpMask64, 0) ? 0x80000000 : 0;
+  const int32_t raw = vgetq_lane_s32(intVal, 0);
+  const int32_t result = raw ^ flip;
+
   FPRi(frd).valueAsDouble = std::bit_cast<f64>(static_cast<s64>(result));
 #else
   LOG_ERROR(Xenon, "fctidzx: Unsupported arch!");
