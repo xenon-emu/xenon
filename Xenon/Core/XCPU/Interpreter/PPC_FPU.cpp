@@ -2,10 +2,6 @@
 
 #include "Base/Arch.h"
 
-#if defined(ARCH_X86) || defined(ARCH_X86_64)
-#include <emmintrin.h>
-#endif
-
 #include "Base/Types.h"
 #include "Base/Logging/Log.h"
 #include "PPCInterpreter.h"
@@ -142,8 +138,7 @@ void PPCInterpreter::PPCInterpreter_fctidx(PPU_STATE* ppuState) {
   const auto val = _mm_set_sd(FPRi(frb).valueAsDouble);
   const auto res = _mm_xor_si128(_mm_set1_epi64x(_mm_cvtsd_si64(val)), _mm_castpd_si128(_mm_cmpge_pd(val, _mm_set1_pd(f64(1ull << 63)))));
   FPRi(frd).valueAsDouble = std::bit_cast<f64>(_mm_cvtsi128_si64(res));
-#else
-  // NOTE: This should be properly handled, but this is kind of a "placeholder" for non-SSE platforms
+#elif defined(ARCH_X86)
   const f64 val = FPRi(frb).valueAsDouble;
   const s64 intVal = static_cast<s64>(val);
   const f64 threshold = static_cast<f64>(1ull << 63);
@@ -151,6 +146,17 @@ void PPCInterpreter::PPCInterpreter_fctidx(PPU_STATE* ppuState) {
 
   s64 flippedVal = flip ? intVal ^ (1ull << 63) : intVal;
   FPRi(frd).valueAsDouble = std::bit_cast<f64>(flippedVal);
+#elif defined(ARCH_AARCH64)
+  const float64x2_t val = vsetq_lane_f64(FPRi(frb).valueAsDouble, vdupq_n_f64(0), 0);
+
+  const s64 intVal = static_cast<s64>(vgetq_lane_f64(val, 0));
+  const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
+  const uint64x2_t cmpMask = vreinterpretq_u64_u32(vcgeq_f64(val, threshold));
+  const uint64x2_t xorResult = veorq_u64(vsetq_lane_u64(static_cast<u64>(intVal), vdupq_n_u64(0), 0), cmpMask);
+
+  FPRi(frd).valueAsDouble = std::bit_cast<f64>(vgetq_lane_u64(xorResult, 0));
+#else
+  LOG_ERROR(Xenon, "fctidx: Unsupported arch!");
 #endif
 
   // TODO:
@@ -168,7 +174,7 @@ void PPCInterpreter::PPCInterpreter_fctidzx(PPU_STATE *ppuState) {
   const auto val = _mm_set_sd(FPRi(frb).valueAsDouble);
   const auto res = _mm_xor_si128(_mm_set1_epi64x(_mm_cvttsd_si64(val)), _mm_castpd_si128(_mm_cmpge_pd(val, _mm_set1_pd(f64(1ull << 63)))));
   FPRi(frd).valueAsDouble = std::bit_cast<f64>(_mm_cvtsi128_si64(res));
-#else
+#elif defined(ARCH_X86)
   // NOTE: This should be properly handled, but this is kind of a "placeholder" for non-SSE platforms
   const f64 val = FPRi(frb).valueAsDouble;
   const s64 intVal = static_cast<s64>(val); // truncates toward zero
@@ -177,6 +183,16 @@ void PPCInterpreter::PPCInterpreter_fctidzx(PPU_STATE *ppuState) {
 
   s64 flippedVal = flip ? intVal ^ (1ull << 63) : intVal;
   FPRi(frd).valueAsDouble = std::bit_cast<f64>(flippedVal);
+#elif defined(ARCH_AARCH64)
+  const float64x2_t val = vsetq_lane_f64(FPRi(frb).valueAsDouble, vdupq_n_f64(0), 0);
+  const s64 intVal = static_cast<s64>(vgetq_lane_f64(val, 0));
+  const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
+  const uint64x2_t cmpMask = vreinterpretq_u64_u32(vcgeq_f64(val, threshold));
+  const uint64x2_t xorResult = veorq_u64(vsetq_lane_u64(static_cast<u64>(intVal), vdupq_n_u64(0), 0), cmpMask);
+
+  FPRi(frd).valueAsDouble = std::bit_cast<f64>(vgetq_lane_u64(xorResult, 0));
+#else
+  LOG_ERROR(Xenon, "fctidzx: Unsupported arch!");
 #endif
 
   // TODO:
@@ -194,7 +210,7 @@ void PPCInterpreter::PPCInterpreter_fctiwzx(PPU_STATE *ppuState) {
   const auto val = _mm_set_sd(FPRi(frb).valueAsDouble);
   const auto res = _mm_xor_si128(_mm_cvttpd_epi32(val), _mm_castpd_si128(_mm_cmpge_pd(val, _mm_set1_pd(0x80000000))));
   FPRi(frd).valueAsDouble = std::bit_cast<f64, s64>(_mm_cvtsi128_si32(res));
-#else
+#elif defined(ARCH_X86)
   // NOTE: This should be properly handled, but this is kind of a "placeholder" for non-SSE platforms
   const f64 val = FPRi(frb).valueAsDouble;
   const s32 intVal = static_cast<s32>(val);
@@ -202,6 +218,16 @@ void PPCInterpreter::PPCInterpreter_fctiwzx(PPU_STATE *ppuState) {
 
   s32 flippedVal = flip ? intVal ^ 0x80000000 : intVal;
   FPRi(frd).valueAsDouble = std::bit_cast<f64>(static_cast<s64>(flippedVal));
+#elif defined(ARCH_AARCH64)
+  const float64x2_t val = vsetq_lane_f64(FPRi(frb).valueAsDouble, vdupq_n_f64(0), 0);
+  const s32 intVal = static_cast<s32>(vgetq_lane_f64(val, 0));
+  const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(0x80000000));
+  const uint32x4_t cmpMask = vreinterpretq_u32_u64(vcgeq_f64(val, threshold));
+  const uint32x4_t xorResult = veorq_u32(vsetq_lane_u32(static_cast<u32>(intVal), vdupq_n_u32(0), 0), cmpMask);
+
+  FPRi(frd).valueAsDouble = std::bit_cast<f64>(static_cast<s64>(vgetq_lane_u32(xorResult, 0)));
+#else
+  LOG_ERROR(Xenon, "fctiwzx: Unsupported arch!");
 #endif
 
   // TODO:

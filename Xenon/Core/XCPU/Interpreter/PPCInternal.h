@@ -2,8 +2,11 @@
 
 #pragma once
 
-#if defined(ARCH_X86_64) || defined(ARCH_X86)
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
 #include <immintrin.h>
+#include <emmintrin.h>
+#elif defined(ARCH_AARCH64)
+#include <arm_neon.h>
 #endif
 
 #define PPC_OPC_RC 1

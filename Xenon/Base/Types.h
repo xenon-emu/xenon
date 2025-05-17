@@ -11,6 +11,8 @@
 #include <format>
 #endif
 
+#include "Arch.h"
+
 #ifndef TOOL
 #define FMT(...) fmt::format(__VA_ARGS__)
 #else
@@ -181,10 +183,10 @@ template <typename cT, typename T>
 }
 
 #if defined(_MSC_VER) || defined(__MINGW32__)
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
 #include <xmmintrin.h>
 
 #if defined(__clang__) && (__clang_major__ >= 20)
-
 static inline constexpr u8 _addcarry_u64(u8, u64, u64, u64*);
 static inline constexpr u8 _subborrow_u64(u8, u64, u64, u64*);
 
@@ -193,9 +195,7 @@ extern "C" {
   u64 __shiftright128(u64, u64, u8);
   u64 _umul128(u64, u64, u64*);
 }
-
 #else
-
 extern "C" {
   u8 _addcarry_u64(u8, u64, u64, u64*);
   u8 _subborrow_u64(u8, u64, u64, u64*);
@@ -203,7 +203,7 @@ extern "C" {
   u64 __shiftright128(u64, u64, u8);
   u64 _umul128(u64, u64, u64*);
 }
-#endif
+#endif // ifdef __clang__ && __clang_major__ >= 20
 
 // Unsigned 128-bit integer implementation.
 class alignas(16) u128 {
@@ -444,7 +444,8 @@ public:
     return *this;
   }
 };
+#endif // ifdef ARCH_X86 || ARCH_X86_64
 #else
 using u128 = __uint128_t;
 using s128 = __int128_t;
-#endif
+#endif // ifdef _MSC_VER || __MINGW32__
