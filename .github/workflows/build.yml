@@ -55,7 +55,7 @@ jobs:
         path: |
           build
           Deps
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-x64-deps-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-x64-deps-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
         restore-keys: |
           ${{runner.os}}-${{env.BUILD_TYPE}}-clang-x64-deps-
 
@@ -65,7 +65,7 @@ jobs:
         cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-x64-cache
       with:
         append-timestamp: false
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-x64-cache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-x64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
 
     - name: Configure CMake (Clang)
       run: cmake -G Ninja -B ${{env.BUILD_DIR}} -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
@@ -112,7 +112,7 @@ jobs:
         path: |
           build
           Deps
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-x64-deps-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-x64-deps-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
         restore-keys: |
           ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-x64-deps-
 
@@ -122,7 +122,7 @@ jobs:
         cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-x64-cache
       with:
         append-timestamp: false
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-x64-cache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-x64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
 
     - name: Configure CMake (GCC)
       run: cmake -G Ninja -B ${{env.BUILD_DIR}} -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
@@ -162,7 +162,7 @@ jobs:
         path: |
           build
           Deps
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-win64-deps-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-win64-deps-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
         restore-keys: |
           ${{runner.os}}-${{env.BUILD_TYPE}}-clang-win64-deps-
 
@@ -172,7 +172,7 @@ jobs:
         cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-win64-cache
       with:
         append-timestamp: false
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-win64-cache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-win64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
 
     - name: Configure CMake (Clang)
       run: cmake -G Ninja -B "${{env.BUILD_DIR}}" -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
@@ -226,7 +226,7 @@ jobs:
         path: |
           build
           Deps
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-win64-deps-${{ hashFiles('**/CMakeLists.txt', '**/*.cpp', '**/*.h') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-win64-deps-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
         restore-keys: |
           ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-win64-deps-
 
@@ -236,7 +236,7 @@ jobs:
         cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-win64-cache
       with:
         append-timestamp: false
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-win64-cache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-win64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
 
     - name: Configure CMake (GCC)
       run: cmake -G Ninja -B "${{env.BUILD_DIR}}" -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
@@ -306,7 +306,7 @@ jobs:
           cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-arm64-cache
         with:
           append-timestamp: false
-          key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-arm64-cache-${{ hashFiles('**/*.cpp', '**/*.h') }}
+          key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-arm64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
 
       - name: Configure CMake
         run: cmake -G Ninja -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_C_COMPILER=$(brew --prefix llvm)/bin/clang -DCMAKE_CXX_COMPILER=$(brew --prefix llvm)/bin/clang++ -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache

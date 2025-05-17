@@ -148,11 +148,10 @@ void PPCInterpreter::PPCInterpreter_fctidx(PPU_STATE* ppuState) {
   FPRi(frd).valueAsDouble = std::bit_cast<f64>(flippedVal);
 #elif defined(ARCH_AARCH64)
   const float64x2_t val = vsetq_lane_f64(FPRi(frb).valueAsDouble, vdupq_n_f64(0), 0);
-
-  const s64 intVal = static_cast<s64>(vgetq_lane_f64(val, 0));
+  const int64x2_t intVal = vcvtq_s64_f64(val);
   const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
-  const uint64x2_t cmpMask = vreinterpretq_u64_u32(vcgeq_f64(val, threshold));
-  const uint64x2_t xorResult = veorq_u64(vsetq_lane_u64(static_cast<u64>(intVal), vdupq_n_u64(0), 0), cmpMask);
+  const uint64x2_t cmpMask = vcgeq_f64(val, threshold);
+  const uint64x2_t xorResult = veorq_u64(vreinterpretq_u64_s64(intVal), cmpMask);
 
   FPRi(frd).valueAsDouble = std::bit_cast<f64>(vgetq_lane_u64(xorResult, 0));
 #else
@@ -185,12 +184,15 @@ void PPCInterpreter::PPCInterpreter_fctidzx(PPU_STATE *ppuState) {
   FPRi(frd).valueAsDouble = std::bit_cast<f64>(flippedVal);
 #elif defined(ARCH_AARCH64)
   const float64x2_t val = vsetq_lane_f64(FPRi(frb).valueAsDouble, vdupq_n_f64(0), 0);
-  const s64 intVal = static_cast<s64>(vgetq_lane_f64(val, 0));
-  const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
-  const uint64x2_t cmpMask = vreinterpretq_u64_u32(vcgeq_f64(val, threshold));
-  const uint64x2_t xorResult = veorq_u64(vsetq_lane_u64(static_cast<u64>(intVal), vdupq_n_u64(0), 0), cmpMask);
+  const int32x2_t intVal = vcvt_s32_f64(vget_low_f64(val));
+  const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(0x80000000));
+  const uint64x2_t cmpMask = vcgeq_f64(val, threshold);
 
-  FPRi(frd).valueAsDouble = std::bit_cast<f64>(vgetq_lane_u64(xorResult, 0));
+  // Narrow 64-bit mask to 32-bit
+  const uint32_t flip = vgetq_lane_u64(cmpMask, 0) ? 0xFFFFFFFF : 0;
+  const int32_t raw = vget_lane_s32(intVal, 0);
+  const int32_t result = raw ^ static_cast<int32_t>(flip & 0xFFFFFFFF);
+  FPRi(frd).valueAsDouble = std::bit_cast<f64>(static_cast<s64>(result));
 #else
   LOG_ERROR(Xenon, "fctidzx: Unsupported arch!");
 #endif
