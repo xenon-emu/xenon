@@ -5,6 +5,11 @@
 
 #include "ASTBlock.h"
 #include "ASTEmitter.h"
+#ifndef TOOL
+#define FMT(...) fmt::format(__VA_ARGS__)
+#else
+#define FMT(...) std::format(__VA_ARGS__)
+#endif
 
 namespace Xe::Microcode::AST {
 
@@ -19,7 +24,7 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType, Shader *sha
       Sirit::Id var = module.AddGlobalVariable(ptr_type, spv::StorageClass::UniformConstant);
       module.Decorate(var, spv::Decoration::DescriptorSet, 0);
       module.Decorate(var, spv::Decoration::Binding, tex.slot);
-      module.Name(var, std::format("TextureSlot{}", tex.slot));
+      module.Name(var, FMT("TextureSlot{}", tex.slot));
       texture_vars[tex.slot] = var;
     }
   }
