@@ -229,6 +229,40 @@ union alignas(16) CR_Reg {
   }
 };
 
+union alignas(16) fpscrBits {
+  u8 bits[32];
+  u32 fields[8];
+
+  u8& operator [](u8 i)
+  {
+    return bits[i];
+  }
+
+  // Pack FPSCR bits
+  u32 pack() const
+  {
+    u32 result{};
+
+    for (u32 bit : bits)
+    {
+      result <<= 1;
+      result |= bit;
+    }
+
+    return result;
+  }
+
+  // Unpack FPSCR bits
+  void unpack(u32 value)
+  {
+    for (u8& b : bits)
+    {
+      b = !!(value & (1u << 31));
+      value <<= 1;
+    }
+  }
+};
+
 /*
 Floating-Point Status and Control Register (FPSCR)
 */
@@ -267,6 +301,8 @@ union FPSCRegister {
     u32 FEX : 1;
     u32 FX : 1;
   };
+  // FPSCR Bits
+  fpscrBits bits; 
 };
 
 /*

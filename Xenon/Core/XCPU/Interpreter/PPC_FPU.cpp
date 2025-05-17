@@ -501,3 +501,22 @@ void PPCInterpreter::PPCInterpreter_mtfsfx(PPU_STATE *ppuState) {
     ppuSetCR(ppuState, 1, curThread.FPSCR.FG, curThread.FPSCR.FL, curThread.FPSCR.FE, curThread.FPSCR.FU);
   }
 }
+
+// Move to FPSCR Bit 1 (x'FC00 004C')
+void PPCInterpreter::PPCInterpreter_mtfsb1x(PPU_STATE* ppuState) {
+  /*
+  Bit crbD of the FPSCR is set. 
+  */
+
+  CHECK_FPU;
+
+  // Get the bit to be set.
+  u32 bit = _instr.crbd;
+
+  // Set the bit in FPSCR.
+  ppuState->ppuThread[ppuState->currentThread].FPSCR.bits[bit] = 1;
+
+  if (_instr.rc) {
+    ppuSetCR(ppuState, 1, curThread.FPSCR.FG, curThread.FPSCR.FL, curThread.FPSCR.FE, curThread.FPSCR.FU);
+  }
+}
