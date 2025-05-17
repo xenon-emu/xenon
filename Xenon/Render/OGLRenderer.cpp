@@ -72,20 +72,38 @@ void OGLRenderer::BackendSDLInit() {
   // Set OpenGL version to 4.3 (earliest with CS)
   SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4));
   SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3));
-  // We aren't using compatibility profile
-  SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE));
+  // Set as compat
+  SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY));
   // Create OpenGL handle for SDL
   context = SDL_GL_CreateContext(mainWindow);
   if (!context) {
-    LOG_ERROR(System, "Failed to create OpenGL context: {}", SDL_GetError());
-  }
-  // Init GLAD
-  if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress)) {
-    LOG_ERROR(Render, "Failed to initialize OpenGL Loader");
+    // Set GLES2 version to 3.1 (earliest with CS)
+    SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3));
+    SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1));
+    // Set as ES
+    SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES));
+    context = SDL_GL_CreateContext(mainWindow);
+    if (!context) {
+      LOG_ERROR(System, "Failed to create OpenGL context: {}", SDL_GetError());
+    } else {
+      LOG_INFO(System, "Failed to use OpenGL4.3, SPIR-V will not be avaliable.");
+    }
   } else {
-    LOG_INFO(Render, "OpenGL Version: {}", OGLRenderer::gl_version());
-    LOG_INFO(Render, "OpenGL Vendor: {}", OGLRenderer::gl_vendor());
-    LOG_INFO(Render, "OpenGL Renderer: {}", OGLRenderer::gl_renderer());
+    // Init GLAD
+    if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress)) {
+      LOG_ERROR(Render, "Failed to initialize OpenGL Loader, trying GLES2");
+      if (!gladLoadGLES2Loader((GLADloadproc)SDL_GL_GetProcAddress)) {
+        LOG_ERROR(Render, "Failed to initialize GLES2 Loader");
+      } else {
+        LOG_INFO(Render, "GLES Version: {}", OGLRenderer::gl_version());
+        LOG_INFO(Render, "OpenGL Vendor: {}", OGLRenderer::gl_vendor());
+        LOG_INFO(Render, "OpenGL Renderer: {}", OGLRenderer::gl_renderer());
+      }
+    } else {
+      LOG_INFO(Render, "OpenGL Version: {}", OGLRenderer::gl_version());
+      LOG_INFO(Render, "OpenGL Vendor: {}", OGLRenderer::gl_vendor());
+      LOG_INFO(Render, "OpenGL Renderer: {}", OGLRenderer::gl_renderer());
+    }
   }
   // Set VSYNC
   SANITY_CHECK(SDL_GL_SetSwapInterval(VSYNC));
