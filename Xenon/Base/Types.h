@@ -11,6 +11,12 @@
 #include <format>
 #endif
 
+#ifndef TOOL
+#define FMT(...) fmt::format(__VA_ARGS__)
+#else
+#define FMT(...) std::format(__VA_ARGS__)
+#endif
+
 // Vali0004: Helper macro to make me sane when doing RAII
 #define STRIP_UNIQUE(x) std::remove_pointer_t<decltype(x.get())>
 #define STRIP_UNIQUE_ARR(x) std::remove_pointer_t<decltype(x.get())>[]
@@ -169,11 +175,7 @@ template <typename cT, typename T>
   if constexpr ((requires() { c.size(); }))
     cSize = c.size();
   if (found == c.end()) [[unlikely]] {
-#ifndef TOOL
-    throw_fail_debug_msg(fmt::format("Range check failed! (index: {}{})", idx, cSize != max_v<size_t> ? fmt::format(", size: {}", cSize) : ""));
-#else
-    throw_fail_debug_msg(std::format("Range check failed! (index: {}{})", idx, cSize != max_v<size_t> ? std::format(", size: {}", cSize) : ""));
-#endif
+    throw_fail_debug_msg(FMT("Range check failed! (index: {}{})", idx, cSize != max_v<size_t> ? FMT(", size: {}", cSize) : ""));
   }
   return found->second;
 }

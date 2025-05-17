@@ -3,14 +3,20 @@
 #pragma once
 
 #include <cstring>
+#ifndef TOOL
+#include <fmt/format.h>
+#else
 #include <format>
+#endif
 #include <iostream>
 #include <string_view>
 #include <vector>
 
+#include "Base/Types.h"
+
 namespace Base {
 
-#define LOG_SECTIONLESS(...) std::cout << std::format(__VA_ARGS__)
+#define LOG_SECTIONLESS(...) std::cout << FMT(__VA_ARGS__)
 
 class Param {
 public:

@@ -5,11 +5,6 @@
 
 #include "ASTBlock.h"
 #include "ASTEmitter.h"
-#ifndef TOOL
-#define FMT(...) fmt::format(__VA_ARGS__)
-#else
-#define FMT(...) std::format(__VA_ARGS__)
-#endif
 
 namespace Xe::Microcode::AST {
 
@@ -41,7 +36,7 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType, Shader *sha
       auto &var = output_vars[static_cast<eExportReg>(static_cast<u32>(eExportReg::COLOR0) + i)];
       Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
       var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
-      module.Name(var, std::format("COLOR{}", i));
+      module.Name(var, FMT("COLOR{}", i));
     }
   } else {
     Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
@@ -55,7 +50,7 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType, Shader *sha
       auto &var = output_vars[static_cast<eExportReg>(static_cast<u32>(eExportReg::INTERP0) + i)];
       Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
       var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
-      module.Name(var, std::format("INTERP{}", i));
+      module.Name(var, FMT("INTERP{}", i));
     }
   }
 
