@@ -142,7 +142,8 @@ void PPCInterpreter::PPCInterpreter_fctidx(PPU_STATE* ppuState) {
   const auto val = _mm_set_sd(FPRi(frb).valueAsDouble);
   const auto res = _mm_xor_si128(_mm_set1_epi64x(_mm_cvtsd_si64(val)), _mm_castpd_si128(_mm_cmpge_pd(val, _mm_set1_pd(f64(1ull << 63)))));
   FPRi(frd).valueAsDouble = std::bit_cast<f64>(_mm_cvtsi128_si64(res));
-#elif defined(ARCH_X86)
+#else
+  // NOTE: This should be properly handled, but this is kind of a "placeholder" for non-SSE platforms
   const f64 val = FPRi(frb).valueAsDouble;
   const s64 intVal = static_cast<s64>(val);
   const f64 threshold = static_cast<f64>(1ull << 63);
@@ -150,8 +151,6 @@ void PPCInterpreter::PPCInterpreter_fctidx(PPU_STATE* ppuState) {
 
   s64 flippedVal = flip ? intVal ^ (1ull << 63) : intVal;
   FPRi(frd).valueAsDouble = std::bit_cast<f64>(flippedVal);
-#else
-  LOG_ERROR(Xenon, "fctiwzx: Unsupported ARCH.");
 #endif
 
   // TODO:
@@ -170,6 +169,7 @@ void PPCInterpreter::PPCInterpreter_fctidzx(PPU_STATE *ppuState) {
   const auto res = _mm_xor_si128(_mm_set1_epi64x(_mm_cvttsd_si64(val)), _mm_castpd_si128(_mm_cmpge_pd(val, _mm_set1_pd(f64(1ull << 63)))));
   FPRi(frd).valueAsDouble = std::bit_cast<f64>(_mm_cvtsi128_si64(res));
 #else
+  // NOTE: This should be properly handled, but this is kind of a "placeholder" for non-SSE platforms
   const f64 val = FPRi(frb).valueAsDouble;
   const s64 intVal = static_cast<s64>(val); // truncates toward zero
   const f64 threshold = static_cast<f64>(1ull << 63);
@@ -195,6 +195,7 @@ void PPCInterpreter::PPCInterpreter_fctiwzx(PPU_STATE *ppuState) {
   const auto res = _mm_xor_si128(_mm_cvttpd_epi32(val), _mm_castpd_si128(_mm_cmpge_pd(val, _mm_set1_pd(0x80000000))));
   FPRi(frd).valueAsDouble = std::bit_cast<f64, s64>(_mm_cvtsi128_si32(res));
 #else
+  // NOTE: This should be properly handled, but this is kind of a "placeholder" for non-SSE platforms
   const f64 val = FPRi(frb).valueAsDouble;
   const s32 intVal = static_cast<s32>(val);
   const bool flip = val >= static_cast<f64>(0x80000000);
