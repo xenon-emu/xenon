@@ -237,7 +237,7 @@ void PPCInterpreter::PPCInterpreter_fctiwzx(PPU_STATE *ppuState) {
   s32 flippedVal = flip ? intVal ^ 0x80000000 : intVal;
   FPRi(frd).valueAsDouble = std::bit_cast<f64>(static_cast<s64>(flippedVal));
 #elif defined(ARCH_AARCH64)
-  #if defined(__ARM_FEATURE_FP64) && __ARM_FEATURE_FP64
+  #if defined(__ARM_FEATURE_FP64)
     const float64x2_t val = vsetq_lane_f64(FPRi(frb).valueAsDouble, vdupq_n_f64(0), 0);
     const s32 intVal = static_cast<s32>(vgetq_lane_f64(val, 0));
     const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(0x80000000));
@@ -249,7 +249,8 @@ void PPCInterpreter::PPCInterpreter_fctiwzx(PPU_STATE *ppuState) {
     const float64x2_t val = vsetq_lane_f64(FPRi(frb).valueAsDouble, vdupq_n_f64(0), 0);
     const float64_t scalar = vgetq_lane_f64(val, 0);
     const float32_t converted = vcvt_f32_f64(scalar);
-    const s32 intVal = static_cast<s32>(converted);
+    const float32_t result_f32 = vget_lane_f32(converted, 0);
+    const s32 intVal = static_cast<s32>(result_f32);
     const bool flip = scalar >= static_cast<f64>(0x80000000);
     const s32 result = flip ? intVal ^ 0x80000000 : intVal;
   #endif
