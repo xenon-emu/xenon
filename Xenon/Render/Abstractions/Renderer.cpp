@@ -46,7 +46,7 @@ void Renderer::Create() {
   case "GLES"_j:
   case "OpenGL"_j: {
     bool gles = GetBackendID() == "GLES"_j;
-    std::string versionString = FMT("#version {} {}\n\n", gles ? 310 : 430, gles ? "es" : "compatibility");
+    std::string versionString = FMT("#version {} {}\n", gles ? 310 : 430, gles ? "es" : "compatibility");
     fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "opengl" };
     computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
       { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
