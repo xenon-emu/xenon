@@ -55,7 +55,7 @@ void Renderer::Create() {
     if (!computeShaderProgram) {
       std::ofstream f{ shaderPath / "fb_deswizzle.comp" };
       f.write(versionString.data(), versionString.size());
-      f.write(computeShaderSource, sizeof(computeShaderSource)-1);
+      f.write(computeShaderSource, sizeof(computeShaderSource));
       f.close();
       computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
         { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
@@ -68,11 +68,11 @@ void Renderer::Create() {
     if (!renderShaderPrograms) {
       std::ofstream vert{ shaderPath / "framebuffer.vert" };
       vert.write(versionString.data(), versionString.size());
-      vert.write(vertexShaderSource, sizeof(vertexShaderSource)-1);
+      vert.write(vertexShaderSource, sizeof(vertexShaderSource));
       vert.close();
       std::ofstream frag{ shaderPath / "framebuffer.frag" };
       frag.write(versionString.data(), versionString.size());
-      frag.write(fragmentShaderSource, sizeof(fragmentShaderSource)-1);
+      frag.write(fragmentShaderSource, sizeof(fragmentShaderSource));
       frag.close();
       renderShaderPrograms = shaderFactory->LoadFromFiles("Render", {
         { eShaderType::Vertex, shaderPath / "framebuffer.vert" },
