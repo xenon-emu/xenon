@@ -180,6 +180,12 @@ void main() {
 })glsl";
 
 inline constexpr const char fragmentShaderSource[] = R"glsl(
+precision highp float;
+precision highp int;
+precision highp sampler2D;
+precision highp usampler2D;
+precision highp uimage2D;
+
 in vec2 o_texture_coord;
 
 out vec4 o_color;
@@ -188,14 +194,20 @@ uniform usampler2D u_texture;
 void main() {
   uint pixel = texture(u_texture, o_texture_coord).r;
   // Gotta love BE vs LE (X360 works in BGRA, so we work in ARGB)
-  const float a = float((pixel >> 24) & 0xFF) / 255.0;
-  const float r = float((pixel >> 16) & 0xFF) / 255.0;
-  const float g = float((pixel >> 8) & 0xFF) / 255.0;
-  const float b = float((pixel >> 0) & 0xFF) / 255.0;
+  const float a = float((pixel >> 24u) & 0xFFu) / 255.0;
+  const float r = float((pixel >> 16u) & 0xFFu) / 255.0;
+  const float g = float((pixel >> 8u) & 0xFFu) / 255.0;
+  const float b = float((pixel >> 0u) & 0xFFu) / 255.0;
   o_color = vec4(r, g, b, a);
 })glsl";
 
 inline constexpr const char computeShaderSource[] = R"glsl(
+precision highp float;
+precision highp int;
+precision highp sampler2D;
+precision highp usampler2D;
+precision highp uimage2D;
+
 layout (local_size_x = 16, local_size_y = 16) in;
 
 layout (r32ui, binding = 0) uniform writeonly uimage2D o_texture;
@@ -225,12 +237,12 @@ void main() {
     return;
 
   // Scale accordingly
-  float scaleX = internalWidth / float(resWidth);
-  float scaleY = internalHeight / float(resHeight);
+  float scaleX = float(internalWidth) / float(resWidth);
+  float scaleY = float(internalHeight) / float(resHeight);
 
   // Map to source resolution
-  const int srcX = int(float(texel_pos.x) * scaleX);
-  const int srcY = int(float(texel_pos.y) * scaleY);
+  int srcX = int(float(texel_pos.x) * scaleX);
+  int srcY = int(float(texel_pos.y) * scaleY);
 
   // God only knows how this indexing works
   int stdIndex = (srcY * internalWidth + srcX);
