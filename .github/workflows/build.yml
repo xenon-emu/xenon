@@ -55,17 +55,17 @@ jobs:
         path: |
           build
           Deps
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-x64-deps-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-amd64-deps-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
         restore-keys: |
-          ${{runner.os}}-${{env.BUILD_TYPE}}-clang-x64-deps-
+          ${{runner.os}}-${{env.BUILD_TYPE}}-clang-amd64-deps-
 
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.18
       env:
-        cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-x64-cache
+        cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-amd64-cache
       with:
         append-timestamp: false
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-x64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-amd64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
 
     - name: Configure CMake (Clang)
       run: cmake -G Ninja -B ${{env.BUILD_DIR}} -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
@@ -112,17 +112,17 @@ jobs:
         path: |
           build
           Deps
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-x64-deps-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-amd64-deps-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
         restore-keys: |
-          ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-x64-deps-
+          ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-amd64-deps-
 
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.18
       env:
-        cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-x64-cache
+        cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-amd64-cache
       with:
         append-timestamp: false
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-x64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-amd64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
 
     - name: Configure CMake (GCC)
       run: cmake -G Ninja -B ${{env.BUILD_DIR}} -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
@@ -135,7 +135,7 @@ jobs:
     - name: Prepare Artifact Folder
       run: |
         mkdir -p artifact
-        cp -r ${{env.BUILD_DIR}}/Xenon artifact/xenon-gcc-x64-${{env.BUILD_TYPE}}
+        cp -r ${{env.BUILD_DIR}}/Xenon artifact/xenon-gcc-amd64-${{env.BUILD_TYPE}}
         mkdir -p artifacts/fonts/
         cp -r ${{github.workspace}}/Deps/fonts/ artifact/fonts/
 
@@ -162,17 +162,17 @@ jobs:
         path: |
           build
           Deps
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-win64-deps-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-amd64-deps-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
         restore-keys: |
-          ${{runner.os}}-${{env.BUILD_TYPE}}-clang-win64-deps-
+          ${{runner.os}}-${{env.BUILD_TYPE}}-clang-amd64-deps-
 
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.18
       env:
-        cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-win64-cache
+        cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-amd64-cache
       with:
         append-timestamp: false
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-win64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-amd64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
 
     - name: Configure CMake (Clang)
       run: cmake -G Ninja -B "${{env.BUILD_DIR}}" -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
@@ -226,17 +226,17 @@ jobs:
         path: |
           build
           Deps
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-win64-deps-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-amd64-deps-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
         restore-keys: |
-          ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-win64-deps-
+          ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-amd64-deps-
 
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.18
       env:
-        cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-win64-cache
+        cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-amd64-cache
       with:
         append-timestamp: false
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-win64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-amd64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
 
     - name: Configure CMake (GCC)
       run: cmake -G Ninja -B "${{env.BUILD_DIR}}" -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
@@ -249,7 +249,7 @@ jobs:
     - name: Prepare Artifact Folder
       run: |
         mkdir -p artifact
-        cp -r "${{github.workspace}}/build/Xenon.exe" "artifact/xenon-gcc-x64-${{env.BUILD_TYPE}}.exe"
+        cp -r "${{github.workspace}}/build/Xenon.exe" "artifact/xenon-gcc-amd64-${{env.BUILD_TYPE}}.exe"
         mkdir -p artifacts/fonts/
         cp -r "${{github.workspace}}/Deps/fonts/" "artifact/fonts/"
 
