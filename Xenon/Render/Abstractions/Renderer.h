@@ -194,10 +194,10 @@ uniform usampler2D u_texture;
 void main() {
   uint pixel = texture(u_texture, o_texture_coord).r;
   // Gotta love BE vs LE (X360 works in BGRA, so we work in ARGB)
-  const float a = float((pixel >> 24u) & 0xFFu) / 255.0;
-  const float r = float((pixel >> 16u) & 0xFFu) / 255.0;
-  const float g = float((pixel >> 8u) & 0xFFu) / 255.0;
-  const float b = float((pixel >> 0u) & 0xFFu) / 255.0;
+  float a = float((pixel >> 24u) & 0xFFu) / 255.0;
+  float r = float((pixel >> 16u) & 0xFFu) / 255.0;
+  float g = float((pixel >> 8u) & 0xFFu) / 255.0;
+  float b = float((pixel >> 0u) & 0xFFu) / 255.0;
   o_color = vec4(r, g, b, a);
 })glsl";
 
