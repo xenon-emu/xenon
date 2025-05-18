@@ -144,9 +144,9 @@ endif()
 
 
 # Link libraries
-target_link_libraries(Xenon PRIVATE fmt::fmt sirit toml11::toml11)
+target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11)
 if (GFX_ENABLED)
-  target_link_libraries(Xenon PRIVATE glad SDL3::SDL3)
+  target_link_libraries(Xenon PRIVATE glad sirit SDL3::SDL3)
 endif()
 
 # Add includes
