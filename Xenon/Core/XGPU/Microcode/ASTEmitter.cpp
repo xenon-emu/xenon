@@ -6,6 +6,7 @@
 #include "ASTBlock.h"
 #include "ASTEmitter.h"
 
+#ifndef NO_GFX
 namespace Xe::Microcode::AST {
 
 ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType, Shader *shader) : type(shaderType) {
@@ -866,4 +867,5 @@ void ShaderCodeWriterSirit::AssignImmediate(const Chunk &dst,
   module.OpStore(dst.ptr, newVec);
 }
 
-} // namespace Xe::Microcode::AST 
+} // namespace Xe::Microcode::AST
+#endif

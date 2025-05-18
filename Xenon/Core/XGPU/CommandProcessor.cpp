@@ -705,6 +705,7 @@ std::pair<Microcode::AST::Shader*, std::vector<u32>> LoadShader(eShaderType shad
     file.close();
   }*/
   Microcode::AST::Shader *shader = Microcode::AST::Shader::DecompileMicroCode(reinterpret_cast<const u8*>(data.data()), data.size() * 4, shaderType);
+#ifndef NO_GFX
   Microcode::AST::ShaderCodeWriterSirit writer{ shaderType, shader };
   if (shader) {
     shader->EmitShaderCode(writer);
@@ -713,6 +714,7 @@ std::pair<Microcode::AST::Shader*, std::vector<u32>> LoadShader(eShaderType shad
   std::ofstream f{ shaderPath / (baseString + ".spv"), std::ios::out | std::ios::binary };
   f.write(reinterpret_cast<char*>(code.data()), code.size() * 4);
   f.close();
+#endif
   return { shader, code };
 }
 

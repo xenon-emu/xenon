@@ -6,22 +6,43 @@
 #include <sstream>
 
 #include "Base/Types.h"
+#ifndef NO_GFX
 #include <sirit/sirit.h>
+#endif
 
 namespace Xe::Microcode::AST {
 
 struct Chunk {
+#ifndef NO_GFX
   Sirit::Id id = {};   // SSA value (result of OpLoad, etc.)
   Sirit::Id ptr = {};  // Pointer to value (from AddLocalVariable, OpAccessChain, etc.)
 
   Chunk() = default;
   explicit Chunk(Sirit::Id v) : id(v) {}
   Chunk(Sirit::Id id_, Sirit::Id ptr_) : id(id_), ptr(ptr_) {}
+#else
+  struct Id {
+    u32 value;
+  };
+  Id id = {};
+  Id ptr = {};
+  Chunk() = default;
+  explicit Chunk(Id v) : id(v) {}
+  Chunk(Id id_, Id ptr_) : id(id_), ptr(ptr_) {}
+#endif
 
   operator u32() const { return id.value; }
+#ifndef NO_GFX
   operator Sirit::Id() const { return id; }
+#else
+  operator Id() const { return id; }
+#endif
 
+#ifndef NO_GFX
   Chunk& operator=(Sirit::Id v) {
+#else
+  Chunk &operator=(Id v) {
+#endif
     id = v;
     return *this;
   }

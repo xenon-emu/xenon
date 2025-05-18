@@ -87,6 +87,7 @@ public:
 
 class Shader;
 
+#ifndef NO_GFX
 class ShaderCodeWriterSirit : public ShaderCodeWriterBase {
 public:
   ShaderCodeWriterSirit(eShaderType shaderType, Shader *shader);
@@ -201,5 +202,6 @@ private:
   Sirit::Id next_block_label = { 0 };
   std::unordered_map<u32, Sirit::Id> address_to_label = {};
 };
+#endif
 
 } // namespace Xe::Microcode::AST
