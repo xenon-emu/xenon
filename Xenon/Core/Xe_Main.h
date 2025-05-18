@@ -51,7 +51,9 @@ public:
   void saveConfig();
   void loadConfig();
 
+#ifndef NO_GFX
   SDL_Window* createWindow();
+#endif
 
   void addPCIDevices();
   void createHostBridge();

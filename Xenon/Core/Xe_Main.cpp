@@ -159,6 +159,7 @@ void XeMain::reloadFiles() {
   getCPU()->Continue();
 }
 
+#ifndef NO_GFX
 SDL_Window* XeMain::createWindow() {
   // Init SDL Events, Video, Joystick, and Gamepad
   if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
@@ -196,6 +197,7 @@ SDL_Window* XeMain::createWindow() {
 
   return mainWindow;
 }
+#endif
 
 void XeMain::addPCIDevices() {
   MICROPROFILE_SCOPEI("[Xe::Main]", "AddPCIDevices", MP_AUTO);

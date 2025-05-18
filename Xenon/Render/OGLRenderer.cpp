@@ -93,18 +93,15 @@ void OGLRenderer::BackendSDLInit() {
   // Init GLAD
   if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress)) {
     LOG_ERROR(Render, "Failed to initialize GL: {}", SDL_GetError());
-    if (!gladLoadGLES2Loader((GLADloadproc)SDL_GL_GetProcAddress)) {
-      LOG_ERROR(Render, "Failed to initialize GLES2: {}", SDL_GetError());
-    } else {
-      gles = true;
-      LOG_INFO(Render, "GLES Version: {}", OGLRenderer::gl_version());
-      LOG_INFO(Render, "OpenGL Vendor: {}", OGLRenderer::gl_vendor());
-      LOG_INFO(Render, "OpenGL Renderer: {}", OGLRenderer::gl_renderer());
-    }
   } else {
-    LOG_INFO(Render, "OpenGL Version: {}", OGLRenderer::gl_version());
+    LOG_INFO(Render, "{} Version: {}", gles ? "GLES" : "OpenGL", OGLRenderer::gl_version());
     LOG_INFO(Render, "OpenGL Vendor: {}", OGLRenderer::gl_vendor());
     LOG_INFO(Render, "OpenGL Renderer: {}", OGLRenderer::gl_renderer());
+  }
+  if (gles) {
+    if (!gladLoadGLES2Loader((GLADloadproc)SDL_GL_GetProcAddress)) {
+      LOG_ERROR(Render, "Failed to initialize GLES2: {}", SDL_GetError());
+    }
   }
   // Set VSYNC
   SANITY_CHECK(SDL_GL_SetSwapInterval(VSYNC));
