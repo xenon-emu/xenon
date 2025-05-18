@@ -88,22 +88,21 @@ void OGLRenderer::BackendSDLInit() {
     } else {
       LOG_INFO(System, "Failed to use OpenGL4.3, SPIR-V will not be avaliable.");
     }
-  } else {
-    // Init GLAD
-    if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress)) {
-      LOG_ERROR(Render, "Failed to initialize OpenGL Loader, trying GLES2");
-      if (!gladLoadGLES2Loader((GLADloadproc)SDL_GL_GetProcAddress)) {
-        LOG_ERROR(Render, "Failed to initialize GLES2 Loader");
-      } else {
-        LOG_INFO(Render, "GLES Version: {}", OGLRenderer::gl_version());
-        LOG_INFO(Render, "OpenGL Vendor: {}", OGLRenderer::gl_vendor());
-        LOG_INFO(Render, "OpenGL Renderer: {}", OGLRenderer::gl_renderer());
-      }
+  }
+  // Init GLAD
+  if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress)) {
+    LOG_ERROR(Render, "Failed to initialize OpenGL Loader, trying GLES2");
+    if (!gladLoadGLES2Loader((GLADloadproc)SDL_GL_GetProcAddress)) {
+      LOG_ERROR(Render, "Failed to initialize GLES2 Loader");
     } else {
-      LOG_INFO(Render, "OpenGL Version: {}", OGLRenderer::gl_version());
+      LOG_INFO(Render, "GLES Version: {}", OGLRenderer::gl_version());
       LOG_INFO(Render, "OpenGL Vendor: {}", OGLRenderer::gl_vendor());
       LOG_INFO(Render, "OpenGL Renderer: {}", OGLRenderer::gl_renderer());
     }
+  } else {
+    LOG_INFO(Render, "OpenGL Version: {}", OGLRenderer::gl_version());
+    LOG_INFO(Render, "OpenGL Vendor: {}", OGLRenderer::gl_vendor());
+    LOG_INFO(Render, "OpenGL Renderer: {}", OGLRenderer::gl_renderer());
   }
   // Set VSYNC
   SANITY_CHECK(SDL_GL_SetSwapInterval(VSYNC));
