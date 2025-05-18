@@ -197,14 +197,14 @@ void PPCInterpreter::PPCInterpreter_fctidzx(PPU_STATE *ppuState) {
     const float64x2_t val = vsetq_lane_f64(FPRi(frb).valueAsDouble, vdupq_n_f64(0), 0);
     const s64 intVal = static_cast<s64>(vgetq_lane_f64(val, 0));
     const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
-    const uint64x2_t cmpMask = vreinterpretq_u64_u32(vcgeq_f64(val, threshold));
+    const uint64x2_t cmpMask = vcgeq_f64(val, threshold);
     const uint64x2_t xorResult = veorq_u64(vsetq_lane_u64(static_cast<u64>(intVal), vdupq_n_u64(0), 0), cmpMask);
     u64 result = vgetq_lane_u64(xorResult, 0);
   #else
-    const float64x2_t val = vsetq_lane_f64(FPRi(frb).valueAsDouble, vdupq_n_f64(0), 0);
-    const s64 intVal = static_cast<s64>(vgetq_lane_f64(val, 0));
+    const float64x2_t fval = vsetq_lane_f64(FPRi(frb).valueAsDouble, vdupq_n_f64(0), 0);
+    const s64 intVal = static_cast<s64>(vgetq_lane_f64(fval, 0));
     const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
-    const uint64x2_t cmpMask = vreinterpretq_u64_u32(vcgeq_f64(val, threshold));
+    const uint64x2_t cmpMask = vcgeq_f64(fval, threshold);
     const uint64x2_t xorResult = veorq_u64(vsetq_lane_u64(static_cast<u64>(intVal), vdupq_n_u64(0), 0), cmpMask);
     u64 result = vgetq_lane_u64(xorResult, 0);
   #endif
@@ -243,13 +243,13 @@ void PPCInterpreter::PPCInterpreter_fctiwzx(PPU_STATE *ppuState) {
     const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(0x80000000));
     const uint32x4_t cmpMask = vreinterpretq_u32_u64(vcgeq_f64(val, threshold));
     const uint32x4_t xorResult = veorq_u32(vsetq_lane_u32(static_cast<u32>(intVal), vdupq_n_u32(0), 0), cmpMask);
-    u32 uResult = vgetq_lane_u32(xorResult, 0));
+    u32 uResult = vgetq_lane_u32(xorResult, 0);
     const s32 result = static_cast<s32>(uResult);
   #else
     const float64x2_t val = vsetq_lane_f64(FPRi(frb).valueAsDouble, vdupq_n_f64(0), 0);
-    const float64_t scalar = vgetq_lane_f64(val, 0);
-    const float32x2_t converted = vcvt_f32_f64(scalar);
-    const float32_t result_f32 = vget_lane_f32(converted, 0);
+    const f64 scalar = vgetq_lane_f64(val, 0);
+    const float32x2_t converted = vcvt_f32_f64(val);
+    const f32 result_f32 = vget_lane_f32(converted, 0);
     const s32 intVal = static_cast<s32>(result_f32);
     const bool flip = scalar >= static_cast<f64>(0x80000000);
     const s32 result = flip ? intVal ^ 0x80000000 : intVal;
