@@ -7,6 +7,7 @@
 #include "Base/Hash.h"
 #include "Base/Logging/Log.h"
 
+#ifndef NO_GFX
 namespace Render {
 
 class DummyRenderer : public Renderer {
@@ -38,3 +39,4 @@ public:
 };
 
 } // namespace Render
+#endif

@@ -6,6 +6,7 @@
 
 #include "Base/Logging/Log.h"
 
+#ifndef NO_GFX
 namespace Render {
 
 class DummyGUI : public GUI {
@@ -16,4 +17,5 @@ public:
   void EndSwap() override;
 };
 
-} // namespace Render
+} // namespace Render#
+#endif

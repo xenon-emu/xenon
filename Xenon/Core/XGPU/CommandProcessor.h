@@ -49,17 +49,21 @@ struct XeIndexBufferInfo {
   u64 length = 0;
 };
 
+#ifndef NO_GFX
 struct XeShader {
   Microcode::AST::Shader *vertexShader = nullptr;
   Microcode::AST::Shader *pixelShader = nullptr;
   std::shared_ptr<Render::Shader> program = {};
 };
+#endif
 
 struct XeDrawParams {
   XenosState *state = nullptr;
   XeIndexBufferInfo indexBufferInfo = {};
   VGT_DRAW_INITIATOR_REG vgtDrawInitiator = {};
+#ifndef NO_GFX
   XeShader shader;
+#endif
   u8 *vertexBufferPtr = nullptr;
   u32 maxVertexIndex = 0;
   u32 minVertexIndex = 0;

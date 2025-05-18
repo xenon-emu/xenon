@@ -2,6 +2,7 @@
 
 #include "DummyShader.h"
 
+#ifndef NO_GFX
 void Render::DummyShader::CompileFromSource(eShaderType type, const char *source) {
   LOG_INFO(Render, "DummyShader::CompileFromSource: {}", static_cast<u8>(type));
 }
@@ -51,6 +52,4 @@ void Render::DummyShader::Unbind() {
 void Render::DummyShader::Destroy() {
   LOG_INFO(Render, "DummyShader::Destroy");
 }
-
-
-
+#endif

@@ -4,6 +4,7 @@
 
 #include "Render/Dummy/DummyShader.h"
 
+#ifndef NO_GFX
 namespace Render {
 
 void DummyShaderFactory::Destroy() {}
@@ -39,3 +40,4 @@ std::shared_ptr<Shader> DummyShaderFactory::LoadFromBinary(const std::string &na
 }
 
 } // namespace Render
+#endif

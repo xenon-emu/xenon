@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "Render/GUI/GUI.h"
+
 #ifndef NO_GFX
 
 #define GL_GLEXT_PROTOTYPES
@@ -11,8 +13,6 @@
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <backends/imgui_impl_opengl3.h>
 #include <backends/imgui_impl_sdl3.h>
-
-#include "Render/GUI/GUI.h"
 
 namespace Render {
 

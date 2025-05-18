@@ -10,6 +10,7 @@
 
 #include "Base/Logging/Log.h"
 
+#ifndef NO_GFX
 namespace Render {
 
 class DummyResourceFactory : public ResourceFactory {
@@ -33,3 +34,4 @@ public:
 };
 
 } // namespace Render
+#endif

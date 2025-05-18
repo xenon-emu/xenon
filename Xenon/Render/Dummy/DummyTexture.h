@@ -7,6 +7,7 @@
 #include "Base/Types.h"
 #include "Base/Logging/Log.h"
 
+#ifndef NO_GFX
 namespace Render {
 
 class DummyTexture : public Texture {
@@ -22,3 +23,4 @@ public:
 };
 
 } // namespace Render
+#endif

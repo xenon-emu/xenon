@@ -5,14 +5,14 @@
 #include <string>
 #include <functional>
 
+#include "Render/Abstractions/Texture.h"
+#include "Base/Assert.h"
+
 #ifndef NO_GFX
 #include <SDL3/SDL.h>
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <imgui.h>
 #include <imgui_internal.h>
-
-#include "Base/Assert.h"
-#include "Render/Abstractions/Texture.h"
 
 namespace Render {
 

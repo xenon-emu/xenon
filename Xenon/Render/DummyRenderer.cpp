@@ -4,6 +4,7 @@
 
 #include "Dummy/Factory/DummyResourceFactory.h"
 
+#ifndef NO_GFX
 namespace Render {
 DummyRenderer::DummyRenderer(RAM *ram, SDL_Window *mainWindow) :
   Renderer(ram, mainWindow) {
@@ -105,3 +106,4 @@ u32 DummyRenderer::GetBackendID() {
 }
 
 } // namespace Render
+#endif

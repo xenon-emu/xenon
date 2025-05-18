@@ -2,6 +2,7 @@
 
 #include "DummyTexture.h"
 
+#ifndef NO_GFX
 void Render::DummyTexture::CreateTextureHandle(u32 width, u32 height, s32 flags) {
   LOG_INFO(Render, "DummyTexture::CreateTextureHandle: {}, {}, {}", width, height, flags);
 }
@@ -33,3 +34,4 @@ void Render::DummyTexture::Unbind() {
 void Render::DummyTexture::DestroyTexture() {
   LOG_INFO(Render, "DummyTexture::DestroyTexture");
 }
+#endif

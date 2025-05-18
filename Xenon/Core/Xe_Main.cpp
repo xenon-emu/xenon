@@ -26,8 +26,10 @@ XeMain::XeMain() {
     LOG_ERROR(Render, "Invalid renderer backend: {}", Config::rendering.backend);
     break;
   }
-#endif
   xenos = std::make_unique<STRIP_UNIQUE(xenos)>(renderer.get(), ram.get(), pciBridge.get());
+#else
+  xenos = std::make_unique<STRIP_UNIQUE(xenos)>(nullptr, ram.get(), pciBridge.get());
+#endif
   createHostBridge();
   createRootBus();
   xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses);

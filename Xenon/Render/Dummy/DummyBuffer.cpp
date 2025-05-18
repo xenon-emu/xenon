@@ -2,6 +2,7 @@
 
 #include "DummyBuffer.h"
 
+#ifndef NO_GFX
 void Render::DummyBuffer::CreateBuffer(u32 size, const void *data, eBufferUsage usage, eBufferType type) {
   LOG_INFO(Render, "DummyBuffer::CreateBuffer: {}, {}, {}", size, static_cast<u8>(usage), static_cast<u8>(size));
 }
@@ -21,3 +22,4 @@ void Render::DummyBuffer::Unbind() {
 void Render::DummyBuffer::DestroyBuffer() {
   LOG_INFO(Render, "DummyBuffer::DestroyBuffer");
 }
+#endif

@@ -7,6 +7,7 @@
 #include "Base/Types.h"
 #include "Base/Logging/Log.h"
 
+#ifndef NO_GFX
 namespace Render {
 
 class DummyBuffer : public Buffer {
@@ -24,3 +25,4 @@ public:
 };
 
 } // namespace Render
+#endif

@@ -206,11 +206,11 @@ void PPU::Halt(u64 haltOn, bool requestedByGuest, s8 ppuId, ePPUThread threadId)
     ppuHaltOn = haltOn;
   }
   guestHalt = requestedByGuest;
-  if (guestHalt && Xe_Main.get() && Xe_Main->renderer) {
 #ifndef NO_GFX
+  if (guestHalt && Xe_Main.get() && Xe_Main->renderer) {
     Xe_Main->renderer->SetDebuggerActive(ppuId);
-#endif
   }
+#endif
   if (ppuThreadPreviousState == eThreadState::None) // If we were told to ignore it, then do so
     ppuThreadPreviousState.store(ppuThreadState.load());
   ppuThreadState = eThreadState::Halted;

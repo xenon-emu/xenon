@@ -23,11 +23,10 @@ if (GFX_ENABLED)
     set(SDL_PIPEWIRE OFF)
     add_subdirectory(SDL3)
   endif()
-endif()
-
-# Sirit
-if (NOT TARGET sirit)
-  add_subdirectory(Sirit)
+  # Sirit
+  if (NOT TARGET sirit)
+    add_subdirectory(Sirit)
+  endif()
 endif()
 
 # Toml11

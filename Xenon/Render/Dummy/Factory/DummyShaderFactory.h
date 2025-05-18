@@ -6,6 +6,7 @@
 
 #include "Base/Logging/Log.h"
 
+#ifndef NO_GFX
 namespace Render {
 
 class DummyShaderFactory : public ShaderFactory {
@@ -20,3 +21,4 @@ public:
 };
 
 } // namespace Render
+#endif

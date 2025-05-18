@@ -68,8 +68,10 @@ public:
   Xenon* getCPU() {
     return xenonCPU.get();
   }
+#ifndef NO_GFX
   // Window
   SDL_Window *mainWindow = nullptr;
+#endif
 private:
   // Main objects
   //  Base path

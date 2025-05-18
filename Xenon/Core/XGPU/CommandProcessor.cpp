@@ -745,6 +745,7 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
 
   std::pair<Microcode::AST::Shader*, std::vector<u32>> shader = LoadShader(shaderType, data, baseString);
 
+#ifndef NO_GFX
   render->shaderLoadQueue.push({
     shaderType,
     crc,
@@ -752,14 +753,19 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
     shader.first,
     shader.second
   });
+#endif
 
   switch (shaderType) {
   case eShaderType::Pixel:{
+#ifndef NO_GFX
     render->currentPixelShader = crc;
+#endif
     LOG_DEBUG(Xenos, "[CP::IM_LOAD] PixelShader CRC: 0x{:08X}", crc);
   } break;
   case eShaderType::Vertex:{
+#ifndef NO_GFX
     render->currentVertexShader = crc;
+#endif
     LOG_DEBUG(Xenos, "[CP::IM_LOAD] VertexShader CRC: 0x{:08X}", crc);
   } break;
   case eShaderType::Unknown:
@@ -798,6 +804,7 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuff
   
   std::pair<Microcode::AST::Shader*, std::vector<u32>> shader = LoadShader(shaderType, data, baseString);
 
+#ifndef NO_GFX
   render->shaderLoadQueue.push({
     shaderType,
     crc,
@@ -805,14 +812,19 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuff
     shader.first,
     shader.second
   });
+#endif
 
   switch (shaderType) {
   case eShaderType::Pixel:{
+#ifndef NO_GFX
     render->currentPixelShader = crc;
+#endif
     LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] PixelShader CRC: 0x{:08X}", crc);
   } break;
   case eShaderType::Vertex:{
+#ifndef NO_GFX
     render->currentVertexShader = crc;
+#endif
     LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] VertexShader CRC: 0x{:08X}", crc);
   } break;
   case eShaderType::Unknown:
@@ -1111,25 +1123,32 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
     // Check the state of things
     if (modeControl == eModeControl::Copy) {
       // Copy to eDRAM, and clear if needed
+#ifndef NO_GFX
       render->copyQueue.push(state);
       while (!render->copyQueue.empty()) {
         // We don't want the state to change in the middle of a copy, so just wait for a bit.
         std::this_thread::sleep_for(1ns);
       }
+#endif
       return true;
     }
     XeDrawParams params = {};
+#ifndef NO_GFX
     u32 combinedShaderHash = (static_cast<u64>(render->currentVertexShader) << 32) | render->currentPixelShader;
+#endif
     params.state = state;
     params.indexBufferInfo = indexBufferInfo;
     params.vgtDrawInitiator = state->vgtDrawInitiator;
+#ifndef NO_GFX
     params.shader = render->linkedShaderPrograms[combinedShaderHash];
+#endif
     params.vertexBufferPtr = ram->getPointerToAddress(state->vertexData.address);
     params.maxVertexIndex = state->maxVertexIndex;
     params.minVertexIndex = state->minVertexIndex;
     params.indexOffset = state->indexOffset;
     params.multiPrimitiveIndexBufferResetIndex = state->multiPrimitiveIndexBufferResetIndex;
     params.currentBinIdMin = state->currentBinIdMin;
+#ifndef NO_GFX
     Render::DrawJob drawJob = {};
     drawJob.params = params;
     drawJob.indexed = isIndexedDraw;
@@ -1138,6 +1157,7 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
     drawJob.shaderHash = combinedShaderHash;
     // Queue off to the Renderer
     render->drawQueue.push(drawJob);
+#endif
     LOG_DEBUG(Xenos, "[CP] Draw{}", isIndexedDraw ? "Indexed" : "");
     state->ClearDirtyState();
   } else {
