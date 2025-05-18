@@ -51,6 +51,8 @@ private:
   u32 dummyVAO;
   // SDL Context
   SDL_GLContext context;
+  // Checks if ES
+  bool gles = false;
 
   // OpenGL Infos
   std::string gl_version() const;

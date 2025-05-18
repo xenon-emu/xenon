@@ -86,6 +86,7 @@ void OGLRenderer::BackendSDLInit() {
     if (!context) {
       LOG_ERROR(System, "Failed to create OpenGL context: {}", SDL_GetError());
     } else {
+      gles = true;
       LOG_INFO(System, "Failed to use OpenGL4.3, SPIR-V will not be avaliable.");
     }
   }
@@ -95,6 +96,7 @@ void OGLRenderer::BackendSDLInit() {
     if (!gladLoadGLES2Loader((GLADloadproc)SDL_GL_GetProcAddress)) {
       LOG_ERROR(Render, "Failed to initialize GLES2 Loader");
     } else {
+      gles = true;
       LOG_INFO(Render, "GLES Version: {}", OGLRenderer::gl_version());
       LOG_INFO(Render, "OpenGL Vendor: {}", OGLRenderer::gl_vendor());
       LOG_INFO(Render, "OpenGL Renderer: {}", OGLRenderer::gl_renderer());
@@ -245,7 +247,7 @@ void* OGLRenderer::GetBackendContext() {
 }
 
 u32 OGLRenderer::GetBackendID() {
-  return "OpenGL"_j;
+  return gles ? "GLES"_j : "OpenGL"_j;
 }
 
 } //namespace Render

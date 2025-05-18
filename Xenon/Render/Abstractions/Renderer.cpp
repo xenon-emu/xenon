@@ -43,13 +43,17 @@ void Renderer::Create() {
 
   // Init shader handles
   switch (GetBackendID()) {
+  case "GLES"_j:
   case "OpenGL"_j: {
+    bool gles = GetBackendID() == "GLES"_j;
+    std::string versionString = FMT("#version {} {}\n\n", gles ? 310 : 430, gles ? "es" : "#version 430 compatibility");
     fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "opengl" };
     computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
       { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
     });
     if (!computeShaderProgram) {
       std::ofstream f{ shaderPath / "fb_deswizzle.comp" };
+      f.write(versionString.data(), versionString.size());
       f.write(computeShaderSource, sizeof(computeShaderSource));
       f.close();
       computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
@@ -62,9 +66,11 @@ void Renderer::Create() {
     });
     if (!renderShaderPrograms) {
       std::ofstream vert{ shaderPath / "framebuffer.vert" };
+      vert.write(versionString.data(), versionString.size());
       vert.write(vertexShaderSource, sizeof(vertexShaderSource));
       vert.close();
       std::ofstream frag{ shaderPath / "framebuffer.frag" };
+      frag.write(versionString.data(), versionString.size());
       frag.write(fragmentShaderSource, sizeof(fragmentShaderSource));
       frag.close();
       renderShaderPrograms = shaderFactory->LoadFromFiles("Render", {

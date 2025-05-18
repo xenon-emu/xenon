@@ -172,8 +172,6 @@ private:
 // Shaders
 
 inline constexpr const char vertexShaderSource[] = R"glsl(
-#version 430 core
-
 out vec2 o_texture_coord;
 
 void main() {
@@ -182,8 +180,6 @@ void main() {
 })glsl";
 
 inline constexpr const char fragmentShaderSource[] = R"glsl(
-#version 430 core
-
 in vec2 o_texture_coord;
 
 out vec4 o_color;
@@ -200,8 +196,6 @@ void main() {
 })glsl";
 
 inline constexpr const char computeShaderSource[] = R"glsl(
-#version 430 core
-
 layout (local_size_x = 16, local_size_y = 16) in;
 
 layout (r32ui, binding = 0) uniform writeonly uimage2D o_texture;
