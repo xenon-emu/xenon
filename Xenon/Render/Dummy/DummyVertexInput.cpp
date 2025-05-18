@@ -2,6 +2,7 @@
 
 #include "DummyVertexInput.h"
 
+#ifndef NO_GFX
 void Render::DummyVertexInput::SetBindings(const std::vector<VertexBinding> &bindings) {
   LOG_INFO(Render, "DummyVertexInput::SetBindings: {}", bindings.size());
 }
@@ -25,3 +26,4 @@ void Render::DummyVertexInput::Bind() {
 void Render::DummyVertexInput::Unbind() {
   LOG_INFO(Render, "DummyVertexInput::Unbind");
 }
+#endif

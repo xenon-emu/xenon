@@ -8,6 +8,7 @@
 #include "Base/Types.h"
 #include "Base/Logging/Log.h"
 
+#ifndef NO_GFX
 namespace Render {
 
 class DummyVertexInput : public VertexInput {
@@ -21,3 +22,4 @@ public:
 };
 
 } // namespace Render
+#endif
