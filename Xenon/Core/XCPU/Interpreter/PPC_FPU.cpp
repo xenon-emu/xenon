@@ -248,7 +248,7 @@ void PPCInterpreter::PPCInterpreter_fctiwzx(PPU_STATE *ppuState) {
   #else
     const float64x2_t val = vsetq_lane_f64(FPRi(frb).valueAsDouble, vdupq_n_f64(0), 0);
     const float64_t scalar = vgetq_lane_f64(val, 0);
-    const float32_t converted = vcvt_f32_f64(scalar);
+    const float32x2_t converted = vcvt_f32_f64(scalar);
     const float32_t result_f32 = vget_lane_f32(converted, 0);
     const s32 intVal = static_cast<s32>(result_f32);
     const bool flip = scalar >= static_cast<f64>(0x80000000);
