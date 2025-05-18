@@ -41,13 +41,14 @@ void Renderer::Create() {
   BackendStart();
   shaderFactory = resourceFactory->CreateShaderFactory();
 
+  fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) };
   // Init shader handles
   switch (GetBackendID()) {
   case "GLES"_j:
   case "OpenGL"_j: {
     bool gles = GetBackendID() == "GLES"_j;
     std::string versionString = FMT("#version {} {}\n", gles ? 310 : 430, gles ? "es" : "compatibility");
-    fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "opengl" };
+    shaderPath /= "opengl";
     computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
       { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
     });
@@ -80,7 +81,7 @@ void Renderer::Create() {
     }
   } break;
   case "Dummy"_j: {
-    fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "dummy" };
+    shaderPath /= "dummy";
     computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
       { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
     });

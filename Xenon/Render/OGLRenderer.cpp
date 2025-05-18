@@ -87,14 +87,14 @@ void OGLRenderer::BackendSDLInit() {
       LOG_ERROR(System, "Failed to create OpenGL context: {}", SDL_GetError());
     } else {
       gles = true;
-      LOG_INFO(System, "Failed to use OpenGL4.3, SPIR-V will not be avaliable.");
+      LOG_WARNING(System, "Using GLES, SPIR-V will not be avaliable");
     }
   }
   // Init GLAD
   if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress)) {
-    LOG_ERROR(Render, "Failed to initialize OpenGL Loader, trying GLES2");
+    LOG_ERROR(Render, "Failed to initialize GL: {}", SDL_GetError());
     if (!gladLoadGLES2Loader((GLADloadproc)SDL_GL_GetProcAddress)) {
-      LOG_ERROR(Render, "Failed to initialize GLES2 Loader");
+      LOG_ERROR(Render, "Failed to initialize GLES2: {}", SDL_GetError());
     } else {
       gles = true;
       LOG_INFO(Render, "GLES Version: {}", OGLRenderer::gl_version());
