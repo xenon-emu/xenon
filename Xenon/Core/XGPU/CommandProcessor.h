@@ -30,6 +30,7 @@
 #include "Core/XGPU/Xenos.h"
 #include "Core/XGPU/XenosState.h"
 #include "Render/Abstractions/Shader.h"
+#include "Render/Abstractions/Texture.h"
 
 // Xenos GPU Command Processor.
 // Handles all commands sent to the Xenos via the RingBuffer.
@@ -53,6 +54,7 @@ struct XeIndexBufferInfo {
 struct XeShader {
   Microcode::AST::Shader *vertexShader = nullptr;
   Microcode::AST::Shader *pixelShader = nullptr;
+  std::vector<std::shared_ptr<Render::Texture>> textures{};
   std::shared_ptr<Render::Shader> program = {};
 };
 #endif

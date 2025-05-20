@@ -94,6 +94,9 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
     const u32 scratchRegIndex = regIndex - static_cast<u32>(XeRegister::SCRATCH_REG0);
     value = scratch[scratchRegIndex];
   } break;
+  case XeRegister::WAIT_UNTIL:
+    value = waitUntil;
+    break;
   case XeRegister::RBBM_STATUS:
     if (!(rbbmStatus & 0x400)) {
       rbbmStatus |= 0x400;

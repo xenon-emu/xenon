@@ -99,6 +99,8 @@ public:
   u32 scratchAddr = 0;
   u32 scratch[8] = {};
 
+  u32 waitUntil = 0;
+
   // RBBM
   u32 rbbmControl = 0;
   u32 rbbmDebug = 0xF0000;

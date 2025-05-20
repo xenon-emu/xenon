@@ -317,11 +317,7 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
   const Xe::eEndianFormat endianFormat = static_cast<Xe::eEndianFormat>(destInfo & 7);
   const u32 destArray = (destInfo >> 3) & 1;
   const u32 destSlice = (destInfo >> 4) & 1;
-  const Xe::eColorFormat destformat = static_cast<Xe::eColorFormat>((destInfo >> 7) & 0x3F);
-  if (destformat == Xe::eColorFormat::Unknown) {
-    LOG_ERROR(Xenos, "[CP] Invalid color format! 0x{:X}", destInfo);
-    return true;
-  }
+  const Xe::eColorFormat destFormat = static_cast<Xe::eColorFormat>((destInfo >> 7) & 0x3F);
   const u32 destNumber = (destInfo >> 13) & 7;
   const u32 destBias = (destInfo >> 16) & 0x3F;
   const u32 destSwap = (destInfo >> 25) & 1;
@@ -404,12 +400,21 @@ void Renderer::Thread() {
             std::shared_ptr<Shader> shader = shaderFactory->LoadFromBinary(job.name, {
               { Render::eShaderType::Vertex, vsIt->second.second },
               { Render::eShaderType::Fragment, fsIt->second.second },
-              });
+            });
             if (shader) {
               Xe::XGPU::XeShader xeShader{};
               xeShader.program = std::move(shader);
               xeShader.pixelShader = vsIt->second.first;
               xeShader.vertexShader = fsIt->second.first;
+              for (u64 i = 0; i != xeShader.pixelShader->usedTextures.size(); ++i) {
+                xeShader.textures.push_back(resourceFactory->CreateTexture());
+              }
+              for (u64 i = 0; i != xeShader.vertexShader->usedTextures.size(); ++i) {
+                xeShader.textures.push_back(resourceFactory->CreateTexture());
+              }
+              for (auto &texture : xeShader.textures) {
+                texture->CreateTextureHandle(width, height, GetBackbufferFlags());
+              }
               linkedShaderPrograms.insert({ combinedHash, xeShader });
               LOG_DEBUG(Xenos, "Linked shader program: VS: 0x{:08X}, PS: 0x{:08X}", currentVertexShader.load(), currentPixelShader.load());
             } else {
@@ -477,8 +482,16 @@ void Renderer::Thread() {
         DrawJob job = drawQueue.front();
         drawQueue.pop();
         u64 combinedHash = (static_cast<u64>(job.shaderVS) << 32) | job.shaderPS;
-        auto shader = linkedShaderPrograms.find(combinedHash);
-        if (shader != linkedShaderPrograms.end()) {
+        if (auto buffer = createdBuffers.find("PixelConsts"_j); buffer != createdBuffers.end()) {
+          buffer->second->Bind(0);
+        }
+        if (auto buffer = createdBuffers.find("CommonBoolConsts"_j); buffer != createdBuffers.end()) {
+          buffer->second->Bind(1);
+        }
+        if (auto buffer = createdBuffers.find("VertexConsts"_j); buffer != createdBuffers.end()) {
+          buffer->second->Bind(2);
+        };
+        if (auto shader = linkedShaderPrograms.find(combinedHash); shader != linkedShaderPrograms.end()) {
           shader->second.program->Bind();
         }
 

@@ -3,6 +3,7 @@
 #include "OGLRenderer.h"
 
 #include "OpenGL/Factory/OGLResourceFactory.h"
+#include "OpenGL/OGLTexture.h"
 #include "GUI/OpenGL.h"
 
 #define SANITY_CHECK(x) if (!x) { LOG_ERROR(Xenon, "Failed to initialize SDL: {}", SDL_GetError()); }
@@ -142,6 +143,11 @@ void OGLRenderer::Draw(Xe::XGPU::XeDrawParams params) {
   ePrimitiveType type = params.vgtDrawInitiator.primitiveType;
   s32 glPrimitive = ConvertToGLPrimitive(params.vgtDrawInitiator.primitiveType);
   u32 numIndices = params.vgtDrawInitiator.numIndices;
+  for (u32 i = 0; i != params.shader.textures.size(); ++i) {
+    glActiveTexture(GL_TEXTURE0 + i);
+    params.shader.textures[i]->Bind();
+    //glBindSampler(i, params.shader.textures[i]->Sampler);
+  }
   glDrawArrays(glPrimitive, 0, params.vgtDrawInitiator.numIndices);
 }
 
@@ -156,22 +162,23 @@ void OGLRenderer::DrawIndexed(Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBu
   const u32 destArray = (destInfo >> 3) & 1;
   const u32 destSlice = (destInfo >> 4) & 1;
   const Xe::eColorFormat destformat = static_cast<Xe::eColorFormat>((destInfo >> 7) & 0x3F);
+  for (u32 i = 0; i != params.shader.textures.size(); ++i) {
+    glActiveTexture(GL_TEXTURE0 + i);
+    params.shader.textures[i]->Bind();
+    //glBindSampler(i, params.shader.textures[i]->Sampler);
+  }
   if (params.shader.vertexShader) {
     for (const auto *fetch : params.shader.vertexShader->vertexFetches) {
       u32 slot = fetch->fetchSlot;
       u32 offset = fetch->fetchOffset;
 
-      // Fetch float constants from cN (2 registers per slot)
-      const u32 *dwords = reinterpret_cast<const u32 *>(&params.state->vsConsts.values[slot * 8]); // 8 floats = 2 cN vec4s
-
-      // Bind vertex buffer (simplified for now: no VBO reuse, just raw pointer)
-      glBindBuffer(GL_ARRAY_BUFFER, 0); // No VBO
+      // Bind vertex buffer
       u32 stride = params.state->vertexData.size;
       const u8 *basePtr = params.vertexBufferPtr + params.minVertexIndex * stride + offset;
 
       // Assume format is float4
       glEnableVertexAttribArray(slot);
-      glVertexAttribPointer(slot, 4, GL_FLOAT, GL_FALSE, stride, (const void *)basePtr);
+      glVertexAttribPointer(slot, 4, GL_FLOAT, GL_FALSE, stride, (const void*)basePtr);
     }
   }
   glDrawElements(glPrimitive, numIndices, indexType, (void*)indexBufferInfo.elements);
