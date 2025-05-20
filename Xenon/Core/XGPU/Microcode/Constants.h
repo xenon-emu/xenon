@@ -304,10 +304,10 @@ struct instr_cf_exec_t {
   };
 
   inline bool is_cond_exec() const {
-    return (this->opc == COND_EXEC) || (this->opc == COND_EXEC_END) ||
-           (this->opc == COND_PRED_EXEC) || (this->opc == COND_PRED_EXEC_END) ||
-           (this->opc == COND_EXEC_PRED_CLEAN) ||
-           (this->opc == COND_EXEC_PRED_CLEAN_END);
+    return (opc == COND_EXEC) || (opc == COND_EXEC_END) ||
+           (opc == COND_PRED_EXEC) || (opc == COND_PRED_EXEC_END) ||
+           (opc == COND_EXEC_PRED_CLEAN) ||
+           (opc == COND_EXEC_PRED_CLEAN_END);
   }
 };
 
@@ -380,18 +380,18 @@ union instr_cf_t {
   };
 
   inline bool is_exec() const {
-    return (this->opc == EXEC) || (this->opc == EXEC_END) ||
-           (this->opc == COND_EXEC) || (this->opc == COND_EXEC_END) ||
-           (this->opc == COND_PRED_EXEC) || (this->opc == COND_PRED_EXEC_END) ||
-           (this->opc == COND_EXEC_PRED_CLEAN) ||
-           (this->opc == COND_EXEC_PRED_CLEAN_END);    
+    return (opc == EXEC) || (opc == EXEC_END) ||
+           (opc == COND_EXEC) || (opc == COND_EXEC_END) ||
+           (opc == COND_PRED_EXEC) || (opc == COND_PRED_EXEC_END) ||
+           (opc == COND_EXEC_PRED_CLEAN) ||
+           (opc == COND_EXEC_PRED_CLEAN_END);    
   }
 
   inline bool is_cond_exec() const {
-    return (this->opc == COND_EXEC) || (this->opc == COND_EXEC_END) ||
-           (this->opc == COND_PRED_EXEC) || (this->opc == COND_PRED_EXEC_END) ||
-           (this->opc == COND_EXEC_PRED_CLEAN) ||
-           (this->opc == COND_EXEC_PRED_CLEAN_END);
+    return (opc == COND_EXEC) || (opc == COND_EXEC_END) ||
+           (opc == COND_PRED_EXEC) || (opc == COND_PRED_EXEC_END) ||
+           (opc == COND_EXEC_PRED_CLEAN) ||
+           (opc == COND_EXEC_PRED_CLEAN_END);
   }
 };
 

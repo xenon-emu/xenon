@@ -431,7 +431,7 @@ Chunk ShaderCodeWriterSirit::VectorFunc1(instr_vector_opc_t instr, const Chunk &
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc1(MOVAv)");
     return Chunk(module.OpFloor(vec4_type, a.id)); // Often MOVA means integer floor for address computation
   default:
-    THROW_MSG(true, "[AST::Emitter] Unsupported vector unary op!");
+    LOG_ERROR(Xenos, "[AST::Emitter] Unsupported vector unary op!");
     return {};
   }
 }
@@ -465,8 +465,14 @@ Chunk ShaderCodeWriterSirit::VectorFunc2(instr_vector_opc_t instr, const Chunk &
   case SETNEv:
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc2(SETNEv)");
     return Chunk(module.OpFOrdNotEqual(vec4_type, a.id, b.id));
+  case DOT4v:
+    LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc3(DOT4v)");
+    return Chunk(module.OpDot(float_type, a.id, b.id)); // Dot product of a and b (vector type)
+  case DOT3v:
+    LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc3(DOT3v)");
+    return Chunk(module.OpDot(float_type, a.id, b.id)); // Dot product of a and b (3D version)
   default:
-    THROW_MSG(true, "[AST::Emitter] Unsupported vector binary op '{}'!", static_cast<u32>(instr));
+    LOG_ERROR(Xenos, "[AST::Emitter] Unsupported vector binary op '{}'!", static_cast<u32>(instr));
     return {};
   }
 }
@@ -504,7 +510,7 @@ Chunk ShaderCodeWriterSirit::VectorFunc3(instr_vector_opc_t instr, const Chunk &
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc3(CNDGTv)");
     return Chunk(module.OpSelect(vec4_type, module.OpFOrdGreaterThan(vec4_type, a.id, b.id), b.id, c.id));
   default:
-    THROW_MSG(true, "[AST::Emitter] Unsupported vector '{}' operation in VectorFunc3!", static_cast<u32>(instr));
+    LOG_ERROR(Xenos, "[AST::Emitter] Unsupported vector '{}' operation in VectorFunc3!", static_cast<u32>(instr));
     return {};
   }
 }
@@ -558,7 +564,7 @@ Chunk ShaderCodeWriterSirit::ScalarFunc1(instr_scalar_opc_t instr, const Chunk &
     LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc1(LOG_IEEE)");
     return Chunk(module.OpLog2(float_type, a.id)); // log2(x)
   default:
-    THROW_MSG(true, "[AST::Emitter] Unsupported scalar unary op '{}'!", static_cast<u32>(instr));
+    LOG_ERROR(Xenos, "[AST::Emitter] Unsupported scalar unary op '{}'!", static_cast<u32>(instr));
     return {};
   }
 }
@@ -580,7 +586,7 @@ Chunk ShaderCodeWriterSirit::ScalarFunc2(instr_scalar_opc_t instr, const Chunk &
     LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc2(MINs)");
     return Chunk(module.OpFMin(float_type, a.id, b.id)); // min(a, b)
   default:
-    THROW_MSG(true, "[AST::Emitter] Unsupported scalar binary op!");
+    LOG_ERROR(Xenos, "[AST::Emitter] Unsupported scalar binary op!");
     return {};
   }
 }
@@ -822,12 +828,12 @@ void ShaderCodeWriterSirit::AssignMasked(const Chunk &src, const Chunk &dst,
   for (u64 i = 0; i < dstSwizzle.size(); ++i) {
     u32 srcIndex = static_cast<u32>(srcSwizzle[i]);
     u32 dstIndex = static_cast<u32>(dstSwizzle[i]);
-    if (srcSwizzle.size() == 1) {
-      components[dstIndex] = src.id;
-    } else {
-      Sirit::Id float_type = module.TypeFloat(32);
-      components[dstIndex] = module.OpCompositeExtract(float_type, src.id, srcIndex);
+    if (srcIndex >= 4 || dstIndex >= 4) {
+      LOG_ERROR(Xenos, "Invalid swizzle index: srcIndex={}, dstIndex={}", srcIndex, dstIndex);
+      continue;
     }
+    Sirit::Id float_type = module.TypeFloat(32);
+    components[dstIndex] = module.OpCompositeExtract(float_type, src.id, srcIndex);
   }
 
   Sirit::Id vec4_type = module.TypeVector(float_type, 4);

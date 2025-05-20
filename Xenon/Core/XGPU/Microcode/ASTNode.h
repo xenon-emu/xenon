@@ -29,6 +29,7 @@ public:
 
   virtual ~ExpressionNode() = default;
   virtual eExprType GetType() const { return eExprType::ALU; }
+  virtual std::string GetName() const { return "ExpressionNode"; }
   virtual s32 GetRegisterIndex() const { return -1; }
   virtual Chunk EmitShaderCode(ShaderCodeWriterBase &writer) = 0;
   virtual std::shared_ptr<ExpressionNode> CloneExpr() const = 0;
@@ -56,6 +57,9 @@ public:
     regIndex(index)
   {}
   s32 GetRegisterIndex() const override { return regIndex; }
+  std::string GetName() const override {
+    return "ReadRegister";
+  }
   Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<ReadRegister>(regIndex);
@@ -70,6 +74,9 @@ public:
     regIndex(index)
   {}
   s32 GetRegisterIndex() const override { return regIndex; }
+  std::string GetName() const override {
+    return "WriteRegister";
+  }
   Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<WriteRegister>(regIndex);
@@ -85,6 +92,9 @@ public:
     exportReg(reg)
   {}
   eExprType GetType() const override { return eExprType::EXPORT; }
+  std::string GetName() const override {
+    return "WriteExportRegister";
+  }
   Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<WriteExportRegister>(exportReg);
@@ -103,6 +113,9 @@ public:
   BoolConstant(bool ps, s32 idx) :
     pixelShader(ps), index(idx)
   {}
+  std::string GetName() const override {
+    return "BoolConstant";
+  }
   Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<BoolConstant>(pixelShader, index);
@@ -118,6 +131,9 @@ public:
   FloatConstant(bool ps, s32 idx) :
     pixelShader(ps), index(idx)
   {}
+  std::string GetName() const override {
+    return "FloatConstant";
+  }
   Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<FloatConstant>(pixelShader, index);
@@ -132,6 +148,9 @@ public:
   FloatRelativeConstant(bool ps, s32 rel) :
     pixelShader(ps), relativeOffset(rel)
   {}
+  std::string GetName() const override {
+    return "FloatRelativeConstant";
+  }
   Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<FloatRelativeConstant>(pixelShader, relativeOffset);
@@ -155,6 +174,9 @@ public:
   Abs(Ptr expr)   {
     children[0] = std::move(expr);
   }
+  std::string GetName() const override {
+    return "Abs";
+  }
   Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<Abs>(children[0]->CloneExpr());
@@ -165,6 +187,9 @@ class Negate : public ExpressionNode {
 public:
   Negate(Ptr expr) {
     children[0] = std::move(expr);
+  }
+  std::string GetName() const override {
+    return "Negate";
   }
   Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
@@ -177,6 +202,9 @@ public:
   Not(Ptr expr) {
     children[0] = std::move(expr);
   }
+  std::string GetName() const override {
+    return "Not";
+  }
   Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<Not>(children[0]->CloneExpr());
@@ -187,6 +215,9 @@ class Saturate : public ExpressionNode {
 public:
   Saturate(Ptr expr) {
     children[0] = std::move(expr);
+  }
+  std::string GetName() const override {
+    return "Saturate";
   }
   Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
@@ -202,6 +233,9 @@ public:
     swizzle[1] = y;
     swizzle[2] = z;
     swizzle[3] = w;
+  }
+  std::string GetName() const override {
+    return "Swizzle";
   }
   Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
@@ -220,6 +254,9 @@ public:
     children[0] = std::move(src);
   }
 
+  std::string GetName() const override {
+    return "VertexFetch";
+  }
   eExprType GetType() const override { return eExprType::VFETCH; }
   Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
@@ -238,6 +275,9 @@ public:
     children[0] = std::move(src);
   }
 
+  std::string GetName() const override {
+    return "TextureFetch";
+  }
   eExprType GetType() const override { return eExprType::TFETCH; }
   Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
@@ -256,6 +296,9 @@ public:
     children[0] = std::move(a);
   }
 
+  std::string GetName() const override {
+    return "VectorFunc1";
+  }
   Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<VectorFunc1>(vectorInstr, children[0]->CloneExpr());
@@ -271,6 +314,9 @@ public:
     children[1] = std::move(b);
   }
 
+  std::string GetName() const override {
+    return "VectorFunc2";
+  }
   Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<VectorFunc2>(vectorInstr, children[0]->CloneExpr(), children[1]->CloneExpr());
@@ -287,6 +333,9 @@ public:
     children[2] = std::move(c);
   }
 
+  std::string GetName() const override {
+    return "VectorFunc3";
+  }
   Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<VectorFunc3>(vectorInstr, children[0]->CloneExpr(), children[1]->CloneExpr(), children[2]->CloneExpr());
@@ -301,6 +350,9 @@ public:
     scalarInstr(instr)
   {}
 
+  std::string GetName() const override {
+    return "ScalarFunc0";
+  }
   Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<ScalarFunc0>(scalarInstr);
@@ -315,6 +367,9 @@ public:
     children[0] = std::move(a);
   }
 
+  std::string GetName() const override {
+    return "ScalarFunc1";
+  }
   Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<ScalarFunc1>(scalarInstr, children[0]->CloneExpr());
@@ -330,6 +385,9 @@ public:
     children[1] = std::move(b);
   }
 
+  std::string GetName() const override {
+    return "ScalarFunc2";
+  }
   Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<ScalarFunc2>(scalarInstr, children[0]->CloneExpr(), children[1]->CloneExpr());

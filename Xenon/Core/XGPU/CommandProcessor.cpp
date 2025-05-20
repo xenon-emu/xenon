@@ -732,6 +732,9 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
   u32 dwordCount = size / 4;
   data.resize(dwordCount);
   memcpy(data.data(), addrPtr, size);
+  for (u32 &value : data) {
+    value = byteswap_be(value);
+  }
   
   fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "cache" };
   std::string typeString = shaderType == Xe::eShaderType::Pixel ? "pixel" : "vertex";
@@ -746,25 +749,28 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
   std::pair<Microcode::AST::Shader*, std::vector<u32>> shader = LoadShader(shaderType, data, baseString);
 
 #ifndef NO_GFX
-  render->shaderLoadQueue.push({
-    shaderType,
-    crc,
-    baseString,
-    shader.first,
-    shader.second
-  });
+  {
+    std::lock_guard<std::mutex> lock(render->shaderQueueMutex);
+    render->shaderLoadQueue.push({
+      shaderType,
+      crc,
+      baseString,
+      shader.first,
+      shader.second
+    });
+  }
 #endif
 
   switch (shaderType) {
   case eShaderType::Pixel:{
 #ifndef NO_GFX
-    render->currentPixelShader = crc;
+    render->currentPixelShader.store(crc);
 #endif
     LOG_DEBUG(Xenos, "[CP::IM_LOAD] PixelShader CRC: 0x{:08X}", crc);
   } break;
   case eShaderType::Vertex:{
 #ifndef NO_GFX
-    render->currentVertexShader = crc;
+    render->currentVertexShader.store(crc);
 #endif
     LOG_DEBUG(Xenos, "[CP::IM_LOAD] VertexShader CRC: 0x{:08X}", crc);
   } break;
@@ -805,25 +811,28 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuff
   std::pair<Microcode::AST::Shader*, std::vector<u32>> shader = LoadShader(shaderType, data, baseString);
 
 #ifndef NO_GFX
-  render->shaderLoadQueue.push({
-    shaderType,
-    crc,
-    baseString,
-    shader.first,
-    shader.second
-  });
+  {
+    std::lock_guard<std::mutex> lock(render->shaderQueueMutex);
+    render->shaderLoadQueue.push({
+      shaderType,
+      crc,
+      baseString,
+      shader.first,
+      shader.second
+    });
+  }
 #endif
 
   switch (shaderType) {
   case eShaderType::Pixel:{
 #ifndef NO_GFX
-    render->currentPixelShader = crc;
+    render->currentPixelShader.store(crc);
 #endif
     LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] PixelShader CRC: 0x{:08X}", crc);
   } break;
   case eShaderType::Vertex:{
 #ifndef NO_GFX
-    render->currentVertexShader = crc;
+    render->currentVertexShader.store(crc);
 #endif
     LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] VertexShader CRC: 0x{:08X}", crc);
   } break;
@@ -1124,17 +1133,16 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
     if (modeControl == eModeControl::Copy) {
       // Copy to eDRAM, and clear if needed
 #ifndef NO_GFX
-      render->copyQueue.push(state);
-      while (!render->copyQueue.empty()) {
-        // We don't want the state to change in the middle of a copy, so just wait for a bit.
-        std::this_thread::sleep_for(1ns);
+      {
+        std::lock_guard<std::mutex> lock(render->copyQueueMutex);
+        render->copyQueue.push(state);
       }
 #endif
       return true;
     }
     XeDrawParams params = {};
 #ifndef NO_GFX
-    u32 combinedShaderHash = (static_cast<u64>(render->currentVertexShader) << 32) | render->currentPixelShader;
+    u32 combinedShaderHash = (static_cast<u64>(render->currentVertexShader.load()) << 32) | render->currentPixelShader.load();
 #endif
     params.state = state;
     params.indexBufferInfo = indexBufferInfo;
@@ -1152,11 +1160,14 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
     Render::DrawJob drawJob = {};
     drawJob.params = params;
     drawJob.indexed = isIndexedDraw;
-    drawJob.shaderPS = render->currentPixelShader;
-    drawJob.shaderVS = render->currentVertexShader;
+    drawJob.shaderPS = render->currentPixelShader.load();
+    drawJob.shaderVS = render->currentVertexShader.load();
     drawJob.shaderHash = combinedShaderHash;
     // Queue off to the Renderer
-    render->drawQueue.push(drawJob);
+    {
+      std::lock_guard<std::mutex> lock(render->drawQueueMutex);
+      render->drawQueue.push(drawJob);
+    }
 #endif
     LOG_DEBUG(Xenos, "[CP] Draw{}", isIndexedDraw ? "Indexed" : "");
     state->ClearDirtyState();

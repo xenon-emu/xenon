@@ -15,6 +15,7 @@ ShaderNodeWriter::~ShaderNodeWriter()
 {}
 
 void ShaderNodeWriter::TransformShader(AST::NodeWriter &nodeWriter, const u32 *words, const u32 numWords) {
+  LOG_DEBUG(Xenos, "Shader start: {:08X} {:08X} {:08X}", words[0], words[1], words[2]);
   u32 pc = 0;
   for (u32 i = 0; i != numWords; i += 3) {
     instr_cf_t cfa;
@@ -24,8 +25,12 @@ void ShaderNodeWriter::TransformShader(AST::NodeWriter &nodeWriter, const u32 *w
     cfb.dword_0 = (words[i+1] >> 16) | (words[i+2] << 16);
     cfa.dword_1 = words[i+1] & 0xFFFF;
     cfb.dword_1 = words[i+2] >> 16;
-    LOG_DEBUG(Xenos, "[ShaderNodeWriter::TransformShader] Opcode: {}, 0x{:02X}", GetCFOpcodeName(static_cast<instr_cf_opc_t>(cfa.opc)), cfa.opc);
-    LOG_DEBUG(Xenos, "[ShaderNodeWriter::TransformShader] Opcode: {}, 0x{:02X}", GetCFOpcodeName(static_cast<instr_cf_opc_t>(cfb.opc)), cfb.opc);
+
+    LOG_DEBUG(Xenos, "Data: {:08X} {:08X} {:08X}", words[i+0], words[i+1], words[i+2]);
+    LOG_DEBUG(Xenos, "[ShaderNodeWriter::TransformShader] Opcode: {}, 0x{:X}",
+      GetCFOpcodeName(static_cast<instr_cf_opc_t>(cfa.opc)), static_cast<u32>(cfa.opc));
+    LOG_DEBUG(Xenos, "[ShaderNodeWriter::TransformShader] Opcode: {}, 0x{:X}",
+      GetCFOpcodeName(static_cast<instr_cf_opc_t>(cfb.opc)), static_cast<u32>(cfb.opc));
 
     TransformBlock(nodeWriter, words, numWords, cfa, pc);
     TransformBlock(nodeWriter, words, numWords, cfb, pc);
@@ -110,10 +115,12 @@ void ShaderNodeWriter::TransformBlock(AST::NodeWriter &nodeWriter, const u32 *wo
     const instr_cf_jmp_call_t &jmp = cf.jmp_call;
     u32 targetAddr = jmp.address;
     if (jmp.address_mode != ABSOLUTE_ADDR) {
+      // Relative addressing: direction = 0 (backward), 1 (forward)
       if (jmp.direction == 0) {
-        LOG_ERROR(Xenos, "[UCode] Jump had a invalid direction of '{}'", targetAddr);
+        targetAddr -= pc;
+      } else {
+        targetAddr += pc;
       }
-      targetAddr += pc;
     }
     // Evaluate condition
     AST::Statement preamble = {};
@@ -139,7 +146,6 @@ void ShaderNodeWriter::TransformBlock(AST::NodeWriter &nodeWriter, const u32 *wo
   } break;
   case LOOP_START: {
     const instr_cf_loop_t &loop = cf.loop;
-
     // Compute loop target address
     u32 targetAddr = loop.address;
     if (loop.address_mode != ABSOLUTE_ADDR)
@@ -158,14 +164,12 @@ void ShaderNodeWriter::TransformBlock(AST::NodeWriter &nodeWriter, const u32 *wo
   } break;
   case LOOP_END: {
     const instr_cf_loop_t &loop = cf.loop;
-
     AST::Expression condition = {};
     if (loop.pred_break) {
       condition = nodeWriter.EmitGetPredicate();
       if (!loop.condition)
         condition = nodeWriter.EmitNot(condition);
     }
-
     nodeWriter.EmitLoopEnd(loop.address, condition);
   } break;
   case RETURN:

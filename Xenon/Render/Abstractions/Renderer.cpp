@@ -288,9 +288,18 @@ void Renderer::UpdateConstants(Xe::XGPU::XenosState *state) {
     Render::eBufferUsage::DynamicDraw
   };
 
-  bufferLoadQueue.push(pixelBufferJob);
-  bufferLoadQueue.push(vertexBufferJob);
-  bufferLoadQueue.push(boolBufferJob);
+  {
+    std::lock_guard<std::mutex> lock(bufferQueueMutex);
+    bufferLoadQueue.push(pixelBufferJob);
+  }
+  {
+    std::lock_guard<std::mutex> lock(bufferQueueMutex);
+    bufferLoadQueue.push(vertexBufferJob);
+  }
+  {
+    std::lock_guard<std::mutex> lock(bufferQueueMutex);
+    bufferLoadQueue.push(boolBufferJob);
+  }
 }
 
 bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
@@ -369,61 +378,70 @@ void Renderer::Thread() {
     if (!threadRunning || !XeRunning)
       break;
 
-    while (!shaderLoadQueue.empty()) {
-      ShaderLoadJob job = shaderLoadQueue.front();
-      shaderLoadQueue.pop();
+    {
+      std::lock_guard<std::mutex> lock(shaderQueueMutex);
+      while (!shaderLoadQueue.empty()) {
+        ShaderLoadJob job = shaderLoadQueue.front();
+        shaderLoadQueue.pop();
 
-      Render::eShaderType shaderType = job.shaderType == Xe::eShaderType::Pixel
-        ? Render::eShaderType::Fragment
-        : Render::eShaderType::Vertex;
+        Render::eShaderType shaderType = job.shaderType == Xe::eShaderType::Pixel
+          ? Render::eShaderType::Fragment
+          : Render::eShaderType::Vertex;
 
-      if (shaderType == Render::eShaderType::Vertex) {
-        pendingVertexShaders[job.shaderCRC] = std::make_pair(job.shaderTree, job.binary);
-      } else {
-        pendingPixelShaders[job.shaderCRC] = std::make_pair(job.shaderTree, job.binary);
-      }
+        if (shaderType == Render::eShaderType::Vertex) {
+          pendingVertexShaders[job.shaderCRC] = std::make_pair(job.shaderTree, job.binary);
+        } else {
+          pendingPixelShaders[job.shaderCRC] = std::make_pair(job.shaderTree, job.binary);
+        }
 
-      // See if we have both shaders now
-      if (currentVertexShader != 0 && currentPixelShader != 0) {
-        auto vsIt = pendingVertexShaders.find(currentVertexShader);
-        auto fsIt = pendingPixelShaders.find(currentPixelShader);
+        // See if we have both shaders now
+        if (currentVertexShader.load() != 0 && currentPixelShader.load() != 0) {
+          auto vsIt = pendingVertexShaders.find(currentVertexShader.load());
+          auto fsIt = pendingPixelShaders.find(currentPixelShader.load());
 
-        if (vsIt != pendingVertexShaders.end() && fsIt != pendingPixelShaders.end()) {
-          u64 combinedHash = (static_cast<u64>(currentVertexShader) << 32) | currentPixelShader;
-          std::shared_ptr<Shader> shader = shaderFactory->LoadFromBinary(job.name, {
-            { Render::eShaderType::Vertex, fsIt->second.second },
-            { Render::eShaderType::Fragment, fsIt->second.second },
-          });
-          if (shader) {
-            Xe::XGPU::XeShader xeShader{};
-            xeShader.program = std::move(shader);
-            xeShader.pixelShader = fsIt->second.first;
-            xeShader.vertexShader = fsIt->second.first;
-            linkedShaderPrograms.insert({ combinedHash, xeShader });
-            LOG_DEBUG(Xenos, "Linked shader program: VS: 0x{:08X}, PS: 0x{:08X}", currentVertexShader, currentPixelShader);
-          } else {
-            LOG_ERROR(Xenos, "Failed to link shader programs.");
+          if (vsIt != pendingVertexShaders.end() && fsIt != pendingPixelShaders.end()) {
+            u64 combinedHash = (static_cast<u64>(currentVertexShader.load()) << 32) | currentPixelShader;
+            std::shared_ptr<Shader> shader = shaderFactory->LoadFromBinary(job.name, {
+              { Render::eShaderType::Vertex, fsIt->second.second },
+              { Render::eShaderType::Fragment, fsIt->second.second },
+              });
+            if (shader) {
+              Xe::XGPU::XeShader xeShader{};
+              xeShader.program = std::move(shader);
+              xeShader.pixelShader = fsIt->second.first;
+              xeShader.vertexShader = fsIt->second.first;
+              linkedShaderPrograms.insert({ combinedHash, xeShader });
+              LOG_DEBUG(Xenos, "Linked shader program: VS: 0x{:08X}, PS: 0x{:08X}", currentVertexShader.load(), currentPixelShader.load());
+            } else {
+              LOG_ERROR(Xenos, "Failed to link shader programs.");
+            }
           }
         }
       }
     }
 
-    while (!bufferLoadQueue.empty()) {
-      BufferLoadJob job = bufferLoadQueue.front();
-      bufferLoadQueue.pop();
+    {
+      std::lock_guard<std::mutex> lock(bufferQueueMutex);
+      while (!bufferLoadQueue.empty()) {
+        BufferLoadJob job = bufferLoadQueue.front();
+        bufferLoadQueue.pop();
 
-      std::shared_ptr<Buffer> buffer = resourceFactory->CreateBuffer();
-      buffer->CreateBuffer(static_cast<u32>(job.data.size()), job.data.data(), job.usage, job.type);
+        std::shared_ptr<Buffer> buffer = resourceFactory->CreateBuffer();
+        buffer->CreateBuffer(static_cast<u32>(job.data.size()), job.data.data(), job.usage, job.type);
 
-      createdBuffers.insert({ job.hash, buffer });
-      LOG_DEBUG(Xenos, "Created buffer '{}', size: {}", job.name, job.data.size());
+        createdBuffers.insert({ job.hash, buffer });
+        LOG_DEBUG(Xenos, "Created buffer '{}', size: {}", job.name, job.data.size());
+      }
     }
 
-    // Handle issue copy (OpenGL things, needs to be in the same thread)
-    if (!copyQueue.empty()) {
-      auto job = copyQueue.front();
-      IssueCopy(job);
-      copyQueue.pop();
+    {
+      std::lock_guard<std::mutex> lock(copyQueueMutex);
+      // Handle issue copy (OpenGL things, needs to be in the same thread)
+      if (!copyQueue.empty()) {
+        auto job = copyQueue.front();
+        IssueCopy(job);
+        copyQueue.pop();
+      }
     }
 
     // Clear the display

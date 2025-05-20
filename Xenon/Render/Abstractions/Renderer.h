@@ -135,12 +135,15 @@ public:
   std::unique_ptr<Texture> backbuffer{};
 
   // Shader texture queue
+  std::mutex drawQueueMutex{};
   std::queue<DrawJob> drawQueue{};
 
   // Shader load queue
+  std::mutex shaderQueueMutex{};
   std::queue<ShaderLoadJob> shaderLoadQueue{};
+  std::mutex bufferQueueMutex{};
   std::queue<BufferLoadJob> bufferLoadQueue{};
-  std::unordered_map<u32, std::shared_ptr<Buffer>> createdBuffers;
+  std::unordered_map<u32, std::shared_ptr<Buffer>> createdBuffers{};
 
   // GUI Helpers
   bool DebuggerActive();
@@ -148,11 +151,13 @@ public:
   void SetDebuggerActive(s8 specificPPU = -1);
   
   // Recompiled shaders
+  std::mutex programLinkMutex{};
   std::unordered_map<u32, std::pair<Xe::Microcode::AST::Shader*, std::vector<u32>>> pendingVertexShaders{};
   std::unordered_map<u32, std::pair<Xe::Microcode::AST::Shader*, std::vector<u32>>> pendingPixelShaders{};
   std::unordered_map<u64, Xe::XGPU::XeShader> linkedShaderPrograms{};
-  u32 currentVertexShader = 0;
-  u32 currentPixelShader = 0;
+  std::atomic<u32> currentVertexShader = 0;
+  std::atomic<u32> currentPixelShader = 0;
+  std::mutex copyQueueMutex{};
   std::queue<Xe::XGPU::XenosState*> copyQueue{};
 private:
   // Thread handle

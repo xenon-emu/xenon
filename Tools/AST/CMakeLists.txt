@@ -33,12 +33,7 @@ project(${Project})
 
 add_executable(${Project})
 
-file(GLOB_RECURSE Microcode Microcode/*.cpp Microcode/*.h)
-
 file(GLOB Main *.cpp *.h)
-
-# Provides a dead-simple logger, designed to avoid threading for tools
-file(GLOB_RECURSE SimpleBase ../Base/*.cpp ../Base/*.h)
 
 # Registers for the XGPU
 set(Xenon
@@ -47,6 +42,8 @@ set(Xenon
   ../../Xenon/Core/XGPU/Xenos.h
   ../../Xenon/Core/XGPU/XenosRegisters.h
 )
+
+file(GLOB XenonMicrocode ../../Xenon/Core/XGPU/Microcode/*.cpp ../../Xenon/Core/XGPU/Microcode/*.h)
 
 # Basics to get types, param, and hashe algos
 set(XenonBase
@@ -63,8 +60,7 @@ add_compile_definitions(TOOL)
 
 target_sources(${Project} PRIVATE
   ${Main}
-  ${Microcode}
-  ${SimpleBase}
+  ${XenonMicrocode}
   ${Xenon}
   ${XenonBase}
 )

@@ -8,8 +8,8 @@
 
 #include "Core/XGPU/ShaderConstants.h"
 
-#include "Microcode/ASTBlock.h"
-#include "Microcode/ASTNodeWriter.h"
+#include "Core/XGPU/Microcode/ASTBlock.h"
+#include "Core/XGPU/Microcode/ASTNodeWriter.h"
 
 namespace Xe::Microcode {
   
