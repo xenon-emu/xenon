@@ -105,7 +105,7 @@ ControlFlowGraph* ControlFlowGraph::DecompileMicroCode(const void *code, u32 cod
     if (type != eBlockType::END && type != eBlockType::RET) {
       if (type == eBlockType::JUMP || type == eBlockType::CALL) {
         if (curr->IsUnconditional())
-          continue;
+          LOG_ERROR(Render, "Unconditional jumps are unsupported!");
       }
       curr->ConnectContinuation(next);
     }

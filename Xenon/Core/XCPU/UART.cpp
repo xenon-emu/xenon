@@ -5,6 +5,8 @@
 #include "Base/Error.h"
 #include "Base/Thread.h"
 
+#define COM_TEST 0
+
 // UART Thread
 void HW_UART_SOCK::uartMainThread() {
   Base::SetCurrentThreadName("[Xe::SMC::UART] Transfer");
@@ -195,7 +197,7 @@ void HW_UART_VCOM::Init(void *uartConfig) {
     LOG_ERROR(UART, "SetCommState failed with error {}", Base::GetLastErrorMsg());
   }
 
-#ifdef DEBUG_BUILD
+#if defined(DEBUG_BUILD) && COM_TEST
   auto path = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
   f.open(path / "UART.txt", std::ios::out | std::ios::binary);
 #endif
@@ -205,13 +207,13 @@ void HW_UART_VCOM::Init(void *uartConfig) {
 }
 
 void HW_UART_VCOM::Shutdown() {
-#ifdef DEBUG_BUILD
+#if defined(DEBUG_BUILD) && COM_TEST
   f.close();
 #endif
 }
 
 void HW_UART_VCOM::Write(const u8 data) {
-#ifdef DEBUG_BUILD
+#if defined(DEBUG_BUILD) && COM_TEST
   if (reading && !uartBuffer.empty()) {
     u64 bufferSize = uartBuffer.size();
     u8 c[17] = {};
@@ -228,7 +230,7 @@ void HW_UART_VCOM::Write(const u8 data) {
 }
 
 u8 HW_UART_VCOM::Read() {
-#ifdef DEBUG_BUILD
+#if defined(DEBUG_BUILD) && COM_TEST
   if (!reading && !uartBuffer.empty()) {
     u64 bufferSize = uartBuffer.size();
     u8 c[17] = {};
@@ -242,7 +244,7 @@ u8 HW_UART_VCOM::Read() {
   u8 data = 0;
   if (comPortHandle)
     retVal = ReadFile(comPortHandle, &data, 1, &currentBytesReadCount, nullptr);
-#ifdef DEBUG_BUILD
+#if defined(DEBUG_BUILD) && COM_TEST
   uartBuffer.push_back(data);
 #endif
   return data;

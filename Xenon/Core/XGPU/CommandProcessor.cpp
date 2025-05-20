@@ -729,11 +729,9 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
   u8 *addrPtr = ram->getPointerToAddress(addr);
 
   std::vector<u32> data{};
-  for (u64 i = 0; i != size; ++i) {
-    u32 value = 0;
-    memcpy(&value, &addrPtr[i], sizeof(value));
-    data.push_back(value);
-  }
+  u32 dwordCount = size / 4;
+  data.resize(dwordCount);
+  memcpy(data.data(), addrPtr, size);
   
   fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "cache" };
   std::string typeString = shaderType == Xe::eShaderType::Pixel ? "pixel" : "vertex";

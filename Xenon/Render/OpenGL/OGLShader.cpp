@@ -111,7 +111,9 @@ bool Render::OGLShader::Link() {
       return false;
     }
     LOG_CRITICAL(System, "Shader linking failed! No message present, likely SPIR-V");
-  } else if (AttachedShaders.empty()) {
+  }
+
+  if (AttachedShaders.empty()) {
     LOG_CRITICAL(System, "Shader linking failed! No shaders to link!");
   }
 

@@ -73,7 +73,7 @@ void WriteWithMaskStatement::EmitShaderCode(ShaderCodeWriterBase &writer) {
       numSpecialChannels += 1;
     } break;
     default: {
-      LOG_ERROR(Render, "[AST::Statement] Unknown swizzle type!");
+      LOG_ERROR(Render, "[AST::Statement] Unknown swizzle type '{}'!", static_cast<u32>(mask[i]));
     } break;
     }
   }

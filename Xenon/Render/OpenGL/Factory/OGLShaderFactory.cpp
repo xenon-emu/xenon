@@ -15,7 +15,8 @@ namespace Render {
 
 void OGLShaderFactory::Destroy() {
   for (const auto& [name, shader] : Shaders) {
-    shader->Destroy();
+    if (shader)
+      shader->Destroy();
   }
 }
 

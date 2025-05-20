@@ -415,7 +415,7 @@ void Renderer::Thread() {
       std::shared_ptr<Buffer> buffer = resourceFactory->CreateBuffer();
       buffer->CreateBuffer(static_cast<u32>(job.data.size()), job.data.data(), job.usage, job.type);
 
-      createdBuffers[job.hash] = buffer;
+      createdBuffers.insert({ job.hash, buffer });
       LOG_DEBUG(Xenos, "Created buffer '{}', size: {}", job.name, job.data.size());
     }
 
