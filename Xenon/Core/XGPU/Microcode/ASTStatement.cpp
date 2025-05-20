@@ -91,9 +91,7 @@ void WriteWithMaskStatement::EmitShaderCode(ShaderCodeWriterBase &writer) {
     std::span<const eSwizzle> srcSpan(src.data(), numSourceSwizzles);
     Chunk src = source->EmitShaderCode(writer);
     Chunk dst = target->EmitShaderCode(writer);
-    LOG_DEBUG(Xenos, "[WriteWithMaskStatement]: Source = {} (reg:{}), Target = {} (reg:{})",
-      source->GetName(), source->GetRegisterIndex(),
-      target->GetName(), target->GetRegisterIndex());
+    LOG_DEBUG(Xenos, "[AST::WriteWithMaskStatement::Masked]: {} -> {}", source->GetName(), target->GetName());
     writer.AssignMasked(src, dst, dstSpan, srcSpan);
   }
 
@@ -111,6 +109,7 @@ void WriteWithMaskStatement::EmitShaderCode(ShaderCodeWriterBase &writer) {
     }
 
     Chunk dst = target->EmitShaderCode(writer);
+    LOG_DEBUG(Xenos, "[WriteWithMaskStatement::Immediate]: {}", target->GetName());
     writer.AssignImmediate(dst,
                            std::span(destImmediateSwizzle.data(), index),
                            std::span(immediateSwizzle.data(), index));

@@ -65,7 +65,7 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType, Shader *sha
   Sirit::Id vec4_array_256 = module.TypeArray(vec4_type, const_256);
   // Struct and UBO
   Sirit::Id ubo_struct_v = module.TypeStruct(vec4_array_256);
-  module.Decorate(ubo_struct_v, spv::Decoration::Block);
+  module.Decorate(ubo_struct_v, spv::Decoration::BufferBlock);
   module.Name(ubo_struct_v, shaderTypeName + "Consts");
   module.MemberName(ubo_struct_v, 0, "FloatConsts");
   ubo_type_v = module.TypePointer(spv::StorageClass::Uniform, ubo_struct_v);
@@ -78,7 +78,7 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType, Shader *sha
   Sirit::Id const_32 = module.Constant(uint_type, 32);
   Sirit::Id uint_array_32 = module.TypeArray(uint_type, const_32);
   Sirit::Id ubo_struct_b = module.TypeStruct(uint_array_32);
-  module.Decorate(ubo_struct_b, spv::Decoration::Block);
+  module.Decorate(ubo_struct_b, spv::Decoration::BufferBlock);
   module.Name(ubo_struct_b, "CommonBoolConsts");
   module.MemberName(ubo_struct_b, 0, "BoolConsts");
   ubo_type_b = module.TypePointer(spv::StorageClass::Uniform, ubo_struct_b);
