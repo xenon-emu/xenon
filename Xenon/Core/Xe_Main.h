@@ -3,8 +3,6 @@
 #pragma once
 
 #include "Base/Path_util.h"
-#include "microprofile.h"
-#include "microprofile_html.h"
 
 #include "Base/Config.h"
 #include "Base/Logging/Backend.h"
@@ -34,37 +32,25 @@
 #include "Render/DummyRenderer.h"
 
 // Global thread state
-inline std::atomic<bool> XeRunning{ true };
 namespace XeMain {
 
 extern void Create();
 extern void Shutdown();
 
-extern void Start();
+extern void StartCPU();
 
 extern void ShutdownCPU();
 
-extern void Reboot(Xe::PCIDev::SMC_PWR_REASON type);
+extern void Reboot(u32 type);
 
 extern void ReloadFiles();
 
 extern void SaveConfig();
 extern void LoadConfig();
 
-#ifndef NO_GFX
-extern SDL_Window* CreateSDLWindow();
-#endif
-
-extern void AddPCIDevices();
 extern void CreateHostBridge();
 extern void CreatePCIDevices();
 extern void CreateRootBus();
-extern void CreateSMCState();
-
-#ifndef NO_GFX
-// Window
-inline SDL_Window *mainWindow = nullptr;
-#endif
 
 // Main objects
 //  Base path
@@ -73,9 +59,9 @@ inline std::filesystem::path rootDirectory = {};
 inline std::unique_ptr<Base::Log::Filter> logFilter{};
 
 // Main Emulator objects
-inline std::unique_ptr<RootBus> rootBus{}; // RootBus Object
-inline std::unique_ptr<HostBridge> hostBridge{}; // HostBridge Object
-inline std::unique_ptr<PCIBridge> pciBridge{}; // PCIBridge Object
+inline std::shared_ptr<RootBus> rootBus{}; // RootBus Object
+inline std::shared_ptr<HostBridge> hostBridge{}; // HostBridge Object
+inline std::shared_ptr<PCIBridge> pciBridge{}; // PCIBridge Object
 
 #ifndef NO_GFX
 // Render thread
@@ -86,36 +72,35 @@ inline bool CPUStarted = false;
 
 // PCI Devices
 //  SMC
-inline std::unique_ptr<Xe::PCIDev::SMC_CORE_STATE> smcCoreState{}; // SMCCore State for setting diffrent SMC settings.
-inline std::unique_ptr<Xe::PCIDev::SMC> smcCore{}; // SMCCore Object
+inline std::shared_ptr<Xe::PCIDev::SMC> smcCore{};
 //  Ethernet
-inline std::unique_ptr<Xe::PCIDev::ETHERNET> ethernet{};
+inline std::shared_ptr<Xe::PCIDev::ETHERNET> ethernet{};
 //  Audio
-inline std::unique_ptr<Xe::PCIDev::AUDIOCTRLR> audioController{};
+inline std::shared_ptr<Xe::PCIDev::AUDIOCTRLR> audioController{};
 //  OHCI
-inline std::unique_ptr<Xe::PCIDev::OHCI0> ohci0{};
-inline std::unique_ptr<Xe::PCIDev::OHCI1> ohci1{};
+inline std::shared_ptr<Xe::PCIDev::OHCI0> ohci0{};
+inline std::shared_ptr<Xe::PCIDev::OHCI1> ohci1{};
 //  EHCI
-inline std::unique_ptr<Xe::PCIDev::EHCI0> ehci0{};
-inline std::unique_ptr<Xe::PCIDev::EHCI1> ehci1{};
+inline std::shared_ptr<Xe::PCIDev::EHCI0> ehci0{};
+inline std::shared_ptr<Xe::PCIDev::EHCI1> ehci1{};
 //  Secure Flash Controller for Xbox Device object
-inline std::unique_ptr<Xe::PCIDev::SFCX> sfcx{};
+inline std::shared_ptr<Xe::PCIDev::SFCX> sfcx{};
 //  XMA
-inline std::unique_ptr<Xe::PCIDev::XMA> xma{};
+inline std::shared_ptr<Xe::PCIDev::XMA> xma{};
 //  ODD (CD-ROM Drive)
-inline std::unique_ptr<Xe::PCIDev::ODD> odd{};
+inline std::shared_ptr<Xe::PCIDev::ODD> odd{};
 //  HDD
-inline std::unique_ptr<Xe::PCIDev::HDD> hdd{};
+inline std::shared_ptr<Xe::PCIDev::HDD> hdd{};
 //  NAND
-inline std::unique_ptr<NAND> nand{};
+inline std::shared_ptr<NAND> nand{};
 //  Random Access Memory (All console RAM, excluding Reserved memory which is mainly PCI Devices)
-inline std::unique_ptr<RAM> ram{};
+inline std::shared_ptr<RAM> ram{};
 
 // Console Handles
 //  Xenon CPU
 inline std::unique_ptr<Xenon> xenonCPU{};
 //  Xenos GPU
-inline std::unique_ptr<Xe::Xenos::XGPU> xenos{};
+inline std::shared_ptr<Xe::Xenos::XGPU> xenos{};
 
 inline Xenon *GetCPU() {
   return xenonCPU.get();

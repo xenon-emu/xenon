@@ -23,13 +23,6 @@
 #define STRIP_UNIQUE(x) std::remove_pointer_t<decltype(x.get())>
 #define STRIP_UNIQUE_ARR(x) std::remove_pointer_t<decltype(x.get())>[]
 
-#ifndef TOOL
-namespace Base { extern std::atomic<bool> gSafeTerm; }
-#define SYSTEM_PAUSE() { Base::gSafeTerm = false; fmt::print("Press Enter to continue..."); (void)getchar(); }
-#else
-#define SYSTEM_PAUSE() { printf("Press Enter to continue..."); (void)getchar(); }
-#endif
-
 // Compile time macros to get endianess
 #ifdef _MSC_VER
 #define __LITTLE_ENDIAN__ 1

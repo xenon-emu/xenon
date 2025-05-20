@@ -8,6 +8,8 @@
 #include <condition_variable>
 #include <thread>
 
+#include "Base/Global.h"
+
 #include "Core/RootBus/HostBridge/PCIBridge/PCIBridge.h"
 #include "Core/RootBus/HostBridge/PCIBridge/PCIDevice.h"
 
@@ -235,7 +237,7 @@ struct SMC_CORE_STATE {
 class SMC : public PCIDevice {
 public:
   SMC(const std::string &deviceName, u64 size,
-    PCIBridge* parentPCIBridge, SMC_CORE_STATE* newSMCCoreState);
+    PCIBridge *parentPCIBridge);
   ~SMC();
 
   // Read/Write functions
@@ -245,6 +247,12 @@ public:
   void ConfigRead(u64 readAddress, u8* data, u64 size) override;
   void ConfigWrite(u64 writeAddress, const u8* data, u64 size) override;
 
+  void SetPowerOnReason(const SMC_PWR_REASON &reason) {
+    smcCoreState.currPowerOnReason = reason;
+  }
+  const SMC_PWR_REASON GetPowerOnReason() {
+    return smcCoreState.currPowerOnReason;
+  }
 private:
   // Mutex, stops other threads from writing to values without the previous one finishing
   std::recursive_mutex mutex;
@@ -256,7 +264,7 @@ private:
   SMC_PCI_STATE smcPCIState;
 
   // SMC Core State, tracking all general system status
-  SMC_CORE_STATE *smcCoreState;
+  SMC_CORE_STATE smcCoreState;
 
   // SMC Thread object
   std::thread smcThread;

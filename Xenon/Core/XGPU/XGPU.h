@@ -40,7 +40,7 @@ public:
   void ConfigRead(u64 readAddress, u8 *data, u64 size);
   void ConfigWrite(u64 writeAddress, const u8 *data, u64 size);
 
-  bool isAddressMappedInBAR(u32 address);
+  bool IsAddressMappedInBAR(u32 address);
 
   // Dump framebuffer from RAM
   void DumpFB(const std::filesystem::path &path, int pitch);

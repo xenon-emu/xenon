@@ -74,13 +74,13 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
 
   if (!nandFile.is_open()) {
     LOG_CRITICAL(SFCX, "Fatal error! Please make sure your NAND (or NAND path) is valid!");
-    SYSTEM_PAUSE();
+    SystemPause();
   }
 
   // Check file magic
   if (!checkMagic()) {
     LOG_CRITICAL(SFCX, "Fatal error! The loaded 'nand.bin' doesn't correspond to a Xbox 360 NAND.");
-    SYSTEM_PAUSE();
+    SystemPause();
   }
 
   // Read NAND Image data
@@ -237,9 +237,6 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
       break;
     }
   }
-  // Enter SFCX Thread
-  sfcxThreadRunning = true;
-  sfcxThread = std::thread(&Xe::PCIDev::SFCX::sfcxMainLoop, this);
 }
 
 Xe::PCIDev::SFCX::~SFCX() {
@@ -251,7 +248,13 @@ Xe::PCIDev::SFCX::~SFCX() {
     sfcxThread.join();
 }
 
-void Xe::PCIDev::SFCX::Read(u64 readAddress, u8* data, u64 size) {
+void Xe::PCIDev::SFCX::Start() {
+  // Enter SFCX Thread
+  sfcxThreadRunning = true;
+  sfcxThread = std::thread(&Xe::PCIDev::SFCX::sfcxMainLoop, this);
+}
+
+void Xe::PCIDev::SFCX::Read(u64 readAddress, u8 *data, u64 size) {
   // Set a lock on registers
   std::lock_guard lck(mutex);
 
@@ -294,12 +297,12 @@ void Xe::PCIDev::SFCX::Read(u64 readAddress, u8* data, u64 size) {
   }
 }
 
-void Xe::PCIDev::SFCX::ConfigRead(u64 readAddress, u8* data, u64 size) {
+void Xe::PCIDev::SFCX::ConfigRead(u64 readAddress, u8 *data, u64 size) {
   const u8 offset = readAddress & 0xFF;
   memcpy(data, &pciConfigSpace.data[offset], size);
 }
 
-void Xe::PCIDev::SFCX::Write(u64 writeAddress, const u8* data, u64 size) {
+void Xe::PCIDev::SFCX::Write(u64 writeAddress, const u8 *data, u64 size) {
   // Set a lock on registers
   std::lock_guard lck(mutex);
 
@@ -414,7 +417,7 @@ void Xe::PCIDev::SFCX::MemSet(u64 writeAddress, s32 data, u64 size) {
   }
 }
 
-void Xe::PCIDev::SFCX::ReadRaw(u64 readAddress, u8* data, u64 size) {
+void Xe::PCIDev::SFCX::ReadRaw(u64 readAddress, u8 *data, u64 size) {
   u32 offset = static_cast<u32>(readAddress & 0xFFFFFF);
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
 #ifdef NAND_DEBUG
@@ -423,7 +426,7 @@ void Xe::PCIDev::SFCX::ReadRaw(u64 readAddress, u8* data, u64 size) {
   memcpy(data, rawImageData.data() + offset, size);
 }
 
-void Xe::PCIDev::SFCX::WriteRaw(u64 writeAddress, const u8* data, u64 size) {
+void Xe::PCIDev::SFCX::WriteRaw(u64 writeAddress, const u8 *data, u64 size) {
   u32 offset = static_cast<u32>(writeAddress & 0xFFFFFF);
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
 #ifdef NAND_DEBUG
@@ -441,7 +444,7 @@ void Xe::PCIDev::SFCX::MemSetRaw(u64 writeAddress, s32 data, u64 size) {
   memset(rawImageData.data() + offset, data, size);
 }
 
-void Xe::PCIDev::SFCX::ConfigWrite(u64 writeAddress, const u8* data, u64 size) {
+void Xe::PCIDev::SFCX::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   const u8 offset = writeAddress & 0xFF;
 
   // Check if we're being scanned

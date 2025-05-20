@@ -177,6 +177,9 @@ public:
     PCIBridge *parentPCIBridge, RAM *ram);
   ~SFCX();
 
+  // Starts the thread
+  void Start();
+
   // PCI Read/Write methods to the SFCX device.
   void Read(u64 readAddress, u8* data, u64 size) override;
   void Write(u64 writeAddress, const u8* data, u64 size) override;

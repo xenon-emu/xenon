@@ -64,7 +64,7 @@ void HW_UART_SOCK::Init(void *uartConfig) {
     if (start != 0) {
       LOG_CRITICAL(UART, "UART type 'socket' failed!\nWSAStartup returned a non-zero value! See error below.\n{}", start);
       socketCreated = false;
-      SYSTEM_PAUSE();
+      SystemPause();
     }
 #endif // _WIN32
     sockHandle = socket(AF_INET, SOCK_STREAM, 0);
@@ -72,14 +72,14 @@ void HW_UART_SOCK::Init(void *uartConfig) {
     if (socketConnect != 0) {
       LOG_CRITICAL(UART, "Failed to connect to socket! See error below.\n{}", Base::GetLastErrorMsg());
       socketCreated = false;
-      SYSTEM_PAUSE();
+      SystemPause();
     }
     if (!socketCreated) {
       socketConnect = connect(sockHandle, (struct sockaddr*)&sockAddr, sizeof(sockAddr));
       if (socketConnect != 0) {
         LOG_CRITICAL(UART, "(x2) Failed to connect to socket! See error below. \n{}", Base::GetLastErrorMsg());
         socketclose(sockHandle);
-        SYSTEM_PAUSE();
+        SystemPause();
       } else {
         socketCreated = true;
       }

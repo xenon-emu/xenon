@@ -3,6 +3,7 @@
 #pragma once
 
 #include <cstring>
+#include <unordered_map>
 
 #include "PCIDevice.h"
 
@@ -81,14 +82,15 @@ struct PCI_BRIDGE_STATE {
 class PCIBridge {
 public:
   PCIBridge();
+  ~PCIBridge();
 
   // Checks wheter the current address belongs to the PCI bridge via
   // the BAR's
-  bool isAddressMappedinBAR(u32 address);
+  bool IsAddressMappedinBAR(u32 address);
 
-  void addPCIDevice(PCIDevice *device);
+  void AddPCIDevice(std::shared_ptr<PCIDevice> device);
 
-  void resetPCIDevice(PCIDevice *device);
+  void ResetPCIDevice(std::shared_ptr<PCIDevice> device);
 
   bool Read(u64 readAddress, u8 *data, u64 size);
   bool Write(u64 writeAddress, const u8 *data, u64 size);
@@ -107,7 +109,7 @@ private:
   Xe::XCPU::IIC::XenonIIC *xenonIIC;
 
   // Connected device pointers
-  std::vector<PCIDevice*> connectedPCIDevices;
+  std::unordered_map<std::string, std::shared_ptr<PCIDevice>> connectedPCIDevices;
 
   // Current bridge config
   PCI_PCI_BRIDGE_CONFIG_SPACE pciBridgeConfig = {};

@@ -919,14 +919,14 @@ void XCPUSettings(Render::GUI *gui) {
     });
   } else {
     gui->Button("Start", [] {
-      XeMain::Start();
+      XeMain::StartCPU();
     });
   }
   gui->Button("Reboot", [] {
-    XeMain::Reboot(XeMain::smcCoreState->currPowerOnReason);
+    XeMain::Reboot(static_cast<u32>(XeMain::smcCore->GetPowerOnReason()));
   });
   gui->Toggle("Load Elf", &Config::xcpu.elfLoader);
-  gui->Toggle("RGH2 Init Skip (Corona Only)", &RGH2, [] {
+  gui->Toggle("RGH3 Init Skip (Corona Only)", &RGH2, [] {
     if (!storedPreviousInitSkips && !RGH2) {
       initSkip1 = Config::xcpu.HW_INIT_SKIP_1;
       initSkip2 = Config::xcpu.HW_INIT_SKIP_2;

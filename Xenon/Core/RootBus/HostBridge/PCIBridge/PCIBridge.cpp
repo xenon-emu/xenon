@@ -70,6 +70,13 @@ PCIBridge::PCIBridge() {
   pciBridgeState.REG_EA00000C = 0x7CFF; // Software writes here to enable interrupts (Bus IRQL)
 }
 
+PCIBridge::~PCIBridge() {
+  for (auto &[name, dev] : connectedPCIDevices) {
+    dev.reset();
+  }
+  connectedPCIDevices.clear();
+}
+
 void PCIBridge::RegisterIIC(Xe::XCPU::IIC::XenonIIC *xenonIICPtr) {
   xenonIIC = xenonIICPtr;
 }
@@ -248,7 +255,7 @@ void PCIBridge::CancelInterrupt(u8 prio) {
   }
 }
 
-bool PCIBridge::isAddressMappedinBAR(u32 address) {
+bool PCIBridge::IsAddressMappedinBAR(u32 address) {
   u32 bar0 = pciBridgeConfig.configSpaceHeader.BAR0;
   u32 bar1 = pciBridgeConfig.configSpaceHeader.BAR1;
 
@@ -260,26 +267,35 @@ bool PCIBridge::isAddressMappedinBAR(u32 address) {
   return false;
 }
 
-void PCIBridge::addPCIDevice(PCIDevice *device) {
-  LOG_INFO(PCIBridge, "Attached: {}", device->GetDeviceName());
-
-  connectedPCIDevices.push_back(device);
-}
-
-void PCIBridge::resetPCIDevice(PCIDevice *device) {
-  LOG_INFO(PCIBridge, "Resetting: {}", device->GetDeviceName());
-
-  for (u64 i = 0; i != connectedPCIDevices.size(); ++i) {
-    PCIDevice* dev = connectedPCIDevices[i];
-    if (dev->GetDeviceName() == device->GetDeviceName()) {
-      connectedPCIDevices.erase(connectedPCIDevices.begin() + i);
-    }
+void PCIBridge::AddPCIDevice(std::shared_ptr<PCIDevice> device) {
+  if (!device.get()) {
+    LOG_CRITICAL(PCIBridge, "Failed to attach a device!");
+    return;
   }
 
-  connectedPCIDevices.push_back(device);
+  LOG_INFO(PCIBridge, "Attached: {}", device->GetDeviceName());
+
+  connectedPCIDevices.insert({ device->GetDeviceName(), device });
 }
 
-bool PCIBridge::Read(u64 readAddress, u8* data, u64 size) {
+void PCIBridge::ResetPCIDevice(std::shared_ptr<PCIDevice> device) {
+  if (!device.get()) {
+    LOG_CRITICAL(PCIBridge, "Failed to reset a device!");
+    return;
+  }
+
+  std::string name = device->GetDeviceName();
+  if (auto it = connectedPCIDevices.find(name); it != connectedPCIDevices.end()) {
+    LOG_INFO(PCIBridge, "Resetting device: {}", it->first);
+    it->second.reset();
+    connectedPCIDevices.erase(it);
+    connectedPCIDevices.insert({ device->GetDeviceName(), device });
+  } else {
+    LOG_CRITICAL(PCIBridge, "Failed to reset device! '{}' never existed.", it->first);
+  }
+}
+
+bool PCIBridge::Read(u64 readAddress, u8 *data, u64 size) {
   // Reading to our own space?
   if (readAddress >= PCI_BRIDGE_BASE_ADDRESS &&
       readAddress <= PCI_BRIDGE_BASE_END_ADDRESS) {
@@ -337,10 +353,10 @@ bool PCIBridge::Read(u64 readAddress, u8* data, u64 size) {
   }
 
   // Try writing to one of the attached devices.
-  for (auto &device : connectedPCIDevices) {
-    if (device->isAddressMappedInBAR(static_cast<u32>(readAddress))) {
+  for (auto &[name, dev] : connectedPCIDevices) {
+    if (dev->IsAddressMappedInBAR(static_cast<u32>(readAddress))) {
       // Hit
-      device->Read(readAddress, data, size);
+      dev->Read(readAddress, data, size);
       return true;
     }
   }
@@ -473,10 +489,10 @@ bool PCIBridge::Write(u64 writeAddress, const u8 *data, u64 size) {
   }
 
   // Try writing to one of the attached devices.
-  for (auto &device : connectedPCIDevices) {
-    if (device->isAddressMappedInBAR(static_cast<u32>(writeAddress))) {
+  for (auto &[name, dev] : connectedPCIDevices) {
+    if (dev->IsAddressMappedInBAR(static_cast<u32>(writeAddress))) {
       // Hit
-      device->Write(writeAddress, data, size);
+      dev->Write(writeAddress, data, size);
       return true;
     }
   }
@@ -608,10 +624,10 @@ bool PCIBridge::MemSet(u64 writeAddress, s32 data, u64 size) {
   }
 
   // Try writing to one of the attached devices
-  for (auto &device : connectedPCIDevices) {
-    if (device->isAddressMappedInBAR(static_cast<u32>(writeAddress))) {
+  for (auto &[name, dev] : connectedPCIDevices) {
+    if (dev->IsAddressMappedInBAR(static_cast<u32>(writeAddress))) {
       // Hit
-      device->MemSet(writeAddress, data, size);
+      dev->MemSet(writeAddress, data, size);
       return true;
     }
   }
@@ -677,11 +693,11 @@ void PCIBridge::ConfigRead(u64 readAddress, u8 *data, u64 size) {
     break;
   }
 
-  for (auto &device : connectedPCIDevices) {
-    if (device->GetDeviceName() == currentDevName) {
+  for (auto &[name, dev] : connectedPCIDevices) {
+    if (name == currentDevName) {
       // Hit!
-      LOG_TRACE(PCIBridge, "Config read, device: {} offset = 0x{:X}", currentDevName, configAddr.regOffset);
-      device->ConfigRead(readAddress, data, size);
+      LOG_TRACE(PCIBridge, "Config read, device: {} offset = 0x{:X}", name, configAddr.regOffset);
+      dev->ConfigRead(readAddress, data, size);
       return;
     }
   }
@@ -751,13 +767,13 @@ void PCIBridge::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
     break;
   }
 
-  for (auto &device : connectedPCIDevices) {
-    if (device->GetDeviceName() == currentDevName) {
+  for (auto &[name, dev] : connectedPCIDevices) {
+    if (name == currentDevName) {
       // Hit!
       u64 value = 0;
       memcpy(&value, data, size);
-      LOG_TRACE(PCIBridge, "Config write, device: {}, offset = 0x{:X} data = 0x{:X}", currentDevName, configAddr.regOffset, value);
-      device->ConfigWrite(writeAddress, data, size);
+      LOG_TRACE(PCIBridge, "Config write, device: {}, offset = 0x{:X} data = 0x{:X}", name, configAddr.regOffset, value);
+      dev->ConfigWrite(writeAddress, data, size);
       return;
     }
   }

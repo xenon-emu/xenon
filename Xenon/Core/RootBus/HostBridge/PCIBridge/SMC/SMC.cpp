@@ -3,13 +3,13 @@
 #include "SMC.h"
 
 #include "Base/Logging/Log.h"
+#include "Base/Config.h"
 #include "Base/Error.h"
+#include "Base/Hash.h"
 #include "Base/Thread.h"
 
 #include "HANA_State.h"
 #include "SMC_Config.h"
-
-#include "Core/Xe_Main.h"
 
 //
 // Registers Offsets
@@ -57,8 +57,7 @@
 #define CLCK_INT_TAKEN 0x3
 
 // Class Constructor.
-Xe::PCIDev::SMC::SMC(const std::string &deviceName, u64 size,
-  PCIBridge *parentPCIBridge, SMC_CORE_STATE *newSMCCoreState) :
+Xe::PCIDev::SMC::SMC(const std::string &deviceName, u64 size, PCIBridge *parentPCIBridge) :
   PCIDevice(deviceName, size) {
   LOG_INFO(SMC, "Core: Initializing...");
 
@@ -67,7 +66,15 @@ Xe::PCIDev::SMC::SMC(const std::string &deviceName, u64 size,
 
   // Assign our core sate, this is already filled with config data regarding
   // AVPACK, PWRON Reason and TrayState
-  smcCoreState = newSMCCoreState;
+  smcCoreState.currentUARTSystem = Base::JoaatStringHash(Config::smc.uartSystem);
+#ifdef _WIN32
+  smcCoreState.currentCOMPort = Config::smc.COMPort();
+#endif
+  smcCoreState.socketIp = Config::smc.socketIp;
+  smcCoreState.socketPort = Config::smc.socketPort;
+  smcCoreState.currAVPackType = (Xe::PCIDev::SMC_AVPACK_TYPE)Config::smc.avPackType;
+  smcCoreState.currPowerOnReason = (Xe::PCIDev::SMC_PWR_REASON)Config::smc.powerOnReason;
+  smcCoreState.currTrayState = Xe::PCIDev::SMC_TRAY_CLOSED;
 
   // Create a new SMC PCI State
   memset(&smcPCIState, 0, sizeof(smcPCIState));
@@ -82,19 +89,19 @@ Xe::PCIDev::SMC::SMC(const std::string &deviceName, u64 size,
   pciDevSizes[0] = 0x100; // BAR0
 
   // Create UART handle
-  bool socket = smcCoreState->currentUARTSystem == "vcom"_j ? false : true;
+  bool socket = smcCoreState.currentUARTSystem == "vcom"_j ? false : true;
   if (socket) {
-    smcCoreState->uartHandle = std::make_unique<HW_UART_SOCK>();
+    smcCoreState.uartHandle = std::make_unique<HW_UART_SOCK>();
   }
   else {
 #ifdef _WIN32
-    smcCoreState->uartHandle = std::make_unique<HW_UART_VCOM>();
+    smcCoreState.uartHandle = std::make_unique<HW_UART_VCOM>();
 #else
     LOG_CRITICAL(UART, "Invalid UART type! Defaulting to print");
-    smcCoreState->uartHandle = std::make_unique<HW_UART_SOCK>();
+    smcCoreState.uartHandle = std::make_unique<HW_UART_SOCK>();
 #endif
   }
-  smcCoreState->uartHandle->uartPresent = true;
+  smcCoreState.uartHandle->uartPresent = true;
 
   // Enter main execution thread.
   smcThread = std::thread(&SMC::smcMainThread, this);
@@ -106,8 +113,8 @@ Xe::PCIDev::SMC::~SMC() {
   smcThreadRunning = false;
   if (smcThread.joinable())
     smcThread.join();
-  smcCoreState->uartHandle->Shutdown();
-  smcCoreState->uartHandle.reset();
+  smcCoreState.uartHandle->Shutdown();
+  smcCoreState.uartHandle.reset();
 }
 
 // PCI Read
@@ -117,17 +124,17 @@ void Xe::PCIDev::SMC::Read(u64 readAddress, u8 *data, u64 size) {
   mutex.lock();
   switch (regOffset) {
   case UART_BYTE_OUT_REG: // UART Data Out Register
-    smcPCIState.uartOutReg = smcCoreState->uartHandle->Read();
-    if (smcCoreState->uartHandle->retVal) {
+    smcPCIState.uartOutReg = smcCoreState.uartHandle->Read();
+    if (smcCoreState.uartHandle->retVal) {
       memcpy(data, &smcPCIState.uartOutReg, size);
     }
     break;
   case UART_STATUS_REG: // UART Status Register
     // First lets check if the UART has already been setup, if so, proceed to do
     // the TX/RX.
-    smcPCIState.uartStatusReg = smcCoreState->uartHandle->ReadStatus();
+    smcPCIState.uartStatusReg = smcCoreState.uartHandle->ReadStatus();
     // Check if UART is already initialized.
-    if (!smcCoreState->uartHandle.get()) {
+    if (!smcCoreState.uartHandle.get()) {
       // XeLL doesn't initialize UART before sending data trough it. Initialize
       // it first then.
       setupUART(0x1E6); // 115200,8,N,1.
@@ -154,8 +161,8 @@ void Xe::PCIDev::SMC::Read(u64 readAddress, u8 *data, u64 size) {
     break;
   case FIFO_OUT_DATA_REG: // FIFO Data Out Register
     // Copy the data to our input buffer.
-    memcpy(data, &smcCoreState->fifoDataBuffer[smcCoreState->fifoBufferPos], size);
-    smcCoreState->fifoBufferPos += 4;
+    memcpy(data, &smcCoreState.fifoDataBuffer[smcCoreState.fifoBufferPos], size);
+    smcCoreState.fifoBufferPos += 4;
     break;
   default:
     LOG_ERROR(SMC, "Unknown register being read, offset 0x{:X}", static_cast<u16>(regOffset));
@@ -178,12 +185,12 @@ void Xe::PCIDev::SMC::Write(u64 writeAddress, const u8 *data, u64 size) {
   switch (regOffset) {
   case UART_BYTE_IN_REG: // UART Data In Register
     memcpy(&smcPCIState.uartInReg, data, size);
-    smcCoreState->uartHandle->Write(*data);
+    smcCoreState.uartHandle->Write(*data);
     break;
   case UART_CONFIG_REG: // UART Config Register
     memcpy(&smcPCIState.uartConfigReg, data, size);
     // Check if UART is already initialized.
-    if (smcCoreState->uartHandle->SetupNeeded()) {
+    if (smcCoreState.uartHandle->SetupNeeded()) {
       u64 tmp = 0;
       memcpy(&tmp, data, size);
       // Initialize UART.
@@ -209,8 +216,8 @@ void Xe::PCIDev::SMC::Write(u64 writeAddress, const u8 *data, u64 size) {
     memcpy(&smcPCIState.fifoInStatusReg, data, size);
     if (smcPCIState.fifoInStatusReg == FIFO_STATUS_READY) { // We're about to receive a message.
       // Reset our input buffer and buffer pointer.
-      memset(smcCoreState->fifoDataBuffer, 0, sizeof(smcCoreState->fifoDataBuffer));
-      smcCoreState->fifoBufferPos = 0;
+      memset(smcCoreState.fifoDataBuffer, 0, sizeof(smcCoreState.fifoDataBuffer));
+      smcCoreState.fifoBufferPos = 0;
     }
     break;
   case FIFO_OUT_STATUS_REG: // FIFO Out Status Register
@@ -218,14 +225,14 @@ void Xe::PCIDev::SMC::Write(u64 writeAddress, const u8 *data, u64 size) {
     // We're about to send a reply.
     if (smcPCIState.fifoOutStatusReg == FIFO_STATUS_READY) {
       // Reset our FIFO buffer pointer.
-      smcCoreState->fifoBufferPos = 0;
+      smcCoreState.fifoBufferPos = 0;
     }
     break;
   case FIFO_IN_DATA_REG: // FIFO Data In Register
     // Copy the data to our input buffer at current position and increse buffer
     // pointer position.
-    memcpy(&smcCoreState->fifoDataBuffer[smcCoreState->fifoBufferPos], data, size);
-    smcCoreState->fifoBufferPos += 4;
+    memcpy(&smcCoreState.fifoDataBuffer[smcCoreState.fifoBufferPos], data, size);
+    smcCoreState.fifoBufferPos += 4;
     break;
   default:
     u64 tmp = 0;
@@ -268,8 +275,8 @@ void Xe::PCIDev::SMC::MemSet(u64 writeAddress, s32 data, u64 size) {
     memset(&smcPCIState.fifoInStatusReg, data, size);
     if (smcPCIState.fifoInStatusReg == FIFO_STATUS_READY) { // We're about to receive a message.
       // Reset our input buffer and buffer pointer.
-      memset(&smcCoreState->fifoDataBuffer, 0, 16);
-      smcCoreState->fifoBufferPos = 0;
+      memset(&smcCoreState.fifoDataBuffer, 0, 16);
+      smcCoreState.fifoBufferPos = 0;
     }
     break;
   case FIFO_OUT_STATUS_REG: // FIFO Out Status Register
@@ -277,14 +284,14 @@ void Xe::PCIDev::SMC::MemSet(u64 writeAddress, s32 data, u64 size) {
     // We're about to send a reply.
     if (smcPCIState.fifoOutStatusReg == FIFO_STATUS_READY) {
       // Reset our FIFO buffer pointer.
-      smcCoreState->fifoBufferPos = 0;
+      smcCoreState.fifoBufferPos = 0;
     }
     break;
   case FIFO_IN_DATA_REG: // FIFO Data In Register
     // Copy the data to our input buffer at current position and increse buffer
     // pointer position.
-    memset(&smcCoreState->fifoDataBuffer[smcCoreState->fifoBufferPos], data, size);
-    smcCoreState->fifoBufferPos += 4;
+    memset(&smcCoreState.fifoDataBuffer[smcCoreState.fifoBufferPos], data, size);
+    smcCoreState.fifoBufferPos += 4;
     break;
   default:
     u64 tmp = 0;
@@ -328,26 +335,26 @@ void Xe::PCIDev::SMC::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
 // Setups the UART Communication at a given configuration.
 void Xe::PCIDev::SMC::setupUART(u32 uartConfig) {
   LOG_INFO(UART, "Initializing...");
-  bool socket = smcCoreState->currentUARTSystem == "vcom"_j ? false : true;
+  bool socket = smcCoreState.currentUARTSystem == "vcom"_j ? false : true;
   if (socket) {
     HW_UART_SOCK_CONFIG *config = new HW_UART_SOCK_CONFIG();
-    strncpy(config->ip, smcCoreState->socketIp.c_str(), sizeof(config->ip));
-    config->port = smcCoreState->socketPort;
-    config->usePrint = smcCoreState->currentUARTSystem == "print"_j;
-    smcCoreState->uartHandle->Init(config);
+    strncpy(config->ip, smcCoreState.socketIp.c_str(), sizeof(config->ip));
+    config->port = smcCoreState.socketPort;
+    config->usePrint = smcCoreState.currentUARTSystem == "print"_j;
+    smcCoreState.uartHandle->Init(config);
   } else {
 #ifdef _WIN32
     HW_UART_VCOM_CONFIG *config = new HW_UART_VCOM_CONFIG();
-    strncpy(config->selectedComPort, smcCoreState->currentCOMPort.c_str(), sizeof(config->selectedComPort));
+    strncpy(config->selectedComPort, smcCoreState.currentCOMPort.c_str(), sizeof(config->selectedComPort));
     config->config = uartConfig;
-    smcCoreState->uartHandle->Init(config);
+    smcCoreState.uartHandle->Init(config);
 #else
     LOG_CRITICAL(UART, "Invalid UART type! Defaulting to print");
     HW_UART_SOCK_CONFIG *config = new HW_UART_SOCK_CONFIG();
-    strncpy(config->ip, smcCoreState->socketIp.c_str(), sizeof(config->ip));
-    config->port = smcCoreState->socketPort;
+    strncpy(config->ip, smcCoreState.socketIp.c_str(), sizeof(config->ip));
+    config->port = smcCoreState.socketPort;
     config->usePrint = true;
-    smcCoreState->uartHandle->Init(config);
+    smcCoreState.uartHandle->Init(config);
 #endif
   }
 }
@@ -481,85 +488,85 @@ void Xe::PCIDev::SMC::smcMainThread() {
       if (false) {
         std::stringstream ss{};
         ss << std::endl;
-        for (u64 i = 0; i != sizeof(smcCoreState->fifoDataBuffer); i += 4) {
+        for (u64 i = 0; i != sizeof(smcCoreState.fifoDataBuffer); i += 4) {
           for (u64 j = 0; j != 4; ++j) {
-            ss << fmt::format(" 0x{:02X}", static_cast<u16>(smcCoreState->fifoDataBuffer[i+j]));
+            ss << fmt::format(" 0x{:02X}", static_cast<u16>(smcCoreState.fifoDataBuffer[i+j]));
           }
-          if (i != (sizeof(smcCoreState->fifoDataBuffer) - 4))
+          if (i != (sizeof(smcCoreState.fifoDataBuffer) - 4))
             ss << std::endl;
         }
         LOG_INFO(SMC, "FIFO Data:{}", ss.str());
       }
-      switch (smcCoreState->fifoDataBuffer[0]) {
+      switch (smcCoreState.fifoDataBuffer[0]) {
       case Xe::PCIDev::SMC_PWRON_TYPE:
         // Zero out the buffer
-        memset(&smcCoreState->fifoDataBuffer, 0, 16);
-        smcCoreState->fifoDataBuffer[0] = SMC_PWRON_TYPE;
-        smcCoreState->fifoDataBuffer[1] = smcCoreState->currPowerOnReason;
+        memset(&smcCoreState.fifoDataBuffer, 0, 16);
+        smcCoreState.fifoDataBuffer[0] = SMC_PWRON_TYPE;
+        smcCoreState.fifoDataBuffer[1] = smcCoreState.currPowerOnReason;
         break;
       case Xe::PCIDev::SMC_QUERY_RTC:
         // Zero out the buffer
-        memset(&smcCoreState->fifoDataBuffer, 0, 16);
-        smcCoreState->fifoDataBuffer[0] = SMC_QUERY_RTC;
-        smcCoreState->fifoDataBuffer[1] = 0;
+        memset(&smcCoreState.fifoDataBuffer, 0, 16);
+        smcCoreState.fifoDataBuffer[0] = SMC_QUERY_RTC;
+        smcCoreState.fifoDataBuffer[1] = 0;
         break;
       case Xe::PCIDev::SMC_QUERY_TEMP_SENS:
-        smcCoreState->fifoDataBuffer[0] = SMC_QUERY_TEMP_SENS;
-        smcCoreState->fifoDataBuffer[1] = 0x3C;
+        smcCoreState.fifoDataBuffer[0] = SMC_QUERY_TEMP_SENS;
+        smcCoreState.fifoDataBuffer[1] = 0x3C;
         LOG_WARNING(SMC, "SMC_FIFO_CMD: SMC_QUERY_TEMP_SENS, returning 3C");
         break;
       case Xe::PCIDev::SMC_QUERY_TRAY_STATE:
-        smcCoreState->fifoDataBuffer[0] = SMC_QUERY_TRAY_STATE;
-        smcCoreState->fifoDataBuffer[1] = smcCoreState->currTrayState;
+        smcCoreState.fifoDataBuffer[0] = SMC_QUERY_TRAY_STATE;
+        smcCoreState.fifoDataBuffer[1] = smcCoreState.currTrayState;
         break;
       case Xe::PCIDev::SMC_QUERY_AVPACK:
-        smcCoreState->fifoDataBuffer[0] = SMC_QUERY_AVPACK;
-        smcCoreState->fifoDataBuffer[1] = smcCoreState->currAVPackType;
+        smcCoreState.fifoDataBuffer[0] = SMC_QUERY_AVPACK;
+        smcCoreState.fifoDataBuffer[1] = smcCoreState.currAVPackType;
         break;
       case Xe::PCIDev::SMC_I2C_READ_WRITE:
-        switch (smcCoreState->fifoDataBuffer[1]) {
+        switch (smcCoreState.fifoDataBuffer[1]) {
         case 0x3: // SMC_I2C_DDC_LOCK
           LOG_INFO(SMC, "[I2C] Requested DDC Lock.");
-          smcCoreState->fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
-          smcCoreState->fifoDataBuffer[1] = 0; // Lock Succeeded.
+          smcCoreState.fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
+          smcCoreState.fifoDataBuffer[1] = 0; // Lock Succeeded.
           break;
         case 0x5: // SMC_I2C_DDC_UNLOCK
           LOG_INFO(SMC, "[I2C] Requested DDC Unlock.");
-          smcCoreState->fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
-          smcCoreState->fifoDataBuffer[1] = 0; // Unlock Succeeded.
+          smcCoreState.fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
+          smcCoreState.fifoDataBuffer[1] = 0; // Unlock Succeeded.
           break;
         case 0x10: // SMC_READ_ANA
-          smcCoreState->fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
-          smcCoreState->fifoDataBuffer[1] = 0x0;
-          smcCoreState->fifoDataBuffer[3] =
-              (hanaState[smcCoreState->fifoDataBuffer[6]] & 0xFF);
-          smcCoreState->fifoDataBuffer[4] =
-              ((hanaState[smcCoreState->fifoDataBuffer[6]] >> 8) & 0xFF);
-          smcCoreState->fifoDataBuffer[5] =
-              ((hanaState[smcCoreState->fifoDataBuffer[6]] >> 16) & 0xFF);
-          smcCoreState->fifoDataBuffer[6] =
-              ((hanaState[smcCoreState->fifoDataBuffer[6]] >> 24) & 0xFF);
+          smcCoreState.fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
+          smcCoreState.fifoDataBuffer[1] = 0x0;
+          smcCoreState.fifoDataBuffer[3] =
+              (hanaState[smcCoreState.fifoDataBuffer[6]] & 0xFF);
+          smcCoreState.fifoDataBuffer[4] =
+              ((hanaState[smcCoreState.fifoDataBuffer[6]] >> 8) & 0xFF);
+          smcCoreState.fifoDataBuffer[5] =
+              ((hanaState[smcCoreState.fifoDataBuffer[6]] >> 16) & 0xFF);
+          smcCoreState.fifoDataBuffer[6] =
+              ((hanaState[smcCoreState.fifoDataBuffer[6]] >> 24) & 0xFF);
           break;
         case 0x60: // SMC_WRITE_ANA
-          smcCoreState->fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
-          smcCoreState->fifoDataBuffer[1] = 0x0;
-          hanaState[smcCoreState->fifoDataBuffer[6]] =
-              smcCoreState->fifoDataBuffer[4] |
-              (smcCoreState->fifoDataBuffer[5] << 8) |
-              (smcCoreState->fifoDataBuffer[6] << 16) |
-              (smcCoreState->fifoDataBuffer[7] << 24);
+          smcCoreState.fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
+          smcCoreState.fifoDataBuffer[1] = 0x0;
+          hanaState[smcCoreState.fifoDataBuffer[6]] =
+              smcCoreState.fifoDataBuffer[4] |
+              (smcCoreState.fifoDataBuffer[5] << 8) |
+              (smcCoreState.fifoDataBuffer[6] << 16) |
+              (smcCoreState.fifoDataBuffer[7] << 24);
           break;
         default:
-          LOG_WARNING(SMC, "SMC_I2C_READ_WRITE: Unimplemented command 0x{:X}", smcCoreState->fifoDataBuffer[1]);
-          smcCoreState->fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
-          smcCoreState->fifoDataBuffer[1] = 0x1; // Set R/W Failed.
+          LOG_WARNING(SMC, "SMC_I2C_READ_WRITE: Unimplemented command 0x{:X}", smcCoreState.fifoDataBuffer[1]);
+          smcCoreState.fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
+          smcCoreState.fifoDataBuffer[1] = 0x1; // Set R/W Failed.
         }
         break;
       case Xe::PCIDev::SMC_QUERY_VERSION:
-        smcCoreState->fifoDataBuffer[0] = SMC_QUERY_VERSION;
-        smcCoreState->fifoDataBuffer[1] = 0x41;
-        smcCoreState->fifoDataBuffer[2] = 0x02;
-        smcCoreState->fifoDataBuffer[3] = 0x03;
+        smcCoreState.fifoDataBuffer[0] = SMC_QUERY_VERSION;
+        smcCoreState.fifoDataBuffer[1] = 0x41;
+        smcCoreState.fifoDataBuffer[2] = 0x02;
+        smcCoreState.fifoDataBuffer[3] = 0x03;
         break;
       case Xe::PCIDev::SMC_FIFO_TEST:
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_FIFO_TEST");
@@ -577,21 +584,21 @@ void Xe::PCIDev::SMC::smcMainThread() {
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_READ_8E_INT");
         break;
       case Xe::PCIDev::SMC_SET_STANDBY:
-        smcCoreState->fifoDataBuffer[0] = SMC_SET_STANDBY;
+        smcCoreState.fifoDataBuffer[0] = SMC_SET_STANDBY;
         // TODO: Fix other HAL types
-        if (smcCoreState->fifoDataBuffer[1] == 0x01) {
+        if (smcCoreState.fifoDataBuffer[1] == 0x01) {
           LOG_INFO(SMC, "[Standby] Requested shutdown");
           XeRunning = false;
         }
-        else if (smcCoreState->fifoDataBuffer[1] == 0x04) {
+        else if (smcCoreState.fifoDataBuffer[1] == 0x04) {
           LOG_INFO(SMC, "[Standby] Requested reboot");
           // Note: Real hardware only respects 0x30, but for automated testing, we will allow anything
           mutex.unlock();
-          XeMain::Reboot(static_cast<Xe::PCIDev::SMC_PWR_REASON>(smcCoreState->fifoDataBuffer[2]));
+          XeMain::Reboot(static_cast<Xe::PCIDev::SMC_PWR_REASON>(smcCoreState.fifoDataBuffer[2]));
           mutex.lock();
         } else {
           LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD Subtype in SMC_SET_STANDBY: 0x{:02X}",
-            static_cast<u16>(smcCoreState->fifoDataBuffer[1]));
+            static_cast<u16>(smcCoreState.fifoDataBuffer[1]));
         }
         break;
       case Xe::PCIDev::SMC_SET_TIME:
@@ -645,7 +652,7 @@ void Xe::PCIDev::SMC::smcMainThread() {
         break;
       default:
         LOG_WARNING(SMC, "Unknown SMC_FIFO_CMD: ID = 0x{:X}", 
-            static_cast<u16>(smcCoreState->fifoDataBuffer[0]));
+            static_cast<u16>(smcCoreState.fifoDataBuffer[0]));
         break;
       }
       mutex.unlock();

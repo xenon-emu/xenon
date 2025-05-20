@@ -62,7 +62,7 @@ struct BufferLoadJob {
 
 class Renderer {
 public:
-  Renderer(RAM *ram, SDL_Window *window);
+  Renderer(RAM *ram);
   virtual ~Renderer() = default;
   virtual void BackendSDLProperties(SDL_PropertiesID properties) = 0;
   virtual void BackendStart() = 0;

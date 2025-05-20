@@ -473,23 +473,17 @@ bool verifyConfig(const std::filesystem::path &path, toml::value &data) {
 void loadConfig(const std::filesystem::path &path) {
   // If the configuration file does not exist, create it and return.
   std::ifstream configFile{ path };
+  bool valid = configFile.is_open() && configFile.good();
   std::error_code error;
-  if (!std::filesystem::exists(path, error) && !configFile.is_open()) {
+  if (!std::filesystem::exists(path, error) && !valid) {
     filepaths.correct(Base::FS::GetUserPath(Base::FS::PathType::ConsoleDir));
     saveConfig(path);
     return;
   }
+
+  // Read file to data, then close
+  toml::value data = toml::parse(configFile);
   configFile.close();
-
-  toml::value data;
-
-  try {
-    data = toml::parse(path);
-  } catch (std::exception &ex) {
-    LOG_ERROR(Config, "Got an exception trying to load config file. {}",
-              ex.what());
-    return;
-  }
 
 #ifndef NO_GFX
   read_section(rendering, Rendering);
@@ -505,21 +499,18 @@ void loadConfig(const std::filesystem::path &path) {
 }
 
 void saveConfig(const std::filesystem::path &path) {
-  toml::value data{};
+  std::ifstream configFile{ path };
+  bool valid = configFile.is_open() && configFile.good();
   std::error_code error{};
-  if (std::filesystem::exists(path, error)) {
-    try {
-      data = toml::parse(path);
-    } catch (const std::exception &ex) {
-      LOG_ERROR(Config, "Exception trying to parse config file. {}", ex.what());
-      return;
-    }
-  } else {
+  if (!std::filesystem::exists(path, error) || !valid) {
     if (error) {
       LOG_ERROR(Config, "Filesystem error: {}", error.message());
     }
-    LOG_INFO(Config, "Config not found. Saving new configuration file: {}", path.string());
+    LOG_INFO(Config, "Config not found! Saving new configuration file to {}", path.string());
   }
+  // Read file to data, then close
+  toml::value data = toml::parse(configFile);
+  configFile.close();
 
   std::string prev_path_str{ path.string() };
   std::string prev_file_str{ path.filename().string() };

@@ -12,35 +12,46 @@
 #define PCI_BRIDGE_END_ADDR 0xEA010000
 
 RootBus::RootBus() {
-  deviceCount = 0;
-  conectedDevices.resize(deviceCount);
+  connectedDevices.clear();
 }
 
 RootBus::~RootBus() {
+  connectedDevices.clear();
   biuData.reset();
 }
 
-void RootBus::AddHostBridge(HostBridge *newHostBridge) {
+void RootBus::AddHostBridge(std::shared_ptr<HostBridge> newHostBridge) {
   hostBridge = newHostBridge;
 }
 
-void RootBus::AddDevice(SystemDevice *device) {
-  deviceCount++;
-  LOG_INFO(RootBus, "Device attached: {}", device->GetDeviceName());
-  conectedDevices.push_back(device);
-}
-
-void RootBus::ResetDevice(SystemDevice *device) {
-  LOG_INFO(RootBus, "Resetting device: {}", device->GetDeviceName());
-
-  for (u64 i = 0; i != conectedDevices.size(); ++i) {
-    SystemDevice *dev = conectedDevices[i];
-    if (dev->GetDeviceName() == device->GetDeviceName()) {
-      conectedDevices.erase(conectedDevices.begin() + i);
-    }
+void RootBus::AddDevice(std::shared_ptr<SystemDevice> device) {
+  if (!device) {
+    LOG_CRITICAL(RootBus, "Failed to attach device!");
+    SystemPause();
+    return;
   }
 
-  conectedDevices.push_back(device);
+  deviceCount++;
+  LOG_INFO(RootBus, "Device attached: {}", device->GetDeviceName());
+  connectedDevices.insert({ device->GetDeviceName(), device });
+}
+
+void RootBus::ResetDevice(std::shared_ptr<SystemDevice> device) {
+  if (!device) {
+    LOG_CRITICAL(RootBus, "Failed to reset device!");
+    SystemPause();
+    return;
+  }
+
+  std::string name = device->GetDeviceName();
+  if (auto it = connectedDevices.find(name); it != connectedDevices.end()) {
+    LOG_INFO(RootBus, "Resetting device: {}", it->first);
+    it->second.reset();
+    connectedDevices.erase(it);
+    connectedDevices.insert({ device->GetDeviceName(), device });
+  } else {
+    LOG_CRITICAL(RootBus, "Failed to reset device! '{}' never existed.", it->first);
+  }
 }
 
 void RootBus::Read(u64 readAddress, u8 *data, u64 size) {
@@ -52,11 +63,11 @@ void RootBus::Read(u64 readAddress, u8 *data, u64 size) {
     return;
   }
 
-  for (auto &device : conectedDevices) {
-    if (readAddress >= device->GetStartAddress() &&
-        readAddress <= device->GetEndAddress()) {
+  for (auto &[name, dev] : connectedDevices) {
+    if (readAddress >= dev->GetStartAddress() &&
+        readAddress <= dev->GetEndAddress()) {
       // Hit
-      device->Read(readAddress, data, size);
+      dev->Read(readAddress, data, size);
       return;
     }
   }
@@ -75,11 +86,11 @@ void RootBus::Read(u64 readAddress, u8 *data, u64 size) {
 
 void RootBus::MemSet(u64 writeAddress, s32 data, u64 size) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "RootBus::MemSet", MP_AUTO);
-  for (auto &device : conectedDevices) {
-    if (writeAddress >= device->GetStartAddress() &&
-        writeAddress <= device->GetEndAddress()) {
+  for (auto &[name, dev] : connectedDevices) {
+    if (writeAddress >= dev->GetStartAddress() &&
+        writeAddress <= dev->GetEndAddress()) {
       // Hit
-      device->MemSet(writeAddress, data, size);
+      dev->MemSet(writeAddress, data, size);
       return;
     }
   }
@@ -92,7 +103,6 @@ void RootBus::MemSet(u64 writeAddress, s32 data, u64 size) {
   // Device or address not found
   if (false) {
     LOG_ERROR(RootBus, "MemSet failed at address: 0x{:X}, data: 0x{:X}", writeAddress, data);
-    LOG_CRITICAL(Xenon, "Halting...");
     if (XeMain::GetCPU())
       XeMain::GetCPU()->Halt(); // Halt the CPU
     Config::imgui.debugWindow = true; // Open the debugger on bad fault
@@ -108,11 +118,11 @@ void RootBus::Write(u64 writeAddress, const u8 *data, u64 size) {
     return;
   }
 
-  for (auto &device : conectedDevices) {
-    if (writeAddress >= device->GetStartAddress() &&
-        writeAddress <= device->GetEndAddress()) {
+  for (auto &[name, dev] : connectedDevices) {
+    if (writeAddress >= dev->GetStartAddress() &&
+        writeAddress <= dev->GetEndAddress()) {
       // Hit
-      device->Write(writeAddress, data, size);
+      dev->Write(writeAddress, data, size);
       return;
     }
   }
@@ -125,7 +135,6 @@ void RootBus::Write(u64 writeAddress, const u8 *data, u64 size) {
   // Device or address not found
   if (false) {
     LOG_ERROR(RootBus, "Write failed at address: 0x{:X}, data: 0x{:X}", writeAddress, *reinterpret_cast<const u64*>(data));
-    LOG_CRITICAL(Xenon, "Halting...");
     if (XeMain::GetCPU())
       XeMain::GetCPU()->Halt(); // Halt the CPU
     Config::imgui.debugWindow = true; // Open the debugger on bad fault

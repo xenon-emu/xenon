@@ -2,8 +2,9 @@
 
 #pragma once
 
-#include "Base/SystemDevice.h"
 #include <memory>
+
+#include "Base/SystemDevice.h"
 
 #define RAM_START_ADDR 0
 #define RAM_SIZE 0x20000000

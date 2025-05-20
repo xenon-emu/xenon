@@ -1,10 +1,13 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
-#include "Assert.h"
-#include "Arch.h"
+#include <stdio.h>
 
 #include "Logging/Backend.h"
-#include "Core/Xe_Main.h"
+#include "Assert.h"
+#include "Arch.h"
+#include "Global.h"
+
+#include "Core/XCPU/Xenon.h"
 
 #ifdef  _MSC_VER
 #define Crash() __debugbreak()
@@ -36,7 +39,7 @@ void assert_fail_impl() {
   if (Config::debug.softHaltOnAssertions) {
     if (XeMain::GetCPU())
       XeMain::GetCPU()->Halt();
-    fmt::print("Assertion Failed! Soft halting emulator...\n");
+    printf("Assertion Failed! Soft halting emulator...\n");
   }
 }
 
@@ -47,11 +50,11 @@ void assert_fail_impl() {
 }
 
 void assert_fail_debug_msg(const std::string& msg) {
-  fmt::print("Assertion Failed! {}\n", msg.data());
+  printf("Assertion Failed! %s\n", msg.c_str());
   assert_fail_impl();
 }
 
 void throw_fail_debug_msg(const std::string& msg) {
-  fmt::print("Assertion Failed! {}\n", msg.data());
+  printf("Assertion Failed! %s\n", msg.c_str());
   throw_fail_impl();
 }

@@ -6,8 +6,6 @@
 #include "Core/Xe_Main.h"
 
 HostBridge::HostBridge() {
-  xGPU = nullptr;
-  pciBridge = nullptr;
   // TODO: Fix these to pull the right data
   switch (Config::highlyExperimental.consoleRevison) {
   case Config::eConsoleRevision::Zephyr: {
@@ -55,17 +53,21 @@ HostBridge::HostBridge() {
   }
 }
 
-void HostBridge::RegisterXGPU(Xe::Xenos::XGPU *newXGPU) {
-  std::lock_guard lck(mutex);
-
-  xGPU = newXGPU;
+HostBridge::~HostBridge() {
+  xGPU.reset();
+  pciBridge.reset();
 }
 
-void HostBridge::RegisterPCIBridge(PCIBridge *newPCIBridge) {
+void HostBridge::RegisterXGPU(std::shared_ptr<Xe::Xenos::XGPU> xgpu) {
   std::lock_guard lck(mutex);
 
-  pciBridge = newPCIBridge;
-  return;
+  xGPU = std::move(xgpu);
+}
+
+void HostBridge::RegisterPCIBridge(std::shared_ptr<PCIBridge> bridge) {
+  std::lock_guard lck(mutex);
+
+  pciBridge = std::move(bridge);
 }
 
 bool HostBridge::Read(u64 readAddress, u8 *data, u64 size) {
@@ -107,19 +109,14 @@ bool HostBridge::Read(u64 readAddress, u8 *data, u64 size) {
     return true;
   }
 
-  // If we are shutting down threads, ignore
-  if (!xGPU || !XeRunning) {
-    return true;
-  }
-
   // Check if this address is in the PCI Bridge
-  if (xGPU->isAddressMappedInBAR(static_cast<u32>(readAddress))) {
+  if (xGPU->IsAddressMappedInBAR(static_cast<u32>(readAddress))) {
     xGPU->Read(readAddress, data, size);
     return true;
   }
 
   // Check if this address is in the PCI Bridge
-  if (pciBridge->isAddressMappedinBAR(static_cast<u32>(readAddress))) {
+  if (pciBridge->IsAddressMappedinBAR(static_cast<u32>(readAddress))) {
     pciBridge->Read(readAddress, data, size);
     return true;
   }
@@ -222,13 +219,13 @@ bool HostBridge::Write(u64 writeAddress, const u8 *data, u64 size) {
   }
 
   // Check if this address is mapped on the GPU
-  if (xGPU->isAddressMappedInBAR(static_cast<u32>(writeAddress))) {
+  if (xGPU->IsAddressMappedInBAR(static_cast<u32>(writeAddress))) {
     xGPU->Write(writeAddress, data, size);
     return true;
   }
 
   // Check if this address is in the PCI Bridge
-  if (pciBridge->isAddressMappedinBAR(static_cast<u32>(writeAddress))) {
+  if (pciBridge->IsAddressMappedinBAR(static_cast<u32>(writeAddress))) {
     pciBridge->Write(writeAddress, data, size);
     return true;
   }
@@ -322,13 +319,13 @@ bool HostBridge::MemSet(u64 writeAddress, s32 data, u64 size) {
   }
 
   // Check if this address is mapped on the GPU
-  if (xGPU->isAddressMappedInBAR(static_cast<u32>(writeAddress))) {
+  if (xGPU->IsAddressMappedInBAR(static_cast<u32>(writeAddress))) {
     xGPU->MemSet(writeAddress, data, size);
     return true;
   }
 
   // Check if this address is in the PCI Bridge
-  if (pciBridge->isAddressMappedinBAR(static_cast<u32>(writeAddress))) {
+  if (pciBridge->IsAddressMappedinBAR(static_cast<u32>(writeAddress))) {
     pciBridge->MemSet(writeAddress, data, size);
     return true;
   }

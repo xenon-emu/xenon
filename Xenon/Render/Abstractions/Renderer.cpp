@@ -15,17 +15,49 @@
 
 namespace Render {
 
-Renderer::Renderer(RAM *ram, SDL_Window *window) :
+Renderer::Renderer(RAM *ram) :
   ramPointer(ram),
   width(TILE(Config::rendering.window.width)),
   height(TILE(Config::rendering.window.height)),
   VSYNC(Config::rendering.vsync),
-  fullscreen(Config::rendering.isFullscreen),
-  mainWindow(window)
+  fullscreen(Config::rendering.isFullscreen)
 {}
 
 void Renderer::SDLInit() {
-  MICROPROFILE_SCOPEI("[Xe::Render]", "Start", MP_AUTO);
+  MICROPROFILE_SCOPEI("[Xe::Render]", "SDLInit", MP_AUTO);
+  // Init SDL Events, Video, Joystick, and Gamepad
+  if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
+    LOG_ERROR(Xenon, "Failed to initialize SDL: {}", SDL_GetError());
+  }
+
+  // SDL3 window properties.
+  SDL_PropertiesID props = SDL_CreateProperties();
+  const std::string title = fmt::format("Xenon {}", Base::Version);
+  SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, title.c_str());
+  // Set starting X and Y position to be centered
+  SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_CENTERED);
+  SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_Y_NUMBER, SDL_WINDOWPOS_CENTERED);
+  // Set width and height
+  SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, Config::rendering.window.width);
+  SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, Config::rendering.window.height);
+  // Allow resizing
+  SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, true);
+  // Enable HiDPI
+  SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_HIGH_PIXEL_DENSITY_BOOLEAN, true);
+  SDL_SetNumberProperty(props, "flags", SDL_WINDOW_OPENGL);
+  SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true);
+  // Create window
+  mainWindow = SDL_CreateWindowWithProperties(props);
+
+  // Set min size
+  SDL_SetWindowMinimumSize(mainWindow, 640, 480);
+
+  if (!mainWindow) {
+    LOG_ERROR(Render, "Failed to create window: {}", SDL_GetError());
+  }
+
+  // Destroy (no longer used) properties
+  SDL_DestroyProperties(props);
   // Set if we are in fullscreen mode or not
   SDL_SetWindowFullscreen(mainWindow, fullscreen);
   // Get current window ID
@@ -33,6 +65,7 @@ void Renderer::SDLInit() {
 }
 
 void Renderer::Start() {
+  MICROPROFILE_SCOPEI("[Xe::Render]", "Start", MP_AUTO);
   // Create thread and SDL
   SDLInit();
   thread = std::thread(&Renderer::Thread, this);
@@ -40,6 +73,7 @@ void Renderer::Start() {
 }
 
 void Renderer::CreateHandles() {
+  MICROPROFILE_SCOPEI("[Xe::Render]", "Create", MP_AUTO);
   // Create factories
   BackendStart();
   shaderFactory = resourceFactory->CreateShaderFactory();
@@ -151,7 +185,7 @@ void Renderer::Resize(s32 x, s32 y) {
 }
 
 void Renderer::HandleEvents() {
-  const SDL_WindowFlags flag = SDL_GetWindowFlags(XeMain::mainWindow);
+  const SDL_WindowFlags flag = SDL_GetWindowFlags(mainWindow);
   if (Config::rendering.pauseOnFocusLoss) {
     focusLost = flag & SDL_WINDOW_INPUT_FOCUS ? false : true;
   }

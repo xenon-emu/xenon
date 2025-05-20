@@ -48,12 +48,13 @@ struct BIU_REGS {
 class HostBridge {
 public:
   HostBridge();
+  ~HostBridge();
 
   // Xbox GPU Register
-  void RegisterXGPU(Xe::Xenos::XGPU *newXGPU);
+  void RegisterXGPU(std::shared_ptr<Xe::Xenos::XGPU> xgpu);
 
   // PCI Bridge Register
-  void RegisterPCIBridge(PCIBridge *newPCIBridge);
+  void RegisterPCIBridge(std::shared_ptr<PCIBridge> bridge);
 
   // Read
   bool Read(u64 readAddress, u8 *data, u64 size);
@@ -76,10 +77,10 @@ private:
   GENRAL_PCI_DEVICE_CONFIG_SPACE hostBridgeConfigSpace{};
 
   // Pointer to the registered XCGPU
-  Xe::Xenos::XGPU *xGPU{};
+  std::shared_ptr<Xe::Xenos::XGPU> xGPU{};
 
   // Pointer to the registered PCI Bridge
-  PCIBridge *pciBridge{};
+  std::shared_ptr<PCIBridge> pciBridge{};
 
   // Helpers
   bool isAddressMappedinBAR(u32 address);

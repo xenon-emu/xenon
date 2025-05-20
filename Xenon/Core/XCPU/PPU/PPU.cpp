@@ -687,7 +687,7 @@ void PPU::PPUCheckExceptions() {
         // TODO: Properly end execution.
         // A checkstop is a full - stop of the processor that requires a System
         // Reset to recover.
-        SYSTEM_PAUSE();
+        SystemPause();
       }
     }
     // Maskable:

@@ -10,8 +10,8 @@
 #ifndef NO_GFX
 namespace Render {
 
-OGLRenderer::OGLRenderer(RAM *ram, SDL_Window *mainWindow) :
-  Renderer(ram, mainWindow)
+OGLRenderer::OGLRenderer(RAM *ram) :
+  Renderer(ram)
 {}
 
 OGLRenderer::~OGLRenderer() {

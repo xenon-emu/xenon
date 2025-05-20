@@ -52,7 +52,7 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPa
   std::ifstream file(blPath, std::ios_base::in | std::ios_base::binary);
   if (!file.is_open()) {
     LOG_CRITICAL(Xenon, "Unable to open file: {} for reading. Check your file path. System Stopped!", blPath);
-    SYSTEM_PAUSE();
+    SystemPause();
   } else {
     u64 fileSize = 0;
     // fs::file_size can cause a exception if it is not a valid file

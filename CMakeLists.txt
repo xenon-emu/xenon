@@ -120,7 +120,7 @@ add_executable(Xenon
   Xenon/Main.cpp
 )
 
-target_precompile_headers(Xenon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Xenon/Base/Types.h)
+target_precompile_headers(Xenon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Xenon/Base/Global.h)
 
 if (GFX_ENABLED)
   add_compile_definitions(GFX_ENABLED)

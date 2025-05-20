@@ -1,7 +1,8 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
-#include "RAM.h"
 #include "Base/Logging/Log.h"
+
+#include "RAM.h"
 
 /***Sets the destination, value (205) and size (RAMData)***/
 RAM::RAM(const std::string &deviceName, u64 startAddress, u64 endAddress, bool isSOCDevice) :
@@ -9,7 +10,7 @@ RAM::RAM(const std::string &deviceName, u64 startAddress, u64 endAddress, bool i
   RAMData = std::make_unique<STRIP_UNIQUE_ARR(RAMData)>(RAM_SIZE);
   if (!RAMData.get()) {
     LOG_CRITICAL(System, "RAM failed to allocate! This is really bad!");
-    SYSTEM_PAUSE();
+    SystemPause();
   }
   else {
     memset(RAMData.get(), 0xCD, RAM_SIZE);

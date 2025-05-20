@@ -2,9 +2,11 @@
 
 #pragma once
 
-#include <map>
+#include <chrono>
 #include <filesystem>
+#include <map>
 #include <string>
+#include <thread>
 
 #include <toml.hpp>
 

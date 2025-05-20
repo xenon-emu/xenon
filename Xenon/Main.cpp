@@ -11,18 +11,18 @@ volatile int hupflag = 0;
 s32 globalShutdownHandler() {
   // If we have been told we cannot safely terminate, just force exit without cleanup
   // The OS will need to handle it, but better than deadlocking the process
-  if (!Base::gSafeTerm) {
+  if (XePaused) {
     const s32 exitCode = Base::exit(-1);
     return exitCode; // Avoid cleanup, as we cannot ensure it'll be done properly
   }
   // If we tried to exit gracefully the first time and failed,
   // use fexit to forcefully send a SIGTERM
   if (!hupflag) {
-    fmt::print("\nAttempting to clean shutdown...\n");
+    printf("\nAttempting to clean shutdown...\n");
     hupflag = 1;
   } else {
-    fmt::print("\nUnable to clean shutdown!\n");
-    fmt::print("Press Crtl+C again to forcefully exit...\n");
+    printf("\nUnable to clean shutdown!\n");
+    printf("Press Crtl+C again to forcefully exit...\n");
     const s32 exitCode = Base::fexit(-1);
     return exitCode;
   }
@@ -36,7 +36,6 @@ BOOL WINAPI consoleControlHandler(ul32 ctrlType) {
   switch (ctrlType) {
   case CTRL_C_EVENT:
   case CTRL_CLOSE_EVENT:
-    globalShutdownHandler();
     return globalShutdownHandler() == 0 ? TRUE : FALSE; // Signal handled, prevent default behavior if told so
   }
   return FALSE; // Default handling
@@ -111,7 +110,7 @@ s32 main(s32 argc, char *argv[]) {
     }
     LOG_INFO(System, "Starting Xenon.");
     // Start execution of the emulator
-    XeMain::Start();
+    XeMain::StartCPU();
   }
   // Inf wait until told otherwise
   while (XeRunning) {

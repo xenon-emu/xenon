@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <unordered_map>
+
 #include "Base/SystemDevice.h"
 #include "Core/RootBus/HostBridge/HostBridge.h"
 
@@ -14,11 +16,11 @@ public:
   RootBus();
   ~RootBus();
 
-  void AddHostBridge(HostBridge *newHostBridge);
+  void AddHostBridge(std::shared_ptr<HostBridge> newHostBridge);
 
-  void AddDevice(SystemDevice *device);
+  void AddDevice(std::shared_ptr<SystemDevice> device);
 
-  void ResetDevice(SystemDevice *device);
+  void ResetDevice(std::shared_ptr<SystemDevice> device);
 
   void Read(u64 readAddress, u8 *data, u64 size);
   void Write(u64 writeAddress, const u8 *data, u64 size);
@@ -29,9 +31,9 @@ public:
   void ConfigWrite(u64 writeAddress, const u8 *data, u64 size);
 
 private:
-  HostBridge *hostBridge{};
+  std::shared_ptr<HostBridge> hostBridge{};
   u32 deviceCount;
-  std::vector<SystemDevice*> conectedDevices;
+  std::unordered_map<std::string, std::shared_ptr<SystemDevice>> connectedDevices;
 
   std::unique_ptr<u8> biuData{ std::make_unique<STRIP_UNIQUE(biuData)>(0x10000) };
 };

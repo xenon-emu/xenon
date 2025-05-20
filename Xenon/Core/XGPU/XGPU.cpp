@@ -113,7 +113,7 @@ Xe::Xenos::XGPU::~XGPU() {
 
 bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
   std::lock_guard lck(mutex);
-  if (isAddressMappedInBAR(static_cast<u32>(readAddress))) {
+  if (IsAddressMappedInBAR(static_cast<u32>(readAddress))) {
     THROW(size > 4);
     const u32 regIndex = (readAddress & 0xFFFFF) / 4;
     const XeRegister reg = static_cast<XeRegister>(regIndex);
@@ -131,7 +131,7 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
 
 bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
   std::lock_guard lck(mutex);
-  if (isAddressMappedInBAR(static_cast<u32>(writeAddress))) {
+  if (IsAddressMappedInBAR(static_cast<u32>(writeAddress))) {
     THROW(size > 4);
     const u32 regIndex = (writeAddress & 0xFFFFF) / 4;
     const XeRegister reg = static_cast<XeRegister>(regIndex);
@@ -149,7 +149,7 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
 
 bool Xe::Xenos::XGPU::MemSet(u64 writeAddress, s32 data, u64 size) {
   std::lock_guard lck(mutex);
-  if (isAddressMappedInBAR(static_cast<u32>(writeAddress))) {
+  if (IsAddressMappedInBAR(static_cast<u32>(writeAddress))) {
     const u32 regIndex = (writeAddress & 0xFFFFF) / 4;
 
 #ifdef XE_DEBUG
@@ -197,7 +197,7 @@ void Xe::Xenos::XGPU::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   memcpy(&xgpuConfigSpace.data[writeAddress & 0xFF], &tmp, size);
 }
 
-bool Xe::Xenos::XGPU::isAddressMappedInBAR(u32 address) {
+bool Xe::Xenos::XGPU::IsAddressMappedInBAR(u32 address) {
   #define ADDRESS_BOUNDS_CHECK(a, b) (address >= a && address <= (a + b))
   if (ADDRESS_BOUNDS_CHECK(xgpuConfigSpace.configSpaceHeader.BAR0, XGPU_DEVICE_SIZE) ||
     ADDRESS_BOUNDS_CHECK(xgpuConfigSpace.configSpaceHeader.BAR1, XGPU_DEVICE_SIZE) ||

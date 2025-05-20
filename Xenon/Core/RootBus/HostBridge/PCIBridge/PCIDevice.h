@@ -28,7 +28,7 @@ public:
   std::string GetDeviceName() { return deviceInfo.deviceName; }
 
   // Checks wether a given address is mapped in the device's BAR's
-  bool isAddressMappedInBAR(u32 address) {
+  bool IsAddressMappedInBAR(u32 address) {
     u32 bar0 = pciConfigSpace.configSpaceHeader.BAR0;
     u32 bar1 = pciConfigSpace.configSpaceHeader.BAR1;
     u32 bar2 = pciConfigSpace.configSpaceHeader.BAR2;

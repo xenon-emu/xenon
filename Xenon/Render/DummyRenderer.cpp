@@ -6,8 +6,9 @@
 
 #ifndef NO_GFX
 namespace Render {
-DummyRenderer::DummyRenderer(RAM *ram, SDL_Window *mainWindow) :
-  Renderer(ram, mainWindow) {
+
+DummyRenderer::DummyRenderer(RAM *ram) :
+  Renderer(ram) {
   LOG_WARNING(Render, "DummyRenderer::DummyRenderer: Using dummy renderer!");
 }
 
