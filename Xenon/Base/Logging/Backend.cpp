@@ -1,7 +1,5 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
-#include "Backend.h"
-
 #include <fmt/format.h>
 #include <functional>
 #include <map>
@@ -13,9 +11,10 @@
 #include "Base/StringUtil.h"
 #include "Base/Thread.h"
 
+#include "Backend.h"
 #include "Log.h"
-#include "Log_entry.h"
-#include "Text_formatter.h"
+#include "LogEntry.h"
+#include "TextFormatter.h"
 
 namespace Base {
 namespace Log {

@@ -4,7 +4,7 @@
 
 #include <chrono>
 
-#include "Log_types.h"
+#include "LogTypes.h"
 
 namespace Base {
 namespace Log {

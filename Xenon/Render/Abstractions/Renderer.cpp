@@ -9,7 +9,7 @@
 
 #include "Core/XGPU/XGPU.h"
 #include "Core/XGPU/ShaderConstants.h"
-#include "Core/Xe_Main.h"
+#include "Core/XeMain.h"
 
 #include "Render/GUI/GUI.h"
 

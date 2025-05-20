@@ -3,7 +3,7 @@
 #include "GUI.h"
 
 #ifndef NO_GFX
-#include "Core/Xe_Main.h"
+#include "Core/XeMain.h"
 #include "Base/Exit.h"
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
 

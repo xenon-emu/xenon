@@ -5,7 +5,7 @@
 #include "XGPUConfig.h"
 #include "XenosRegisters.h"
 
-#include "Core/Xe_Main.h"
+#include "Core/XeMain.h"
 
 #include "Base/Config.h"
 #include "Base/PathUtil.h"

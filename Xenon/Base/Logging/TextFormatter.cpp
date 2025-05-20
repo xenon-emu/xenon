@@ -1,11 +1,12 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
-#include "Text_formatter.h"
-
 #include "Base/Assert.h"
 #include "Base/Config.h"
+
+#include "TextFormatter.h"
+
 #include "Filter.h"
-#include "Log_entry.h"
+#include "LogEntry.h"
 
 namespace Base {
 namespace Log {

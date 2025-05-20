@@ -3,7 +3,8 @@
 #pragma once
 
 #include <array>
-#include "Log_types.h"
+
+#include "LogTypes.h"
 
 namespace Base {
 namespace Log {

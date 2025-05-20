@@ -1,7 +1,7 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
 #include "Base/Config.h"
-#include "Core/Xe_Main.h"
+#include "Core/XeMain.h"
 
 #include "PPCInterpreter.h"
 

@@ -7,8 +7,9 @@
 #include <algorithm>
 #include <fmt/format.h>
 
-#include "Log_types.h"
 #include "Base/Config.h"
+
+#include "LogTypes.h"
 
 namespace Base {
 namespace Log {

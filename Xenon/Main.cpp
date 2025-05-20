@@ -1,6 +1,6 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
-#include "Core/Xe_Main.h"
+#include "Core/XeMain.h"
 #include "Base/Param.h"
 #include "Base/Exit.h"
 #include "Base/Thread.h"

@@ -1,6 +1,6 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
-#include "Xe_Main.h"
+#include "XeMain.h"
 
 void XeMain::Create() {
   MICROPROFILE_SCOPEI("[Xe::Main]", "Create", MP_AUTO);
