@@ -22,11 +22,7 @@ Renderer::Renderer(RAM *ram, SDL_Window *window) :
   VSYNC(Config::rendering.vsync),
   fullscreen(Config::rendering.isFullscreen),
   mainWindow(window)
-{
-  SDLInit();
-  thread = std::thread(&Renderer::Thread, this);
-  thread.detach();
-}
+{}
 
 void Renderer::SDLInit() {
   MICROPROFILE_SCOPEI("[Xe::Render]", "Start", MP_AUTO);
@@ -36,7 +32,14 @@ void Renderer::SDLInit() {
   windowID = SDL_GetWindowID(mainWindow);
 }
 
-void Renderer::Create() {
+void Renderer::Start() {
+  // Create thread and SDL
+  SDLInit();
+  thread = std::thread(&Renderer::Thread, this);
+  thread.detach();
+}
+
+void Renderer::CreateHandles() {
   // Create factories
   BackendStart();
   shaderFactory = resourceFactory->CreateShaderFactory();
@@ -148,11 +151,9 @@ void Renderer::Resize(s32 x, s32 y) {
 }
 
 void Renderer::HandleEvents() {
-  if (Xe_Main.get()) {
-    const SDL_WindowFlags flag = SDL_GetWindowFlags(Xe_Main->mainWindow);
-    if (Config::rendering.pauseOnFocusLoss) {
-      focusLost = flag & SDL_WINDOW_INPUT_FOCUS ? false : true;
-    }
+  const SDL_WindowFlags flag = SDL_GetWindowFlags(XeMain::mainWindow);
+  if (Config::rendering.pauseOnFocusLoss) {
+    focusLost = flag & SDL_WINDOW_INPUT_FOCUS ? false : true;
   }
   // Process events.
   while (XeRunning && SDL_PollEvent(&windowEvent)) {
@@ -323,7 +324,7 @@ void Renderer::Thread() {
   BackendSDLInit();
 
   // Create all handles
-  Create();
+  CreateHandles();
 
   // Main loop
   while (threadRunning && XeRunning) {
@@ -394,10 +395,10 @@ void Renderer::Thread() {
     // Clear the display
     Clear();
 
-    if (Xe_Main.get() && Xe_Main->xenos->RenderingTo2DFramebuffer() && !focusLost) {
+    if (XeMain::xenos && XeMain::xenos->RenderingTo2DFramebuffer() && !focusLost) {
       // Upload buffer
       // Framebuffer pointer from main memory
-      fbPointer = ramPointer->getPointerToAddress(Xe_Main->xenos->GetSurface());
+      fbPointer = ramPointer->getPointerToAddress(XeMain::xenos->GetSurface());
       // Profile
       MICROPROFILE_SCOPEI("[Xe::Render]", "Deswizle", MP_AUTO);
       const u32 *ui_fbPointer = reinterpret_cast<u32 *>(fbPointer);
@@ -406,9 +407,9 @@ void Renderer::Thread() {
       // Use the compute shader
       computeShaderProgram->Bind();
       pixelSSBO->Bind();
-      if (Xe_Main.get() && Xe_Main->xenos) {
-        computeShaderProgram->SetUniformInt("internalWidth", Xe_Main->xenos->GetWidth());
-        computeShaderProgram->SetUniformInt("internalHeight", Xe_Main->xenos->GetHeight());
+      if (XeMain::xenos) {
+        computeShaderProgram->SetUniformInt("internalWidth", XeMain::xenos->GetWidth());
+        computeShaderProgram->SetUniformInt("internalHeight", XeMain::xenos->GetHeight());
       }
       computeShaderProgram->SetUniformInt("resWidth", width);
       computeShaderProgram->SetUniformInt("resHeight", height);

@@ -19,7 +19,7 @@ namespace PPCInterpreter {
   }
   void PPCInterpreter_invalid(PPU_STATE *ppuState) {
     if (Config::debug.haltOnInvalidInstructions) {
-      Xe_Main->getCPU()->Halt();
+      XeMain::GetCPU()->Halt();
       Config::imgui.debugWindow = true; // Open debugger on bad fault
     }
 

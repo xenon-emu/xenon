@@ -28,7 +28,7 @@ s32 globalShutdownHandler() {
   }
   // Cleanly shutdown without the exit syscall
   XeRunning = false;
-  Xe_Main.reset();
+  XeMain::Shutdown();
   return 0;
 }
 #ifdef _WIN32
@@ -104,14 +104,14 @@ s32 main(s32 argc, char *argv[]) {
   // Define profiler
   {
     // Create all handles
-    Xe_Main = std::make_unique<STRIP_UNIQUE(Xe_Main)>();
+    XeMain::Create();
     // Setup hangup
     if (installHangup() != 0) {
       LOG_CRITICAL(System, "Failed to install signal handler. Clean shutdown is not possible through console");
     }
     LOG_INFO(System, "Starting Xenon.");
     // Start execution of the emulator
-    Xe_Main->start();
+    XeMain::Start();
   }
   // Inf wait until told otherwise
   while (XeRunning) {
@@ -119,12 +119,12 @@ s32 main(s32 argc, char *argv[]) {
     MicroProfileFlip(nullptr);
 #endif
 #ifndef NO_GFX
-    if (Xe_Main.get() && Xe_Main->renderer.get())
-      Xe_Main->renderer->HandleEvents();
+    if (XeMain::renderer.get())
+      XeMain::renderer->HandleEvents();
 #endif
     std::this_thread::sleep_for(100ns);
   }
   // Shutdown
-  Xe_Main.reset();
+  XeMain::Shutdown();
   return 0;
 }

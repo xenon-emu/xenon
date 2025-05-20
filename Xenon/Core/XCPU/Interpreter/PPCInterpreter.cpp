@@ -254,9 +254,9 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
     break;
   }
   case 0x16: {
-    if (Config::debug.haltOnGuestAssertion && Xe_Main.get()) {
+    if (Config::debug.haltOnGuestAssertion && XeMain::GetCPU()) {
       LOG_XBOX(Xenon, "FATAL ERROR! Halting CPU...");
-      PPU *PPU = Xe_Main->xenonCPU->GetPPU(ppuState->ppuID);
+      PPU *PPU = XeMain::GetCPU()->GetPPU(ppuState->ppuID);
       if (PPU)
         PPU->Halt(0, true, ppuState->ppuID, curThreadId);
     }
@@ -270,9 +270,9 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
   case 0x19: {
     if (Config::debug.haltOnGuestAssertion) {
 #ifndef NO_GFX
-      if (Xe_Main.get()) {
+      if (XeMain::GetCPU()) {
         LOG_XBOX(Xenon, "Assertion! Halting CPU... (Continuing will cause execution to resume as normal)");
-        PPU *PPU = Xe_Main->xenonCPU->GetPPU(ppuState->ppuID);
+        PPU *PPU = XeMain::GetCPU()->GetPPU(ppuState->ppuID);
         if (PPU)
           PPU->Halt(0, true, ppuState->ppuID, curThreadId);
       }

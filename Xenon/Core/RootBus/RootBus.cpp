@@ -93,7 +93,8 @@ void RootBus::MemSet(u64 writeAddress, s32 data, u64 size) {
   if (false) {
     LOG_ERROR(RootBus, "MemSet failed at address: 0x{:X}, data: 0x{:X}", writeAddress, data);
     LOG_CRITICAL(Xenon, "Halting...");
-    Xe_Main->getCPU()->Halt(); // Halt the CPU
+    if (XeMain::GetCPU())
+      XeMain::GetCPU()->Halt(); // Halt the CPU
     Config::imgui.debugWindow = true; // Open the debugger on bad fault
   }
 }
@@ -125,7 +126,8 @@ void RootBus::Write(u64 writeAddress, const u8 *data, u64 size) {
   if (false) {
     LOG_ERROR(RootBus, "Write failed at address: 0x{:X}, data: 0x{:X}", writeAddress, *reinterpret_cast<const u64*>(data));
     LOG_CRITICAL(Xenon, "Halting...");
-    Xe_Main->getCPU()->Halt(); // Halt the CPU
+    if (XeMain::GetCPU())
+      XeMain::GetCPU()->Halt(); // Halt the CPU
     Config::imgui.debugWindow = true; // Open the debugger on bad fault
   }
 }

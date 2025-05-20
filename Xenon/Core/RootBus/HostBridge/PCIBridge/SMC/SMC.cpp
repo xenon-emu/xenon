@@ -581,13 +581,13 @@ void Xe::PCIDev::SMC::smcMainThread() {
         // TODO: Fix other HAL types
         if (smcCoreState->fifoDataBuffer[1] == 0x01) {
           LOG_INFO(SMC, "[Standby] Requested shutdown");
-          Xe_Main->shutdown();
+          XeRunning = false;
         }
         else if (smcCoreState->fifoDataBuffer[1] == 0x04) {
           LOG_INFO(SMC, "[Standby] Requested reboot");
           // Note: Real hardware only respects 0x30, but for automated testing, we will allow anything
           mutex.unlock();
-          Xe_Main->reboot(static_cast<Xe::PCIDev::SMC_PWR_REASON>(smcCoreState->fifoDataBuffer[2]));
+          XeMain::Reboot(static_cast<Xe::PCIDev::SMC_PWR_REASON>(smcCoreState->fifoDataBuffer[2]));
           mutex.lock();
         } else {
           LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD Subtype in SMC_SET_STANDBY: 0x{:02X}",

@@ -35,99 +35,93 @@
 
 // Global thread state
 inline std::atomic<bool> XeRunning{ true };
-class XeMain {
-public:
-  XeMain();
-  ~XeMain();
+namespace XeMain {
 
-  void start();
+extern void Create();
+extern void Shutdown();
 
-  void shutdownCPU();
+extern void Start();
 
-  void reboot(Xe::PCIDev::SMC_PWR_REASON type);
+extern void ShutdownCPU();
 
-  void reloadFiles();
+extern void Reboot(Xe::PCIDev::SMC_PWR_REASON type);
 
-  void saveConfig();
-  void loadConfig();
+extern void ReloadFiles();
+
+extern void SaveConfig();
+extern void LoadConfig();
 
 #ifndef NO_GFX
-  SDL_Window* createWindow();
+extern SDL_Window* CreateSDLWindow();
 #endif
 
-  void addPCIDevices();
-  void createHostBridge();
-  void createPCIDevices();
-  void createRootBus();
-  void createSMCState();
+extern void AddPCIDevices();
+extern void CreateHostBridge();
+extern void CreatePCIDevices();
+extern void CreateRootBus();
+extern void CreateSMCState();
 
-  void shutdown() {
-    XeRunning = false;
-  }
-
-  Xenon* getCPU() {
-    return xenonCPU.get();
-  }
 #ifndef NO_GFX
-  // Window
-  SDL_Window *mainWindow = nullptr;
+// Window
+inline SDL_Window *mainWindow = nullptr;
 #endif
-private:
-  // Main objects
-  //  Base path
-  std::filesystem::path rootDirectory = {};
-  //  Log level
-  std::unique_ptr<Base::Log::Filter> logFilter{};
 
-  // Main Emulator objects
-  std::unique_ptr<RootBus> rootBus{}; // RootBus Object
-  std::unique_ptr<HostBridge> hostBridge{}; // HostBridge Object
-  std::unique_ptr<PCIBridge> pciBridge{}; // PCIBridge Object
+// Main objects
+//  Base path
+inline std::filesystem::path rootDirectory = {};
+//  Log level
+inline std::unique_ptr<Base::Log::Filter> logFilter{};
 
-public:
+// Main Emulator objects
+inline std::unique_ptr<RootBus> rootBus{}; // RootBus Object
+inline std::unique_ptr<HostBridge> hostBridge{}; // HostBridge Object
+inline std::unique_ptr<PCIBridge> pciBridge{}; // PCIBridge Object
+
 #ifndef NO_GFX
-  // Render thread
-  std::unique_ptr<Render::Renderer> renderer{};
+// Render thread
+inline std::unique_ptr<Render::Renderer> renderer{};
 #endif
-  // CPU started flag
-  bool CPUStarted = false;
+// CPU started flag
+inline bool CPUStarted = false;
 
-  // PCI Devices
-  //  SMC
-  std::unique_ptr<Xe::PCIDev::SMC_CORE_STATE> smcCoreState{}; // SMCCore State for setting diffrent SMC settings.
-  std::unique_ptr<Xe::PCIDev::SMC> smcCore{}; // SMCCore Object
-  //  Ethernet
-  std::unique_ptr<Xe::PCIDev::ETHERNET> ethernet{};
-  //  Audio
-  std::unique_ptr<Xe::PCIDev::AUDIOCTRLR> audioController{};
-  //  OHCI
-  std::unique_ptr<Xe::PCIDev::OHCI0> ohci0{};
-  std::unique_ptr<Xe::PCIDev::OHCI1> ohci1{};
-  //  EHCI
-  std::unique_ptr<Xe::PCIDev::EHCI0> ehci0{};
-  std::unique_ptr<Xe::PCIDev::EHCI1> ehci1{};
-  //  Secure Flash Controller for Xbox Device object
-  std::unique_ptr<Xe::PCIDev::SFCX> sfcx{};
-  //  XMA
-  std::unique_ptr<Xe::PCIDev::XMA> xma{};
-  //  ODD (CD-ROM Drive)
-  std::unique_ptr<Xe::PCIDev::ODD> odd{};
-  //  HDD
-  std::unique_ptr<Xe::PCIDev::HDD> hdd{};
-  //  NAND
-  std::unique_ptr<NAND> nand{};
-  //  Random Access Memory (All console RAM, excluding Reserved memory which is mainly PCI Devices)
-  std::unique_ptr<RAM> ram{};
+// PCI Devices
+//  SMC
+inline std::unique_ptr<Xe::PCIDev::SMC_CORE_STATE> smcCoreState{}; // SMCCore State for setting diffrent SMC settings.
+inline std::unique_ptr<Xe::PCIDev::SMC> smcCore{}; // SMCCore Object
+//  Ethernet
+inline std::unique_ptr<Xe::PCIDev::ETHERNET> ethernet{};
+//  Audio
+inline std::unique_ptr<Xe::PCIDev::AUDIOCTRLR> audioController{};
+//  OHCI
+inline std::unique_ptr<Xe::PCIDev::OHCI0> ohci0{};
+inline std::unique_ptr<Xe::PCIDev::OHCI1> ohci1{};
+//  EHCI
+inline std::unique_ptr<Xe::PCIDev::EHCI0> ehci0{};
+inline std::unique_ptr<Xe::PCIDev::EHCI1> ehci1{};
+//  Secure Flash Controller for Xbox Device object
+inline std::unique_ptr<Xe::PCIDev::SFCX> sfcx{};
+//  XMA
+inline std::unique_ptr<Xe::PCIDev::XMA> xma{};
+//  ODD (CD-ROM Drive)
+inline std::unique_ptr<Xe::PCIDev::ODD> odd{};
+//  HDD
+inline std::unique_ptr<Xe::PCIDev::HDD> hdd{};
+//  NAND
+inline std::unique_ptr<NAND> nand{};
+//  Random Access Memory (All console RAM, excluding Reserved memory which is mainly PCI Devices)
+inline std::unique_ptr<RAM> ram{};
 
-  // Console Handles
-  //  Xenon CPU
-  std::unique_ptr<Xenon> xenonCPU{};
-  //  Xenos GPU
-  std::unique_ptr<Xe::Xenos::XGPU> xenos{};
-};
+// Console Handles
+//  Xenon CPU
+inline std::unique_ptr<Xenon> xenonCPU{};
+//  Xenos GPU
+inline std::unique_ptr<Xe::Xenos::XGPU> xenos{};
 
-// Global pointer
-inline std::unique_ptr<XeMain> Xe_Main{};
+inline Xenon *GetCPU() {
+  return xenonCPU.get();
+}
+
+} // namespace XeMain
 
 // Global shutdown handler
 extern s32 globalShutdownHandler();

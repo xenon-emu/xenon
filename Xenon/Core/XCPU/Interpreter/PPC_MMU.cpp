@@ -395,8 +395,8 @@ void PPCInterpreter::mmuAddTlbEntry(PPU_STATE *ppuState) {
   const u64 VPN = AVPN | LVPN;
 
 #ifdef DEBUG_BUILD
-  if (Xe_Main.get() && Xe_Main->xenonCPU.get()) {
-    PPU *ppu = Xe_Main->xenonCPU->GetPPU(ppuState->ppuID);
+  if (XeMain::GetCPU()) {
+    PPU *ppu = XeMain::xenonCPU->GetPPU(ppuState->ppuID);
     if (ppu && ppu->traceFile) {
       fprintf(ppu->traceFile, "TLB[%d:%d] map 0x%llx -> 0x%llx\n", TS, TI, tlbVpn, tlbRpn);
     }
@@ -1031,8 +1031,8 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
       }
     } else {
       // Debug tools
-      if (Config::debug.haltOnSlbMiss && Xe_Main.get()) {
-        Xe_Main->xenonCPU->Halt();
+      if (Config::debug.haltOnSlbMiss && XeMain::GetCPU()) {
+        XeMain::xenonCPU->Halt();
       }
       // SLB Miss
       // Data or Inst Segment Exception
@@ -1085,8 +1085,8 @@ void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE *ppuState,
     socRead = true;
 
   // Debugger halt
-  if (EA && EA == Config::debug.haltOnReadAddress && Xe_Main.get()) {
-    Xe_Main->getCPU()->Halt(); // Halt the CPU
+  if (EA && EA == Config::debug.haltOnReadAddress && XeMain::GetCPU()) {
+    XeMain::GetCPU()->Halt(); // Halt the CPU
     Config::imgui.debugWindow = true; // Open the debugger after halting
   }
 
@@ -1172,8 +1172,8 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
     socWrite = true;
 
   // Debugger halt
-  if (EA && EA == Config::debug.haltOnWriteAddress && Xe_Main.get()) {
-    Xe_Main->getCPU()->Halt(); // Halt the CPU
+  if (EA && EA == Config::debug.haltOnWriteAddress && XeMain::GetCPU()) {
+    XeMain::GetCPU()->Halt(); // Halt the CPU
     Config::imgui.debugWindow = true; // Open the debugger after halting
   }
 
@@ -1238,6 +1238,9 @@ void PPCInterpreter::MMUMemSet(PPU_STATE *ppuState,
   const u64 oldEA = EA;
 
   if (MMUTranslateAddress(&EA, ppuState, true, thr) == false)
+    return;
+
+  if (!CPUContext)
     return;
 
   // Check if it's reserved

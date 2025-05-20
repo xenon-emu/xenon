@@ -393,6 +393,8 @@ void Render::GUI::Tooltip(const std::string &contents, ImGuiHoveredFlags delay) 
 }
 
 void RenderInstructions(Render::GUI *gui, PPU_STATE *state, ePPUThread thr, u64 numInstructions) {
+  if (!gui || !state)
+    return;
   PPU_THREAD_REGISTERS &thread = state->ppuThread[thr];
   f32 maxLineWidth = ImGui::GetContentRegionAvail().x;
   for (u64 i = 0; i != (numInstructions * 2) + 1; ++i) {
@@ -432,6 +434,8 @@ void PPUThreadDiassembly(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
 }
 
 void PPUThreadRegisters(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
+  if (!state)
+    return;
   gui->SimpleWindow(fmt::format("Registers [{}:{}]", state->ppuName, static_cast<u8>(thr)), [&] {
     PPU_THREAD_REGISTERS &ppuRegisters = state->ppuThread[thr];
     gui->Node("GPRs", [&] {
@@ -649,6 +653,8 @@ void PPUThreadRegisters(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
 bool rebuildThreadDS[6]{};
 bool builtWithDisassembly[6]{};
 void PPUThreadDockSpace(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
+  if (!state)
+    return;
   gui->SimpleWindow(fmt::format("{} [{}]", static_cast<u8>(thr), state->ppuName), [&] {
     std::string id = fmt::format("{}:{}_DS", state->ppuName, static_cast<u8>(thr));
     PPU_THREAD_REGISTERS &thread = state->ppuThread[thr];
@@ -684,7 +690,9 @@ void PPUThreadDockSpace(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
 
 void PPURegisters(Render::GUI *gui, PPU_STATE *state) {
   gui->SimpleWindow(fmt::format("Registers [{}]", state->ppuID), [&] {
-    Xenon *CPU = Xe_Main->getCPU();
+    Xenon *CPU = XeMain::GetCPU();
+    if (!CPU)
+      return;
     gui->Node("SPR", [&] {
       PPU_STATE_SPRS &SPR = state->SPR;
       Hex(gui, SPR, SDR1);
@@ -869,13 +877,11 @@ void DebuggerDockSpace(Render::GUI *gui) {
   }
   ImGui::DockSpace(dsId);
 
-  if (Xe_Main.get()) {
-    Xenon *CPU = Xe_Main->getCPU();
-    for (u8 ppuID = 0; ppuID != 3; ++ppuID) {
-      if (CPU && gui->ppcDebuggerActive[ppuID]) {
-        PPU *PPU = CPU->GetPPU(ppuID);
-        PPUDockSpace(gui, PPU);
-      }
+  Xenon *CPU = XeMain::GetCPU();
+  for (u8 ppuID = 0; ppuID != 3; ++ppuID) {
+    if (CPU && gui->ppcDebuggerActive[ppuID]) {
+      PPU *PPU = CPU->GetPPU(ppuID);
+      PPUDockSpace(gui, PPU);
     }
   }
 }
@@ -896,28 +902,28 @@ void GraphicsSettings(Render::GUI *gui) {
   gui->Toggle("Enable GUI", &Config::rendering.enableGui);
   gui->Tooltip("Whether to create the GUI handle");
   gui->Toggle("Fullscreen", &Config::rendering.isFullscreen, [&] {
-    Xe_Main->renderer->fullscreen = Config::rendering.isFullscreen;
-    SDL_SetWindowFullscreen(gui->mainWindow, Xe_Main->renderer->fullscreen);
+    XeMain::renderer->fullscreen = Config::rendering.isFullscreen;
+    SDL_SetWindowFullscreen(gui->mainWindow, XeMain::renderer->fullscreen);
   });
   gui->Toggle("VSync", &Config::rendering.vsync, [&] {
-    Xe_Main->renderer->VSYNC = Config::rendering.vsync;
-    SDL_GL_SetSwapInterval(Xe_Main->renderer->VSYNC ? 1 : 0);
+    XeMain::renderer->VSYNC = Config::rendering.vsync;
+    SDL_GL_SetSwapInterval(XeMain::renderer->VSYNC ? 1 : 0);
   });
   gui->Toggle("Exit on window close", &Config::rendering.quitOnWindowClosure);
 }
 
 void XCPUSettings(Render::GUI *gui) {
-  if (Xe_Main->CPUStarted) {
+  if (XeMain::CPUStarted) {
     gui->Button("Shutdown", [] {
-      Xe_Main->shutdownCPU();
+      XeMain::ShutdownCPU();
     });
   } else {
     gui->Button("Start", [] {
-      Xe_Main->start();
+      XeMain::Start();
     });
   }
   gui->Button("Reboot", [] {
-    Xe_Main->reboot(Xe_Main->smcCoreState->currPowerOnReason);
+    XeMain::Reboot(XeMain::smcCoreState->currPowerOnReason);
   });
   gui->Toggle("Load Elf", &Config::xcpu.elfLoader);
   gui->Toggle("RGH2 Init Skip (Corona Only)", &RGH2, [] {
@@ -952,7 +958,7 @@ void PathSettings(Render::GUI *gui) {
   Config::filepaths.elfBinary = gui->InputText("ELF Binary", Config::filepaths.elfBinary);
   Config::filepaths.oddImage = gui->InputText("ODD Image File (iso)", Config::filepaths.oddImage);
   gui->Button("Reload files", [] {
-    Xe_Main->reloadFiles();
+    XeMain::ReloadFiles();
   });
   gui->Tooltip("Warning: It is *highly* recommended you shutdown the CPU before reloading files");
 }
@@ -974,10 +980,10 @@ void ImGuiSettings(Render::GUI *gui) {
 
 void ConfigSettings(Render::GUI *gui) {
   gui->Button("Save", [] {
-    Xe_Main->saveConfig();
+    XeMain::SaveConfig();
   });
   gui->Button("Load", [] {
-    Xe_Main->loadConfig();
+    XeMain::LoadConfig();
   });
 }
 
@@ -1000,7 +1006,7 @@ void Render::GUI::OnSwap(Texture *texture) {
           for (bool& a : ppcDebuggerActive)
             a ^= true;
         });
-        Xenon *CPU = Xe_Main->getCPU();
+        Xenon *CPU = XeMain::GetCPU();
         bool halted = CPU->IsHalted();
         TabItemButton(halted ? "Continue" : "Pause", [&] {
           if (halted)
@@ -1031,17 +1037,15 @@ void Render::GUI::OnSwap(Texture *texture) {
               for (bool& a : ppcDebuggerActive)
                 a ^= true;
             });
-            if (Xe_Main.get()) {
-              Xenon *CPU = Xe_Main->getCPU();
-              if (CPU) {
-                bool halted = CPU->IsHalted();
-                TabItemButton(halted ? "Continue" : "Pause", [&] {
-                  if (halted)
-                    CPU->Continue();
-                  else
-                    CPU->Halt();
-                });
-              }
+            Xenon *CPU = XeMain::GetCPU();
+            if (CPU) {
+              bool halted = CPU->IsHalted();
+              TabItemButton(halted ? "Continue" : "Pause", [&] {
+                if (halted)
+                  CPU->Continue();
+                else
+                  CPU->Halt();
+              });
             }
           });
         });
@@ -1065,7 +1069,7 @@ void Render::GUI::OnSwap(Texture *texture) {
         TabItem("Dump", [&] {
           Button("Dump FB", [&] {
             const auto UserDir = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
-            Xe_Main->xenos->DumpFB(UserDir / "fbmem.bin", Xe_Main->renderer->pitch);
+            XeMain::xenos->DumpFB(UserDir / "fbmem.bin", XeMain::renderer->pitch);
           });
           Button("Dump Memory", [&] {
             const auto UserDir = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
@@ -1075,7 +1079,7 @@ void Render::GUI::OnSwap(Texture *texture) {
               LOG_ERROR(Xenon, "Failed to open {} for writing", path.filename().string());
             }
             else {
-              RAM *ramPtr = Xe_Main->ram.get();
+              RAM *ramPtr = XeMain::ram.get();
               f.write(reinterpret_cast<const char*>(ramPtr->getPointerToAddress(0)), RAM_SIZE);
               LOG_INFO(Xenon, "RAM dumped to '{}' (size: 0x{:08X})", path.string(), RAM_SIZE);
             }
@@ -1092,7 +1096,7 @@ void Render::GUI::OnSwap(Texture *texture) {
             });
             TabItem("General", [&] {
               Button("Exit", [] {
-                Xe_Main->shutdown();
+                XeRunning = false;
               });
               Tooltip("Cleanly exits the process");
               Button("Soft exit", [] {

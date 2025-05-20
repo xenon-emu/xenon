@@ -2,25 +2,27 @@
 
 #include "Xe_Main.h"
 
-XeMain::XeMain() {
+void XeMain::Create() {
   MICROPROFILE_SCOPEI("[Xe::Main]", "Create", MP_AUTO);
   Base::Log::Initialize();
   Base::Log::Start();
   rootDirectory = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
-  loadConfig();
+  LoadConfig();
   logFilter = std::make_unique<STRIP_UNIQUE(logFilter)>(Config::log.currentLevel);
   Base::Log::SetGlobalFilter(*logFilter);
   pciBridge = std::make_unique<STRIP_UNIQUE(pciBridge)>();
-  createSMCState();
-  createPCIDevices();
-  addPCIDevices();
+  CreateSMCState();
+  CreatePCIDevices();
+  AddPCIDevices();
 #ifndef NO_GFX
   switch (Base::JoaatStringHash(Config::rendering.backend, false)) {
   case "OpenGL"_j:
-    renderer = std::make_unique<Render::OGLRenderer>(ram.get(), createWindow());
+    renderer = std::make_unique<Render::OGLRenderer>(ram.get(), CreateSDLWindow());
+    renderer->Start();
     break;
   case "Dummy"_j:
-    renderer = std::make_unique<Render::DummyRenderer>(ram.get(), createWindow());
+    renderer = std::make_unique<Render::DummyRenderer>(ram.get(), CreateSDLWindow());
+    renderer->Start();
     break;
   default:
     LOG_ERROR(Render, "Invalid renderer backend: {}", Config::rendering.backend);
@@ -30,13 +32,14 @@ XeMain::XeMain() {
 #else
   xenos = std::make_unique<STRIP_UNIQUE(xenos)>(nullptr, ram.get(), pciBridge.get());
 #endif
-  createHostBridge();
-  createRootBus();
+  CreateHostBridge();
+  CreateRootBus();
   xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses);
   pciBridge->RegisterIIC(xenonCPU->GetIICPointer());
 }
-XeMain::~XeMain() {
-  saveConfig();
+
+void XeMain::Shutdown() {
+  SaveConfig();
   // Delete the XGPU and XCPU
   xenos.reset();
   xenonCPU.reset();
@@ -79,16 +82,16 @@ XeMain::~XeMain() {
   MicroProfileShutdown();
 }
 
-void XeMain::saveConfig() {
+void XeMain::SaveConfig() {
   MICROPROFILE_SCOPEI("[Xe::Main]", "SaveConfig", MP_AUTO);
   Config::saveConfig(rootDirectory / "config.toml");
 }
-void XeMain::loadConfig() {
+void XeMain::LoadConfig() {
   MICROPROFILE_SCOPEI("[Xe::Main]", "LoadConfig", MP_AUTO);
   Config::loadConfig(rootDirectory / "config.toml");
 }
 
-void XeMain::start() {
+void XeMain::Start() {
   if (!xenonCPU.get()) {
     LOG_CRITICAL(Xenon, "Failed to initialize Xenon's CPU!");
     SYSTEM_PAUSE();
@@ -106,7 +109,7 @@ void XeMain::start() {
   }
 }
 
-void XeMain::shutdownCPU() {
+void XeMain::ShutdownCPU() {
   MICROPROFILE_SCOPEI("[Xe::Main]", "ShutdownCPU", MP_AUTO);
   // Set the CPU to 'Resetting' mode before killing the handle
   xenonCPU->Reset();
@@ -126,22 +129,22 @@ void XeMain::shutdownCPU() {
   CPUStarted = false;
 }
 
-void XeMain::reboot(Xe::PCIDev::SMC_PWR_REASON type) {
+void XeMain::Reboot(Xe::PCIDev::SMC_PWR_REASON type) {
   MICROPROFILE_SCOPEI("[Xe::Main]", "Reboot", MP_AUTO);
   // Check if the CPU is active
   if (CPUStarted) {
     // Shutdown the CPU
-    shutdownCPU();
+    ShutdownCPU();
   }
   // Set poweron type
   smcCoreState->currPowerOnReason = type;
   // Setup CPU
-  start();
+  Start();
 }
 
-void XeMain::reloadFiles() {
+void XeMain::ReloadFiles() {
   MICROPROFILE_SCOPEI("[Xe::Main]", "ReloadFiles", MP_AUTO);
-  getCPU()->Halt();
+  GetCPU()->Halt();
   // Reset the SFCX
   sfcx.reset();
   u32 cpi = xenonCPU->GetCPI();
@@ -158,11 +161,11 @@ void XeMain::reloadFiles() {
     // Ensure the IIC pointer in the PCI bridge is correct
     pciBridge->RegisterIIC(xenonCPU->GetIICPointer());
   }
-  getCPU()->Continue();
+  GetCPU()->Continue();
 }
 
 #ifndef NO_GFX
-SDL_Window* XeMain::createWindow() {
+SDL_Window* XeMain::CreateSDLWindow() {
   // Init SDL Events, Video, Joystick, and Gamepad
   if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
     LOG_ERROR(Xenon, "Failed to initialize SDL: {}", SDL_GetError());
@@ -201,7 +204,7 @@ SDL_Window* XeMain::createWindow() {
 }
 #endif
 
-void XeMain::addPCIDevices() {
+void XeMain::AddPCIDevices() {
   MICROPROFILE_SCOPEI("[Xe::Main]", "AddPCIDevices", MP_AUTO);
   pciBridge->addPCIDevice(ohci0.get());
   pciBridge->addPCIDevice(ohci1.get());
@@ -216,7 +219,7 @@ void XeMain::addPCIDevices() {
   pciBridge->addPCIDevice(smcCore.get());
 }
 
-void XeMain::createHostBridge() {
+void XeMain::CreateHostBridge() {
   MICROPROFILE_SCOPEI("[Xe::Main::PCI]", "CreateHostBridge", MP_AUTO);
   hostBridge = std::make_unique<STRIP_UNIQUE(hostBridge)>();
 
@@ -224,7 +227,7 @@ void XeMain::createHostBridge() {
   hostBridge->RegisterPCIBridge(pciBridge.get());
 }
 
-void XeMain::createRootBus() {
+void XeMain::CreateRootBus() {
   MICROPROFILE_SCOPEI("[Xe::Main::PCI]", "CreateRootBus", MP_AUTO);
   rootBus = std::make_unique<STRIP_UNIQUE(rootBus)>();
 
@@ -233,7 +236,7 @@ void XeMain::createRootBus() {
   rootBus->AddDevice(ram.get());
 }
 
-void XeMain::createPCIDevices() {
+void XeMain::CreatePCIDevices() {
   MICROPROFILE_SCOPEI("[Xe::Main::PCI]", "CreateDevices", MP_AUTO);
   {
     {
@@ -285,7 +288,7 @@ void XeMain::createPCIDevices() {
   }
 }
 
-void XeMain::createSMCState() {
+void XeMain::CreateSMCState() {
   MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "SMCState", MP_AUTO);
   // Initialize several settings from the struct.
   smcCoreState = std::make_unique<STRIP_UNIQUE(smcCoreState)>();

@@ -88,7 +88,8 @@ public:
   virtual u32 GetBackendID() = 0;
   void SDLInit();
 
-  void Create();
+  void Start();
+  void CreateHandles();
   void Shutdown();
   void Resize(s32 x, s32 y);
 

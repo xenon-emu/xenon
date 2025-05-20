@@ -55,11 +55,11 @@ void PPCInterpreter::PPCInterpreter_bclr(PPU_STATE *ppuState) {
   bool condOk = ((_instr.bo & 0x10) != 0 ? 1 : 0) || (CR_GET(_instr.bi) == ((_instr.bo & 0x8) != 0));
 
   // CB/SB Hardware Init step skip (hacky)
-  if (Xe_Main.get() && Xe_Main->sfcx.get() && Xe_Main->sfcx->initSkip1 && Xe_Main->sfcx->initSkip2) {
-    if (curThread.CIA == Xe_Main->sfcx->initSkip1)
+  if (XeMain::sfcx && XeMain::sfcx->initSkip1 && XeMain::sfcx->initSkip2) {
+    if (curThread.CIA == XeMain::sfcx->initSkip1)
       condOk = false;
 
-    if (curThread.CIA == Xe_Main->sfcx->initSkip2)
+    if (curThread.CIA == XeMain::sfcx->initSkip2)
       condOk = true;
   }
 

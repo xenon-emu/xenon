@@ -207,8 +207,8 @@ void PPU::Halt(u64 haltOn, bool requestedByGuest, s8 ppuId, ePPUThread threadId)
   }
   guestHalt = requestedByGuest;
 #ifndef NO_GFX
-  if (guestHalt && Xe_Main.get() && Xe_Main->renderer) {
-    Xe_Main->renderer->SetDebuggerActive(ppuId);
+  if (guestHalt && XeMain::renderer) {
+    XeMain::renderer->SetDebuggerActive(ppuId);
   }
 #endif
   if (ppuThreadPreviousState == eThreadState::None) // If we were told to ignore it, then do so
