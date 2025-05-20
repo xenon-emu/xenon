@@ -106,7 +106,7 @@ public:
 
   static Shader* DecompileMicroCode(const void *code, const u32 codeLength, eShaderType shaderType);
 
-  void EmitShaderCode(AST::ShaderCodeWriterBase &writer) const;
+  void EmitShaderCode(AST::ShaderCodeWriterBase &writer);
 
   ControlFlowGraph *controlFlow = nullptr;
   

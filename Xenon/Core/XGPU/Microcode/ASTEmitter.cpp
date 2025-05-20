@@ -9,7 +9,8 @@
 #ifndef NO_GFX
 namespace Xe::Microcode::AST {
 
-ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType, Shader *shader) : type(shaderType) {
+ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType, Shader *shader) :
+  type(shaderType), shader(shader) {
   module.AddCapability(spv::Capability::Shader);
   module.SetMemoryModel(spv::AddressingModel::Logical, spv::MemoryModel::GLSL450);
 
@@ -21,7 +22,7 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType, Shader *sha
       module.Decorate(var, spv::Decoration::DescriptorSet, 0);
       module.Decorate(var, spv::Decoration::Binding, tex.slot);
       module.Name(var, FMT("TextureSlot{}", tex.slot));
-      texture_vars[tex.slot] = var;
+      texture_vars[tex.slot] = Chunk(var, sampled_type);
     }
   }
 
@@ -33,25 +34,68 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType, Shader *sha
   Sirit::Id vec4_type = module.TypeVector(float_type, 4);
 
   if (type == eShaderType::Pixel) {
-    for (u32 i = 0; i != 4; ++i) {
-      auto &var = output_vars[static_cast<eExportReg>(static_cast<u32>(eExportReg::COLOR0) + i)];
-      Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
-      var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
-      module.Name(var, FMT("COLOR{}", i));
+    if (shader) {
+      for (const auto &reg : shader->usedRegisters) {
+        eExportReg exportReg = static_cast<eExportReg>(reg);
+        auto &var = output_vars[exportReg];
+        switch (exportReg) {
+        case eExportReg::POSITION:
+          Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
+          output_vars[eExportReg::POSITION] =
+            module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
+          module.Name(output_vars[eExportReg::POSITION], "POSITION");
+          module.Decorate(var, spv::Decoration::BuiltIn, spv::BuiltIn::Position);
+          break;
+        case eExportReg::POINTSIZE:
+          Sirit::Id float_ptr_output = module.TypePointer(spv::StorageClass::Output, module.TypeFloat(32));
+          output_vars[eExportReg::POINTSIZE] = module.AddGlobalVariable(float_ptr_output, spv::StorageClass::Output);
+          module.Name(output_vars[eExportReg::POINTSIZE], "POINTSIZE");
+          module.Decorate(var, spv::Decoration::BuiltIn, spv::BuiltIn::PointSize);
+          break;
+        default:
+          if (exportReg >= eExportReg::COLOR0 && exportReg <= eExportReg::COLOR3) {
+            Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
+            var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
+            module.Name(var, FMT("COLOR{}", reg - static_cast<u32>(eExportReg::COLOR0)));
+          } else {
+            LOG_ERROR(Xenos, "[AST::Sirit] Invalid output variable '{}'!", reg);
+          }
+          break;
+        }
+      }
     }
   } else {
+    // POSITION
     Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
     output_vars[eExportReg::POSITION] =
       module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
     module.Name(output_vars[eExportReg::POSITION], "POSITION");
+    // POINTSIZE
     Sirit::Id float_ptr_output = module.TypePointer(spv::StorageClass::Output, module.TypeFloat(32));
     output_vars[eExportReg::POINTSIZE] = module.AddGlobalVariable(float_ptr_output, spv::StorageClass::Output);
     module.Name(output_vars[eExportReg::POINTSIZE], "POINTSIZE");
-    for (u32 i = 0; i != 8; ++i) {
-      auto &var = output_vars[static_cast<eExportReg>(static_cast<u32>(eExportReg::INTERP0) + i)];
-      Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
-      var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
-      module.Name(var, FMT("INTERP{}", i));
+    if (shader) {
+      for (const auto &reg : shader->usedRegisters) {
+        eExportReg exportReg = static_cast<eExportReg>(reg);
+        auto &var = output_vars[exportReg];
+        switch (exportReg) {
+        case eExportReg::POSITION:
+          module.Decorate(var, spv::Decoration::BuiltIn, spv::BuiltIn::Position);
+          break;
+        case eExportReg::POINTSIZE:
+          module.Decorate(var, spv::Decoration::BuiltIn, spv::BuiltIn::PointSize);
+          break;
+        default:
+          if (exportReg >= eExportReg::INTERP0 && exportReg <= eExportReg::INTERP7) {
+            Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
+            var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
+            module.Name(var, FMT("INTERP{}", reg - static_cast<u32>(eExportReg::INTERP0)));
+          } else {
+            LOG_ERROR(Xenos, "[AST::Sirit] Invalid output variable '{}'!", reg);
+          }
+          break;
+        }
+      }
     }
   }
 
@@ -134,12 +178,16 @@ void ShaderCodeWriterSirit::FinalizeEntryPoint() {
     module.AddExecutionMode(main_func, spv::ExecutionMode::PixelCenterInteger);
     module.AddEntryPoint(spv::ExecutionModel::Fragment, main_func, "main", interface_vars);
   } else {
-    for (const auto& name : { "VertexID", "InstanceID" }) {
-      if (input_vars.count(name)) {
-        spv::BuiltIn builtin = name == std::string("VertexID") ? spv::BuiltIn::VertexIndex : spv::BuiltIn::InstanceIndex;
-        module.Decorate(input_vars[name], spv::Decoration::BuiltIn, builtin);
-        interface_vars.push_back(input_vars[name]);
-      }
+    u32 i = 0;
+    for (const auto &[name, var] : input_vars) {
+      spv::BuiltIn builtin = name == std::string("VertexID") ? spv::BuiltIn::VertexIndex : spv::BuiltIn::InstanceIndex;
+      module.Decorate(input_vars[name], spv::Decoration::BuiltIn, builtin);
+      module.Decorate(input_vars[name], spv::Decoration::Location, i);
+      LOG_DEBUG(Xenos, "[AST::FinalizeEntryPoint] {}", input_vars[name].value);
+      interface_vars.push_back(input_vars[name]);
+    }
+    for (const auto &[slot, var] : vertex_input_vars) {
+      interface_vars.push_back(var);
     }
     for (const auto& [reg, var] : output_vars) {
       // Only use what's needed
@@ -181,18 +229,10 @@ void ShaderCodeWriterSirit::EndMain() {
       // Only use what's needed
       if (!used_exports.count(reg))
         continue;
-      if (reg == eExportReg::POINTSIZE) {
-        module.OpStore(var, module.Constant(float_type, 1.f)); // Default point size
-      } else {
-        std::vector<Sirit::Id> constants = {
-          module.Constant(float_type, 0.f),
-          module.Constant(float_type, 0.f),
-          module.Constant(float_type, 0.f),
-          module.Constant(float_type, 0.f),
-        };
-        module.OpStore(var, module.ConstantComposite(vec4_type, constants));
-      }
     }
+  }
+  for (auto fetch : shader->vertexFetches) {
+    FetchVertex({}, *fetch); // This ensures each slot gets declared and decorated
   }
   module.OpReturn();
   module.OpFunctionEnd();
@@ -202,19 +242,30 @@ void ShaderCodeWriterSirit::EndMain() {
 Chunk ShaderCodeWriterSirit::GetExportDest(const eExportReg reg) {
   LOG_DEBUG(Xenos, "[AST::Sirit] GetExportDest({})", (u32)reg);
   used_exports.insert(reg);
+  Sirit::Id float_type = module.TypeFloat(32);
+  Sirit::Id vec4_type = module.TypeVector(float_type, 4);
   auto it = output_vars.find(reg);
   if (it == output_vars.end()) {
-    LOG_ERROR(Xenos, "[AST::Sirit] Unknown export register used in GetExportDest!");
-    return {};
+    auto &var = output_vars[reg];
+    if (reg >= eExportReg::COLOR0 && reg <= eExportReg::COLOR3) {
+      Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
+      var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
+      module.Name(var, FMT("COLOR{}", static_cast<u32>(reg) - static_cast<u32>(eExportReg::COLOR0)));
+    } else if (reg >= eExportReg::INTERP0 && reg <= eExportReg::INTERP7) {
+      Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
+      var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
+      module.Name(var, FMT("INTERP{}", static_cast<u32>(reg) - static_cast<u32>(eExportReg::INTERP0)));
+    }
+    it = output_vars.find(reg);
   }
   Sirit::Id var_id = it->second;
   Sirit::Id loaded = {};
-  Sirit::Id float_type = module.TypeFloat(32);
-  Sirit::Id vec4_type = module.TypeVector(float_type, 4);
+  eChunkType chunkType = eChunkType::Vector;
   if (type == eShaderType::Pixel) {
     loaded = module.OpLoad(vec4_type, var_id);
   } else {
     if (reg == eExportReg::POINTSIZE) {
+      chunkType = eChunkType::Scalar;
       loaded = module.OpLoad(float_type, var_id);
     }
     else {
@@ -222,7 +273,7 @@ Chunk ShaderCodeWriterSirit::GetExportDest(const eExportReg reg) {
     }
   }
 
-  return Chunk(loaded, var_id);
+  return Chunk(loaded, var_id, chunkType);
 }
 
 Chunk ShaderCodeWriterSirit::GetReg(u32 regIndex) {
@@ -234,7 +285,8 @@ Chunk ShaderCodeWriterSirit::GetReg(u32 regIndex) {
   Sirit::Id index_id = module.Constant(uint_type, regIndex);
   Sirit::Id ptr = module.OpAccessChain(vec4_ptr_type, ubo_var_v, module.Constant(uint_type, 0), index_id);
   Sirit::Id val = module.OpLoad(vec4_type, ptr);
-  return Chunk(val, ptr);
+  LOG_DEBUG(Xenos, "[AST::GetReg] {}, {}", val.value, ptr.value);
+  return Chunk(val, ptr, eChunkType::Vector);
 }
 
 Chunk ShaderCodeWriterSirit::GetBoolVal(const u32 boolRegIndex) {
@@ -254,7 +306,7 @@ Chunk ShaderCodeWriterSirit::GetBoolVal(const u32 boolRegIndex) {
 
   Sirit::Id and_val = module.OpBitwiseAnd(uint_type, word_val, bit_mask);
   Sirit::Id result = module.OpINotEqual(bool_type, and_val, module.Constant(uint_type, 0));
-  return Chunk(result, word_ptr);
+  return Chunk(result, word_ptr, eChunkType::Boolean);
 }
 
 Chunk ShaderCodeWriterSirit::GetFloatVal(const u32 floatRegIndex) {
@@ -262,7 +314,7 @@ Chunk ShaderCodeWriterSirit::GetFloatVal(const u32 floatRegIndex) {
   Chunk chunk = GetReg(floatRegIndex);
   Sirit::Id float_type = module.TypeFloat(32);
   Sirit::Id x_val = module.OpCompositeExtract(float_type, chunk.id, 0);
-  return Chunk(x_val, chunk.ptr);
+  return Chunk(x_val, chunk.ptr, eChunkType::Scalar);
 }
 
 Chunk ShaderCodeWriterSirit::GetFloatValRelative(const u32 floatRegOffset) {
@@ -281,32 +333,32 @@ Chunk ShaderCodeWriterSirit::GetFloatValRelative(const u32 floatRegOffset) {
 
   Sirit::Id x_value = module.OpCompositeExtract(float_type, reg_val, 0);
 
-  return Chunk(x_value, reg_ptr);
+  return Chunk(x_value, reg_ptr, eChunkType::Scalar);
 }
 
 Chunk ShaderCodeWriterSirit::GetPredicate() {
   LOG_DEBUG(Xenos, "[AST::Sirit] GetPredicate()");
   Sirit::Id bool_type = module.TypeBool();
   Sirit::Id pred_val = module.OpLoad(bool_type, predicate_var);
-  return Chunk(pred_val);
+  return Chunk(pred_val, eChunkType::Boolean);
 }
 
 Chunk ShaderCodeWriterSirit::Abs(const Chunk &value) {
   LOG_DEBUG(Xenos, "[AST::Sirit] Abs({})", value.id.value);
   Sirit::Id float_type = module.TypeFloat(32);
-  return Chunk(module.OpFAbs(float_type, value.id));
+  return Chunk(module.OpFAbs(float_type, value.id), eChunkType::Scalar);
 }
 
 Chunk ShaderCodeWriterSirit::Negate(const Chunk &value) {
   LOG_DEBUG(Xenos, "[AST::Sirit] Negate({})", value.id.value);
   Sirit::Id float_type = module.TypeFloat(32);
-  return Chunk(module.OpFNegate(float_type, value.id));
+  return Chunk(module.OpFNegate(float_type, value.id), eChunkType::Scalar);
 }
 
 Chunk ShaderCodeWriterSirit::Not(const Chunk &value) {
   LOG_DEBUG(Xenos, "[AST::Sirit] Not({})", value.id.value);
   Sirit::Id bool_type = module.TypeBool();
-  return Chunk(module.OpNot(bool_type, value.id));
+  return Chunk(module.OpNot(bool_type, value.id), eChunkType::Boolean);
 }
 
 Chunk ShaderCodeWriterSirit::Saturate(const Chunk &value) {
@@ -315,24 +367,27 @@ Chunk ShaderCodeWriterSirit::Saturate(const Chunk &value) {
   Sirit::Id zero = module.Constant(float_type, 0.f);
   Sirit::Id one = module.Constant(float_type, 1.f);
 
-  return Chunk(module.OpFClamp(float_type, value.id, zero, one));
+  return Chunk(module.OpFClamp(float_type, value.id, zero, one), eChunkType::Scalar);
 }
 
 Chunk ShaderCodeWriterSirit::Swizzle(const Chunk &value, std::array<eSwizzle, 4> swizzle) {
   LOG_DEBUG(Xenos, "[AST::Sirit] Swizzle({})", value.id.value);
-
-  // Assumes input is a float4 vector
   Sirit::Id float_type = module.TypeFloat(32);
   Sirit::Id vec4_type = module.TypeVector(float_type, 4);
-
-  std::array<u32, 4> components = {
-    static_cast<u32>(swizzle[0]),
-    static_cast<u32>(swizzle[1]),
-    static_cast<u32>(swizzle[2]),
-    static_cast<u32>(swizzle[3])
-  };
-
-  return Chunk(module.OpVectorShuffle(vec4_type, value.id, value.id, components[0], components[1], components[2], components[3]));
+  // If scalar, just broadcast the value to all components
+  if (value.type == eChunkType::Scalar) {
+    std::array<Sirit::Id, 4> scalar_comps{};
+    for (u8 i = 0; i != 4; ++i) {
+      scalar_comps[i] = value.id;
+    }
+    return Chunk(module.OpCompositeConstruct(vec4_type, scalar_comps), eChunkType::Vector);
+  }
+  // Otherwise assume it's a proper vector
+  std::array<u32, 4> components{};
+  for (u8 i = 0; i != 4; ++i) {
+    components[i] = static_cast<u32>(swizzle[i]);
+  }
+  return Chunk(module.OpVectorShuffle(vec4_type, value.id, value.id, components[0], components[1], components[2], components[3]), eChunkType::Vector);
 }
 
 Sirit::Id ShaderCodeWriterSirit::GetSampledImageType(instr_dimension_t dim) {
@@ -373,9 +428,10 @@ Chunk ShaderCodeWriterSirit::FetchTexture(const Chunk &src, const TextureFetch &
 
   Sirit::Id float_type = module.TypeFloat(32);
   Sirit::Id vec4_type = module.TypeVector(float_type, 4);
-  Sirit::Id sampled_image = it->second;
-  Sirit::Id sampled_result = module.OpImageSampleImplicitLod(vec4_type, sampled_image, coord);
-  return Chunk(sampled_result, { 0 });
+  Sirit::Id sampled_image = it->second.id;
+  Sirit::Id sampled_image_val = module.OpLoad(it->second.ptr, sampled_image);
+  Sirit::Id sampled_result = module.OpImageSampleImplicitLod(vec4_type, sampled_image_val, coord);
+  return Chunk(sampled_result, { 0 }, eChunkType::Fetch);
 }
 
 Chunk ShaderCodeWriterSirit::FetchVertex(const Chunk &src, const VertexFetch &instr) {
@@ -398,7 +454,7 @@ Chunk ShaderCodeWriterSirit::FetchVertex(const Chunk &src, const VertexFetch &in
 
   // TODO: Apply format decoding here based on instr.format, isFloat, isSigned, isNormalized, etc.
 
-  return Chunk(val, var);
+  return Chunk(val, var, eChunkType::Fetch);
 }
 
 Chunk ShaderCodeWriterSirit::VectorFunc1(instr_vector_opc_t instr, const Chunk &a) {
@@ -408,13 +464,13 @@ Chunk ShaderCodeWriterSirit::VectorFunc1(instr_vector_opc_t instr, const Chunk &
   switch (instr) {
   case FRACv:
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc1(FRACv)");
-    return Chunk(module.OpFMod(vec4_type, a.id, module.Constant(float_type, 1.f))); // frac(a)
+    return Chunk(module.OpFMod(vec4_type, a.id, module.Constant(float_type, 1.f)), eChunkType::Vector); // frac(a)
   case TRUNCv:
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc1(TRUNCv)");
-    return Chunk(module.OpTrunc(vec4_type, a.id)); // trunc(a)
+    return Chunk(module.OpTrunc(vec4_type, a.id), eChunkType::Vector); // trunc(a)
   case FLOORv:
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc1(FLOORv)");
-    return Chunk(module.OpFloor(vec4_type, a.id)); // floor(a)
+    return Chunk(module.OpFloor(vec4_type, a.id), eChunkType::Vector); // floor(a)
   case MAX4v: {
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc1(MAX4v)");
     // max4(a): max(a.x, a.y, a.z, a.w)
@@ -425,14 +481,14 @@ Chunk ShaderCodeWriterSirit::VectorFunc1(instr_vector_opc_t instr, const Chunk &
     Sirit::Id max1 = module.OpFMax(float_type, x, y);
     Sirit::Id max2 = module.OpFMax(float_type, z, w);
     Sirit::Id max4 = module.OpFMax(float_type, max1, max2);
-    return Chunk(module.OpCompositeConstruct(vec4_type, max4, max4, max4, max4));
+    return Chunk(module.OpCompositeConstruct(vec4_type, max4, max4, max4, max4), eChunkType::Vector);
   }
   case MOVAv:
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc1(MOVAv)");
-    return Chunk(module.OpFloor(vec4_type, a.id)); // Often MOVA means integer floor for address computation
+    return Chunk(module.OpFloor(vec4_type, a.id), eChunkType::Vector); // Often MOVA means integer floor for address computation
   default:
     LOG_ERROR(Xenos, "[AST::Emitter] Unsupported vector unary op!");
-    return {};
+    return Chunk({ 0 }, eChunkType::Vector);
   }
 }
 
@@ -443,37 +499,43 @@ Chunk ShaderCodeWriterSirit::VectorFunc2(instr_vector_opc_t instr, const Chunk &
   switch (instr) {
   case ADDv:
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc2(ADDv)");
-    return Chunk(module.OpFAdd(vec4_type, a.id, b.id));
+    return Chunk(module.OpFAdd(vec4_type, a.id, b.id), eChunkType::Vector);
   case MULv:
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc2(MULv)");
-    return Chunk(module.OpFMul(vec4_type, a.id, b.id));
+    return Chunk(module.OpFMul(vec4_type, a.id, b.id), eChunkType::Vector);
   case MAXv:
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc2(MAXv)");
-    return Chunk(module.OpFMax(vec4_type, a.id, b.id));
+    return Chunk(module.OpFMax(vec4_type, a.id, b.id), eChunkType::Vector);
   case MINv:
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc2(MINv)");
-    return Chunk(module.OpFMin(vec4_type, a.id, b.id));
+    return Chunk(module.OpFMin(vec4_type, a.id, b.id), eChunkType::Vector);
   case SETEv:
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc2(SETEv)");
-    return Chunk(module.OpFOrdEqual(vec4_type, a.id, b.id));
+    return Chunk(module.OpFOrdEqual(vec4_type, a.id, b.id), eChunkType::Vector);
   case SETGTv:
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc2(SETGTv)");
-    return Chunk(module.OpFOrdGreaterThan(vec4_type, a.id, b.id));
+    return Chunk(module.OpFOrdGreaterThan(vec4_type, a.id, b.id), eChunkType::Vector);
   case SETGTEv:
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc2(SETGTEv)");
-    return Chunk(module.OpFOrdGreaterThanEqual(vec4_type, a.id, b.id));
+    return Chunk(module.OpFOrdGreaterThanEqual(vec4_type, a.id, b.id), eChunkType::Vector);
   case SETNEv:
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc2(SETNEv)");
-    return Chunk(module.OpFOrdNotEqual(vec4_type, a.id, b.id));
-  case DOT4v:
+    return Chunk(module.OpFOrdNotEqual(vec4_type, a.id, b.id), eChunkType::Vector);
+  case DOT4v: {
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc3(DOT4v)");
-    return Chunk(module.OpDot(float_type, a.id, b.id)); // Dot product of a and b (vector type)
-  case DOT3v:
+    Sirit::Id dot = module.OpDot(float_type, a.id, b.id);
+    Sirit::Id broadcast = module.OpCompositeConstruct(vec4_type, dot, dot, dot, dot);
+    return Chunk(broadcast, eChunkType::Vector); // Dot product of a and b (vector type)
+  }
+  case DOT3v: {
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc3(DOT3v)");
-    return Chunk(module.OpDot(float_type, a.id, b.id)); // Dot product of a and b (3D version)
+    Sirit::Id dot = module.OpDot(float_type, a.id, b.id);
+    Sirit::Id broadcast = module.OpCompositeConstruct(vec4_type, dot, dot, dot, dot);
+    return Chunk(broadcast, eChunkType::Vector); // Dot product of a and b (3D version)
+  }
   default:
     LOG_ERROR(Xenos, "[AST::Emitter] Unsupported vector binary op '{}'!", static_cast<u32>(instr));
-    return {};
+    return Chunk({ 0 }, eChunkType::Vector);
   }
 }
 
@@ -482,36 +544,30 @@ Chunk ShaderCodeWriterSirit::VectorFunc3(instr_vector_opc_t instr, const Chunk &
   Sirit::Id vec4_type = module.TypeVector(float_type, 4);
 
   switch (instr) {
-  case DOT4v:
-    LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc3(DOT4v)");
-    return Chunk(module.OpDot(float_type, a.id, b.id)); // Dot product of a and b (vector type)
-  case DOT3v:
-    LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc3(DOT3v)");
-    return Chunk(module.OpDot(float_type, a.id, b.id)); // Dot product of a and b (3D version)
   case DOT2ADDv:
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc3(DOT2ADDv)");
-    return Chunk(module.OpFAdd(float_type, module.OpDot(float_type, a.id, b.id), c.id)); // Compute the dot product
+    return Chunk(module.OpFAdd(float_type, module.OpDot(float_type, a.id, b.id), c.id), eChunkType::Vector); // Compute the dot product
   case CUBEv: {
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc3(CUBEv)");
     Sirit::Id squared = module.OpFMul(vec4_type, a.id, a.id);
     Sirit::Id cubed = module.OpFMul(vec4_type, squared, a.id);
-    return Chunk(cubed);
+    return Chunk(cubed, eChunkType::Vector);
   }
   case MULADDv:
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc3(MULADDv)");
-    return Chunk(module.OpFAdd(vec4_type, module.OpFMul(vec4_type, a.id, b.id), c.id));
+    return Chunk(module.OpFAdd(vec4_type, module.OpFMul(vec4_type, a.id, b.id), c.id), eChunkType::Vector);
   case CNDEv:
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc3(CNDEv)");
-    return Chunk(module.OpSelect(vec4_type, module.OpFOrdGreaterThanEqual(vec4_type, a.id, module.Constant(float_type, 0.5f)), b.id, c.id));
+    return Chunk(module.OpSelect(vec4_type, module.OpFOrdGreaterThanEqual(vec4_type, a.id, module.Constant(float_type, 0.5f)), b.id, c.id), eChunkType::Vector);
   case CNDGTEv:
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc3(CNDGTEv)");
-    return Chunk(module.OpSelect(vec4_type, module.OpFOrdGreaterThanEqual(vec4_type, a.id, b.id), b.id, c.id));
+    return Chunk(module.OpSelect(vec4_type, module.OpFOrdGreaterThanEqual(vec4_type, a.id, b.id), b.id, c.id), eChunkType::Vector);
   case CNDGTv:
     LOG_DEBUG(Xenos, "[AST::Sirit] VectorFunc3(CNDGTv)");
-    return Chunk(module.OpSelect(vec4_type, module.OpFOrdGreaterThan(vec4_type, a.id, b.id), b.id, c.id));
+    return Chunk(module.OpSelect(vec4_type, module.OpFOrdGreaterThan(vec4_type, a.id, b.id), b.id, c.id), eChunkType::Vector);
   default:
     LOG_ERROR(Xenos, "[AST::Emitter] Unsupported vector '{}' operation in VectorFunc3!", static_cast<u32>(instr));
-    return {};
+    return Chunk({ 0 }, eChunkType::Vector);
   }
 }
 
@@ -527,45 +583,47 @@ Chunk ShaderCodeWriterSirit::ScalarFunc0(instr_scalar_opc_t instr) {
 
 Chunk ShaderCodeWriterSirit::ScalarFunc1(instr_scalar_opc_t instr, const Chunk &a) {
   Sirit::Id float_type = module.TypeFloat(32);
+  Sirit::Id vec4_type = module.TypeVector(float_type, 4);
+  Sirit::Id type = a.type == eChunkType::Vector ? vec4_type : float_type;
 
   switch (instr) {
   case ADDs:
     LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc1(ADDs)");
-    return Chunk(module.OpFAdd(float_type, a.id, a.id)); // a + a
+    return Chunk(module.OpFAdd(type, a.id, a.id), eChunkType::Scalar); // a + a
   case MULs:
     LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc1(MULs)");
-    return Chunk(module.OpFMul(float_type, a.id, a.id)); // a * a
+    return Chunk(module.OpFMul(type, a.id, a.id), eChunkType::Scalar); // a * a
   case MAXs:
     LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc1(MAXs)");
-    return Chunk(module.OpFMax(float_type, a.id, a.id)); // max(a, a)
+    return Chunk(module.OpFMax(type, a.id, a.id), eChunkType::Scalar); // max(a, a)
   case MINs:
     LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc1(MINs)");
-    return Chunk(module.OpFMin(float_type, a.id, a.id)); // min(a, a)
+    return Chunk(module.OpFMin(type, a.id, a.id), eChunkType::Scalar); // min(a, a)
   case FRACs:
     LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc1(FRACs)");
-    return Chunk(module.OpFMod(float_type, a.id, module.Constant(float_type, 1.0f))); // frac(a)
+    return Chunk(module.OpFMod(type, a.id, module.Constant(float_type, 1.f)), eChunkType::Scalar); // frac(a)
   case TRUNCs:
     LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc1(TRUNCs)");
-    return Chunk(module.OpTrunc(float_type, a.id)); // trunc(a)
+    return Chunk(module.OpTrunc(type, a.id), eChunkType::Scalar); // trunc(a)
   case FLOORs:
     LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc1(FLOORs)");
-    return Chunk(module.OpFloor(float_type, a.id)); // floor(a)
+    return Chunk(module.OpFloor(type, a.id), eChunkType::Scalar); // floor(a)
   case EXP_IEEE:
     LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc1(EXP_IEEE)");
-    return Chunk(module.OpExp2(float_type, a.id)); // 2^x
+    return Chunk(module.OpExp2(type, a.id), eChunkType::Scalar); // 2^x
   case LOG_CLAMP: {
     LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc1(LOG_CLAMP)");
-    Sirit::Id abs_x = module.OpFAbs(float_type, a.id);
-    Sirit::Id epsilon = module.Constant(float_type, 1e-8f); // or smallest denormal > 0
-    Sirit::Id clamped = module.OpFMax(float_type, abs_x, epsilon);
-    return Chunk(module.OpLog2(float_type, clamped)); // log2(max(abs(x), 1e-8f))
+    Sirit::Id abs_x = module.OpFAbs(type, a.id);
+    Sirit::Id epsilon = module.Constant(type, 1e-8f); // or smallest denormal > 0
+    Sirit::Id clamped = module.OpFMax(type, abs_x, epsilon);
+    return Chunk(module.OpLog2(type, clamped)); // log2(max(abs(x), 1e-8f))
   }
   case LOG_IEEE:
     LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc1(LOG_IEEE)");
     return Chunk(module.OpLog2(float_type, a.id)); // log2(x)
   default:
     LOG_ERROR(Xenos, "[AST::Emitter] Unsupported scalar unary op '{}'!", static_cast<u32>(instr));
-    return {};
+    return Chunk({ 0 }, eChunkType::Scalar);
   }
 }
 
@@ -575,19 +633,19 @@ Chunk ShaderCodeWriterSirit::ScalarFunc2(instr_scalar_opc_t instr, const Chunk &
   switch (instr) {
   case ADDs:
     LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc2(ADDs)");
-    return Chunk(module.OpFAdd(float_type, a.id, b.id)); // a + b
+    return Chunk(module.OpFAdd(float_type, a.id, b.id), eChunkType::Scalar); // a + b
   case MULs:
     LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc2(MULs)");
-    return Chunk(module.OpFMul(float_type, a.id, b.id)); // a * b
+    return Chunk(module.OpFMul(float_type, a.id, b.id), eChunkType::Scalar); // a * b
   case MAXs:
     LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc2(MAXs)");
-    return Chunk(module.OpFMax(float_type, a.id, b.id)); // max(a, b)
+    return Chunk(module.OpFMax(float_type, a.id, b.id), eChunkType::Scalar); // max(a, b)
   case MINs:
     LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc2(MINs)");
-    return Chunk(module.OpFMin(float_type, a.id, b.id)); // min(a, b)
+    return Chunk(module.OpFMin(float_type, a.id, b.id), eChunkType::Scalar); // min(a, b)
   default:
     LOG_ERROR(Xenos, "[AST::Emitter] Unsupported scalar binary op!");
-    return {};
+    return Chunk({ 0 }, eChunkType::Scalar);
   }
 }
 
@@ -611,19 +669,20 @@ Chunk ShaderCodeWriterSirit::AllocLocalVector(const Chunk &initCode) {
   LOG_DEBUG(Xenos, "[AST::Sirit] AllocLocalVector({})", initCode.id.value);
   Sirit::Id float_type = module.TypeFloat(32);
   Sirit::Id vec4_type = module.TypeVector(float_type, 4);
-  return AllocLocalImpl(vec4_type, initCode);
+  return Chunk(AllocLocalImpl(vec4_type, initCode), eChunkType::Vector);
 }
 
 Chunk ShaderCodeWriterSirit::AllocLocalScalar(const Chunk &initCode) {
   LOG_DEBUG(Xenos, "[AST::Sirit] AllocLocalScalar({})", initCode.id.value);
   Sirit::Id float_type = module.TypeFloat(32);
-  return AllocLocalImpl(float_type, initCode);
+  return Chunk(AllocLocalImpl(float_type, initCode), eChunkType::Scalar);
 }
 
 Chunk ShaderCodeWriterSirit::AllocLocalBool(const Chunk &initCode) {
   LOG_DEBUG(Xenos, "[AST::Sirit] AllocLocalBool({})", initCode.id.value);
   Sirit::Id bool_type = module.TypeBool();
   return AllocLocalImpl(bool_type, initCode);
+  return Chunk(AllocLocalImpl(bool_type, initCode), eChunkType::Boolean);
 }
 
 void ShaderCodeWriterSirit::BeingCondition(const Chunk &condition) {
@@ -832,8 +891,17 @@ void ShaderCodeWriterSirit::AssignMasked(const Chunk &src, const Chunk &dst,
       LOG_ERROR(Xenos, "Invalid swizzle index: srcIndex={}, dstIndex={}", srcIndex, dstIndex);
       continue;
     }
-    Sirit::Id float_type = module.TypeFloat(32);
-    components[dstIndex] = module.OpCompositeExtract(float_type, src.id, srcIndex);
+    
+    if (src.type == eChunkType::Vector || src.type == eChunkType::Fetch) {
+      // Extract src vector component
+      components[dstIndex] = module.OpCompositeExtract(float_type, src.id, srcIndex);
+    } else if (src.type == eChunkType::Scalar) {
+      // Use scalar directly
+      components[dstIndex] = src.id;
+    } else {
+      // Default to 0 if something is off
+      components[dstIndex] = module.Constant(float_type, 0.f);
+    }
   }
 
   Sirit::Id vec4_type = module.TypeVector(float_type, 4);

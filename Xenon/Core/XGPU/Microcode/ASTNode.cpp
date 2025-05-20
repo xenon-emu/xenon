@@ -1,5 +1,7 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
+#include "Base/Logging/Log.h"
+
 #include "ASTNode.h"
 
 #include "ASTNodeWriter.h"
@@ -71,47 +73,56 @@ Chunk GetPredicate::EmitShaderCode(ShaderCodeWriterBase &writer) {
 
 Chunk Abs::EmitShaderCode(ShaderCodeWriterBase &writer) {
   Chunk src = children[0]->EmitShaderCode(writer);
+  LOG_DEBUG(Xenos, "[Abs::EmitShaderCode]: src = {}", children[0]->GetName());
   return writer.Abs(src);
 }
 
 Chunk Negate::EmitShaderCode(ShaderCodeWriterBase &writer) {
   Chunk src = children[0]->EmitShaderCode(writer);
+  LOG_DEBUG(Xenos, "[Negate::EmitShaderCode]: src = {}", children[0]->GetName());
   return writer.Negate(src);
 }
 
 Chunk Not::EmitShaderCode(ShaderCodeWriterBase &writer) {
   Chunk src = children[0]->EmitShaderCode(writer);
+  LOG_DEBUG(Xenos, "[Not::EmitShaderCode]: src = {}", children[0]->GetName());
   return writer.Not(src);
 }
 
 Chunk Saturate::EmitShaderCode(ShaderCodeWriterBase &writer) {
   Chunk src = children[0]->EmitShaderCode(writer);
+  LOG_DEBUG(Xenos, "[Saturate::EmitShaderCode]: src = {}", children[0]->GetName());
   return writer.Saturate(src);
 }
 
 Chunk Swizzle::EmitShaderCode(ShaderCodeWriterBase &writer) {
   Chunk src = children[0]->EmitShaderCode(writer);
+  LOG_DEBUG(Xenos, "[Swizzle::EmitShaderCode]: src = {}", children[0]->GetName());
   return writer.Swizzle(src, swizzle);
 }
 
 Chunk VertexFetch::EmitShaderCode(ShaderCodeWriterBase &writer) {
   Chunk src = children[0]->EmitShaderCode(writer);
+  LOG_DEBUG(Xenos, "[VertexFetch::EmitShaderCode]: src = {}", children[0]->GetName());
   return writer.FetchVertex(src, *this);
 }
 
 Chunk TextureFetch::EmitShaderCode(ShaderCodeWriterBase &writer) {
   Chunk src = children[0]->EmitShaderCode(writer);
+  LOG_DEBUG(Xenos, "[TextureFetch::EmitShaderCode]: src = {}", children[0]->GetName());
   return writer.FetchTexture(src, *this);
 }
 
 Chunk VectorFunc1::EmitShaderCode(ShaderCodeWriterBase &writer) {
   Chunk a = children[0]->EmitShaderCode(writer);
+  LOG_DEBUG(Xenos, "[VectorFunc1::EmitShaderCode]: a = {}", children[0]->GetName());
   return writer.VectorFunc1(vectorInstr, a);
 }
 
 Chunk VectorFunc2::EmitShaderCode(ShaderCodeWriterBase &writer) {
   Chunk a = children[0]->EmitShaderCode(writer);
   Chunk b = children[1]->EmitShaderCode(writer);
+  LOG_DEBUG(Xenos, "[VectorFunc2::EmitShaderCode]: a = {}, b = {}", children[0]->GetName(), children[1]->GetName());
   return writer.VectorFunc2(vectorInstr, a, b);
 }
 
@@ -119,6 +130,7 @@ Chunk VectorFunc3::EmitShaderCode(ShaderCodeWriterBase &writer) {
   Chunk a = children[0]->EmitShaderCode(writer);
   Chunk b = children[1]->EmitShaderCode(writer);
   Chunk c = children[2]->EmitShaderCode(writer);
+  LOG_DEBUG(Xenos, "[VectorFunc3::EmitShaderCode]: a = {}, b = {}, c = {}", children[0]->GetName(), children[1]->GetName(), children[2]->GetName());
   return writer.VectorFunc3(vectorInstr, a, b, c);
 }
 
@@ -128,12 +140,14 @@ Chunk ScalarFunc0::EmitShaderCode(ShaderCodeWriterBase &writer) {
 
 Chunk ScalarFunc1::EmitShaderCode(ShaderCodeWriterBase &writer) {
   Chunk a = children[0]->EmitShaderCode(writer);
+  LOG_DEBUG(Xenos, "[ScalarFunc1::EmitShaderCode]: a = {}", children[0]->GetName());
   return writer.ScalarFunc1(scalarInstr, a);
 }
 
 Chunk ScalarFunc2::EmitShaderCode(ShaderCodeWriterBase &writer) {
   Chunk a = children[0]->EmitShaderCode(writer);
   Chunk b = children[1]->EmitShaderCode(writer);
+  LOG_DEBUG(Xenos, "[ScalarFunc2::EmitShaderCode]: a = {}, b = {}", children[0]->GetName(), children[1]->GetName());
   return writer.ScalarFunc2(scalarInstr, a, b);
 }
 

@@ -402,18 +402,18 @@ void Renderer::Thread() {
           if (vsIt != pendingVertexShaders.end() && fsIt != pendingPixelShaders.end()) {
             u64 combinedHash = (static_cast<u64>(currentVertexShader.load()) << 32) | currentPixelShader;
             std::shared_ptr<Shader> shader = shaderFactory->LoadFromBinary(job.name, {
-              { Render::eShaderType::Vertex, fsIt->second.second },
+              { Render::eShaderType::Vertex, vsIt->second.second },
               { Render::eShaderType::Fragment, fsIt->second.second },
               });
             if (shader) {
               Xe::XGPU::XeShader xeShader{};
               xeShader.program = std::move(shader);
-              xeShader.pixelShader = fsIt->second.first;
+              xeShader.pixelShader = vsIt->second.first;
               xeShader.vertexShader = fsIt->second.first;
               linkedShaderPrograms.insert({ combinedHash, xeShader });
               LOG_DEBUG(Xenos, "Linked shader program: VS: 0x{:08X}, PS: 0x{:08X}", currentVertexShader.load(), currentPixelShader.load());
             } else {
-              LOG_ERROR(Xenos, "Failed to link shader programs.");
+              LOG_ERROR(Xenos, "Failed to link shader programs! VS: 0x{:08X}, PS: 0x{:08X}", currentVertexShader.load(), currentPixelShader.load());
             }
           }
         }

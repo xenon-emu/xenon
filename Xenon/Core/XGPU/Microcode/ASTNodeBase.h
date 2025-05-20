@@ -12,14 +12,51 @@
 
 namespace Xe::Microcode::AST {
 
+// General expression type
+enum class eExprType : u8 {
+  ALU,
+  VFETCH,
+  TFETCH,
+  EXPORT
+};
+
+// Export register type
+enum class eExportReg : u8 {
+  POSITION,
+  POINTSIZE,
+  COLOR0,
+  COLOR1,
+  COLOR2,
+  COLOR3,
+  INTERP0,
+  INTERP1,
+  INTERP2,
+  INTERP3,
+  INTERP4,
+  INTERP5,
+  INTERP6,
+  INTERP7,
+  INTERP8
+};
+
+enum class eChunkType : u8 {
+  Fetch,
+  Vector,
+  Scalar,
+  Boolean,
+  Unknown
+};
+
 struct Chunk {
+  eChunkType type = {};
 #ifndef NO_GFX
   Sirit::Id id = {};   // SSA value (result of OpLoad, etc.)
   Sirit::Id ptr = {};  // Pointer to value (from AddLocalVariable, OpAccessChain, etc.)
 
   Chunk() = default;
-  explicit Chunk(Sirit::Id v) : id(v) {}
-  Chunk(Sirit::Id id_, Sirit::Id ptr_) : id(id_), ptr(ptr_) {}
+  explicit Chunk(Sirit::Id v, eChunkType type = eChunkType::Unknown) : id(v), type(type) {}
+  Chunk(Sirit::Id id_, Sirit::Id ptr_, eChunkType type = eChunkType::Unknown) : id(id_), ptr(ptr_), type(type) {}
+  Chunk(const Chunk &c, eChunkType type = eChunkType::Unknown) : id(c.id), ptr(c.ptr), type(type) {}
 #else
   struct Id {
     u32 value;
@@ -66,33 +103,6 @@ public:
   std::shared_ptr<T> CloneAs() const {
     return std::dynamic_pointer_cast<T>(Clone());
   }
-};
-
-// General expression type
-enum class eExprType : u8 {
-  ALU,
-  VFETCH,
-  TFETCH,
-  EXPORT
-};
-
-// Export register type
-enum class eExportReg : u8 {
-  POSITION,
-  POINTSIZE,
-  COLOR0,
-  COLOR1,
-  COLOR2,
-  COLOR3,
-  INTERP0,
-  INTERP1,
-  INTERP2,
-  INTERP3,
-  INTERP4,
-  INTERP5,
-  INTERP6,
-  INTERP7,
-  INTERP8
 };
 
 } // namespace Xe::Microcode::AST

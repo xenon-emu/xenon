@@ -161,9 +161,10 @@ public:
     std::span<const eSwizzle> dstSwizzle,
     std::span<const eSwizzle> immediateValues) override;
 
+  Shader *shader = nullptr;
   eShaderType type{};
 
-  std::unordered_map<u32, Sirit::Id> texture_vars{};
+  std::unordered_map<u32, Chunk> texture_vars{};
 
   std::unordered_map<u32, Sirit::Id> vertex_input_vars{};
   std::unordered_set<u32> used_vertex_slots{};

@@ -15,7 +15,6 @@ ShaderNodeWriter::~ShaderNodeWriter()
 {}
 
 void ShaderNodeWriter::TransformShader(AST::NodeWriter &nodeWriter, const u32 *words, const u32 numWords) {
-  LOG_DEBUG(Xenos, "Shader start: {:08X} {:08X} {:08X}", words[0], words[1], words[2]);
   u32 pc = 0;
   for (u32 i = 0; i != numWords; i += 3) {
     instr_cf_t cfa;
@@ -26,7 +25,6 @@ void ShaderNodeWriter::TransformShader(AST::NodeWriter &nodeWriter, const u32 *w
     cfa.dword_1 = words[i+1] & 0xFFFF;
     cfb.dword_1 = words[i+2] >> 16;
 
-    LOG_DEBUG(Xenos, "Data: {:08X} {:08X} {:08X}", words[i+0], words[i+1], words[i+2]);
     LOG_DEBUG(Xenos, "[ShaderNodeWriter::TransformShader] Opcode: {}, 0x{:X}",
       GetCFOpcodeName(static_cast<instr_cf_opc_t>(cfa.opc)), static_cast<u32>(cfa.opc));
     LOG_DEBUG(Xenos, "[ShaderNodeWriter::TransformShader] Opcode: {}, 0x{:X}",
