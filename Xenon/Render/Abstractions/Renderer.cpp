@@ -203,7 +203,7 @@ void Renderer::HandleEvents() {
       break;
     case SDL_EVENT_QUIT:
       if (Config::rendering.quitOnWindowClosure) {
-        globalShutdownHandler();
+        XeRunning = false;
       }
       break;
     case SDL_EVENT_KEY_DOWN:

@@ -1,6 +1,6 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
-#include "Path_util.h"
+#include "PathUtil.h"
 #include "Base/Logging/Log.h"
 
 #include <fmt/format.h>

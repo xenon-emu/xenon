@@ -6,11 +6,11 @@
 #include <functional>
 #include <map>
 
-#include "Base/Bounded_threadsafe_queue.h"
+#include "Base/BoundedQueue.h"
 #include "Base/Hash.h"
-#include "Base/io_file.h"
-#include "Base/Path_util.h"
-#include "Base/String_util.h"
+#include "Base/IoFile.h"
+#include "Base/PathUtil.h"
+#include "Base/StringUtil.h"
 #include "Base/Thread.h"
 
 #include "Log.h"

@@ -6,6 +6,7 @@
 #include <span>
 
 #include "Enum.h"
+#include "PathUtil.h"
 
 namespace Base::FS {
 
@@ -69,7 +70,7 @@ public:
   explicit IOFile(std::string_view path, FileAccessMode mode,
           FileMode type = FileMode::BinaryMode,
           FileShareFlag flag = FileShareFlag::ShareReadOnly);
-  explicit IOFile(const std::filesystem::path& path, FileAccessMode mode,
+  explicit IOFile(const fs::path &path, FileAccessMode mode,
           FileMode type = FileMode::BinaryMode,
           FileShareFlag flag = FileShareFlag::ShareReadOnly);
 
@@ -81,16 +82,16 @@ public:
   IOFile(IOFile&& other) noexcept;
   IOFile& operator=(IOFile&& other) noexcept;
 
-  std::filesystem::path GetPath() const {
-    return file_path;
+  fs::path GetPath() const {
+    return filePath;
   }
 
   FileAccessMode GetAccessMode() const {
-    return file_access_mode;
+    return fileAccessMode;
   }
 
   FileMode GetType() const {
-    return file_type;
+    return fileType;
   }
 
   bool IsOpen() const {
@@ -99,7 +100,7 @@ public:
 
   uptr GetFileMapping();
 
-  int Open(const std::filesystem::path& path, FileAccessMode mode,
+  int Open(const fs::path& path, FileAccessMode mode,
        FileMode type = FileMode::BinaryMode,
        FileShareFlag flag = FileShareFlag::ShareReadOnly);
   void Close();
@@ -202,20 +203,20 @@ public:
     return WriteSpan(string);
   }
 
-  static size_t WriteBytes(const std::filesystem::path path, const auto& data) {
+  static size_t WriteBytes(const fs::path path, const auto& data) {
     IOFile out(path, FileAccessMode::Write);
     return out.Write(data);
   }
 
 private:
-  std::filesystem::path file_path;
-  FileAccessMode file_access_mode{};
-  FileMode file_type{};
+  fs::path filePath{};
+  FileAccessMode fileAccessMode{};
+  FileMode fileType{};
 
-  std::FILE* file = nullptr;
-  uptr file_mapping = 0;
+  std::FILE *file = nullptr;
+  uptr fileMapping = 0;
 };
 
-u64 GetDirectorySize(const std::filesystem::path& path);
+u64 GetDirectorySize(const fs::path &path);
 
 } // namespace Base::FS

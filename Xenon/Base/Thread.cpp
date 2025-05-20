@@ -10,7 +10,7 @@
 #include <pthread.h>
 #elif defined(_WIN32)
 #include <Windows.h>
-#include "String_util.h"
+#include "StringUtil.h"
 #else
 
 #if defined(__Bitrig__) || defined(__DragonFly__) || defined(__FreeBSD__) || defined(__OpenBSD__)
@@ -22,7 +22,6 @@
 #endif
 #ifndef _WIN32
 #include <unistd.h>
-#include "ntapi.h"
 #endif
 #include <thread>
 #include <algorithm>

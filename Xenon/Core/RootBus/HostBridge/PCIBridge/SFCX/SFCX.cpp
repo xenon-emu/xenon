@@ -74,13 +74,13 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
 
   if (!nandFile.is_open()) {
     LOG_CRITICAL(SFCX, "Fatal error! Please make sure your NAND (or NAND path) is valid!");
-    SystemPause();
+    Base::SystemPause();
   }
 
   // Check file magic
   if (!checkMagic()) {
     LOG_CRITICAL(SFCX, "Fatal error! The loaded 'nand.bin' doesn't correspond to a Xbox 360 NAND.");
-    SystemPause();
+    Base::SystemPause();
   }
 
   // Read NAND Image data
@@ -556,7 +556,7 @@ void Xe::PCIDev::SFCX::sfcxReadPageFromNAND(bool physical) {
     cpi = XeMain::GetCPU()->GetCPI();
 #ifndef SFCX_DEBUG
   // Simulate the time required to read
-  std::this_thread::sleep_for(std::chrono::milliseconds(2 * cpi));
+  std::this_thread::sleep_for(2ms * cpi);
 #endif
 
   // Perform the read
@@ -580,7 +580,7 @@ void Xe::PCIDev::SFCX::sfcxEraseBlock() {
     cpi = XeMain::GetCPU()->GetCPI();
 #ifndef SFCX_DEBUG
   // Simulate the time required to erase
-  std::this_thread::sleep_for(std::chrono::milliseconds(2 * cpi));
+  std::this_thread::sleep_for(2ms * cpi);
 #endif
 
   // Perform the erase

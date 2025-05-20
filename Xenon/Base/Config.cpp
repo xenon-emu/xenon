@@ -1,8 +1,8 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
 #include "Config.h"
-#include "Path_util.h"
-#include "String_util.h"
+#include "PathUtil.h"
+#include "StringUtil.h"
 
 #include "Logging/Log.h"
 
@@ -474,6 +474,7 @@ void loadConfig(const std::filesystem::path &path) {
   // If the configuration file does not exist, create it and return.
   std::ifstream configFile{ path };
   bool valid = configFile.is_open() && configFile.good();
+  configFile.close();
   std::error_code error;
   if (!std::filesystem::exists(path, error) && !valid) {
     filepaths.correct(Base::FS::GetUserPath(Base::FS::PathType::ConsoleDir));
@@ -482,8 +483,7 @@ void loadConfig(const std::filesystem::path &path) {
   }
 
   // Read file to data, then close
-  toml::value data = toml::parse(configFile);
-  configFile.close();
+  toml::value data = toml::parse(path);
 
 #ifndef NO_GFX
   read_section(rendering, Rendering);
@@ -501,6 +501,7 @@ void loadConfig(const std::filesystem::path &path) {
 void saveConfig(const std::filesystem::path &path) {
   std::ifstream configFile{ path };
   bool valid = configFile.is_open() && configFile.good();
+  configFile.close();
   std::error_code error{};
   if (!std::filesystem::exists(path, error) || !valid) {
     if (error) {
@@ -509,22 +510,16 @@ void saveConfig(const std::filesystem::path &path) {
     LOG_INFO(Config, "Config not found! Saving new configuration file to {}", path.string());
   }
   // Read file to data, then close
-  toml::value data = toml::parse(configFile);
-  configFile.close();
+  toml::value data = toml::parse(path);
 
-  std::string prev_path_str{ path.string() };
-  std::string prev_file_str{ path.filename().string() };
-  std::filesystem::path base_path{ prev_path_str.substr(0, prev_path_str.length() - prev_file_str.length() - 1) };
-  std::filesystem::path new_path{ base_path / (prev_file_str + ".tmp") };
-
-  // Write to toml, then verify contents
-  if (!verifyConfig(new_path, data)) {
-    return;
-  }
+  std::string prevPath{ path.string() };
+  std::string prevFile{ path.filename().string() };
+  std::filesystem::path basePath{ prevPath.substr(0, prevPath.length() - prevFile.length() - 1) };
+  std::filesystem::path newPath{ basePath / (prevFile + ".tmp") };
 
   // Write to file
   try {
-    std::ofstream file(new_path, std::ios::binary);
+    std::ofstream file{ newPath };
     file << data;
     file.close();
   } catch (const std::exception &ex) {
@@ -532,17 +527,21 @@ void saveConfig(const std::filesystem::path &path) {
     return;
   }
 
+  // Write to toml, then verify contents
+  if (!verifyConfig(newPath, data)) {
+    return;
+  }
+
   // Copy file config to current version, if it's valid
   try {
-    std::error_code fs_error;
-    u64 fSize = std::filesystem::file_size(new_path, fs_error);
-    if (fSize != -1 && fSize) {
-      std::filesystem::remove(path);
-      std::filesystem::rename(new_path, path);
+    std::error_code fsError;
+    u64 fileSize = fs::file_size(newPath, fsError);
+    if (fileSize != -1 && fileSize) {
+      fs::rename(newPath, path);
     } else {
-      fSize = 0;
-      if (fs_error) {
-        LOG_ERROR(Config, "Filesystem error: {} ({})", fs_error.message(), fs_error.value());
+      fileSize = 0;
+      if (fsError) {
+        LOG_ERROR(Config, "Filesystem error: {} ({})", fsError.message(), fsError.value());
       }
     }
   } catch (const std::exception &ex) {

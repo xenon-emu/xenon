@@ -2,15 +2,16 @@
 
 #include <vector>
 
-#include "io_file.h"
+#include "IoFile.h"
 
 #include "Assert.h"
 #include "Error.h"
 #include "Logging/Log.h"
-#include "Path_util.h"
+#include "PathUtil.h"
 
 #ifdef _WIN32
-#include "ntapi.h"
+#define ftruncate _chsize_s
+#define fsync _commit
 
 #include <io.h>
 #include <share.h>
@@ -141,7 +142,7 @@ IOFile::IOFile(std::string_view path, FileAccessMode mode, FileMode type, FileSh
   Open(path, mode, type, flag);
 }
 
-IOFile::IOFile(const fs::path& path, FileAccessMode mode, FileMode type, FileShareFlag flag) {
+IOFile::IOFile(const fs::path &path, FileAccessMode mode, FileMode type, FileShareFlag flag) {
   Open(path, mode, type, flag);
 }
 
@@ -150,16 +151,16 @@ IOFile::~IOFile() {
 }
 
 IOFile::IOFile(IOFile&& other) noexcept {
-  std::swap(file_path, other.file_path);
-  std::swap(file_access_mode, other.file_access_mode);
-  std::swap(file_type, other.file_type);
+  std::swap(filePath, other.filePath);
+  std::swap(fileAccessMode, other.fileAccessMode);
+  std::swap(fileType, other.fileType);
   std::swap(file, other.file);
 }
 
 IOFile& IOFile::operator=(IOFile&& other) noexcept {
-  std::swap(file_path, other.file_path);
-  std::swap(file_access_mode, other.file_access_mode);
-  std::swap(file_type, other.file_type);
+  std::swap(filePath, other.filePath);
+  std::swap(fileAccessMode, other.fileAccessMode);
+  std::swap(fileType, other.fileType);
   std::swap(file, other.file);
   return *this;
 }
@@ -167,9 +168,9 @@ IOFile& IOFile::operator=(IOFile&& other) noexcept {
 int IOFile::Open(const fs::path& path, FileAccessMode mode, FileMode type, FileShareFlag flag) {
   Close();
 
-  file_path = path;
-  file_access_mode = mode;
-  file_type = type;
+  filePath = path;
+  fileAccessMode = mode;
+  fileType = type;
 
   errno = 0;
   int result = 0;
@@ -189,7 +190,7 @@ int IOFile::Open(const fs::path& path, FileAccessMode mode, FileMode type, FileS
   if (!IsOpen()) {
     const auto ec = std::error_code{result, std::generic_category()};
     LOG_ERROR(Base_Filesystem, "Failed to open the file at path={}, error_message={}",
-              PathToUTF8String(file_path), ec.message());
+              PathToUTF8String(filePath), ec.message());
   }
 
   return result;
@@ -207,14 +208,14 @@ void IOFile::Close() {
   if (!closeResult) {
     const auto ec = std::error_code{errno, std::generic_category()};
     LOG_ERROR(Base_Filesystem, "Failed to close the file at path={}, ec_message={}",
-              PathToUTF8String(file_path), ec.message());
+              PathToUTF8String(filePath), ec.message());
   }
 
   file = nullptr;
 
 #ifdef _WIN64
-  if (file_mapping && file_access_mode == FileAccessMode::ReadWrite) {
-    ::CloseHandle(std::bit_cast<HANDLE>(file_mapping));
+  if (fileMapping && fileAccessMode == FileAccessMode::ReadWrite) {
+    ::CloseHandle(std::bit_cast<HANDLE>(fileMapping));
   }
 #endif
 }
@@ -225,29 +226,17 @@ void IOFile::Unlink() {
   }
 
   // Mark the file for deletion
-  // TODO: Also remove the file path?
-#if defined(_WIN64) || defined(_WIN32)
-  FILE_DISPOSITION_INFORMATION disposition;
-  IO_STATUS_BLOCK iosb;
-
-  const s32 fd = fileno(file);
-  const HANDLE hfile = reinterpret_cast<HANDLE>(::_get_osfhandle(fd));
-
-  disposition.DeleteFile = true;
-  ::NtSetInformationFile(hfile, &iosb, &disposition, sizeof(disposition),
-                       FileDispositionInformation);
-#else
-  if (unlink(file_path.c_str()) != 0) {
-    const auto ec = std::error_code{errno, std::generic_category()};
-    LOG_ERROR(Base_Filesystem, "Failed to unlink the file at path={}, ec_message={}",
-              PathToUTF8String(file_path), ec.message());
+  std::error_code fsError;
+  fs::remove_all(filePath, fsError);
+  if (fsError) {
+    LOG_ERROR(Base_Filesystem, "Failed to remove the file at '{}'. Reason: {}",
+      PathToUTF8String(filePath), fsError.message());
   }
-#endif
 }
 
 uptr IOFile::GetFileMapping() {
-  if (file_mapping) {
-    return file_mapping;
+  if (fileMapping) {
+    return fileMapping;
   }
 #ifdef _WIN64
   const s32 fd = fileno(file);
@@ -255,7 +244,7 @@ uptr IOFile::GetFileMapping() {
   HANDLE hfile = reinterpret_cast<HANDLE>(::_get_osfhandle(fd));
   HANDLE mapping = nullptr;
 
-/*  if (file_access_mode == FileAccessMode::ReadWrite) {
+/*  if (fileAccessMode == FileAccessMode::ReadWrite) {
     mapping = CreateFileMapping2(hfile, NULL, FILE_MAP_WRITE, PAGE_READWRITE, SEC_COMMIT, 0,
                                  NULL, NULL, 0);
   } else {
@@ -264,12 +253,12 @@ uptr IOFile::GetFileMapping() {
 
   mapping = hfile;
 
-  file_mapping = std::bit_cast<uptr>(mapping);
-  ASSERT_MSG(file_mapping, "{}", Base::GetLastErrorMsg());
-  return file_mapping;
+  fileMapping = std::bit_cast<uptr>(mapping);
+  ASSERT_MSG(fileMapping, "{}", Base::GetLastErrorMsg());
+  return fileMapping;
 #else
-  file_mapping = fileno(file);
-  return file_mapping;
+  fileMapping = fileno(file);
+  return fileMapping;
 #endif
 }
 
@@ -294,7 +283,7 @@ bool IOFile::Flush() const {
   if (!flushResult) {
     const std::error_code ec = { errno, std::generic_category() };
     LOG_ERROR(Base_Filesystem, "Failed to flush the file at path={}, ec_message={}",
-              PathToUTF8String(file_path), ec.message());
+              PathToUTF8String(filePath), ec.message());
   }
 
   return flushResult;
@@ -307,17 +296,12 @@ bool IOFile::Commit() const {
 
   errno = 0;
 
-  bool commitResult = ::fflush(file) == 0;
-#ifdef _WIN32
-  commitResult = commitResult && _commit(fileno(file)) == 0;
-#else
-  commitResult = commitResult && fsync(fileno(file)) == 0;
-#endif
+  bool commitResult = ::fflush(file) == 0 && ::fsync(::fileno(file)) == 0;
 
   if (!commitResult) {
     const std::error_code ec = { errno, std::generic_category() };
     LOG_ERROR(Base_Filesystem, "Failed to commit the file at path={}, ec_message={}",
-              PathToUTF8String(file_path), ec.message());
+              PathToUTF8String(filePath), ec.message());
   }
 
   return commitResult;
@@ -330,16 +314,12 @@ bool IOFile::SetSize(u64 size) const {
 
   errno = 0;
 
-#ifdef _WIN32
-  const bool setSizeResult = _chsize_s(fileno(file), static_cast<s64>(size)) == 0;
-#else
-  const auto setSizeResult = ftruncate(fileno(file), static_cast<s64>(size)) == 0;
-#endif
+  const bool setSizeResult = ::ftruncate(::fileno(file), static_cast<s64>(size)) == 0;
 
   if (!setSizeResult) {
     const std::error_code ec = { errno, std::generic_category() };
     LOG_ERROR(Base_Filesystem, "Failed to resize the file at path={}, size={}, ec_message={}",
-              PathToUTF8String(file_path), size, ec.message());
+              PathToUTF8String(filePath), size, ec.message());
   }
 
   return setSizeResult;
@@ -358,10 +338,10 @@ u64 IOFile::GetSize() const {
   // fs::file_size can cause a exception if it is not a valid file
   try {
     std::error_code ec{};
-    fSize = fs::file_size(file_path, ec);
+    fSize = fs::file_size(filePath, ec);
     if (fSize == -1 || !fSize) {
       LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of path={}, ec_message={}",
-        PathToUTF8String(file_path), ec.message());
+        PathToUTF8String(filePath), ec.message());
       return 0;
     }
   } catch (const std::exception &ex) {
@@ -378,7 +358,7 @@ bool IOFile::Seek(s64 offset, SeekOrigin origin) const {
     return false;
   }
 
-  if (False(file_access_mode & (FileAccessMode::Write | FileAccessMode::Append))) {
+  if (False(fileAccessMode & (FileAccessMode::Write | FileAccessMode::Append))) {
     u64 size = GetSize();
     if (origin == SeekOrigin::CurrentPosition && Tell() + offset > size) {
       LOG_ERROR(Base_Filesystem, "Seeking past the end of the file");
@@ -400,7 +380,7 @@ bool IOFile::Seek(s64 offset, SeekOrigin origin) const {
     const std::error_code ec = { errno, std::generic_category() };
     LOG_ERROR(Base_Filesystem,
               "Failed to seek the file at path={}, offset={}, origin={}, ec_message={}",
-              PathToUTF8String(file_path), offset, static_cast<u32>(origin), ec.message());
+              PathToUTF8String(filePath), offset, static_cast<u32>(origin), ec.message());
   }
 
   return seekResult;
@@ -416,7 +396,7 @@ s64 IOFile::Tell() const {
   return ftello(file);
 }
 
-u64 GetDirectorySize(const std::filesystem::path& path) {
+u64 GetDirectorySize(const std::filesystem::path &path) {
   if (!fs::exists(path)) {
     return 0;
   }
@@ -427,9 +407,9 @@ u64 GetDirectorySize(const std::filesystem::path& path) {
       // fs::file_size can cause a exception if it is not a valid file
       try {
         std::error_code ec{};
-        u64 fSize = fs::file_size(entry.path(), ec);
-        if (fSize != -1 && fSize) {
-          total += fSize;
+        u64 fileSize = fs::file_size(entry.path(), ec);
+        if (fileSize != -1 && fileSize) {
+          total += fileSize;
         }
         else {
           LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of path={}, ec_message={}",

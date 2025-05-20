@@ -27,7 +27,7 @@ void RootBus::AddHostBridge(std::shared_ptr<HostBridge> newHostBridge) {
 void RootBus::AddDevice(std::shared_ptr<SystemDevice> device) {
   if (!device) {
     LOG_CRITICAL(RootBus, "Failed to attach device!");
-    SystemPause();
+    Base::SystemPause();
     return;
   }
 
@@ -39,7 +39,7 @@ void RootBus::AddDevice(std::shared_ptr<SystemDevice> device) {
 void RootBus::ResetDevice(std::shared_ptr<SystemDevice> device) {
   if (!device) {
     LOG_CRITICAL(RootBus, "Failed to reset device!");
-    SystemPause();
+    Base::SystemPause();
     return;
   }
 

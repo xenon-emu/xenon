@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Base/Path_util.h"
+#include "Base/PathUtil.h"
 
 #include "Base/Config.h"
 #include "Base/Logging/Backend.h"
@@ -51,6 +51,8 @@ extern void LoadConfig();
 extern void CreateHostBridge();
 extern void CreatePCIDevices();
 extern void CreateRootBus();
+
+extern Xenon *GetCPU();
 
 // Main objects
 //  Base path
@@ -101,10 +103,6 @@ inline std::shared_ptr<RAM> ram{};
 inline std::unique_ptr<Xenon> xenonCPU{};
 //  Xenos GPU
 inline std::shared_ptr<Xe::Xenos::XGPU> xenos{};
-
-inline Xenon *GetCPU() {
-  return xenonCPU.get();
-}
 
 } // namespace XeMain
 

@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Base/Path_util.h"
+#include "Base/PathUtil.h"
 
 #include "Render/Abstractions/Factory/ShaderFactory.h"
 

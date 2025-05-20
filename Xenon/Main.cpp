@@ -4,7 +4,6 @@
 #include "Base/Param.h"
 #include "Base/Exit.h"
 #include "Base/Thread.h"
-#include "Base/ntapi.h"
 
 volatile int hupflag = 0;
 // Clean shutdown when we are sent by the OS to shutdown
@@ -27,7 +26,6 @@ s32 globalShutdownHandler() {
     return exitCode;
   }
   // Cleanly shutdown without the exit syscall
-  XeRunning = false;
   XeMain::Shutdown();
   return 0;
 }
@@ -82,9 +80,6 @@ PARAM(help, "Prints this message", false);
 #define AUTO_FLIP 1
 s32 main(s32 argc, char *argv[]) {
   MicroProfileOnThreadCreate("Main");
-#ifdef _WIN32
-  Base::NtApi::Initialize();
-#endif
   // Init params
   Base::Param::Init(argc, argv);
   // Handle help param
@@ -108,7 +103,6 @@ s32 main(s32 argc, char *argv[]) {
     if (installHangup() != 0) {
       LOG_CRITICAL(System, "Failed to install signal handler. Clean shutdown is not possible through console");
     }
-    LOG_INFO(System, "Starting Xenon.");
     // Start execution of the emulator
     XeMain::StartCPU();
   }
@@ -121,7 +115,7 @@ s32 main(s32 argc, char *argv[]) {
     if (XeMain::renderer.get())
       XeMain::renderer->HandleEvents();
 #endif
-    std::this_thread::sleep_for(100ns);
+    std::this_thread::sleep_for(100ms);
   }
   // Shutdown
   XeMain::Shutdown();

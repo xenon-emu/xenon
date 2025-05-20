@@ -4,6 +4,7 @@
 
 #include <atomic>
 
+#include "Logging/Log.h"
 #include "Types.h"
 
 #include "microprofile.h"
@@ -16,14 +17,25 @@ inline std::atomic<bool> XePaused{ false };
 
 class Xenon;
 
+// Handles system pause
+namespace Base {
+
 inline void SystemPause() {
   XePaused = true;
+#ifndef TOOL
+  Base::Log::NoFmtMessage(Base::Log::Class::Log, Base::Log::Level::Critical, "Press Enter to continue...");
+#else
   printf("Press Enter to continue...");
+#endif
   (void)::getchar();
 }
 
+} // namespace Base
+
 // Handles various CPU routines, done in Xe_Main.cpp
 namespace XeMain {
+
+extern void Shutdown();
 
 extern void StartCPU();
 

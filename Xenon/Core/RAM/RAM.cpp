@@ -10,7 +10,7 @@ RAM::RAM(const std::string &deviceName, u64 startAddress, u64 endAddress, bool i
   RAMData = std::make_unique<STRIP_UNIQUE_ARR(RAMData)>(RAM_SIZE);
   if (!RAMData.get()) {
     LOG_CRITICAL(System, "RAM failed to allocate! This is really bad!");
-    SystemPause();
+    Base::SystemPause();
   }
   else {
     memset(RAMData.get(), 0xCD, RAM_SIZE);

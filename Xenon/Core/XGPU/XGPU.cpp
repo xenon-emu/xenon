@@ -8,7 +8,7 @@
 #include "Core/Xe_Main.h"
 
 #include "Base/Config.h"
-#include "Base/Path_util.h"
+#include "Base/PathUtil.h"
 #include "Base/Logging/Log.h"
 
 //#ifdef _DEBUG

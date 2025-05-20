@@ -6,10 +6,11 @@ void XeMain::Create() {
   MICROPROFILE_SCOPEI("[Xe::Main]", "Create", MP_AUTO);
   Base::Log::Initialize();
   Base::Log::Start();
+  LOG_INFO(System, "Starting Xenon.");
   rootDirectory = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
   LoadConfig();
-  logFilter = std::make_unique<STRIP_UNIQUE(logFilter)>(Config::log.currentLevel);
-  Base::Log::SetGlobalFilter(*logFilter);
+  Base::Log::Filter logFilter{ Config::log.currentLevel };
+  Base::Log::SetGlobalFilter(logFilter);
   CreatePCIDevices();
 #ifndef NO_GFX
   switch (Base::JoaatStringHash(Config::rendering.backend, false)) {
@@ -38,15 +39,14 @@ void XeMain::Create() {
 void XeMain::Shutdown() {
   // Set all states to false
   XePaused = false;
+  XeRunning = false;
 
   // Save config
   SaveConfig();
 
   // Shutdown the XGPU and XCPU
   xenonCPU.reset();
-  std::this_thread::sleep_for(1s);
   xenos.reset();
-  CPUStarted = false;
 
   // Shutdown the PCI bridges
   hostBridge.reset();
@@ -71,7 +71,6 @@ void XeMain::Shutdown() {
   MicroProfileStopAutoFlip();
 #endif
   MicroProfileShutdown();
-  //XeRunning = false;
 }
 
 void XeMain::SaveConfig() {
@@ -79,14 +78,16 @@ void XeMain::SaveConfig() {
   Config::saveConfig(rootDirectory / "config.toml");
 }
 void XeMain::LoadConfig() {
+  LOG_INFO(Xenon, "Loading Config...");
   MICROPROFILE_SCOPEI("[Xe::Main]", "LoadConfig", MP_AUTO);
   Config::loadConfig(rootDirectory / "config.toml");
 }
 
 void XeMain::StartCPU() {
+  LOG_INFO(Xenon, "Starting CPU...");
   if (!xenonCPU.get()) {
     LOG_CRITICAL(Xenon, "Failed to initialize Xenon's CPU!");
-    SystemPause();
+    Base::SystemPause();
     return;
   }
   CPUStarted = true;
@@ -159,6 +160,7 @@ void XeMain::ReloadFiles() {
 
 void XeMain::CreateHostBridge() {
   MICROPROFILE_SCOPEI("[Xe::Main::PCI]", "CreateHostBridge", MP_AUTO);
+  LOG_INFO(Xenon, "Creating Host Bridge...");
   hostBridge = std::make_shared<STRIP_UNIQUE(hostBridge)>();
 
   // Transfers ownership of xenos & pciBridge
@@ -168,6 +170,7 @@ void XeMain::CreateHostBridge() {
 
 void XeMain::CreateRootBus() {
   MICROPROFILE_SCOPEI("[Xe::Main::PCI]", "CreateRootBus", MP_AUTO);
+  LOG_INFO(Xenon, "Creating Root Bus...");
   rootBus = std::make_shared<STRIP_UNIQUE(rootBus)>();
 
   rootBus->AddHostBridge(hostBridge);
@@ -177,6 +180,7 @@ void XeMain::CreateRootBus() {
 
 void XeMain::CreatePCIDevices() {
   pciBridge = std::make_shared<STRIP_UNIQUE(pciBridge)>();
+  LOG_INFO(Xenon, "Creating PCI Devices...");
   MICROPROFILE_SCOPEI("[Xe::Main::PCI]", "CreateDevices", MP_AUTO);
   {
     {
@@ -210,7 +214,6 @@ void XeMain::CreatePCIDevices() {
     {
       MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "SFCX", MP_AUTO);
       sfcx = std::make_shared<STRIP_UNIQUE(sfcx)>("SFCX", SFCX_DEV_SIZE, Config::filepaths.nand, 0, pciBridge.get(), ram.get());
-      sfcx->Start();
       pciBridge->AddPCIDevice(sfcx);
       nand = std::make_shared<STRIP_UNIQUE(nand)>("NAND", sfcx.get(), true);
     }
@@ -234,5 +237,10 @@ void XeMain::CreatePCIDevices() {
       smcCore = std::make_shared<STRIP_UNIQUE(smcCore)>("SMC", SMC_DEV_SIZE, pciBridge.get());
       pciBridge->AddPCIDevice(smcCore);
     }
+    sfcx->Start();
   }
+}
+
+Xenon *XeMain::GetCPU() {
+  return xenonCPU.get();
 }

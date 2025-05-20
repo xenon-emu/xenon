@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Polyfill_thread.h"
+#include "PolyfillThread.h"
 
 namespace Base {
 

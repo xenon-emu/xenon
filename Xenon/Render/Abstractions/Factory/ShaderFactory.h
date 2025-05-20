@@ -6,7 +6,7 @@
 #include <memory>
 #include <unordered_map>
 
-#include "Base/Path_util.h"
+#include "Base/PathUtil.h"
 
 #include "Render/Abstractions/Shader.h"
 

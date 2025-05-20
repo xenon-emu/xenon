@@ -135,7 +135,7 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
 PPU::~PPU() {
   // Signal we're quitting
   ppuThreadState.store(eThreadState::Quiting);
-  std::this_thread::sleep_for(100ms);
+  LOG_INFO(Xenon, "PPU{} is exiting!", ppuState->ppuID);
   ppuThreadActive = false;
   // Kill the thread
   if (ppuThread.joinable())
@@ -296,8 +296,7 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
 // PPU Thread state machine, handles all execution and codeflow
 void PPU::ThreadStateMachine() {
   // Check if we should exit or not
-  ppuThreadActive = ppuThreadState.load() != eThreadState::None &&
-                    ppuThreadState.load() != eThreadState::Quiting;
+  ppuThreadActive = ppuThreadState.load() != eThreadState::None;
   // Signal a reset if needed
   if (ppuThreadResetting) {
     ppuThreadState.store(eThreadState::Resetting);
@@ -309,12 +308,12 @@ void PPU::ThreadStateMachine() {
   case eThreadState::Running: {
     // Check our threads to see if any are running
     u8 state = GetCurrentRunningThreads();
-    if (ppuThreadActive && !ppuThreadResetting  && (state & ePPUThreadBit_Zero)) {
+    if (!ppuThreadResetting  && (state & ePPUThreadBit_Zero)) {
       // Thread 0 is running, process instructions until we reach TTR timeout.
       curThreadId = ePPUThread_Zero;
       PPURunInstructions(ppuState->SPR.TTR, ppuHaltOn != 0);
     }
-    if (ppuThreadActive && !ppuThreadResetting && (state & ePPUThreadBit_One)) {
+    if (!ppuThreadResetting && (state & ePPUThreadBit_One)) {
       // Thread 1 is running, process instructions until we reach TTR timeout.
       curThreadId = ePPUThread_One;
       PPURunInstructions(ppuState->SPR.TTR, ppuHaltOn != 0);
@@ -322,18 +321,17 @@ void PPU::ThreadStateMachine() {
   } break;
   case eThreadState::Halted: {
     // Check if we should exit or not
-    ppuThreadActive = ppuThreadState.load() != eThreadState::None &&
-                      ppuThreadState.load() != eThreadState::Quiting;
+    ppuThreadActive = ppuThreadState.load() != eThreadState::None;
     // Handle stepping
     u8 state = GetCurrentRunningThreads();
-    if (ppuThreadActive && state & ePPUThreadBit_Zero) {
+    if (state & ePPUThreadBit_Zero) {
       curThreadId = ePPUThread_Zero;
       if (ppuStepAmount > 0) {
         PPURunInstructions(ppuStepAmount, false);
         ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
       }
     } 
-    if (ppuThreadActive && state & ePPUThreadBit_One) {
+    if (state & ePPUThreadBit_One) {
       curThreadId = ePPUThread_One;
       if (ppuStepAmount > 0) {
         PPURunInstructions(ppuStepAmount, false);
@@ -343,7 +341,7 @@ void PPU::ThreadStateMachine() {
   } break;
   case eThreadState::Sleeping: {
     // Waiting for an event, do nothing
-    std::this_thread::sleep_for(1ms); // Don't burn the CPU
+    std::this_thread::sleep_for(1ns); // Don't burn the CPU
   } break;
   case eThreadState::Unused: {
     ppuThreadState.store(eThreadState::None);
@@ -353,16 +351,9 @@ void PPU::ThreadStateMachine() {
       LOG_INFO(Xenon, "PPU{} is resetting!", ppuState->ppuID);
     else
       LOG_INFO(Xenon, "A PPU is in the middle of resetting!");
-    ppuThreadActive = false;
+    ppuThreadState.store(eThreadState::None);
   } break;
   case eThreadState::Quiting: {
-    if (ppuState.get()) {
-      if (ppuState->ppuID == 0) {
-        // Ensure the log is flushed
-        fmt::print("\n");
-      }
-      LOG_INFO(Xenon, "PPU{} is exiting!", ppuState->ppuID);
-    }
     ppuThreadState.store(eThreadState::None);
   } break;
   default: {
@@ -377,11 +368,6 @@ void PPU::ThreadLoop() {
   while (ppuThreadActive) {
     // Start Profile
     MICROPROFILE_SCOPEI("[Xe::PPU]", "ThreadLoop", MP_AUTO);
-    // Check if we should exit or not
-    ppuThreadActive = ppuThreadState.load() != eThreadState::None &&
-                      ppuThreadState.load() != eThreadState::Quiting &&
-                      ppuThreadState.load() != eThreadState::Resetting;
-
     // Run state machine
     ThreadStateMachine();
 
@@ -687,7 +673,7 @@ void PPU::PPUCheckExceptions() {
         // TODO: Properly end execution.
         // A checkstop is a full - stop of the processor that requires a System
         // Reset to recover.
-        SystemPause();
+        Base::SystemPause();
       }
     }
     // Maskable:
