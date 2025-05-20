@@ -10,13 +10,14 @@
 #include "Render/OpenGL/OGLTexture.h"
 
 void Render::OpenGLGUI::InitBackend(void *context) {
+  s32 value = 0;
+  SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &value);
+  std::string versionString = FMT("#version {} {}", value < 4 ? 310 : 430, value < 4 ? "es" : "");
   if (!ImGui_ImplSDL3_InitForOpenGL(mainWindow, context)) {
     LOG_ERROR(System, "Failed to initialize ImGui's SDL3 implementation");
-    SYSTEM_PAUSE();
   }
-  if (!ImGui_ImplOpenGL3_Init()) {
+  if (!ImGui_ImplOpenGL3_Init(versionString.c_str())) {
     LOG_ERROR(System, "Failed to initialize ImGui's OpenGL implementation");
-    SYSTEM_PAUSE();
   }
 }
 
