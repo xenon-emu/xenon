@@ -1,9 +1,8 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
-#include "PostBus.h"
-
 #include "Base/Logging/Log.h"
-#include "Core/Xe_Main.h"
+
+#include "PostBus.h"
 
 void Xe::XCPU::POSTBUS::POST(u64 postCode) {
   /* 1BL */

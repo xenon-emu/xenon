@@ -229,21 +229,25 @@ private:
   }
 
   void StartBackendThread() {
-    backendThread = std::jthread([this](std::stop_token stop_token) {
+    backendThread = std::jthread([this](std::stop_token stopToken) {
       Base::SetCurrentThreadName("[Xe] Log");
       Entry entry = {};
       const auto writeLogs = [this, &entry]() {
-        ForEachBackend([&entry](BaseBackend* backend) { backend->Write(entry); });
+        ForEachBackend([&entry](BaseBackend *backend) { backend->Write(entry); });
       };
-      while (!stop_token.stop_requested()) {
-        messageQueue.PopWait(entry, stop_token);
-        writeLogs();
+      while (!stopToken.stop_requested()) {
+        if (messageQueue.PopWait(entry, stopToken))
+          writeLogs();
       }
       // Drain the logging queue. Only writes out up to MAX_LOGS_TO_WRITE to prevent a
       // case where a system is repeatedly spamming logs even on close.
       s32 maxLogsToWrite = filter.IsDebug() ? std::numeric_limits<s32>::max() : 100;
-      while (maxLogsToWrite-- && messageQueue.TryPop(entry)) {
-        writeLogs();
+      while (maxLogsToWrite-- > 0) {
+        if (messageQueue.TryPop(entry)) {
+          writeLogs();
+        } else {
+          break;
+        }
       }
     });
   }
@@ -254,7 +258,7 @@ private:
       backendThread.join();
     }
 
-    ForEachBackend([](BaseBackend* backend) { backend->Flush(); });
+    ForEachBackend([](BaseBackend *backend) { backend->Flush(); });
   }
 
   void ForEachBackend(std::function<void(BaseBackend*)> lambda) {

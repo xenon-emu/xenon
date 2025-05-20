@@ -26,6 +26,7 @@ s32 globalShutdownHandler() {
     return exitCode;
   }
   // Cleanly shutdown without the exit syscall
+  XeRunning = false;
   XeMain::Shutdown();
   return 0;
 }

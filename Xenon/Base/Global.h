@@ -11,7 +11,8 @@
 #include "microprofile_html.h"
 
 // Global running state
-inline std::atomic<bool> XeRunning{ true };
+inline volatile bool XeRunning{ true };
+inline std::atomic<bool> XeShutdonSignaled{ false };
 // Global paused state
 inline std::atomic<bool> XePaused{ false };
 

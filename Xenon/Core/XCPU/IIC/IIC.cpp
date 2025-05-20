@@ -1,13 +1,12 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
-#include "IIC.h"
-
-#include "Core/Xe_Main.h"
-
-#include "Base/Assert.h"
-#include "Base/Logging/Log.h"
-
 #include <unordered_map>
+
+#include "Base/Logging/Log.h"
+#include "Base/Assert.h"
+#include "Base/Global.h"
+
+#include "IIC.h"
 
 #ifdef DEBUG
 #define IIC_DEBUG

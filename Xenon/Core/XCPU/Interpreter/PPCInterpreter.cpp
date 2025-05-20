@@ -1,9 +1,11 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
-#include "PPCInterpreter.h"
-
 #include "Base/Logging/Log.h"
-#include "Core/Xe_Main.h"
+#include "Base/Global.h"
+#include "Core/XCPU/Xenon.h"
+#include "Core/XCPU/PPU/PPU.h"
+
+#include "PPCInterpreter.h"
 
 using namespace PPCInterpreter;
 

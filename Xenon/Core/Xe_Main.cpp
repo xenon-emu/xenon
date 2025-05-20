@@ -37,6 +37,13 @@ void XeMain::Create() {
 }
 
 void XeMain::Shutdown() {
+  // Check if we've shutdown, no need to do it twice
+  if (XeShutdonSignaled) {
+    return;
+  }
+  // Set as already shutdown
+  XeShutdonSignaled = true;
+
   // Set all states to false
   XePaused = false;
   XeRunning = false;
@@ -44,12 +51,11 @@ void XeMain::Shutdown() {
   // Save config
   SaveConfig();
 
-  // Shutdown the XGPU and XCPU
+  // Shutdown the XCPU
   xenonCPU.reset();
-  xenos.reset();
+  CPUStarted = false;
 
   // Shutdown the PCI bridges
-  hostBridge.reset();
   pciBridge.reset();
 
   // Shutdown the rootbus
@@ -59,14 +65,14 @@ void XeMain::Shutdown() {
 
 #ifndef NO_GFX
   // Delete the renderer
+  renderer->Shutdown();
   renderer.reset();
 #endif
 
   // Stop the logger
   Base::Log::Stop();
-
-  // Delete the log filter
-  logFilter.reset();
+  // Wait a bit for the logger to flush
+  std::this_thread::sleep_for(200ms);
 #if AUTO_FLIP
   MicroProfileStopAutoFlip();
 #endif
@@ -103,6 +109,9 @@ void XeMain::StartCPU() {
 }
 
 void XeMain::ShutdownCPU() {
+  if (!CPUStarted) {
+    return;
+  }
   MICROPROFILE_SCOPEI("[Xe::Main]", "ShutdownCPU", MP_AUTO);
   // Set the CPU to 'Resetting' mode before killing the handle
   xenonCPU->Reset();

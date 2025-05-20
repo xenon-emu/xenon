@@ -1,12 +1,12 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
-#include "SFCX.h"
-
 #include "Base/Logging/Log.h"
+#include "Base/Global.h"
 #include "Base/Config.h"
 #include "Base/Thread.h"
+#include "Core/XCPU/Xenon.h"
 
-#include "Core/Xe_Main.h"
+#include "SFCX.h"
 
 //#define SFCX_DEBUG
 

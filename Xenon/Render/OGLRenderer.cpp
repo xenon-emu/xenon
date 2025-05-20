@@ -14,10 +14,6 @@ OGLRenderer::OGLRenderer(RAM *ram) :
   Renderer(ram)
 {}
 
-OGLRenderer::~OGLRenderer() {
-  Shutdown();
-}
-
 std::string OGLRenderer::gl_version() const {
   const GLubyte* version = glGetString(GL_VERSION);
   const char* c_version = reinterpret_cast<const char*>(version);

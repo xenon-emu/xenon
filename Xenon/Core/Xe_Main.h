@@ -57,8 +57,6 @@ extern Xenon *GetCPU();
 // Main objects
 //  Base path
 inline std::filesystem::path rootDirectory = {};
-//  Log level
-inline std::unique_ptr<Base::Log::Filter> logFilter{};
 
 // Main Emulator objects
 inline std::shared_ptr<RootBus> rootBus{}; // RootBus Object

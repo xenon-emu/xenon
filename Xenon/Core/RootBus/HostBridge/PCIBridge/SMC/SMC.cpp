@@ -109,12 +109,13 @@ Xe::PCIDev::SMC::SMC(const std::string &deviceName, u64 size, PCIBridge *parentP
 
 // Class Destructor.
 Xe::PCIDev::SMC::~SMC() {
-  LOG_INFO(SMC, "Core: Exiting.");
+  LOG_INFO(SMC, "Shutting SMC down...");
   smcThreadRunning = false;
   if (smcThread.joinable())
     smcThread.join();
   smcCoreState.uartHandle->Shutdown();
   smcCoreState.uartHandle.reset();
+  LOG_INFO(SMC, "Done!");
 }
 
 // PCI Read

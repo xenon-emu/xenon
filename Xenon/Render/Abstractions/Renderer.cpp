@@ -150,11 +150,10 @@ void Renderer::CreateHandles() {
 }
 
 void Renderer::Shutdown() {
-  threadRunning = false;
   if (Config::rendering.enableGui) {
     gui->Shutdown();
   }
-  BackendShutdown();
+  threadRunning = false;
   backbuffer->DestroyTexture();
   pixelSSBO->DestroyBuffer();
   shaderFactory->Destroy();
@@ -163,6 +162,7 @@ void Renderer::Shutdown() {
   backbuffer.reset();
   pixelSSBO.reset();
   gui.reset();
+  BackendShutdown();
   BackendSDLShutdown();
   SDL_DestroyWindow(mainWindow);
   SDL_Quit();

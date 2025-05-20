@@ -12,11 +12,6 @@ DummyRenderer::DummyRenderer(RAM *ram) :
   LOG_WARNING(Render, "DummyRenderer::DummyRenderer: Using dummy renderer!");
 }
 
-DummyRenderer::~DummyRenderer() {
-  LOG_INFO(Render, "DummyRenderer::~DummyRenderer");
-  Shutdown();
-}
-
 void DummyRenderer::BackendStart() {
   LOG_INFO(Render, "DummyRenderer::BackendStart");
   resourceFactory = std::make_unique<DummyResourceFactory>();

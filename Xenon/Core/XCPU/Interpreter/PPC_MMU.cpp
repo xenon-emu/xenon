@@ -1,8 +1,11 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
-#include "PPCInterpreter.h"
-#include "Core/Xe_Main.h"
+#include "Base/Global.h"
+#include "Core/NAND/NAND.h"
 #include "Core/XCPU/PostBus/PostBus.h"
+#include "Core/XCPU/Xenon.h"
+
+#include "PPCInterpreter.h"
 
 //
 // Xbox 360 Memory map, info taken from various sources.
@@ -396,7 +399,7 @@ void PPCInterpreter::mmuAddTlbEntry(PPU_STATE *ppuState) {
 
 #ifdef DEBUG_BUILD
   if (XeMain::GetCPU()) {
-    PPU *ppu = XeMain::xenonCPU->GetPPU(ppuState->ppuID);
+    PPU *ppu = XeMain::GetCPU()->GetPPU(ppuState->ppuID);
     if (ppu && ppu->traceFile) {
       fprintf(ppu->traceFile, "TLB[%d:%d] map 0x%llx -> 0x%llx\n", TS, TI, tlbVpn, tlbRpn);
     }
@@ -1032,7 +1035,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
     } else {
       // Debug tools
       if (Config::debug.haltOnSlbMiss && XeMain::GetCPU()) {
-        XeMain::xenonCPU->Halt();
+        XeMain::GetCPU()->Halt();
       }
       // SLB Miss
       // Data or Inst Segment Exception

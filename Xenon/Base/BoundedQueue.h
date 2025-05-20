@@ -29,12 +29,12 @@ public:
     return Pop<PopMode::Try>(t);
   }
 
-  void PopWait(T& t) {
-    Pop<PopMode::Wait>(t);
+  bool PopWait(T& t) {
+    return Pop<PopMode::Wait>(t);
   }
 
-  void PopWait(T& t, std::stop_token stop_token) {
-    Pop<PopMode::WaitWithStopToken>(t, stop_token);
+  bool PopWait(T& t, std::stop_token stopToken) {
+    return Pop<PopMode::WaitWithStopToken>(t, stopToken);
   }
 
   T PopWait() {
@@ -43,9 +43,9 @@ public:
     return t;
   }
 
-  T PopWait(std::stop_token stop_token) {
+  T PopWait(std::stop_token stopToken) {
     T t;
-    Pop<PopMode::WaitWithStopToken>(t, stop_token);
+    Pop<PopMode::WaitWithStopToken>(t, stopToken);
     return t;
   }
 
@@ -158,39 +158,39 @@ class MPSCQueue {
 public:
   template <typename... Args>
   bool TryEmplace(Args&&... args) {
-    std::scoped_lock lock{write_mutex};
-    return spsc_queue.TryEmplace(std::forward<Args>(args)...);
+    std::scoped_lock lock{writeMutex};
+    return spscQueue.TryEmplace(std::forward<Args>(args)...);
   }
 
   template <typename... Args>
   void EmplaceWait(Args&&... args) {
-    std::scoped_lock lock{write_mutex};
-    spsc_queue.EmplaceWait(std::forward<Args>(args)...);
+    std::scoped_lock lock{writeMutex};
+    spscQueue.EmplaceWait(std::forward<Args>(args)...);
   }
 
   bool TryPop(T& t) {
-    return spsc_queue.TryPop(t);
+    return spscQueue.TryPop(t);
   }
 
-  void PopWait(T& t) {
-    spsc_queue.PopWait(t);
+  bool PopWait(T& t) {
+    return spscQueue.PopWait(t);
   }
 
-  void PopWait(T& t, std::stop_token stop_token) {
-    spsc_queue.PopWait(t, stop_token);
+  bool PopWait(T& t, std::stop_token stop_token) {
+    return spscQueue.PopWait(t, stop_token);
   }
 
   T PopWait() {
-    return spsc_queue.PopWait();
+    return spscQueue.PopWait();
   }
 
   T PopWait(std::stop_token stop_token) {
-    return spsc_queue.PopWait(stop_token);
+    return spscQueue.PopWait(stop_token);
   }
 
 private:
-  SPSCQueue<T, Capacity> spsc_queue;
-  std::mutex write_mutex;
+  SPSCQueue<T, Capacity> spscQueue;
+  std::mutex writeMutex;
 };
 
 template <typename T, size_t Capacity = detail::DefaultCapacity>
@@ -198,45 +198,45 @@ class MPMCQueue {
 public:
   template <typename... Args>
   bool TryEmplace(Args&&... args) {
-    std::scoped_lock lock{write_mutex};
-    return spsc_queue.TryEmplace(std::forward<Args>(args)...);
+    std::scoped_lock lock{ writeMutex };
+    return spscQueue.TryEmplace(std::forward<Args>(args)...);
   }
 
   template <typename... Args>
   void EmplaceWait(Args&&... args) {
-    std::scoped_lock lock{write_mutex};
-    spsc_queue.EmplaceWait(std::forward<Args>(args)...);
+    std::scoped_lock lock{ writeMutex };
+    spscQueue.EmplaceWait(std::forward<Args>(args)...);
   }
 
   bool TryPop(T& t) {
-    std::scoped_lock lock{read_mutex};
-    return spsc_queue.TryPop(t);
+    std::scoped_lock lock{ readMutex };
+    return spscQueue.TryPop(t);
   }
 
-  void PopWait(T& t) {
-    std::scoped_lock lock{read_mutex};
-    spsc_queue.PopWait(t);
+  bool PopWait(T& t) {
+    std::scoped_lock lock{ readMutex };
+    return spscQueue.PopWait(t);
   }
 
-  void PopWait(T& t, std::stop_token stop_token) {
-    std::scoped_lock lock{read_mutex};
-    spsc_queue.PopWait(t, stop_token);
+  bool PopWait(T& t, std::stop_token stopToken) {
+    std::scoped_lock lock{ readMutex };
+    return spscQueue.PopWait(t, stopToken);
   }
 
   T PopWait() {
-    std::scoped_lock lock{read_mutex};
-    return spsc_queue.PopWait();
+    std::scoped_lock lock{ readMutex };
+    return spscQueue.PopWait();
   }
 
   T PopWait(std::stop_token stop_token) {
-    std::scoped_lock lock{read_mutex};
-    return spsc_queue.PopWait(stop_token);
+    std::scoped_lock lock{ readMutex };
+    return spscQueue.PopWait(stop_token);
   }
 
 private:
-  SPSCQueue<T, Capacity> spsc_queue;
-  std::mutex write_mutex;
-  std::mutex read_mutex;
+  SPSCQueue<T, Capacity> spscQueue;
+  std::mutex writeMutex;
+  std::mutex readMutex;
 };
 
 } // namespace Base

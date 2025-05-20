@@ -3,7 +3,6 @@
 #include "OpenGL.h"
 
 #ifndef NO_GFX
-#include "Core/Xe_Main.h"
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
 #include "Base/Config.h"
 #include "Render/Abstractions/Renderer.h"

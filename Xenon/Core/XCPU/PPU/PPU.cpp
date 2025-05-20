@@ -135,7 +135,6 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
 PPU::~PPU() {
   // Signal we're quitting
   ppuThreadState.store(eThreadState::Quiting);
-  LOG_INFO(Xenon, "PPU{} is exiting!", ppuState->ppuID);
   ppuThreadActive = false;
   // Kill the thread
   if (ppuThread.joinable())

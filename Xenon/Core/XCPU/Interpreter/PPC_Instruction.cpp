@@ -7,10 +7,10 @@
 * License: GPL2
 */
 
-#include "Core/Xe_Main.h"
+#include "Base/Global.h"
+#include "Core/XCPU/Xenon.h"
 
 #include "PPC_Instruction.h"
-
 #include "PPCInterpreter.h"
 
 namespace PPCInterpreter {

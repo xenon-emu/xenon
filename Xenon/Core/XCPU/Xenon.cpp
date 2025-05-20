@@ -85,6 +85,7 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPa
 }
 
 Xenon::~Xenon() {
+  LOG_INFO(Xenon, "Shutting PPU cores down...");
   ppu0.reset();
   ppu1.reset();
   ppu2.reset();

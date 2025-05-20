@@ -3,7 +3,7 @@
 #include "HostBridge.h"
 
 #include "Base/Logging/Log.h"
-#include "Core/Xe_Main.h"
+#include "Base/Global.h"
 
 HostBridge::HostBridge() {
   // TODO: Fix these to pull the right data
