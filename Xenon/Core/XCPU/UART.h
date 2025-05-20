@@ -112,6 +112,12 @@ public:
   void Write(const u8 data) override;
   u8 Read() override;
   u32 ReadStatus() override;
+#ifdef DEBUG_BUILD
+  std::ofstream f{};
+  bool reading = false;
+  // Buffer, used to detect when direction changes
+  std::vector<u8> uartBuffer = {};
+#endif
 #ifdef _WIN32
   // Current COM Port Device Control Block
   // See

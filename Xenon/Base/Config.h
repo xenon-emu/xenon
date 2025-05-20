@@ -205,11 +205,16 @@ inline struct _filepaths {
 
   // Corrects the paths on first time creation
   void correct(const fs::path &basePath) {
-    fuses = fs::path(basePath / fuses).string();
-    oneBl = fs::path(basePath / oneBl).string();
-    nand = fs::path(basePath / nand).string();
-    oddImage = fs::path(basePath / oddImage).string();
-    elfBinary = fs::path(basePath / elfBinary).string();
+    auto fusesPath = basePath / fuses;
+    fuses = fusesPath.string();
+    auto oneBlPath = basePath / oneBl;
+    oneBl = oneBlPath.string();
+    auto nandPath = basePath / nand;
+    nand = nandPath.string();
+    auto oddImagePath = basePath / oddImage;
+    oddImage = oddImagePath.string();
+    auto elfBinaryPath = basePath / elfBinary;
+    elfBinary = elfBinaryPath.string();
   }
 
   // TOML Conversion

@@ -50,7 +50,7 @@ void HW_UART_SOCK::uartReceiveThread() {
 }
 
 void HW_UART_SOCK::Init(void *uartConfig) {
-  HW_UART_SOCK_CONFIG* sock = reinterpret_cast<decltype(sock)>(uartConfig);
+  HW_UART_SOCK_CONFIG *sock = reinterpret_cast<decltype(sock)>(uartConfig);
   printMode = sock->usePrint;
   socketCreated = true;
 
@@ -146,7 +146,7 @@ u32 HW_UART_SOCK::ReadStatus() {
 
 #ifdef _WIN32
 void HW_UART_VCOM::Init(void *uartConfig) {
-  HW_UART_VCOM_CONFIG* vcom = reinterpret_cast<decltype(vcom)>(uartConfig);
+  HW_UART_VCOM_CONFIG *vcom = reinterpret_cast<decltype(vcom)>(uartConfig);
   // Initialize the DCB structure
   SecureZeroMemory(&comPortDCB, sizeof(DCB));
   comPortDCB.DCBlength = sizeof(DCB);
@@ -195,23 +195,56 @@ void HW_UART_VCOM::Init(void *uartConfig) {
     LOG_ERROR(UART, "SetCommState failed with error {}", Base::GetLastErrorMsg());
   }
 
+#ifdef DEBUG_BUILD
+  auto path = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
+  f.open(path / "UART.txt", std::ios::out | std::ios::binary);
+#endif
+
   // Everything initialized
   uartInitialized = true;
 }
 
 void HW_UART_VCOM::Shutdown() {
-
+#ifdef DEBUG_BUILD
+  f.close();
+#endif
 }
 
 void HW_UART_VCOM::Write(const u8 data) {
+#ifdef DEBUG_BUILD
+  if (reading && !uartBuffer.empty()) {
+    u64 bufferSize = uartBuffer.size();
+    u8 c[17] = {};
+    snprintf((char*)c, sizeof(c), "W  0x%llX\xFF\0", bufferSize);
+    f.write((char*)&c, strlen((char*)c) + 1);
+    f.write((char*)uartBuffer.data(), uartBuffer.size());
+    uartBuffer.clear();
+  }
+  reading = false;
+  uartBuffer.push_back(data);
+#endif
   if (comPortHandle)
     retVal = WriteFile(comPortHandle, &data, 1, &currentBytesWrittenCount, nullptr);
 }
 
 u8 HW_UART_VCOM::Read() {
+#ifdef DEBUG_BUILD
+  if (!reading && !uartBuffer.empty()) {
+    u64 bufferSize = uartBuffer.size();
+    u8 c[17] = {};
+    snprintf((char*)c, sizeof(c), "R  0x%llX\xFF\0", bufferSize);
+    f.write((char*)&c, strlen((char *)c) + 1);
+    f.write((char*)uartBuffer.data(), uartBuffer.size());
+    uartBuffer.clear();
+  }
+  reading = true;
+#endif
   u8 data = 0;
   if (comPortHandle)
     retVal = ReadFile(comPortHandle, &data, 1, &currentBytesReadCount, nullptr);
+#ifdef DEBUG_BUILD
+  uartBuffer.push_back(data);
+#endif
   return data;
 }
 

@@ -419,8 +419,7 @@ void Renderer::Thread() {
       renderShaderPrograms->Bind();
       backbuffer->Bind();
       OnBind();
-    }
-    else {
+    } else {
       while (!drawQueue.empty()) {
         DrawJob job = drawQueue.front();
         drawQueue.pop();
