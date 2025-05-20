@@ -57,6 +57,10 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType, Shader *sha
             Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
             var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
             module.Name(var, FMT("COLOR{}", reg - static_cast<u32>(eExportReg::COLOR0)));
+          } else if (exportReg >= eExportReg::INTERP0 && exportReg <= eExportReg::INTERP7) {
+            Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
+            var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
+            module.Name(var, FMT("INTERP{}", reg - static_cast<u32>(eExportReg::INTERP0)));
           } else {
             LOG_ERROR(Xenos, "[AST::Sirit] Invalid output variable '{}'!", reg);
           }
@@ -86,7 +90,11 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType, Shader *sha
           module.Decorate(var, spv::Decoration::BuiltIn, spv::BuiltIn::PointSize);
           break;
         default:
-          if (exportReg >= eExportReg::INTERP0 && exportReg <= eExportReg::INTERP7) {
+          if (exportReg >= eExportReg::COLOR0 && exportReg <= eExportReg::COLOR3) {
+            Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
+            var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
+            module.Name(var, FMT("COLOR{}", reg - static_cast<u32>(eExportReg::COLOR0)));
+          } else if (exportReg >= eExportReg::INTERP0 && exportReg <= eExportReg::INTERP7) {
             Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
             var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
             module.Name(var, FMT("INTERP{}", reg - static_cast<u32>(eExportReg::INTERP0)));
