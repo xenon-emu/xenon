@@ -12,7 +12,7 @@
 void Render::OpenGLGUI::InitBackend(void *context) {
   s32 value = 0;
   SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &value);
-  std::string versionString = FMT("#version {} {}", value < 4 ? 100 : 130, value < 4 ? "es" : "");
+  std::string versionString = FMT("#version {}", value < 4 ? 100 : 130);
   if (!ImGui_ImplSDL3_InitForOpenGL(mainWindow, context)) {
     LOG_ERROR(System, "Failed to initialize ImGui's SDL3 implementation");
   }
