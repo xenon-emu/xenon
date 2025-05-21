@@ -1,4 +1,4 @@
-# Copyright 2025 Xenon Emulator Project
+# Copyright 2025 Xenon Emulator Project. All rights reserved.
 
 set(BUILD_SHARED_LIBS OFF)
 set(BUILD_TESTING OFF)
@@ -13,7 +13,9 @@ if (NOT TARGET fmt::fmt)
 endif()
 
 # GLAD
-add_subdirectory(glad)
+if (NOT TARGET glad)
+  add_subdirectory(glad)
+endif()
 
 # SDL3
 if (GFX_ENABLED)

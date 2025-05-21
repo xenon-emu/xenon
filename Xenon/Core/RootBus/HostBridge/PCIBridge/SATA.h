@@ -1,8 +1,4 @@
-/*
-* Copyright Xenon Emulator Project 2025
-* SATA.h:
-* Contains common definitions for Serial ATA and ATAPI devices
-*/
+// Copyright 2025 Xenon Emulator Project. All rights reserved.
 
 //
 // ATA/ATAPI Registers Offsets

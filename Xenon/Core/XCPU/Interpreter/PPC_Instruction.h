@@ -1,12 +1,13 @@
-#pragma once
-/*
-* Copyright 2025 Xenon Emulator Project
+// Copyright 2025 Xenon Emulator Project. All rights reserved.
 
+/*
 * All original authors of the rpcs3 PPU_Decoder and PPU_Opcodes maintain their original copyright.
 * Modifed for usage in the Xenon Emulator
 * All rights reserved
 * License: GPL2
 */
+
+#pragma once
 
 #include <array>
 #include <string>

@@ -1,3 +1,5 @@
+// Copyright 2025 Xenon Emulator Project. All rights reserved.
+
 #include "EDRAM.h"
 
 Xe::XGPU::EDRAM::EDRAM() {
