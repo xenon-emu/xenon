@@ -32,6 +32,8 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType, Shader *sha
   Sirit::Id uint_type = module.TypeInt(32, false);
   Sirit::Id float_type = module.TypeFloat(32);
   Sirit::Id vec4_type = module.TypeVector(float_type, 4);
+  Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
+  Sirit::Id float_ptr_output = module.TypePointer(spv::StorageClass::Output, module.TypeFloat(32));
 
   if (type == eShaderType::Pixel) {
     if (shader) {
@@ -40,25 +42,21 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType, Shader *sha
         auto &var = output_vars[exportReg];
         switch (exportReg) {
         case eExportReg::POSITION:
-          Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
           output_vars[eExportReg::POSITION] =
             module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
           module.Name(output_vars[eExportReg::POSITION], "POSITION");
           module.Decorate(var, spv::Decoration::BuiltIn, spv::BuiltIn::Position);
           break;
         case eExportReg::POINTSIZE:
-          Sirit::Id float_ptr_output = module.TypePointer(spv::StorageClass::Output, module.TypeFloat(32));
           output_vars[eExportReg::POINTSIZE] = module.AddGlobalVariable(float_ptr_output, spv::StorageClass::Output);
           module.Name(output_vars[eExportReg::POINTSIZE], "POINTSIZE");
           module.Decorate(var, spv::Decoration::BuiltIn, spv::BuiltIn::PointSize);
           break;
         default:
           if (exportReg >= eExportReg::COLOR0 && exportReg <= eExportReg::COLOR3) {
-            Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
             var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
             module.Name(var, FMT("COLOR{}", reg - static_cast<u32>(eExportReg::COLOR0)));
           } else if (exportReg >= eExportReg::INTERP0 && exportReg <= eExportReg::INTERP7) {
-            Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
             var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
             module.Name(var, FMT("INTERP{}", reg - static_cast<u32>(eExportReg::INTERP0)));
           } else {
