@@ -8,6 +8,114 @@
 using namespace Base;
 
 //
+// Utilities
+//
+
+// Single-precision load floating-point instructions convert single-precision data to double-precision format
+// prior to loading the operands into the target FPR.
+// For double-precision floating-point load instructions, no conversion is required as the data from memory is 
+// copied directly into the FPRs.
+// This means that we need some conversion algorithm, luckily this is already described in PPC_PEM.pdf, chapter 
+// C.6 Floating - Point Load Instructions
+inline u64 ConvertToDouble(u32 inValue) {
+  u64 word = inValue;
+  u64 exp = (word >> 23) & 0xff; // As denoted by the PPC_PEM manual.
+  u64 frac = word & 0x007fffff;
+
+  if (exp > 0 && exp < 255) {
+    /*
+    If WORD[1-8] > 0 and WORD[1-8] < 255 then normalized operand
+      frD[0-1] <- WORD[0-1] 
+      frD[2] <- ~ WORD[1] 
+      frD[3] <- ~ WORD[1] 
+      frD[4] <- ~ WORD[1] 
+      frD[5-63] <- WORD[2-31] || (29)0
+    */
+    u64 x = !(exp >> 7);
+    u64 z = x << 61 | x << 60 | x << 59;
+    return ((word & 0xc0000000) << 32) | z | ((word & 0x3fffffff) << 29);
+  } else if (exp == 0 && frac != 0) {
+    /*
+    If WORD[1-8] = 0 and WORD[9-31] ¦ 0 then denormalized operand
+      sign <- WORD[0] 
+      exp <- -126
+      frac[0-52] <- 0b0 || WORD[9-31] || (29)0
+      normalize the operand
+      Do while frac[0] = 0
+      frac <- frac[1-52] || 0b0
+      exp <- exp - 1
+      End
+      frD[0] <- sign
+      frD[1-11] <- exp + 1023
+      frD[12-63] <- frac[1-52]
+    */
+    exp = 1023 - 126;
+    do
+    {
+      frac <<= 1;
+      exp -= 1;
+    } while ((frac & 0x00800000) == 0);
+
+    return ((word & 0x80000000) << 32) | (exp << 52) | ((frac & 0x007fffff) << 29);
+  } else {
+    /*
+    If WORD[1-8] = 255 or WORD[1-31] = 0 then Infinity / QNaN / SNaN / Zero operand
+      frD[0-1] <- WORD[0-1] 
+      frD[2] <- WORD[1] 
+      frD[3] <- WORD[1] 
+      frD[4] <- WORD[1] 
+      frD[5-63] <- WORD[2-31] || (29)0
+    */
+    u64 y = exp >> 7;
+    u64 z = y << 61 | y << 60 | y << 59;
+    return ((word & 0xc0000000) << 32) | z | ((word & 0x3fffffff) << 29);
+  }
+}
+
+// There are three basic forms of store instruction—single - precision, double - precision, and integer.The integer
+// form is provided by the stfiwx instruction.Because the FPRs support only floating - point double format for
+// floating - point data, single - precision store floating - point instructions convert double - precision data to 
+// single precision format prior to storing the operands into memory.
+inline u32 ConvertToSingle(u64 inValue) {
+  const u32 exp = u32((inValue >> 52) & 0x7ff);
+
+  if (exp > 896 || (inValue & ~0x8000000000000000ULL) == 0) {
+    /*
+    No Denormalization Required (includes Zero/Infinity/NaN):
+    if frS[1-11] > 896 or frS[1-63] = 0 then
+      WORD[0-1] <- frS[0-1]
+      WORD[2-31] <- frS[5-34]
+    */
+    return static_cast<u32>(((inValue >> 32) & 0xc0000000) | ((inValue >> 29) & 0x3fffffff));
+  } else if (exp >= 874) {
+    /*
+    Denormalization Required
+    if 874 <= frS[1-11] <= 896 then
+      sign <- frS[0]
+      exp <- frS[1-11] - 1023
+      frac <- 0b1 || frS[12-63]
+      Denormalize operand
+        Do while exp < -126
+          frac <- 0b0 || frac[0-62]
+          exp <- exp + 1
+        End
+      WORD[0] <- sign
+      WORD[1-8] <- 0x00
+      WORD[9-31] <- frac[1-23]
+    */
+    u32 t = static_cast<u32>(0x80000000 | ((inValue & 0x000FFFFFFFFFFFFFULL) >> 21));
+    t = t >> (905 - exp);
+    t |= static_cast<u32>((inValue >> 32) & 0x80000000);
+    return t;
+  } else {
+    /*
+    WORD <- undefined
+    */
+    return static_cast<u32>(((inValue >> 32) & 0xc0000000) | ((inValue >> 29) & 0x3fffffff));
+  }
+}
+
+//
 // Store Byte
 //
 
@@ -472,7 +580,7 @@ void PPCInterpreter::PPCInterpreter_stfs(PPU_STATE *ppuState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  MMUWrite32(ppuState, EA, static_cast<f32>(FPRi(frs).valueAsDouble));
+  MMUWrite32(ppuState, EA, ConvertToSingle(FPRi(frs).valueAsU64));
 }
 
 // Store Floating-Point Single with Update (x'D400 0000')
@@ -486,7 +594,7 @@ void PPCInterpreter::PPCInterpreter_stfsu(PPU_STATE* ppuState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  MMUWrite32(ppuState, EA, static_cast<f32>(FPRi(frs).valueAsDouble));
+  MMUWrite32(ppuState, EA, ConvertToSingle(FPRi(frs).valueAsU64));
   
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -505,7 +613,7 @@ void PPCInterpreter::PPCInterpreter_stfsux(PPU_STATE* ppuState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite32(ppuState, EA, static_cast<f32>(FPRi(frs).valueAsDouble));
+  MMUWrite32(ppuState, EA, ConvertToSingle(FPRi(frs).valueAsU64));
   
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -525,7 +633,7 @@ void PPCInterpreter::PPCInterpreter_stfsx(PPU_STATE *ppuState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite32(ppuState, EA, static_cast<f32>(FPRi(frs).valueAsDouble));
+  MMUWrite32(ppuState, EA, ConvertToSingle(FPRi(frs).valueAsU64));
 }
 
 // Store Floating-Point Double (x'D800 0000')
@@ -608,7 +716,7 @@ void PPCInterpreter::PPCInterpreter_stfiwx(PPU_STATE *ppuState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite32(ppuState, EA, static_cast<u32>(std::bit_cast<u64>(FPRi(frs))));
+  MMUWrite32(ppuState, EA, static_cast<u32>(FPRi(frs).valueAsU64));
 }
 
 //
@@ -1295,7 +1403,7 @@ void PPCInterpreter::PPCInterpreter_lfsx(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  FPRi(frd).valueAsDouble = static_cast<f64>(static_cast<f32>(data));
+  FPRi(frd).valueAsDouble = std::bit_cast<f64>(ConvertToDouble(data));
 }
 
 // Load Floating-Point Single with Update Indexed
@@ -1316,7 +1424,7 @@ void PPCInterpreter::PPCInterpreter_lfsux(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  FPRi(frd).valueAsDouble = static_cast<f64>(static_cast<f32>(data));
+  FPRi(frd).valueAsDouble = std::bit_cast<f64>(ConvertToDouble(data));
   
   GPRi(ra) = EA;
 }
@@ -1338,7 +1446,7 @@ void PPCInterpreter::PPCInterpreter_lfd(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  FPRi(frd).valueAsDouble = static_cast<f64>(data);
+  FPRi(frd).valueAsDouble = std::bit_cast<f64>(data);
 }
 
 // Load Floating-Point Double-Indexed (x'C800 0000')
@@ -1358,7 +1466,7 @@ void PPCInterpreter::PPCInterpreter_lfdx(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  FPRi(frd).valueAsDouble = static_cast<f64>(data);
+  FPRi(frd).valueAsDouble = std::bit_cast<f64>(data);
 }
 
 // Load Floating-Point Double with Update
@@ -1377,7 +1485,7 @@ void PPCInterpreter::PPCInterpreter_lfdu(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  FPRi(frd).valueAsDouble = static_cast<f64>(data);
+  FPRi(frd).valueAsDouble = std::bit_cast<f64>(data);
   GPRi(ra) = EA;
 }
 
@@ -1397,7 +1505,7 @@ void PPCInterpreter::PPCInterpreter_lfdux(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  FPRi(frd).valueAsDouble = static_cast<f64>(data);
+  FPRi(frd).valueAsDouble = std::bit_cast<f64>(data);
   GPRi(ra) = EA;
 }
 
@@ -1413,13 +1521,13 @@ void PPCInterpreter::PPCInterpreter_lfs(PPU_STATE *ppuState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  SFPRegister singlePresFP;
-  singlePresFP.valueAsU32 = MMURead32(ppuState, EA);
+
+  u32 data = MMURead32(ppuState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  FPRi(frd).valueAsDouble = static_cast<f64>(singlePresFP.valueAsFloat);
+  FPRi(frd).valueAsDouble = std::bit_cast<f64>(ConvertToDouble(data));
 }
 
 // Load Floating-Point Single with Update
@@ -1435,13 +1543,13 @@ void PPCInterpreter::PPCInterpreter_lfsu(PPU_STATE *ppuState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  SFPRegister singlePresFP;
-  singlePresFP.valueAsU32 = MMURead32(ppuState, EA);
+  
+  u32 data = MMURead32(ppuState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  FPRi(frd).valueAsDouble = static_cast<f64>(singlePresFP.valueAsFloat);
+  FPRi(frd).valueAsDouble = std::bit_cast<f64>(ConvertToDouble(data));
 
   GPRi(ra) = EA;
 }
