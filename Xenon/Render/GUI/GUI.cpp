@@ -448,8 +448,8 @@ void PPUThreadRegisters(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
         FPRegister &FPR = ppuRegisters.FPR[i];
         gui->IDGroup(i, [&] {
           TextFmt(gui, "FPR[{}]", i);
-          Custom(gui, valueAsDouble, "{}", FPR.valueAsDouble);
-          Custom(gui, valueAsU64, "0x{:X}", FPR.valueAsU64);
+          Custom(gui, valueAsDouble, "{}", FPR.asDouble());
+          Custom(gui, valueAsU64, "0x{:X}", FPR.asU64());
         });
       }
     });

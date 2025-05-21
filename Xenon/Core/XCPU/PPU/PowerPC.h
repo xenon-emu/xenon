@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <bit>
 #include <memory>
 #include <unordered_map>
 
@@ -644,15 +645,16 @@ struct SECENG_ADDRESS_INFO {
 #define EX_SRR1_TRAP_TRAP 46
 
 // Floating Point Register
+struct FPRegister {
+private:
+  u64 hexValue = 0;
+public:
+  u32 asU32() { return static_cast<u32>(hexValue); }
+  u64 asU64() { return hexValue; }
+  double asDouble() { return std::bit_cast<double>(hexValue); }
 
-union SFPRegister { // Single Precision
-  float valueAsFloat;
-  u32 valueAsU32;
-};
-
-union FPRegister { // Double Precision
-  f64 valueAsDouble;
-  u64 valueAsU64;
+  void setValue(u64 inValue) { hexValue = inValue; }
+  void setValue(double inValue) { hexValue = std::bit_cast<u64>(inValue); }
 };
 
 //
