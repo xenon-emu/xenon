@@ -1168,8 +1168,10 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
       }
       params.shader = render->linkedShaderPrograms[combinedShaderHash];
 #endif
-      params.vertexBufferPtr = ram->getPointerToAddress(state->vertexData.address);
-      params.vertexBufferSize = state->vertexData.size;
+      if (state->vertexData.address > 0) {
+        params.vertexBufferPtr = ram->getPointerToAddress(state->vertexData.address);
+        params.vertexBufferSize = state->vertexData.size;
+      }
       params.maxVertexIndex = state->maxVertexIndex;
       params.minVertexIndex = state->minVertexIndex;
       params.indexOffset = state->indexOffset;

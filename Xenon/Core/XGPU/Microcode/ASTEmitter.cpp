@@ -252,10 +252,12 @@ Chunk ShaderCodeWriterSirit::GetExportDest(const eExportReg reg) {
   used_exports.insert(reg);
   Sirit::Id float_type = module.TypeFloat(32);
   Sirit::Id vec4_type = module.TypeVector(float_type, 4);
+  bool colorReg = false;
   auto it = output_vars.find(reg);
   if (it == output_vars.end()) {
     auto &var = output_vars[reg];
     if (reg >= eExportReg::COLOR0 && reg <= eExportReg::COLOR3) {
+      colorReg = true;
       Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
       var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
       module.Name(var, FMT("COLOR{}", static_cast<u32>(reg) - static_cast<u32>(eExportReg::COLOR0)));
@@ -268,6 +270,7 @@ Chunk ShaderCodeWriterSirit::GetExportDest(const eExportReg reg) {
   }
   Sirit::Id var_id = it->second;
   Sirit::Id loaded = {};
+
   eChunkType chunkType = eChunkType::Vector;
   if (type == eShaderType::Pixel) {
     loaded = module.OpLoad(vec4_type, var_id);
@@ -279,6 +282,18 @@ Chunk ShaderCodeWriterSirit::GetExportDest(const eExportReg reg) {
     else {
       loaded = module.OpLoad(vec4_type, var_id);
     }
+  }
+
+  // Swizzles to RGBA from BGRA/ARGB
+  // XYZW = ARGB
+  // YZWX = RGBA
+  if (colorReg) {
+    loaded = Swizzle(Chunk(loaded, eChunkType::Vector), {
+      eSwizzle::Y,
+      eSwizzle::Z,
+      eSwizzle::W,
+      eSwizzle::X,
+    }).id;
   }
 
   return Chunk(loaded, var_id, chunkType);
