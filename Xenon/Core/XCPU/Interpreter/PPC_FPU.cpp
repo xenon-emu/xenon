@@ -6,6 +6,92 @@
 #include "Base/Logging/Log.h"
 #include "PPCInterpreter.h"
 
+//
+// Utilities & constants
+//
+
+// Excpetion/Bit masks for FPSCR. See PPC Programming Environments Manual, Page 112, Table 3-9.
+enum eFPSCRExceptionBits : u32 {
+  FPSCR_BIT_FX = 1U << (31 - 0), // Floating-point exception summary.
+  FPSCR_BIT_FEX = 1U << (31 - 1), // Floating-point enabled exception summary.
+  FPSCR_BIT_VX = 1U << (31 - 2), // Floating-point invalid operation exception summary.
+  FPSCR_BIT_OX = 1U << (31 - 3), // Floating-point overflow exception.
+  FPSCR_BIT_UX = 1U << (31 - 4), // Floating-point underflow exception.
+  FPSCR_BIT_ZX = 1U << (31 - 5), // Floating-point zero divide exception.
+  FPSCR_BIT_XX = 1U << (31 - 6), // Floating-point inexact exception.
+  FPSCR_BIT_VXSNAN = 1U << (31 - 7), // Floating-point invalid operation exception for SNaN.
+  FPSCR_BIT_VXISI = 1U << (31 - 8), // Floating-point invalid operation exception for Infinity – Infinity.
+  FPSCR_BIT_VXIDI = 1U << (31 - 9), // Floating-point invalid operation exception for Infinity / Infinity.
+  FPSCR_BIT_VXZDZ = 1U << (31 - 10), // Floating-point invalid operation exception for Zero / Zero.
+  FPSCR_BIT_VXIMZ = 1U << (31 - 11), // Floating-point invalid operation exception for Infinity * Zero.
+  FPSCR_BIT_VXVC = 1U << (31 - 12), // Floating-point invalid operation exception for invalid compare.
+  FPSCR_BIT_VXSOFT = 1U << (31 - 21), // Floating-point invalid operation exception for software request. 
+  FPSCR_BIT_VXSQRT = 1U << (31 - 22), // Floating-point invalid operation exception for invalid square root.
+  FPSCR_BIT_VXCVI = 1U << (31 - 23), // Floating-point invalid operation exception for invalid integer convert.
+  FPSCR_BIT_VE = 1U << (31 - 24), // Floating-point invalid operation exception enable.
+  FPSCR_BIT_OE = 1U << (31 - 25), // IEEE floating-point overflow exception enable. 
+  FPSCR_BIT_UE = 1U << (31 - 26), // IEEE floating-point underflow exception enable. 
+  FPSCR_BIT_ZE = 1U << (31 - 27), // IEEE floating-point zero divide exception enable.
+  FPSCR_BIT_XE = 1U << (31 - 28), // Floating-point inexact exception enable.
+
+  // VX Enabled Exceptions.
+  FPSCR_VX_ANY = FPSCR_BIT_VXSNAN | FPSCR_BIT_VXISI | FPSCR_BIT_VXIDI | FPSCR_BIT_VXZDZ | FPSCR_BIT_VXIMZ | FPSCR_BIT_VXVC |
+  // Software Generated Exceptions.
+  FPSCR_BIT_VXSOFT | FPSCR_BIT_VXSQRT | FPSCR_BIT_VXCVI,
+
+  FPSCR_ANY_X = FPSCR_BIT_OX | FPSCR_BIT_UX | FPSCR_BIT_ZX | FPSCR_BIT_XX | FPSCR_VX_ANY,
+
+  FPSCR_ANY_E = FPSCR_BIT_VE | FPSCR_BIT_OE | FPSCR_BIT_UE | FPSCR_BIT_ZE | FPSCR_BIT_XE,
+};
+
+// Checks if exceptions regarding FPU are to be generated.
+inline void FPCheckExceptions(PPU_STATE* ppuState) {
+  if (curThread.FPSCR.FEX && (curThread.SPR.MSR.FE0 || curThread.SPR.MSR.FE1)) {
+    // Floating program exceptions are enabled and an exception is pending in 
+    // Floating Point Enabled Exception Summary bit of FPSCR.
+    curThread.exceptReg |= PPU_EX_PROG;
+    curThread.progExceptionType = PROGRAM_EXCEPTION_TYPE_FPU;
+  }
+}
+
+// Sets the FEX bit in FPSCR if any of the pending exception bits in it are to be raised.
+inline void FPUpdateExceptionSummaryBit(PPU_STATE* ppuState) {
+  curThread.FPSCR.VX = (curThread.FPSCR.FPSCR_Hex & FPSCR_VX_ANY) != 0;
+  curThread.FPSCR.FEX = ((curThread.FPSCR.FPSCR_Hex >> 22) & (curThread.FPSCR.FPSCR_Hex & FPSCR_ANY_E)) != 0;
+
+  FPCheckExceptions(ppuState);
+}
+
+// Sets the FX bit in FPSCR and causes said exception if allowed following logic from docs.
+void FPSetException(PPU_STATE* ppuState, u32 exceptionMask) {
+  // Check for the same exception already being present.
+  if ((curThread.FPSCR.FPSCR_Hex & exceptionMask) != exceptionMask) {
+    // Set exception summary.
+    curThread.FPSCR.FX = 1;
+  }
+
+  // Set the exception bit in FPSCR.
+  curThread.FPSCR.FPSCR_Hex |= exceptionMask;
+
+  // Update FP Exception Summary bit.
+  FPUpdateExceptionSummaryBit(ppuState);
+}
+
+// Represents a FP Operation Result, wich may set exeptions and or check for them.
+struct FPResult
+{
+  bool HasNoInvalidExceptions() const { return (exception & FPSCR_VX_ANY) == 0; }
+
+  void SetException(PPU_STATE *ppuState, eFPSCRExceptionBits exceptionBits) {
+    exception = exceptionBits;
+    FPSetException(ppuState, exceptionBits);
+  }
+
+  // Resulting Value.
+  double value = 0.0;
+  eFPSCRExceptionBits exception{};
+};
+
 // Updates needed fields from FPSCR and CR1 bits if requested
 void PPCInterpreter::ppuUpdateFPSCR(PPU_STATE *ppuState, f64 op0, f64 op1, bool updateCR, u8 CR) {
   // TODO(bitsh1ft3r): Detect NaN's

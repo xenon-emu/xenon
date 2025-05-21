@@ -201,7 +201,7 @@ void PPCInterpreter::ppcProgramException(PPU_STATE *ppuState) {
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Program exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA;
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & (QMASK(0, 32) | QMASK(37, 41) | QMASK(48, 63));
-  BSET(thread.SPR.SRR1, 64, thread.exceptTrapType);
+  BSET(thread.SPR.SRR1, 64, thread.progExceptionType);
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | (QMASK(0, 0) | QMASK(3, 3));
   thread.NIA = 0x700;
@@ -281,11 +281,11 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
 #else
       LOG_XBOX(Xenon, "Assertion! Continuing...");
 #endif
-      thread.exceptTrapType = EX_SRR1_TRAP_TRAP;
+      thread.progExceptionType = PROGRAM_EXCEPTION_TYPE_TRAP;
       return;
     } else if (Config::debug.autoContinueOnGuestAssertion) {
       LOG_XBOX(Xenon, "Assertion! Automatically continuing execution...");
-      thread.exceptTrapType = EX_SRR1_TRAP_TRAP;
+      thread.progExceptionType = PROGRAM_EXCEPTION_TYPE_TRAP;
       return;
     } else {
       LOG_XBOX(Xenon, "Assertion!");
@@ -304,7 +304,7 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
   }
 
   _ex |= PPU_EX_PROG;
-  thread.exceptTrapType = EX_SRR1_TRAP_TRAP;
+  thread.progExceptionType = PROGRAM_EXCEPTION_TYPE_TRAP;
   // Hacky optimization
   #undef curThread
   #define curThread ppuState->ppuThread[curThreadId]

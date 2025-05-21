@@ -642,7 +642,7 @@ void PPUThreadRegisters(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
     Hex(gui, ppuRegisters, exceptReg);
     Bool(gui, ppuRegisters, exceptionTaken);
     Hex(gui, ppuRegisters, exceptEA);
-    Hex(gui, ppuRegisters, exceptTrapType);
+    Hex(gui, ppuRegisters, progExceptionType);
     Bool(gui, ppuRegisters, exceptHVSysCall);
     Hex(gui, ppuRegisters, intEA);
     Hex(gui, ppuRegisters, lastWriteAddress);

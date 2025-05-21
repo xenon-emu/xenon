@@ -637,12 +637,11 @@ struct SECENG_ADDRESS_INFO {
 #define PPU_EX_TRACE 0x4000
 #define PPU_EX_PERFMON 0x8000
 
-// Exception trap types
-
-#define EX_SRR1_TRAP_FPU 43
-#define EX_SRR1_TRAP_ILL 44
-#define EX_SRR1_TRAP_PRIV 45
-#define EX_SRR1_TRAP_TRAP 46
+// Program exception types.
+#define PROGRAM_EXCEPTION_TYPE_FPU 43 // Floating Point Exception.
+#define PROGRAM_EXCEPTION_TYPE_ILL 44 // Illegal instruction Exception.
+#define PROGRAM_EXCEPTION_TYPE_PRIV 45 // Priviliged instruction Exception.
+#define PROGRAM_EXCEPTION_TYPE_TRAP 46 // TRAP instruction Exception.
 
 // Floating Point Register
 struct FPRegister {
@@ -693,14 +692,14 @@ struct PPU_THREAD_REGISTERS {
   LRUCache iERAT{}; // Instruction effective to real address cache.
   LRUCache dERAT{}; // Data effective to real address cache.
 
-  // Interrupt Register
+  // Exception Register
   u16 exceptReg = 0;
+  // Program Exception Type
+  u16 progExceptionType = 0;
   // Tells wheter we're currently processing an exception.
   bool exceptionTaken = false;
   // For use with Data/Instruction Storage/Segment exceptions.
   u64 exceptEA = 0;
-  // Trap type
-  u16 exceptTrapType = 0;
   // SystemCall Type
   bool exceptHVSysCall = false;
 
