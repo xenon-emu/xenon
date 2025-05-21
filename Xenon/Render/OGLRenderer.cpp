@@ -59,7 +59,7 @@ void OGLRenderer::BackendSDLProperties(SDL_PropertiesID properties) {
   SDL_SetBooleanProperty(properties, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true);
 }
 void OGLRenderer::BackendSDLInit() {
-  // Set as a debug context
+  // Set as a debug context 
   SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG));
   // Set OpenGL SDL Properties
   SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1));
@@ -229,6 +229,15 @@ void OGLRenderer::DrawIndexed(Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBu
   const Xe::eColorFormat destformat = static_cast<Xe::eColorFormat>((destInfo >> 7) & 0x3F);
   // Bind VAO
   glBindVertexArray(VAO);
+  if (auto buffer = createdBuffers.find("PixelConsts"_j); buffer != createdBuffers.end()) {
+    buffer->second->Bind(0);
+  }
+  if (auto buffer = createdBuffers.find("CommonBoolConsts"_j); buffer != createdBuffers.end()) {
+    buffer->second->Bind(1);
+  }
+  if (auto buffer = createdBuffers.find("VertexConsts"_j); buffer != createdBuffers.end()) {
+    buffer->second->Bind(2);
+  }
   // Bind and upload index buffer
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexBufferInfo.count, indexBufferInfo.elements, GL_STATIC_DRAW);
@@ -297,11 +306,13 @@ void OGLRenderer::UpdateViewportFromState(const Xe::XGPU::XenosState *state) {
   f32 zoffset = f(state->viewportZOffset);
 
   // Compute viewport rectangle
-  s32 x = static_cast<s32>(xoffset - xscale);
-  s32 y = static_cast<s32>(yoffset - yscale);
-  s32 width = static_cast<s32>(xscale * 2);
-  s32 height = static_cast<s32>(yscale * 2);
+  s32 width = static_cast<s32>(std::abs(xscale * 2));
+  s32 height = static_cast<s32>(std::abs(yscale * 2));
+  s32 x = static_cast<s32>(xoffset - std::abs(xscale));
+  s32 y = static_cast<s32>(yoffset - std::abs(yscale));
 
+  LOG_DEBUG(Xenos, "Resizing viewport pos: {}x{}, size: {}x{}", x, y, width, height);
+  Resize(width, height);
   glViewport(x, y, width, height);
 
   // Clamp to valid ranges (just in case)
