@@ -20,6 +20,8 @@ u32 Render::OGLTexture::GetOGLTextureFormat(eDataFormat format) {
   switch (format) {
     case eDataFormat::RGB:  return GL_RGB;
     case eDataFormat::RGBA: return GL_RGBA;
+    case eDataFormat::ARGB:
+    case eDataFormat::BGRA: return GL_BGRA;
     default: UNREACHABLE_MSG("Missing Format: {}", std::to_string(format));
   }
 }
@@ -47,7 +49,7 @@ void Render::OGLTexture::CreateTextureHandle(u32 width, u32 height, s32 flags) {
   Unbind();
 }
 
-void Render::OGLTexture::CreateTextureWithData(u32 width, u32 height, eDataFormat format, u8* data, u32 /*dataSize*/, s32 flags) {
+void Render::OGLTexture::CreateTextureWithData(u32 width, u32 height, eDataFormat format, u8 *data, u32 /*dataSize*/, s32 flags) {
   DestroyTexture();
   SetTexture(&TextureHandle);
   SetWidth(width);
@@ -59,7 +61,13 @@ void Render::OGLTexture::CreateTextureWithData(u32 width, u32 height, eDataForma
   glTexStorage2D(GL_TEXTURE_2D, 1, GetDepth(), width, height);
   SetupTextureFlags(flags);
   glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-  glTexImage2D(GL_TEXTURE_2D, 0, GetDepth(), width, height, 0, GetOGLTextureFormat(format), GL_UNSIGNED_BYTE, data);
+  u32 glFormat = GetOGLTextureFormat(format);
+  if (Type != 0) {
+    Type = GL_UNSIGNED_BYTE;
+    if (format == eDataFormat::ARGB)
+      Type = GL_UNSIGNED_INT_8_8_8_8_REV;
+  }
+  glTexImage2D(GL_TEXTURE_2D, 0, GetDepth(), width, height, 0, glFormat, GetType(), data);
   Unbind();
 }
 

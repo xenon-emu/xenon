@@ -5,10 +5,11 @@
 namespace Xe::XGPU {
 
   RingBuffer::RingBuffer(u8 *buffer, size_t capacity)
-    : _buffer(buffer), _capacity(capacity) {
-  }
+    : _buffer(buffer), _capacity(capacity)
+  {}
 
   void RingBuffer::AdvanceRead(size_t count) {
+    std::lock_guard lock(mutex);
     if (_readOffset + count < _capacity) {
       _readOffset += count;
     }
@@ -20,6 +21,7 @@ namespace Xe::XGPU {
   }
 
   void RingBuffer::AdvanceWrite(size_t count) {
+    std::lock_guard lock(mutex);
     if (_writeOffset + count < _capacity) {
       _writeOffset += count;
     }
@@ -31,6 +33,7 @@ namespace Xe::XGPU {
   }
 
   RingBuffer::ReadRange RingBuffer::BeginRead(size_t count) {
+    std::lock_guard lock(mutex);
     count = std::min(count, _capacity);
     if (!count) {
       return { nullptr };
@@ -46,6 +49,7 @@ namespace Xe::XGPU {
   }
 
   void RingBuffer::EndRead(ReadRange readRange) {
+    std::lock_guard lock(mutex);
     if (readRange.second) {
       _readOffset = readRange.secondLength;
     }
@@ -55,6 +59,7 @@ namespace Xe::XGPU {
   }
 
   size_t RingBuffer::Read(u8 *buffer, size_t count) {
+    std::lock_guard lock(mutex);
     count = std::min(count, _capacity);
     if (!count) {
       return 0;
@@ -85,6 +90,7 @@ namespace Xe::XGPU {
   }
 
   size_t RingBuffer::Write(const u8 *buffer, size_t count) {
+    std::lock_guard lock(mutex);
     count = std::min(count, _capacity);
     if (!count) {
       return 0;

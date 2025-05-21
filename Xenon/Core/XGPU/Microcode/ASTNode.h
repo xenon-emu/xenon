@@ -245,6 +245,13 @@ public:
   std::array<eSwizzle, 4> swizzle = {};
 };
 
+enum class VertexFetchResultType {
+  Float,
+  Int,
+  UInt,
+  Unknown
+};
+
 // Vertex/Texture Fetch
 class VertexFetch : public ExpressionNode {
 public:
@@ -261,6 +268,38 @@ public:
   Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<VertexFetch>(children[0]->CloneExpr(), fetchSlot, fetchOffset, fetchStride, format, isFloat, isSigned, isNormalized);
+  }
+
+  u32 GetComponentCount() const {
+    switch (format) {
+      case FMT_8:
+      case FMT_16:
+      case FMT_32:
+      case FMT_16_FLOAT:
+      case FMT_32_FLOAT:
+        return 1;
+      case FMT_8_8:
+      case FMT_16_16:
+      case FMT_32_32:
+        return 2;
+      case FMT_8_8_8_8:
+      case FMT_2_10_10_10:
+      case FMT_16_16_16_16:
+      case FMT_32_32_32_32:
+        return 4;
+      case FMT_32_32_32_FLOAT:
+        return 3;
+      default:
+        return 4;
+    }
+  }
+
+  VertexFetchResultType GetResultType() const {
+    if (isFloat)
+      return VertexFetchResultType::Float;
+    if (isSigned)
+      return VertexFetchResultType::Int;
+    return VertexFetchResultType::UInt;
   }
 
   u32 fetchSlot = 0, fetchOffset = 0, fetchStride = 0;

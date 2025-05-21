@@ -91,6 +91,11 @@ s32 DummyRenderer::GetBackbufferFlags() {
   return 0;
 }
 
+s32 DummyRenderer::GetXenosFlags() {
+  LOG_INFO(Render, "DummyRenderer::GetXenosFlags");
+  return 0;
+}
+
 void* DummyRenderer::GetBackendContext() {
   LOG_INFO(Render, "DummyRenderer::GetBackendContext");
   return nullptr;

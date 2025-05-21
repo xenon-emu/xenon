@@ -1,6 +1,7 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
 #include "Base/Logging/Log.h"
+#include <mutex>
 
 namespace Xe::XGPU {
 
@@ -10,7 +11,7 @@ namespace Xe::XGPU {
 
   class RingBuffer {
   public:
-    RingBuffer(u8* buffer, size_t capacity);
+    RingBuffer(u8 *buffer, size_t capacity);
 
     u8* buffer() const { return _buffer; }
     size_t capacity() const { return _capacity; }
@@ -62,6 +63,7 @@ namespace Xe::XGPU {
     template <typename T>
     T Read() {
       static_assert(std::is_fundamental<T>::value, "Immediate read only supports basic types!");
+      std::lock_guard lock(mutex);
       T imm;
       size_t read = Read(reinterpret_cast<u8*>(&imm), sizeof(T));
       assert(read == sizeof(T));
@@ -72,6 +74,7 @@ namespace Xe::XGPU {
     template <typename T>
     T ReadAndSwap() {
       static_assert(std::is_fundamental<T>::value, "Immediate read only supports basic types!");
+      std::lock_guard lock(mutex);
       T imm;
       size_t read = Read(reinterpret_cast<u8*>(&imm), sizeof(T));
       assert(read == sizeof(T));
@@ -81,14 +84,21 @@ namespace Xe::XGPU {
 
     size_t Write(const u8 *buffer, size_t count);
     template <typename T>
-    size_t Write(const T *buffer, size_t count) { return Write(reinterpret_cast<const u8*>(buffer), count); }
+    size_t Write(const T *buffer, size_t count) {
+      std::lock_guard lock(mutex);
+      return Write(reinterpret_cast<const u8*>(buffer), count);
+    }
 
     template <typename T>
-    size_t Write(T& data) { return Write(reinterpret_cast<const u8*>(&data), sizeof(T)); }
+    size_t Write(T &data) {
+      std::lock_guard lock(mutex);
+      return Write(reinterpret_cast<const u8*>(&data), sizeof(T));
+    }
 
   private:
+    std::recursive_mutex mutex{};
     // Buffer to store our data.
-    u8* _buffer = nullptr;
+    u8 *_buffer = nullptr;
     // Current buffer capacity
     size_t _capacity = 0;
     // Read and Write offsets.

@@ -7,8 +7,11 @@ namespace Render {
 
 // TODO(Vali0004): Expand formats
 enum eDataFormat : const u8 {
-  RGB = 0,
-  RGBA = 1
+  RGB,
+  RGBA,
+  BGR,
+  BGRA,
+  ARGB
 };
 
 class Texture {
@@ -24,13 +27,16 @@ public:
   virtual void DestroyTexture() = 0;
   virtual void SetTexture(void *handle) { Texture = handle; }
   virtual void* GetTexture() { return Texture; }
-  virtual void SetDepth(u32 depth) {  Depth = depth; }
+  virtual void SetType(u32 type) { Type = type; }
+  virtual u32 GetType() { return Type; }
+  virtual void SetDepth(u32 depth) { Depth = depth; }
   virtual u32 GetDepth() { return Depth; }
   virtual void SetWidth(u32 width) { Width = width; }
   virtual u32 GetWidth() { return Width; }
   virtual void SetHeight(u32 height) { Height = height; }
   virtual u32 GetHeight() { return Height; }
 protected:
+  u32 Type = 0;
   u32 Depth = 0;
   u32 Width = 0, Height = 0;
   void *Texture;

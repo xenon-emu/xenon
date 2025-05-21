@@ -938,7 +938,7 @@ void ShaderCodeWriterSirit::AssignImmediate(const Chunk &dst,
       LOG_ERROR(Xenos, "[AST::Sirit] Invalid immediate swizzle");
       continue;
     }
-      
+
     Sirit::Id imm = module.Constant(float_type, value);
     u32 dstIndex = static_cast<u32>(dstSwizzle[i]);
     components[dstIndex] = imm;

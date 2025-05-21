@@ -42,12 +42,13 @@ public:
   void OnBind() override;
   void OnSwap(SDL_Window* window) override;
   s32 GetBackbufferFlags() override;
+  s32 GetXenosFlags() override;
   void* GetBackendContext() override;
   u32 GetBackendID() override;
 private:
   // OpenGL Handles
-  // Dummy VAO
   u32 dummyVAO;
+  u32 VAO, VBO, EBO;
   // SDL Context
   SDL_GLContext context;
   // Checks if ES

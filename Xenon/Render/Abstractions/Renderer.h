@@ -84,6 +84,7 @@ public:
   virtual void OnBind() = 0;
   virtual void OnSwap(SDL_Window *window) = 0;
   virtual s32 GetBackbufferFlags() = 0;
+  virtual s32 GetXenosFlags() = 0;
   virtual void* GetBackendContext() = 0;
   virtual u32 GetBackendID() = 0;
   void SDLInit();

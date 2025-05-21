@@ -33,6 +33,7 @@ public:
   void OnBind() override;
   void OnSwap(SDL_Window* window) override;
   s32 GetBackbufferFlags() override;
+  s32 GetXenosFlags() override;
   void* GetBackendContext() override;
   u32 GetBackendID() override;
 };

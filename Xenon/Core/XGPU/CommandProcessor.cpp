@@ -142,13 +142,13 @@ u32 CommandProcessor::cpExecutePrimaryBuffer(u32 readIndex, u32 writeIndex) {
   cpRingBufer.setWriteOffset(writeIndex * sizeof(u32));
 
   do {
-    if (!ExecutePacket(&cpRingBufer)) {
+    if (!ExecutePacket(&cpRingBufer) && cpWorkerThreadRunning) {
       // TODO(bitsh1ft3r): Check whether this should be a fatal crash.
       LOG_ERROR(Xenos, "CP[PrimaryBuffer]: Failed to execute a packet.");
       assert(true);
       break;
     }
-  } while (cpRingBufer.readCount());
+  } while (cpRingBufer.readCount() && cpWorkerThreadRunning);
 
   return writeIndex; // Set Read and Write index equal, signaling buffer processed.
 }
@@ -161,13 +161,13 @@ void CommandProcessor::cpExecuteIndirectBuffer(u32 bufferPtr, u32 bufferSize) {
   ringBufer.setWriteOffset(bufferSize * sizeof(u32));
 
   do {
-    if (!ExecutePacket(&ringBufer)) {
+    if (!ExecutePacket(&ringBufer) && cpWorkerThreadRunning) {
       // TODO(bitsh1ft3r): Check whether this should be a fatal crash.
       LOG_ERROR(Xenos, "CP[IndirectRingBuffer]: Failed to execute a packet.");
       assert(true);
       break;
     }
-  } while (ringBufer.readCount());
+  } while (ringBufer.readCount() && cpWorkerThreadRunning);
   return;
 }
 
@@ -220,7 +220,7 @@ bool CommandProcessor::ExecutePacketType0(RingBuffer *ringBuffer, u32 packetData
   // Tells wheter the write is to one or multiple regs starting at specified register at base index.
   const u32 singleRegWrite = (packetData >> 15) & 0x1;
 
-  for (u64 idx = 0; idx < regCount; idx++) {
+  for (u64 idx = 0; cpWorkerThreadRunning && idx < regCount; idx++) {
     // Get the data to be written to the (internal) Register.
     u32 registerData = ringBuffer->Read<u32>();
     // Target register index.
@@ -1140,35 +1140,39 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
 #endif
       return true;
     }
-    XeDrawParams params = {};
-#ifndef NO_GFX
-    u32 combinedShaderHash = (static_cast<u64>(render->currentVertexShader.load()) << 32) | render->currentPixelShader.load();
-#endif
-    params.state = state;
-    params.indexBufferInfo = indexBufferInfo;
-    params.vgtDrawInitiator = state->vgtDrawInitiator;
-#ifndef NO_GFX
-    params.shader = render->linkedShaderPrograms[combinedShaderHash];
-#endif
-    params.vertexBufferPtr = ram->getPointerToAddress(state->vertexData.address);
-    params.maxVertexIndex = state->maxVertexIndex;
-    params.minVertexIndex = state->minVertexIndex;
-    params.indexOffset = state->indexOffset;
-    params.multiPrimitiveIndexBufferResetIndex = state->multiPrimitiveIndexBufferResetIndex;
-    params.currentBinIdMin = state->currentBinIdMin;
-#ifndef NO_GFX
-    Render::DrawJob drawJob = {};
-    drawJob.params = params;
-    drawJob.indexed = isIndexedDraw;
-    drawJob.shaderPS = render->currentPixelShader.load();
-    drawJob.shaderVS = render->currentVertexShader.load();
-    drawJob.shaderHash = combinedShaderHash;
-    // Queue off to the Renderer
     {
+#ifndef NO_GFX
       std::lock_guard<std::mutex> lock(render->drawQueueMutex);
-      render->drawQueue.push(drawJob);
-    }
+      u64 combinedShaderHash = (static_cast<u64>(render->currentVertexShader.load()) << 32) | render->currentPixelShader.load();
 #endif
+      XeDrawParams params = {};
+      params.state = state;
+      params.indexBufferInfo = indexBufferInfo;
+      params.vgtDrawInitiator = state->vgtDrawInitiator;
+#ifndef NO_GFX
+      if (render->linkedShaderPrograms.find(combinedShaderHash) == render->linkedShaderPrograms.end()) {
+        LOG_ERROR(Xenos, "Shader hash 0x{:X} (VS:0x{:X}, PS:0x{:X}) not found in linkedShaderPrograms!", combinedShaderHash, render->currentVertexShader.load(), render->currentPixelShader.load());
+      }
+      params.shader = render->linkedShaderPrograms[combinedShaderHash];
+#endif
+      params.vertexBufferPtr = ram->getPointerToAddress(state->vertexData.address);
+      params.vertexBufferSize = state->vertexData.size;
+      params.maxVertexIndex = state->maxVertexIndex;
+      params.minVertexIndex = state->minVertexIndex;
+      params.indexOffset = state->indexOffset;
+      params.multiPrimitiveIndexBufferResetIndex = state->multiPrimitiveIndexBufferResetIndex;
+      params.currentBinIdMin = state->currentBinIdMin;
+#ifndef NO_GFX
+      Render::DrawJob drawJob = {};
+      drawJob.params = params;
+      drawJob.indexed = isIndexedDraw;
+      drawJob.shaderPS = render->currentPixelShader.load();
+      drawJob.shaderVS = render->currentVertexShader.load();
+      drawJob.shaderHash = combinedShaderHash;
+      // Queue off to the Renderer
+      render->drawQueue.push(drawJob);
+#endif
+    }
     LOG_DEBUG(Xenos, "[CP] Draw{}", isIndexedDraw ? "Indexed" : "");
     state->ClearDirtyState();
   } else {

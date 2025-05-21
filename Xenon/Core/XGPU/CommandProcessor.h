@@ -52,7 +52,9 @@ struct XeIndexBufferInfo {
 
 #ifndef NO_GFX
 struct XeShader {
+  u32 vertexShaderHash = 0;
   Microcode::AST::Shader *vertexShader = nullptr;
+  u32 pixelShaderHash = 0;
   Microcode::AST::Shader *pixelShader = nullptr;
   std::vector<std::shared_ptr<Render::Texture>> textures{};
   std::shared_ptr<Render::Shader> program = {};
@@ -67,6 +69,7 @@ struct XeDrawParams {
   XeShader shader;
 #endif
   u8 *vertexBufferPtr = nullptr;
+  u64 vertexBufferSize = 0;
   u32 maxVertexIndex = 0;
   u32 minVertexIndex = 0;
   u32 indexOffset = 0;

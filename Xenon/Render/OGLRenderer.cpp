@@ -39,8 +39,11 @@ std::string OGLRenderer::gl_renderer() const {
 void OGLRenderer::BackendStart() {
   // Create the resource factory
   resourceFactory = std::make_unique<OGLResourceFactory>();
-  // Create a dummy VAO
+  // Create VAOs, VBOs and EBOs
+  glGenVertexArrays(1, &VAO);
   glGenVertexArrays(1, &dummyVAO);
+  glGenBuffers(1, &VBO);
+  glGenBuffers(1, &EBO);
 
   // Set clear color
   glClearColor(0.f, 0.f, 0.f, 1.f);
@@ -106,6 +109,9 @@ void OGLRenderer::BackendSDLInit() {
 
 void OGLRenderer::BackendShutdown() {
   glDeleteVertexArrays(1, &dummyVAO);
+  glDeleteVertexArrays(1, &VAO);
+  glDeleteBuffers(1, &VBO);
+  glDeleteBuffers(1, &EBO);
 }
 void OGLRenderer::BackendSDLShutdown() {
   SDL_GL_DestroyContext(context);
@@ -139,20 +145,46 @@ s32 ConvertToGLPrimitive(ePrimitiveType prim) {
 }
 
 void OGLRenderer::Draw(Xe::XGPU::XeDrawParams params) {
-  // TODO: Draw
   ePrimitiveType type = params.vgtDrawInitiator.primitiveType;
   s32 glPrimitive = ConvertToGLPrimitive(params.vgtDrawInitiator.primitiveType);
   u32 numIndices = params.vgtDrawInitiator.numIndices;
-  for (u32 i = 0; i != params.shader.textures.size(); ++i) {
+  // Bind VAO
+  glBindVertexArray(VAO);
+
+  // Upload vertex buffer data
+  glBindBuffer(GL_ARRAY_BUFFER, VBO);
+  glBufferData(GL_ARRAY_BUFFER, params.vertexBufferSize, params.vertexBufferPtr, GL_STATIC_DRAW);
+
+  u64 combinedShaderHash = (static_cast<u64>(params.shader.pixelShaderHash) << 32) | params.shader.vertexShaderHash;
+  params.shader = linkedShaderPrograms[combinedShaderHash];
+  // Configure vertex attributes from vertex fetches
+  if (params.shader.vertexShader) {
+    for (const auto *fetch : params.shader.vertexShader->vertexFetches) {
+      u32 slot = fetch->fetchSlot;
+      u32 offset = fetch->fetchOffset;
+      u32 stride = params.state->vertexData.size;
+
+      // Configure vertex attribute, assumes float4
+      glEnableVertexAttribArray(slot);
+      if (!fetch->isFloat && fetch->format == Xe::FMT_8_8_8_8 && fetch->isNormalized) {
+        glVertexAttribPointer(slot, 4, GL_UNSIGNED_BYTE, GL_TRUE, stride, (const void*)(u64)offset);
+      } else {
+        glVertexAttribPointer(slot, 4, GL_FLOAT, GL_FALSE, stride, (const void*)(u64)offset);
+      }
+    }
+  }
+  // Bind textures
+  for (u32 i = 0; i < params.shader.textures.size(); ++i) {
     glActiveTexture(GL_TEXTURE0 + i);
     params.shader.textures[i]->Bind();
-    //glBindSampler(i, params.shader.textures[i]->Sampler);
   }
+  // Perform draw
   glDrawArrays(glPrimitive, 0, params.vgtDrawInitiator.numIndices);
+  // Unbind VAO
+  glBindVertexArray(0);
 }
 
 void OGLRenderer::DrawIndexed(Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) {
-  // TODO: Draw
   ePrimitiveType type = params.vgtDrawInitiator.primitiveType;
   s32 glPrimitive = ConvertToGLPrimitive(params.vgtDrawInitiator.primitiveType);
   u32 numIndices = params.vgtDrawInitiator.numIndices;
@@ -162,26 +194,40 @@ void OGLRenderer::DrawIndexed(Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBu
   const u32 destArray = (destInfo >> 3) & 1;
   const u32 destSlice = (destInfo >> 4) & 1;
   const Xe::eColorFormat destformat = static_cast<Xe::eColorFormat>((destInfo >> 7) & 0x3F);
+  // Bind VAO
+  glBindVertexArray(VAO);
+
+  // Bind and upload index buffer
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexBufferInfo.count, indexBufferInfo.elements, GL_STATIC_DRAW);
+
+  // Bind and configure vertex buffer
+  glBindBuffer(GL_ARRAY_BUFFER, VBO);
+  glBufferData(GL_ARRAY_BUFFER, params.vertexBufferSize, params.vertexBufferPtr, GL_STATIC_DRAW);
+
+  if (params.shader.vertexShader) {
+    for (const auto* fetch : params.shader.vertexShader->vertexFetches) {
+      u32 slot = fetch->fetchSlot;
+      u32 offset = fetch->fetchOffset;
+      u32 stride = params.state->vertexData.size;
+
+      glEnableVertexAttribArray(slot);
+      if (!fetch->isFloat && fetch->format == Xe::FMT_8_8_8_8 && fetch->isNormalized) {
+        glVertexAttribPointer(slot, 4, GL_UNSIGNED_BYTE, GL_TRUE, stride, (const void*)(u64)offset);
+      } else {
+        glVertexAttribPointer(slot, 4, GL_FLOAT, GL_FALSE, stride, (const void*)(u64)offset);
+      }
+    }
+  }
+  // Bind textures
   for (u32 i = 0; i != params.shader.textures.size(); ++i) {
     glActiveTexture(GL_TEXTURE0 + i);
     params.shader.textures[i]->Bind();
-    //glBindSampler(i, params.shader.textures[i]->Sampler);
   }
-  if (params.shader.vertexShader) {
-    for (const auto *fetch : params.shader.vertexShader->vertexFetches) {
-      u32 slot = fetch->fetchSlot;
-      u32 offset = fetch->fetchOffset;
-
-      // Bind vertex buffer
-      u32 stride = params.state->vertexData.size;
-      const u8 *basePtr = params.vertexBufferPtr + params.minVertexIndex * stride + offset;
-
-      // Assume format is float4
-      glEnableVertexAttribArray(slot);
-      glVertexAttribPointer(slot, 4, GL_FLOAT, GL_FALSE, stride, (const void*)basePtr);
-    }
-  }
-  glDrawElements(glPrimitive, numIndices, indexType, (void*)indexBufferInfo.elements);
+  // Perform draw
+  glDrawElements(glPrimitive, numIndices, indexType, 0);
+  // Unbind VAO
+  glBindVertexArray(0);
 }
 
 void OGLRenderer::UpdateViewportFromState(const Xe::XGPU::XenosState *state) {
@@ -227,8 +273,12 @@ void OGLRenderer::OnCompute() {
 }
 
 void OGLRenderer::OnBind() {
+  // Bind VAO
   glBindVertexArray(dummyVAO);
+  // Draw fullscreen triangle
   glDrawArrays(GL_TRIANGLE_FAN, 0, 3);
+  // Unbind VAO
+  glBindVertexArray(0);
 }
 
 void OGLRenderer::OnSwap(SDL_Window *window) {
@@ -236,6 +286,13 @@ void OGLRenderer::OnSwap(SDL_Window *window) {
 }
 
 s32 OGLRenderer::GetBackbufferFlags() {
+  // Set our texture flags & depth
+  return eCreationFlags::glTextureWrapS_GL_CLAMP_TO_EDGE | eCreationFlags::glTextureWrapT_GL_CLAMP_TO_EDGE |
+        eCreationFlags::glTextureMinFilter_GL_NEAREST | eCreationFlags::glTextureMagFilter_GL_NEAREST |
+        eTextureDepth::R32U;
+}
+
+s32 OGLRenderer::GetXenosFlags() {
   // Set our texture flags & depth
   return eCreationFlags::glTextureWrapS_GL_CLAMP_TO_EDGE | eCreationFlags::glTextureWrapT_GL_CLAMP_TO_EDGE |
         eCreationFlags::glTextureMinFilter_GL_NEAREST | eCreationFlags::glTextureMagFilter_GL_NEAREST |

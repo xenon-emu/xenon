@@ -386,26 +386,29 @@ void Renderer::Thread() {
 
         if (shaderType == Render::eShaderType::Vertex) {
           pendingVertexShaders[job.shaderCRC] = std::make_pair(job.shaderTree, job.binary);
-        } else {
+        }
+        else {
           pendingPixelShaders[job.shaderCRC] = std::make_pair(job.shaderTree, job.binary);
         }
 
         // See if we have both shaders now
         if (currentVertexShader.load() != 0 && currentPixelShader.load() != 0) {
           auto vsIt = pendingVertexShaders.find(currentVertexShader.load());
-          auto fsIt = pendingPixelShaders.find(currentPixelShader.load());
+          auto psIt = pendingPixelShaders.find(currentPixelShader.load());
 
-          if (vsIt != pendingVertexShaders.end() && fsIt != pendingPixelShaders.end()) {
-            u64 combinedHash = (static_cast<u64>(currentVertexShader.load()) << 32) | currentPixelShader;
+          if (vsIt != pendingVertexShaders.end() && psIt != pendingPixelShaders.end()) {
+            u64 combinedHash = (static_cast<u64>(currentVertexShader.load()) << 32) | currentPixelShader.load();
             std::shared_ptr<Shader> shader = shaderFactory->LoadFromBinary(job.name, {
               { Render::eShaderType::Vertex, vsIt->second.second },
-              { Render::eShaderType::Fragment, fsIt->second.second },
+              { Render::eShaderType::Fragment, psIt->second.second },
             });
             if (shader) {
               Xe::XGPU::XeShader xeShader{};
               xeShader.program = std::move(shader);
-              xeShader.pixelShader = vsIt->second.first;
-              xeShader.vertexShader = fsIt->second.first;
+              xeShader.pixelShader = psIt->second.first;
+              xeShader.pixelShaderHash = psIt->first;
+              xeShader.vertexShaderHash = vsIt->first;
+              xeShader.vertexShader = vsIt->second.first;
               for (u64 i = 0; i != xeShader.pixelShader->usedTextures.size(); ++i) {
                 xeShader.textures.push_back(resourceFactory->CreateTexture());
               }
@@ -413,12 +416,13 @@ void Renderer::Thread() {
                 xeShader.textures.push_back(resourceFactory->CreateTexture());
               }
               for (auto &texture : xeShader.textures) {
-                texture->CreateTextureHandle(width, height, GetBackbufferFlags());
+                texture->CreateTextureHandle(width, height, GetXenosFlags());
               }
               linkedShaderPrograms.insert({ combinedHash, xeShader });
-              LOG_DEBUG(Xenos, "Linked shader program: VS: 0x{:08X}, PS: 0x{:08X}", currentVertexShader.load(), currentPixelShader.load());
-            } else {
-              LOG_ERROR(Xenos, "Failed to link shader programs! VS: 0x{:08X}, PS: 0x{:08X}", currentVertexShader.load(), currentPixelShader.load());
+              LOG_INFO(Xenos, "Linked shader program 0x{:X} (VS:0x{:X}, PS:0x{:X})", combinedHash, currentVertexShader.load(), currentPixelShader.load());
+            }
+            else {
+              LOG_ERROR(Xenos, "Failed to link shader program '0x{:X}'! VS: 0x{:08X}, PS: 0x{:08X}", combinedHash, currentVertexShader.load(), currentPixelShader.load());
             }
           }
         }
@@ -477,30 +481,34 @@ void Renderer::Thread() {
       renderShaderPrograms->Bind();
       backbuffer->Bind();
       OnBind();
-    } else {
-      while (!drawQueue.empty()) {
-        DrawJob job = drawQueue.front();
-        drawQueue.pop();
-        u64 combinedHash = (static_cast<u64>(job.shaderVS) << 32) | job.shaderPS;
-        if (auto buffer = createdBuffers.find("PixelConsts"_j); buffer != createdBuffers.end()) {
-          buffer->second->Bind(0);
-        }
-        if (auto buffer = createdBuffers.find("CommonBoolConsts"_j); buffer != createdBuffers.end()) {
-          buffer->second->Bind(1);
-        }
-        if (auto buffer = createdBuffers.find("VertexConsts"_j); buffer != createdBuffers.end()) {
-          buffer->second->Bind(2);
-        };
-        if (auto shader = linkedShaderPrograms.find(combinedHash); shader != linkedShaderPrograms.end()) {
-          shader->second.program->Bind();
-        }
+      backbuffer->Unbind();
+      renderShaderPrograms->Unbind();
+    }
 
-        if (job.indexed) {
-          DrawIndexed(job.params, job.params.indexBufferInfo);
-        }
-        else {
-          Draw(job.params);
-        }
+    while (!drawQueue.empty()) {
+      DrawJob drawJob = drawQueue.front();
+      if (auto buffer = createdBuffers.find("PixelConsts"_j); buffer != createdBuffers.end()) {
+        buffer->second->Bind(0);
+      }
+      if (auto buffer = createdBuffers.find("CommonBoolConsts"_j); buffer != createdBuffers.end()) {
+        buffer->second->Bind(1);
+      }
+      if (auto buffer = createdBuffers.find("VertexConsts"_j); buffer != createdBuffers.end()) {
+        buffer->second->Bind(2);
+      }
+      u64 combinedHash = (static_cast<u64>(currentVertexShader.load()) << 32) | currentPixelShader.load();
+      if (!linkedShaderPrograms.contains(combinedHash)) {
+        // Optionally log or delay the job
+        LOG_WARNING(Xenos, "Draw deferred: shader program 0x{:X} not linked yet", combinedHash);
+        continue;
+      }
+      drawQueue.pop();
+
+      if (drawJob.indexed) {
+        DrawIndexed(drawJob.params, drawJob.params.indexBufferInfo);
+      }
+      else {
+        Draw(drawJob.params);
       }
     }
 
