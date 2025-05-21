@@ -266,7 +266,7 @@ void Renderer::UpdateConstants(Xe::XGPU::XenosState *state) {
       reinterpret_cast<u8*>(&psConsts),
       reinterpret_cast<u8*>(&psConsts) + sizeof(psConsts)
     ),
-    Render::eBufferType::Uniform,
+    Render::eBufferType::Storage,
     Render::eBufferUsage::DynamicDraw
   };
   Render::BufferLoadJob vertexBufferJob = {
@@ -275,7 +275,7 @@ void Renderer::UpdateConstants(Xe::XGPU::XenosState *state) {
       reinterpret_cast<u8*>(&vsConsts),
       reinterpret_cast<u8*>(&vsConsts) + sizeof(vsConsts)
     ),
-    Render::eBufferType::Uniform,
+    Render::eBufferType::Storage,
     Render::eBufferUsage::DynamicDraw
   };
   Render::BufferLoadJob boolBufferJob = {
@@ -284,7 +284,7 @@ void Renderer::UpdateConstants(Xe::XGPU::XenosState *state) {
       reinterpret_cast<u8*>(&boolConsts),
       reinterpret_cast<u8*>(&boolConsts) + sizeof(boolConsts)
     ),
-    Render::eBufferType::Uniform,
+    Render::eBufferType::Storage,
     Render::eBufferUsage::DynamicDraw
   };
 
@@ -333,10 +333,10 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
   LOG_DEBUG(Xenos, "[CP] Copy state to EDRAM (address: 0x{:X}, size 0x{:X})", address, state->vertexData.size);
   // Clear
   if (colorClearEnabled) {
-    u8 a = (state->clearColor >> 24) & 0xFF;
-    u8 r = (state->clearColor >> 16) & 0xFF;
-    u8 g = (state->clearColor >> 8) & 0xFF;
-    u8 b = (state->clearColor >> 0) & 0xFF;
+    u8 r = (state->clearColor >> 24) & 0xFF;
+    u8 g = (state->clearColor >> 16) & 0xFF;
+    u8 b = (state->clearColor >> 8) & 0xFF;
+    u8 a = (state->clearColor >> 0) & 0xFF;
     UpdateClearColor(r, g, b, a);
     LOG_DEBUG(Xenos, "[CP] Clear color: {}, {}, {}, {}", r, g, b, a);
   }
@@ -493,15 +493,6 @@ void Renderer::Thread() {
       if (!threadRunning || !XeRunning)
         break;
       DrawJob drawJob = drawQueue.front();
-      if (auto buffer = createdBuffers.find("PixelConsts"_j); buffer != createdBuffers.end()) {
-        buffer->second->Bind(0);
-      }
-      if (auto buffer = createdBuffers.find("CommonBoolConsts"_j); buffer != createdBuffers.end()) {
-        buffer->second->Bind(1);
-      }
-      if (auto buffer = createdBuffers.find("VertexConsts"_j); buffer != createdBuffers.end()) {
-        buffer->second->Bind(2);
-      }
       u64 combinedHash = (static_cast<u64>(currentVertexShader.load()) << 32) | currentPixelShader.load();
       if (!linkedShaderPrograms.contains(combinedHash)) {
         // Optionally log or delay the job

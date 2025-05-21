@@ -59,6 +59,8 @@ void OGLRenderer::BackendSDLProperties(SDL_PropertiesID properties) {
   SDL_SetBooleanProperty(properties, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true);
 }
 void OGLRenderer::BackendSDLInit() {
+  // Set as a debug context
+  SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG));
   // Set OpenGL SDL Properties
   SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1));
   SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24));
@@ -105,6 +107,11 @@ void OGLRenderer::BackendSDLInit() {
   }
   // Set VSYNC
   SANITY_CHECK(SDL_GL_SetSwapInterval(VSYNC));
+  glEnable(GL_DEBUG_OUTPUT);
+  glDebugMessageCallback([](GLenum source, GLenum type, GLuint id, GLenum severity,
+    GLsizei length, const GLchar *message, const void *userParam) {
+    LOG_DEBUG(Render, "GL: {}", message);
+  }, nullptr);
 }
 
 void OGLRenderer::BackendShutdown() {
@@ -150,10 +157,14 @@ void OGLRenderer::Draw(Xe::XGPU::XeDrawParams params) {
   u32 numIndices = params.vgtDrawInitiator.numIndices;
   // Bind VAO
   glBindVertexArray(VAO);
-  if (params.vertexBufferSize && params.vertexBufferPtr) {
-    // Upload vertex buffer data
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, params.vertexBufferSize, params.vertexBufferPtr, GL_STATIC_DRAW);
+  if (auto buffer = createdBuffers.find("PixelConsts"_j); buffer != createdBuffers.end()) {
+    buffer->second->Bind(0);
+  }
+  if (auto buffer = createdBuffers.find("CommonBoolConsts"_j); buffer != createdBuffers.end()) {
+    buffer->second->Bind(1);
+  }
+  if (auto buffer = createdBuffers.find("VertexConsts"_j); buffer != createdBuffers.end()) {
+    buffer->second->Bind(2);
   }
   // Configure vertex attributes from vertex fetches
   if (params.shader.vertexShader) {
@@ -221,12 +232,6 @@ void OGLRenderer::DrawIndexed(Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBu
   // Bind and upload index buffer
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexBufferInfo.count, indexBufferInfo.elements, GL_STATIC_DRAW);
-  // Bind and configure vertex buffer
-  if (params.vertexBufferSize && params.vertexBufferPtr) {
-    // Upload vertex buffer data
-    glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, params.vertexBufferSize, params.vertexBufferPtr, GL_STATIC_DRAW);
-  }
   // Configure vertex attributes from vertex fetches
   if (params.shader.vertexShader) {
     for (const auto *fetch : params.shader.vertexShader->vertexFetches) {
