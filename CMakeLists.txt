@@ -75,7 +75,7 @@ add_compile_definitions(MICROPROFILE_USE_CONFIG)
 # Include Deps/ThirdParty and Packages
 if (GFX_ENABLED)
   find_package(SDL3 3.2.4 CONFIG)
-  find_package(sirit)
+  find_package(sirit CONFIG)
 endif()
 
 find_package(fmt 10.2.1 CONFIG)
