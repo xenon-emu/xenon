@@ -376,7 +376,9 @@ void Renderer::Thread() {
 
     {
       std::lock_guard<std::mutex> lock(shaderQueueMutex);
-      while (!shaderLoadQueue.empty()) {
+      while (threadRunning && !shaderLoadQueue.empty()) {
+        if (!threadRunning || !XeRunning)
+          break;
         ShaderLoadJob job = shaderLoadQueue.front();
         shaderLoadQueue.pop();
 
@@ -431,7 +433,9 @@ void Renderer::Thread() {
 
     {
       std::lock_guard<std::mutex> lock(bufferQueueMutex);
-      while (!bufferLoadQueue.empty()) {
+      while (threadRunning && !bufferLoadQueue.empty()) {
+        if (!threadRunning || !XeRunning)
+          break;
         BufferLoadJob job = bufferLoadQueue.front();
         bufferLoadQueue.pop();
 
@@ -485,7 +489,9 @@ void Renderer::Thread() {
       renderShaderPrograms->Unbind();
     }
 
-    while (!drawQueue.empty()) {
+    while (threadRunning && !drawQueue.empty()) {
+      if (!threadRunning || !XeRunning)
+        break;
       DrawJob drawJob = drawQueue.front();
       if (auto buffer = createdBuffers.find("PixelConsts"_j); buffer != createdBuffers.end()) {
         buffer->second->Bind(0);
@@ -502,10 +508,17 @@ void Renderer::Thread() {
         LOG_WARNING(Xenos, "Draw deferred: shader program 0x{:X} not linked yet", combinedHash);
         continue;
       }
-      drawQueue.pop();
       // Update shader after it's loaded
-      drawJob.params.shader = linkedShaderPrograms[combinedHash];
-      drawJob.params.shader.program->Bind();
+      if (auto it = linkedShaderPrograms.find(combinedHash); it != linkedShaderPrograms.end()) {
+        drawJob.params.shader = it->second;
+        if (drawJob.params.shader.program) {
+          drawJob.params.shader.program->Bind();
+        }
+      } else {
+        LOG_WARNING(Xenos, "Draw deferred: shader program 0x{:X} not linked yet", combinedHash);
+        continue;
+      }
+      drawQueue.pop();
 
       // Draw
       if (drawJob.indexed) {

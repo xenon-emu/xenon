@@ -24,7 +24,7 @@
 #include "Render/Abstractions/Renderer.h"
 
 namespace Xe::XGPU {
-  
+
 CommandProcessor::CommandProcessor(RAM *ramPtr, XenosState *statePtr, Render::Renderer *renderer, PCIBridge *pciBridge) :
   ram(ramPtr),
   state(statePtr), render(renderer),
@@ -124,6 +124,7 @@ void CommandProcessor::cpWorkerThreadLoop() {
     }
 
     // Shutdown if we were told to
+    cpWorkerThreadRunning = XeRunning;
     if (!cpWorkerThreadRunning)
       break;
 
@@ -148,6 +149,10 @@ u32 CommandProcessor::cpExecutePrimaryBuffer(u32 readIndex, u32 writeIndex) {
       assert(true);
       break;
     }
+    // Shutdown if we were told to
+    cpWorkerThreadRunning = XeRunning;
+    if (!cpWorkerThreadRunning)
+      break;
   } while (cpRingBufer.readCount() && cpWorkerThreadRunning);
 
   return writeIndex; // Set Read and Write index equal, signaling buffer processed.
@@ -167,6 +172,10 @@ void CommandProcessor::cpExecuteIndirectBuffer(u32 bufferPtr, u32 bufferSize) {
       assert(true);
       break;
     }
+    // Shutdown if we were told to
+    cpWorkerThreadRunning = XeRunning;
+    if (!cpWorkerThreadRunning)
+      break;
   } while (ringBufer.readCount() && cpWorkerThreadRunning);
   return;
 }
@@ -221,6 +230,10 @@ bool CommandProcessor::ExecutePacketType0(RingBuffer *ringBuffer, u32 packetData
   const u32 singleRegWrite = (packetData >> 15) & 0x1;
 
   for (u64 idx = 0; cpWorkerThreadRunning && idx < regCount; idx++) {
+    // Shutdown if we were told to
+    cpWorkerThreadRunning = XeRunning;
+    if (!cpWorkerThreadRunning)
+      break;
     // Get the data to be written to the (internal) Register.
     u32 registerData = ringBuffer->Read<u32>();
     // Target register index.
