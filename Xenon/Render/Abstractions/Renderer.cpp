@@ -503,7 +503,11 @@ void Renderer::Thread() {
         continue;
       }
       drawQueue.pop();
+      // Update shader after it's loaded
+      drawJob.params.shader = linkedShaderPrograms[combinedHash];
+      drawJob.params.shader.program->Bind();
 
+      // Draw
       if (drawJob.indexed) {
         DrawIndexed(drawJob.params, drawJob.params.indexBufferInfo);
       }
