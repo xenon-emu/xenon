@@ -72,6 +72,9 @@ void Render::OGLTexture::CreateTextureWithData(u32 width, u32 height, eDataForma
 }
 
 void Render::OGLTexture::ResizeTexture(u32 width, u32 height) {
+  DestroyTexture();
+  SetTexture(&TextureHandle);
+  glGenTextures(1, &TextureHandle);
   Bind();
   glTexStorage2D(GL_TEXTURE_2D, 1, GetDepth(), width, height);
   SetupTextureFlags(glTextureWrapS_GL_CLAMP_TO_EDGE | glTextureWrapT_GL_CLAMP_TO_EDGE |

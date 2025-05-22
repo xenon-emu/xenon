@@ -1188,7 +1188,12 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
       render->drawQueue.push(drawJob);
 #endif
     }
-    LOG_DEBUG(Xenos, "[CP] Draw{}", isIndexedDraw ? "Indexed" : "");
+    LOG_DEBUG(Xenos, "[CP] Draw {}: PrimType {}, IndexCount {}, VS: 0x{:X}, PS: 0x{:X}",
+      isIndexedDraw ? "Indexed" : "Auto",
+      (u32)state->vgtDrawInitiator.primitiveType,
+      state->vgtDrawInitiator.numIndices,
+      render->currentVertexShader.load(),
+      render->currentPixelShader.load());
     state->ClearDirtyState();
   } else {
     LOG_ERROR(Xenos, "[CP] Invalid draw");

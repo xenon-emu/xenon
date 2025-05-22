@@ -400,31 +400,34 @@ void Renderer::Thread() {
 
           if (vsIt != pendingVertexShaders.end() && psIt != pendingPixelShaders.end()) {
             u64 combinedHash = (static_cast<u64>(currentVertexShader.load()) << 32) | currentPixelShader.load();
-            std::shared_ptr<Shader> shader = shaderFactory->LoadFromBinary(job.name, {
-              { Render::eShaderType::Vertex, vsIt->second.second },
-              { Render::eShaderType::Fragment, psIt->second.second },
-            });
-            if (shader) {
-              Xe::XGPU::XeShader xeShader{};
-              xeShader.program = std::move(shader);
-              xeShader.pixelShader = psIt->second.first;
-              xeShader.pixelShaderHash = psIt->first;
-              xeShader.vertexShaderHash = vsIt->first;
-              xeShader.vertexShader = vsIt->second.first;
-              for (u64 i = 0; i != xeShader.pixelShader->usedTextures.size(); ++i) {
-                xeShader.textures.push_back(resourceFactory->CreateTexture());
+            if (linkedShaderPrograms.find(combinedHash) == linkedShaderPrograms.end()) {
+              std::shared_ptr<Shader> shader = shaderFactory->LoadFromBinary(job.name, {
+                { Render::eShaderType::Vertex, vsIt->second.second },
+                { Render::eShaderType::Fragment, psIt->second.second }
+              });
+              if (shader) {
+                Xe::XGPU::XeShader xeShader{};
+                xeShader.program = std::move(shader);
+                xeShader.pixelShader = psIt->second.first;
+                xeShader.pixelShaderHash = psIt->first;
+                xeShader.vertexShaderHash = vsIt->first;
+                xeShader.vertexShader = vsIt->second.first;
+                if (xeShader.textures.empty()) {
+                  for (u64 i = 0; i != xeShader.pixelShader->usedTextures.size(); ++i) {
+                    xeShader.textures.push_back(resourceFactory->CreateTexture());
+                  }
+                  for (u64 i = 0; i != xeShader.vertexShader->usedTextures.size(); ++i) {
+                    xeShader.textures.push_back(resourceFactory->CreateTexture());
+                  }
+                  for (auto &texture : xeShader.textures) {
+                    texture->CreateTextureHandle(width, height, GetXenosFlags());
+                  }
+                }
+                linkedShaderPrograms.insert({ combinedHash, xeShader });
+                LOG_INFO(Xenos, "Linked shader program 0x{:X} (VS:0x{:X}, PS:0x{:X})", combinedHash, currentVertexShader.load(), currentPixelShader.load());
+              } else {
+                LOG_ERROR(Xenos, "Failed to link shader program '0x{:X}'! VS: 0x{:08X}, PS: 0x{:08X}", combinedHash, currentVertexShader.load(), currentPixelShader.load());
               }
-              for (u64 i = 0; i != xeShader.vertexShader->usedTextures.size(); ++i) {
-                xeShader.textures.push_back(resourceFactory->CreateTexture());
-              }
-              for (auto &texture : xeShader.textures) {
-                texture->CreateTextureHandle(width, height, GetXenosFlags());
-              }
-              linkedShaderPrograms.insert({ combinedHash, xeShader });
-              LOG_INFO(Xenos, "Linked shader program 0x{:X} (VS:0x{:X}, PS:0x{:X})", combinedHash, currentVertexShader.load(), currentPixelShader.load());
-            }
-            else {
-              LOG_ERROR(Xenos, "Failed to link shader program '0x{:X}'! VS: 0x{:08X}, PS: 0x{:08X}", combinedHash, currentVertexShader.load(), currentPixelShader.load());
             }
           }
         }
