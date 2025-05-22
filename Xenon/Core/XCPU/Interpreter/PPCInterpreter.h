@@ -40,7 +40,10 @@ extern XENON_CONTEXT *CPUContext;
 #define SET_FPSCR(x)  curThread.FPSCR.FPSCR_Hex = x
 // Check for Enabled FPU.
 #define CHECK_FPU     if (!checkFpuAvailable(ppuState)) { return; }
-
+// Converts a given number into an integer.
+void ConvertToInteger(PPU_STATE* ppuState, eFPRoundMode roundingMode);
+void FPCompareOrdered(PPU_STATE* ppuState, double fra, double frb);
+void FPCompareUnordered(PPU_STATE* ppuState, double fra, double frb);
 //
 // VXU Helpers
 //
@@ -119,6 +122,9 @@ template <typename T>
 inline void ppuSetCR(PPU_STATE *ppuState, u32 crField, const T& a, const T& b) {
   ppuSetCR(ppuState, crField, a < b, a > b, a == b, curThread.SPR.XER.SO);
 }
+
+// // Updates CR1 field based on the contents of FPSCR.
+void ppuSetCR1(PPU_STATE* ppuState);
 
 // Update FPSCR FPCC bits and CR if requested. Default CR to be updated is 1.
 void ppuUpdateFPSCR(PPU_STATE *ppuState, f64 op0, f64 op1, bool updateCR, u8 CR = 1);

@@ -16,7 +16,7 @@
 
 // PowerPC Opcode definitions
 /*
-* All original authors of the rpcs3 PPU_Decoder and PPU_Opcodes and cr_bits maintain their original copyright.
+* All original authors of the rpcs3 PPU_Decoder and PPU_Opcodes maintain their original copyright.
 * Modifed for usage in the Xenon Emulator
 * All rights reserved
 * License: GPL2
@@ -189,6 +189,11 @@ result of either an integer or floating-point compare instruction
 */
 union CRegister {
   u32 CR_Hex;
+  // Individual Bit access.
+  u8 bits[32];
+
+  u8& operator [](size_t bitIdx) { return bits[bitIdx]; }
+
   struct {
     u32 CR7 : 4;
     u32 CR6 : 4;
@@ -201,109 +206,104 @@ union CRegister {
   };
 };
 
-union alignas(16) CR_Reg {
-  u8 bits[32];
-  u32 fields[8];
-
-  u8& operator [](size_t i) {
-    return bits[i];
-  }
-
-  // Pack CR bits
-  u32 pack() const {
-    u32 result{};
-
-    for (u32 bit : bits) {
-      result <<= 1;
-      result |= bit;
-    }
-
-    return result;
-  }
-
-  // Unpack CR bits
-  void unpack(u32 value) {
-    for (u8& b : bits) {
-      b = !!(value & (1u << 31));
-      value <<= 1;
-    }
-  }
-};
-
-union alignas(16) fpscrBits {
-  u8 bits[32];
-  u32 fields[8];
-
-  u8& operator [](u8 i)
-  {
-    return bits[i];
-  }
-
-  // Pack FPSCR bits
-  u32 pack() const
-  {
-    u32 result{};
-
-    for (u32 bit : bits)
-    {
-      result <<= 1;
-      result |= bit;
-    }
-
-    return result;
-  }
-
-  // Unpack FPSCR bits
-  void unpack(u32 value)
-  {
-    for (u8& b : bits)
-    {
-      b = !!(value & (1u << 31));
-      value <<= 1;
-    }
-  }
+// Rounding modes useb by FPSCR's RN bits. They specify rounding mode regarding several operations
+// inside the FPU.
+// See PPC Assembly IBM Programming Environment Manual, 2.3, page 109, table 3-8.
+enum eFPRoundMode : u32 {
+  roundModeNearest = 0,
+  roundModeTowardZero = 1,
+  roundModePlusInfinity = 2,
+  roundModeNegativeInfinity = 3
 };
 
 /*
 Floating-Point Status and Control Register (FPSCR)
 */
 union FPSCRegister {
-  u32 FPSCR_Hex;
-  struct {
-    u32 RN : 2;
-    u32 NI : 1;
-    u32 XE : 1;
-    u32 ZE : 1;
-    u32 UE : 1;
-    u32 OE : 1;
-    u32 VE : 1;
-    u32 VXCVI : 1;
-    u32 VXSQRT : 1;
-    u32 VXSOFT : 1;
-    u32 R0 : 1;
-    u32 C : 1;  // FPRF Field.
-    u32 FL : 1;
-    u32 FG : 1;
-    u32 FE : 1;
-    u32 FU : 1;
-    u32 FI : 1;
-    u32 FR : 1;
-    u32 VXVC : 1;
-    u32 VXIMZ : 1;
-    u32 VXZDZ : 1;
-    u32 VXIDI : 1;
-    u32 VXISI : 1;
-    u32 VXSNAN : 1;
-    u32 XX : 1;
-    u32 ZX : 1;
-    u32 UX : 1;
-    u32 OX : 1;
-    u32 VX : 1;
-    u32 FEX : 1;
-    u32 FX : 1;
-  };
-  // FPSCR Bits
-  fpscrBits bits; 
+  // Rounding mode (towards: nearest, zero, +inf, -inf)
+  PPCBitfield<eFPRoundMode, 30, 2> RN;
+  // Non-IEEE mode enable (aka flush-to-zero)
+  PPCBitfield<u32, 29, 1> NI;
+  // Inexact exception enable
+  PPCBitfield<u32, 28, 1> XE;
+  // IEEE division by zero exception enable
+  PPCBitfield<u32, 27, 1> ZE;
+  // IEEE underflow exception enable
+  PPCBitfield<u32, 26, 1> UE;
+  // IEEE overflow exception enable
+  PPCBitfield<u32, 25, 1> OE;
+  // Invalid operation exception enable
+  PPCBitfield<u32, 24, 1> VE;
+  // Invalid operation exception for integer conversion (sticky)
+  PPCBitfield<u32, 23, 1> VXCVI;
+  // Invalid operation exception for square root (sticky)
+  PPCBitfield<u32, 22, 1> VXSQRT;
+  // Invalid operation exception for software request (sticky)
+  PPCBitfield<u32, 21, 1> VXSOFT;
+  // reserved
+  PPCBitfield<u32, 20, 1> R0;
+  // Floating point result flags (includes FPCC) (not sticky)
+  // from more to less significand: class, <, >, =, ?
+  PPCBitfield<u32, 15, 5> FPRF;
+  PPCBitfield<u32, 15, 1> C; // Floating-point result class descriptor (C)
+  PPCBitfield<u32, 16, 1> FL; // Floating-point less than or negative
+  PPCBitfield<u32, 17, 1> FG; // Floating-point greater than or positive
+  PPCBitfield<u32, 18, 1> FE; // Floating-point equal or zero
+  PPCBitfield<u32, 19, 1> FU; // Floating-point unordered or NaN 
+  // Fraction inexact (not sticky)
+  PPCBitfield<u32, 14, 1> FI;
+  // Fraction rounded (not sticky)
+  PPCBitfield<u32, 13, 1> FR;
+  // Invalid operation exception for invalid comparison (sticky)
+  PPCBitfield<u32, 12, 1> VXVC;
+  // Invalid operation exception for inf * 0 (sticky)
+  PPCBitfield<u32, 11, 1> VXIMZ;
+  // Invalid operation exception for 0 / 0 (sticky)
+  PPCBitfield<u32, 10, 1> VXZDZ;
+  // Invalid operation exception for inf / inf (sticky)
+  PPCBitfield<u32, 9, 1> VXIDI;
+  // Invalid operation exception for inf - inf (sticky)
+  PPCBitfield<u32, 8, 1> VXISI;
+  // Invalid operation exception for SNaN (sticky)
+  PPCBitfield<u32, 7, 1> VXSNAN;
+  // Inexact exception (sticky)
+  PPCBitfield<u32, 6, 1> XX;
+  // Division by zero exception (sticky)
+  PPCBitfield<u32, 5, 1> ZX;
+  // Underflow exception (sticky)
+  PPCBitfield<u32, 4, 1> UX;
+  // Overflow exception (sticky)
+  PPCBitfield<u32, 3, 1> OX;
+  // Invalid operation exception summary (not sticky)
+  PPCBitfield<u32, 2, 1> VX;
+  // Enabled exception summary (not sticky)
+  PPCBitfield<u32, 1, 1> FEX;
+  // Exception summary (sticky)
+  PPCBitfield<u32, 0, 1> FX;
+
+  u8 bits[32];
+
+  u32 FPSCR_Hex = 0;
+
+  // FPSCR's bit 20 is defined as reserved and set to zero. Attempts to modify it
+  // are ignored by hardware, we set a mask in order to mimic this.
+  static constexpr u32 fpscrMask = 0xFFFFF7FF;
+
+  FPSCRegister() = default;
+  explicit FPSCRegister(u32 hexValue) : FPSCR_Hex{ hexValue & fpscrMask } {}
+
+  u8& operator[](u8 bitIdx) { return bits[bitIdx]; }
+
+  FPSCRegister& operator=(u32 inValue) { FPSCR_Hex = inValue & fpscrMask; return *this; }
+
+  FPSCRegister& operator|=(u32 inValue) { FPSCR_Hex |= inValue & fpscrMask; return *this; }
+
+  FPSCRegister& operator&=(u32 inValue) { FPSCR_Hex &= inValue; return *this; }
+
+  FPSCRegister& operator^=(u32 inValue) { FPSCR_Hex ^= inValue & fpscrMask; return *this; }
+
+  // Clears both Fraction Inexact and Fraction Rounded bits.
+  void clearFIFR() { FI = 0; FR = 0; }
 };
 
 /*
