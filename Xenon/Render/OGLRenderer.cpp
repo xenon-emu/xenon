@@ -171,29 +171,30 @@ void OGLRenderer::Draw(Xe::XGPU::XeDrawParams params) {
     for (const auto *fetch : params.shader.vertexShader->vertexFetches) {
       u32 slot = fetch->fetchSlot;
       u32 offset = fetch->fetchOffset;
+      u32 stride = fetch->fetchStride;
 
       glEnableVertexAttribArray(slot);
       // TODO: Make this actually cleaner, by taking size of args, and the type
       switch (fetch->format) {
       case Xe::FMT_8_8_8_8:
-        glVertexAttribPointer(slot, 4, GL_UNSIGNED_BYTE, fetch->isNormalized ? GL_TRUE : GL_FALSE, 0, (const void*)(u64)offset);
+        glVertexAttribPointer(slot, 4, GL_UNSIGNED_BYTE, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
         break;
       case Xe::FMT_8_8:
-        glVertexAttribPointer(slot, 2, GL_UNSIGNED_BYTE, fetch->isNormalized ? GL_TRUE : GL_FALSE, 0, (const void*)(u64)offset);
+        glVertexAttribPointer(slot, 2, GL_UNSIGNED_BYTE, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
         break;
       case Xe::FMT_32:
       case Xe::FMT_32_FLOAT:
-        glVertexAttribPointer(slot, 1, fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT, fetch->isNormalized ? GL_TRUE : GL_FALSE, 0, (const void*)(u64)offset);
+        glVertexAttribPointer(slot, 1, fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
         break;
       case Xe::FMT_16_16_16_16:
-        glVertexAttribPointer(slot, 4, GL_UNSIGNED_SHORT, fetch->isNormalized ? GL_TRUE : GL_FALSE, 0, (const void*)(u64)offset);
+        glVertexAttribPointer(slot, 4, GL_UNSIGNED_SHORT, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
         break;
       case Xe::FMT_16_16_16_16_FLOAT:
-        glVertexAttribPointer(slot, 4, GL_FLOAT, fetch->isNormalized ? GL_TRUE : GL_FALSE, 0, (const void*)(u64)offset);
+        glVertexAttribPointer(slot, 4, GL_FLOAT, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
         break;
       case Xe::FMT_32_32:
       case Xe::FMT_32_32_FLOAT:
-        glVertexAttribPointer(slot, 2, fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT, fetch->isNormalized ? GL_TRUE : GL_FALSE, 0, (const void*)(u64)offset);
+        glVertexAttribPointer(slot, 2, fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
         break;
       case Xe::FMT_32_32_32_32:
       case Xe::FMT_32_32_32_32_FLOAT:
@@ -245,32 +246,33 @@ void OGLRenderer::DrawIndexed(Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBu
     for (const auto *fetch : params.shader.vertexShader->vertexFetches) {
       u32 slot = fetch->fetchSlot;
       u32 offset = fetch->fetchOffset;
+      u32 stride = fetch->fetchStride;
 
       glEnableVertexAttribArray(slot);
       switch (fetch->format) {
       case Xe::FMT_8_8_8_8:
-        glVertexAttribPointer(slot, 4, GL_UNSIGNED_BYTE, fetch->isNormalized ? GL_TRUE : GL_FALSE, 0, (const void*)(u64)offset);
+        glVertexAttribPointer(slot, 4, GL_UNSIGNED_BYTE, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
         break;
       case Xe::FMT_8_8:
-        glVertexAttribPointer(slot, 2, GL_UNSIGNED_BYTE, fetch->isNormalized ? GL_TRUE : GL_FALSE, 0, (const void*)(u64)offset);
+        glVertexAttribPointer(slot, 2, GL_UNSIGNED_BYTE, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
         break;
       case Xe::FMT_32:
       case Xe::FMT_32_FLOAT:
-        glVertexAttribPointer(slot, 1, fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT, fetch->isNormalized ? GL_TRUE : GL_FALSE, 0, (const void*)(u64)offset);
+        glVertexAttribPointer(slot, 1, fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
         break;
       case Xe::FMT_16_16_16_16:
-        glVertexAttribPointer(slot, 4, GL_UNSIGNED_SHORT, fetch->isNormalized ? GL_TRUE : GL_FALSE, 0, (const void*)(u64)offset);
+        glVertexAttribPointer(slot, 4, GL_UNSIGNED_SHORT, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
         break;
       case Xe::FMT_16_16_16_16_FLOAT:
-        glVertexAttribPointer(slot, 4, GL_FLOAT, fetch->isNormalized ? GL_TRUE : GL_FALSE, 0, (const void*)(u64)offset);
+        glVertexAttribPointer(slot, 4, GL_FLOAT, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
         break;
       case Xe::FMT_32_32:
       case Xe::FMT_32_32_FLOAT:
-        glVertexAttribPointer(slot, 2, fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT, fetch->isNormalized ? GL_TRUE : GL_FALSE, 0, (const void*)(u64)offset);
+        glVertexAttribPointer(slot, 2, fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
         break;
       case Xe::FMT_32_32_32_32:
       case Xe::FMT_32_32_32_32_FLOAT:
-        glVertexAttribPointer(slot, 4, fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT, fetch->isNormalized ? GL_TRUE : GL_FALSE, 0, (const void*)(u64)offset);
+        glVertexAttribPointer(slot, 4, fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
         break;
       default:
         LOG_ERROR(Xenos, "[Render] Unhandled OpenGL conversion from Xenos vertex fetch!");
