@@ -132,17 +132,6 @@ if (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" OR "Debug")
   add_compile_definitions(DEBUG_BUILD)
 endif()
 
-# Copy fonts to build directory
-if (GFX_ENABLED)
-  add_custom_target(copy-fonts
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-    "${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts" # Input
-    "${CMAKE_CURRENT_BINARY_DIR}/fonts"  # Output
-    COMMENT "Copying fonts (${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts) to build directory (${CMAKE_CURRENT_BINARY_DIR}/fonts)"
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/Deps/fonts)
-endif()
-
-
 # Link libraries
 target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11)
 if (GFX_ENABLED)
@@ -154,12 +143,6 @@ target_include_directories(Xenon PRIVATE ${microprofile_dir} Xenon/include)
 if (GFX_ENABLED)
     target_include_directories(Xenon PRIVATE ${ImGuiDir})
 endif()
-
-# Add fonts target
-if (GFX_ENABLED)
-  add_dependencies(Xenon copy-fonts)
-endif()
-
 
 # Add defines specific to windows
 if (WIN32)

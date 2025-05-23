@@ -75,7 +75,6 @@ public:
   void Render(Texture *texture);
   void SetStyle();
 
-  ImFont *defaultFont13 = nullptr;
   ImFont *robotRegular14 = nullptr;
   ImFont *robotRegular16 = nullptr;
   ImFont *robotRegular18 = nullptr;

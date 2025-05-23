@@ -15,7 +15,6 @@ enum class PathType {
   RootDir,    // Execution Path
   ConsoleDir, // Where Xenon gets the console files
   LogDir,     // Where log files are stored
-  FontDir,    // Where fonts are stored
   ShaderDir   // Where shaders are stored
 };
 
@@ -35,8 +34,6 @@ typedef struct _FileInfo {
 constexpr auto CONSOLE_DIR = "console";
 
 constexpr auto LOG_DIR = "log";
-
-constexpr auto FONT_DIR = "fonts";
 
 constexpr auto SHADER_DIR = "shaders";
 

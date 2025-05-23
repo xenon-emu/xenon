@@ -79,19 +79,6 @@ static auto UserPaths = [] {
     fs::create_directory(binaryDir / SHADER_DIR / "spirv");
     fs::create_directory(binaryDir / SHADER_DIR / "opengl");
   }
-  fs::path fontDir = binaryDir / FONT_DIR;
-  // Check if fonts are in ../share/FONT_DIR
-  bool createFontsDir = true;
-  if (!fs::exists(fontDir) && fs::exists(binaryDir / ".." / "share" / FONT_DIR)) {
-    createFontsDir = false;
-    fontDir = binaryDir / ".." / "share" / FONT_DIR / "truetype";
-  }
-  if (createFontsDir && nixos) {
-    // We cannot create a directory in the nix-store. Change font dir to currentDir / files
-    fontDir = currentDir / FONT_DIR;
-  }
-  insert_path(PathType::FontDir, fontDir, createFontsDir);
-
   return paths;
 }();
 

@@ -1,6 +1,7 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
 #include "GUI.h"
+#include "Roboto-Regular.h"
 
 #ifndef NO_GFX
 #include "Core/XeMain.h"
@@ -68,13 +69,15 @@ bool storedPreviousInitSkips{};
 s32 initSkip1{}, initSkip2{};
 void Render::GUI::PostInit() {
   ImGuiIO &io = ImGui::GetIO();
+
+  ImFontConfig fontConfig;
+  fontConfig.FontDataOwnedByAtlas = false; 
+
   // It might not be a bad idea to take the Xbox 360 font and convert it to TTF
-  const std::filesystem::path fontsPath{ Base::FS::GetUserPath(Base::FS::PathType::FontDir) };
-  const std::string robotoRegular = (fontsPath / "Roboto-Regular.ttf").string();
-  robotRegular16 = io.Fonts->AddFontFromFileTTF(robotoRegular.c_str(), 16.f);
-  robotRegular14 = io.Fonts->AddFontFromFileTTF(robotoRegular.c_str(), 14.f);
-  robotRegular18 = io.Fonts->AddFontFromFileTTF(robotoRegular.c_str(), 18.f);
-  defaultFont13 = io.Fonts->AddFontDefault();
+  robotRegular14 = io.Fonts->AddFontFromMemoryTTF((void*)Roboto_Regular_ttf, Roboto_Regular_ttf_len, 14.0f, &fontConfig);
+  robotRegular16 = io.Fonts->AddFontFromMemoryTTF((void*)Roboto_Regular_ttf, Roboto_Regular_ttf_len, 16.0f, &fontConfig);
+  robotRegular18 = io.Fonts->AddFontFromMemoryTTF((void*)Roboto_Regular_ttf, Roboto_Regular_ttf_len, 18.0f, &fontConfig);
+
   if (Config::xcpu.HW_INIT_SKIP_1 == 0x3003DC0 && Config::xcpu.HW_INIT_SKIP_2 == 0x3003E54) {
     storedPreviousInitSkips = true; // If we already have RGH2, ignore
     RGH2 = true;
