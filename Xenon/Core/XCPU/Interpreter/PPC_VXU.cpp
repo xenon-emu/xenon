@@ -3,28 +3,28 @@
 #include "PPCInterpreter.h"
 
 // Data Stream Touch for Store
-void PPCInterpreter::PPCInterpreter_dss(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_dss(PPU_STATE* ppuState) {
   CHECK_VXU;
 
   // We don't really need to do anything here, as it's handling cache. We mostly ignore it
 }
 
 // Data Stream Touch for Store
-void PPCInterpreter::PPCInterpreter_dst(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_dst(PPU_STATE* ppuState) {
   CHECK_VXU;
 
   // We don't really need to do anything here, as it's handling cache. We mostly ignore it
 }
 
 // Data Stream Touch for Store
-void PPCInterpreter::PPCInterpreter_dstst(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_dstst(PPU_STATE* ppuState) {
   CHECK_VXU;
 
   // We don't really need to do anything here, as it's handling cache. We mostly ignore it
 }
 
 // Move from Vector Status and Control Register (x'1000 0604')
-void PPCInterpreter::PPCInterpreter_mfvscr(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_mfvscr(PPU_STATE* ppuState) {
   /*
   vD <- 0 || (VSCR)
   */
@@ -35,7 +35,7 @@ void PPCInterpreter::PPCInterpreter_mfvscr(PPU_STATE *ppuState) {
 }
 
 // Move to Vector Status and Control Register (x'1000 0C44')
-void PPCInterpreter::PPCInterpreter_mtvscr(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_mtvscr(PPU_STATE* ppuState) {
   /*
   VSCR <- (vB)96:127
   */
@@ -46,51 +46,63 @@ void PPCInterpreter::PPCInterpreter_mtvscr(PPU_STATE *ppuState) {
 }
 
 // Vector Logical AND (x'1000 0404')
-void PPCInterpreter::PPCInterpreter_vand(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_vand(PPU_STATE* ppuState) {
   /*
   vD <- (vA) & (vB)
   */
 
   CHECK_VXU;
 
-  VRi(vd) = VRi(va) & VRi(vb);
+  VRi(vd).dword[0] = VRi(va).dword[0] & VRi(vb).dword[0];
+  VRi(vd).dword[1] = VRi(va).dword[1] & VRi(vb).dword[1];
+  VRi(vd).dword[2] = VRi(va).dword[2] & VRi(vb).dword[2];
+  VRi(vd).dword[3] = VRi(va).dword[3] & VRi(vb).dword[3];
 }
 
 // Vector Logical AND with Complement (x'1000 0444')
-void PPCInterpreter::PPCInterpreter_vandc(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_vandc(PPU_STATE* ppuState) {
   /*
   vD <- (vA) & ~(vB)
   */
 
   CHECK_VXU;
 
-  VRi(vd) = VRi(va) & ~VRi(vb);
+  VRi(vd).dword[0] = VRi(va).dword[0] & ~VRi(vb).dword[0];
+  VRi(vd).dword[1] = VRi(va).dword[1] & ~VRi(vb).dword[1];
+  VRi(vd).dword[2] = VRi(va).dword[2] & ~VRi(vb).dword[2];
+  VRi(vd).dword[3] = VRi(va).dword[3] & ~VRi(vb).dword[3];
 }
 
 // Vector Logical NOR (x'1000 0504')
-void PPCInterpreter::PPCInterpreter_vnor(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_vnor(PPU_STATE* ppuState) {
   /*
   vD <- ~((vA) | (vB))
   */
 
   CHECK_VXU;
 
-  VRi(vd) = ~(VRi(va) | VRi(vb));
+  VRi(vd).dword[0] = ~(VRi(va).dword[0] | VRi(vb).dword[0]);
+  VRi(vd).dword[1] = ~(VRi(va).dword[1] | VRi(vb).dword[1]);
+  VRi(vd).dword[2] = ~(VRi(va).dword[2] | VRi(vb).dword[2]);
+  VRi(vd).dword[3] = ~(VRi(va).dword[3] | VRi(vb).dword[3]);
 }
 
 // Vector Logical OR (x'1000 0484')
-void PPCInterpreter::PPCInterpreter_vor(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_vor(PPU_STATE* ppuState) {
   /*
   vD <- (vA) | (vB)
   */
 
   CHECK_VXU;
 
-  VRi(vd) = VRi(va) | VRi(vb);
+  VRi(vd).dword[0] = VRi(va).dword[0] | VRi(vb).dword[0];
+  VRi(vd).dword[1] = VRi(va).dword[1] | VRi(vb).dword[1];
+  VRi(vd).dword[2] = VRi(va).dword[2] | VRi(vb).dword[2];
+  VRi(vd).dword[3] = VRi(va).dword[3] | VRi(vb).dword[3];
 }
 
 // Vector Splat Word (x'1000 028C')
-void PPCInterpreter::PPCInterpreter_vspltw(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_vspltw(PPU_STATE* ppuState) {
   /*
    b <- UIMM*32
     do i=0 to 127 by 32
@@ -109,7 +121,7 @@ void PPCInterpreter::PPCInterpreter_vspltw(PPU_STATE *ppuState) {
 }
 
 // Vector 128 Multiply Floating Point
-void PPCInterpreter::PPCInterpreter_vmulfp128(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_vmulfp128(PPU_STATE* ppuState) {
   /*
   vD <- vA * vB (4 x FP)
   */
@@ -123,7 +135,7 @@ void PPCInterpreter::PPCInterpreter_vmulfp128(PPU_STATE *ppuState) {
 }
 
 // Vector Merge High Word (x'1000 008C')
-void PPCInterpreter::PPCInterpreter_vmrghw(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_vmrghw(PPU_STATE* ppuState) {
   /*
   do i=0 to 63 by 32
     vDi*2:(i*2)+63 <- (vA)i:i+31 || (vB)i:i+31
@@ -139,7 +151,7 @@ void PPCInterpreter::PPCInterpreter_vmrghw(PPU_STATE *ppuState) {
 }
 
 // Vector Merge Low Word (x'1000 018C')
-void PPCInterpreter::PPCInterpreter_vmrglw(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_vmrglw(PPU_STATE* ppuState) {
   /*
   do i=0 to 63 by 32
     vDi*2:(i*2)+63 <- (vA)i+64:i+95 || (vB)i+64:i+95
@@ -155,7 +167,7 @@ void PPCInterpreter::PPCInterpreter_vmrglw(PPU_STATE *ppuState) {
 }
 
 // Vector Merge High Word 128
-void PPCInterpreter::PPCInterpreter_vmrghw128(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_vmrghw128(PPU_STATE* ppuState) {
 
   CHECK_VXU;
 
@@ -209,12 +221,12 @@ void PPCInterpreter::PPCInterpreter_vspltish(PPU_STATE* ppuState) {
 
   CHECK_VXU;
 
-  u32 simm = 0;
+  s32 simm = 0;
 
-  if (_instr.vsimm) { simm = (_instr.vsimm & 0x10) ? (_instr.vsimm | 0xFFFFFFF0) : _instr.vsimm; }
+  if (_instr.vsimm) { simm = ((_instr.vsimm & 0x10) ? (_instr.vsimm | 0xFFFFFFF0) : _instr.vsimm); }
 
   for (u8 idx = 0; idx < 8; idx++) {
-    VRi(vd).word[idx] = static_cast<u16>(simm);
+    VRi(vd).sword[idx] = static_cast<s16>(simm);
   }
 }
 
@@ -228,12 +240,12 @@ void PPCInterpreter::PPCInterpreter_vspltisb(PPU_STATE* ppuState) {
 
   CHECK_VXU;
 
-  u32 simm = 0;
+  s32 simm = 0;
 
-  if (_instr.vsimm) { simm = (_instr.vsimm & 0x10) ? (_instr.vsimm | 0xFFFFFFF0) : _instr.vsimm; }
+  if (_instr.vsimm) { simm = ((_instr.vsimm & 0x10) ? (_instr.vsimm | 0xFFFFFFF0) : _instr.vsimm); }
 
   for (u8 idx = 0; idx < 16; idx++) {
-    VRi(vd).bytes[idx] = static_cast<u8>(simm);
+    VRi(vd).bytes[idx] = static_cast<s8>(simm);
   }
 }
 
@@ -245,22 +257,25 @@ void PPCInterpreter::PPCInterpreter_vspltisw128(PPU_STATE* ppuState) {
 
   CHECK_VXU;
 
-  u32 simm = 0;
+  s32 simm = 0;
 
-  if (VMX128_3_IMM) { simm = (VMX128_3_IMM & 0x10) ? (VMX128_3_IMM | 0xFFFFFFF0) : VMX128_3_IMM; }
+  if (VMX128_3_IMM) { simm = ((VMX128_3_IMM & 0x10) ? (VMX128_3_IMM | 0xFFFFFFF0) : VMX128_3_IMM); }
 
   for (u8 idx = 0; idx < 4; idx++) {
-    VR(VMX128_3_VD128).dword[idx] = simm;
+    VR(VMX128_3_VD128).dsword[idx] = simm;
   }
 }
 
 // Vector Logical XOR (x'1000 04C4')
-void PPCInterpreter::PPCInterpreter_vxor(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_vxor(PPU_STATE* ppuState) {
   /*
   vD <- (vA) ^ (vB)
   */
 
   CHECK_VXU;
 
-  VRi(vd) = VRi(va) ^ VRi(vb);
+  VRi(vd).dword[0] = VRi(va).dword[0] ^ VRi(vb).dword[0];
+  VRi(vd).dword[1] = VRi(va).dword[1] ^ VRi(vb).dword[1];
+  VRi(vd).dword[2] = VRi(va).dword[2] ^ VRi(vb).dword[2];
+  VRi(vd).dword[3] = VRi(va).dword[3] ^ VRi(vb).dword[3];
 }
