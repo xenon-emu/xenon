@@ -25,6 +25,7 @@ inline void SystemPause() {
   XePaused = true;
 #ifndef TOOL
   Base::Log::NoFmtMessage(Base::Log::Class::Log, Base::Log::Level::Critical, "Press Enter to continue...");
+  std::this_thread::sleep_for(10ms); // Wait for log to catchup
 #else
   printf("Press Enter to continue...");
 #endif

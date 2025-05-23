@@ -509,44 +509,60 @@ void saveConfig(const std::filesystem::path &path) {
     }
     LOG_INFO(Config, "Config not found! Saving new configuration file to {}", path.string());
   }
+
   // Read file to data, then close
-  toml::value data = toml::parse(path);
+  toml::value data = valid ? toml::parse(path) : toml::value{};
 
   std::string prevPath{ path.string() };
   std::string prevFile{ path.filename().string() };
   std::filesystem::path basePath{ prevPath.substr(0, prevPath.length() - prevFile.length() - 1) };
-  std::filesystem::path newPath{ basePath / (prevFile + ".tmp") };
+  // If we didn't have a config, just write directly. Nothing to save
+  std::filesystem::path newPath{ valid ? basePath / (prevFile + ".tmp") : path };
+
+  // If it wasn't valid, write before
+  if (!valid) {
+    // Write to toml, then verify contents
+    if (!verifyConfig(newPath, data)) {
+      return;
+    }
+  }
 
   // Write to file
   try {
     std::ofstream file{ newPath };
     file << data;
     file.close();
-  } catch (const std::exception &ex) {
+  }
+  catch (const std::exception &ex) {
     LOG_ERROR(Config, "Exception trying to write config. {}", ex.what());
     return;
   }
 
-  // Write to toml, then verify contents
-  if (!verifyConfig(newPath, data)) {
-    return;
+  // If it is, just ensure there is a backup config
+  if (valid) {
+    // Write to toml, then verify contents
+    if (!verifyConfig(newPath, data)) {
+      return;
+    }
   }
 
   // Copy file config to current version, if it's valid
-  try {
-    std::error_code fsError;
-    u64 fileSize = fs::file_size(newPath, fsError);
-    if (fileSize != -1 && fileSize) {
-      fs::rename(newPath, path);
-    } else {
-      fileSize = 0;
-      if (fsError) {
-        LOG_ERROR(Config, "Filesystem error: {} ({})", fsError.message(), fsError.value());
+  if (valid) {
+    try {
+      std::error_code fsError;
+      u64 fileSize = fs::file_size(newPath, fsError);
+      if (fileSize != -1 && fileSize) {
+        fs::rename(newPath, path);
+      } else {
+        fileSize = 0;
+        if (fsError) {
+          LOG_ERROR(Config, "Filesystem error: {} ({})", fsError.message(), fsError.value());
+        }
       }
+    } catch (const std::exception &ex) {
+      LOG_ERROR(Config, "Exception trying to copy backup config. {}", ex.what());
+      return;
     }
-  } catch (const std::exception &ex) {
-    LOG_ERROR(Config, "Exception trying to copy backup config. {}", ex.what());
-    return;
   }
 }
 
