@@ -424,16 +424,24 @@ void _highlyExperimental::from_toml(const toml::value &value) {
   s32 tmpConsoleRevison = static_cast<s32>(consoleRevison);
   tmpConsoleRevison = toml::find_or<s32&>(value, "ConsoleRevison", tmpConsoleRevison);
   consoleRevison = static_cast<eConsoleRevision>(tmpConsoleRevison);
+  cpuExecutor = toml::find_or<std::string>(value, "CPUExecutor", cpuExecutor);
   clocksPerInstructionBypass = toml::find_or<s32&>(value, "CPIBypass", clocksPerInstructionBypass);
 }
 void _highlyExperimental::to_toml(toml::value &value) {
+  value.comments().clear();
+  value.comments().push_back("# Do not touch these options unless you know what you're doing!");
+  value.comments().push_back("# It can break execution! User beware");
   value["ConsoleRevison"].comments().clear();
   value["ConsoleRevison"] = static_cast<u32>(consoleRevison);
   value["ConsoleRevison"].comments().push_back("# Console motherboard revision, used for PVR and XGPU Init");
   value["ConsoleRevison"].comments().push_back("# Zephyr = 0 | Falcon = 1 | Jasper = 2 | Trinity = 3 | Corona = 4 | Corona 4GB = 5 | Winchester = 6");
-  value.comments().clear();
-  value.comments().push_back("# Do not touch these options unless you know what you're doing!");
-  value.comments().push_back("# It can break execution! User beware");
+  value["CPUExecutor"].comments().clear();
+  value["CPUExecutor"] = cpuExecutor;
+  value["CPUExecutor"].comments().push_back("# PowerPC CPU Executor:");
+  value["CPUExecutor"].comments().push_back("# Interpreted - Cached Interpreter, uses regular interpreted execution with caching");
+  value["CPUExecutor"].comments().push_back("# JIT - Just In Time compilation, runs opcodes in 'blocks'");
+  value["CPUExecutor"].comments().push_back("# Hybrid - JIT with Cached Interpreter fallback, uses faster block system with Interpreter opcodes");
+  value["CPUExecutor"].comments().push_back("# [WARN] This is unfinished, you *will* break the emulator changing this");
   value["CPIBypass"].comments().clear();
   value["CPIBypass"] = clocksPerInstructionBypass;
   value["CPIBypass"].comments().push_back("# Zero will use the estimated CPI for your system (view XCPU for more info)");

@@ -1198,7 +1198,7 @@ void Render::GUI::SetStyle() {
   colors[ImGuiCol_TabDimmed] = ImLerp(colors[ImGuiCol_Tab], colors[ImGuiCol_TitleBg], 0.80f);
   colors[ImGuiCol_TabDimmedSelected] = ImLerp(colors[ImGuiCol_TabSelected], colors[ImGuiCol_TitleBg], 0.4f);
   colors[ImGuiCol_TabDimmedSelectedOverline] = ImVec4(135, 135, 221, 0);
-  colors[ImGuiCol_DockingPreview] = colors[ImGuiCol_Header] * ImColor(255, 255, 255, 178);
+  colors[ImGuiCol_DockingPreview] = colors[ImGuiCol_Header] * ImVec4(ImColor(255, 255, 255, 178));
 
   colors[ImGuiCol_PlotLines] = ImColor(155, 155, 155, 255);
   colors[ImGuiCol_PlotLinesHovered] = ImColor(255, 110, 89, 255);

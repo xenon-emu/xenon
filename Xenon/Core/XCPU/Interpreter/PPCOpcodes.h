@@ -4,6 +4,7 @@
 
 #include "PPCInternal.h"
 #include "Core/XCPU/PPU/PowerPC.h"
+#include "Core/XCPU/PPU/PPU_JIT.h"
 
 namespace PPCInterpreter {
 //
@@ -523,4 +524,17 @@ extern void PPCInterpreter_lvlx(PPU_STATE *ppuState);
 extern void PPCInterpreter_lvrx(PPU_STATE *ppuState);
 extern void PPCInterpreter_lvsl(PPU_STATE *ppuState);
 
-} // namespace PPCInterpreter
+
+// @Aleblbl probably better to move it into a separate file for the JIT emitters
+//
+//	JIT emitters
+//
+extern void PPCInterpreterJIT_mfspr(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+extern void PPCInterpreterJIT_addi(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+extern void PPCInterpreterJIT_b(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+extern void PPCInterpreterJIT_rlwinmx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+extern void PPCInterpreterJIT_andi(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+extern void PPCInterpreterJIT_oris(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+extern void PPCInterpreterJIT_invalid(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+
+}

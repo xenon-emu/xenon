@@ -8,6 +8,14 @@
 
 #include "Core/RootBus/RootBus.h"
 
+class PPU_JIT;
+
+enum class eExecutorMode : u8 {
+  Interpreter,
+  JIT,
+  Hybrid
+};
+
 enum class eThreadState : u8 {
   None,        // Not created
   Unused,      // Should we create a handle? (Only really used in elf loading and single-core testing)
@@ -82,6 +90,8 @@ public:
   u64 loadElfImage(u8 *data, u64 size);
 
   FILE *traceFile;
+
+  eExecutorMode currentExecMode = eExecutorMode::Interpreter;
 private:
   // Thread handle
   std::thread ppuThread;
@@ -118,16 +128,28 @@ private:
 
   // Initial reset vector
   u32 resetVector = 0;
+  
+  //
+  // JIT
+  //
 
+  std::unique_ptr<PPU_JIT> ppuJIT;
+  friend class PPU_JIT;
+  friend bool callEpil(PPU *ppu, PPU_STATE *ppuState);
+
+  //
   // Helpers
-
+  //
+ 
   // Returns the number of instructions per second the current
   // host computer can process.
   u32 GetIPS();
   // Read next intruction from memory
   bool PPUReadNextInstruction();
   // Checks for pending exceptions
-  void PPUCheckExceptions();
+  bool PPUCheckInterrupts();
+  // Checks for pending exceptions
+  bool PPUCheckExceptions();
   // Checks if it should update the time base
   void CheckTimeBaseStatus();
   // Updates the current PPU's time base and decrementer based on

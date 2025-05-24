@@ -12,12 +12,18 @@
 }:
 
 let
+  asmjit = fetchFromGitHub {
+    owner = "asmjit";
+    repo = "asmjit";
+    rev = "356dddbc5508dd65f466098da26a2e47584eafdb";
+    hash = "sha256-j/Ft9hVU1bXPM70jOC5uyirvs7aWZF2yUtyYK9kQZ/8=";
+  };
   imgui = if withGraphics
     then fetchFromGitHub {
       owner = "ocornut";
       repo = "imgui";
-      rev = "15b96fd051731254f4ed0ef78c183f3466bf9e1f";
-      hash = "sha256-VYNqqpE1bo4bjzVsPQhNlOVKemWOZeQg0JaryuAu/Tk=";
+      rev = "126d004f9e1eef062bf4b044b3b2faaf58d48c51";
+      hash = "sha256-4L37NRR+dlkhdxuDjhLR45kgjyZK2uelKBlGZ1nQzgY=";
     }
     else {};
   sirit = if withGraphics
@@ -54,12 +60,14 @@ stdenv.mkDerivation {
   postUnpack = ''
     ${lib.optionalString withGraphics ''
       echo graphics present
-      rm -rf $sourceRoot/Deps/ThirdParty/Sirit
       rm -rf $sourceRoot/Deps/ThirdParty/ImGui
+      rm -rf $sourceRoot/Deps/ThirdParty/Sirit
       cp -r ${imgui} $sourceRoot/Deps/ThirdParty/ImGui
       cp -r ${sirit} $sourceRoot/Deps/ThirdParty/Sirit
     ''}
+    rm -rf $sourceRoot/Deps/ThirdParty/asmjit
     rm -rf $sourceRoot/Deps/ThirdParty/microprofile
+    cp -r ${asmjit} $sourceRoot/Deps/ThirdParty/asmjit
     cp -r ${microprofile} $sourceRoot/Deps/ThirdParty/microprofile
     chmod -R +w $sourceRoot
   '';

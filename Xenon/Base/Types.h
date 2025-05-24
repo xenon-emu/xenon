@@ -54,6 +54,11 @@ using uptr = uintptr_t;
 using f32 = float;
 using f64 = double;
 
+// Function pointer
+template <typename T>
+  requires std::is_function_v<T>
+using fptr = std::add_pointer_t<T>;
+
 // UDLs for memory size values
 [[nodiscard]] constexpr u64 operator""_KB(const u64 x) {
   return 1024ULL * x;
