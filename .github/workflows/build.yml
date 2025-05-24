@@ -55,9 +55,9 @@ jobs:
         path: |
           build
           Deps
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-amd64-deps-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-xenon-clang-amd64-deps-${{ hashFiles('build/x64-clang-${env.BUILD_TYPE}/Deps/ThirdParty/**/CMakeLists.txt', 'build/x64-clang-${env.BUILD_TYPE}/Deps/ThirdParty/**cmake/**') }}
         restore-keys: |
-          ${{runner.os}}-${{env.BUILD_TYPE}}-clang-amd64-deps-
+          ${{runner.os}}-${{env.BUILD_TYPE}}-xenon-clang-amd64-deps-
 
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.18
@@ -110,9 +110,9 @@ jobs:
         path: |
           build
           Deps
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-amd64-deps-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-xenon-gcc-amd64-deps-${{ hashFiles('build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**/CMakeLists.txt', 'build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**cmake/**') }}
         restore-keys: |
-          ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-amd64-deps-
+          ${{runner.os}}-${{env.BUILD_TYPE}}-xenon-gcc-amd64-deps-
 
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.18
@@ -158,9 +158,10 @@ jobs:
         path: |
           build
           Deps
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-amd64-deps-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
+
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-xenon-clang-win64-deps-${{ hashFiles('build/x64-clang-${env.BUILD_TYPE}/Deps/ThirdParty/**/CMakeLists.txt', 'build/x64-clang-${env.BUILD_TYPE}/Deps/ThirdParty/**cmake/**') }}
         restore-keys: |
-          ${{runner.os}}-${{env.BUILD_TYPE}}-clang-amd64-deps-
+          ${{runner.os}}-${{env.BUILD_TYPE}}-xenon-clang-win64-deps-
 
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.18
@@ -220,9 +221,10 @@ jobs:
         path: |
           build
           Deps
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-amd64-deps-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
+
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-xenon-gcc-amd64-deps-${{ hashFiles('build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**/CMakeLists.txt', 'build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**cmake/**') }}
         restore-keys: |
-          ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-amd64-deps-
+          ${{runner.os}}-${{env.BUILD_TYPE}}-xenon-gcc-amd64-deps-
 
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.18
@@ -286,7 +288,7 @@ jobs:
       - name: Cache CMake Configuration
         uses: actions/cache@main
         env:
-          cache-name: ${{runner.os}}-xenon-cache-config
+          cache-name: ${{runner.os}}-cache-config
         with:
           path: |
             ${{github.workspace}}/build

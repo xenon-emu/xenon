@@ -36,7 +36,7 @@ namespace PPCInterpreter {
       curThread.CIA);
   }
 
-  void PPCInterpreter::PPCInterpreterJIT_invalid(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
+  void PPCInterpreterJIT_invalid(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
     u32 opcodeEntry = PPCDecode(instr.opcode);
     std::string opName = ppcDecoder.getNameTable()[opcodeEntry];
     LOG_DEBUG(Xenon, "JIT: No emitter found for opcode '{}' (0x{:08X}) at addr 0x{:X}", opName, instr.opcode, curThread.CIA);

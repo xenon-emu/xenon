@@ -35,6 +35,7 @@ namespace PPCInterpreter {
   extern void PPCInterpreter_invalid(PPU_STATE *ppuState);
   extern void PPCInterpreter_known_unimplemented(const char *name, PPU_STATE *ppuState);
   extern const std::string PPCInterpreter_getFullName(u32 instr);
+  extern void PPCInterpreterJIT_invalid(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
   class PPCDecoder {
     template <typename T>
     class InstrInfo {
