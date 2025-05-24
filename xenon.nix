@@ -23,7 +23,7 @@ let
       owner = "ocornut";
       repo = "imgui";
       rev = "126d004f9e1eef062bf4b044b3b2faaf58d48c51";
-      hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+      hash = "sha256-4L37NRR+dlkhdxuDjhLR45kgjyZK2uelKBlGZ1nQzgY=";
     }
     else {};
   sirit = if withGraphics
