@@ -25,10 +25,10 @@ inline u64 ConvertToDouble(u32 inValue) {
   if (exp > 0 && exp < 255) {
     /*
     If WORD[1-8] > 0 and WORD[1-8] < 255 then normalized operand
-      frD[0-1] <- WORD[0-1] 
-      frD[2] <- ~ WORD[1] 
-      frD[3] <- ~ WORD[1] 
-      frD[4] <- ~ WORD[1] 
+      frD[0-1] <- WORD[0-1]
+      frD[2] <- ~ WORD[1]
+      frD[3] <- ~ WORD[1]
+      frD[4] <- ~ WORD[1]
       frD[5-63] <- WORD[2-31] || (29)0
     */
     u64 x = !(exp >> 7);
@@ -36,8 +36,8 @@ inline u64 ConvertToDouble(u32 inValue) {
     return ((word & 0xc0000000) << 32) | z | ((word & 0x3fffffff) << 29);
   } else if (exp == 0 && frac != 0) {
     /*
-    If WORD[1-8] = 0 and WORD[9-31] ¦ 0 then denormalized operand
-      sign <- WORD[0] 
+    If WORD[1-8] = 0 and WORD[9-31] - 0 then denormalized operand
+      sign <- WORD[0]
       exp <- -126
       frac[0-52] <- 0b0 || WORD[9-31] || (29)0
       normalize the operand
@@ -60,10 +60,10 @@ inline u64 ConvertToDouble(u32 inValue) {
   } else {
     /*
     If WORD[1-8] = 255 or WORD[1-31] = 0 then Infinity / QNaN / SNaN / Zero operand
-      frD[0-1] <- WORD[0-1] 
-      frD[2] <- WORD[1] 
-      frD[3] <- WORD[1] 
-      frD[4] <- WORD[1] 
+      frD[0-1] <- WORD[0-1]
+      frD[2] <- WORD[1]
+      frD[3] <- WORD[1]
+      frD[4] <- WORD[1]
       frD[5-63] <- WORD[2-31] || (29)0
     */
     u64 y = exp >> 7;
@@ -72,9 +72,9 @@ inline u64 ConvertToDouble(u32 inValue) {
   }
 }
 
-// There are three basic forms of store instruction—single - precision, double - precision, and integer.The integer
+// There are three basic forms of store instruction, single - precision, double - precision, and integer. The integer
 // form is provided by the stfiwx instruction.Because the FPRs support only floating - point double format for
-// floating - point data, single - precision store floating - point instructions convert double - precision data to 
+// floating - point data, single - precision store floating - point instructions convert double - precision data to
 // single precision format prior to storing the operands into memory.
 inline u32 ConvertToSingle(u64 inValue) {
   const u32 exp = u32((inValue >> 52) & 0x7ff);

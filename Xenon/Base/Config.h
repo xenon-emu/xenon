@@ -265,6 +265,11 @@ enum class eConsoleRevision : const u8 {
 //
 inline struct _highlyExperimental {
   eConsoleRevision consoleRevison = eConsoleRevision::Corona;
+  // Executor modes:
+  // Interpreted - Cached Interpreter
+  // Hybrid - JIT with Cached Interpreter fallback
+  // JIT - Just In Time
+  std::string cpuExecutor = "vcom";
   s32 clocksPerInstructionBypass = 0;
 
   // TOML Conversion

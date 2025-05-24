@@ -21,13 +21,13 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 endif()
 
 # Optimizations
-#set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
-#if (msvc)
-#  add_compile_options($<$<CONFIG:Release>:/Oi>)
-#  add_compile_options($<$<CONFIG:Release>:/Ot>)
-#elseif (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-#  add_link_options(-O3)
-#endif()
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+if (msvc)
+  add_compile_options($<$<CONFIG:Release>:/Oi>)
+  add_compile_options($<$<CONFIG:Release>:/Ot>)
+elseif (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+  add_link_options(-O3)
+endif()
 
 project(Xenon)
 
@@ -78,6 +78,7 @@ if (GFX_ENABLED)
   find_package(sirit CONFIG)
 endif()
 
+find_package(asmjit CONFIG)
 find_package(fmt 10.2.1 CONFIG)
 find_package(toml11 4.4.0 CONFIG)
 
@@ -133,7 +134,7 @@ if (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" OR "Debug")
 endif()
 
 # Link libraries
-target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11)
+target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11 asmjit::asmjit)
 if (GFX_ENABLED)
   target_link_libraries(Xenon PRIVATE glad sirit SDL3::SDL3)
 endif()

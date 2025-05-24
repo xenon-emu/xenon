@@ -20,3 +20,6 @@
 [submodule "Deps/ThirdParty/Sirit"]
 	path = Deps/ThirdParty/Sirit
 	url = https://github.com/Vali0004/sirit.git
+[submodule "Deps/ThirdParty/asmjit"]
+	path = Deps/ThirdParty/asmjit
+	url = https://github.com/asmjit/asmjit

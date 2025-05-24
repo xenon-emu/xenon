@@ -17,7 +17,7 @@ void PPCInterpreter::PPCInterpreter_bc(PPU_STATE *ppuState) {
   if (ctrOk && condOk) {
     curThread.NIA = (_instr.aa ? 0 : curThread.CIA) + (EXTS(_instr.ds, 14) << 2);
   }
-  
+
   if (_instr.lk) {
     curThread.SPR.LR = curThread.CIA + 4;
   }

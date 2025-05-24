@@ -476,7 +476,7 @@ void Xe::PCIDev::SFCX::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
 void Xe::PCIDev::SFCX::sfcxMainLoop() {
   Base::SetCurrentThreadName("[Xe] SFCX");
   // Config register should be initialized by now
-  while (sfcxThreadRunning) {
+  while (XeRunning && sfcxThreadRunning) {
     // Did we got a command?
     if (sfcxState.commandReg != NO_CMD) {
       // Check the command reg to see what command was issued
