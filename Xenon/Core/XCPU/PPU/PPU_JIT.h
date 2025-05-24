@@ -86,6 +86,7 @@ public:
   u64 size = 0;                // PPC code size in bytes
   bool isDirty;                // Tracks validation of the block, if Dirty the block is discarded and recompiled
   asmjit::JitRuntime *runtime; // Reference to JIT runtime
+  u64 hash;
 };
 
 class PPU_JIT {
@@ -97,7 +98,8 @@ public:
   u64 ExecuteJITBlock(u64 addr, bool enableHalt); // returns step count
   JITBlock* BuildJITBlock(u64 addr, u64 maxBlockSize);
   void setupContext(JITBlockBuilder* b);
-  void setupProl(JITBlockBuilder* b, u64 addr);
+  void setupProl(JITBlockBuilder* b, u32 addr);
+  void patchSkips(JITBlockBuilder* b, u32 addr);
 private:
   bool isBlockCached(u64 addr);
 

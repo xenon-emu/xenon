@@ -5,15 +5,15 @@
 #include "PPCInterpreter.h"
 
 void PPCInterpreter::PPCInterpreter_bc(PPU_STATE *ppuState) {
-  B_FORM_BO_BI_BD_AA_LK;
+    B_FORM_BO_BI_BD_AA_LK;
 
-  if (!BO_GET(2)) {
-    curThread.SPR.CTR -= 1;
-  }
+    if (!BO_GET(2)) {
+        curThread.SPR.CTR -= 1;
+    }
 
-  bool ctrOk = BO_GET(2) | ((curThread.SPR.CTR != 0) ^ BO_GET(3));
-  bool condOk = BO_GET(0) || (CR_GET(BI) == BO_GET(1));
-
+    bool ctrOk = BO_GET(2) | ((curThread.SPR.CTR != 0) ^ BO_GET(3));
+    bool condOk = BO_GET(0) || (CR_GET(BI) == BO_GET(1));
+   
   if (ctrOk && condOk) {
     curThread.NIA = (AA ? 0 : curThread.CIA) + (EXTS(BD, 14) << 2);
   }
