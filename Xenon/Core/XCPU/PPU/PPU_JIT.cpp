@@ -223,7 +223,7 @@ u64 PPU_JIT::ExecuteJITBlock(u64 addr, bool enableHalt) {
 void PPU_JIT::setupContext(JITBlockBuilder *b) {
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
   x86::Gp tempR = newGP32();
-  COMP->movzx(tempR, x86::byte_ptr(b->ppuState->Base(), offsetof(PPU_STATE, currentThread)));
+  COMP->movzx(tempR, b->threadCtx->Ptr<u8>());
   COMP->imul(b->threadCtx->Base(), tempR, sizeof(PPU_THREAD_REGISTERS));
   // Since ppuThread[] base is at offset 0 we just need to add the offset in the array
   COMP->add(b->threadCtx->Base(), b->ppuState->Base());
@@ -243,14 +243,14 @@ void PPU_JIT::setupProl(JITBlockBuilder *b, u32 instrData) {
   COMP->je(continueLabel);
 
   // ppuHaltOn != NULL
-  COMP->mov(temp, x86::ptr(b->ppu->Base(), offsetof(PPU, ppuHaltOn)));
+  COMP->mov(temp, b->ppu->scalar(&PPU::ppuHaltOn));
   COMP->test(temp, temp);
   COMP->je(continueLabel);
 
   // ppuHaltOn == curThread.CIA - !guestHalt
-  COMP->cmp(temp, x86::ptr(b->threadCtx->Base(), offsetof(PPU_THREAD_REGISTERS, CIA)));
+  COMP->cmp(temp, b->threadCtx->scalar(&PPU_THREAD_REGISTERS::CIA));
   COMP->jne(continueLabel);
-  COMP->cmp(x86::byte_ptr(b->ppu->Base(), offsetof(PPU, guestHalt)), 0);
+  COMP->cmp(b->ppu->scalar(&PPU::guestHalt).Ptr<u8>(), 0);
   COMP->jne(continueLabel);
 
   // Call HALT
@@ -260,12 +260,12 @@ void PPU_JIT::setupProl(JITBlockBuilder *b, u32 instrData) {
   COMP->bind(continueLabel);
 
   // Update CIA NIA _instr (CI)
-  COMP->mov(temp, x86::ptr(b->threadCtx->Base(), offsetof(PPU_THREAD_REGISTERS, NIA)));
-  COMP->mov(x86::ptr(b->threadCtx->Base(), offsetof(PPU_THREAD_REGISTERS, CIA)), temp);
+  COMP->mov(temp, b->threadCtx->scalar(&PPU_THREAD_REGISTERS::NIA));
+  COMP->mov(b->threadCtx->scalar(&PPU_THREAD_REGISTERS::CIA), temp);
   COMP->add(temp, 4);
-  COMP->mov(x86::ptr(b->threadCtx->Base(), offsetof(PPU_THREAD_REGISTERS, NIA)), temp);
+  COMP->mov(b->threadCtx->scalar(&PPU_THREAD_REGISTERS::NIA), temp);
   COMP->mov(temp, instrData);
-  COMP->mov(x86::dword_ptr(b->threadCtx->Base(), offsetof(PPU_THREAD_REGISTERS, CI.opcode)), temp);
+  COMP->mov(b->threadCtx->scalar(&PPU_THREAD_REGISTERS::CI).Ptr<u32>(), temp);
 
   COMP->nop();
   COMP->nop();
@@ -289,7 +289,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
   jitBuilder->compiler = &compiler;
 
   // Setup function and, state / thread context
-  jitBuilder->ppu = new PPUPtr(compiler.newGpz("ppu"));
+  jitBuilder->ppu = new ASMJitPtr<PPU>(compiler.newGpz("ppu"));
   jitBuilder->ppuState = new ASMJitPtr<PPU_STATE>(compiler.newGpz("ppuState"));
   jitBuilder->threadCtx = new ASMJitPtr<PPU_THREAD_REGISTERS>(compiler.newGpz("thread"));
   jitBuilder->haltBool = compiler.newGpb("enableHalt"); // bool

@@ -71,6 +71,11 @@ public:
     return asmjit::x86::ptr(base, offset);
   }
 
+  template <typename T = u8>
+  asmjit::x86::Mem Ptr(u64 size = sizeof(T)) const {
+    return asmjit::x86::ptr(base, offset, size);
+  }
+
   asmjit::x86::Gp Base() const {
     return base;
   }
@@ -108,6 +113,11 @@ public:
     return ASMJitPtr<sT>(base, offset + off);
   }
 
+  template <typename T = u8>
+  asmjit::x86::Mem Ptr(u64 size = sizeof(T)) const {
+    return asmjit::x86::ptr(base, offset, size);
+  }
+
   operator asmjit::x86::Gp() const {
     return base;
   }
@@ -117,30 +127,6 @@ public:
   }
 
   asmjit::x86::Gp Base() const {
-    return base;
-  }
-private:
-  asmjit::x86::Gp base;
-  u64 offset = 0;
-};
-
-class PPUPtr {
-public:
-  PPUPtr(asmjit::x86::Gp baseReg) :
-    base(baseReg)
-  {}
-  PPUPtr() :
-    PPUPtr(asmjit::x86::Gp{})
-  {}
-  u64 Offset() {
-    return offset;
-  }
-
-  operator asmjit::x86::Gp() const {
-    return base;
-  }
-
-  asmjit::x86::Gp &Base() {
     return base;
   }
 private:
@@ -176,7 +162,7 @@ public:
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
   // x86_64
   // Current PPU
-  PPUPtr *ppu = nullptr;
+  ASMJitPtr<PPU> *ppu = nullptr;
   // Context pointer
   ASMJitPtr<PPU_STATE> *ppuState = nullptr;
   // Current thread context
