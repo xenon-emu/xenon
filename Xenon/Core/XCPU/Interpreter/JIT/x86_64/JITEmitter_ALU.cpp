@@ -1,7 +1,8 @@
-// Copyright 2025 Xenon Emulator Project
+// Copyright 2025 Xenon Emulator Project. All rights reserved.
 
 #include "JITEmitter_Helpers.h"
 
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
 // Add Immediate (x'3800 0000')
 void PPCInterpreter::PPCInterpreterJIT_addi(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
   /*
@@ -71,3 +72,4 @@ void PPCInterpreter::PPCInterpreterJIT_oris(PPU_STATE* ppuState, JITBlockBuilder
   COMP->or_(tmp, val1);
   COMP->mov(GPRPtr(t_instr.ra), tmp);
 }
+#endif

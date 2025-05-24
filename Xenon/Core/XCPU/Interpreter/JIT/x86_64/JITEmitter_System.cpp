@@ -1,7 +1,8 @@
-// Copyright 2025 Xenon Emulator Project
+// Copyright 2025 Xenon Emulator Project. All rights reserved.
 
 #include "JITEmitter_Helpers.h"
 
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
 void PPCInterpreter::PPCInterpreterJIT_mfspr(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
   u64 rS = 0, crm = 0;
   PPC_OPC_TEMPL_XFX(instr.opcode, rS, crm);
@@ -71,7 +72,7 @@ void PPCInterpreter::PPCInterpreterJIT_mfspr(PPU_STATE *ppuState, JITBlockBuilde
     COMP->mov(rSValue, SharedSPRPtr(TB));
     break;
   case SPR_PVR:
-    COMP->mov(rSValue, SharedSPRPtr(PVR.PVR_Hex));
+    COMP->mov(rSValue, SharedSPRPtr(PVR));
     break;
   case SPR_HSPRG0:
     COMP->mov(rSValue, SPRPtr(HSPRG0));
@@ -122,3 +123,4 @@ void PPCInterpreter::PPCInterpreterJIT_mfspr(PPU_STATE *ppuState, JITBlockBuilde
 
   COMP->mov(GPRPtr(rS), rSValue);
 }
+#endif

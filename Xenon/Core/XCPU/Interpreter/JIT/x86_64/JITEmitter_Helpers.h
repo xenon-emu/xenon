@@ -1,18 +1,16 @@
+// Copyright 2025 Xenon Emulator Project. All rights reserved.
+
 #pragma once
+
 #include "Base/Logging/Log.h"
-#include "../../PPCInterpreter.h"
+
+#include "Core/XCPU/Interpreter/PPCInterpreter.h"
 #include "../../../PPU/PPU_JIT.h"
 
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
 using namespace asmjit;
 
 #define COMP b->compiler
-
-//
-// Offset Helpers
-//
-#define GPROffest(x) (offsetof(PPU_THREAD_REGISTERS, GPR) + (x * 8))
-#define SPROffest(x) (offsetof(PPU_THREAD_REGISTERS, SPR) + offsetof(PPU_THREAD_SPRS, x))
-#define SharedSPROffest(x) (offsetof(PPU_STATE, SPR) + offsetof(PPU_STATE_SPRS, x))
 
 //
 // Allocates a new general purpose x86 register
@@ -30,7 +28,8 @@ using namespace asmjit;
 #define GPRPtr(x) b->threadCtx->array(&PPU_THREAD_REGISTERS::GPR).Ptr(x)
 #define SPRStruct(x) b->threadCtx->substruct(&PPU_THREAD_REGISTERS::SPR).substruct(&PPU_THREAD_SPRS::x)
 #define SPRPtr(x) b->threadCtx->substruct(&PPU_THREAD_REGISTERS::SPR).scalar(&PPU_THREAD_SPRS::x)
-#define SharedSPRPtr(x) x86::ptr(b->ppuState->Base(), SharedSPROffest(x))
+#define SharedSPRStruct(x) b->ppuState->substruct(&PPU_STATE::SPR).substruct(&PPU_STATE_SPRS::x)
+#define SharedSPRPtr(x) b->ppuState->substruct(&PPU_STATE::SPR).scalar(&PPU_STATE_SPRS::x)
 #define CRValPtr() b->threadCtx->scalar(&PPU_THREAD_REGISTERS::CR)
 #define CIAPtr() b->threadCtx->scalar(&PPU_THREAD_REGISTERS::CIA)
 #define NIAPtr() b->threadCtx->scalar(&PPU_THREAD_REGISTERS::NIA)
@@ -122,3 +121,4 @@ inline void J_ppuSetCR(JITBlockBuilder *b, x86::Gp value, u32 index) {
   x86::Gp field = J_BuildCR_0(b, value);
   J_SetCRField(b, field, index);
 }
+#endif

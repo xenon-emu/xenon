@@ -1,4 +1,4 @@
-// Copyright 2025 Xenon Emulator Project
+// Copyright 2025 Xenon Emulator Project. All rights reserved.
 
 #pragma once
 
@@ -10,10 +10,13 @@
 #include <unordered_map>
 #include <vector>
 
-#include "asmjit/asmjit.h"
-
 #include "Base/Arch.h"
-#include "Base/Types.h"
+
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
+#include "asmjit/x86.h"
+#else
+#include "asmjit/core.h"
+#endif
 
 #include "Core/XCPU/PPU/PowerPC.h"
 #include "Core/RootBus/RootBus.h"
@@ -21,6 +24,7 @@
 class PPU;
 using JITFunc = fptr<void(PPU*, PPU_STATE*, bool)>;
 
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
 template <typename T, typename fT>
 class ArrayFieldProxy {
 public:
@@ -143,6 +147,7 @@ private:
   asmjit::x86::Gp base;
   u64 offset = 0;
 };
+#endif
 
 using namespace asmjit;
 class JITBlockBuilder {
@@ -166,7 +171,7 @@ public:
   asmjit::CodeHolder* Code() {
     return &code;
   }
-#ifdef ARCH_X86_64
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
   // x86_64
   // Current PPU
   PPUPtr *ppu = nullptr;

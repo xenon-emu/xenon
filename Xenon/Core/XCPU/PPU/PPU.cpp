@@ -251,12 +251,7 @@ void PPU::Step(int amount) {
 }
 
 // PPU Entry Point.
-void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) { 
-  if (currentExecMode != eExecutorMode::Interpreter) {
-    ppuJIT->ExecuteJITInstrs(numInstrs, enableHalt, ppuThreadActive);
-    return;
-  }
-    
+void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
   // Start Profile
   MICROPROFILE_SCOPEI("[Xe::PPU]", "PPURunInstructions", MP_AUTO);
   for (size_t instrCount = 0; instrCount < numInstrs && ppuThreadActive; ++instrCount) {
@@ -317,15 +312,28 @@ void PPU::ThreadStateMachine() {
   case eThreadState::Running: {
     // Check our threads to see if any are running
     u8 state = GetCurrentRunningThreads();
-    if (!ppuThreadResetting  && (state & ePPUThreadBit_Zero)) {
-      // Thread 0 is running, process instructions until we reach TTR timeout.
-      curThreadId = ePPUThread_Zero;
-      PPURunInstructions(ppuState->SPR.TTR, ppuHaltOn != 0);
-    }
-    if (!ppuThreadResetting && (state & ePPUThreadBit_One)) {
-      // Thread 1 is running, process instructions until we reach TTR timeout.
-      curThreadId = ePPUThread_One;
-      PPURunInstructions(ppuState->SPR.TTR, ppuHaltOn != 0);
+    if (currentExecMode == eExecutorMode::Interpreter) {
+      if (!ppuThreadResetting && (state & ePPUThreadBit_Zero)) {
+        // Thread 0 is running, process instructions until we reach TTR timeout.
+        curThreadId = ePPUThread_Zero;
+        PPURunInstructions(ppuState->SPR.TTR, ppuHaltOn != 0);
+      }
+      if (!ppuThreadResetting && (state & ePPUThreadBit_One)) {
+        // Thread 1 is running, process instructions until we reach TTR timeout.
+        curThreadId = ePPUThread_One;
+        PPURunInstructions(ppuState->SPR.TTR, ppuHaltOn != 0);
+      }
+    } else {
+      if (!ppuThreadResetting && (state & ePPUThreadBit_Zero)) {
+        // Thread 1 is running, process instructions until we reach TTR timeout.
+        curThreadId = ePPUThread_Zero;
+        ppuJIT->ExecuteJITInstrs(ppuState->SPR.TTR, ppuThreadActive, ppuHaltOn != 0);
+      }
+      if (!ppuThreadResetting && (state & ePPUThreadBit_One)) {
+        // Thread 1 is running, process instructions until we reach TTR timeout.
+        curThreadId = ePPUThread_One;
+        ppuJIT->ExecuteJITInstrs(ppuState->SPR.TTR, ppuThreadActive, ppuHaltOn != 0);
+      }
     }
   } break;
   case eThreadState::Halted: {
@@ -333,18 +341,35 @@ void PPU::ThreadStateMachine() {
     ppuThreadActive = ppuThreadState.load() != eThreadState::None;
     // Handle stepping
     u8 state = GetCurrentRunningThreads();
-    if (state & ePPUThreadBit_Zero) {
-      curThreadId = ePPUThread_Zero;
-      if (ppuStepAmount > 0) {
-        PPURunInstructions(ppuStepAmount, false);
-        ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
+    if (currentExecMode == eExecutorMode::Interpreter) {
+      if (state & ePPUThreadBit_Zero) {
+        curThreadId = ePPUThread_Zero;
+        if (ppuStepAmount > 0) {
+          PPURunInstructions(ppuStepAmount, false);
+          ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
+        }
       }
-    } 
-    if (state & ePPUThreadBit_One) {
-      curThreadId = ePPUThread_One;
-      if (ppuStepAmount > 0) {
-        PPURunInstructions(ppuStepAmount, false);
-        ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
+      if (state & ePPUThreadBit_One) {
+        curThreadId = ePPUThread_One;
+        if (ppuStepAmount > 0) {
+          PPURunInstructions(ppuStepAmount, false);
+          ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
+        }
+      }
+    } else {
+      if (state & ePPUThreadBit_Zero) {
+        curThreadId = ePPUThread_Zero;
+        if (ppuStepAmount > 0) {
+          ppuJIT->ExecuteJITInstrs(ppuStepAmount, ppuThreadActive, false);
+          ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
+        }
+      }
+      if (state & ePPUThreadBit_One) {
+        curThreadId = ePPUThread_One;
+        if (ppuStepAmount > 0) {
+          ppuJIT->ExecuteJITInstrs(ppuStepAmount, ppuThreadActive, false);
+          ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
+        }
       }
     }
   } break;

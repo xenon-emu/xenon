@@ -1,14 +1,23 @@
-// Copyright 2025 Xenon Emulator Project
+// Copyright 2025 Xenon Emulator Project. All rights reserved.
 
 #include "Base/Logging/Log.h"
 #include "Base/Global.h"
 
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
 #include "Core/XCPU/Interpreter/JIT/x86_64/JITEmitter_Helpers.h"
+#endif
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
 #include "Core/XCPU/Interpreter/PPCInternal.h"
 #include "Core/XCPU/Xenon.h"
 #include "PPU.h"
 #include "PPU_JIT.h"
+
+static u32 ComputeBlockHash(const std::vector<u32> &instrs) {
+  u32 hash = 0;
+  for (u32 instr : instrs)
+    hash += instr;
+  return hash;
+}
 
 //
 //  Trampolines for Invoke
@@ -22,8 +31,9 @@ bool callEpil(PPU *ppu) {
   ppu->CheckTimeBaseStatus();
 
   // Check for external interrupts
-  if (ppu->ppuState->ppuThread[ppu->ppuState->currentThread].SPR.MSR.EE && ppu->xenonContext->xenonIIC.checkExtInterrupt(ppu->ppuState->ppuThread[ppu->ppuState->currentThread].SPR.PIR)) {
-    ppu->ppuState->ppuThread[ppu->ppuState->currentThread].exceptReg |= PPU_EX_EXT;
+  auto &thread = ppu->ppuState->ppuThread[ppu->ppuState->currentThread];
+  if (thread.SPR.MSR.EE && ppu->xenonContext->xenonIIC.checkExtInterrupt(thread.SPR.PIR)) {
+    thread.exceptReg |= PPU_EX_EXT;
   }
 
   // Handle pending exceptions 
@@ -41,21 +51,24 @@ PPU_JIT::~PPU_JIT() {
 }
 
 u64 PPU_JIT::ExecuteJITBlock(u64 addr, bool enableHalt) {
-  std::shared_ptr<JITBlock> &entry = jitBlocks.at(addr);
-  entry->codePtr(ppu, ppuState, enableHalt);
-  return entry->size / 4;
+  auto &block = jitBlocks.at(addr);
+  block->codePtr(ppu, ppuState, enableHalt);
+  return block->size / 4;
 }
 
 // get current PPU_THREAD_REGISTERS, use ppuState to get the current Thread
 void PPU_JIT::setupContext(JITBlockBuilder *b) {
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
   x86::Gp tempR = newGP32();
   COMP->movzx(tempR, x86::byte_ptr(b->ppuState->Base(), offsetof(PPU_STATE, currentThread)));
   COMP->imul(b->threadCtx->Base(), tempR, sizeof(PPU_THREAD_REGISTERS));
   // Since ppuThread[] base is at offset 0 we just need to add the offset in the array
   COMP->add(b->threadCtx->Base(), b->ppuState->Base());
+#endif
 }
 
 void PPU_JIT::setupProl(JITBlockBuilder *b, u32 instrData) {
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
   COMP->nop();
   COMP->nop();
 
@@ -77,22 +90,23 @@ void PPU_JIT::setupProl(JITBlockBuilder *b, u32 instrData) {
   COMP->cmp(x86::byte_ptr(b->ppu->Base(), offsetof(PPU, guestHalt)), 0);
   COMP->jne(continueLabel);
 
-  // call HALT
+  // Call HALT
   InvokeNode *out = nullptr;
   COMP->invoke(&out, imm((void*)callHalt), FuncSignatureT<void>());
 
   COMP->bind(continueLabel);
 
-  // update CIA NIA _instr (CI)
+  // Update CIA NIA _instr (CI)
   COMP->mov(temp, x86::ptr(b->threadCtx->Base(), offsetof(PPU_THREAD_REGISTERS, NIA)));
   COMP->mov(x86::ptr(b->threadCtx->Base(), offsetof(PPU_THREAD_REGISTERS, CIA)), temp);
   COMP->add(temp, 4);
   COMP->mov(x86::ptr(b->threadCtx->Base(), offsetof(PPU_THREAD_REGISTERS, NIA)), temp);
   COMP->mov(temp, instrData);
   COMP->mov(x86::dword_ptr(b->threadCtx->Base(), offsetof(PPU_THREAD_REGISTERS, CI.opcode)), temp);
-  
+
   COMP->nop();
   COMP->nop();
+#endif
 }
 
 void PPU_JIT::patchSkips(JITBlockBuilder *b, u32 addr) {
@@ -104,6 +118,7 @@ using namespace asmjit;
 std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
   std::unique_ptr<JITBlockBuilder> jitBuilder = std::make_unique<STRIP_UNIQUE(jitBuilder)>(addr, &jitRuntime);
 
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
   //
   // x86
   //
@@ -129,7 +144,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
   // Instruction emitters
   //
   u64 instrCount = 0;
-  while (true) {
+  while (XeRunning && !XePaused) {
     u32 offset = instrCount * 4;
     u64 pc = addr + offset;
 
@@ -138,32 +153,39 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
     curThread.NIA += 4;
     curThread.instrFetch = true;
     PPCOpcode op{ PPCInterpreter::MMURead32(ppuState, curThread.CIA) };
-	  instrsTemp.push_back(op.opcode);
+    u32 opcode = op.opcode;
+    instrsTemp.push_back(opcode);
     curThread.instrFetch = false;
 
-
     // Decode and emit
-    PPCInterpreter::instructionHandlerJIT emitter = PPCInterpreter::ppcDecoder.decodeJIT(op.opcode);
-    u32 opName = Base::JoaatStringHash(PPCInterpreter::ppcDecoder.decodeName(op.opcode));
+
+    // Saves a few cycles to cache the value here
+    u32 decodedInstr = PPCDecode(opcode);
+    auto emitter = PPCInterpreter::ppcDecoder.getJITTable()[decodedInstr];
+    static thread_local std::unordered_map<u32, u32> opcodeHashCache;
+    u32 opName = opcodeHashCache.contains(opcode) ? opcodeHashCache[opcode] : opcodeHashCache[opcode] = Base::JoaatStringHash(PPCInterpreter::ppcDecoder.getNameTable()[decodedInstr]);
 
     // Handle skips
-    x86::Gp temp = compiler.newGpq();
     bool skip = false;
     switch (curThread.CIA) {
     case 0x0200C870: {
+      x86::Gp temp = compiler.newGpq();
       compiler.mov(temp, 0);
       compiler.mov(jitBuilder->threadCtx->array(&PPU_THREAD_REGISTERS::GPR).Ptr(5), temp);
     } break;
     // RGH 2 17489 in a JRunner Corona XDKBuild.
     case 0x0200C7F0: {
+      x86::Gp temp = compiler.newGpq();
       compiler.mov(temp, 0);
       compiler.mov(jitBuilder->threadCtx->array(&PPU_THREAD_REGISTERS::GPR).Ptr(3), temp);
     } break;
     case 0x1003598ULL: {
+      x86::Gp temp = compiler.newGpq();
       compiler.mov(temp, 0x0E);
       compiler.mov(jitBuilder->threadCtx->array(&PPU_THREAD_REGISTERS::GPR).Ptr(11), temp);
     } break;
     case 0x1003644ULL: {
+      x86::Gp temp = compiler.newGpq();
       compiler.mov(temp, 0x02);
       compiler.mov(jitBuilder->threadCtx->array(&PPU_THREAD_REGISTERS::GPR).Ptr(11), temp);
     } break;
@@ -184,17 +206,16 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
 
     bool readNextInstr = true;
     // Prol
-    setupProl(jitBuilder.get(), op.opcode);
+    setupProl(jitBuilder.get(), opcode);
 
-    if ((curThread.exceptReg & PPU_EX_INSSTOR || curThread.exceptReg & PPU_EX_INSTSEGM) || op.opcode == 0xFFFFFFFF) {
+    if ((curThread.exceptReg & PPU_EX_INSSTOR || curThread.exceptReg & PPU_EX_INSTSEGM) || opcode == 0xFFFFFFFF)
       readNextInstr = false;
-    }
 
     // Call JIT emitter
     if (ppu->currentExecMode == eExecutorMode::Hybrid && emitter == &PPCInterpreter::PPCInterpreterJIT_invalid && readNextInstr) {
-      PPCInterpreter::instructionHandler intEmitter = PPCInterpreter::ppcDecoder.decode(op.opcode);
+      auto intEmitter = PPCInterpreter::ppcDecoder.getTable()[decodedInstr];
 
-      InvokeNode *out;
+      InvokeNode *out = nullptr;
       compiler.invoke(&out, imm((void*)intEmitter), FuncSignatureT<void, void*>());
       out->setArg(0, jitBuilder->ppuState->Base());
     }
@@ -211,21 +232,14 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
     compiler.ret();
     compiler.bind(skipRet);
 
+
+    // If branch or block end    
     instrCount++;
-
-    // If branch or block end
-    if (opName == "bclr"_j || opName == "bcctr"_j || opName == "bc"_j || opName == "b"_j || opName == "rfid"_j) {
+    if (opName == "bclr"_j || opName == "bcctr"_j || opName == "bc"_j || opName == "b"_j || opName == "rfid"_j ||
+        opName == "invalid"_j || instrCount >= maxBlockSize)
       break;
-    }
-
-    if (opName == "invalid"_j) {
-      break;
-    }
-
-    if (instrCount >= maxBlockSize) {
-      break;
-    }
   }
+#endif
 
   // reset CIA NIA
   curThread.CIA = addr - 4;
@@ -250,8 +264,8 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
   }
   
   // Insert block into cache
-  jitBlocks.emplace(addr, block);
-  return block;
+  jitBlocks.emplace(addr, std::move(block));
+  return jitBlocks.at(addr);
 }
 #define GPR(x) curThread.GPR[x]
 
@@ -260,28 +274,33 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt) {
   u32 instrsExecuted = 0;
   while (instrsExecuted < numInstrs && active) {
     u64 blockStart = curThread.NIA;
-    if (!isBlockCached(blockStart)) {
-      if (isBlockCached(blockStart))
+    auto it = jitBlocks.find(blockStart);
+    if (it == jitBlocks.end()) {
+      if (it != jitBlocks.end())
         jitBlocks.erase(blockStart);
-      std::shared_ptr<JITBlock>block = BuildJITBlock(blockStart, numInstrs - instrsExecuted);
-      // Failed to build block, abort
+      auto block = BuildJITBlock(blockStart, numInstrs - instrsExecuted);
       if (!block)
-        break;
-
+        break; // Failed to build block, abort
       block->codePtr(ppu, ppuState, enableHalt);
       instrsExecuted += block->size / 4;
     } else {
+      auto &block = it->second;
       u64 sum = 0;
-      std::shared_ptr<JITBlock> &block = jitBlocks.at(blockStart);
-      std::vector<u32> values{};
-      values.resize(block->size / 4);
-
-      curThread.instrFetch = true;
-      PPCInterpreter::MMURead(PPCInterpreter::CPUContext, ppuState, block->ppuAddress, values.size(), reinterpret_cast<u8*>(values.data()));
-      curThread.instrFetch = false;
-
-      for (auto &v : values) {
-        sum += v;
+      if (block->size % 8 == 0) {
+        for (u64 i = 0; i < block->size / 8; i++) {
+          curThread.instrFetch = true;
+          u64 val = PPCInterpreter::MMURead64(ppuState, block->ppuAddress + i * 8);
+          curThread.instrFetch = false;
+          u64 top = val >> 32;
+          u64 bottom = val & 0xFFFFFFFF;
+          sum += top + bottom;
+        }
+      } else {
+        for (u64 i = 0; i != block->size / 4; i++) {
+          curThread.instrFetch = true;
+          sum += PPCInterpreter::MMURead32(ppuState, block->ppuAddress + i * 4);
+          curThread.instrFetch = false;
+        }
       }
 
       if (block->hash != sum) {
