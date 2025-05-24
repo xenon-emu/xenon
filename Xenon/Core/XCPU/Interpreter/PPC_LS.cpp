@@ -753,7 +753,7 @@ void PPCInterpreter::PPCInterpreter_stvrx(PPU_STATE* ppuState) {
   EA &= ~0xF;
 
   auto bytes = VRi(vs).bytes;
-  for (s32 i = (bytes.size() - 1); i > (bytes.size() - 1) - eb; i--) {
+  for (u32 i = (bytes.size() - 1); i > (bytes.size() - 1) - eb; i--) {
     MMUWrite8(ppuState, (EA - bytes.size()) + i, bytes[i]);
   }
 }
@@ -767,7 +767,9 @@ void PPCInterpreter::PPCInterpreter_stvlx(PPU_STATE* ppuState) {
   EA &= ~0xF;
 
   auto bytes = VRi(vs).bytes;
-  MMUWrite(CPUContext, ppuState, bytes.data() + (bytes.size() - eb), EA - eb, eb);
+  for (u32 i = 0; i < 16 - eb; i++) {
+    MMUWrite8(ppuState, EA + i, bytes[i]);
+  }
 }
 
 // Store Vector Indexed LRU (x'7C00 03CE')
@@ -799,8 +801,10 @@ void PPCInterpreter::PPCInterpreter_stvlxl128(PPU_STATE *ppuState) {
   const u8 eb = EA & 0xF;
   EA &= ~0xF;
 
-  auto bytes = VRi(vs).bytes;
-  MMUWrite(CPUContext, ppuState, bytes.data() + (bytes.size() - eb), EA - eb, eb);
+  auto bytes = VR(VMX128_1_VD128).bytes;
+  for (u32 i = 0; i < 16 - eb; i++) {
+    MMUWrite8(ppuState, EA + i, bytes[i]);
+  }
 }
 
 //
@@ -1616,35 +1620,23 @@ void PPCInterpreter::PPCInterpreter_lvlx(PPU_STATE *ppuState) {
 
   CHECK_VXU;
 
-  Vector128 vector0{};
-  Vector128 vector1{};
+  Vector128 vector{};
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
   const u8 eb = EA & 0xF;
   EA &= ~0xF;
 
-  MMURead(CPUContext, ppuState, EA, vector0.bytes.size(), vector0.bytes.data());
+  MMURead(CPUContext, ppuState, EA, vector.bytes.size(), vector.bytes.data());
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  if (eb != 0 && Config::log.advanced) {
-    LOG_WARNING(Xenon, "lvlx: Unaligned load! Check!");
-  }
+  VR(_instr.rd).dword[0] = byteswap_be<u32>(vector.dword[0]);
+  VR(_instr.rd).dword[1] = byteswap_be<u32>(vector.dword[1]);
+  VR(_instr.rd).dword[2] = byteswap_be<u32>(vector.dword[2]);
+  VR(_instr.rd).dword[3] = byteswap_be<u32>(vector.dword[3]);
 
-  s32 i = 0;
-
-  for (i = 0; i < 16 - eb; ++i)
-    vector1.bytes[i] = vector0.bytes[i + eb];
-
-  i = 0;
-  while (i < 16)
-    vector1.bytes[i++] = 0;
-
-  VR(_instr.rd).dword[0] = byteswap_be<u32>(vector1.dword[0]);
-  VR(_instr.rd).dword[1] = byteswap_be<u32>(vector1.dword[1]);
-  VR(_instr.rd).dword[2] = byteswap_be<u32>(vector1.dword[2]);
-  VR(_instr.rd).dword[3] = byteswap_be<u32>(vector1.dword[3]);
+  VR(_instr.rd).vuword <<= (eb * 8);
 }
 
 // Load Vector Right Indexed (x'7C00 044E')
@@ -1659,32 +1651,23 @@ void PPCInterpreter::PPCInterpreter_lvrx(PPU_STATE *ppuState) {
 
   CHECK_VXU;
 
-  Vector128 vector0{};
-  Vector128 vector1{};
+  Vector128 vector{};
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
   u8 eb = EA & 0xF;
   EA &= ~0xF;
 
-  MMURead(CPUContext, ppuState, EA, 16, vector0.bytes.data());
+  MMURead(CPUContext, ppuState, EA, vector.bytes.size(), vector.bytes.data());
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  if (eb != 0 && Config::log.advanced) {
-    LOG_WARNING(Xenon, "lvrx: Unaligned load! Check!");
-  }
+  VR(_instr.rd).dword[0] = byteswap_be<u32>(vector.dword[0]);
+  VR(_instr.rd).dword[1] = byteswap_be<u32>(vector.dword[1]);
+  VR(_instr.rd).dword[2] = byteswap_be<u32>(vector.dword[2]);
+  VR(_instr.rd).dword[3] = byteswap_be<u32>(vector.dword[3]);
 
-  memset(vector1.bytes.data(), 0, vector1.bytes.size() - eb);
-
-  for (s32 i = 0; i != vector1.bytes.size(); ++i) {
-    vector1.bytes[i] = vector0.bytes[i - (vector0.bytes.size() - eb)];
-  }
-
-  VR(_instr.rd).dword[0] = byteswap_be<u32>(vector1.dword[0]);
-  VR(_instr.rd).dword[1] = byteswap_be<u32>(vector1.dword[1]);
-  VR(_instr.rd).dword[2] = byteswap_be<u32>(vector1.dword[2]);
-  VR(_instr.rd).dword[3] = byteswap_be<u32>(vector1.dword[3]);
+  VR(_instr.rd).vuword >>= (eb * 8);
 }
 
 // Load Vector for Shift Left (x'7C00 000C')
