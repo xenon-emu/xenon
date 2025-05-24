@@ -60,12 +60,14 @@ stdenv.mkDerivation {
   postUnpack = ''
     ${lib.optionalString withGraphics ''
       echo graphics present
-      rm -rf $sourceRoot/Deps/ThirdParty/Sirit
       rm -rf $sourceRoot/Deps/ThirdParty/ImGui
+      rm -rf $sourceRoot/Deps/ThirdParty/Sirit
       cp -r ${imgui} $sourceRoot/Deps/ThirdParty/ImGui
       cp -r ${sirit} $sourceRoot/Deps/ThirdParty/Sirit
     ''}
+    rm -rf $sourceRoot/Deps/ThirdParty/asmjit
     rm -rf $sourceRoot/Deps/ThirdParty/microprofile
+    cp -r ${sirit} $sourceRoot/Deps/ThirdParty/asmjit
     cp -r ${microprofile} $sourceRoot/Deps/ThirdParty/microprofile
     chmod -R +w $sourceRoot
   '';
