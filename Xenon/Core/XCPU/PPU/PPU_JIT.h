@@ -71,8 +71,8 @@ public:
     return asmjit::x86::ptr(base, offset);
   }
 
-  template <typename T = u8>
-  asmjit::x86::Mem Ptr(u64 size = sizeof(T)) const {
+  template <typename pT = u8>
+  asmjit::x86::Mem Ptr(u64 size = sizeof(pT)) const {
     return asmjit::x86::ptr(base, offset, size);
   }
 
@@ -113,8 +113,8 @@ public:
     return ASMJitPtr<sT>(base, offset + off);
   }
 
-  template <typename T = u8>
-  asmjit::x86::Mem Ptr(u64 size = sizeof(T)) const {
+  template <typename pT = u8>
+  asmjit::x86::Mem Ptr(u64 size = sizeof(pT)) const {
     return asmjit::x86::ptr(base, offset, size);
   }
 

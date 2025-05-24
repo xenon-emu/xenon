@@ -269,7 +269,7 @@ inline struct _highlyExperimental {
   // Interpreted - Cached Interpreter
   // Hybrid - JIT with Cached Interpreter fallback
   // JIT - Just In Time
-  std::string cpuExecutor = "vcom";
+  std::string cpuExecutor = "Interpreted";
   s32 clocksPerInstructionBypass = 0;
 
   // TOML Conversion
