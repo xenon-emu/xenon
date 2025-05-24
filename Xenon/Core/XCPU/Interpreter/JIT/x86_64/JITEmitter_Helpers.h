@@ -28,7 +28,7 @@ using namespace asmjit;
 //
 #define GPRPtr(x) x86::ptr(b->threadCtx, GPROffest(x))
 #define SPRPtr(x) x86::ptr(b->threadCtx, SPROffest(x))
-#define SharedSPRPtr(x) x86::ptr(b->ppuAddr, SharedSPROffest(x))
+#define SharedSPRPtr(x) x86::ptr(b->ppuState, SharedSPROffest(x))
 #define CRValPtr() x86::ptr(b->threadCtx, offsetof(PPU_THREAD_REGISTERS, CR))
 #define CIAPtr() x86::ptr(b->threadCtx, offsetof(PPU_THREAD_REGISTERS, CIA))
 #define NIAPtr() x86::ptr(b->threadCtx, offsetof(PPU_THREAD_REGISTERS, NIA))
@@ -59,15 +59,15 @@ inline x86::Gp J_BuildCR_0(JITBlockBuilder *b, x86::Gp value) {
 
   // lt
   COMP->setl(tmp);
-  COMP->shl(tmp, imm(CR_BIT_LT));
+  COMP->shl(tmp, imm(3 - CR_BIT_LT));
   COMP->or_(crValue.r8(), tmp.r8());
   // gt
   COMP->setg(tmp);
-  COMP->shl(tmp, imm(CR_BIT_GT));
+  COMP->shl(tmp, imm(3 - CR_BIT_GT));
   COMP->or_(crValue.r8(), tmp.r8());
   // eq
   COMP->sete(tmp);
-  COMP->shl(tmp, imm(CR_BIT_EQ));
+  COMP->shl(tmp, imm(3 - CR_BIT_EQ));
   COMP->or_(crValue.r8(), tmp.r8());
 
   // Handle SO flag
@@ -78,7 +78,7 @@ inline x86::Gp J_BuildCR_0(JITBlockBuilder *b, x86::Gp value) {
   COMP->mov(tmp.r32(), SPRPtr(XER.XER_Hex));
   COMP->and_(tmp.r32(), imm(1));
 #endif
-  COMP->shl(tmp, imm(CR_BIT_SO));
+  COMP->shl(tmp, imm(3 - CR_BIT_SO));
   COMP->or_(crValue.r8(), tmp.r8());
 
   return crValue;

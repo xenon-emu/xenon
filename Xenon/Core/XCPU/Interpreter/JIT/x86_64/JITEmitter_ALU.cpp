@@ -35,11 +35,11 @@ void PPCInterpreter::PPCInterpreterJIT_rlwinmx(PPU_STATE* ppuState, JITBlockBuil
   x86::Gp rol = Jrotl32(b, GPRPtr(t_instr.rs), t_instr.sh32);
   x86::Gp dup = Jduplicate32(b, rol);
   COMP->and_(dup, mask); // mask
-
-  /*/ _rc
-  if (_instr.rc) {
-      RECORD_CR0(GPRi(ra));
-  }*/
+  COMP->mov(GPRPtr(t_instr.ra), dup);
+  // _rc
+  if (t_instr.rc) {
+      J_ppuSetCR(b, dup, 0);
+  }
 }
 
 
@@ -64,8 +64,10 @@ void PPCInterpreter::PPCInterpreterJIT_oris(PPU_STATE* ppuState, JITBlockBuilder
     rA <- (rS) | ((32)0 || UIMM || (16)0)
   */
   x86::Gp tmp = newGP64();
-  u64 shImm = t_instr.uimm16 << 16;
+  x86::Gp val1 = newGP64();
+  u64 shImm = (u64{ t_instr.uimm16 } << 16);
   COMP->mov(tmp, GPRPtr(t_instr.rs));
-  COMP->or_(tmp, shImm);
+  COMP->mov(val1, shImm);
+  COMP->or_(tmp, val1);
   COMP->mov(GPRPtr(t_instr.ra), tmp);
 }
