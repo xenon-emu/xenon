@@ -158,9 +158,11 @@ public:
     code.init(runtime->environment(), runtime->cpuFeatures());
   }
   ~JITBlockBuilder() {
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
     delete ppu;
     delete ppuState;
     delete threadCtx;
+#endif
     ppuAddr = 0;
     size = 0;
   }
