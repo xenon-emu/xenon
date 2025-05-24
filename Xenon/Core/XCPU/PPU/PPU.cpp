@@ -409,38 +409,8 @@ void PPU::ThreadLoop() {
     if (!ppuThreadActive)
       break;
 
-    // Check if we are allowed to enable thread zero if the thread is sleeping...
-    bool WEXT = (ppuState->SPR.TSCR & 0x100000) >> 20;
-
-    // Check for external interrupts that enable execution
-    if (ppuThreadActive && !ppuThreadResetting && (ppuThreadState.load() == eThreadState::Halted 
-      || ppuThreadState.load() == eThreadState::Sleeping) && WEXT) {
-      
-      // Check for an external interrupt that enables execution.
-      if (!xenonContext->xenonIIC.checkExtInterrupt(curThread.SPR.PIR)) {
-        continue;
-      }
-
-      // Proceed.
-      LOG_DEBUG(Xenon, "{} was previously halted or sleeping, bringing online", ppuState->ppuName);
-      ppuThreadState.store(eThreadState::Running);
-      // Enable thread 0 execution
-      ppuState->SPR.CTRL = 0x800000;
-
-      // Issue reset
-      ppuState->ppuThread[ePPUThread_Zero].exceptReg |= PPU_EX_RESET;
-      ppuState->ppuThread[ePPUThread_One].exceptReg |= PPU_EX_RESET;
-
-      PPU_THREAD_REGISTERS& thread = curThread;
-
-      thread.SPR.SRR1 = 0x200000; // Set SRR1[42:44] = 100
-
-      // ACK and EOI the interrupt
-      u64 intData = 0;
-      xenonContext->xenonIIC.readInterrupt(thread.SPR.PIR * 0x1000 + 0x50050, reinterpret_cast<u8*>(&intData), sizeof(intData));
-      intData = 0;
-      xenonContext->xenonIIC.writeInterrupt(thread.SPR.PIR * 0x1000 + 0x50060, reinterpret_cast<u8*>(&intData), sizeof(intData));
-    }
+    if (PPUCheckInterrupts())
+      continue;
   }
   // Thread is done executing, just tell it to exit
   ppuThreadActive = false;
@@ -677,9 +647,45 @@ bool PPU::PPUReadNextInstruction() {
   return true;
 }
 
+// Checks for CPU bringup interrupts
+bool PPU::PPUCheckInterrupts() {
+  // Check if we are allowed to enable thread zero if the thread is sleeping...
+  bool WEXT = (ppuState->SPR.TSCR & 0x100000) >> 20;
+
+  // Check for external interrupts that enable execution
+  if (ppuThreadActive && !ppuThreadResetting && (ppuThreadState.load() == eThreadState::Halted || ppuThreadState.load() == eThreadState::Sleeping) && WEXT) {
+    // Check for an external interrupt that enables execution.
+    if (!xenonContext->xenonIIC.checkExtInterrupt(curThread.SPR.PIR)) {
+      return true;
+    }
+
+    // Proceed.
+    LOG_DEBUG(Xenon, "{} was previously halted or sleeping, bringing online", ppuState->ppuName);
+    ppuThreadState.store(eThreadState::Running);
+    // Enable thread 0 execution
+    ppuState->SPR.CTRL = 0x800000;
+
+    // Issue reset
+    ppuState->ppuThread[ePPUThread_Zero].exceptReg |= PPU_EX_RESET;
+    ppuState->ppuThread[ePPUThread_One].exceptReg |= PPU_EX_RESET;
+
+    PPU_THREAD_REGISTERS &thread = curThread;
+
+    thread.SPR.SRR1 = 0x200000; // Set SRR1[42:44] = 100
+
+    // ACK and EOI the interrupt
+    u64 intData = 0;
+    xenonContext->xenonIIC.readInterrupt(thread.SPR.PIR * 0x1000 + 0x50050, reinterpret_cast<u8*>(&intData), sizeof(intData));
+    intData = 0;
+    xenonContext->xenonIIC.writeInterrupt(thread.SPR.PIR * 0x1000 + 0x50060, reinterpret_cast<u8*>(&intData), sizeof(intData));
+  }
+
+  return false;
+}
+
 // Checks for exceptions and process them in the correct order.
 bool PPU::PPUCheckExceptions() {
-  PPU_THREAD_REGISTERS& thread = curThread;
+  PPU_THREAD_REGISTERS &thread = curThread;
   // Start Profile
   MICROPROFILE_SCOPEI("[Xe::PPU]", "CheckExceptions", MP_AUTO);
   // Check Exceptions pending and process them in order.
@@ -709,10 +715,9 @@ bool PPU::PPUCheckExceptions() {
       } else {
         // Checkstop Mode. Hard Fault.
         LOG_CRITICAL(Xenon, "{}: CHECKSTOP!", ppuState->ppuName);
-        // TODO: Properly end execution.
         // A checkstop is a full - stop of the processor that requires a System
         // Reset to recover.
-        Base::SystemPause();
+        XeMain::ShutdownCPU();
       }
     }
     // Maskable:

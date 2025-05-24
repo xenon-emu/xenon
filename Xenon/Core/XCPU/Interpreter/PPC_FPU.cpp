@@ -20,17 +20,17 @@ enum eFPSCRExceptionBits : u32 {
   FPSCR_BIT_ZX = 1U << (31 - 5), // Floating-point zero divide exception.
   FPSCR_BIT_XX = 1U << (31 - 6), // Floating-point inexact exception.
   FPSCR_BIT_VXSNAN = 1U << (31 - 7), // Floating-point invalid operation exception for SNaN.
-  FPSCR_BIT_VXISI = 1U << (31 - 8), // Floating-point invalid operation exception for Infinity – Infinity.
+  FPSCR_BIT_VXISI = 1U << (31 - 8), // Floating-point invalid operation exception for Infinity / Infinity.
   FPSCR_BIT_VXIDI = 1U << (31 - 9), // Floating-point invalid operation exception for Infinity / Infinity.
   FPSCR_BIT_VXZDZ = 1U << (31 - 10), // Floating-point invalid operation exception for Zero / Zero.
   FPSCR_BIT_VXIMZ = 1U << (31 - 11), // Floating-point invalid operation exception for Infinity * Zero.
   FPSCR_BIT_VXVC = 1U << (31 - 12), // Floating-point invalid operation exception for invalid compare.
-  FPSCR_BIT_VXSOFT = 1U << (31 - 21), // Floating-point invalid operation exception for software request. 
+  FPSCR_BIT_VXSOFT = 1U << (31 - 21), // Floating-point invalid operation exception for software request.
   FPSCR_BIT_VXSQRT = 1U << (31 - 22), // Floating-point invalid operation exception for invalid square root.
   FPSCR_BIT_VXCVI = 1U << (31 - 23), // Floating-point invalid operation exception for invalid integer convert.
   FPSCR_BIT_VE = 1U << (31 - 24), // Floating-point invalid operation exception enable.
-  FPSCR_BIT_OE = 1U << (31 - 25), // IEEE floating-point overflow exception enable. 
-  FPSCR_BIT_UE = 1U << (31 - 26), // IEEE floating-point underflow exception enable. 
+  FPSCR_BIT_OE = 1U << (31 - 25), // IEEE floating-point overflow exception enable.
+  FPSCR_BIT_UE = 1U << (31 - 26), // IEEE floating-point underflow exception enable.
   FPSCR_BIT_ZE = 1U << (31 - 27), // IEEE floating-point zero divide exception enable.
   FPSCR_BIT_XE = 1U << (31 - 28), // Floating-point inexact exception enable.
 
@@ -79,15 +79,15 @@ enum class eFPCCBits {
 };
 
 // Updates CR1 field based on the contents of FPSCR's FX, FEX, VX and OX bits.
-void PPCInterpreter::ppuSetCR1(PPU_STATE* ppuState) {
+void PPCInterpreter::ppuSetCR1(PPU_STATE *ppuState) {
   u8 crValue = (curThread.FPSCR.FX << 3) | (curThread.FPSCR.FEX << 2) | (curThread.FPSCR.VX << 1) | curThread.FPSCR.OX;
   curThread.CR.CR1 = crValue;
 }
 
 // Checks if exceptions regarding FPU are to be generated.
-inline void FPCheckExceptions(PPU_STATE* ppuState) {
+inline void FPCheckExceptions(PPU_STATE *ppuState) {
   if (curThread.FPSCR.FEX && (curThread.SPR.MSR.FE0 || curThread.SPR.MSR.FE1)) {
-    // Floating program exceptions are enabled and an exception is pending in 
+    // Floating program exceptions are enabled and an exception is pending in
     // Floating Point Enabled Exception Summary bit of FPSCR.
     curThread.exceptReg |= PPU_EX_PROG;
     curThread.progExceptionType = PROGRAM_EXCEPTION_TYPE_FPU;
@@ -95,7 +95,7 @@ inline void FPCheckExceptions(PPU_STATE* ppuState) {
 }
 
 // Sets the FEX bit in FPSCR if any of the pending exception bits in it are to be raised.
-inline void FPUpdateExceptionSummaryBit(PPU_STATE* ppuState) {
+inline void FPUpdateExceptionSummaryBit(PPU_STATE *ppuState) {
   curThread.FPSCR.VX = (curThread.FPSCR.FPSCR_Hex & FPSCR_VX_ANY) != 0;
   curThread.FPSCR.FEX = ((curThread.FPSCR.FPSCR_Hex >> 22) & (curThread.FPSCR.FPSCR_Hex & FPSCR_ANY_E)) != 0;
 
@@ -103,12 +103,11 @@ inline void FPUpdateExceptionSummaryBit(PPU_STATE* ppuState) {
 }
 
 // Sets the FX bit in FPSCR and causes said exception if allowed following logic from docs.
-void FPSetException(PPU_STATE* ppuState, u32 exceptionMask) {
-  // Check for the same exception already being present.
-  if ((curThread.FPSCR.FPSCR_Hex & exceptionMask) != exceptionMask) {
-    // Set exception summary.
+void FPSetException(PPU_STATE *ppuState, u32 exceptionMask) {
+  // Check for the same exception already being present
+  if ((curThread.FPSCR.FPSCR_Hex & exceptionMask) != exceptionMask)
+    // Set exception summary
     curThread.FPSCR.FX = 1;
-  }
 
   // Set the exception bit in FPSCR.
   curThread.FPSCR.FPSCR_Hex |= exceptionMask;
@@ -118,7 +117,7 @@ void FPSetException(PPU_STATE* ppuState, u32 exceptionMask) {
 }
 
 // Checks for Signaling NaN's.
-inline bool IsSignalingNAN(double inValue) {
+inline bool IsSignalingNAN(f64 inValue) {
   // Do a bit cast to u64 to check for bits.
   const u64 integer = std::bit_cast<u64>(inValue);
   return ((integer & FP_DOUBLE_EXP) == FP_DOUBLE_EXP)
@@ -126,78 +125,86 @@ inline bool IsSignalingNAN(double inValue) {
     && ((integer & FP_DOUBLE_QBIT) == FP_DOUBLE_ZERO);
 }
 
-inline double MakeQuiet(double d) {
+inline f64 MakeQuiet(f64 d) {
   const u64 integral = std::bit_cast<u64>(d) | FP_DOUBLE_QBIT;
 
-  return std::bit_cast<double>(integral);
+  return std::bit_cast<f64>(integral);
 }
 
 // Checks for FP exponent, if it is zero then it turns it into signed zero.
-inline float FPFlushToZero(float f) {
+inline f32 FPFlushToZero(f32 f) {
   u32 i = std::bit_cast<u32>(f);
   // Check for exponent and turn into signed zero.
-  return std::bit_cast<float>(((i & FP_FLOAT_EXP) == 0) ? i &= FP_FLOAT_SIGN : i);
+  return std::bit_cast<f32>(((i & FP_FLOAT_EXP) == 0) ? i &= FP_FLOAT_SIGN : i);
 }
 
-inline double FPFlushToZero(double d) {
+inline f64 FPFlushToZero(f64 d) {
   u64 i = std::bit_cast<u64>(d);
-  return std::bit_cast<double>(((i & FP_DOUBLE_EXP) == 0) ? i &= FP_DOUBLE_SIGN : i);
+  return std::bit_cast<f64>(((i & FP_DOUBLE_EXP) == 0) ? i &= FP_DOUBLE_SIGN : i);
 }
 
 // Classifies the input value based on operand type and returns the value in PPC
 // FP Operand Class type.
-u32 ClassifyDouble(double dvalue) {
+u32 ClassifyDouble(f64 dvalue) {
   const u64 inValue = std::bit_cast<u64>(dvalue);
   const u64 sign = inValue & FP_DOUBLE_SIGN;
   const u64 exp = inValue & FP_DOUBLE_EXP;
 
-  // Normalized number.
-  if (exp > FP_DOUBLE_ZERO && exp < FP_DOUBLE_EXP) { return sign ? FP_CLASS_NN : FP_CLASS_PN; }
+  // Normalized number
+  if (exp > FP_DOUBLE_ZERO && exp < FP_DOUBLE_EXP)
+    return sign ? FP_CLASS_NN : FP_CLASS_PN;
 
   const u64 mantissa = inValue & FP_DOUBLE_FRAC;
   if (mantissa) {
-    if (exp) { return FP_CLASS_QNAN; }
+    // Quiet NAN
+    if (exp)
+      return FP_CLASS_QNAN;
 
-    // Denormalized number.
+    // Denormalized number
     return sign ? FP_CLASS_ND : FP_CLASS_PD;
   }
 
-  // Infinite.
-  if (exp) { return sign ? FP_CLASS_NINF : FP_CLASS_PINF; }
+  // Infinite
+  if (exp)
+    return sign ? FP_CLASS_NINF : FP_CLASS_PINF;
 
-  // Zero.
+  // Zero
   return sign ? FP_CLASS_NZ : FP_CLASS_PZ;
 }
 
-u32 ClassifyFloat(float fvalue) {
+u32 ClassifyFloat(f32 fvalue) {
   const u32 inValue = std::bit_cast<u32>(fvalue);
   const u32 sign = inValue & FP_FLOAT_SIGN;
   const u32 exp = inValue & FP_FLOAT_EXP;
 
-  // Normalized number.
-  if (exp > FP_FLOAT_ZERO && exp < FP_FLOAT_EXP) { return sign ? FP_CLASS_NN : FP_CLASS_PN; }
+  // Normalized number
+  if (exp > FP_FLOAT_ZERO && exp < FP_FLOAT_EXP)
+    return sign ? FP_CLASS_NN : FP_CLASS_PN;
 
   const u32 mantissa = inValue & FP_FLOAT_FRAC;
   if (mantissa) {
-    if (exp) { return FP_CLASS_QNAN; } // Quiet NAN
+    // Quiet NAN
+    if (exp)
+      return FP_CLASS_QNAN;
 
-    // Denormalized number.
+    // Denormalized number
     return sign ? FP_CLASS_ND : FP_CLASS_PD;
   }
 
-  // Infinite.
-  if (exp) { return sign ? FP_CLASS_NINF : FP_CLASS_PINF; }
+  // Infinite
+  if (exp)
+    return sign ? FP_CLASS_NINF : FP_CLASS_PINF;
 
-  // Zero.
+  // Zero
   return sign ? FP_CLASS_NZ : FP_CLASS_PZ;
 }
 
-void SetFI(PPU_STATE* ppuState, u32 FI){
+void SetFI(PPU_STATE *ppuState, u32 FI){
   if (FI != 0) { FPSetException(ppuState, FPSCR_BIT_XX); }
   curThread.FPSCR.FI = FI;
 }
 
-inline float FPForceSingle(PPU_STATE* ppuState, double value) {
+inline f32 FPForceSingle(PPU_STATE *ppuState, f64 value) {
   if (curThread.FPSCR.NI) {
     // Emulate a rounding quirk. If the conversion result before rounding is a subnormal single,
     // it's always flushed to zero, even if rounding would have caused it to become normal.
@@ -209,24 +216,25 @@ inline float FPForceSingle(PPU_STATE* ppuState, double value) {
     if (value_without_sign < smallest_normal_single) {
       const u64 flushed_double = std::bit_cast<u64>(value) & FP_DOUBLE_SIGN;
       const u32 flushed_single = static_cast<u32>(flushed_double >> 32);
-      return std::bit_cast<float>(flushed_single);
+      return std::bit_cast<f32>(flushed_single);
     }
   }
 
   // Emulate standard conversion to single precision.
 
-  float x = static_cast<float>(value);
-  if (curThread.FPSCR.NI) { x = FPFlushToZero(x); }
+  f32 x = static_cast<f32>(value);
+  if (curThread.FPSCR.NI)
+    x = FPFlushToZero(x);
   return x;
 }
 
-inline double FPForceDouble(PPU_STATE* ppuState, double inValue) {
-  if (curThread.FPSCR.NI) { inValue = FPFlushToZero(inValue); }
+inline f64 FPForceDouble(PPU_STATE *ppuState, f64 inValue) {
+  if (curThread.FPSCR.NI)
+    inValue = FPFlushToZero(inValue);
   return inValue;
 }
 
-inline double Force25Bit(double d)
-{
+inline f64 Force25Bit(f64 d) {
   u64 integral = std::bit_cast<u64>(d);
 
   u64 exponent = integral & FP_DOUBLE_EXP;
@@ -250,26 +258,32 @@ inline double Force25Bit(double d)
 
     // Round using these shifted values
     integral = (integral & keep_mask) + (integral & round);
+  } else {
+    integral = (integral & 0xFFFFFFFFF8000000ULL) + (integral & 0x8000000);
   }
-  else { integral = (integral & 0xFFFFFFFFF8000000ULL) + (integral & 0x8000000); }
 
-  return std::bit_cast<double>(integral);
+  return std::bit_cast<f64>(integral);
 }
 
-void PPCInterpreter::FPCompareOrdered(PPU_STATE * ppuState, double fra, double frb) {
+void PPCInterpreter::FPCompareOrdered(PPU_STATE *ppuState, f64 fra, f64 frb) {
   eFPCCBits compareResult;
 
   if (std::isnan(fra) || std::isnan(frb)) {
     compareResult = eFPCCBits::FU;
     if (IsSignalingNAN(fra) || IsSignalingNAN(frb)) {
       FPSetException(ppuState, FPSCR_BIT_VXSNAN);
-      if (curThread.FPSCR.VE == 0) { FPSetException(ppuState, FPSCR_BIT_VXVC); }
+      if (curThread.FPSCR.VE == 0)
+        FPSetException(ppuState, FPSCR_BIT_VXVC);
+    } else {
+      FPSetException(ppuState, FPSCR_BIT_VXVC);
     }
-    else { FPSetException(ppuState, FPSCR_BIT_VXVC); }
+  } else if (fra < frb) {
+    compareResult = eFPCCBits::FL;
+  } else if (fra > frb) {
+    compareResult = eFPCCBits::FG;
+  } else {
+    compareResult = eFPCCBits::FE;
   }
-  else if (fra < frb) { compareResult = eFPCCBits::FL; }
-  else if (fra > frb) { compareResult = eFPCCBits::FG; }
-  else { compareResult = eFPCCBits::FE; }
 
   const u32 compareValue = static_cast<u32>(compareResult);
 
@@ -279,17 +293,21 @@ void PPCInterpreter::FPCompareOrdered(PPU_STATE * ppuState, double fra, double f
   ppcUpdateCR(ppuState, _instr.crfd, compareValue);
 }
 
-void PPCInterpreter::FPCompareUnordered(PPU_STATE* ppuState, double fra, double frb) {
+void PPCInterpreter::FPCompareUnordered(PPU_STATE *ppuState, f64 fra, f64 frb) {
   eFPCCBits compareResult;
 
   if (std::isnan(fra) || std::isnan(frb)) {
     compareResult = eFPCCBits::FU;
 
-    if (IsSignalingNAN(fra) || IsSignalingNAN(frb)) { FPSetException(ppuState, FPSCR_BIT_VXSNAN); }
+    if (IsSignalingNAN(fra) || IsSignalingNAN(frb))
+      FPSetException(ppuState, FPSCR_BIT_VXSNAN);
+  } else if (fra < frb) {
+    compareResult = eFPCCBits::FL;
+  } else if (fra > frb) {
+    compareResult = eFPCCBits::FG;
+  } else {
+    compareResult = eFPCCBits::FE;
   }
-  else if (fra < frb) { compareResult = eFPCCBits::FL; }
-  else if (fra > frb) { compareResult = eFPCCBits::FG; }
-  else { compareResult = eFPCCBits::FE; }
 
   const u32 compareValue = static_cast<u32>(compareResult);
 
@@ -301,30 +319,28 @@ void PPCInterpreter::FPCompareUnordered(PPU_STATE* ppuState, double fra, double 
 
 // Round a number to an integer in the same direction as the CPU rounding mode,
 // without setting any CPU flags or being careful about NaNs
-double RoundToIntegerMode(double number)
-{
+f64 RoundToIntegerMode(f64 number) {
   // This value is 2^52 -- The first number in which double precision floating point
   // numbers can only store subsequent integers, and no longer any decimals
   // This keeps the sign of the unrounded value because it needs to scale it
   // upwards when added
-  const double int_precision = std::copysign(4503599627370496.0, number);
+  const f64 intPrecision = std::copysign(4503599627370496.0, number);
 
   // By adding this value to the original number,
   // it will be forced to decide a integer to round to
   // This rounding will be the same as the CPU rounding mode
-  return (number + int_precision) - int_precision;
+  return (number + intPrecision) - intPrecision;
 }
 
-void PPCInterpreter::ConvertToInteger(PPU_STATE* ppuState, eFPRoundMode roundingMode) {
-  const double b = FPRi(frb).asDouble();
-  double rounded;
+void PPCInterpreter::ConvertToInteger(PPU_STATE *ppuState, eFPRoundMode roundingMode) {
+  const f64 b = FPRi(frb).asDouble();
+  f64 rounded;
   u32 value;
   bool exceptionOccurred = false;
 
   // To reduce complexity, this takes in a rounding mode in a switch case,
   // rather than always judging based on the emulated CPU rounding mode
-  switch (roundingMode)
-  {
+  switch (roundingMode)   {
   case eFPRoundMode::roundModeNearest:
     // On generic platforms, the rounding should be assumed to be ties to even
     // For targeted platforms this would work for any rounding mode,
@@ -346,17 +362,18 @@ void PPCInterpreter::ConvertToInteger(PPU_STATE* ppuState, eFPRoundMode rounding
   }
 
   if (std::isnan(b)) {
-    if (IsSignalingNAN(b)) { FPSetException(ppuState, FPSCR_BIT_VXSNAN); }
+    if (IsSignalingNAN(b))
+      FPSetException(ppuState, FPSCR_BIT_VXSNAN);
 
     value = 0x80000000;
     FPSetException(ppuState, FPSCR_BIT_VXCVI);
     exceptionOccurred = true;
-  } else if (rounded >= static_cast<double>(0x80000000)) {
+  } else if (rounded >= static_cast<f64>(0x80000000)) {
     // Positive large operand or +inf
-    value = 0x7fffffff;
+    value = 0x7FFFFFFF;
     FPSetException(ppuState, FPSCR_BIT_VXCVI);
     exceptionOccurred = true;
-  } else if (rounded < -static_cast<double>(0x80000000)) {
+  } else if (rounded < -static_cast<f64>(0x80000000)) {
     // Negative large operand or -inf
     value = 0x80000000;
     FPSetException(ppuState, FPSCR_BIT_VXCVI);
@@ -364,122 +381,121 @@ void PPCInterpreter::ConvertToInteger(PPU_STATE* ppuState, eFPRoundMode rounding
   } else {
     s32 signed_value = static_cast<s32>(rounded);
     value = static_cast<u32>(signed_value);
-    const double di = static_cast<double>(signed_value);
+    const double di = static_cast<f64>(signed_value);
     if (di == b) { curThread.FPSCR.clearFIFR(); }
     else { SetFI(ppuState, 1); curThread.FPSCR.FR = fabs(di) > fabs(b); }
   }
 
-  if (exceptionOccurred) { curThread.FPSCR.clearFIFR(); }
-
-  if (!exceptionOccurred || curThread.FPSCR.VE == 0)
-  {
+  if (exceptionOccurred) {
+    curThread.FPSCR.clearFIFR();
+  } else if (!exceptionOccurred || curThread.FPSCR.VE == 0) {
     // Based on HW tests
     // FPRF is not affected
-    u64 result = 0xfff8000000000000ull | value;
+    u64 result = 0xFFF8000000000000ull | value;
     if (value == 0 && std::signbit(b))
       result |= 0x100000000ull;
 
     FPRi(frd).setValue(result);
   }
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
-// Represents a FP Operation Result, wich may set exeptions and/or check for them.
-struct FPResult
-{
-  bool HasNoInvalidExceptions() const { return (exception & FPSCR_VX_ANY) == 0; }
+// Represents a FP Operation Result, which may set exceptions and/or check for them
+struct FPResult {
+  bool HasNoInvalidExceptions() const {
+    return (exception & FPSCR_VX_ANY) == 0;
+  }
 
   void SetException(PPU_STATE *ppuState, eFPSCRExceptionBits exceptionBits) {
     exception = exceptionBits;
     FPSetException(ppuState, exceptionBits);
   }
 
-  // Resulting Value.
-  double value = 0.0;
+  // Resulting value
+  f64 value = 0.0;
   eFPSCRExceptionBits exception{};
 };
 
 // Floating point addition, with exception recording.
-inline FPResult FPAdd(PPU_STATE* ppuState, double fra, double frb) {
+inline FPResult FPAdd(PPU_STATE *ppuState, f64 fra, f64 frb) {
   // Calculate Result.
   FPResult result{ fra + frb };
 
   // Check for a NaN result.
-  if (std::isnan(result.value))
-  {
-    if (IsSignalingNAN(fra) || IsSignalingNAN(frb)) { result.SetException(ppuState, FPSCR_BIT_VXSNAN); }
-    // Clear FIFR bits as per docs.
+  if (std::isnan(result.value)) {
+    if (IsSignalingNAN(fra) || IsSignalingNAN(frb))
+      result.SetException(ppuState, FPSCR_BIT_VXSNAN);
+    // Clear FIFR bits as per docs
     curThread.FPSCR.clearFIFR();
 
     if (std::isnan(fra)) {
       result.value = MakeQuiet(fra);
       return result;
-    }
-    if (std::isnan(frb)) {
+    } else if (std::isnan(frb)) {
       result.value = MakeQuiet(frb);
       return result;
     }
 
     result.SetException(ppuState, FPSCR_BIT_VXISI);
-    result.value = std::numeric_limits<double>::quiet_NaN();
+    result.value = std::numeric_limits<f64>::quiet_NaN();
     return result;
   }
 
-  if (std::isinf(fra) || std::isinf(frb)) { curThread.FPSCR.clearFIFR(); }
+  if (std::isinf(fra) || std::isinf(frb))
+    curThread.FPSCR.clearFIFR();
 
   return result;
 }
 
-inline FPResult FPSub(PPU_STATE* ppuState, double fra, double frb)
-{
+inline FPResult FPSub(PPU_STATE *ppuState, f64 fra, f64 frb) {
   FPResult result{ fra - frb };
 
-  if (std::isnan(result.value))
-  {
-    if (IsSignalingNAN(fra) || IsSignalingNAN(frb)) { result.SetException(ppuState, FPSCR_BIT_VXSNAN); }
+  if (std::isnan(result.value)) {
+    if (IsSignalingNAN(fra) || IsSignalingNAN(frb))
+      result.SetException(ppuState, FPSCR_BIT_VXSNAN);
 
     curThread.FPSCR.clearFIFR();
 
     if (std::isnan(fra)) {
       result.value = MakeQuiet(fra);
       return result;
-    }
-    if (std::isnan(frb)) {
+    } else if (std::isnan(frb)) {
       result.value = MakeQuiet(frb);
       return result;
     }
 
     result.SetException(ppuState, FPSCR_BIT_VXISI);
-    result.value = std::numeric_limits<double>::quiet_NaN();
+    result.value = std::numeric_limits<f64>::quiet_NaN();
     return result;
   }
 
-  if (std::isinf(fra) || std::isinf(frb)) { curThread.FPSCR.clearFIFR(); }
+  if (std::isinf(fra) || std::isinf(frb))
+    curThread.FPSCR.clearFIFR();
 
   return result;
 }
 
 
-inline FPResult FPMul(PPU_STATE* ppuState, double fra, double frb)
-{
+inline FPResult FPMul(PPU_STATE *ppuState, f64 fra, f64 frb) {
   FPResult result{ fra * frb };
 
   if (std::isnan(result.value)) {
-    if (IsSignalingNAN(fra) || IsSignalingNAN(frb)) { result.SetException(ppuState, FPSCR_BIT_VXSNAN); }
+    if (IsSignalingNAN(fra) || IsSignalingNAN(frb))
+      result.SetException(ppuState, FPSCR_BIT_VXSNAN);
 
     curThread.FPSCR.clearFIFR();
 
     if (std::isnan(fra)) {
       result.value = MakeQuiet(fra);
       return result;
-    }
-    if (std::isnan(frb)) {
+    } else if (std::isnan(frb)) {
       result.value = MakeQuiet(frb);
       return result;
     }
 
-    result.value = std::numeric_limits<double>::quiet_NaN();
+    result.value = std::numeric_limits<f64>::quiet_NaN();
     result.SetException(ppuState, FPSCR_BIT_VXIMZ);
     return result;
   }
@@ -487,7 +503,7 @@ inline FPResult FPMul(PPU_STATE* ppuState, double fra, double frb)
   return result;
 }
 
-inline FPResult FPDiv(PPU_STATE* ppuState, double fra, double frb) {
+inline FPResult FPDiv(PPU_STATE *ppuState, f64 fra, f64 frb) {
   FPResult result{ fra / frb };
 
   if (std::isinf(result.value)) {
@@ -495,95 +511,94 @@ inline FPResult FPDiv(PPU_STATE* ppuState, double fra, double frb) {
       result.SetException(ppuState, FPSCR_BIT_ZX);
       return result;
     }
-  }
-  else if (std::isnan(result.value)) {
-    if (IsSignalingNAN(fra) || IsSignalingNAN(frb)) { result.SetException(ppuState, FPSCR_BIT_VXSNAN); }
+  } else if (std::isnan(result.value)) {\
+    if (IsSignalingNAN(fra) || IsSignalingNAN(frb))
+      result.SetException(ppuState, FPSCR_BIT_VXSNAN);
 
     curThread.FPSCR.clearFIFR();
 
-    if (std::isnan(fra)) { 
+    if (std::isnan(fra)) {
       result.value = MakeQuiet(fra);
       return result;
-    }
-    if (std::isnan(frb)) {
+    } else if (std::isnan(frb)) {
       result.value = MakeQuiet(frb);
       return result;
     }
 
-    if (frb == 0.0) { result.SetException(ppuState, FPSCR_BIT_VXZDZ); }
-    else if (std::isinf(fra) && std::isinf(frb)) { result.SetException(ppuState, FPSCR_BIT_VXIDI); }
+    if (frb == 0.0)
+      result.SetException(ppuState, FPSCR_BIT_VXZDZ);
+    else if (std::isinf(fra) && std::isinf(frb))
+      result.SetException(ppuState, FPSCR_BIT_VXIDI);
 
-    result.value = std::numeric_limits<double>::quiet_NaN();
+    result.value = std::numeric_limits<f64>::quiet_NaN();
     return result;
   }
+
   return result;
 }
 
 // FMA instructions on PowerPC are weird:
 // They calculate (a * c) + b, but the order in which
 // inputs are checked for NaN is still a, b, c.
-inline FPResult FPMadd(PPU_STATE* ppuState, double fra, double frc, double frb)
+inline FPResult FPMadd(PPU_STATE *ppuState, f64 fra, f64 frc, f64 frb)
 {
   FPResult result{ std::fma(fra, frc, frb) };
 
-  if (std::isnan(result.value))
-  {
-    if (IsSignalingNAN(fra) || IsSignalingNAN(frb) || IsSignalingNAN(frc)) { result.SetException(ppuState, FPSCR_BIT_VXSNAN); }
+  if (std::isnan(result.value)) {
+    if (IsSignalingNAN(fra) || IsSignalingNAN(frb) || IsSignalingNAN(frc))
+      result.SetException(ppuState, FPSCR_BIT_VXSNAN);
 
     curThread.FPSCR.clearFIFR();
 
     if (std::isnan(fra)) {
       result.value = MakeQuiet(fra);
       return result;
-    }
-    if (std::isnan(frb)) {
+    } else if (std::isnan(frb)) {
       result.value = MakeQuiet(frb);
       return result;
-    }
-    if (std::isnan(frc)) {
+    } else if (std::isnan(frc)) {
       result.value = MakeQuiet(frc);
       return result;
     }
 
     result.SetException(ppuState, std::isnan(fra * frc) ? FPSCR_BIT_VXIMZ : FPSCR_BIT_VXISI);
-    result.value = std::numeric_limits<double>::quiet_NaN();
+    result.value = std::numeric_limits<f64>::quiet_NaN();
     return result;
   }
 
-  if (std::isinf(fra) || std::isinf(frb) || std::isinf(frc)) { curThread.FPSCR.clearFIFR(); }
+  if (std::isinf(fra) || std::isinf(frb) || std::isinf(frc))
+    curThread.FPSCR.clearFIFR();
 
   return result;
 }
 
-inline FPResult FPMsub(PPU_STATE* ppuState, double fra, double frc, double frb)
-{
+inline FPResult FPMsub(PPU_STATE *ppuState, f64 fra, f64 frc, f64 frb) {
   FPResult result{ std::fma(fra, frc, -frb) };
 
-  if (std::isnan(result.value))
-  {
-    if (IsSignalingNAN(fra) || IsSignalingNAN(frb) || IsSignalingNAN(frc)) { result.SetException(ppuState, FPSCR_BIT_VXSNAN); }
+  if (std::isnan(result.value)) {
+    if (IsSignalingNAN(fra) || IsSignalingNAN(frb) || IsSignalingNAN(frc))
+      result.SetException(ppuState, FPSCR_BIT_VXSNAN);
 
     curThread.FPSCR.clearFIFR();
 
     if (std::isnan(fra)) {
       result.value = MakeQuiet(fra);
       return result;
-    }
-    if (std::isnan(frb)) {
+    } else if (std::isnan(frb)) {
       result.value = MakeQuiet(frb);
       return result;
-    }
-    if (std::isnan(frc)) {
+    } else if (std::isnan(frc)) {
       result.value = MakeQuiet(frc);
       return result;
     }
 
     result.SetException(ppuState, std::isnan(fra * frc) ? FPSCR_BIT_VXIMZ : FPSCR_BIT_VXISI);
-    result.value = std::numeric_limits<double>::quiet_NaN();
+    result.value = std::numeric_limits<f64>::quiet_NaN();
     return result;
   }
 
-  if (std::isinf(fra) || std::isinf(frb) || std::isinf(frc)) { curThread.FPSCR.clearFIFR(); }
+  if (std::isinf(fra) || std::isinf(frb) || std::isinf(frc))
+    curThread.FPSCR.clearFIFR();
 
   return result;
 }
@@ -636,6 +651,7 @@ void PPCInterpreter::PPCInterpreter_mcrfs(PPU_STATE *ppuState) {
   * The contents of field crS (bits 4 * crS + 32-4 * crS + 35) of CR are copied to field
   * crD (bits 4 * crD + 32-4 * crD + 35) of CR.
   */
+
   CHECK_FPU;
 
   const u32 shift = 4 * (7 - _instr.crfs);
@@ -654,8 +670,8 @@ void PPCInterpreter::PPCInterpreter_faddx(PPU_STATE *ppuState) {
 
   CHECK_FPU;
 
-  const double fra = FPRi(fra).asDouble();
-  const double frb = FPRi(frb).asDouble();
+  const f64 fra = FPRi(fra).asDouble();
+  const f64 frb = FPRi(frb).asDouble();
 
   const FPResult sum = FPAdd(ppuState, fra, frb);
 
@@ -666,7 +682,8 @@ void PPCInterpreter::PPCInterpreter_faddx(PPU_STATE *ppuState) {
     curThread.FPSCR.FPRF = ClassifyDouble(result);
   }
 
-  if (_instr.rc) ppuSetCR1(ppuState);
+  if (_instr.rc)
+  ppuSetCR1(ppuState);
 }
 
 // Floating Absolute Value (x'FC00 0210')
@@ -676,10 +693,11 @@ void PPCInterpreter::PPCInterpreter_fabsx(PPU_STATE *ppuState) {
   */
 
   CHECK_FPU;
-  
+
   FPRi(frd).setValue(std::fabs(FPRi(frb).asDouble()));
 
-  if (_instr.rc) ppuSetCR1(ppuState);
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Floating Add Single (x'EC00 002A')
@@ -690,8 +708,8 @@ void PPCInterpreter::PPCInterpreter_faddsx(PPU_STATE *ppuState) {
 
   CHECK_FPU;
 
-  const double fra = FPRi(fra).asDouble();
-  const double frb = FPRi(frb).asDouble();
+  const f64 fra = FPRi(fra).asDouble();
+  const f64 frb = FPRi(frb).asDouble();
 
   const FPResult sum = FPAdd(ppuState, fra, frb);
 
@@ -702,7 +720,8 @@ void PPCInterpreter::PPCInterpreter_faddsx(PPU_STATE *ppuState) {
     curThread.FPSCR.FPRF = ClassifyFloat(result);
   }
 
-  if (_instr.rc) ppuSetCR1(ppuState);
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Floating Compare Unordered (x'FC00 0000')
@@ -729,7 +748,7 @@ void PPCInterpreter::PPCInterpreter_fcmpu(PPU_STATE *ppuState) {
 }
 
 // Floating Compare Ordered (x'FC00 0040')
-void PPCInterpreter::PPCInterpreter_fcmpo(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_fcmpo(PPU_STATE *ppuState) {
   /*
   if (frA) is a NaN or
      (frB) is a NaN then c <- 0b0001
@@ -738,7 +757,7 @@ void PPCInterpreter::PPCInterpreter_fcmpo(PPU_STATE* ppuState) {
   else c <- 0b0010
 
   FPCC <- c
-  CR[4 * crfD–4 * crfD + 3] <- c 
+  CR[4 * crfD-4 * crfD + 3] <- c
 
   if (frA) is an SNaN or
      (frB) is an SNaN then
@@ -757,14 +776,14 @@ void PPCInterpreter::PPCInterpreter_fcmpo(PPU_STATE* ppuState) {
 }
 
 // Floating Convert to Integer Word (x'FC00 001C')
-void PPCInterpreter::PPCInterpreter_fctiwx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_fctiwx(PPU_STATE *ppuState) {
   CHECK_FPU;
 
   ConvertToInteger(ppuState, static_cast<eFPRoundMode>(curThread.FPSCR.RN.value()));
 }
 
 // Floating Convert to Integer Double Word(x'FC00 065C')
-void PPCInterpreter::PPCInterpreter_fctidx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_fctidx(PPU_STATE *ppuState) {
   // TODO(bitsh1ft3r): Respect rounding modes!
   // Test correct behavior.
 
@@ -810,7 +829,7 @@ void PPCInterpreter::PPCInterpreter_fctidx(PPU_STATE* ppuState) {
 
 // Floating Convert to Integer Double Word with Round toward Zero (x'FC00 065E')
 void PPCInterpreter::PPCInterpreter_fctidzx(PPU_STATE *ppuState) {
-  // This was mostly taken from rpcs3's PPUInterpreter. 
+  // This was mostly taken from rpcs3's PPUInterpreter.
   // TODO: Verify.
 
   CHECK_FPU;
@@ -855,7 +874,7 @@ void PPCInterpreter::PPCInterpreter_fctidzx(PPU_STATE *ppuState) {
 
 // Floating Convert to Integer Word with Round toward Zero (x'FC00 001E')
 void PPCInterpreter::PPCInterpreter_fctiwzx(PPU_STATE *ppuState) {
-  // This was mostly taken from rpcs3's PPUInterpreter. 
+  // This was mostly taken from rpcs3's PPUInterpreter.
   // TODO: Verify.
 
   CHECK_FPU;
@@ -1309,7 +1328,7 @@ void PPCInterpreter::PPCInterpreter_fsubsx(PPU_STATE *ppuState) {
 }
 
 // Floating Square Root (Double-Precision) (x'FC00 002C')
-void PPCInterpreter::PPCInterpreter_fsqrtx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_fsqrtx(PPU_STATE *ppuState) {
   /*
   frD <- (Square_rootfrB)
   */
@@ -1322,7 +1341,7 @@ void PPCInterpreter::PPCInterpreter_fsqrtx(PPU_STATE* ppuState) {
 }
 
 // Floating Square Root Single (x'EC00 002C')
-void PPCInterpreter::PPCInterpreter_fsqrtsx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_fsqrtsx(PPU_STATE *ppuState) {
   /*
   frD <- Single(Square_rootfrB)
   */
@@ -1361,7 +1380,7 @@ void PPCInterpreter::PPCInterpreter_mtfsfx(PPU_STATE *ppuState) {
 }
 
 // Move to FPSCR Bit 0 (x'FC00 008C')
-void PPCInterpreter::PPCInterpreter_mtfsb0x(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_mtfsb0x(PPU_STATE *ppuState) {
   /*
   Bit crbD of the FPSCR is unset. 
   */
@@ -1376,7 +1395,7 @@ void PPCInterpreter::PPCInterpreter_mtfsb0x(PPU_STATE* ppuState) {
 }
 
 // Move to FPSCR Bit 1 (x'FC00 004C')
-void PPCInterpreter::PPCInterpreter_mtfsb1x(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_mtfsb1x(PPU_STATE *ppuState) {
   /*
   Bit crbD of the FPSCR is set.
   */

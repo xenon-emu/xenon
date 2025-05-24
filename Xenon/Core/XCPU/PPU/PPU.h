@@ -135,7 +135,8 @@ private:
 
   std::unique_ptr<PPU_JIT> ppuJIT;
   friend class PPU_JIT;
-  friend bool callEpil(PPU* ppu);
+  friend bool callEpil(PPU *ppu, PPU_STATE *ppuState);
+  friend bool callIntil(PPU *ppu);
 
   //
   // Helpers
@@ -146,6 +147,8 @@ private:
   u32 GetIPS();
   // Read next intruction from memory
   bool PPUReadNextInstruction();
+  // Checks for pending exceptions
+  bool PPUCheckInterrupts();
   // Checks for pending exceptions
   bool PPUCheckExceptions();
   // Checks if it should update the time base

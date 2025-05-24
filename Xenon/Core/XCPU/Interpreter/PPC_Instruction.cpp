@@ -17,6 +17,7 @@ namespace PPCInterpreter {
   void PPCInterpreter_nop(PPU_STATE *ppuState) {
     // Do nothing
   }
+
   void PPCInterpreter_invalid(PPU_STATE *ppuState) {
     if (Config::debug.haltOnInvalidInstructions) {
       XeMain::GetCPU()->Halt();
