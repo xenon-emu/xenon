@@ -13,7 +13,7 @@ void PPCInterpreter::PPCInterpreterJIT_mfspr(PPU_STATE *ppuState, JITBlockBuilde
 
   switch (sprNum) {
   case SPR_XER:
-    COMP->mov(rSValue, SPRPtr(XER.XER_Hex));
+    COMP->mov(rSValue, SPRPtr(XER).Base());
     break;
   case SPR_LR:
     COMP->mov(rSValue, SPRPtr(LR));

@@ -26,13 +26,15 @@ using namespace asmjit;
 //
 // Pointer Helpers
 //
-#define GPRPtr(x) x86::ptr(b->threadCtx, GPROffest(x))
-#define SPRPtr(x) x86::ptr(b->threadCtx, SPROffest(x))
-#define SharedSPRPtr(x) x86::ptr(b->ppuState, SharedSPROffest(x))
-#define CRValPtr() x86::ptr(b->threadCtx, offsetof(PPU_THREAD_REGISTERS, CR))
-#define CIAPtr() x86::ptr(b->threadCtx, offsetof(PPU_THREAD_REGISTERS, CIA))
-#define NIAPtr() x86::ptr(b->threadCtx, offsetof(PPU_THREAD_REGISTERS, NIA))
-#define LRPtr() x86::ptr(b->threadCtx, offsetof(PPU_THREAD_REGISTERS, SPR) + offsetof(PPU_THREAD_SPRS, LR))
+
+#define GPRPtr(x) b->threadCtx->array(&PPU_THREAD_REGISTERS::GPR).Ptr(x)
+#define SPRStruct(x) b->threadCtx->substruct(&PPU_THREAD_REGISTERS::SPR).substruct(&PPU_THREAD_SPRS::x)
+#define SPRPtr(x) b->threadCtx->substruct(&PPU_THREAD_REGISTERS::SPR).scalar(&PPU_THREAD_SPRS::x)
+#define SharedSPRPtr(x) x86::ptr(b->ppuState->Base(), SharedSPROffest(x))
+#define CRValPtr() b->threadCtx->scalar(&PPU_THREAD_REGISTERS::CR)
+#define CIAPtr() b->threadCtx->scalar(&PPU_THREAD_REGISTERS::CIA)
+#define NIAPtr() b->threadCtx->scalar(&PPU_THREAD_REGISTERS::NIA)
+#define LRPtr() SPRPtr(LR)
 
 inline x86::Gp Jrotl32(JITBlockBuilder *b, x86::Mem x, u32 n) {
   x86::Gp tmp = newGP32();
@@ -72,10 +74,10 @@ inline x86::Gp J_BuildCR_0(JITBlockBuilder *b, x86::Gp value) {
 
   // Handle SO flag
 #ifdef __LITTLE_ENDIAN__
-  COMP->mov(tmp.r32(), SPRPtr(XER.XER_Hex));
+  COMP->mov(tmp.r32(), SPRPtr(XER));
   COMP->shr(tmp.r32(), imm(31));
 #else
-  COMP->mov(tmp.r32(), SPRPtr(XER.XER_Hex));
+  COMP->mov(tmp.r32(), SPRPtr(XER));
   COMP->and_(tmp.r32(), imm(1));
 #endif
   COMP->shl(tmp, imm(3 - CR_BIT_SO));
@@ -106,10 +108,10 @@ inline void J_ppuSetCR(JITBlockBuilder *b, x86::Gp value, u32 index) {
   // Cast Check
   //
 #ifdef __LITTLE_ENDIAN__
-  COMP->mov(temp8.r32(), SPRPtr(MSR.MSR_Hex));
+  COMP->mov(temp8.r32(), SPRPtr(MSR));
   COMP->shr(temp8.r32(), imm(31));
 #else
-  COMP->mov(temp8.r32(), SPRPtr(MSR.MSR_Hex));
+  COMP->mov(temp8.r32(), SPRPtr(MSR));
   COMP->and_(temp8.r32(), imm(1));
 #endif
   COMP->test(temp8, temp8);
