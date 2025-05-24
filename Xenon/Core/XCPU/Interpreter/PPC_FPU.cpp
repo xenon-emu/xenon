@@ -672,14 +672,16 @@ void PPCInterpreter::PPCInterpreter_faddx(PPU_STATE *ppuState) {
 // Floating Absolute Value (x'FC00 0210')
 void PPCInterpreter::PPCInterpreter_fabsx(PPU_STATE *ppuState) {
   /*
-  The contents of frB with bit [0] cleared are placed into frD.
+  frD <- abs(frB)
   */
 
   CHECK_FPU;
   
-  FPRi(frd).setValue(std::fabs(FPRi(frb).asDouble()));
+  const f64 frB = FPRi(frb).asDouble();
+  FPRi(frd).setValue(std::fabs(frB));
 
-  if (_instr.rc) ppuSetCR1(ppuState);
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Floating Add Single (x'EC00 002A')
@@ -1118,6 +1120,21 @@ void PPCInterpreter::PPCInterpreter_fmsubsx(PPU_STATE *ppuState) {
   }
 
   if (_instr.rc) { ppuSetCR1(ppuState); }
+}
+
+// Floating Negative Absolute Value
+void PPCInterpreter::PPCInterpreter_fnabsx(PPU_STATE *ppuState) {
+  /*
+  frD <- - abs(frB)
+  */
+
+  CHECK_FPU;
+
+  const f64 frB = FPRi(frb).asDouble();
+  FPRi(frd).setValue(-(std::fabs(frB)));
+
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Floating Negative Multiply-Add (Double-Precision) (x'FC00 003E')
