@@ -294,11 +294,12 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
   jitBuilder->threadCtx = new ASMJitPtr<PPU_THREAD_REGISTERS>(compiler.newGpz("thread"));
   jitBuilder->haltBool = compiler.newGpb("enableHalt"); // bool
 
-  FuncSignatureT<void, void*, void*, bool> signature;
-  compiler.addFunc(signature);
-  compiler.setArg(0, jitBuilder->ppu->Base());
-  compiler.setArg(1, jitBuilder->ppuState->Base());
-  compiler.setArg(2, jitBuilder->haltBool);
+  FuncNode *signature = nullptr;
+  compiler.addFuncNode(&signature, FuncSignatureT<void, PPU *, PPU_STATE *, bool>());
+  signature->setArg(0, jitBuilder->ppu->Base());
+  signature->setArg(1, jitBuilder->ppuState->Base());
+  signature->setArg(2, jitBuilder->haltBool);
+
   setupContext(jitBuilder.get());
 
   std::vector<u32> instrsTemp{};
