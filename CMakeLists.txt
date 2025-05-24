@@ -78,6 +78,7 @@ if (GFX_ENABLED)
   find_package(sirit CONFIG)
 endif()
 
+find_package(asmjit CONFIG)
 find_package(fmt 10.2.1 CONFIG)
 find_package(toml11 4.4.0 CONFIG)
 
@@ -88,15 +89,6 @@ add_subdirectory(Deps/ThirdParty)
 file(GLOB_RECURSE Base Xenon/Base/*.cpp Xenon/Base/*.h)
 
 file(GLOB_RECURSE Core Xenon/Core/*.cpp Xenon/Core/*.h)
-
-set(XCPU_JIT
-  Xenon/Core/XCPU/Interpreter/JIT/x86_64/JITEmitter_ALU.cpp
-  Xenon/Core/XCPU/Interpreter/JIT/x86_64/JITEmitter_BC.cpp
-  Xenon/Core/XCPU/Interpreter/JIT/x86_64/JITEmitter_Helpers.h
-  Xenon/Core/XCPU/Interpreter/JIT/x86_64/JITEmitter_System.cpp
-  Xenon/Core/XCPU/PPU/PPU_JIT.cpp
-  Xenon/Core/XCPU/PPU/PPU_JIT.h
-)
 
 if (GFX_ENABLED)
   set(ImGuiDir Deps/ThirdParty/ImGui)
@@ -119,7 +111,6 @@ file(GLOB_RECURSE include Xenon/include/*.cpp Xenon/include/*.h)
 
 set(microprofile_dir Deps/ThirdParty/microprofile)
 file(GLOB microprofile ${microprofile_dir}/*.cpp ${microprofile_dir}/*.h)
-
 
 add_executable(Xenon
   ${Base}
