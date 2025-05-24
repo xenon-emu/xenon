@@ -223,7 +223,7 @@ u64 PPU_JIT::ExecuteJITBlock(u64 addr, bool enableHalt) {
 void PPU_JIT::setupContext(JITBlockBuilder *b) {
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
   x86::Gp tempR = newGP32();
-  COMP->movzx(tempR, b->threadCtx->Ptr<u8>());
+  COMP->movzx(tempR, b->ppuState->Ptr<u8>());
   COMP->imul(b->threadCtx->Base(), tempR, sizeof(PPU_THREAD_REGISTERS));
   // Since ppuThread[] base is at offset 0 we just need to add the offset in the array
   COMP->add(b->threadCtx->Base(), b->ppuState->Base());
@@ -255,7 +255,7 @@ void PPU_JIT::setupProl(JITBlockBuilder *b, u32 instrData) {
 
   // Call HALT
   InvokeNode *out = nullptr;
-  COMP->invoke(&out, imm((void*)callHalt), FuncSignatureT<void>());
+  COMP->invoke(&out, imm((void*)callHalt), FuncSignature::build<void>());
 
   COMP->bind(continueLabel);
 
@@ -295,7 +295,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
   jitBuilder->haltBool = compiler.newGpb("enableHalt"); // bool
 
   FuncNode *signature = nullptr;
-  compiler.addFuncNode(&signature, FuncSignatureT<void, PPU *, PPU_STATE *, bool>());
+  compiler.addFuncNode(&signature, FuncSignature::build<void, PPU *, PPU_STATE *, bool>());
   signature->setArg(0, jitBuilder->ppu->Base());
   signature->setArg(1, jitBuilder->ppuState->Base());
   signature->setArg(2, jitBuilder->haltBool);
@@ -416,14 +416,14 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
       auto intEmitter = PPCInterpreter::ppcDecoder.getTable()[decodedInstr];
 
       InvokeNode *out = nullptr;
-      compiler.invoke(&out, imm((void*)intEmitter), FuncSignatureT<void, void*>());
+      compiler.invoke(&out, imm((void*)intEmitter), FuncSignature::build<void, void*>());
       out->setArg(0, jitBuilder->ppuState->Base());
     }
 
     // Epil (check for exc and interrupts)
     InvokeNode *tbCheck = nullptr;
     x86::Gp retVal = compiler.newGpb();
-    compiler.invoke(&tbCheck, imm((void*)callEpil), FuncSignatureT<bool, PPU*, PPU_STATE*>());
+    compiler.invoke(&tbCheck, imm((void*)callEpil), FuncSignature::build<bool, PPU*, PPU_STATE*>());
     tbCheck->setArg(0, jitBuilder->ppu->Base());
     tbCheck->setArg(1, jitBuilder->ppuState->Base());
     tbCheck->setRet(0, retVal);
@@ -472,7 +472,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
 // TODO: Invalidate blocks
 void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt) {
   u32 instrsExecuted = 0;
-  while (instrsExecuted < numInstrs && active) {
+  while (instrsExecuted < numInstrs && active && (XeRunning && !XePaused)) {
     u64 blockStart = curThread.NIA;
     auto it = jitBlocks.find(blockStart);
     if (it == jitBlocks.end()) {
