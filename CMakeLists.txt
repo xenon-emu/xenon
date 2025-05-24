@@ -21,13 +21,13 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
 endif()
 
 # Optimizations
-#set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
-#if (msvc)
-#  add_compile_options($<$<CONFIG:Release>:/Oi>)
-#  add_compile_options($<$<CONFIG:Release>:/Ot>)
-#elseif (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-#  add_link_options(-O3)
-#endif()
+set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+if (msvc)
+  add_compile_options($<$<CONFIG:Release>:/Oi>)
+  add_compile_options($<$<CONFIG:Release>:/Ot>)
+elseif (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
+  add_link_options(-O3)
+endif()
 
 project(Xenon)
 
