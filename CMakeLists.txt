@@ -115,36 +115,11 @@ if (GFX_ENABLED)
   )
 endif()
 
+file(GLOB_RECURSE include Xenon/include/*.cpp Xenon/include/*.h)
+
 set(microprofile_dir Deps/ThirdParty/microprofile)
-set(microprofile
-    Xenon/include/microprofile.config.h
-    ${microprofile_dir}/microprofile.cpp
-    ${microprofile_dir}/microprofile.h
-    ${microprofile_dir}/microprofile_html.h
-)
+file(GLOB microprofile ${microprofile_dir}/*.cpp ${microprofile_dir}/*.h)
 
-set(XGPU
-    Xenon/Core/XGPU/XGPU.cpp
-    Xenon/Core/XGPU/XenosRegisters.h
-    Xenon/Core/XGPU/XGPU.h
-    Xenon/Core/XGPU/XGPUConfig.h
-    Xenon/Core/XGPU/CommandProcessor.h
-    Xenon/Core/XGPU/CommandProcessor.cpp
-    Xenon/Core/XGPU/RingBuffer.h
-    Xenon/Core/XGPU/RingBuffer.cpp
-)
-
-set(Core
-    ${NAND}
-    ${RAM}
-    ${Render}
-    ${RootBus}
-    ${XCPU}
-    ${XCPU_JIT}
-    ${XGPU}
-    Xenon/Core/Xe_Main.cpp
-    Xenon/Core/Xe_Main.h
-)
 
 add_executable(Xenon
   ${Base}
