@@ -692,7 +692,8 @@ void PPCInterpreter::PPCInterpreter_fabsx(PPU_STATE *ppuState) {
   frD <- abs(frB)
   */
 
-  CHECK_FPU
+  CHECK_FPU;
+
   const f64 frB = FPRi(frb).asDouble();
   FPRi(frd).setValue(std::fabs(frB));
 
