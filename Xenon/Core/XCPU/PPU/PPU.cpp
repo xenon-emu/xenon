@@ -44,17 +44,17 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
 #endif
   u32 executionMode = Base::JoaatStringHash(Config::highlyExperimental.cpuExecutor);
   switch (executionMode) {
-  case "Interpreted"_j:
+  case "Interpreted"_jLower:
     currentExecMode = eExecutorMode::Interpreter;
     break;
-  case "JIT"_j:
+  case "JIT"_jLower:
     currentExecMode = eExecutorMode::JIT;
     break;
-  case "Hybrid"_j:
+  case "Hybrid"_jLower:
     currentExecMode = eExecutorMode::Hybrid;
     break;
   default:
-    LOG_WARNING(Xenon, "Invalid execution mode! Defaulting to Interpreted");
+    LOG_WARNING(Xenon, "Invalid execution mode '{}'! Defaulting to Interpreted", Config::highlyExperimental.cpuExecutor);
     currentExecMode = eExecutorMode::Interpreter;
     break;
   }
