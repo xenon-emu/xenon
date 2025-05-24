@@ -76,16 +76,15 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
   // Asign global Xenon context
   xenonContext = inXenonContext;
 
-  //if (Config::xcpu.clocksPerInstruction) {
-  //  clocksPerInstruction = Config::xcpu.clocksPerInstruction;
-  //  LOG_INFO(Xenon, "{}: Using cached CPI from Config, got {}", ppuState->ppuName, clocksPerInstruction);
-  //} else {
-  //  CalculateCPI();
-  //  if (ppuState->ppuID == 0) {
-  //    Config::xcpu.clocksPerInstruction = clocksPerInstruction;
-  //  }
-  //}
-  CalculateCPI();
+  if (Config::xcpu.clocksPerInstruction) {
+    clocksPerInstruction = Config::xcpu.clocksPerInstruction;
+    LOG_INFO(Xenon, "{}: Using cached CPI from Config, got {}", ppuState->ppuName, clocksPerInstruction);
+  } else {
+    CalculateCPI();
+    if (ppuState->ppuID == 0) {
+      Config::xcpu.clocksPerInstruction = clocksPerInstruction;
+    }
+  }
   if (!Config::highlyExperimental.clocksPerInstructionBypass) {
     LOG_INFO(Xenon, "{}: {} clocks per instruction", ppuState->ppuName, clocksPerInstruction);
   }

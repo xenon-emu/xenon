@@ -45,7 +45,7 @@ public:
     return asmjit::x86::ptr(base, offset + index * sizeof(eT));
   }
 
-  asmjit::x86::Gp &Base() const {
+  asmjit::x86::Gp Base() const {
     return base;
   }
 
