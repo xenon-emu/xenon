@@ -91,7 +91,7 @@ public:
 
   FILE *traceFile;
 
-  eExecutorMode currentExecMode = eExecutorMode::Hybrid;
+  eExecutorMode currentExecMode = eExecutorMode::Interpreter;
 private:
   // Thread handle
   std::thread ppuThread;

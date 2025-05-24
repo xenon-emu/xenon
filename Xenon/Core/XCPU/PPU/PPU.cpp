@@ -42,6 +42,22 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
     traceFile = fopen(path, "w");
   }
 #endif
+  u32 executionMode = Base::JoaatStringHash(Config::highlyExperimental.cpuExecutor);
+  switch (executionMode) {
+  case "Interpreted"_j:
+    currentExecMode = eExecutorMode::Interpreter;
+    break;
+  case "JIT"_j:
+    currentExecMode = eExecutorMode::JIT;
+    break;
+  case "Hybrid"_j:
+    currentExecMode = eExecutorMode::Hybrid;
+    break;
+  default:
+    LOG_WARNING(Xenon, "Invalid execution mode! Defaulting to Interpreted");
+    currentExecMode = eExecutorMode::Interpreter;
+    break;
+  }
 
   //
   // Set everything as in POR. See CELL-BE Programming Handbook
