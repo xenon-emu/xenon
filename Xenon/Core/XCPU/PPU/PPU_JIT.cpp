@@ -299,10 +299,11 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
   signature->setArg(0, jitBuilder->ppu->Base());
   signature->setArg(1, jitBuilder->ppuState->Base());
   signature->setArg(2, jitBuilder->haltBool);
-
-  setupContext(jitBuilder.get());
+#endif
 
   std::vector<u32> instrsTemp{};
+
+  setupContext(jitBuilder.get());
 
   //
   // Instruction emitters
@@ -330,6 +331,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
     static thread_local std::unordered_map<u32, u32> opcodeHashCache;
     u32 opName = opcodeHashCache.contains(opcode) ? opcodeHashCache[opcode] : opcodeHashCache[opcode] = Base::JoaatStringHash(PPCInterpreter::ppcDecoder.getNameTable()[decodedInstr]);
 
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
     // Handle skips
     bool skip = false;
     switch (thread.CIA) {
@@ -403,6 +405,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
 
     if (skip)
       break;
+#endif
 
     bool readNextInstr = true;
     // Prol
@@ -415,11 +418,14 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
     if (ppu->currentExecMode == eExecutorMode::Hybrid && emitter == &PPCInterpreter::PPCInterpreterJIT_invalid && readNextInstr) {
       auto intEmitter = PPCInterpreter::ppcDecoder.getTable()[decodedInstr];
 
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
       InvokeNode *out = nullptr;
       compiler.invoke(&out, imm((void*)intEmitter), FuncSignature::build<void, void*>());
       out->setArg(0, jitBuilder->ppuState->Base());
+#endif
     }
 
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
     // Epil (check for exc and interrupts)
     InvokeNode *tbCheck = nullptr;
     x86::Gp retVal = compiler.newGpb();
@@ -432,6 +438,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
     compiler.je(skipRet);
     compiler.ret();
     compiler.bind(skipRet);
+#endif
 
     // If branch or block end
     instrCount++;
@@ -439,16 +446,17 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
         opName == "invalid"_j || instrCount >= maxBlockSize)
       break;
   }
-#endif
 
   // reset CIA NIA
   curThread.CIA = addr - 4;
   curThread.NIA = addr;
   jitBuilder->size = instrCount * 4;
 
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
   compiler.ret();
   compiler.endFunc();
   compiler.finalize();
+#endif
 
   // Create the final JITBlock
   std::shared_ptr<JITBlock> block = std::make_shared<STRIP_UNIQUE(block)>(&jitRuntime, addr, jitBuilder.get());
