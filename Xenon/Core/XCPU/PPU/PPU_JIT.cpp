@@ -1,20 +1,20 @@
 // Copyright 2025 Xenon Emulator Project
 
 #include "Base/Logging/Log.h"
+#include "Base/Global.h"
 
+#include "Core/XCPU/Interpreter/JIT/x86_64/JITEmitter_Helpers.h"
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
 #include "Core/XCPU/Interpreter/PPCInternal.h"
+#include "Core/XCPU/Xenon.h"
 #include "PPU.h"
 #include "PPU_JIT.h"
-#include "../Interpreter/JIT/x86_64/JITEmitter_Helpers.h"
-#include <Core/Xe_Main.h>
-
 
 //
 //  Trampolines for Invoke
 //
 void callHalt() {
-  return Xe_Main->getCPU()->Halt();
+  return XeMain::GetCPU()->Halt();
 }
 
 bool callEpil(PPU *ppu) {
@@ -136,15 +136,15 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
     // Fetch instruction
     curThread.CIA = curThread.NIA;
     curThread.NIA += 4;
-    curThread.iFetch = true;
+    curThread.instrFetch = true;
     PPCOpcode op{ PPCInterpreter::MMURead32(ppuState, curThread.CIA) };
 	  instrsTemp.push_back(op.opcode);
-    curThread.iFetch = false;
+    curThread.instrFetch = false;
 
 
     // Decode and emit
     PPCInterpreter::instructionHandlerJIT emitter = PPCInterpreter::ppcDecoder.decodeJIT(op.opcode);
-    u32 opName = Base::joaatStringHash(PPCInterpreter::ppcDecoder.decodeName(op.opcode));
+    u32 opName = Base::JoaatStringHash(PPCInterpreter::ppcDecoder.decodeName(op.opcode));
 
     // Handle skips
     x86::Gp temp = compiler.newGpq();
@@ -276,9 +276,9 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt) {
       std::vector<u32> values{};
       values.resize(block->size / 4);
 
-      curThread.iFetch = true;
+      curThread.instrFetch = true;
       PPCInterpreter::MMURead(PPCInterpreter::CPUContext, ppuState, block->ppuAddress, values.size(), reinterpret_cast<u8*>(values.data()));
-      curThread.iFetch = false;
+      curThread.instrFetch = false;
 
       for (auto &v : values) {
         sum += v;
