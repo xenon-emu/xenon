@@ -21,7 +21,6 @@ extern void PPCInterpreter_known_unimplemented(const char* name, PPU_STATE *ppuS
 D_STUBRC(mtfsfi)
 D_STUBRC(fsel)
 D_STUBRC(fres)
-D_STUBRC(fnabs)
 D_STUBRC(frsqrte)
 D_STUB(mfsrin)
 D_STUB(mfsr)
@@ -370,6 +369,7 @@ extern void PPCInterpreter_fmulsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fmrx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fmsubx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fmsubsx(PPU_STATE *ppuState);
+extern void PPCInterpreter_fnabsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fnmaddx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fnmaddsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_fnegx(PPU_STATE *ppuState);
