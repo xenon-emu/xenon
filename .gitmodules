@@ -17,9 +17,9 @@
 [submodule "third_party/microprofile"]
 	path = Deps/ThirdParty/microprofile
 	url = https://github.com/jonasmr/microprofile.git
-[submodule "Deps/ThirdParty/asmjit"]
-	path = Deps/ThirdParty/asmjit
-	url = https://github.com/asmjit/asmjit
+[submodule "Deps/ThirdParty/Sirit"]
+	path = Deps/ThirdParty/Sirit
+	url = https://github.com/Vali0004/sirit.git
 [submodule "Deps/ThirdParty/asmjit"]
 	path = Deps/ThirdParty/asmjit
 	url = https://github.com/asmjit/asmjit

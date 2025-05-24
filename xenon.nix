@@ -12,6 +12,12 @@
 }:
 
 let
+  asmjit = fetchFromGitHub {
+    owner = "asmji";
+    repo = "asmjit";
+    rev = "356dddbc5508dd65f466098da26a2e47584eafdb";
+    hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+  };
   imgui = if withGraphics
     then fetchFromGitHub {
       owner = "ocornut";
