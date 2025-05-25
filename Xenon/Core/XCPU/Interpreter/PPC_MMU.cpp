@@ -1094,6 +1094,16 @@ void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE *ppuState,
     Config::imgui.debugWindow = true; // Open the debugger after halting
   }
 
+  // TODO: Investigate why FSB_CONFIG_RX_STATE needs these values to work
+  switch (thread.CIA) {
+  case 0x1003598ULL: {
+    GPR(11) = 0x0E;
+  } break;
+  case 0x1003644ULL: {
+    GPR(11) = 0x02;
+  } break;
+  }
+
   // Handle SoC reads
   if (socRead) {
     // Check if the read is from the SROM
