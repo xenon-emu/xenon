@@ -804,16 +804,16 @@ void PPCInterpreter::PPCInterpreter_fctidx(PPU_STATE *ppuState) {
   FPRi(frd).setValue(std::bit_cast<f64>(flippedVal));
 #elif defined(ARCH_AARCH64)
   #if defined(__ARM_FEATURE_FP64) && __ARM_FEATURE_FP64
-    const f3264x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
+    const float64x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
     const int64x2_t intVal = vcvtq_s64_f64(val);
-    const f3264x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
+    const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
     const uint64x2_t cmpMask = vcgeq_f64(val, threshold);
     const uint64x2_t xorResult = veorq_u64(vreinterpretq_u64_s64(intVal), cmpMask);
     u64 result = vgetq_lane_u64(xorResult, 0);
   #else
-    const f3264x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
+    const float64x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
     const int64x2_t intVal = vcvtq_s64_f64(val);
-    const f3264x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
+    const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
     const uint64x2_t cmpMask = vcgeq_f64(val, threshold);
     const uint64x2_t xorResult = veorq_u64(vreinterpretq_u64_s64(intVal), cmpMask);
     u64 result = vgetq_lane_u64(xorResult, 0);
@@ -850,16 +850,16 @@ void PPCInterpreter::PPCInterpreter_fctidzx(PPU_STATE *ppuState) {
   FPRi(frd).setValue(std::bit_cast<f64>(flippedVal));
 #elif defined(ARCH_AARCH64)
   #if defined(__ARM_FEATURE_FP64) && __ARM_FEATURE_FP64
-    const f3264x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
+    const float64x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
     const s64 intVal = static_cast<s64>(vgetq_lane_f64(val, 0));
-    const f3264x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
+    const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
     const uint64x2_t cmpMask = vcgeq_f64(val, threshold);
     const uint64x2_t xorResult = veorq_u64(vsetq_lane_u64(static_cast<u64>(intVal), vdupq_n_u64(0), 0), cmpMask);
     u64 result = vgetq_lane_u64(xorResult, 0);
   #else
-    const f3264x2_t fval = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
+    const float64x2_t fval = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
     const s64 intVal = static_cast<s64>(vgetq_lane_f64(fval, 0));
-    const f3264x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
+    const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
     const uint64x2_t cmpMask = vcgeq_f64(fval, threshold);
     const uint64x2_t xorResult = veorq_u64(vsetq_lane_u64(static_cast<u64>(intVal), vdupq_n_u64(0), 0), cmpMask);
     u64 result = vgetq_lane_u64(xorResult, 0);
@@ -894,17 +894,17 @@ void PPCInterpreter::PPCInterpreter_fctiwzx(PPU_STATE *ppuState) {
   FPRi(frd).setValue(std::bit_cast<f64>(static_cast<s64>(flippedVal)));
 #elif defined(ARCH_AARCH64)
   #if defined(__ARM_FEATURE_FP64)
-    const f3264x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
+    const float64x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
     const s32 intVal = static_cast<s32>(vgetq_lane_f64(val, 0));
-    const f3264x2_t threshold = vdupq_n_f64(static_cast<f64>(0x80000000));
+    const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(0x80000000));
     const uint32x4_t cmpMask = vreinterpretq_u32_u64(vcgeq_f64(val, threshold));
     const uint32x4_t xorResult = veorq_u32(vsetq_lane_u32(static_cast<u32>(intVal), vdupq_n_u32(0), 0), cmpMask);
     u32 uResult = vgetq_lane_u32(xorResult, 0);
     const s32 result = static_cast<s32>(uResult);
   #else
-    const f3264x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
+    const float64x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
     const f64 scalar = vgetq_lane_f64(val, 0);
-    const f3232x2_t converted = vcvt_f32_f64(val);
+    const float32x2_t converted = vcvt_f32_f64(val);
     const f32 result_f32 = vget_lane_f32(converted, 0);
     const s32 intVal = static_cast<s32>(result_f32);
     const bool flip = scalar >= static_cast<f64>(0x80000000);
