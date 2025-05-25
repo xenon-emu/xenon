@@ -28,31 +28,7 @@ void callHalt() {
 
 bool callEpil(PPU *ppu, PPU_STATE *ppuState) {
   // Check timebase
-  // Increase Time Base Counter
-  if (ppu->xenonContext->timeBaseActive) {
-    // HID6[15]: Time-base and decrementer facility enable.
-    // 0 -> TBU, TBL, DEC, HDEC, and the hang-detection logic do not
-    // update. 1 -> TBU, TBL, DEC, HDEC, and the hang-detection logic
-    // are enabled to update
-    if (ppuState->SPR.HID6 & 0x1000000000000) {
-      // The Decrementer and the Time Base are driven by the same time frequency.
-      u32 newDec = 0;
-      u32 dec = 0;
-      // Update the Time Base.
-      ppuState->SPR.TB += ppu->clocksPerInstruction;
-      // Get the decrementer value.
-      dec = curThread.SPR.DEC;
-      newDec = dec - ppu->clocksPerInstruction;
-      // Update the new decrementer value.
-      curThread.SPR.DEC = newDec;
-      // Check if Previous decrementer measurement is smaller than current and a
-      // decrementer exception is not pending.
-      if (newDec > dec && !(_ex & PPU_EX_DEC)) {
-        // The decrementer must issue an interrupt.
-        _ex |= PPU_EX_DEC;
-      }
-    }
-  }
+  ppu->CheckTimeBaseStatus();
 
   // Get current thread
   auto &thread = ppuState->ppuThread[ppuState->currentThread];
@@ -62,145 +38,7 @@ bool callEpil(PPU *ppu, PPU_STATE *ppuState) {
   }
 
   // Handle pending exceptions
-  u16 &exceptions = thread.exceptReg;
-  if (exceptions != PPU_EX_NONE) {
-    // Non Maskable:
-    //
-    // 1. System Reset
-    //
-    if (exceptions & PPU_EX_RESET) {
-      PPCInterpreter::ppcResetException(ppuState);
-      exceptions &= ~PPU_EX_RESET;
-      return true;
-    }
-    //
-    // 2. Machine Check
-    //
-    if (exceptions & PPU_EX_MC) {
-      if (thread.SPR.MSR.ME) {
-        PPCInterpreter::ppcResetException(ppuState);
-        exceptions &= ~PPU_EX_MC;
-        return true;
-      } else {
-        // Checkstop Mode. Hard Fault.
-        // A checkstop is a full - stop of the processor that requires a System
-        // Reset to recover.
-        LOG_CRITICAL(Xenon, "{}: CHECKSTOP!", ppuState->ppuName);
-        XeMain::ShutdownCPU();
-      }
-    }
-    // Maskable:
-    //
-    // 3. Instruction-Dependent
-    //
-    // A. Program - Illegal Instruction
-    if (exceptions & PPU_EX_PROG && thread.progExceptionType == PROGRAM_EXCEPTION_TYPE_ILL) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Illegal Instruction.", ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
-      exceptions &= ~PPU_EX_PROG;
-      return true;
-    }
-    // B. Floating-Point Unavailable
-    if (exceptions & PPU_EX_FPU) {
-      PPCInterpreter::ppcFPUnavailableException(ppuState);
-      exceptions &= ~PPU_EX_FPU;
-      return true;
-    }
-    // C. Data Storage, Data Segment, or Alignment
-    // Data Storage
-    if (exceptions & PPU_EX_DATASTOR) {
-      PPCInterpreter::ppcDataStorageException(ppuState);
-      exceptions &= ~PPU_EX_DATASTOR;
-      return true;
-    }
-    // Data Segment
-    if (exceptions & PPU_EX_DATASEGM) {
-      PPCInterpreter::ppcDataSegmentException(ppuState);
-      exceptions &= ~PPU_EX_DATASEGM;
-      return true;
-    }
-    // Alignment
-    if (exceptions & PPU_EX_ALIGNM) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Alignment.", ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
-      exceptions &= ~PPU_EX_ALIGNM;
-      return true;
-    }
-    // D. Trace
-    if (exceptions & PPU_EX_TRACE) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Trace.", ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
-      exceptions &= ~PPU_EX_TRACE;
-      return true;
-    }
-    // E. Program Trap, System Call, Program Priv Inst, Program Illegal Inst
-    // Program Trap
-    if (exceptions & PPU_EX_PROG && thread.progExceptionType == PROGRAM_EXCEPTION_TYPE_TRAP) {
-      PPCInterpreter::ppcProgramException(ppuState);
-      exceptions &= ~PPU_EX_PROG;
-      return true;
-    }
-    // System Call
-    if (exceptions & PPU_EX_SC) {
-      PPCInterpreter::ppcSystemCallException(ppuState);
-      exceptions &= ~PPU_EX_SC;
-      return true;
-    }
-    // Program - Privileged Instruction
-    if (exceptions & PPU_EX_PROG && thread.progExceptionType == PROGRAM_EXCEPTION_TYPE_PRIV) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Privileged Instruction.", ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
-      exceptions &= ~PPU_EX_PROG;
-      return true;
-    }
-    // F. Instruction Storage and Instruction Segment
-    // Instruction Storage
-    if (exceptions & PPU_EX_INSSTOR) {
-      PPCInterpreter::ppcInstStorageException(ppuState);
-      exceptions &= ~PPU_EX_INSSTOR;
-      return true;
-    }
-    // Instruction Segment
-    if (exceptions & PPU_EX_INSTSEGM) {
-      PPCInterpreter::ppcInstSegmentException(ppuState);
-      exceptions &= ~PPU_EX_INSTSEGM;
-      return true;
-    }
-    //
-    // 4. Program - Imprecise Mode Floating-Point Enabled Exception
-    //
-    if (exceptions & PPU_EX_PROG) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Imprecise Mode Floating-Point Enabled Exception.", ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
-      exceptions &= ~PPU_EX_PROG;
-      return true;
-    }
-    //
-    // 5. External, Decrementer, and Hypervisor Decrementer
-    //
-    // External
-    if (exceptions & PPU_EX_EXT && thread.SPR.MSR.EE) {
-      PPCInterpreter::ppcExternalException(ppuState);
-      exceptions &= ~PPU_EX_EXT;
-      return true;
-    }
-    // Decrementer. A dec exception may be present but will only be taken when
-    // the EE bit of MSR is set.
-    if (exceptions & PPU_EX_DEC && thread.SPR.MSR.EE) {
-      PPCInterpreter::ppcDecrementerException(ppuState);
-      exceptions &= ~PPU_EX_DEC;
-      return true;
-    }
-    // Hypervisor Decrementer
-    if (exceptions & PPU_EX_HDEC) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Hypervisor Decrementer.", ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
-      exceptions &= ~PPU_EX_HDEC;
-      return true;
-    }
-    // VX Unavailable.
-    if (exceptions & PPU_EX_VXU) {
-      PPCInterpreter::ppcVXUnavailableException(ppuState);
-      exceptions &= ~PPU_EX_VXU;
-      return true;
-    }
-  }
-
-  return false;
+  return ppu->PPUCheckExceptions();
 }
 
 PPU_JIT::PPU_JIT(PPU *ppu) :
@@ -309,12 +147,14 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
   // Instruction emitters
   //
   u64 instrCount = 0;
+  auto &thread = curThread;
+  u64 prevCIA = thread.CIA;
+  u64 prevNIA = thread.NIA;
   while (XeRunning && !XePaused) {
     u32 offset = instrCount * 4;
     u64 pc = addr + offset;
 
     // Fetch instruction
-    auto &thread = curThread;
     thread.CIA = thread.NIA;
     thread.NIA += 4;
     thread.instrFetch = true;
@@ -438,8 +278,8 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
   }
 
   // reset CIA NIA
-  curThread.CIA = addr - 4;
-  curThread.NIA = addr;
+  thread.CIA = prevCIA;
+  thread.NIA = prevNIA;
   jitBuilder->size = instrCount * 4;
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
@@ -471,7 +311,8 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
 void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt) {
   u32 instrsExecuted = 0;
   while (instrsExecuted < numInstrs && active && (XeRunning && !XePaused)) {
-    u64 blockStart = curThread.NIA;
+    auto &thread = curThread;
+    u64 blockStart = thread.NIA;
     auto it = jitBlocks.find(blockStart);
     if (it == jitBlocks.end()) {
       if (it != jitBlocks.end())
@@ -486,18 +327,18 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt) {
       u64 sum = 0;
       if (block->size % 8 == 0) {
         for (u64 i = 0; i < block->size / 8; i++) {
-          curThread.instrFetch = true;
+          thread.instrFetch = true;
           u64 val = PPCInterpreter::MMURead64(ppuState, block->ppuAddress + i * 8);
-          curThread.instrFetch = false;
+          thread.instrFetch = false;
           u64 top = val >> 32;
           u64 bottom = val & 0xFFFFFFFF;
           sum += top + bottom;
         }
       } else {
         for (u64 i = 0; i != block->size / 4; i++) {
-          curThread.instrFetch = true;
+          thread.instrFetch = true;
           sum += PPCInterpreter::MMURead32(ppuState, block->ppuAddress + i * 4);
-          curThread.instrFetch = false;
+          thread.instrFetch = false;
         }
       }
 
