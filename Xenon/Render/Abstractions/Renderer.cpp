@@ -461,7 +461,8 @@ void Renderer::Thread() {
     }
 
     // Clear the display
-    Clear();
+    if (XeMain::xenos)
+      Clear();
 
     if (XeMain::xenos && XeMain::xenos->RenderingTo2DFramebuffer() && !focusLost) {
       // Upload buffer

@@ -381,7 +381,7 @@ void PPCInterpreter::ConvertToInteger(PPU_STATE *ppuState, eFPRoundMode rounding
   } else {
     s32 signed_value = static_cast<s32>(rounded);
     value = static_cast<u32>(signed_value);
-    const double di = static_cast<f64>(signed_value);
+    const f64 di = static_cast<f64>(signed_value);
     if (di == b) { curThread.FPSCR.clearFIFR(); }
     else { SetFI(ppuState, 1); curThread.FPSCR.FR = fabs(di) > fabs(b); }
   }
@@ -677,7 +677,7 @@ void PPCInterpreter::PPCInterpreter_faddx(PPU_STATE *ppuState) {
 
   if (curThread.FPSCR.VE == 0 || sum.HasNoInvalidExceptions()) {
     // Flush to zero if enabled in FPSCR.
-    const double result = FPForceDouble(ppuState, sum.value);
+    const f64 result = FPForceDouble(ppuState, sum.value);
     FPRi(frd).setValue(result);
     curThread.FPSCR.FPRF = ClassifyDouble(result);
   }
@@ -716,7 +716,7 @@ void PPCInterpreter::PPCInterpreter_faddsx(PPU_STATE *ppuState) {
 
   if (curThread.FPSCR.VE == 0 || sum.HasNoInvalidExceptions()) {
     // Flush to zero if enabled in FPSCR.
-    const float result = FPForceSingle(ppuState, sum.value);
+    const f32 result = FPForceSingle(ppuState, sum.value);
     FPRi(frd).setValue(result);
     curThread.FPSCR.FPRF = ClassifyFloat(result);
   }
@@ -804,16 +804,16 @@ void PPCInterpreter::PPCInterpreter_fctidx(PPU_STATE *ppuState) {
   FPRi(frd).setValue(std::bit_cast<f64>(flippedVal));
 #elif defined(ARCH_AARCH64)
   #if defined(__ARM_FEATURE_FP64) && __ARM_FEATURE_FP64
-    const float64x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
+    const f3264x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
     const int64x2_t intVal = vcvtq_s64_f64(val);
-    const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
+    const f3264x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
     const uint64x2_t cmpMask = vcgeq_f64(val, threshold);
     const uint64x2_t xorResult = veorq_u64(vreinterpretq_u64_s64(intVal), cmpMask);
     u64 result = vgetq_lane_u64(xorResult, 0);
   #else
-    const float64x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
+    const f3264x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
     const int64x2_t intVal = vcvtq_s64_f64(val);
-    const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
+    const f3264x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
     const uint64x2_t cmpMask = vcgeq_f64(val, threshold);
     const uint64x2_t xorResult = veorq_u64(vreinterpretq_u64_s64(intVal), cmpMask);
     u64 result = vgetq_lane_u64(xorResult, 0);
@@ -850,16 +850,16 @@ void PPCInterpreter::PPCInterpreter_fctidzx(PPU_STATE *ppuState) {
   FPRi(frd).setValue(std::bit_cast<f64>(flippedVal));
 #elif defined(ARCH_AARCH64)
   #if defined(__ARM_FEATURE_FP64) && __ARM_FEATURE_FP64
-    const float64x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
+    const f3264x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
     const s64 intVal = static_cast<s64>(vgetq_lane_f64(val, 0));
-    const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
+    const f3264x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
     const uint64x2_t cmpMask = vcgeq_f64(val, threshold);
     const uint64x2_t xorResult = veorq_u64(vsetq_lane_u64(static_cast<u64>(intVal), vdupq_n_u64(0), 0), cmpMask);
     u64 result = vgetq_lane_u64(xorResult, 0);
   #else
-    const float64x2_t fval = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
+    const f3264x2_t fval = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
     const s64 intVal = static_cast<s64>(vgetq_lane_f64(fval, 0));
-    const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
+    const f3264x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
     const uint64x2_t cmpMask = vcgeq_f64(fval, threshold);
     const uint64x2_t xorResult = veorq_u64(vsetq_lane_u64(static_cast<u64>(intVal), vdupq_n_u64(0), 0), cmpMask);
     u64 result = vgetq_lane_u64(xorResult, 0);
@@ -894,17 +894,17 @@ void PPCInterpreter::PPCInterpreter_fctiwzx(PPU_STATE *ppuState) {
   FPRi(frd).setValue(std::bit_cast<f64>(static_cast<s64>(flippedVal)));
 #elif defined(ARCH_AARCH64)
   #if defined(__ARM_FEATURE_FP64)
-    const float64x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
+    const f3264x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
     const s32 intVal = static_cast<s32>(vgetq_lane_f64(val, 0));
-    const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(0x80000000));
+    const f3264x2_t threshold = vdupq_n_f64(static_cast<f64>(0x80000000));
     const uint32x4_t cmpMask = vreinterpretq_u32_u64(vcgeq_f64(val, threshold));
     const uint32x4_t xorResult = veorq_u32(vsetq_lane_u32(static_cast<u32>(intVal), vdupq_n_u32(0), 0), cmpMask);
     u32 uResult = vgetq_lane_u32(xorResult, 0);
     const s32 result = static_cast<s32>(uResult);
   #else
-    const float64x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
+    const f3264x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
     const f64 scalar = vgetq_lane_f64(val, 0);
-    const float32x2_t converted = vcvt_f32_f64(val);
+    const f3232x2_t converted = vcvt_f32_f64(val);
     const f32 result_f32 = vget_lane_f32(converted, 0);
     const s32 intVal = static_cast<s32>(result_f32);
     const bool flip = scalar >= static_cast<f64>(0x80000000);
@@ -928,9 +928,11 @@ void PPCInterpreter::PPCInterpreter_fcfidx(PPU_STATE *ppuState) {
 
   CHECK_FPU;
 
-  FPRi(frd).setValue(static_cast<f64>(std::bit_cast<s64>(FPRi(frb).asDouble())));
+  const f64 frb = FPRi(frb).asDouble();
 
-  ppuUpdateFPSCR(ppuState, FPRi(frd).asDouble(), 0.0, _instr.rc);
+  FPRi(frd).setValue(static_cast<f64>(std::bit_cast<s64>(frb)));
+
+  ppuUpdateFPSCR(ppuState, frb, 0.0, _instr.rc);
 }
 
 // Floating Divide (Double-Precision) (x'FC00 0024')
@@ -949,12 +951,13 @@ void PPCInterpreter::PPCInterpreter_fdivx(PPU_STATE *ppuState) {
   const bool notInvalid = curThread.FPSCR.VE == 0 || quotient.HasNoInvalidExceptions();
 
   if (notDivideByZero && notInvalid) {
-    const double result = FPForceDouble(ppuState, quotient.value);
+    const f64 result = FPForceDouble(ppuState, quotient.value);
     FPRi(frd).setValue(result);
     curThread.FPSCR.FPRF = ClassifyDouble(result);
   }
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Floating Divide Single (x'EC00 0024')
@@ -973,12 +976,13 @@ void PPCInterpreter::PPCInterpreter_fdivsx(PPU_STATE *ppuState) {
   const bool notInvalid = curThread.FPSCR.VE == 0 || quotient.HasNoInvalidExceptions();
 
   if (notDivideByZero && notInvalid) {
-    const float result = FPForceSingle(ppuState, quotient.value);
+    const f32 result = FPForceSingle(ppuState, quotient.value);
     FPRi(frd).setValue(result);
     curThread.FPSCR.FPRF = ClassifyFloat(result);
   }
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Floating Multiply-Add (Double-Precision) (x'FC00 003A')
@@ -996,12 +1000,13 @@ void PPCInterpreter::PPCInterpreter_fmaddx(PPU_STATE *ppuState) {
   const FPResult product = FPMadd(ppuState, fra, frc, frb);
 
   if (curThread.FPSCR.VE == 0 || product.HasNoInvalidExceptions()) {
-    const double result = FPForceDouble(ppuState, product.value);
+    const f64 result = FPForceDouble(ppuState, product.value);
     FPRi(frd).setValue(result);
     curThread.FPSCR.FPRF = ClassifyDouble(result);
   }
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Floating Multiply-Add Single (x'EC00 003A')
@@ -1016,18 +1021,19 @@ void PPCInterpreter::PPCInterpreter_fmaddsx(PPU_STATE *ppuState) {
   const f64 frb = FPRi(frb).asDouble();
   const f64 frc = FPRi(frc).asDouble();
 
-  const double cValue = Force25Bit(frc);
+  const f64 cValue = Force25Bit(frc);
   const FPResult dValue = FPMadd(ppuState, fra, cValue, frb);
 
   if (curThread.FPSCR.VE == 0 || dValue.HasNoInvalidExceptions()) {
-    const float result = FPForceSingle(ppuState, dValue.value);
+    const f32 result = FPForceSingle(ppuState, dValue.value);
     FPRi(frd).setValue(result);
     curThread.FPSCR.clearFIFR();
     curThread.FPSCR.FI = dValue.value != result;
     curThread.FPSCR.FPRF = ClassifyFloat(result);
   }
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Floating Multiply (Double-Precision) (x'FC00 0032')
@@ -1044,7 +1050,7 @@ void PPCInterpreter::PPCInterpreter_fmulx(PPU_STATE *ppuState) {
   const FPResult product = FPMul(ppuState, fra, frc);
 
   if (curThread.FPSCR.VE == 0 || product.HasNoInvalidExceptions()) {
-    const double result = FPForceDouble(ppuState, product.value);
+    const f64 result = FPForceDouble(ppuState, product.value);
 
     FPRi(frd).setValue(result);
     
@@ -1052,7 +1058,8 @@ void PPCInterpreter::PPCInterpreter_fmulx(PPU_STATE *ppuState) {
     curThread.FPSCR.FPRF = ClassifyDouble(result);
   }
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Floating Multiply Single (x'EC00 0032')
@@ -1066,18 +1073,19 @@ void PPCInterpreter::PPCInterpreter_fmulsx(PPU_STATE *ppuState) {
   const f64 fra = FPRi(fra).asDouble();
   const f64 frc = FPRi(frc).asDouble();
 
-  const double cValue = Force25Bit(frc);
+  const f64 cValue = Force25Bit(frc);
   const FPResult dValue = FPMul(ppuState, fra, cValue);
 
   if (curThread.FPSCR.VE == 0 || dValue.HasNoInvalidExceptions()) {
-    const float result = FPForceSingle(ppuState, dValue.value);
+    const f32 result = FPForceSingle(ppuState, dValue.value);
 
     FPRi(frd).setValue(result);
     curThread.FPSCR.clearFIFR();
     curThread.FPSCR.FPRF = ClassifyFloat(result);
   }
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Floating Move Register (Double-Precision) (x'FC00 0090')
@@ -1090,7 +1098,8 @@ void PPCInterpreter::PPCInterpreter_fmrx(PPU_STATE *ppuState) {
 
   FPRi(frd).setValue(FPRi(frb).asU64());
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Floating Multiply-Subtract (Double-Precision) (x'FC00 0038')
@@ -1108,12 +1117,13 @@ void PPCInterpreter::PPCInterpreter_fmsubx(PPU_STATE *ppuState) {
   const FPResult product = FPMsub(ppuState, fra, frc, frb);
 
   if (curThread.FPSCR.VE == 0 || product.HasNoInvalidExceptions()) {
-    const double result = FPForceDouble(ppuState, product.value);
+    const f64 result = FPForceDouble(ppuState, product.value);
     FPRi(frd).setValue(result);
     curThread.FPSCR.FPRF = ClassifyDouble(result);
   }
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Floating Multiply-Subtract Single (x'EC00 0038')
@@ -1128,16 +1138,17 @@ void PPCInterpreter::PPCInterpreter_fmsubsx(PPU_STATE *ppuState) {
   const f64 frb = FPRi(frb).asDouble();
   const f64 frc = FPRi(frc).asDouble();
 
-  const double cValue = Force25Bit(frc);
+  const f64 cValue = Force25Bit(frc);
   const FPResult product = FPMsub(ppuState, fra, cValue, frb);
 
   if (curThread.FPSCR.VE == 0 || product.HasNoInvalidExceptions()) {
-    const float result = FPForceSingle(ppuState, product.value);
+    const f32 result = FPForceSingle(ppuState, product.value);
     FPRi(frd).setValue(result);
     curThread.FPSCR.FPRF = ClassifyFloat(result);
   }
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Floating Negative Absolute Value
@@ -1170,13 +1181,14 @@ void PPCInterpreter::PPCInterpreter_fnmaddx(PPU_STATE *ppuState) {
   const FPResult product = FPMadd(ppuState, fra, frc, frb);
 
   if (curThread.FPSCR.VE == 0 || product.HasNoInvalidExceptions()) {
-    const float tmp = FPForceDouble(ppuState, product.value);
-    const double result = std::isnan(tmp) ? tmp : -tmp;
+    const f32 tmp = FPForceDouble(ppuState, product.value);
+    const f64 result = std::isnan(tmp) ? tmp : -tmp;
     FPRi(frd).setValue(result);
     curThread.FPSCR.FPRF = ClassifyDouble(result);
   }
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Floating Negative Multiply-Add Single (x'EC00 003E')
@@ -1191,17 +1203,18 @@ void PPCInterpreter::PPCInterpreter_fnmaddsx(PPU_STATE *ppuState) {
   const f64 frb = FPRi(frb).asDouble();
   const f64 frc = FPRi(frc).asDouble();
 
-  const double cValue = Force25Bit(frc);
+  const f64 cValue = Force25Bit(frc);
   const FPResult product = FPMadd(ppuState, fra, cValue, frb);
 
   if (curThread.FPSCR.VE == 0 || product.HasNoInvalidExceptions()) {
-    const float tmp = FPForceSingle(ppuState, product.value);
-    const float result = std::isnan(tmp) ? tmp : -tmp;
+    const f32 tmp = FPForceSingle(ppuState, product.value);
+    const f32 result = std::isnan(tmp) ? tmp : -tmp;
     FPRi(frd).setValue(result);
     curThread.FPSCR.FPRF = ClassifyFloat(result);
   }
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Floating Negate (x'FC00 0050')
@@ -1214,7 +1227,8 @@ void PPCInterpreter::PPCInterpreter_fnegx(PPU_STATE *ppuState) {
 
   FPRi(frd).setValue(FPRi(frb).asU64() ^ (UINT64_C(1) << 63));
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Floating Negative Multiply-Subtract (Double-Precision)
@@ -1232,13 +1246,14 @@ void PPCInterpreter::PPCInterpreter_fnmsubx(PPU_STATE *ppuState) {
   const FPResult product = FPMsub(ppuState, fra, frc, frb);
 
   if (curThread.FPSCR.VE == 0 || product.HasNoInvalidExceptions()) {
-    const float tmp = FPForceDouble(ppuState, product.value);
-    const double result = std::isnan(tmp) ? tmp : -tmp;
+    const f32 tmp = FPForceDouble(ppuState, product.value);
+    const f64 result = std::isnan(tmp) ? tmp : -tmp;
     FPRi(frd).setValue(result);
     curThread.FPSCR.FPRF = ClassifyDouble(result);
   }
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Floating Negative Multiply-Subtract Single (x'EC00 003C')
@@ -1253,17 +1268,18 @@ void PPCInterpreter::PPCInterpreter_fnmsubsx(PPU_STATE *ppuState) {
   const f64 frb = FPRi(frb).asDouble();
   const f64 frc = FPRi(frc).asDouble();
 
-  const double cValue = Force25Bit(frc);
+  const f64 cValue = Force25Bit(frc);
   const FPResult product = FPMsub(ppuState, fra, cValue, frb);
 
   if (curThread.FPSCR.VE == 0 || product.HasNoInvalidExceptions()) {
-    const float tmp = FPForceSingle(ppuState, product.value);
-    const float result = std::isnan(tmp) ? tmp : -tmp;
+    const f32 tmp = FPForceSingle(ppuState, product.value);
+    const f32 result = std::isnan(tmp) ? tmp : -tmp;
     FPRi(frd).setValue(result);
     curThread.FPSCR.FPRF = ClassifyFloat(result);
   }
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Floating Round to Single (x'FC00 0018')
@@ -1274,8 +1290,8 @@ void PPCInterpreter::PPCInterpreter_frspx(PPU_STATE *ppuState) {
 
   CHECK_FPU;
 
-  const double b = FPRi(frb).asDouble();
-  const float rounded = FPForceSingle(ppuState, b);
+  const f64 b = FPRi(frb).asDouble();
+  const f32 rounded = FPForceSingle(ppuState, b);
 
   if (std::isnan(b)) {
     const bool is_snan = IsSignalingNAN(b);
@@ -1296,7 +1312,8 @@ void PPCInterpreter::PPCInterpreter_frspx(PPU_STATE *ppuState) {
     curThread.FPSCR.FPRF = ClassifyFloat(rounded);
   }
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Floating Subtract (Double-Precision) (x'FC00 0028')
@@ -1313,12 +1330,30 @@ void PPCInterpreter::PPCInterpreter_fsubx(PPU_STATE *ppuState) {
   const FPResult difference = FPSub(ppuState, fra, frb);
 
   if (curThread.FPSCR.VE == 0 || difference.HasNoInvalidExceptions()) {
-    const double result = FPForceDouble(ppuState, difference.value);
+    const f64 result = FPForceDouble(ppuState, difference.value);
     FPRi(frd).setValue(result);
     curThread.FPSCR.FPRF = ClassifyDouble(result);
   }
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
+}
+
+// Floating Select (Double-Precision)
+void PPCInterpreter::PPCInterpreter_fselx(PPU_STATE *ppuState) {
+  /*
+    frD <- (frA >= 0.0 ? (frC) : (frB))
+    */
+
+  CHECK_FPU;
+
+  if (FPRi(fra).asDouble() >= 0.0)
+    FPRi(frd).setValue(FPRi(frc).asDouble());
+  else
+    FPRi(frd).setValue(FPRi(frb).asDouble());
+
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Floating Subtract Single (x'EC00 0028')
@@ -1335,38 +1370,66 @@ void PPCInterpreter::PPCInterpreter_fsubsx(PPU_STATE *ppuState) {
   const FPResult difference = FPSub(ppuState, fra, frb);
 
   if (curThread.FPSCR.VE == 0 || difference.HasNoInvalidExceptions()) {
-    const double result = FPForceSingle(ppuState, difference.value);
+    const f64 result = FPForceSingle(ppuState, difference.value);
     FPRi(frd).setValue(result);
     curThread.FPSCR.FPRF = ClassifyFloat(result);
   }
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Floating Square Root (Double-Precision) (x'FC00 002C')
 void PPCInterpreter::PPCInterpreter_fsqrtx(PPU_STATE *ppuState) {
   /*
-  frD <- (Square_rootfrB)
+  frD <- (Sqrt(frB))
   */
 
   CHECK_FPU;
 
-  FPRi(frd).setValue(std::sqrt(FPRi(frb).asDouble()));
+  const f64 frb = FPRi(frb).asDouble();
 
-  ppuUpdateFPSCR(ppuState, FPRi(frd).asDouble(), 0.0, _instr.rc);
+  FPRi(frd).setValue(std::sqrt(frb));
+
+  ppuUpdateFPSCR(ppuState, frb, 0.0, _instr.rc);
 }
 
 // Floating Square Root Single (x'EC00 002C')
 void PPCInterpreter::PPCInterpreter_fsqrtsx(PPU_STATE *ppuState) {
   /*
-  frD <- Single(Square_rootfrB)
+  frD <- Single(Sqrt(frB))
   */
 
   CHECK_FPU;
 
-  FPRi(frd).setValue(static_cast<f32>(std::sqrt(FPRi(frb).asDouble())));
+  const f64 frb = FPRi(frb).asDouble();
 
-  ppuUpdateFPSCR(ppuState, FPRi(frd).asDouble(), 0.0, _instr.rc);
+  FPRi(frd).setValue(static_cast<f32>(std::sqrt(frb)));
+
+  ppuUpdateFPSCR(ppuState, frb, 0.0, _instr.rc);
+}
+
+// Floating Reciprocal Square Root Estimate
+void PPCInterpreter::PPCInterpreter_frsqrtex(PPU_STATE *ppuState) {
+  /*
+  frD <- Single(1 / Sqrt(frB))
+  */
+
+  CHECK_FPU;
+
+  const f64 frb = FPRi(frb).asDouble();
+
+  // The lovely algorithm that Quake III used
+  const f32 threehalfs = 1.5f;
+  f32 x2 = frb * 0.5f, y = frb;
+  s32 i = *(s32*)&y; // evil floating point bit level hacking
+  i = 0x5F3759DF - (i >> 1); // what the fuck?
+  y = *(f32*)&i;
+  y = y * (threehalfs - (x2 * y * y)); // 1st iteration
+
+  FPRi(frd).setValue(static_cast<f32>(frb));
+
+  ppuUpdateFPSCR(ppuState, frb, 0.0, _instr.rc);
 }
 
 // Move from FPSCR (x'FC00 048E')
@@ -1375,7 +1438,8 @@ void PPCInterpreter::PPCInterpreter_mffsx(PPU_STATE *ppuState) {
 
   FPRi(frd).setValue(static_cast<u64>(GET_FPSCR));
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Move to FPSCR Fields (x'FC00 058E')
@@ -1392,7 +1456,8 @@ void PPCInterpreter::PPCInterpreter_mtfsfx(PPU_STATE *ppuState) {
 
   curThread.FPSCR = (curThread.FPSCR.FPSCR_Hex & ~m) | (static_cast<u32>(FPRi(frb).asU64()) & m);
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Move to FPSCR Bit 0 (x'FC00 008C')
@@ -1407,7 +1472,8 @@ void PPCInterpreter::PPCInterpreter_mtfsb0x(PPU_STATE *ppuState) {
 
   curThread.FPSCR.FPSCR_Hex &= ~b;
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
 
 // Move to FPSCR Bit 1 (x'FC00 004C')
@@ -1426,5 +1492,6 @@ void PPCInterpreter::PPCInterpreter_mtfsb1x(PPU_STATE *ppuState) {
   else
     curThread.FPSCR |= b;
 
-  if (_instr.rc) { ppuSetCR1(ppuState); }
+  if (_instr.rc)
+    ppuSetCR1(ppuState);
 }
