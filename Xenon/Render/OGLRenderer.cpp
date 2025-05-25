@@ -107,11 +107,13 @@ void OGLRenderer::BackendSDLInit() {
   }
   // Set VSYNC
   SANITY_CHECK(SDL_GL_SetSwapInterval(VSYNC));
-  glEnable(GL_DEBUG_OUTPUT);
-  glDebugMessageCallback([](GLenum source, GLenum type, GLuint id, GLenum severity,
-    GLsizei length, const GLchar *message, const void *userParam) {
-    LOG_DEBUG(Render, "GL: {}", message);
-  }, nullptr);
+  if (Config::rendering.debugValidation) {
+    glEnable(GL_DEBUG_OUTPUT);
+    glDebugMessageCallback([](GLenum source, GLenum type, GLuint id, GLenum severity,
+      GLsizei length, const GLchar *message, const void *userParam) {
+      LOG_INFO(Render, "GL: {}", message);
+    }, nullptr);
+  }
 }
 
 void OGLRenderer::BackendShutdown() {

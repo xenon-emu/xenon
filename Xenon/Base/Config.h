@@ -62,6 +62,8 @@ inline struct _rendering {
   s32 gpuId = -1;
   // Backend selection
   std::string backend = "OpenGL";
+  // Debug validation
+  bool debugValidation = false;
 
   // TOML Conversion
   void to_toml(toml::value &value);

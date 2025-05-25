@@ -21,12 +21,11 @@ void _rendering::from_toml(const toml::value &value) {
   window.from_toml("Resolution", value);
   isFullscreen = toml::find_or<bool>(value, "Fullscreen", isFullscreen);
   vsync = toml::find_or<bool>(value, "VSync", vsync);
-  quitOnWindowClosure =
-    toml::find_or<bool>(value, "QuitOnWindowClosure", quitOnWindowClosure);
-  pauseOnFocusLoss =
-    toml::find_or<bool>(value, "PauseOnFocusLoss", pauseOnFocusLoss);
+  quitOnWindowClosure =toml::find_or<bool>(value, "QuitOnWindowClosure", quitOnWindowClosure);
+  pauseOnFocusLoss = toml::find_or<bool>(value, "PauseOnFocusLoss", pauseOnFocusLoss);
   gpuId = toml::find_or<s32&>(value, "GPU", gpuId);
   backend = toml::find_or<std::string>(value, "Backend", backend);
+  debugValidation = toml::find_or<bool>(value, "DebugValidation", debugValidation);
 }
 void _rendering::to_toml(toml::value &value) {
   value["Enable"].comments().clear();
@@ -56,6 +55,9 @@ void _rendering::to_toml(toml::value &value) {
   value["Backend"].comments().clear();
   value["Backend"] = backend;
   value["Backend"].comments().push_back("# Graphics API used for rendering (OpenGL/Dummy)");
+  value["DebugValidation"].comments().clear();
+  value["DebugValidation"] = debugValidation;
+  value["DebugValidation"].comments().push_back("# Graphics API Validation");
 }
 bool _rendering::verify_toml(toml::value &value) {
   to_toml(value);
@@ -68,6 +70,7 @@ bool _rendering::verify_toml(toml::value &value) {
   cache_value(pauseOnFocusLoss);
   cache_value(gpuId);
   cache_value(backend);
+  cache_value(debugValidation);
   from_toml(value);
   verify_value(enable);
   verify_value(enableGui);
@@ -79,6 +82,7 @@ bool _rendering::verify_toml(toml::value &value) {
   verify_value(pauseOnFocusLoss);
   verify_value(gpuId);
   verify_value(backend);
+  verify_value(debugValidation);
   return true;
 }
 
@@ -315,12 +319,14 @@ void _xcpu::to_toml(toml::value &value) {
 }
 bool _xcpu::verify_toml(toml::value &value) {
   to_toml(value);
+  cache_value(ramSize);
   cache_value(elfLoader);
   cache_value(clocksPerInstruction);
   cache_value(overrideInitSkip);
   cache_value(HW_INIT_SKIP_1);
   cache_value(HW_INIT_SKIP_2);
   from_toml(value);
+  verify_value(ramSize);
   verify_value(elfLoader);
   verify_value(clocksPerInstruction);
   verify_value(overrideInitSkip);
@@ -415,12 +421,14 @@ void _log::to_toml(toml::value &value) {
 bool _log::verify_toml(toml::value &value) {
   to_toml(value);
   cache_value(currentLevel);
+  cache_value(type);
   cache_value(advanced);
 #ifdef DEBUG_BUILD
   cache_value(debugOnly);
 #endif
   from_toml(value);
   verify_value(currentLevel);
+  verify_value(type);
   verify_value(advanced);
 #ifdef DEBUG_BUILD
   verify_value(debugOnly);
@@ -457,9 +465,11 @@ void _highlyExperimental::to_toml(toml::value &value) {
 bool _highlyExperimental::verify_toml(toml::value &value) {
   to_toml(value);
   cache_value(consoleRevison);
+  cache_value(cpuExecutor);
   cache_value(clocksPerInstructionBypass);
   from_toml(value);
   verify_value(consoleRevison);
+  verify_value(cpuExecutor);
   verify_value(clocksPerInstructionBypass);
   return true;
 }
@@ -471,7 +481,7 @@ bool _highlyExperimental::verify_toml(toml::value &value) {
     const toml::value &x ## _ = data.at(#n); \
     x.from_toml(x ## _); \
   }
-bool verifyConfig(const std::filesystem::path &path, toml::value &data) {
+bool verifyConfig(const fs::path &path, toml::value &data) {
 #ifndef NO_GFX
   verify_section(rendering, Rendering);
   verify_section(imgui, ImGui);
@@ -486,13 +496,13 @@ bool verifyConfig(const std::filesystem::path &path, toml::value &data) {
   return true;
 }
 
-void loadConfig(const std::filesystem::path &path) {
+void loadConfig(const fs::path &path) {
   // If the configuration file does not exist, create it and return.
   std::ifstream configFile{ path };
   bool valid = configFile.is_open() && configFile.good();
   configFile.close();
   std::error_code error;
-  if (!std::filesystem::exists(path, error) && !valid) {
+  if (!fs::exists(path, error) && !valid) {
     filepaths.correct(Base::FS::GetUserPath(Base::FS::PathType::ConsoleDir));
     saveConfig(path);
     return;
@@ -514,12 +524,12 @@ void loadConfig(const std::filesystem::path &path) {
   read_section(highlyExperimental, HighlyExperimental);
 }
 
-void saveConfig(const std::filesystem::path &path) {
+void saveConfig(const fs::path &path) {
   std::ifstream configFile{ path };
   bool valid = configFile.is_open() && configFile.good();
   configFile.close();
   std::error_code error{};
-  if (!std::filesystem::exists(path, error) || !valid) {
+  if (!fs::exists(path, error) || !valid) {
     if (error) {
       LOG_ERROR(Config, "Filesystem error: {}", error.message());
     }
@@ -531,9 +541,9 @@ void saveConfig(const std::filesystem::path &path) {
 
   std::string prevPath{ path.string() };
   std::string prevFile{ path.filename().string() };
-  std::filesystem::path basePath{ prevPath.substr(0, prevPath.length() - prevFile.length() - 1) };
+  fs::path basePath{ prevPath.substr(0, prevPath.length() - prevFile.length() - 1) };
   // If we didn't have a config, just write directly. Nothing to save
-  std::filesystem::path newPath{ valid ? basePath / (prevFile + ".tmp") : path };
+  fs::path newPath{ valid ? basePath / (prevFile + ".tmp") : path };
 
   // If it wasn't valid, write before
   if (!valid) {
