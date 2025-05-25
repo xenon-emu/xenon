@@ -31,8 +31,11 @@ public:
   std::string GetDeviceName() { return info.deviceName; }
   u64 GetStartAddress() { return info.startAddr; }
   u64 GetEndAddress() { return info.endAddr; }
+  u64 GetSize() { return info.startAddr - info.endAddr; }
   bool IsSOCDevice() { return info.socDevice; }
-
+  
+  void UpdateEndAddress(u64 addr) { info.endAddr = addr; }
+  void UpdateStartAddress(u64 addr) { info.startAddr = addr; }
 private:
   DeviceInfo info{};
 };

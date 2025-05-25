@@ -1093,25 +1093,8 @@ void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE *ppuState,
     Config::imgui.debugWindow = true; // Open the debugger after halting
   }
 
-  // TODO: Investigate why FSB_CONFIG_RX_STATE needs these values to work
-  switch (thread.CIA) {
-  case 0x1003598ULL: {
-    GPR(11) = 0x0E;
-  } break;
-  case 0x1003644ULL: {
-    GPR(11) = 0x02;
-  } break;
-  }
-
   // Handle SoC reads
   if (socRead) {
-    // Hack to get the CB to work, seems to be writing ram size to this address, further
-    // research required. Free60.org shows this belongs to BIU address range.
-    if (EA == 0xE1040000ULL) {
-      constexpr u64 val = 0x20000000;
-      memcpy(outData, &val, byteCount);
-      return;
-    }
     // Check if the read is from the SROM
     if (EA >= XE_SROM_ADDR && EA < XE_SROM_ADDR + XE_SROM_SIZE) {
       const u32 sromAddr = static_cast<u32>(EA - XE_SROM_ADDR);
@@ -1136,21 +1119,13 @@ void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE *ppuState,
     else if (cpuContext->HandleSOCRead(EA, outData, byteCount)) {
       return;
     }
-
-    // Check if this read address belongs to the SoC MMIO in the PCI Bus.
-    bool nand{ EA >= NAND_MEMORY_MAPPED_ADDR && EA <= NAND_MEMORY_MAPPED_ADDR + NAND_MEMORY_MAPPED_SIZE },
-      pciConfigSpace{ EA >= PCI_BRIDGE_CONFIG_SPACE_ADDRESS_BASE && EA <= PCI_BRIDGE_CONFIG_SPACE_ADDRESS_BASE + PCI_BRIDGE_CONFIG_SPACE_SIZE },
-      pciBridge{ EA >= PCI_BRIDGE_BASE_ADDRESS && EA <= PCI_BRIDGE_BASE_ADDRESS + PCI_BRIDGE_SIZE },
-      xGPU{ EA >= XGPU_DEVICE_BASE && EA <= XGPU_DEVICE_BASE + XGPU_DEVICE_SIZE };
-    if (!nand && !pciBridge && !pciConfigSpace && !xGPU) {
-      if (Config::log.advanced)
-        LOG_WARNING(Xenon_MMU, "Invalid SoC Read from 0x{:X}, returning 0.", EA);
-      memset(outData, 0, byteCount);
-      return;
-    }
   }
+
   // External read
-  sysBus->Read(EA, outData, byteCount);
+  if (!sysBus->Read(EA, outData, byteCount, socRead) && socRead) {
+    if (Config::log.advanced)
+      LOG_WARNING(Xenon_MMU, "Invalid SoC Read from 0x{:X}", EA);
+  }
 }
 
 // MMU Write Routine, used by the CPU
@@ -1204,23 +1179,15 @@ void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
     else if (cpuContext->HandleSOCWrite(EA, data, byteCount)) {
       return;
     }
-
-    // Check if its any of the MMIO regions.
-    bool nand{ EA >= NAND_MEMORY_MAPPED_ADDR && EA <= NAND_MEMORY_MAPPED_ADDR + NAND_MEMORY_MAPPED_SIZE },
-      pciConfigSpace{ EA >= PCI_BRIDGE_CONFIG_SPACE_ADDRESS_BASE && EA <= PCI_BRIDGE_CONFIG_SPACE_ADDRESS_BASE + PCI_BRIDGE_CONFIG_SPACE_SIZE },
-      pciBridge{ EA >= PCI_BRIDGE_BASE_ADDRESS && EA <= PCI_BRIDGE_BASE_ADDRESS + PCI_BRIDGE_SIZE },
-      xGPU{ EA >= XGPU_DEVICE_BASE && EA <= XGPU_DEVICE_BASE + XGPU_DEVICE_SIZE };
-    if (!nand && !pciBridge && !pciConfigSpace && !xGPU) {
-      u64 tmp = 0;
-      memcpy(&tmp, data, byteCount);
-      if (Config::log.advanced)
-        LOG_WARNING(Xenon_MMU, "Invalid SoC Write to 0x{:X} (data:0x{:X})", EA, tmp);
-      return;
-    }
   }
 
-  // External Write
-  sysBus->Write(EA, data, byteCount);
+  // External write
+  if (!sysBus->Write(EA, data, byteCount, socWrite) && socWrite) {
+    u64 tmp = 0;
+    memcpy(&tmp, data, byteCount);
+    if (Config::log.advanced)
+      LOG_WARNING(Xenon_MMU, "Invalid SoC Write to 0x{:X}", EA);
+  }
 }
 
 void PPCInterpreter::MMUMemCpyFromHost(PPU_STATE *ppuState,

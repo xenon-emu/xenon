@@ -346,16 +346,6 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
       compiler.mov(temp, 0);
       compiler.mov(jitBuilder->threadCtx->array(&PPU_THREAD_REGISTERS::GPR).Ptr(3), temp);
     } break;
-    case 0x1003598ULL: {
-      x86::Gp temp = compiler.newGpq();
-      compiler.mov(temp, 0x0E);
-      compiler.mov(jitBuilder->threadCtx->array(&PPU_THREAD_REGISTERS::GPR).Ptr(11), temp);
-    } break;
-    case 0x1003644ULL: {
-      x86::Gp temp = compiler.newGpq();
-      compiler.mov(temp, 0x02);
-      compiler.mov(jitBuilder->threadCtx->array(&PPU_THREAD_REGISTERS::GPR).Ptr(11), temp);
-    } break;
     // INIT_POWER_MODE bypass 2.0.17489.0.
     case 0x80081764:
     // XAudioRenderDriverInitialize bypass 2.0.17489.0.

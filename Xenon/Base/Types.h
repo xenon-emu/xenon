@@ -61,13 +61,22 @@ using fptr = std::add_pointer_t<T>;
 
 // UDLs for memory size values
 [[nodiscard]] constexpr u64 operator""_KB(const u64 x) {
+  return 1000ULL * x;
+}
+[[nodiscard]] constexpr u64 operator""_KiB(const u64 x) {
   return 1024ULL * x;
 }
 [[nodiscard]] constexpr u64 operator""_MB(const u64 x) {
-  return 1024_KB * x;
+  return 1000_KB * x;
+}
+[[nodiscard]] constexpr u64 operator""_MiB(const u64 x) {
+  return 1024_KiB * x;
 }
 [[nodiscard]] constexpr u64 operator""_GB(const u64 x) {
-  return 1024_MB * x;
+  return 1000_MB * x;
+}
+[[nodiscard]] constexpr u64 operator""_GiB(const u64 x) {
+  return 1024_MiB * x;
 }
 
 // Byteswap to BE

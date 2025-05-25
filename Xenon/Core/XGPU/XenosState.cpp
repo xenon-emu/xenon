@@ -98,8 +98,15 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
     value = waitUntil;
     break;
   case XeRegister::RBBM_STATUS:
+    // Soft reset 1
+    // Checks if the GPU got the reset command
     if (!(rbbmStatus & 0x400)) {
       rbbmStatus |= 0x400;
+    }
+    // Soft reset 2
+    // Checks if the GPU reseponded to the reset a second time, ensures it didn't hang
+    if ((rbbmStatus & 0x80)) {
+      rbbmStatus &= ~0x80;
     }
     if (!(rbbmStatus & 0x600)) {
       rbbmStatus |= 0x600;
@@ -446,7 +453,7 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
       // Writeback
       const u32 memAddr = scratchAddr + (scratchRegIndex * 4);
       LOG_DEBUG(Xenos, "[CP] Scratch {} was accessed, writing back to 0x{:X} with 0x{:X}", scratchRegIndex, memAddr, tmp);
-      u8 *memPtr = ramPtr->getPointerToAddress(memAddr);
+      u8 *memPtr = ramPtr->GetPointerToAddress(memAddr);
       memcpy(memPtr, &scratch[scratchRegIndex], sizeof(scratch[scratchRegIndex]));
     }
   } break;

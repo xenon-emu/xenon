@@ -162,6 +162,8 @@ inline struct _smc {
 // XCPU
 //
 inline struct _xcpu {
+  // CPU RAM Size
+  std::string ramSize = "512MiB";
   // Loads an elf from the ElfBinary path
   bool elfLoader = false;
   // CPI for your system, do not modify

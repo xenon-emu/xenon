@@ -36,7 +36,7 @@ private:
   u32 periodicListBase; // 0x34 - PERIODICLISTBASE
   u32 asyncListAddr; // 0x38 - ASYNCLISTADDR
   u32 configFlag; // 0x40 - CONFIGFLAG
-  u32 portSC[9]; // 0x44-... - PORTSC
+  u32 portSC[9*2]; // 0x44-... - PORTSC
 };
 
 } // namespace PCIDev

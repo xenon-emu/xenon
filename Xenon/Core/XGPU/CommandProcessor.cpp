@@ -31,10 +31,9 @@ CommandProcessor::CommandProcessor(RAM *ramPtr, XenosState *statePtr, Render::Re
   parentBus(pciBridge) {
   cpWorkerThread = std::thread(&CommandProcessor::cpWorkerThreadLoop, this);
 
-  // Initialize uCode buffers.
-  // According to free60/libxenon, these are the correct uCode sizes.
-  cpMEuCodeData.resize(0x900);
-  cpPFPuCodeData.resize(0x120);
+  // According to free60/libxenon, these are the correct uCode sizes
+  cpMEuCodeSize = 0x900;
+  cpPFPuCodeSize = 0x120;
 }
 
 CommandProcessor::~CommandProcessor() {
@@ -47,23 +46,21 @@ CommandProcessor::~CommandProcessor() {
 void CommandProcessor::CPWriteMicrocodeData(eCPMicrocodeType uCodeType, u32 data) {
   switch (uCodeType) {
   case Xe::XGPU::uCodeTypeME:
-    // Sanity Check
-    if (cpMEuCodeWriteAdddress <= cpMEuCodeData.size()) {
-      // Write elements at specified offset.
-      cpMEuCodeData[cpMEuCodeWriteAdddress] = data;
-      cpMEuCodeWriteAdddress++;
+    // Sanity check
+    if (cpMEuCodeWriteAddress < cpMEuCodeSize) {
+      cpMEuCodeData[cpMEuCodeWriteAddress] = data;
+      cpMEuCodeWriteAddress++;
     } else {
-      LOG_ERROR(Xenos, "[CP] ME uCode Address bigger than uCode buffer, addr = {:#x}.", cpMEuCodeWriteAdddress);
+      LOG_ERROR(Xenos, "[CP] ME uCode Address '0x{:X}' is bigger than the uCode buffer", cpMEuCodeWriteAddress);
     }
     break;
   case Xe::XGPU::uCodeTypePFP:
-    // Sanity Check
-    if (cpPFPuCodeAdddress <= cpMEuCodeData.size()) {
-      // Write elements at specified offset.
-      cpPFPuCodeData[cpPFPuCodeAdddress] = data;
-      cpPFPuCodeAdddress++;
+    // Sanity check
+    if (cpPFPuCodeAddress < cpPFPuCodeSize) {
+      cpPFPuCodeData[cpPFPuCodeAddress] = data;
+      cpPFPuCodeAddress++;
     } else {
-      LOG_ERROR(Xenos, "[CP] PFP uCode Address bigger than uCode buffer, addr = {:#x}.", cpPFPuCodeAdddress);
+      LOG_ERROR(Xenos, "[CP] PFP uCode Address '0x{:X}' is bigger than the uCode buffer", cpPFPuCodeAddress);
     }
     break;
   }
@@ -73,17 +70,17 @@ u32 CommandProcessor::CPReadMicrocodeData(eCPMicrocodeType uCodeType) {
   u32 tmp = 0;
   switch (uCodeType) {
   case Xe::XGPU::uCodeTypeME:
-    // Sanity check.
-    if (cpMEuCodeReadAdddress <= cpMEuCodeData.size()) {
-      tmp = byteswap_be(cpMEuCodeData[cpMEuCodeReadAdddress]); // Data was byteswapped, so we need to reverse that.
-      cpMEuCodeReadAdddress++;
+    // Sanity check
+    if (cpMEuCodeReadAddress < cpMEuCodeSize) {
+      tmp = byteswap_be(cpMEuCodeData[cpMEuCodeReadAddress]); // Data was byteswapped, so we need to reverse that
+      cpMEuCodeReadAddress++;
     }
     break;
   case Xe::XGPU::uCodeTypePFP:
-    // Sanity check.
-    if (cpPFPuCodeAdddress <= cpPFPuCodeData.size()) {
-      tmp = byteswap_be(cpPFPuCodeData[cpPFPuCodeAdddress]); // Data was byteswapped, so we need to reverse that.
-      cpPFPuCodeAdddress++;
+    // Sanity check
+    if (cpPFPuCodeAddress < cpPFPuCodeSize) {
+      tmp = byteswap_be(cpPFPuCodeData[cpPFPuCodeAddress]); // Data was byteswapped, so we need to reverse that
+      cpPFPuCodeAddress++;
     }
     break;
   }
@@ -94,10 +91,10 @@ void CommandProcessor::CPUpdateRBBase(u32 address) {
   if (!address)
     return;
 
-  cpRingBufferBasePtr = ram->getPointerToAddress(address);
+  cpRingBufferBasePtr = ram->GetPointerToAddress(address);
   LOG_DEBUG(Xenos, "CP: Updating RingBuffer Base Address: 0x{:X}", address);
   
-  // Reset CP Read Ptr Idx.
+  // Reset CP Read pointer index
   cpReadPtrIndex = 0;
 }
 
@@ -160,7 +157,7 @@ u32 CommandProcessor::cpExecutePrimaryBuffer(u32 readIndex, u32 writeIndex) {
 
 void CommandProcessor::cpExecuteIndirectBuffer(u32 bufferPtr, u32 bufferSize) {
   // Create the ring buffer instance for the indirect buffer.
-  RingBuffer ringBufer(ram->getPointerToAddress(bufferPtr), bufferSize * sizeof(u32));
+  RingBuffer ringBufer(ram->GetPointerToAddress(bufferPtr), bufferSize * sizeof(u32));
 
   // Set write offset.
   ringBufer.setWriteOffset(bufferSize * sizeof(u32));
@@ -571,7 +568,7 @@ bool CommandProcessor::ExecutePacketType3_COND_WRITE(RingBuffer *ringBuffer, u32
 
   u32 value = 0;
   if (waitInfo & 0x10) {
-    u8 *addrPtr = ram->getPointerToAddress(static_cast<u32>(pollReg));
+    u8 *addrPtr = ram->GetPointerToAddress(static_cast<u32>(pollReg));
     memcpy(&value, addrPtr, sizeof(value));
   } else {
     value = state->ReadRegister(pollReg);
@@ -606,7 +603,7 @@ bool CommandProcessor::ExecutePacketType3_COND_WRITE(RingBuffer *ringBuffer, u32
 
   if (matched) {
     if (waitInfo & 0x100) {
-      u8 *addrPtr = ram->getPointerToAddress(static_cast<u32>(writeReg));
+      u8 *addrPtr = ram->GetPointerToAddress(static_cast<u32>(writeReg));
       memcpy(addrPtr, &writeData, sizeof(writeData));
     } else {
       state->WriteRegister(writeReg, writeData);
@@ -739,7 +736,7 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
   const u32 startSize = ringBuffer->ReadAndSwap<u32>();
   const u32 start = startSize >> 16;
   const u64 size = (startSize & 0xFFFF) * 4;
-  u8 *addrPtr = ram->getPointerToAddress(addr);
+  u8 *addrPtr = ram->GetPointerToAddress(addr);
 
   std::vector<u32> data{};
   u32 dwordCount = size / 4;
@@ -952,7 +949,7 @@ bool CommandProcessor::ExecutePacketType3_EVENT_WRITE_SHD(RingBuffer *ringBuffer
     writeValue = value;
   }
 
-  u8 *addrPtr = ram->getPointerToAddress(address);
+  u8 *addrPtr = ram->GetPointerToAddress(address);
   memcpy(addrPtr, &writeValue, sizeof(writeValue));
 
   return true;
@@ -972,7 +969,7 @@ bool CommandProcessor::ExecutePacketType3_WAIT_REG_MEM(RingBuffer *ringBuffer, u
     u32 value = 0;
     if (waitInfo & 0x10) {
       u32 addr = static_cast<u32>(pollReg);
-      u8 *addrPtr = ram->getPointerToAddress(addr);
+      u8 *addrPtr = ram->GetPointerToAddress(addr);
       memcpy(&value, addrPtr, sizeof(value));
     } else {
       value = state->ReadRegister(pollReg);
@@ -1103,7 +1100,7 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
 
     // The base address must already be word-aligned according to the R6xx documentation.
     indexBufferInfo.guestBase = state->vgtDMABase & ~(indexSizeInBytes - 1);
-    indexBufferInfo.elements = ram->getPointerToAddress(indexBufferInfo.guestBase);
+    indexBufferInfo.elements = ram->GetPointerToAddress(indexBufferInfo.guestBase);
     indexBufferInfo.endianness = state->vgtDMASize.swapMode;
     indexBufferInfo.indexFormat = state->vgtDrawInitiator.indexSize;
     indexBufferInfo.length = state->vgtDMASize.numWords * indexSizeInBytes;
@@ -1169,7 +1166,7 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
       params.shader = render->linkedShaderPrograms[combinedShaderHash];
 #endif
       if (state->vertexData.address > 0) {
-        params.vertexBufferPtr = ram->getPointerToAddress(state->vertexData.address);
+        params.vertexBufferPtr = ram->GetPointerToAddress(state->vertexData.address);
         params.vertexBufferSize = state->vertexData.size;
       }
       params.maxVertexIndex = state->maxVertexIndex;

@@ -270,6 +270,7 @@ bool _smc::verify_toml(toml::value &value) {
 }
 
 void _xcpu::from_toml(const toml::value &value) {
+  ramSize = toml::find_or<std::string>(value, "RAMSize", ramSize);
   elfLoader = toml::find_or<bool>(value, "ElfLoader", elfLoader);
   clocksPerInstruction = toml::find_or<s32&>(value, "CPI", clocksPerInstruction);
   overrideInitSkip = toml::find_or<bool>(value, "OverrideHWInit", overrideInitSkip);
@@ -277,6 +278,13 @@ void _xcpu::from_toml(const toml::value &value) {
   HW_INIT_SKIP_2 = toml::find_or<u64&>(value, "HW_INIT_SKIP2", HW_INIT_SKIP_2);
 }
 void _xcpu::to_toml(toml::value &value) {
+  value["RAMSize"].comments().clear();
+  value["RAMSize"] = ramSize;
+  value["RAMSize"].comments().push_back("# CPU RAM Size");
+  value["RAMSize"].comments().push_back("# Supports Bytes, (Kilobytes, Kibibytes), (Megabytes, Mebibytes), and (Gigabytes, Gibibytes)");
+  value["RAMSize"].comments().push_back("# 512MiB = 536.870912MB");
+  value["RAMSize"].comments().push_back("# 1GiB = 1024MiB");
+
   value["ElfLoader"].comments().clear();
   value["ElfLoader"] = elfLoader;
   value["ElfLoader"].comments().push_back("# Disables normal codeflow and loads an elf from ElfBinary");

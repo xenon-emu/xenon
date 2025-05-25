@@ -22,13 +22,13 @@ public:
 
   void ResetDevice(std::shared_ptr<SystemDevice> device);
 
-  void Read(u64 readAddress, u8 *data, u64 size);
-  void Write(u64 writeAddress, const u8 *data, u64 size);
-  void MemSet(u64 writeAddress, s32 data, u64 size);
+  bool Read(u64 readAddress, u8 *data, u64 size, bool soc = false);
+  bool Write(u64 writeAddress, const u8 *data, u64 size, bool soc = false);
+  bool MemSet(u64 writeAddress, s32 data, u64 size);
 
   // Configuration Space R/W
-  void ConfigRead(u64 readAddress, u8 *data, u64 size);
-  void ConfigWrite(u64 writeAddress, const u8 *data, u64 size);
+  bool ConfigRead(u64 readAddress, u8 *data, u64 size);
+  bool ConfigWrite(u64 writeAddress, const u8 *data, u64 size);
 
 private:
   std::shared_ptr<HostBridge> hostBridge{};

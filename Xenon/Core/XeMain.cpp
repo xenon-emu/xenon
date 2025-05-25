@@ -120,7 +120,7 @@ void XeMain::ShutdownCPU() {
 #ifndef NO_GFX
   // Reinit RAM handles for rendering (should be valid, mainly safety)
   renderer->ramPointer = ram.get();
-  renderer->fbPointer = ram->getPointerToAddress(XE_FB_BASE);
+  renderer->fbPointer = ram->GetPointerToAddress(XE_FB_BASE);
 #endif
   // Reset the CPU
   xenonCPU.reset();
@@ -170,7 +170,13 @@ void XeMain::ReloadFiles() {
 void XeMain::CreateHostBridge() {
   MICROPROFILE_SCOPEI("[Xe::Main::PCI]", "CreateHostBridge", MP_AUTO);
   LOG_INFO(Xenon, "Creating Host Bridge...");
-  hostBridge = std::make_shared<STRIP_UNIQUE(hostBridge)>();
+  u64 ramSize = 512_MiB;
+  if (!ram.get()) {
+    LOG_ERROR(Xenon, "Unable to get RAM size! Defaulting to 512MiB");
+  } else {
+    ramSize = ram->GetSize();
+  }
+  hostBridge = std::make_shared<STRIP_UNIQUE(hostBridge)>(ramSize);
 
   // Transfers ownership of xenos & pciBridge
   hostBridge->RegisterXGPU(xenos);
@@ -194,7 +200,7 @@ void XeMain::CreatePCIDevices() {
   {
     {
       MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "RAM", MP_AUTO);
-      ram = std::make_shared<STRIP_UNIQUE(ram)>("RAM", RAM_START_ADDR, RAM_START_ADDR + RAM_SIZE, false);
+      ram = std::make_shared<STRIP_UNIQUE(ram)>("RAM", RAM_START_ADDR, Config::xcpu.ramSize, false);
     }
     {
       MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "OHCI", MP_AUTO);

@@ -466,7 +466,7 @@ void Renderer::Thread() {
     if (XeMain::xenos && XeMain::xenos->RenderingTo2DFramebuffer() && !focusLost) {
       // Upload buffer
       // Framebuffer pointer from main memory
-      fbPointer = ramPointer->getPointerToAddress(XeMain::xenos->GetSurface());
+      fbPointer = ramPointer->GetPointerToAddress(XeMain::xenos->GetSurface());
       // Profile
       MICROPROFILE_SCOPEI("[Xe::Render]", "Deswizle", MP_AUTO);
       const u32 *ui_fbPointer = reinterpret_cast<u32 *>(fbPointer);

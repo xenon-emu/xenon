@@ -632,14 +632,14 @@ bool PCIBridge::MemSet(u64 writeAddress, s32 data, u64 size) {
   return false;
 }
 
-void PCIBridge::ConfigRead(u64 readAddress, u8 *data, u64 size) {
+bool PCIBridge::ConfigRead(u64 readAddress, u8 *data, u64 size) {
   PCIE_CONFIG_ADDR configAddr = {};
   configAddr.hexData = static_cast<u32>(readAddress);
 
   if (configAddr.busNum == 0 && configAddr.devNum == 0) {
     // Reading from our own config space!
     memcpy(data, &pciBridgeConfig.data[configAddr.regOffset], size);
-    return;
+    return true;
   }
 
   // Current device name
@@ -687,8 +687,7 @@ void PCIBridge::ConfigRead(u64 readAddress, u8 *data, u64 size) {
   default:
     LOG_ERROR(PCIBridge, "Config Space Read: Unknown device accessed: Dev 0x{:X}, Reg 0x{:X}",
         configAddr.devNum, configAddr.regOffset);
-    return;
-    break;
+    return true;
   }
 
   for (auto &[name, dev] : connectedPCIDevices) {
@@ -696,22 +695,23 @@ void PCIBridge::ConfigRead(u64 readAddress, u8 *data, u64 size) {
       // Hit!
       LOG_TRACE(PCIBridge, "Config read, device: {} offset = 0x{:X}", name, configAddr.regOffset);
       dev->ConfigRead(readAddress, data, size);
-      return;
+      return true;
     }
   }
 
   LOG_ERROR(PCIBridge, "Read to unimplemented device: {}", currentDevName);
   memset(data, 0xFF, size);
+  return false;
 }
 
-void PCIBridge::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
+bool PCIBridge::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   PCIE_CONFIG_ADDR configAddr = {};
   configAddr.hexData = static_cast<u32>(writeAddress);
 
   if (configAddr.busNum == 0 && configAddr.devNum == 0) {
     // Writing to our own config space!
     memcpy(&pciBridgeConfig.data[configAddr.regOffset], data, size);
-    return;
+    return true;
   }
 
   // Current device name
@@ -761,22 +761,18 @@ void PCIBridge::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
     memcpy(&value, data, size);
     LOG_ERROR(PCIBridge, "Config Space Write: Unknown device accessed: Dev 0x{:X} Func 0x{:X}"
         "Reg 0x{:X} data = 0x{:X}", configAddr.devNum, configAddr.functNum, configAddr.regOffset, value);
-    return;
-    break;
+    return true;
   }
 
   for (auto &[name, dev] : connectedPCIDevices) {
     if (name == currentDevName) {
       // Hit!
-      u64 value = 0;
-      memcpy(&value, data, size);
-      LOG_TRACE(PCIBridge, "Config write, device: {}, offset = 0x{:X} data = 0x{:X}", name, configAddr.regOffset, value);
+      LOG_TRACE(PCIBridge, "Config write to '{}+0x{:X}'", name, configAddr.regOffset);
       dev->ConfigWrite(writeAddress, data, size);
-      return;
+      return true;
     }
   }
 
-  u64 value = 0;
-  memcpy(&value, data, size);
-  LOG_ERROR(PCIBridge, "Write to unimplemented device: {} data = 0x{:X}", currentDevName, value);
+  LOG_ERROR(PCIBridge, "Config write to unimplemented device '{}'", currentDevName);
+  return false;
 }

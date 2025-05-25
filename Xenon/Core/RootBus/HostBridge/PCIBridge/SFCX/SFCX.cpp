@@ -597,8 +597,8 @@ void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND() {
   u32 dmaPagesNum = ((sfcxState.configReg & CONFIG_DMA_LEN) >> 6) + 1;
 
   // Get RAM pointers for both buffers
-  u8* dataPhysAddrPtr = mainMemory->getPointerToAddress(sfcxState.dataPhysAddrReg);
-  u8* sparePhysAddrPtr = mainMemory->getPointerToAddress(sfcxState.sparePhysAddrReg);
+  u8* dataPhysAddrPtr = mainMemory->GetPointerToAddress(sfcxState.dataPhysAddrReg);
+  u8* sparePhysAddrPtr = mainMemory->GetPointerToAddress(sfcxState.sparePhysAddrReg);
 
 #ifdef SFCX_DEBUG
   LOG_DEBUG(SFCX, "DMA_PHY_TO_RAM: Reading 0x{:X} pages. Logical Address: 0x{:X}, Physical Address: 0x{:X}, Data DMA address: 0x{:X}, Spare DMA address: 0x{:X}",
@@ -647,8 +647,8 @@ void Xe::PCIDev::SFCX::sfcxDoDMAtoNAND() {
   u32 dmaPagesNum = ((sfcxState.configReg & CONFIG_DMA_LEN) >> 6) + 1;
 
   // Get RAM pointers for both buffers
-  u8 *dataPhysAddrPtr = mainMemory->getPointerToAddress(sfcxState.dataPhysAddrReg);
-  u8 *sparePhysAddrPtr = mainMemory->getPointerToAddress(sfcxState.sparePhysAddrReg);
+  u8 *dataPhysAddrPtr = mainMemory->GetPointerToAddress(sfcxState.dataPhysAddrReg);
+  u8 *sparePhysAddrPtr = mainMemory->GetPointerToAddress(sfcxState.sparePhysAddrReg);
 
 #ifdef SFCX_DEBUG
   LOG_DEBUG(SFCX, "DMA_RAM_TO_PHY: Writing 0x{:X} pages. Logical Address: 0x{:X}, Physical Address: 0x{:X}, Data DMA address: 0x{:X}, Spare DMA address: 0x{:X}",

@@ -5,14 +5,14 @@
 #include "Base/Logging/Log.h"
 #include "Base/Global.h"
 
-HostBridge::HostBridge() {
+HostBridge::HostBridge(u64 ramSize) {
   // TODO: Fix these to pull the right data
   switch (Config::highlyExperimental.consoleRevison) {
   case Config::eConsoleRevision::Zephyr: {
-      // Device/Vendor ID
-      // hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = ... ;
-      // Device Type/Revision
-      // hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = ... ;
+    // Device/Vendor ID
+    hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = 0x58301414;
+    // Device Type/Revision
+    hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = 0x06000010;
   } break;
   case Config::eConsoleRevision::Falcon: {
     // Device/Vendor ID
@@ -46,11 +46,19 @@ HostBridge::HostBridge() {
   } break;
   case Config::eConsoleRevision::Winchester: {
     // Device/Vendor ID
-    // hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = ... ;
+    hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = 0x58301414;
     // Device Type/Revision
-    // hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = ... ;
+    hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = 0x06000010;
   } break;
   }
+  //0x20000000
+  hostBridgeConfigSpace.configSpaceHeader.BAR0 = 0xE0010000;
+  hostBridgeConfigSpace.configSpaceHeader.BAR1 = 0xE0030000;
+  hostBridgeConfigSpace.configSpaceHeader.BAR2 = 0xE1010000;
+  hostBridgeConfigSpace.configSpaceHeader.BAR3 = 0xE1030000;
+  hostBridgeConfigSpace.configSpaceHeader.BAR4 = 0xE2010000;
+  hostBridgeConfigSpace.configSpaceHeader.BAR5 = 0xE2030000;
+  biuRegs.ramSize = ramSize;
 }
 
 HostBridge::~HostBridge() {
@@ -79,31 +87,30 @@ bool HostBridge::Read(u64 readAddress, u8 *data, u64 size) {
     switch (readAddress) {
     // HostBridge
     case 0xE0020000:
-      *data = hostBridgeRegs.REG_E0020000;
+      memcpy(data, &hostBridgeRegs.REG_E0020000, size);
       break;
     case 0xE0020004:
-      *data = hostBridgeRegs.REG_E0020004;
+      memcpy(data, &hostBridgeRegs.REG_E0020004, size);
       break;
     // BIU
     case 0xE1020004:
-      *data = biuRegs.REG_E1020004;
+      memcpy(data, &biuRegs.REG_E1020004, size);
       break;
     case 0xE1010010:
-      *data = biuRegs.REG_E1010010;
+      memcpy(data, &biuRegs.REG_E1010010, size);
       break;
     case 0xE1018000:
-      *data = biuRegs.REG_E1018000;
+      memcpy(data, &biuRegs.REG_E1018000, size);
       break;
     case 0xE1020000:
-      *data = biuRegs.REG_E1020000;
+      memcpy(data, &biuRegs.REG_E1020000, size);
       break;
     case 0xE1040000:
-      *data = biuRegs.REG_E1040000;
+      memcpy(data, &biuRegs.ramSize, size);
       break;
     default:
-      LOG_ERROR(HostBridge, "Unknown register being read at address: 0x{:X}",
-          readAddress);
-      *data = 0;
+      memset(data, 0, size);
+      LOG_ERROR(HostBridge, "Unknown register being read! 0x{:X}", readAddress);
       break;
     }
     return true;
@@ -200,7 +207,7 @@ bool HostBridge::Write(u64 writeAddress, const u8 *data, u64 size) {
       memcpy(&biuRegs.REG_E1020008, data, size);
       break;
     case 0xE1040000:
-      memcpy(&biuRegs.REG_E1040000, data, size);
+      memcpy(&biuRegs.ramSize, data, size);
       break;
     case 0xE1040074:
       memcpy(&biuRegs.REG_E1040074, data, size);
@@ -209,10 +216,9 @@ bool HostBridge::Write(u64 writeAddress, const u8 *data, u64 size) {
       memcpy(&biuRegs.REG_E1040078, data, size);
       break;
     default:
-      u64 tmp{};
+      u64 tmp = 0;
       memcpy(&tmp, data, size);
-      LOG_ERROR(HostBridge, "Unknown register being written at address: 0x{:X}, data: 0x{:X}",
-                writeAddress, tmp);
+      LOG_ERROR(HostBridge, "Unknown register being written! 0x{:X} = 0x{:X}", writeAddress, tmp);
       break;
     }
     return true;
@@ -300,7 +306,7 @@ bool HostBridge::MemSet(u64 writeAddress, s32 data, u64 size) {
       memset(&biuRegs.REG_E1020008, data, size);
       break;
     case 0xE1040000:
-      memset(&biuRegs.REG_E1040000, data, size);
+      memset(&biuRegs.ramSize, data, size);
       break;
     case 0xE1040074:
       memset(&biuRegs.REG_E1040074, data, size);
@@ -334,7 +340,7 @@ bool HostBridge::MemSet(u64 writeAddress, s32 data, u64 size) {
   return false;
 }
 
-void HostBridge::ConfigRead(u64 readAddress, u8 *data, u64 size) {
+bool HostBridge::ConfigRead(u64 readAddress, u8 *data, u64 size) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "HostBridge::ConfigRead", MP_AUTO);
   std::lock_guard lck(mutex);
 
@@ -356,15 +362,15 @@ void HostBridge::ConfigRead(u64 readAddress, u8 *data, u64 size) {
       LOG_ERROR(HostBridge, "BUS0: Configuration read to inexistant PCI Device at address: 0x{:X}", readAddress);
       break;
     }
-    return;
+    return true;
   }
 
   // Config Address belongs to a secondary Bus, let's send it to the PCI-PCI
   // Bridge
-  pciBridge->ConfigRead(readAddress, data, size);
+  return pciBridge->ConfigRead(readAddress, data, size);
 }
 
-void HostBridge::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
+bool HostBridge::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "HostBridge::ConfigWrite", MP_AUTO);
   std::lock_guard lck(mutex);
 
@@ -392,12 +398,12 @@ void HostBridge::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
                 writeAddress, tmp);
       break;
     }
-    return;
+    return true;
   }
 
   // Config Address belongs to a secondary Bus, let's send it to the PCI-PCI
   // Bridge
-  pciBridge->ConfigWrite(writeAddress, data, size);
+  return pciBridge->ConfigWrite(writeAddress, data, size);
 }
 
 bool HostBridge::isAddressMappedinBAR(u32 address) {

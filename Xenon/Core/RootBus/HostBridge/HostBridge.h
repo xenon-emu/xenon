@@ -40,14 +40,14 @@ struct BIU_REGS {
   u32 REG_E1020000;
   u32 REG_E1020004;
   u32 REG_E1020008;
-  u32 REG_E1040000;
+  u32 ramSize;
   u32 REG_E1040074;
   u32 REG_E1040078;
 };
 
 class HostBridge {
 public:
-  HostBridge();
+  HostBridge(u64 ramSize);
   ~HostBridge();
 
   // Xbox GPU Register
@@ -66,10 +66,10 @@ public:
   bool MemSet(u64 writeAddress, s32 data, u64 size);
 
   // Configuration Read
-  void ConfigRead(u64 readAddress, u8 *data, u64 size);
+  bool ConfigRead(u64 readAddress, u8 *data, u64 size);
 
   // Configuration Write
-  void ConfigWrite(u64 writeAddress, const u8 *data, u64 size);
+  bool ConfigWrite(u64 writeAddress, const u8 *data, u64 size);
 
 private:
   std::mutex mutex{};

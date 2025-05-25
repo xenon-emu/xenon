@@ -155,7 +155,7 @@ void Xe::PCIDev::ODD::processSCSICommand() {
 void Xe::PCIDev::ODD::doDMA() {
   for (;;) {
     // Read the first entry of the table in memory
-    u8* DMAPointer = mainMemory->getPointerToAddress(atapiState.atapiRegs.dmaTableOffsetReg + atapiState.dmaState.currentTableOffset);
+    u8* DMAPointer = mainMemory->GetPointerToAddress(atapiState.atapiRegs.dmaTableOffsetReg + atapiState.dmaState.currentTableOffset);
     // Each entry is 64 bit long
     memcpy(&atapiState.dmaState, DMAPointer, 8);
 
@@ -171,7 +171,7 @@ void Xe::PCIDev::ODD::doDMA() {
     // The address in memory to be written to/read from
     u32 bufferAddress = atapiState.dmaState.currentPRD.physAddress;
     // Buffer Pointer in main memory
-    u8 *bufferInMemory = mainMemory->getPointerToAddress(bufferAddress);
+    u8 *bufferInMemory = mainMemory->GetPointerToAddress(bufferAddress);
 
     if (readOperation) {
       // Reading from us

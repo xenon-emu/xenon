@@ -928,16 +928,12 @@ void XCPUSettings(Render::GUI *gui) {
   gui->Button("Reboot", [] {
     XeMain::Reboot(static_cast<u32>(XeMain::smcCore->GetPowerOnReason()));
   });
+  Config::xcpu.ramSize = gui->InputText("RAM Size", Config::xcpu.ramSize);
+  gui->Tooltip("Requires restart of the CPU for things to take affect");
   gui->Toggle("Load Elf", &Config::xcpu.elfLoader);
-  gui->Toggle("RGH3 Init Skip (Corona Only)", &RGH2, [] {
-    if (!storedPreviousInitSkips && !RGH2) {
-      initSkip1 = Config::xcpu.HW_INIT_SKIP_1;
-      initSkip2 = Config::xcpu.HW_INIT_SKIP_2;
-      storedPreviousInitSkips = true;
-    }
-    Config::xcpu.HW_INIT_SKIP_1 = RGH2 ? 0x3003DC0 : initSkip1;
-    Config::xcpu.HW_INIT_SKIP_2 = RGH2 ? 0x3003E54 : initSkip2;
-  });
+  gui->Toggle("Override Init Skips", &Config::xcpu.overrideInitSkip);
+  gui->InputInt("Init Skip 1", &Config::xcpu.HW_INIT_SKIP_1);
+  gui->InputInt("Init Skip 2", &Config::xcpu.HW_INIT_SKIP_2);
 }
 
 void SMCSettings(Render::GUI *gui) {
@@ -1083,8 +1079,8 @@ void Render::GUI::OnSwap(Texture *texture) {
             }
             else {
               RAM *ramPtr = XeMain::ram.get();
-              f.write(reinterpret_cast<const char*>(ramPtr->getPointerToAddress(0)), RAM_SIZE);
-              LOG_INFO(Xenon, "RAM dumped to '{}' (size: 0x{:08X})", path.string(), RAM_SIZE);
+              f.write(reinterpret_cast<const char*>(ramPtr->GetPointerToAddress(0)), ramPtr->GetSize());
+              LOG_INFO(Xenon, "RAM dumped to '{}' (size: 0x{:08X})", path.string(), ramPtr->GetSize());
             }
             f.close();
           });

@@ -218,7 +218,7 @@ void Xe::Xenos::XGPU::DumpFB(const std::filesystem::path &path, int pitch) {
     LOG_ERROR(Xenos, "Failed to open {} for writing", path.filename().string());
   }
   else {
-    f.write(reinterpret_cast<const char*>(ramPtr->getPointerToAddress(xenosState->fbSurfaceAddress)), pitch);
+    f.write(reinterpret_cast<const char*>(ramPtr->GetPointerToAddress(xenosState->fbSurfaceAddress)), pitch);
     LOG_INFO(Xenos, "Framebuffer dumped to '{}'", path.string());
   }
   f.close();

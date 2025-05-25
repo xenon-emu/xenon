@@ -18,9 +18,11 @@
 #include <atomic>
 #include <thread>
 #include <memory>
+#include <unordered_map>
 
 #include "Base/Logging/Log.h"
 #include "Base/Types.h"
+
 #include "Core/RAM/RAM.h"
 #include "Core/RootBus/HostBridge/PCIBridge/PCIBridge.h"
 #include "Core/XGPU/Microcode/ASTBlock.h"
@@ -29,6 +31,7 @@
 #include "Core/XGPU/XenosRegisters.h"
 #include "Core/XGPU/Xenos.h"
 #include "Core/XGPU/XenosState.h"
+
 #include "Render/Abstractions/Shader.h"
 #include "Render/Abstractions/Texture.h"
 
@@ -82,25 +85,25 @@ public:
   CommandProcessor(RAM *ramPtr, XenosState *statePtr, Render::Renderer *renderer, PCIBridge *pciBridge);
   ~CommandProcessor();
 
-  // Methods for R/W of the CP/PFP uCode data.
-  void CPSetPFPMicrocodeAddress(u32 address) { cpPFPuCodeAdddress = address; }
-  void CPSetMEMicrocodeWriteAddress(u32 address) { cpMEuCodeWriteAdddress = address; }
-  void CPSetMEMicrocodeReadAddress(u32 address) { cpMEuCodeReadAdddress = address; }
+  // Methods for R/W of the CP/PFP uCode data
+  void CPSetPFPMicrocodeAddress(u32 address) { cpPFPuCodeAddress = address; }
+  void CPSetMEMicrocodeWriteAddress(u32 address) { cpMEuCodeWriteAddress = address; }
+  void CPSetMEMicrocodeReadAddress(u32 address) { cpMEuCodeReadAddress = address; }
   void CPWriteMicrocodeData(eCPMicrocodeType uCodeType, u32 data);
   u32 CPReadMicrocodeData(eCPMicrocodeType uCodeType);
 
-  // Update RingBuffer Base Address.
+  // Update RingBuffer base address
   void CPUpdateRBBase(u32 address);
-  // Update RingBuffer Size.
+  // Update RingBuffer size
   void CPUpdateRBSize(size_t newSize);
-  // CP RB Write Ptr offset (from base in words).
+  // CP RB Write Ptr offset (from base in words)
   void CPUpdateRBWritePointer(u32 offset);
 
 private:
-  // PCI Bridge pointer. Used for Interrupts.
+  // PCI Bridge pointer. Used for interrupts
   PCIBridge *parentBus{};
 
-  // RAM Poiner, for DMA ops and RingBuffer access.
+  // RAM Poiner, for DMA ops and RingBuffer access
   RAM *ram{};
 
   // Render handle
@@ -109,31 +112,33 @@ private:
   // Xenos State, contains register data
   XenosState *state{};
 
-  // Worker Thread.
+  // Worker thread
   std::thread cpWorkerThread;
 
   // Worker thread running
   volatile bool cpWorkerThreadRunning = true;
 
-  // Command Processor Worker Thread Loop.
+  // Command Processor Worker Thread Loop
   // Whenever there's valid commands in the read/write Ptrs, this will process 
-  // all commands and perform tasks associated with them.
+  // all commands and perform tasks associated with them
   void cpWorkerThreadLoop();
 
-  // Software loads ME and PFP uCode. 
-  // libXenon driver loads it and after it verifies it.
+  // Software loads ME and PFP uCode
+  // libXenon driver loads it and after it verifies it
   
-  // CP PFP Address (offset).
-  u32 cpPFPuCodeAdddress = 0;
-  // CP ME Write Address (offset).
-  u32 cpMEuCodeWriteAdddress = 0;
-  // CP ME Read Address (offset).
-  u32 cpMEuCodeReadAdddress = 0;
-  // CP Microcode Engine data. 
-  std::vector<u32> cpMEuCodeData;
-  // CP PreFetch Parser data.
-  std::vector<u32> cpPFPuCodeData;  
-  // CP ME for PM4_ME_INIT data.
+  // CP PFP Write Address (offset)
+  u32 cpPFPuCodeAddress = 0;
+  // CP ME Write Address (offset)
+  u32 cpMEuCodeWriteAddress = 0;
+  // CP ME Read Address (offset)
+  u32 cpMEuCodeReadAddress = 0;
+  // CP Microcode Engine data & size
+  u32 cpMEuCodeSize = 0;
+  std::unordered_map<u32, u32> cpMEuCodeData;
+  // CP PreFetch Parser data & size
+  u32 cpPFPuCodeSize = 0;
+  std::unordered_map<u32, u32> cpPFPuCodeData;
+  // CP ME for PM4_ME_INIT data
   std::vector<u32> cpME_PM4_ME_INIT_Data;
 
   // Basically, the driver sets the CP write base to an address in memory where
