@@ -12,18 +12,6 @@
 #include "PPU.h"
 #include "PPU_JIT.h"
 
-u32 ComputeBlockHash(const std::vector<u32> &instrs) {
-  u32 hash = 0x811C9DC5; // FNV offset basis
-  for (u32 instr : instrs) {
-    for (int i = 0; i < 4; ++i) {
-      u8 byte = (instr >> (i * 8)) & 0xFF;
-      hash ^= byte;
-      hash *= 0x01000193; // FNV prime
-    }
-  }
-  return hash;
-}
-
 //
 //  Trampolines for Invoke
 //
