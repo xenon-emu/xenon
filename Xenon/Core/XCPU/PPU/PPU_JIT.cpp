@@ -223,7 +223,7 @@ u64 PPU_JIT::ExecuteJITBlock(u64 addr, bool enableHalt) {
 void PPU_JIT::setupContext(JITBlockBuilder *b) {
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
   x86::Gp tempR = newGP32();
-  COMP->movzx(tempR, b->ppuState->Ptr<u8>());
+  COMP->movzx(tempR, b->ppuState->scalar(&PPU_STATE::currentThread).Ptr<u8>());
   COMP->imul(b->threadCtx->Base(), tempR, sizeof(PPU_THREAD_REGISTERS));
   // Since ppuThread[] base is at offset 0 we just need to add the offset in the array
   COMP->add(b->threadCtx->Base(), b->ppuState->Base());

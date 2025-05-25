@@ -683,7 +683,7 @@ void PPCInterpreter::PPCInterpreter_faddx(PPU_STATE *ppuState) {
   }
 
   if (_instr.rc)
-  ppuSetCR1(ppuState);
+    ppuSetCR1(ppuState);
 }
 
 // Floating Absolute Value (x'FC00 0210')
