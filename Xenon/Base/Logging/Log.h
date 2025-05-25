@@ -54,10 +54,14 @@ if (Config::log.debugOnly)                                                      
 #define LOG_TRACE(logClass, ...) ;
 #endif
 
+#ifdef DEBUG_BUILD
 #define LOG_DEBUG(logClass, ...)                                                         \
   Base::Log::FmtLogMessage(Base::Log::Class::logClass, Base::Log::Level::Debug,          \
                            Base::Log::TrimSourcePath(__FILE__), __LINE__, __func__,      \
                            __VA_ARGS__)
+#else
+#define LOG_DEBUG(logClass, ...) ;
+#endif
 #define LOG_INFO(logClass, ...)                                                          \
   Base::Log::FmtLogMessage(Base::Log::Class::logClass, Base::Log::Level::Info,           \
                            Base::Log::TrimSourcePath(__FILE__), __LINE__, __func__,      \

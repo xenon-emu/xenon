@@ -24,17 +24,20 @@ private:
   u32 HcRevision;         //  0
   u32 HcControl;          //  4
   u32 HcCommandStatus;    //  8
-  u32 HcInterruptStatus;  //  c
+  u32 HcInterruptStatus;  //  C
   u32 HcInterruptEnable;  // 10
   u32 HcHCCA;             // 18
-  u32 HcPeriodCurrentED;  // 1c
+  u32 HcPeriodCurrentED;  // 1C
   u32 HcControlHeadED;    // 20
   u32 HcBulkHeadED;       // 28
   u32 HcFmInterval;       // 34
   u32 HcPeriodicStart;    // 40
   u32 HcRhDescriptorA;    // 48
-  u32 HcRhDescriptorB;    // 4c
+  u32 HcRhDescriptorB;    // 4C
   u32 HcRhStatus;         // 50
+  // In addition to these registers, starting at offset 54, each USB port on the root hub is assigned
+  // an HcRhPortStatus register that denotes the current status of the port
+  u32 HcRhPortStatus[9]; // 54 - ..
 };
 
 } // namespace PCIDev

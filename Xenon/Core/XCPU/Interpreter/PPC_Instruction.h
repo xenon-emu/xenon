@@ -548,18 +548,20 @@ namespace PPCInterpreter {
       }
 
       // Main opcodes (field 0..5)
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
       fillTable<instructionHandlerJIT>(jitTable, 0x00, 6, -1, {
-        //{ 0x0E, GET(addi) },
-        //{ 0x12, GET(b) },
-        //{ 0x15, GETRC(rlwinm) },
-        //{ 0x19, GET(oris) },
-        //{ 0x1C, GET(andi) },
+        { 0x0E, GET(addi) },
+        { 0x12, GET(b) },
+        { 0x15, GETRC(rlwinm) },
+        { 0x19, GET(oris) },
+        { 0x1C, GET(andi) },
       });
 
       // Group 0x1F opcodes (field 21..30)
       fillTable<instructionHandlerJIT>(jitTable, 0x1F, 10, 1, {
-        //{ 0x153, GET(mfspr) },
+        { 0x153, GET(mfspr) },
       });
+#endif
 
       #undef GET_
       #undef GET
@@ -1064,6 +1066,13 @@ namespace PPCInterpreter {
     }
     std::string decodeName(u32 instr) const noexcept {
       return getNameTable()[PPCDecode(instr)];
+    }
+    bool isBranch(u32 decoded) const noexcept {
+      return decoded == 0x0012 // b
+          || decoded == 0x0010 // bc
+          || decoded == 0x6490 // bclr (0x13 << 11 | 0x010)
+          || decoded == 0x7290 // bcctr (0x13 << 11 | 0x210)
+          || decoded == 0x6590;// rfid  (0x13 << 11 | 0x012)
     }
   private:
     // Fast lookup table

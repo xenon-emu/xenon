@@ -48,8 +48,14 @@ void Xe::PCIDev::OHCI::Read(u64 readAddress, u8 *data, u64 size) {
   case 0x18:
     ret = HcHCCA;
     break;
-  case 0x1c:
+  case 0x1C:
     ret = HcPeriodCurrentED;
+    break;
+  case 0x20:
+    ret = HcControlHeadED;
+    break;
+  case 0x28:
+    ret = HcBulkHeadED;
     break;
   case 0x34:
     ret = HcFmInterval;
@@ -57,11 +63,15 @@ void Xe::PCIDev::OHCI::Read(u64 readAddress, u8 *data, u64 size) {
   case 0x48:
     ret = HcRhDescriptorA;
     break;
-  case 0x4c:
+  case 0x4C:
     ret = HcRhDescriptorB;
     break;
   default:
-    LOG_WARNING(OHCI, "{} Read(0x{:X}, data)", instance, offset);
+    if (offset >= 0x54 && offset < 0x54 + sizeof(HcRhPortStatus)) {
+      u32 portIndex = (offset - 0x54) / 4;
+      ret = HcRhPortStatus[portIndex];
+    }
+    break;
   }
   ret = byteswap_le<u32>(ret);
   LOG_DEBUG(OHCI, "{} Read(0x{:X}, data) == 0x{:X}", instance, offset, ret);
@@ -120,10 +130,18 @@ void Xe::PCIDev::OHCI::Write(u64 writeAddress, const u8 *data, u64 size) {
     LOG_DEBUG(OHCI, "{} HcRhStatus = 0x{:X}", instance, value);
     break;
   default:
-    LOG_WARNING(OHCI, "{} Write(0x{:X}, 0x{:X}, {})", instance, offset, value, size);
+    if (offset >= 0x54 && offset < 0x54 + sizeof(HcRhPortStatus)) {
+      u32 portIndex = (offset - 0x54) / 4;
+      LOG_DEBUG(OHCI, "{} HcRhPortStatus[{}] = 0x{:X}", instance, portIndex, value);
+      HcRhPortStatus[portIndex] = value;
+    } else {
+      LOG_WARNING(OHCI, "{} Write(0x{:X}, 0x{:X}, {})", instance, offset, value, size);
+    }
+    break;
   }
 
-  if (HcCommandStatus & 1) { // HCR
+  if (HcCommandStatus & 1) {
+    // HCR
     HcCommandStatus &= ~1;
     // TODO, reset everything else
   }

@@ -47,7 +47,7 @@ void CommandProcessor::CPWriteMicrocodeData(eCPMicrocodeType uCodeType, u32 data
   switch (uCodeType) {
   case Xe::XGPU::uCodeTypeME:
     // Sanity check
-    if (cpMEuCodeWriteAddress < cpMEuCodeSize) {
+    if (cpMEuCodeWriteAddress <= cpMEuCodeSize) {
       cpMEuCodeData[cpMEuCodeWriteAddress] = data;
       cpMEuCodeWriteAddress++;
     } else {
@@ -56,7 +56,7 @@ void CommandProcessor::CPWriteMicrocodeData(eCPMicrocodeType uCodeType, u32 data
     break;
   case Xe::XGPU::uCodeTypePFP:
     // Sanity check
-    if (cpPFPuCodeAddress < cpPFPuCodeSize) {
+    if (cpPFPuCodeAddress <= cpPFPuCodeSize) {
       cpPFPuCodeData[cpPFPuCodeAddress] = data;
       cpPFPuCodeAddress++;
     } else {

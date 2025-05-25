@@ -756,9 +756,10 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
         LOG_CRITICAL(Xenon_MMU, "LPAR Interrupt unimplemented.");
       }
     }
-  }
-  // Virtual Mode
-  else {
+  } else {
+    //
+    // Virtual Mode
+    //
     // Page size bits
     u8 p = 0;
     // Large pages

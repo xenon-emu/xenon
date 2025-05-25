@@ -167,8 +167,10 @@ public:
   ASMJitPtr<PPU_STATE> *ppuState = nullptr;
   // Current thread context
   ASMJitPtr<PPU_THREAD_REGISTERS> *threadCtx = nullptr;
-  x86::Gp haltBool{}; // enableHalt flag
-  x86::Compiler *compiler = nullptr; // asmjit Compiler
+  // EnableHalt flag
+  x86::Gp haltBool{};
+  // asmjit Compiler
+  x86::Compiler *compiler = nullptr;
 #endif
 private:
   asmjit::CodeHolder code{};
@@ -198,14 +200,22 @@ public:
     return true;
   }
 
-  JITBlockBuilder *builder;    // JIT block builder
-  JITFunc codePtr = nullptr;   // Pointer to compiled assembly code
-  u64 codeSize = 0;            // Size of the compiled code
-  u64 ppuAddress = 0;          // Address of the PPC block
-  u64 size = 0;                // PPC code size in bytes
-  bool isDirty;                // Tracks validation of the block, if Dirty the block is discarded and recompiled
-  asmjit::JitRuntime *runtime; // Reference to JIT runtime
-  u64 hash;
+  // JIT block builder
+  JITBlockBuilder *builder;
+  // Pointer to compiled assembly code
+  JITFunc codePtr = nullptr;
+  // Size of the compiled code
+  u64 codeSize = 0;
+  // Address of the PPC block
+  u64 ppuAddress = 0;
+  // PPC code size in bytes
+  u64 size = 0;
+  // Tracks validation of the block, if Dirty the block is discarded and recompiled
+  bool isDirty = false;
+  // Reference to JIT runtime
+  asmjit::JitRuntime *runtime = nullptr;
+  // Array of all opcodes, used to avoid a MMU lookup
+  std::vector<u32> opcodes = {};
 };
 
 class PPU_JIT {
@@ -220,8 +230,6 @@ public:
   void setupProl(JITBlockBuilder *b, u32 addr);
   void patchSkips(JITBlockBuilder *b, u32 addr);
 private:
-  bool isBlockCached(u64 addr);
-
   PPU *ppu = nullptr; // "Linked" PPU
   PPU_STATE *ppuState = nullptr; // For easier thread access
   asmjit::JitRuntime jitRuntime;

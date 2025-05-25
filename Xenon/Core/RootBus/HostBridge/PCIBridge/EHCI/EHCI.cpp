@@ -72,7 +72,7 @@ void Xe::PCIDev::EHCI::Read(u64 readAddress, u8 *data, u64 size) {
     value = configFlag;
     break;
   default:
-    if (offset >= 0x44 && offset < 0x44 + 8 * 4) {
+    if (offset >= 0x44 && offset < 0x44 + sizeof(portSC)) {
       u32 portIndex = (offset - 0x44) / 4;
       if (portIndex < (hcsParams & 0xF)) {
         value = portSC[portIndex];
@@ -100,45 +100,45 @@ void Xe::PCIDev::EHCI::Write(u64 writeAddress, const u8 *data, u64 size) {
     if (usbCmd & (1 << 1)) {
       usbCmd &= ~(1 << 1);
     }
-    LOG_DEBUG(OHCI, "{} USBCMD = 0x{:X}", instance, value);
+    LOG_DEBUG(EHCI, "{} USBCMD = 0x{:X}", instance, value);
     break;
   case 0x24:
     usbSts &= ~value; // Writing 1 clears bits
-    LOG_DEBUG(OHCI, "{} USBSTS = 0x{:X}", instance, value);
+    LOG_DEBUG(EHCI, "{} USBSTS = 0x{:X}", instance, value);
     break;
   case 0x28:
     usbIntr = value;
-    LOG_DEBUG(OHCI, "{} USBINTR = 0x{:X}", instance, value);
+    LOG_DEBUG(EHCI, "{} USBINTR = 0x{:X}", instance, value);
     break;
   case 0x2C:
     frameIndex = value;
-    LOG_DEBUG(OHCI, "{} FRINDEX = 0x{:X}", instance, value);
+    LOG_DEBUG(EHCI, "{} FRINDEX = 0x{:X}", instance, value);
     break;
   case 0x30:
     ctrlDsSegment = value;
-    LOG_DEBUG(OHCI, "{} CTRLDSSEGMENT = 0x{:X}", instance, value);
+    LOG_DEBUG(EHCI, "{} CTRLDSSEGMENT = 0x{:X}", instance, value);
     break;
   case 0x34:
     periodicListBase = value;
-    LOG_DEBUG(OHCI, "{} PERIODICLISTBASE = 0x{:X}", instance, value);
+    LOG_DEBUG(EHCI, "{} PERIODICLISTBASE = 0x{:X}", instance, value);
     break;
   case 0x38:
     asyncListAddr = value;
-    LOG_DEBUG(OHCI, "{} ASYNCLISTADDR = 0x{:X}", instance, value);
+    LOG_DEBUG(EHCI, "{} ASYNCLISTADDR = 0x{:X}", instance, value);
     break;
   case 0x40:
     configFlag = value;
-    LOG_DEBUG(OHCI, "{} CONFIGFLAG = 0x{:X}", instance, value);
+    LOG_DEBUG(EHCI, "{} CONFIGFLAG = 0x{:X}", instance, value);
     break;
   default:
-    if (offset >= 0x44 && offset < 0x44 + 8 * 4) {
+    if (offset >= 0x44 && offset < 0x44 + sizeof(portSC)) {
       u32 portIndex = (offset - 0x44) / 4;
       if (portIndex < (hcsParams & 0xF)) {
-        LOG_DEBUG(OHCI, "{} PORTSC[{}] = 0x{:X}", instance, portIndex, value);
+        LOG_DEBUG(EHCI, "{} PORTSC[{}] = 0x{:X}", instance, portIndex, value);
         portSC[portIndex] = value;
       }
     } else {
-      LOG_WARNING(OHCI, "{} Write(0x{:X}, 0x{:X}, {})", instance, offset, value, size);
+      LOG_WARNING(EHCI, "{} Write(0x{:X}, 0x{:X}, {})", instance, offset, value, size);
     }
     break;
   }
