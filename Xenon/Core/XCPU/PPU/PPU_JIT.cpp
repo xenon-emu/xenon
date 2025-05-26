@@ -268,12 +268,16 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
 }
 #define GPR(x) curThread.GPR[x]
 
-// TODO: Invalidate blocks
 void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt) {
   u32 instrsExecuted = 0;
   while (instrsExecuted < numInstrs && active && (XeRunning && !XePaused)) {
-    u64 blockStart = curThread.NIA;
-    switch (blockStart) {
+    auto &thread = curThread;
+    // This *must* be done here simply because of how we handle JIT.
+    // We run until the start of a block, which is a branch opcode (or until it's a invalid instruction),
+    // but these are branch opcodes, designed to avoid calling them.
+    // So, these will break under BuildJITBlock, and tp avoid the issue, it's done here
+    bool skipBlock = false;
+    switch (thread.NIA) {
     // INIT_POWER_MODE bypass 2.0.17489.0
     case 0x80081764:
     // XAudioRenderDriverInitialize bypass 2.0.17489.0
@@ -281,9 +285,16 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt) {
     // XDK 17.489.0 AudioChipCorder Device Detect bypass. This is not needed for
     // older console revisions
     case 0x801AF580:
-      continue;
+      skipBlock = true;
+      break;
+    default:
       break;
     }
+    if (skipBlock) {
+      instrsExecuted++;
+      thread.NIA += 4;
+    }
+    u64 blockStart = thread.NIA;
     auto it = jitBlocks.find(blockStart);
     if (it == jitBlocks.end()) {
       if (it != jitBlocks.end())
@@ -298,18 +309,18 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt) {
       u64 sum = 0;
       if (block->size % 8 == 0) {
         for (u64 i = 0; i < block->size / 8; i++) {
-          curThread.instrFetch = true;
+          thread.instrFetch = true;
           u64 val = PPCInterpreter::MMURead64(ppuState, block->ppuAddress + i * 8);
-          curThread.instrFetch = false;
+          thread.instrFetch = false;
           u64 top = val >> 32;
           u64 bottom = val & 0xFFFFFFFF;
           sum += top + bottom;
         }
       } else {
         for (u64 i = 0; i != block->size / 4; i++) {
-          curThread.instrFetch = true;
+          thread.instrFetch = true;
           sum += PPCInterpreter::MMURead32(ppuState, block->ppuAddress + i * 4);
-          curThread.instrFetch = false;
+          thread.instrFetch = false;
         }
       }
 
