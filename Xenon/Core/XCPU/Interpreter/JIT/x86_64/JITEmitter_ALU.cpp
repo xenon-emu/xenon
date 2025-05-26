@@ -45,7 +45,7 @@ void PPCInterpreter::PPCInterpreterJIT_rlwinmx(PPU_STATE *ppuState, JITBlockBuil
 
   // _rc
   if (instr.rc)
-    J_ppuSetCR_LOGICAL(b, dup, 0);
+    J_ppuSetCR(b, dup, 0);
 }
 
 // Rotate Left Word then AND with Mask (x'5C00 0000')
@@ -71,7 +71,7 @@ void PPCInterpreter::PPCInterpreterJIT_rlwnmx(PPU_STATE *ppuState, JITBlockBuild
 
   // _rc
   if (instr.rc)
-    J_ppuSetCR_LOGICAL(b, dup, 0);
+    J_ppuSetCR(b, dup, 0);
 }
 
 
@@ -85,7 +85,7 @@ void PPCInterpreter::PPCInterpreterJIT_andi(PPU_STATE *ppuState, JITBlockBuilder
   COMP->and_(res, imm<u16>(instr.uimm16));
   COMP->mov(GPRPtr(instr.ra), res);
 
-  J_ppuSetCR_LOGICAL(b, res, 0);
+  J_ppuSetCR(b, res, 0);
 }
 
 // XOR Immediate (x'6800 0000')

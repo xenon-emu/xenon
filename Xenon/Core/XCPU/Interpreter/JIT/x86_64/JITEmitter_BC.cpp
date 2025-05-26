@@ -18,7 +18,7 @@ void PPCInterpreter::PPCInterpreterJIT_b(PPU_STATE *ppuState, JITBlockBuilder *b
     COMP->add(target, offset);
   }
 
-  COMP->mov(NIAPtr(), target);  // NIA = target
+  COMP->mov(NIAPtr(), target); // NIA = target
 
   if (instr.lk) {
     // LR = CIA + 4
