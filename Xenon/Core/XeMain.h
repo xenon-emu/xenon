@@ -2,12 +2,10 @@
 
 #pragma once
 
-#include "Base/PathUtil.h"
-
-#include "Base/Config.h"
 #include "Base/Logging/Backend.h"
 #include "Base/Logging/Log.h"
-#include "Base/Version.h"
+#include "Base/Config.h"
+#include "Base/PathUtil.h"
 
 #include "Core/NAND/NAND.h"
 #include "Core/RAM/RAM.h"

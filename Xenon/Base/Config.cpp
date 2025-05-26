@@ -553,7 +553,7 @@ void saveConfig(const fs::path &path) {
     }
   }
 
-  // Write to file
+  // Write initial file
   try {
     std::ofstream file{ newPath };
     file << data;
@@ -570,6 +570,17 @@ void saveConfig(const fs::path &path) {
     if (!verifyConfig(newPath, data)) {
       return;
     }
+  }
+
+  // Do the final write
+  try {
+    std::ofstream file{ newPath };
+    file << data;
+    file.close();
+  }
+  catch (const std::exception &ex) {
+    LOG_ERROR(Config, "Exception trying to write config. {}", ex.what());
+    return;
   }
 
   // Copy file config to current version, if it's valid
