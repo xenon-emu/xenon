@@ -744,6 +744,26 @@ void PPCInterpreter::PPCInterpreter_stvx(PPU_STATE *ppuState) {
   MMUWrite32(ppuState, EA + (sizeof(u32) * 3), byteswap_be<u32>(VRi(vs).dword[3]));
 }
 
+// Store Vector Element Word Indexed (x'7C00 018E')
+void PPCInterpreter::PPCInterpreter_stvewx(PPU_STATE* ppuState) {
+  /*
+    if rA=0 then b <- 0
+    else b <- (rA)
+    EA <- (b + (rB)) & 0xFFFF_FFFF_FFFF_FFFC
+    eb <- EA[60:63]
+    if the processor is in big-endian mode
+     then MEM(EA,4) <- (vS)eb*8:(eb*8)+31
+     else MEM(EA,4) <- (vS)96-eb*8:127-(eb*8)
+  */
+
+  CHECK_VXU;
+
+  u64 EA = ((_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~3);
+  const u8 eb = EA & 0xF;
+
+  MMUWrite32(ppuState, EA, VRi(vd).dword[eb / 4]);
+}
+
 // Store Vector Right Indexed
 void PPCInterpreter::PPCInterpreter_stvrx(PPU_STATE* ppuState) {
   CHECK_VXU;

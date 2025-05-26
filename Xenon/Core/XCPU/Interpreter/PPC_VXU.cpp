@@ -45,6 +45,24 @@ void PPCInterpreter::PPCInterpreter_mtvscr(PPU_STATE* ppuState) {
   curThread.VSCR.hexValue = VRi(vb).dword[3];
 }
 
+// Vector Add Floating Point (x'1000 000A')
+void PPCInterpreter::PPCInterpreter_vaddfp(PPU_STATE* ppuState) {
+/*
+  do i = 0,127,32
+    (vD)i:i+31 <- RndToNearFP32((vA)i:i+31 + fp (vB)i:i+31) 
+  end 
+*/
+
+  // TODO: Rounding and NJ mode check.
+
+  CHECK_VXU;
+
+  VRi(vd).flt[0] = VRi(va).flt[0] + VRi(vb).flt[0];
+  VRi(vd).flt[1] = VRi(va).flt[1] + VRi(vb).flt[1];
+  VRi(vd).flt[2] = VRi(va).flt[2] + VRi(vb).flt[2];
+  VRi(vd).flt[3] = VRi(va).flt[3] + VRi(vb).flt[3];
+}
+
 // Vector Logical AND (x'1000 0404')
 void PPCInterpreter::PPCInterpreter_vand(PPU_STATE* ppuState) {
   /*
@@ -71,6 +89,24 @@ void PPCInterpreter::PPCInterpreter_vandc(PPU_STATE* ppuState) {
   VRi(vd).dword[1] = VRi(va).dword[1] & ~VRi(vb).dword[1];
   VRi(vd).dword[2] = VRi(va).dword[2] & ~VRi(vb).dword[2];
   VRi(vd).dword[3] = VRi(va).dword[3] & ~VRi(vb).dword[3];
+}
+
+// Vector Convert from Unsigned Fixed-Point Word (x'1000 030A')
+void PPCInterpreter::PPCInterpreter_vcfux(PPU_STATE* ppuState) {
+  /*
+  do i=0 to 127 by 32
+    vDi:i+31 <- CnvtUI32ToFP32((vB)i:i+31) / fp 2UIMM
+  end
+  */
+
+  // TODO: Rounding
+
+  const f32 divisor = 1 << _instr.vuimm;
+
+  VRi(vd).flt[0] = VRi(va).dword[0] / divisor;
+  VRi(vd).flt[1] = VRi(va).dword[1] / divisor;
+  VRi(vd).flt[2] = VRi(va).dword[2] / divisor;
+  VRi(vd).flt[3] = VRi(va).dword[3] / divisor;
 }
 
 // Vector Logical NOR (x'1000 0504')
@@ -118,6 +154,42 @@ void PPCInterpreter::PPCInterpreter_vspltw(PPU_STATE* ppuState) {
   VRi(vd).dword[1] = VRi(vb).dword[b];
   VRi(vd).dword[2] = VRi(vb).dword[b];
   VRi(vd).dword[3] = VRi(vb).dword[b];
+}
+
+// Vector Maximum Unsigned Word (x’1000 0082)
+void PPCInterpreter::PPCInterpreter_vmaxuw(PPU_STATE* ppuState) {
+  /*
+  do i=0 to 127 by 32
+  if (vA)i:i+31 >=ui (vB)i:i+31
+   then vDi:i+31 <- (vA)i:i+31
+   else vDi:i+31 <- (vB)i:i+31
+  end
+  */
+
+  CHECK_VXU;
+
+  VRi(vd).dword[0] = (VRi(va).dword[0] > VRi(vb).dword[0]) ? VRi(va).dword[0] : VRi(vb).dword[0];
+  VRi(vd).dword[1] = (VRi(va).dword[1] > VRi(vb).dword[1]) ? VRi(va).dword[1] : VRi(vb).dword[1];
+  VRi(vd).dword[2] = (VRi(va).dword[2] > VRi(vb).dword[2]) ? VRi(va).dword[2] : VRi(vb).dword[2];
+  VRi(vd).dword[3] = (VRi(va).dword[3] > VRi(vb).dword[3]) ? VRi(va).dword[3] : VRi(vb).dword[3];
+}
+
+// Vector Minimum Unsigned Word (x’1000 0282)
+void PPCInterpreter::PPCInterpreter_vminuw(PPU_STATE* ppuState) {
+  /*
+  do i=0 to 127 by 32
+  if (vA)i:i+31 < ui (vB)i:i+31
+   then vDi:i+31 <- (vA)i:i+31
+   else vDi:i+31 <- (vB)i:i+31
+  end
+  */
+
+  CHECK_VXU;
+
+  VRi(vd).dword[0] = (VRi(va).dword[0] < VRi(vb).dword[0]) ? VRi(va).dword[0] : VRi(vb).dword[0];
+  VRi(vd).dword[1] = (VRi(va).dword[1] < VRi(vb).dword[1]) ? VRi(va).dword[1] : VRi(vb).dword[1];
+  VRi(vd).dword[2] = (VRi(va).dword[2] < VRi(vb).dword[2]) ? VRi(va).dword[2] : VRi(vb).dword[2];
+  VRi(vd).dword[3] = (VRi(va).dword[3] < VRi(vb).dword[3]) ? VRi(va).dword[3] : VRi(vb).dword[3];
 }
 
 // Vector 128 Multiply Floating Point
@@ -177,6 +249,91 @@ void PPCInterpreter::PPCInterpreter_vmrghw128(PPU_STATE* ppuState) {
   VR(VMX128_VD128).dword[3] = VR(VMX128_VB128).dword[1];
 }
 
+constexpr uint32_t MakePermuteMask(uint32_t sel_x, uint32_t x, uint32_t sel_y,
+  uint32_t y, uint32_t sel_z, uint32_t z,
+  uint32_t sel_w, uint32_t w) {
+  return ((x & 0x3) << 0) | (sel_x << 2) | ((y & 0x3) << 8) | (sel_y << 10) |
+    ((z & 0x3) << 16) | (sel_z << 18) | ((w & 0x3) << 24) | (sel_w << 26);
+}
+
+enum PermuteMasks : uint32_t {
+  kIdentityPermuteMask = MakePermuteMask(0, 0, 0, 1, 0, 2, 0, 3),
+};
+
+constexpr uint32_t MakeSwizzleMask(uint32_t x, uint32_t y, uint32_t z,
+  uint32_t w) {
+  return ((x & 0x3) << 0) | ((y & 0x3) << 2) | ((z & 0x3) << 4) |
+    ((w & 0x3) << 6);
+}
+
+enum Swizzles {
+  SWIZZLE_XYZW_TO_XYZW = MakeSwizzleMask(0, 1, 2, 3),
+  SWIZZLE_XYZW_TO_YZWX = MakeSwizzleMask(1, 2, 3, 0),
+  SWIZZLE_XYZW_TO_ZWXY = MakeSwizzleMask(2, 3, 0, 1),
+  SWIZZLE_XYZW_TO_WXYZ = MakeSwizzleMask(3, 0, 1, 2),
+};
+
+// Vector128 Rotate Left Immediate and Mask Insert
+/*
+void PPCInterpreter::PPCInterpreter_vrlimi128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  // From Xenia:
+  // This is just a fancy permute.
+  // X Y Z W, rotated left by 2 = Z W X Y
+  // Then mask select the results into the dest.
+  // Sometimes rotation is zero, so fast path.
+
+  const uint32_t vd = _instr.VMX128_4.VD128l | (_instr.VMX128_4.VD128h << 5);
+  const uint32_t vb = _instr.VMX128_4.VB128l | (_instr.VMX128_4.VB128h << 5);
+  uint32_t blend_mask_src = _instr.VMX128_4.IMM;
+  uint32_t blend_mask = 0;
+  blend_mask |= (((blend_mask_src >> 3) & 0x1) ? 0 : 4) << 0;
+  blend_mask |= (((blend_mask_src >> 2) & 0x1) ? 1 : 5) << 8;
+  blend_mask |= (((blend_mask_src >> 1) & 0x1) ? 2 : 6) << 16;
+  blend_mask |= (((blend_mask_src >> 0) & 0x1) ? 3 : 7) << 24;
+  uint32_t rotate = _instr.VMX128_4.z;
+
+  if (rotate) {
+    uint32_t swizzle_mask;
+    switch (rotate) {
+    case 1:
+      // X Y Z W -> Y Z W X
+      swizzle_mask = SWIZZLE_XYZW_TO_YZWX;
+      break;
+    case 2:
+      // X Y Z W -> Z W X Y
+      swizzle_mask = SWIZZLE_XYZW_TO_ZWXY;
+      break;
+    case 3:
+      // X Y Z W -> W X Y Z
+      swizzle_mask = SWIZZLE_XYZW_TO_WXYZ;
+      break;
+    }
+  } else {
+  
+  }
+}
+*/
+
+// Vector Multiply Add Floating Point (x'1000 002E')
+void PPCInterpreter::PPCInterpreter_vmaddfp(PPU_STATE* ppuState) {
+  /*
+  do i=0 to 127 by 32
+    vDi:i+31 <- RndToNearFP32(((vA)i:i+31 *fp (vC)i:i+31) +fp (vB)i:i+31)
+  end
+  */
+
+  // TODO: Rounding.
+
+  CHECK_VXU;
+
+  VRi(vd).flt[0] = (VRi(va).flt[0] * VRi(vc).flt[0]) + VRi(vb).flt[0];
+  VRi(vd).flt[1] = (VRi(va).flt[1] * VRi(vc).flt[1]) + VRi(vb).flt[1];
+  VRi(vd).flt[2] = (VRi(va).flt[2] * VRi(vc).flt[2]) + VRi(vb).flt[2];
+  VRi(vd).flt[3] = (VRi(va).flt[3] * VRi(vc).flt[3]) + VRi(vb).flt[3];
+}
+
 // Vector Shift Left Integer Byte (x'1000 0104')
 void PPCInterpreter::PPCInterpreter_vslb(PPU_STATE* ppuState) {
   /*
@@ -190,6 +347,21 @@ void PPCInterpreter::PPCInterpreter_vslb(PPU_STATE* ppuState) {
 
   for (u8 idx = 0; idx < 16; idx++) {
     VRi(vd).bytes[idx] = VRi(va).bytes[idx] << (VRi(vb).bytes[idx] & 0x7);
+  }
+}
+
+static inline u8 vsldoiHelper(u8 sh, Base::Vector128 vra, Base::Vector128 vrb) {
+  return (sh < 16) ? vra.bytes[sh] : vrb.bytes[sh & 15];
+}
+
+// Vector Shift Left Double by Octet Immediate (x'1000 002C')
+void PPCInterpreter::PPCInterpreter_vsldoi(PPU_STATE* ppuState) {
+  /*
+  vD <- ((vA) || (vB)) << ui (SHB || 0b000)
+  */
+
+  for(u8 idx = 0; idx < 16; idx++) {
+    VRi(vd).bytes[idx] = vsldoiHelper(_instr.vsh + idx, VRi(va), VRi(vb));
   }
 }
 
@@ -227,6 +399,25 @@ void PPCInterpreter::PPCInterpreter_vspltish(PPU_STATE* ppuState) {
 
   for (u8 idx = 0; idx < 8; idx++) {
     VRi(vd).sword[idx] = static_cast<s16>(simm);
+  }
+}
+
+// Vector Splat Immediate Signed Word (x’1000 038C)
+void PPCInterpreter::PPCInterpreter_vspltisw(PPU_STATE* ppuState) {
+  /*
+  do i=0 to 127 by 32
+    vDi:i+31 <- SignExtend(SIMM,32)
+  end
+  */
+  
+  CHECK_VXU;
+
+  s32 simm = 0;
+
+  if (_instr.vsimm) { simm = ((_instr.vsimm & 0x10) ? (_instr.vsimm | 0xFFFFFFF0) : _instr.vsimm); }
+
+  for (u8 idx = 0; idx < 4; idx++) {
+    VRi(vd).dsword[idx] = simm;
   }
 }
 
