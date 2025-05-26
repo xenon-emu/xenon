@@ -474,7 +474,7 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt) {
       if (block->hash != sum) {
         block.reset();
         jitBlocks.erase(blockStart);
-        return;
+        continue;
       }
 
       instrsExecuted += ExecuteJITBlock(blockStart, enableHalt);
