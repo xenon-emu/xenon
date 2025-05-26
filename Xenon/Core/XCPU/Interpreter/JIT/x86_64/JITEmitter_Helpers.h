@@ -52,26 +52,29 @@ inline x86::Gp Jduplicate32(JITBlockBuilder *b, x86::Gp origin) {
   return cast64;
 }
 
-inline x86::Gp J_BuildCR_0(JITBlockBuilder *b, x86::Gp value) {
+inline x86::Gp J_BuildCR(JITBlockBuilder *b, x86::Gp lhs, x86::Gp rhs) {
   x86::Gp crValue = newGP32();
   x86::Gp tmp = newGP8();
-  COMP->cmp(value, imm(0)); // cmp with zero
+
+  COMP->cmp(lhs, rhs); // Compare lhs and rhs
   COMP->xor_(crValue, crValue);
 
-  // lt
+  // lt (less than)
   COMP->setl(tmp);
   COMP->shl(tmp, imm(3 - CR_BIT_LT));
   COMP->or_(crValue.r8(), tmp.r8());
-  // gt
+
+  // gt (greater than)
   COMP->setg(tmp);
   COMP->shl(tmp, imm(3 - CR_BIT_GT));
   COMP->or_(crValue.r8(), tmp.r8());
-  // eq
+
+  // eq (equal)
   COMP->sete(tmp);
   COMP->shl(tmp, imm(3 - CR_BIT_EQ));
   COMP->or_(crValue.r8(), tmp.r8());
 
-  // Handle SO flag
+  // so (summary overflow)
 #ifdef __LITTLE_ENDIAN__
   COMP->mov(tmp.r32(), SPRPtr(XER));
   COMP->shr(tmp.r32(), imm(31));
@@ -100,25 +103,63 @@ inline void J_SetCRField(JITBlockBuilder *b, x86::Gp field, u32 index) {
 }
 
 inline void J_ppuSetCR(JITBlockBuilder *b, x86::Gp value, u32 index) {
-  Label continueLabel = COMP->newLabel();
-  x86::Gp temp8 = newGP8();
+  Label use64 = COMP->newLabel();
+  Label done = COMP->newLabel();
 
-  //
-  // Cast Check
-  //
-#ifdef __LITTLE_ENDIAN__
-  COMP->mov(temp8.r32(), SPRPtr(MSR));
-  COMP->shr(temp8.r32(), imm(31));
-#else
-  COMP->mov(temp8.r32(), SPRPtr(MSR));
-  COMP->and_(temp8.r32(), imm(1));
-#endif
-  COMP->test(temp8, temp8);
-  COMP->jnz(continueLabel);
-  COMP->mov(value.r32(), value.r32()); // Cast 64 TO 32
-  COMP->bind(continueLabel);
+  x86::Gp tempMSR = newGP32();
+  x86::Gp tempCR = newGP32();
 
-  x86::Gp field = J_BuildCR_0(b, value);
+  // Load MSR and check SF bit
+  COMP->mov(tempMSR, SPRPtr(MSR));
+  COMP->bt(tempMSR, 0); // Bit 0 (SF) on MSR
+  COMP->jc(use64); // If set, use 64-bit compare
+
+  // 32-bit compare
+  {
+    x86::Gp zero32 = newGP32();
+    COMP->xor_(zero32, zero32);
+    x86::Gp field = J_BuildCR(b, value.r32(), zero32);
+    J_SetCRField(b, field, index);
+    COMP->jmp(done);
+  }
+
+  // 64-bit compare
+  COMP->bind(use64);
+  {
+    x86::Gp zero64 = newGP64();
+    COMP->xor_(zero64, zero64);
+    x86::Gp field = J_BuildCR(b, value.r64(), zero64);
+    J_SetCRField(b, field, index);
+  }
+
+  COMP->bind(done);
+}
+
+inline void J_ppuSetCR_LOGICAL(JITBlockBuilder *b, x86::Gp value, u32 index) {
+  x86::Gp tempCR = newGP32();
+  x86::Gp field = newGP32();
+
+  // Zero compare (logical)
+  Label is_zero = COMP->newLabel();
+  Label done = COMP->newLabel();
+
+  COMP->xor_(field, field); // Clear field
+
+  COMP->test(value, value); // Logical test
+  COMP->jz(is_zero);
+
+  // result != 0: GT = 1
+  COMP->mov(field, imm(1 << (3 - CR_BIT_GT)));
+  COMP->jmp(done);
+
+  COMP->bind(is_zero);
+  // result == 0: EQ = 1
+  COMP->mov(field, imm(1 << (3 - CR_BIT_EQ)));
+
+  COMP->bind(done);
+
+  // Set field in CR
   J_SetCRField(b, field, index);
 }
+
 #endif

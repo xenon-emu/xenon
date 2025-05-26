@@ -23,7 +23,7 @@ void PPCInterpreter::PPCInterpreterJIT_addi(PPU_STATE *ppuState, JITBlockBuilder
   }
 }
 
-
+// Rotate Left Word Immediate then AND with Mask (x'5400 0000')
 void PPCInterpreter::PPCInterpreterJIT_rlwinmx(PPU_STATE *ppuState, JITBlockBuilder* b, PPCOpcode instr) {
   /*
     n <- SH
@@ -31,15 +31,47 @@ void PPCInterpreter::PPCInterpreterJIT_rlwinmx(PPU_STATE *ppuState, JITBlockBuil
     m <- MASK(MB + 32, ME + 32)
     rA <- (r & m)
   */
-  u64 mask = PPCRotateMask(32 + instr.mb32, 32 + instr.me32);
-  //
-  x86::Gp rol = Jrotl32(b, GPRPtr(instr.rs), instr.sh32);
+  x86::Gp n = newGP32();
+  COMP->mov(n, imm<u16>(instr.sh32));
+
+  x86::Gp rol = newGP32();
+  COMP->mov(rol, GPRPtr(instr.rs));
+  COMP->rol(rol, n); // rol32 by variable
+
   x86::Gp dup = Jduplicate32(b, rol);
-  COMP->and_(dup, mask); // mask
+  u64 mask = PPCRotateMask(32 + instr.mb32, 32 + instr.me32);
+  COMP->and_(dup, mask);
   COMP->mov(GPRPtr(instr.ra), dup);
+
   // _rc
   if (instr.rc)
-    J_ppuSetCR(b, dup, 0);
+    J_ppuSetCR_LOGICAL(b, dup, 0);
+}
+
+// Rotate Left Word then AND with Mask (x'5C00 0000')
+void PPCInterpreter::PPCInterpreterJIT_rlwnmx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
+  /*
+    n <- rB[59-63]27-31
+    r <- ROTL[32](rS[32-63], n)
+    m <- MASK(MB + 32, ME + 32)
+    rA <- r & m
+  */
+  x86::Gp n = newGP32();
+  COMP->mov(n, GPRPtr(instr.rb));
+  COMP->and_(n, 0x1F); // n = rB & 0x1F (rot amount)
+
+  x86::Gp rol = newGP32();
+  COMP->mov(rol, GPRPtr(instr.rs));
+  COMP->rol(rol, n); // rol32 by variable
+
+  x86::Gp dup = Jduplicate32(b, rol);
+  u64 mask = PPCRotateMask(32 + instr.mb32, 32 + instr.me32);
+  COMP->and_(dup, mask);
+  COMP->mov(GPRPtr(instr.ra), dup);
+
+  // _rc
+  if (instr.rc)
+    J_ppuSetCR_LOGICAL(b, dup, 0);
 }
 
 
@@ -49,13 +81,11 @@ void PPCInterpreter::PPCInterpreterJIT_andi(PPU_STATE *ppuState, JITBlockBuilder
     rA <- (rS) & ((48)0 || UIMM)
   */
   x86::Gp res = newGP64();
-
-  int16_t immVal = instr.simm16;
-  COMP->mov(res, GPRPtr(instr.rs));
-  COMP->and_(res, immVal);
+  COMP->mov(res, GPRPtr(instr.rs)); 
+  COMP->and_(res, imm<u16>(instr.uimm16));
   COMP->mov(GPRPtr(instr.ra), res);
 
-  J_ppuSetCR(b, res, 0);
+  J_ppuSetCR_LOGICAL(b, res, 0);
 }
 
 // XOR Immediate (x'6800 0000')

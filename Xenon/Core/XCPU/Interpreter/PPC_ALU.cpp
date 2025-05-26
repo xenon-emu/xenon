@@ -1291,7 +1291,7 @@ void PPCInterpreter::PPCInterpreter_rlwimix(PPU_STATE *ppuState) {
 // Rotate Left Word then AND with Mask (x'5C00 0000')
 void PPCInterpreter::PPCInterpreter_rlwnmx(PPU_STATE *ppuState) {
   /*
-    n <- rB[59-6327-31]
+    n <- rB[59-63]27-31
     r <- ROTL[32](rS[32-63], n)
     m <- MASK(MB + 32, ME + 32)
     rA <- r & m
