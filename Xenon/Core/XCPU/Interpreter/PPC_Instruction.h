@@ -30,7 +30,7 @@ constexpr u32 PPCDecode(u32 instr) {
 namespace PPCInterpreter {
   // Define a type alias for function pointers
   using instructionHandler = fptr<void(PPU_STATE *ppuState)>;
-  using instructionHandlerJIT = fptr<void(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr)>;
+  using instructionHandlerJIT = fptr<void(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr)>;
   extern void PPCInterpreter_nop(PPU_STATE *ppuState);
   extern void PPCInterpreter_invalid(PPU_STATE *ppuState);
   extern void PPCInterpreter_known_unimplemented(const char *name, PPU_STATE *ppuState);
@@ -547,35 +547,7 @@ namespace PPCInterpreter {
       #undef GET
       #undef GETRC
     }
-    void fillJITTables() {
-      #define GET_(name) &PPCInterpreterJIT_##name
-      #define GET(name) GET_(name), GET_(name)
-      #define GETRC(name) GET_(name##x), GET_(name##x)
-
-      for (auto& x : jitTable) {
-        x = GET(invalid);
-      }
-
-      // Main opcodes (field 0..5)
-#if defined(ARCH_X86) || defined(ARCH_X86_64)
-      fillTable<instructionHandlerJIT>(jitTable, 0x00, 6, -1, {
-        //{ 0x0E, GET(addi) },
-        //{ 0x12, GET(b) },
-        //{ 0x15, GETRC(rlwinm) },
-        //{ 0x19, GET(oris) },
-        //{ 0x1C, GET(andi) },
-      });
-
-      // Group 0x1F opcodes (field 21..30)
-      fillTable<instructionHandlerJIT>(jitTable, 0x1F, 10, 1, {
-        //{ 0x153, GET(mfspr) },
-      });
-#endif
-
-      #undef GET_
-      #undef GET
-      #undef GETRC
-    }
+    void fillJITTables();
     void fillNameTables() {
       #define GET_(name) std::string(#name)
       #define GET(name) GET_(name), GET_(name)

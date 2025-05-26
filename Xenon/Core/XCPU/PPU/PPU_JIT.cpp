@@ -21,31 +21,7 @@ void callHalt() {
 
 bool callEpil(PPU *ppu, PPU_STATE *ppuState) {
   // Check timebase
-  // Increase Time Base Counter
-  if (ppu->xenonContext->timeBaseActive) {
-    // HID6[15]: Time-base and decrementer facility enable.
-    // 0 -> TBU, TBL, DEC, HDEC, and the hang-detection logic do not
-    // update. 1 -> TBU, TBL, DEC, HDEC, and the hang-detection logic
-    // are enabled to update
-    if (ppuState->SPR.HID6 & 0x1000000000000) {
-      // The Decrementer and the Time Base are driven by the same time frequency.
-      u32 newDec = 0;
-      u32 dec = 0;
-      // Update the Time Base.
-      ppuState->SPR.TB += ppu->clocksPerInstruction;
-      // Get the decrementer value.
-      dec = curThread.SPR.DEC;
-      newDec = dec - ppu->clocksPerInstruction;
-      // Update the new decrementer value.
-      curThread.SPR.DEC = newDec;
-      // Check if Previous decrementer measurement is smaller than current and a
-      // decrementer exception is not pending.
-      if (newDec > dec && !(_ex & PPU_EX_DEC)) {
-        // The decrementer must issue an interrupt.
-        _ex |= PPU_EX_DEC;
-      }
-    }
-  }
+  ppu->CheckTimeBaseStatus();
 
   // Get current thread
   auto &thread = ppuState->ppuThread[ppuState->currentThread];
@@ -54,146 +30,7 @@ bool callEpil(PPU *ppu, PPU_STATE *ppuState) {
     thread.exceptReg |= PPU_EX_EXT;
   }
 
-  // Handle pending exceptions
-  u16 &exceptions = thread.exceptReg;
-  if (exceptions != PPU_EX_NONE) {
-    // Non Maskable:
-    //
-    // 1. System Reset
-    //
-    if (exceptions & PPU_EX_RESET) {
-      PPCInterpreter::ppcResetException(ppuState);
-      exceptions &= ~PPU_EX_RESET;
-      return true;
-    }
-    //
-    // 2. Machine Check
-    //
-    if (exceptions & PPU_EX_MC) {
-      if (thread.SPR.MSR.ME) {
-        PPCInterpreter::ppcResetException(ppuState);
-        exceptions &= ~PPU_EX_MC;
-        return true;
-      } else {
-        // Checkstop Mode. Hard Fault.
-        // A checkstop is a full - stop of the processor that requires a System
-        // Reset to recover.
-        LOG_CRITICAL(Xenon, "{}: CHECKSTOP!", ppuState->ppuName);
-        XeMain::ShutdownCPU();
-      }
-    }
-    // Maskable:
-    //
-    // 3. Instruction-Dependent
-    //
-    // A. Program - Illegal Instruction
-    if (exceptions & PPU_EX_PROG && thread.progExceptionType == PROGRAM_EXCEPTION_TYPE_ILL) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Illegal Instruction.", ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
-      exceptions &= ~PPU_EX_PROG;
-      return true;
-    }
-    // B. Floating-Point Unavailable
-    if (exceptions & PPU_EX_FPU) {
-      PPCInterpreter::ppcFPUnavailableException(ppuState);
-      exceptions &= ~PPU_EX_FPU;
-      return true;
-    }
-    // C. Data Storage, Data Segment, or Alignment
-    // Data Storage
-    if (exceptions & PPU_EX_DATASTOR) {
-      PPCInterpreter::ppcDataStorageException(ppuState);
-      exceptions &= ~PPU_EX_DATASTOR;
-      return true;
-    }
-    // Data Segment
-    if (exceptions & PPU_EX_DATASEGM) {
-      PPCInterpreter::ppcDataSegmentException(ppuState);
-      exceptions &= ~PPU_EX_DATASEGM;
-      return true;
-    }
-    // Alignment
-    if (exceptions & PPU_EX_ALIGNM) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Alignment.", ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
-      exceptions &= ~PPU_EX_ALIGNM;
-      return true;
-    }
-    // D. Trace
-    if (exceptions & PPU_EX_TRACE) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Trace.", ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
-      exceptions &= ~PPU_EX_TRACE;
-      return true;
-    }
-    // E. Program Trap, System Call, Program Priv Inst, Program Illegal Inst
-    // Program Trap
-    if (exceptions & PPU_EX_PROG && thread.progExceptionType == PROGRAM_EXCEPTION_TYPE_TRAP) {
-      PPCInterpreter::ppcProgramException(ppuState);
-      exceptions &= ~PPU_EX_PROG;
-      return true;
-    }
-    // System Call
-    if (exceptions & PPU_EX_SC) {
-      PPCInterpreter::ppcSystemCallException(ppuState);
-      exceptions &= ~PPU_EX_SC;
-      return true;
-    }
-    // Program - Privileged Instruction
-    if (exceptions & PPU_EX_PROG && thread.progExceptionType == PROGRAM_EXCEPTION_TYPE_PRIV) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Privileged Instruction.", ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
-      exceptions &= ~PPU_EX_PROG;
-      return true;
-    }
-    // F. Instruction Storage and Instruction Segment
-    // Instruction Storage
-    if (exceptions & PPU_EX_INSSTOR) {
-      PPCInterpreter::ppcInstStorageException(ppuState);
-      exceptions &= ~PPU_EX_INSSTOR;
-      return true;
-    }
-    // Instruction Segment
-    if (exceptions & PPU_EX_INSTSEGM) {
-      PPCInterpreter::ppcInstSegmentException(ppuState);
-      exceptions &= ~PPU_EX_INSTSEGM;
-      return true;
-    }
-    //
-    // 4. Program - Imprecise Mode Floating-Point Enabled Exception
-    //
-    if (exceptions & PPU_EX_PROG) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Imprecise Mode Floating-Point Enabled Exception.", ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
-      exceptions &= ~PPU_EX_PROG;
-      return true;
-    }
-    //
-    // 5. External, Decrementer, and Hypervisor Decrementer
-    //
-    // External
-    if (exceptions & PPU_EX_EXT && thread.SPR.MSR.EE) {
-      PPCInterpreter::ppcExternalException(ppuState);
-      exceptions &= ~PPU_EX_EXT;
-      return true;
-    }
-    // Decrementer. A dec exception may be present but will only be taken when
-    // the EE bit of MSR is set.
-    if (exceptions & PPU_EX_DEC && thread.SPR.MSR.EE) {
-      PPCInterpreter::ppcDecrementerException(ppuState);
-      exceptions &= ~PPU_EX_DEC;
-      return true;
-    }
-    // Hypervisor Decrementer
-    if (exceptions & PPU_EX_HDEC) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Hypervisor Decrementer.", ppuState->ppuName, static_cast<u8>(ppuState->currentThread));
-      exceptions &= ~PPU_EX_HDEC;
-      return true;
-    }
-    // VX Unavailable.
-    if (exceptions & PPU_EX_VXU) {
-      PPCInterpreter::ppcVXUnavailableException(ppuState);
-      exceptions &= ~PPU_EX_VXU;
-      return true;
-    }
-  }
-
-  return false;
+  return ppu->PPUCheckExceptions();
 }
 
 PPU_JIT::PPU_JIT(PPU *ppu) :
@@ -223,7 +60,7 @@ void PPU_JIT::setupContext(JITBlockBuilder *b) {
 #endif
 }
 
-void PPU_JIT::setupProl(JITBlockBuilder *b, u32 instrData) {
+void PPU_JIT::setupProl(JITBlockBuilder *b, u32 instrData, u32 decoded) {
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
   COMP->nop();
   COMP->nop();
@@ -253,6 +90,7 @@ void PPU_JIT::setupProl(JITBlockBuilder *b, u32 instrData) {
   COMP->bind(continueLabel);
 
   // Update CIA NIA _instr (CI)
+  auto emitter = PPCInterpreter::ppcDecoder.getJITTable()[decoded];
   COMP->mov(temp, b->threadCtx->scalar(&PPU_THREAD_REGISTERS::NIA));
   COMP->mov(b->threadCtx->scalar(&PPU_THREAD_REGISTERS::CIA), temp);
   COMP->add(temp, 4);
@@ -288,7 +126,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
   jitBuilder->haltBool = compiler.newGpb("enableHalt"); // bool
 
   FuncNode *signature = nullptr;
-  compiler.addFuncNode(&signature, FuncSignature::build<void, PPU *, PPU_STATE *, bool>());
+  compiler.addFuncNode(&signature, FuncSignature::build<void, PPU*, PPU_STATE*, bool>());
   signature->setArg(0, jitBuilder->ppu->Base());
   signature->setArg(1, jitBuilder->ppuState->Base());
   signature->setArg(2, jitBuilder->haltBool);
@@ -354,7 +192,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
     // INIT_POWER_MODE bypass 2.0.17489.0
     case 0x80081764:
     // XAudioRenderDriverInitialize bypass 2.0.17489.0
-    case 0x80081830:
+    case 0x8018B0EC:
     // XDK 17.489.0 AudioChipCorder Device Detect bypass. This is not needed for
     // older console revisions
     case 0x801AF580:
@@ -362,27 +200,30 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
       jitBuilder->size++;
       break;
     }
-
-    if (skip)
-      break;
 #endif
 
     bool readNextInstr = true;
+
     // Prol
-    setupProl(jitBuilder.get(), opcode);
+    setupProl(jitBuilder.get(), opcode, decodedInstr);
 
     if ((curThread.exceptReg & PPU_EX_INSSTOR || curThread.exceptReg & PPU_EX_INSTSEGM) || opcode == 0xFFFFFFFF)
       readNextInstr = false;
 
     // Call JIT emitter
-    if (ppu->currentExecMode == eExecutorMode::Hybrid && emitter == &PPCInterpreter::PPCInterpreterJIT_invalid && readNextInstr) {
-      auto intEmitter = PPCInterpreter::ppcDecoder.getTable()[decodedInstr];
+    if (!skip && readNextInstr) {
+      bool invalidInstr = emitter == &PPCInterpreter::PPCInterpreterJIT_invalid;
+      if (ppu->currentExecMode == eExecutorMode::Hybrid && invalidInstr) {
+        auto intEmitter = PPCInterpreter::ppcDecoder.getTable()[decodedInstr];
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
-      InvokeNode *out = nullptr;
-      compiler.invoke(&out, imm((void*)intEmitter), FuncSignature::build<void, void*>());
-      out->setArg(0, jitBuilder->ppuState->Base());
+        InvokeNode *out = nullptr;
+        compiler.invoke(&out, imm((void *)intEmitter), FuncSignature::build<void, void *>());
+        out->setArg(0, jitBuilder->ppuState->Base());
 #endif
+      } else {
+        emitter(ppuState, jitBuilder.get(), op);
+      }
     }
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)

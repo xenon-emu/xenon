@@ -100,7 +100,7 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
     if (ppuState->ppuID == 0) {
       Config::xcpu.clocksPerInstruction = clocksPerInstruction;
     }
-  }
+  } 
   if (!Config::highlyExperimental.clocksPerInstructionBypass) {
     LOG_INFO(Xenon, "{}: {} clocks per instruction", ppuState->ppuName, clocksPerInstruction);
   }

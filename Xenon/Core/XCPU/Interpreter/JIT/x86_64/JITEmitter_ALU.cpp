@@ -10,51 +10,50 @@ void PPCInterpreter::PPCInterpreterJIT_addi(PPU_STATE *ppuState, JITBlockBuilder
     else rD <- (rA) + EXTS(SIMM)
   */
   int16_t immVal = instr.simm16;
+
   // rDT = imm
   x86::Gp rDTemp = newGP64();
-  COMP->mov(rDTemp, immVal); 
+  COMP->mov(rDTemp, immVal);
 
   if (instr.ra == 0) {
     COMP->mov(GPRPtr(instr.rd), rDTemp);
-  }
-  else {
+  } else {
     COMP->add(rDTemp, GPRPtr(instr.ra)); // rDT += rA
     COMP->mov(GPRPtr(instr.rd), rDTemp); // rD  = rDT
-  } 
+  }
 }
 
 
-void PPCInterpreter::PPCInterpreterJIT_rlwinmx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode t_instr) {
+void PPCInterpreter::PPCInterpreterJIT_rlwinmx(PPU_STATE *ppuState, JITBlockBuilder* b, PPCOpcode instr) {
   /*
     n <- SH
     r <- ROTL[32](rS[32-63], n)
     m <- MASK(MB + 32, ME + 32)
     rA <- (r & m)
   */
-  u64 mask = PPCRotateMask(32 + t_instr.mb32, 32 + t_instr.me32);
+  u64 mask = PPCRotateMask(32 + instr.mb32, 32 + instr.me32);
   //
-  x86::Gp rol = Jrotl32(b, GPRPtr(t_instr.rs), t_instr.sh32);
+  x86::Gp rol = Jrotl32(b, GPRPtr(instr.rs), instr.sh32);
   x86::Gp dup = Jduplicate32(b, rol);
   COMP->and_(dup, mask); // mask
-  COMP->mov(GPRPtr(t_instr.ra), dup);
+  COMP->mov(GPRPtr(instr.ra), dup);
   // _rc
-  if (t_instr.rc) {
-      J_ppuSetCR(b, dup, 0);
-  }
+  if (instr.rc)
+    J_ppuSetCR(b, dup, 0);
 }
 
 
 // And Immediate (x'7000 0000')
-void PPCInterpreter::PPCInterpreterJIT_andi(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode t_instr) {
+void PPCInterpreter::PPCInterpreterJIT_andi(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
   /*
     rA <- (rS) & ((48)0 || UIMM)
   */
   x86::Gp res = newGP64();
 
-  int16_t immVal = t_instr.simm16;
-  COMP->mov(res, GPRPtr(t_instr.rs));
+  int16_t immVal = instr.simm16;
+  COMP->mov(res, GPRPtr(instr.rs));
   COMP->and_(res, immVal);
-  COMP->mov(GPRPtr(t_instr.ra), res);
+  COMP->mov(GPRPtr(instr.ra), res);
 
   J_ppuSetCR(b, res, 0);
 }
@@ -102,16 +101,16 @@ void PPCInterpreter::PPCInterpreterJIT_ori(PPU_STATE* ppuState, JITBlockBuilder*
 }
 
 // OR Immediate Shifted (x'6400 0000')
-void PPCInterpreter::PPCInterpreterJIT_oris(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode t_instr) {
+void PPCInterpreter::PPCInterpreterJIT_oris(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
   /*
     rA <- (rS) | ((32)0 || UIMM || (16)0)
   */
   x86::Gp tmp = newGP64();
   x86::Gp val1 = newGP64();
-  u64 shImm = (u64{ t_instr.uimm16 } << 16);
-  COMP->mov(tmp, GPRPtr(t_instr.rs));
+  u64 shImm = (u64{ instr.uimm16 } << 16);
+  COMP->mov(tmp, GPRPtr(instr.rs));
   COMP->mov(val1, shImm);
   COMP->or_(tmp, val1);
-  COMP->mov(GPRPtr(t_instr.ra), tmp);
+  COMP->mov(GPRPtr(instr.ra), tmp);
 }
 #endif

@@ -3,28 +3,28 @@
 #include "PPCInterpreter.h"
 
 // Data Stream Touch for Store
-void PPCInterpreter::PPCInterpreter_dss(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_dss(PPU_STATE *ppuState) {
   CHECK_VXU;
 
   // We don't really need to do anything here, as it's handling cache. We mostly ignore it
 }
 
 // Data Stream Touch for Store
-void PPCInterpreter::PPCInterpreter_dst(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_dst(PPU_STATE *ppuState) {
   CHECK_VXU;
 
   // We don't really need to do anything here, as it's handling cache. We mostly ignore it
 }
 
 // Data Stream Touch for Store
-void PPCInterpreter::PPCInterpreter_dstst(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_dstst(PPU_STATE *ppuState) {
   CHECK_VXU;
 
   // We don't really need to do anything here, as it's handling cache. We mostly ignore it
 }
 
 // Move from Vector Status and Control Register (x'1000 0604')
-void PPCInterpreter::PPCInterpreter_mfvscr(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_mfvscr(PPU_STATE *ppuState) {
   /*
   vD <- 0 || (VSCR)
   */
@@ -35,7 +35,7 @@ void PPCInterpreter::PPCInterpreter_mfvscr(PPU_STATE* ppuState) {
 }
 
 // Move to Vector Status and Control Register (x'1000 0C44')
-void PPCInterpreter::PPCInterpreter_mtvscr(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_mtvscr(PPU_STATE *ppuState) {
   /*
   VSCR <- (vB)96:127
   */
@@ -46,10 +46,10 @@ void PPCInterpreter::PPCInterpreter_mtvscr(PPU_STATE* ppuState) {
 }
 
 // Vector Add Floating Point (x'1000 000A')
-void PPCInterpreter::PPCInterpreter_vaddfp(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_vaddfp(PPU_STATE *ppuState) {
 /*
   do i = 0,127,32
-    (vD)i:i+31 <- RndToNearFP32((vA)i:i+31 + fp (vB)i:i+31) 
+    (vD)i:i+31 <- RndToNearFP32((vA)i:i+31 + fp (vB)i:i+31)
   end 
 */
 
@@ -64,7 +64,7 @@ void PPCInterpreter::PPCInterpreter_vaddfp(PPU_STATE* ppuState) {
 }
 
 // Vector Logical AND (x'1000 0404')
-void PPCInterpreter::PPCInterpreter_vand(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_vand(PPU_STATE *ppuState) {
   /*
   vD <- (vA) & (vB)
   */
@@ -78,7 +78,7 @@ void PPCInterpreter::PPCInterpreter_vand(PPU_STATE* ppuState) {
 }
 
 // Vector Logical AND with Complement (x'1000 0444')
-void PPCInterpreter::PPCInterpreter_vandc(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_vandc(PPU_STATE *ppuState) {
   /*
   vD <- (vA) & ~(vB)
   */
@@ -92,7 +92,7 @@ void PPCInterpreter::PPCInterpreter_vandc(PPU_STATE* ppuState) {
 }
 
 // Vector Convert from Unsigned Fixed-Point Word (x'1000 030A')
-void PPCInterpreter::PPCInterpreter_vcfux(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_vcfux(PPU_STATE *ppuState) {
   /*
   do i=0 to 127 by 32
     vDi:i+31 <- CnvtUI32ToFP32((vB)i:i+31) / fp 2UIMM
@@ -110,7 +110,7 @@ void PPCInterpreter::PPCInterpreter_vcfux(PPU_STATE* ppuState) {
 }
 
 // Vector Logical NOR (x'1000 0504')
-void PPCInterpreter::PPCInterpreter_vnor(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_vnor(PPU_STATE *ppuState) {
   /*
   vD <- ~((vA) | (vB))
   */
@@ -124,7 +124,7 @@ void PPCInterpreter::PPCInterpreter_vnor(PPU_STATE* ppuState) {
 }
 
 // Vector Logical OR (x'1000 0484')
-void PPCInterpreter::PPCInterpreter_vor(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_vor(PPU_STATE *ppuState) {
   /*
   vD <- (vA) | (vB)
   */
@@ -138,7 +138,7 @@ void PPCInterpreter::PPCInterpreter_vor(PPU_STATE* ppuState) {
 }
 
 // Vector Splat Word (x'1000 028C')
-void PPCInterpreter::PPCInterpreter_vspltw(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_vspltw(PPU_STATE *ppuState) {
   /*
    b <- UIMM*32
     do i=0 to 127 by 32
@@ -156,8 +156,8 @@ void PPCInterpreter::PPCInterpreter_vspltw(PPU_STATE* ppuState) {
   VRi(vd).dword[3] = VRi(vb).dword[b];
 }
 
-// Vector Maximum Unsigned Word (x’1000 0082)
-void PPCInterpreter::PPCInterpreter_vmaxuw(PPU_STATE* ppuState) {
+// Vector Maximum Unsigned Word (x'1000 0082')
+void PPCInterpreter::PPCInterpreter_vmaxuw(PPU_STATE *ppuState) {
   /*
   do i=0 to 127 by 32
   if (vA)i:i+31 >=ui (vB)i:i+31
@@ -174,8 +174,8 @@ void PPCInterpreter::PPCInterpreter_vmaxuw(PPU_STATE* ppuState) {
   VRi(vd).dword[3] = (VRi(va).dword[3] > VRi(vb).dword[3]) ? VRi(va).dword[3] : VRi(vb).dword[3];
 }
 
-// Vector Minimum Unsigned Word (x’1000 0282)
-void PPCInterpreter::PPCInterpreter_vminuw(PPU_STATE* ppuState) {
+// Vector Minimum Unsigned Word (x'1000 0282')
+void PPCInterpreter::PPCInterpreter_vminuw(PPU_STATE *ppuState) {
   /*
   do i=0 to 127 by 32
   if (vA)i:i+31 < ui (vB)i:i+31
@@ -193,7 +193,7 @@ void PPCInterpreter::PPCInterpreter_vminuw(PPU_STATE* ppuState) {
 }
 
 // Vector 128 Multiply Floating Point
-void PPCInterpreter::PPCInterpreter_vmulfp128(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_vmulfp128(PPU_STATE *ppuState) {
   /*
   vD <- vA * vB (4 x FP)
   */
@@ -207,7 +207,7 @@ void PPCInterpreter::PPCInterpreter_vmulfp128(PPU_STATE* ppuState) {
 }
 
 // Vector Merge High Word (x'1000 008C')
-void PPCInterpreter::PPCInterpreter_vmrghw(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_vmrghw(PPU_STATE *ppuState) {
   /*
   do i=0 to 63 by 32
     vDi*2:(i*2)+63 <- (vA)i:i+31 || (vB)i:i+31
@@ -223,7 +223,7 @@ void PPCInterpreter::PPCInterpreter_vmrghw(PPU_STATE* ppuState) {
 }
 
 // Vector Merge Low Word (x'1000 018C')
-void PPCInterpreter::PPCInterpreter_vmrglw(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_vmrglw(PPU_STATE *ppuState) {
   /*
   do i=0 to 63 by 32
     vDi*2:(i*2)+63 <- (vA)i+64:i+95 || (vB)i+64:i+95
@@ -239,7 +239,7 @@ void PPCInterpreter::PPCInterpreter_vmrglw(PPU_STATE* ppuState) {
 }
 
 // Vector Merge High Word 128
-void PPCInterpreter::PPCInterpreter_vmrghw128(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_vmrghw128(PPU_STATE *ppuState) {
 
   CHECK_VXU;
 
@@ -250,7 +250,7 @@ void PPCInterpreter::PPCInterpreter_vmrghw128(PPU_STATE* ppuState) {
 }
 
 // Vector Multiply Add Floating Point (x'1000 002E')
-void PPCInterpreter::PPCInterpreter_vmaddfp(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_vmaddfp(PPU_STATE *ppuState) {
   /*
   do i=0 to 127 by 32
     vDi:i+31 <- RndToNearFP32(((vA)i:i+31 *fp (vC)i:i+31) +fp (vB)i:i+31)
@@ -268,7 +268,7 @@ void PPCInterpreter::PPCInterpreter_vmaddfp(PPU_STATE* ppuState) {
 }
 
 // Vector Shift Left Integer Byte (x'1000 0104')
-void PPCInterpreter::PPCInterpreter_vslb(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_vslb(PPU_STATE *ppuState) {
   /*
   do i=0 to 127 by 8
    sh <- (vB)i+5):i+7
@@ -288,7 +288,7 @@ static inline u8 vsldoiHelper(u8 sh, Base::Vector128 vra, Base::Vector128 vrb) {
 }
 
 // Vector Shift Left Double by Octet Immediate (x'1000 002C')
-void PPCInterpreter::PPCInterpreter_vsldoi(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_vsldoi(PPU_STATE *ppuState) {
   /*
   vD <- ((vA) || (vB)) << ui (SHB || 0b000)
   */
@@ -299,7 +299,7 @@ void PPCInterpreter::PPCInterpreter_vsldoi(PPU_STATE* ppuState) {
 }
 
 // Vector Splat Byte (x'1000 020C')
-void PPCInterpreter::PPCInterpreter_vspltb(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_vspltb(PPU_STATE *ppuState) {
   /*
    b <- UIMM*8
   do i=0 to 127 by 8
@@ -317,7 +317,7 @@ void PPCInterpreter::PPCInterpreter_vspltb(PPU_STATE* ppuState) {
 }
 
 // Vector Splat Immediate Signed Halfword (x'1000 034C')
-void PPCInterpreter::PPCInterpreter_vspltish(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_vspltish(PPU_STATE *ppuState) {
   /*
   do i=0 to 127 by 16
     (vD)i:i+15 <- SignExtend(SIMM,16)
@@ -335,8 +335,8 @@ void PPCInterpreter::PPCInterpreter_vspltish(PPU_STATE* ppuState) {
   }
 }
 
-// Vector Splat Immediate Signed Word (x’1000 038C)
-void PPCInterpreter::PPCInterpreter_vspltisw(PPU_STATE* ppuState) {
+// Vector Splat Immediate Signed Word (x'1000 038C)
+void PPCInterpreter::PPCInterpreter_vspltisw(PPU_STATE *ppuState) {
   /*
   do i=0 to 127 by 32
     vDi:i+31 <- SignExtend(SIMM,32)
@@ -355,7 +355,7 @@ void PPCInterpreter::PPCInterpreter_vspltisw(PPU_STATE* ppuState) {
 }
 
 // Vector Splat Immediate Signed Byte (x'1000 030C')
-void PPCInterpreter::PPCInterpreter_vspltisb(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_vspltisb(PPU_STATE *ppuState) {
   /*
    do i = 0 to 127 by 8
    vDi:i+7 <- SignExtend(SIMM,8)
@@ -374,7 +374,7 @@ void PPCInterpreter::PPCInterpreter_vspltisb(PPU_STATE* ppuState) {
 }
 
 // Vector128 Splat Immediate Signed Word
-void PPCInterpreter::PPCInterpreter_vspltisw128(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_vspltisw128(PPU_STATE *ppuState) {
   /*
   (VRD.xyzw) <- sign_extend(uimm)
   */
@@ -391,7 +391,7 @@ void PPCInterpreter::PPCInterpreter_vspltisw128(PPU_STATE* ppuState) {
 }
 
 // Vector Logical XOR (x'1000 04C4')
-void PPCInterpreter::PPCInterpreter_vxor(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_vxor(PPU_STATE *ppuState) {
   /*
   vD <- (vA) ^ (vB)
   */

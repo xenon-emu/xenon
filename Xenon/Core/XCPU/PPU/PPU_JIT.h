@@ -227,7 +227,7 @@ public:
   u64 ExecuteJITBlock(u64 addr, bool enableHalt); // returns step count
   std::shared_ptr<JITBlock> BuildJITBlock(u64 addr, u64 maxBlockSize);
   void setupContext(JITBlockBuilder *b);
-  void setupProl(JITBlockBuilder *b, u32 addr);
+  void setupProl(JITBlockBuilder *b, u32 instrData, u32 decoded);
   void patchSkips(JITBlockBuilder *b, u32 addr);
 private:
   PPU *ppu = nullptr; // "Linked" PPU
