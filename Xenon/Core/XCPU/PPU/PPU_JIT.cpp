@@ -189,16 +189,6 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
       compiler.or_(temp, 0x08);
       compiler.mov(jitBuilder->threadCtx->array(&PPU_THREAD_REGISTERS::GPR).Ptr(11), temp);
     } break;
-    // INIT_POWER_MODE bypass 2.0.17489.0
-    case 0x80081764:
-    // XAudioRenderDriverInitialize bypass 2.0.17489.0
-    case 0x8018B0EC:
-    // XDK 17.489.0 AudioChipCorder Device Detect bypass. This is not needed for
-    // older console revisions
-    case 0x801AF580:
-      skip = true;
-      jitBuilder->size++;
-      break;
     }
 #endif
 
@@ -283,6 +273,17 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt) {
   u32 instrsExecuted = 0;
   while (instrsExecuted < numInstrs && active && (XeRunning && !XePaused)) {
     u64 blockStart = curThread.NIA;
+    switch (blockStart) {
+    // INIT_POWER_MODE bypass 2.0.17489.0
+    case 0x80081764:
+    // XAudioRenderDriverInitialize bypass 2.0.17489.0
+    case 0x8018B0EC:
+    // XDK 17.489.0 AudioChipCorder Device Detect bypass. This is not needed for
+    // older console revisions
+    case 0x801AF580:
+      continue;
+      break;
+    }
     auto it = jitBlocks.find(blockStart);
     if (it == jitBlocks.end()) {
       if (it != jitBlocks.end())
