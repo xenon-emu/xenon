@@ -452,7 +452,7 @@ u32 PPU::GetIPS() {
   // Instr Count: The amount of instructions to execute in order to test
 
   // Write the calibration code to main memory
-  for (int i = 0; i < 4; i++) {
+  for (s32 i = 0; i < 4; i++) {
     PPCInterpreter::MMUWrite32(ppuState.get(), 4 + (i * 4), ipsCalibrationCode[i]);
   }
 
@@ -479,7 +479,7 @@ u32 PPU::GetIPS() {
   }
 
   // Zero out the memory after execution
-  for (int i = 0; i < 4; i++) {
+  for (s32 i = 0; i < 4; i++) {
     PPCInterpreter::MMUWrite32(ppuState.get(), 4 + (i * 4), 0x00000000);
   }
 
@@ -487,9 +487,7 @@ u32 PPU::GetIPS() {
   curThread.NIA = 0x100;
 
   // Reset the registers
-  for (int i = 0; i < 32; i++) {
-    curThread.GPR[i] = 0;
-  }
+  memset(curThread.GPR, 0, sizeof(curThread.GPR));
 
   return instrCount;
 }

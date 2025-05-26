@@ -214,8 +214,8 @@ public:
   bool isDirty = false;
   // Reference to JIT runtime
   asmjit::JitRuntime *runtime = nullptr;
-  // Array of all opcodes, used to avoid a MMU lookup
-  std::vector<u32> opcodes = {};
+  // Hash of all opcodes
+  u64 hash = 0;
 };
 
 class PPU_JIT {

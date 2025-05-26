@@ -49,5 +49,5 @@ inline consteval u32 operator ""_j(const char *data, size_t size) {
 }
 
 inline consteval u32 operator ""_jLower(const char *data, size_t size) {
-  return Base::JoaatStringHash(data);
+  return Base::JoaatStringHash(data, true);
 }
