@@ -171,6 +171,7 @@ namespace PPCInterpreter {
       { 0x4B04, GET(vsldoi) },
       { 0xF406, GET(vpermwi128) },
       { 0x6AC4, GET(vperm) },
+      { 0x5AC4, GET(vperm) },
       { 0x141C4, GET(stvlx128) },
       { 0x151C4, GET(stvrx128) },
       //{ 0x503, GET(stvlx128) },
