@@ -316,6 +316,40 @@ void PPCInterpreter::PPCInterpreter_vslb(PPU_STATE *ppuState) {
   }
 }
 
+// Vector Shift Left Integer Word (x'1000 0184')
+void PPCInterpreter::PPCInterpreter_vslw(PPU_STATE* ppuState) {
+  /*
+  do i=0 to 127 by 32
+    sh <- (vB)i+27:i+31
+    vD[i:i+31] <- (vA)[i:i+31] << ui sh
+  end
+  */
+
+  CHECK_VXU;
+
+  VRi(rd).dword[0] = VRi(ra).dword[0] << (VRi(rb).dword[0] & 31);
+  VRi(rd).dword[1] = VRi(ra).dword[1] << (VRi(rb).dword[1] & 31);
+  VRi(rd).dword[2] = VRi(ra).dword[2] << (VRi(rb).dword[2] & 31);
+  VRi(rd).dword[3] = VRi(ra).dword[3] << (VRi(rb).dword[3] & 31);
+}
+
+// Vector Shift Right Word (x'1000 0284')
+void PPCInterpreter::PPCInterpreter_vsrw(PPU_STATE* ppuState) {
+  /*
+  do i=0 to 127 by 32
+    sh <- (vB)i+(27):i+31
+    vD[i:i+31] <- (vA)[i:i+31] >> ui sh
+  end
+  */
+
+  CHECK_VXU;
+
+  VRi(rd).dword[0] = VRi(ra).dword[0] >> (VRi(rb).dword[0] & 31);
+  VRi(rd).dword[1] = VRi(ra).dword[1] >> (VRi(rb).dword[1] & 31);
+  VRi(rd).dword[2] = VRi(ra).dword[2] >> (VRi(rb).dword[2] & 31);
+  VRi(rd).dword[3] = VRi(ra).dword[3] >> (VRi(rb).dword[3] & 31);
+}
+
 static inline u8 vsldoiHelper(u8 sh, Base::Vector128 vra, Base::Vector128 vrb) {
   return (sh < 16) ? vra.bytes[sh] : vrb.bytes[sh & 15];
 }
