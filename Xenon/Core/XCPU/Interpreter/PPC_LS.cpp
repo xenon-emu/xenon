@@ -1582,6 +1582,33 @@ void PPCInterpreter::PPCInterpreter_lfsu(PPU_STATE *ppuState) {
 // Load Vector
 //
 
+// Load Vector Indexed (x'7C00 00CE')
+void PPCInterpreter::PPCInterpreter_lvx(PPU_STATE* ppuState) {
+  /*
+  if rA=0 then b <- 0
+  else b <- (rA)
+  EA <- (b + (rB)) & (~0xF)
+  if the processor is in big-endian mode
+   then vD <- MEM(EA,16)
+   else vD <- MEM(EA+8,8) || MEM(EA,8)
+  */
+  
+  CHECK_VXU;
+
+  Vector128 vector{};
+  const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
+
+  MMURead(CPUContext, ppuState, EA, 16, vector.bytes.data());
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  VRi(vd).dword[0] = byteswap_be<u32>(vector.dword[0]);
+  VRi(vd).dword[1] = byteswap_be<u32>(vector.dword[1]);
+  VRi(vd).dword[2] = byteswap_be<u32>(vector.dword[2]);
+  VRi(vd).dword[3] = byteswap_be<u32>(vector.dword[3]);
+}
+
 // Load Vector Indexed 128
 void PPCInterpreter::PPCInterpreter_lvx128(PPU_STATE *ppuState) {
 
