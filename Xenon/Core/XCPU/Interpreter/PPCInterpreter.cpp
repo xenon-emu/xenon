@@ -58,6 +58,22 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
     return;
   }
 
+  // XamAppsIntilized Check bypass.
+  if (static_cast<u32>(thread.CIA) == 0x81751168) {
+    thread.GPR[3] = 1;
+  }
+
+  // XHVpCreateEngine XAM Call skip. Related to XAudio Microphone stuff.
+  if (static_cast<u32>(thread.CIA) == 0x81B17D88) {
+    thread.GPR[3] = -1;
+    return;
+  }
+
+  // XamSetPowerMode call to KeSetPowerMode bypass.
+  if (static_cast<u32>(thread.CIA) == 0x817AC968) {
+    return;
+  }
+
   // XDK 17.489.0 AudioChipCorder Device Detect bypass. This is not needed for
   // older console revisions.
   if (static_cast<u32>(thread.CIA) == 0x801AF580) {
