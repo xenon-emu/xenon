@@ -135,4 +135,31 @@ inline void J_ppuSetCR(JITBlockBuilder *b, x86::Gp value, u32 index) {
   COMP->bind(done);
 }
 
+inline void J_ppuSetCR_LOGICAL(JITBlockBuilder *b, x86::Gp value, u32 index) {
+  x86::Gp tempCR = newGP32();
+  x86::Gp field = newGP32();
+
+  // Zero compare (logical)
+  Label is_zero = COMP->newLabel();
+  Label done = COMP->newLabel();
+
+  COMP->xor_(field, field); // Clear field
+
+  COMP->test(value, value); // Logical test
+  COMP->jz(is_zero);
+
+  // result != 0: GT = 1
+  COMP->mov(field, imm(1 << (3 - CR_BIT_GT)));
+  COMP->jmp(done);
+
+  COMP->bind(is_zero);
+  // result == 0: EQ = 1
+  COMP->mov(field, imm(1 << (3 - CR_BIT_EQ)));
+
+  COMP->bind(done);
+
+  // Set field in CR
+  J_SetCRField(b, field, index);
+}
+
 #endif
