@@ -138,7 +138,6 @@ D_STUB(vcmpgtuw)
 D_STUB(vcmpgtuw_)
 D_STUB(vrfip)
 D_STUB(vupklsb)
-D_STUB(vsr)
 D_STUB(vcmpgtfp)
 D_STUB(vcmpgtfp_)
 D_STUB(vrfim)
@@ -397,6 +396,7 @@ extern void PPCInterpreter_vperm(PPU_STATE *ppuState);
 extern void PPCInterpreter_vperm128(PPU_STATE *ppuState);
 extern void PPCInterpreter_vslb(PPU_STATE *ppuState);
 extern void PPCInterpreter_vslw(PPU_STATE *ppuState);
+extern void PPCInterpreter_vsr(PPU_STATE *ppuState);
 extern void PPCInterpreter_vsrw(PPU_STATE *ppuState);
 extern void PPCInterpreter_vsldoi(PPU_STATE *ppuState);
 extern void PPCInterpreter_vspltb(PPU_STATE *ppuState);
