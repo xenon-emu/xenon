@@ -333,6 +333,44 @@ void PPCInterpreter::PPCInterpreter_vslw(PPU_STATE* ppuState) {
   VRi(rd).dword[3] = VRi(ra).dword[3] << (VRi(rb).dword[3] & 31);
 }
 
+// Vector Shift Right (x’1000 02C4
+void PPCInterpreter::PPCInterpreter_vsr(PPU_STATE* ppuState) {
+  /*
+  sh <- (vB)125:127
+  t <- 1
+  do i = 0 to 127 by 8
+    t <- t & ((vB)i+5:i+7 = sh)
+    if t = 1 then vD <- (vA) >>ui sh
+  else vD <- undefined
+  end
+  */
+
+  // Let sh = vB[125–127]; sh is the shift count in bits (0<=sh<=7). The contents of vA are shifted right by sh bits. Bits 
+  // shifted out of bit 127 are lost. Zeros are supplied to the vacated bits on the left. The result is placed into vD.
+  
+  CHECK_VXU;
+
+  const auto sh = VRi(rb).bytes[15] & 0x7;
+  const auto rsh = 8 - sh;
+
+  VRi(rd).bytes[15] = VRi(ra).bytes[15] >> sh | (VRi(rd).bytes[14] << rsh);
+  VRi(rd).bytes[14] = VRi(ra).bytes[14] >> sh | (VRi(rd).bytes[13] << rsh);
+  VRi(rd).bytes[13] = VRi(ra).bytes[13] >> sh | (VRi(rd).bytes[12] << rsh);
+  VRi(rd).bytes[12] = VRi(ra).bytes[12] >> sh | (VRi(rd).bytes[11] << rsh);
+  VRi(rd).bytes[11] = VRi(ra).bytes[11] >> sh | (VRi(rd).bytes[10] << rsh);
+  VRi(rd).bytes[10] = VRi(ra).bytes[10] >> sh | (VRi(rd).bytes[9] << rsh);
+  VRi(rd).bytes[9] = VRi(ra).bytes[9] >> sh | (VRi(rd).bytes[8] << rsh);
+  VRi(rd).bytes[8] = VRi(ra).bytes[8] >> sh | (VRi(rd).bytes[7] << rsh);
+  VRi(rd).bytes[7] = VRi(ra).bytes[7] >> sh | (VRi(rd).bytes[6] << rsh);
+  VRi(rd).bytes[6] = VRi(ra).bytes[6] >> sh | (VRi(rd).bytes[5] << rsh);
+  VRi(rd).bytes[5] = VRi(ra).bytes[5] >> sh | (VRi(rd).bytes[4] << rsh);
+  VRi(rd).bytes[4] = VRi(ra).bytes[4] >> sh | (VRi(rd).bytes[3] << rsh);
+  VRi(rd).bytes[3] = VRi(ra).bytes[3] >> sh | (VRi(rd).bytes[2] << rsh);
+  VRi(rd).bytes[2] = VRi(ra).bytes[2] >> sh | (VRi(rd).bytes[1] << rsh);
+  VRi(rd).bytes[1] = VRi(ra).bytes[1] >> sh | (VRi(rd).bytes[0] << rsh);
+  VRi(rd).bytes[0] = VRi(ra).bytes[0] >> sh;
+}
+
 // Vector Shift Right Word (x'1000 0284')
 void PPCInterpreter::PPCInterpreter_vsrw(PPU_STATE* ppuState) {
   /*
