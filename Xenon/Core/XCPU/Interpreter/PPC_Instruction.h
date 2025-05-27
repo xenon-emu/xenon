@@ -114,12 +114,15 @@ namespace PPCInterpreter {
       });
       // Special case opcodes
       fillTable<std::string>(nameTable, 0x04, 11, 11, {
+        { 0x945, GET(vperm128) },
         { 0x7193, GET(stvewx128) },
         { 0x7393, GET(stvrx128) },
         { 0x73C4, GET(stvx128) },
         { 0xB705, GET(vor128) },
         { 0x30C4, GET(lvx128) },
         { 0x2405, GET(vmulfp128) },
+        { 0x141C4, GET(stvlx128) },
+        { 0x151C4, GET(stvrx128) },
         { 0x1D8C6, GET(vmrglw128) },
         { 0x1C8C6, GET(vmrghw128) },        
         { 0x1C1C4, GET(stvlxl128) },

@@ -249,6 +249,39 @@ void PPCInterpreter::PPCInterpreter_vmrghw128(PPU_STATE *ppuState) {
   VR(VMX128_VD128).dword[3] = VR(VMX128_VB128).dword[1];
 }
 
+static const u8 reIndex[32] = { 3,2,1,0, 7,6,5,4, 11,10,9,8, 15,14,13,12, 19,18,17,16, 23,22,21,20, 27,26,25,24, 31,30,29,28 };
+
+static inline u8 vpermHelper(u8 idx, Base::Vector128 vra, Base::Vector128 vrb) {
+  return (idx & 16) ? vrb.bytes[idx & 15] : vra.bytes[idx & 15];
+}
+
+// Vector Permute (x’1000 002B)
+void PPCInterpreter::PPCInterpreter_vperm(PPU_STATE* ppuState) {
+  /*
+  temp0:255 <- (vA) || (vB)
+  do i=0 to 127 by 8
+    b <- (vC)i+3:i+7 || 0b000
+    vDi:i+7 <- tempb:b+7
+  end
+  */
+
+  CHECK_VXU;
+
+  for (u8 idx = 0; idx < 16; idx++) {
+    VRi(vd).bytes[idx] = vpermHelper(reIndex[VRi(vc).bytes[reIndex[idx]]], VRi(va), VRi(rb));
+  }
+}
+
+// Vector Permute 128
+void PPCInterpreter::PPCInterpreter_vperm128(PPU_STATE* ppuState) {
+
+  CHECK_VXU;
+
+  for (u8 idx = 0; idx < 16; idx++) {
+    VR(VMX128_2_VD128).bytes[idx] = vpermHelper(reIndex[VR(VMX128_2_VC).bytes[reIndex[idx]]], VR(VMX128_2_VA128), VR(VMX128_2_VB128));
+  }
+}
+
 // Vector Multiply Add Floating Point (x'1000 002E')
 void PPCInterpreter::PPCInterpreter_vmaddfp(PPU_STATE *ppuState) {
   /*

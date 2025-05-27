@@ -778,6 +778,20 @@ void PPCInterpreter::PPCInterpreter_stvrx(PPU_STATE* ppuState) {
   }
 }
 
+// Store Vector Right Indexed 128
+void PPCInterpreter::PPCInterpreter_stvrx128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
+  const u8 eb = EA & 0xF;
+  EA &= ~0xF;
+
+  auto bytes = VR(VMX128_1_VD128).bytes;
+  for (u32 i = (bytes.size() - 1); i > (bytes.size() - 1) - eb; i--) {
+    MMUWrite8(ppuState, (EA - bytes.size()) + i, bytes[i]);
+  }
+}
+
 // Store Vector Left Indexed
 void PPCInterpreter::PPCInterpreter_stvlx(PPU_STATE* ppuState) {
   CHECK_VXU;
@@ -813,7 +827,21 @@ void PPCInterpreter::PPCInterpreter_stvxl(PPU_STATE *ppuState) {
   MMUWrite32(ppuState, EA + (sizeof(u32) * 3), byteswap_be<u32>(VRi(vs).dword[3]));
 }
 
-// Store Vector Left Indexed 128
+// // Store Vector Left Indexed 128
+void PPCInterpreter::PPCInterpreter_stvlx128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
+  const u8 eb = EA & 0xF;
+  EA &= ~0xF;
+
+  auto bytes = VR(VMX128_1_VD128).bytes;
+  for (u32 i = 0; i < 16 - eb; i++) {
+    MMUWrite8(ppuState, EA + i, bytes[i]);
+  }
+}
+
+// Store Vector Left Indexed LRU 128
 void PPCInterpreter::PPCInterpreter_stvlxl128(PPU_STATE *ppuState) {
   CHECK_VXU;
 
