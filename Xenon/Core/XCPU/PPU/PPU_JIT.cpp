@@ -162,9 +162,10 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
     static thread_local std::unordered_map<u32, u32> opcodeHashCache;
     u32 opName = opcodeHashCache.contains(opcode) ? opcodeHashCache[opcode] : opcodeHashCache[opcode] = Base::JoaatStringHash(PPCInterpreter::ppcDecoder.getNameTable()[decodedInstr]);
 
-#if defined(ARCH_X86) || defined(ARCH_X86_64)
     // Handle skips
     bool skip = false;
+
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
     auto patchGPR = [&](s32 reg, u64 val) {
       x86::Gp temp = compiler.newGpq();
       compiler.mov(temp, val);
