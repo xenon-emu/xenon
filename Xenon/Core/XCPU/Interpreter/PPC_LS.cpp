@@ -738,10 +738,10 @@ void PPCInterpreter::PPCInterpreter_stvx(PPU_STATE *ppuState) {
 
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
 
-  MMUWrite32(ppuState, EA, byteswap_be<u32>(VRi(vs).dword[0]));
-  MMUWrite32(ppuState, EA + (sizeof(u32) * 1), byteswap_be<u32>(VRi(vs).dword[1]));
-  MMUWrite32(ppuState, EA + (sizeof(u32) * 2), byteswap_be<u32>(VRi(vs).dword[2]));
-  MMUWrite32(ppuState, EA + (sizeof(u32) * 3), byteswap_be<u32>(VRi(vs).dword[3]));
+  MMUWrite32(ppuState, EA, VRi(vs).dword[0]);
+  MMUWrite32(ppuState, EA + (sizeof(u32) * 1), VRi(vs).dword[1]);
+  MMUWrite32(ppuState, EA + (sizeof(u32) * 2), VRi(vs).dword[2]);
+  MMUWrite32(ppuState, EA + (sizeof(u32) * 3), VRi(vs).dword[3]);
 }
 
 // Store Vector Element Word Indexed (x'7C00 018E')
@@ -821,10 +821,10 @@ void PPCInterpreter::PPCInterpreter_stvxl(PPU_STATE *ppuState) {
 
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
 
-  MMUWrite32(ppuState, EA, byteswap_be<u32>(VRi(vs).dword[0]));
-  MMUWrite32(ppuState, EA + (sizeof(u32) * 1), byteswap_be<u32>(VRi(vs).dword[1]));
-  MMUWrite32(ppuState, EA + (sizeof(u32) * 2), byteswap_be<u32>(VRi(vs).dword[2]));
-  MMUWrite32(ppuState, EA + (sizeof(u32) * 3), byteswap_be<u32>(VRi(vs).dword[3]));
+  MMUWrite32(ppuState, EA, VRi(vs).dword[0]);
+  MMUWrite32(ppuState, EA + (sizeof(u32) * 1), VRi(vs).dword[1]);
+  MMUWrite32(ppuState, EA + (sizeof(u32) * 2), VRi(vs).dword[2]);
+  MMUWrite32(ppuState, EA + (sizeof(u32) * 3), VRi(vs).dword[3]);
 }
 
 // // Store Vector Left Indexed 128
