@@ -1,5 +1,9 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
 #include "Serial.h"
 
 namespace Serial {

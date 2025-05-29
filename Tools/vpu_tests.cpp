@@ -4,10 +4,11 @@
 #include "Base/Param.h"
 #include "Base/Types.h"
 #include "Base/Vector128.h"
+#include <emmintrin.h>
 
 Base::Vector128 VR[128]{};
 struct DummyInstr {
-  u8 vsh = 0;
+  u8 vsh = 0xF;
   u8 va = 0;
   u8 vb = 1;
   u8 vc = 2;
@@ -15,8 +16,54 @@ struct DummyInstr {
 } _instr;
 #define VRi(x) VR[_instr.x]
 
-static inline u8 vsldoiHelper(u8 sh, Base::Vector128 vra, Base::Vector128 vrb) {
-  return (sh < 16) ? vra.bytes[sh] : vrb.bytes[sh & 15];
+__m128i swap_bytes_4words(__m128i v) {
+  __m128i mask_ff = _mm_set1_epi32(0xFF);
+
+  __m128i b0 = _mm_and_si128(v, mask_ff);
+  __m128i b1 = _mm_and_si128(_mm_srli_epi32(v, 8), mask_ff);
+  __m128i b2 = _mm_and_si128(_mm_srli_epi32(v, 16), mask_ff);
+  __m128i b3 = _mm_and_si128(_mm_srli_epi32(v, 24), mask_ff);
+
+  __m128i r = _mm_or_si128(
+    _mm_slli_epi32(b0, 24),
+    _mm_or_si128(
+      _mm_slli_epi32(b1, 16),
+      _mm_or_si128(_mm_slli_epi32(b2, 8), b3)
+    )
+  );
+  return r;
+}
+
+__m128i vsldoi_sse(__m128i va, __m128i vb, u8 shb) {
+  __m128i result;
+  switch (shb) {
+  #define CASE(i) case i: result = _mm_or_si128(_mm_srli_si128(va, i), _mm_slli_si128(vb, 15 - i)); break
+    case 0: result = va; break;
+    CASE(1);
+    CASE(2);
+    CASE(3);
+    CASE(4);
+    CASE(5);
+    CASE(6);
+    CASE(7);
+    CASE(8);
+    CASE(9);
+    CASE(10);
+    CASE(11);
+    CASE(12);
+    CASE(13);
+    CASE(14);
+    CASE(15);
+    default: result = _mm_setzero_si128(); break;
+  }
+  return swap_bytes_4words(result);
+}
+
+void vsldoi() {
+  __m128i va = _mm_loadu_si128(reinterpret_cast<__m128i*>(VRi(va).bytes.data()));
+  __m128i vb = _mm_loadu_si128(reinterpret_cast<__m128i*>(VRi(vb).bytes.data()));
+  __m128i vd = vsldoi_sse(va, vb, _instr.vsh);
+  _mm_storeu_si128(reinterpret_cast<__m128i*>(VRi(vd).bytes.data()), vd);
 }
 
 s32 ToolMain() {
@@ -40,14 +87,12 @@ s32 ToolMain() {
   VRi(vb).dword[2] = byteswap_be<u32>(VRi(vb).dword[2]);
   VRi(vb).dword[3] = byteswap_be<u32>(VRi(vb).dword[3]);
 
-  for (u8 idx = 0; idx < 16; idx++) {
-    VRi(vd).bytes[idx] = vsldoiHelper(_instr.vsh + idx, VRi(va), VRi(vb));
-  }
+  vsldoi();
 
-  VRi(vd).dword[0] = byteswap_be<u32>(VRi(vd).dword[0]);
-  VRi(vd).dword[1] = byteswap_be<u32>(VRi(vd).dword[1]);
-  VRi(vd).dword[2] = byteswap_be<u32>(VRi(vd).dword[2]);
-  VRi(vd).dword[3] = byteswap_be<u32>(VRi(vd).dword[3]);
+  //VRi(vd).dword[0] = byteswap_be<u32>(VRi(vd).dword[0]);
+  //VRi(vd).dword[1] = byteswap_be<u32>(VRi(vd).dword[1]);
+  //VRi(vd).dword[2] = byteswap_be<u32>(VRi(vd).dword[2]);
+  //VRi(vd).dword[3] = byteswap_be<u32>(VRi(vd).dword[3]);
 
   for (u8 i = 0; i != 4; ++i) {
     LOG_INFO(Main, "VD{}: 0x{:08X}", i, VRi(vd).dword[i]);

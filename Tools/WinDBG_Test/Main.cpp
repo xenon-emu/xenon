@@ -14,16 +14,16 @@ s32 ToolMain() {
   std::string portName = "\\\\.\\COM" + port;
   Serial::Handle serialPort = Serial::OpenPort(portName.c_str());
   if ((u64)serialPort < 0) {
-    std::cerr << "Failed to open serial port: " << portName << std::endl;
+    LOG_ERROR(KD, "Failed to open serial port: {}", portName);
     return 1;
   }
-  std::cout << "Listening for KD packets..." << std::endl;
+  LOG_INFO(KD, "Listening for KD packets...");
   u8 buffer[1024] = {};
   u32 bytesRead = 0;
   while (true) {
     bytesRead = Serial::Read(serialPort, buffer);
     if (bytesRead != 0) {
-      std::cout << "Got a packet!" << std::endl;
+      LOG_INFO(KD, "Got a packet!");
     }
     if (bytesRead >= sizeof(KD_PACKET)) {
       for (u64 i = 0; i + sizeof(KD_PACKET) <= bytesRead; ++i) {

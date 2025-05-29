@@ -2,10 +2,10 @@
 
 #pragma once
 
-#include "types.h"
+#include "Base/Types.h"
 
 #ifdef _WIN32
-#include <windows.h>
+
 #else
 #include <fcntl.h>
 #include <termios.h>
@@ -16,7 +16,7 @@
 namespace Serial {
 
 #ifdef _WIN32
-using Handle = HANDLE;
+using Handle = void*;
 #else
 using Handle = s32;
 #endif
