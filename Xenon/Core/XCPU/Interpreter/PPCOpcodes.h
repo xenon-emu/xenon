@@ -41,7 +41,6 @@ D_STUB(vmrglw128)
 D_STUB(lvrxl)
 D_STUB(lvlxl)
 D_STUB(lswx)
-D_STUB(lvewx)
 D_STUB(lveb)
 D_STUB(lvebx)
 D_STUB(lvehx)
@@ -518,6 +517,7 @@ extern void PPCInterpreter_lfs(PPU_STATE *ppuState);
 extern void PPCInterpreter_lfsu(PPU_STATE *ppuState);
 
 // Load Vector
+extern void PPCInterpreter_lvewx(PPU_STATE *ppuState);
 extern void PPCInterpreter_lvx(PPU_STATE *ppuState);
 extern void PPCInterpreter_lvx128(PPU_STATE *ppuState);
 extern void PPCInterpreter_lvxl(PPU_STATE *ppuState);

@@ -774,6 +774,11 @@ void PPCInterpreter::PPCInterpreter_stvrx(PPU_STATE* ppuState) {
   const u8 eb = EA & 0xF;
   EA &= ~0xF;
 
+  // If EB = 0, then memory is not modified by the instruction.
+  if (eb == 0) {
+    return;
+  }
+
   auto bytes = VRi(vs).bytes;
   for (u32 i = (bytes.size() - 1); i > (bytes.size() - 1) - eb; i--) {
     MMUWrite8(ppuState, (EA - bytes.size()) + i, bytes[i]);
@@ -787,6 +792,11 @@ void PPCInterpreter::PPCInterpreter_stvrx128(PPU_STATE* ppuState) {
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
   const u8 eb = EA & 0xF;
   EA &= ~0xF;
+
+  // If EB = 0, then memory is not modified by the instruction.
+  if (eb == 0) {
+    return;
+  }
 
   auto bytes = VR(VMX128_1_VD128).bytes;
   for (u32 i = (bytes.size() - 1); i > (bytes.size() - 1) - eb; i--) {
@@ -1611,6 +1621,34 @@ void PPCInterpreter::PPCInterpreter_lfsu(PPU_STATE *ppuState) {
 //
 // Load Vector
 //
+
+// Load Vector Element Word Indexed (x'7C00 008E')
+void PPCInterpreter::PPCInterpreter_lvewx(PPU_STATE* ppuState) {
+  /*
+  if rA=0 then b <- 0
+  else b <- (rA)
+  EA <- (b + (rB)) & (~3)
+  eb <- EA60:63
+  vD <- undefined
+  if the processor is in big-endian mode
+   then vDeb*8:(eb*8)+31<- MEM(EA,4)
+   else vD96-(eb*8):127-(eb*8)<- MEM(EA,4)
+  */
+
+  CHECK_VXU;
+
+  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
+
+  u8 eb = EA & 0x3;
+  EA &= ~0x3;
+
+  u32 data = MMURead32(ppuState, EA);
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  VRi(vd).dword[eb] = data;
+}
 
 // Load Vector Indexed (x'7C00 00CE')
 void PPCInterpreter::PPCInterpreter_lvx(PPU_STATE* ppuState) {
