@@ -53,6 +53,7 @@ set(XenonBase
   ../../Xenon/Base/Hash.h
   ../../Xenon/Base/Param.h
   ../../Xenon/Base/Types.h
+  ../../Xenon/Base/Vector128.h
 )
 
 # Sets as tool, and disables the logger
@@ -69,24 +70,35 @@ target_include_directories(Byteswap PRIVATE
   ../Xenon
 )
 
-add_executable(Get_IDX
+add_executable(GetIndex
   get_idx.cpp
   ${SimpleBase}
   ${XenonBase}
 )
 
-target_include_directories(Get_IDX PRIVATE
+target_include_directories(GetIndex PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}
   ../Xenon
 )
 
-add_executable(Get_Opcode
+add_executable(GetOpcode
   get_opcode.cpp
   ${SimpleBase}
   ${XenonBase}
 )
 
-target_include_directories(Get_Opcode PRIVATE
+target_include_directories(GetOpcode PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  ../Xenon
+)
+
+add_executable(VPUTests
+  vpu_tests.cpp
+  ${SimpleBase}
+  ${XenonBase}
+)
+
+target_include_directories(VPUTests PRIVATE
   ${CMAKE_CURRENT_SOURCE_DIR}
   ../Xenon
 )
