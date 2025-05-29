@@ -270,6 +270,11 @@ void PPCInterpreter::PPCInterpreter_vperm(PPU_STATE* ppuState) {
   for (u8 idx = 0; idx < 16; idx++) {
     VRi(vd).bytes[idx] = vpermHelper(reIndex[VRi(vc).bytes[reIndex[idx]]], VRi(va), VRi(rb));
   }
+
+  VRi(vd).dword[0] = byteswap_be<u32>(VRi(vd).dword[0]);
+  VRi(vd).dword[1] = byteswap_be<u32>(VRi(vd).dword[1]);
+  VRi(vd).dword[2] = byteswap_be<u32>(VRi(vd).dword[2]);
+  VRi(vd).dword[3] = byteswap_be<u32>(VRi(vd).dword[3]);
 }
 
 // Vector Permute 128
@@ -280,6 +285,11 @@ void PPCInterpreter::PPCInterpreter_vperm128(PPU_STATE* ppuState) {
   for (u8 idx = 0; idx < 16; idx++) {
     VR(VMX128_2_VD128).bytes[idx] = vpermHelper(reIndex[VR(VMX128_2_VC).bytes[reIndex[idx]]], VR(VMX128_2_VA128), VR(VMX128_2_VB128));
   }
+
+  VR(VMX128_2_VD128).dword[0] = byteswap_be<u32>(VR(VMX128_2_VD128).dword[0]);
+  VR(VMX128_2_VD128).dword[1] = byteswap_be<u32>(VR(VMX128_2_VD128).dword[1]);
+  VR(VMX128_2_VD128).dword[2] = byteswap_be<u32>(VR(VMX128_2_VD128).dword[2]);
+  VR(VMX128_2_VD128).dword[3] = byteswap_be<u32>(VR(VMX128_2_VD128).dword[3]);
 }
 
 // Vector Multiply Add Floating Point (x'1000 002E')
