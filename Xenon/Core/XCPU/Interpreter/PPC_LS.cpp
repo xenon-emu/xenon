@@ -779,9 +779,16 @@ void PPCInterpreter::PPCInterpreter_stvrx(PPU_STATE* ppuState) {
     return;
   }
 
-  auto bytes = VRi(vs).bytes;
-  for (u32 i = (bytes.size() - 1); i > (bytes.size() - 1) - eb; i--) {
-    MMUWrite8(ppuState, (EA - bytes.size()) + i, bytes[i]);
+  // Need to byteswap the bytes prior to the operation because of endianness.
+  Vector128 vec = VRi(vs);
+  vec.dword[0] = byteswap_be<u32>(vec.dword[0]);
+  vec.dword[1] = byteswap_be<u32>(vec.dword[1]);
+  vec.dword[2] = byteswap_be<u32>(vec.dword[2]);
+  vec.dword[3] = byteswap_be<u32>(vec.dword[3]);
+
+  auto bytes = vec.bytes;
+  for (u32 i = 0; i < eb; ++i) {
+    MMUWrite8(ppuState, EA + i, bytes[(16 - eb) + i]);
   }
 }
 
@@ -798,9 +805,16 @@ void PPCInterpreter::PPCInterpreter_stvrx128(PPU_STATE* ppuState) {
     return;
   }
 
-  auto bytes = VR(VMX128_1_VD128).bytes;
-  for (u32 i = (bytes.size() - 1); i > (bytes.size() - 1) - eb; i--) {
-    MMUWrite8(ppuState, (EA - bytes.size()) + i, bytes[i]);
+  // Need to byteswap the bytes prior to the operation because of endianness.
+  Vector128 vec = VR(VMX128_1_VD128);
+  vec.dword[0] = byteswap_be<u32>(vec.dword[0]);
+  vec.dword[1] = byteswap_be<u32>(vec.dword[1]);
+  vec.dword[2] = byteswap_be<u32>(vec.dword[2]);
+  vec.dword[3] = byteswap_be<u32>(vec.dword[3]);
+
+  auto bytes = vec.bytes;
+  for (u32 i = 0; i < eb; ++i) {
+    MMUWrite8(ppuState, EA + i, bytes[(16 - eb) + i]);
   }
 }
 
@@ -812,8 +826,55 @@ void PPCInterpreter::PPCInterpreter_stvlx(PPU_STATE* ppuState) {
   const u8 eb = EA & 0xF;
   EA &= ~0xF;
 
-  auto bytes = VRi(vs).bytes;
-  for (u32 i = 0; i < 16 - eb; i++) {
+  // Need to byteswap the bytes prior to the operation because of endianness.
+  Vector128 vec = VRi(vs);
+  vec.dword[0] = byteswap_be<u32>(vec.dword[0]);
+  vec.dword[1] = byteswap_be<u32>(vec.dword[1]);
+  vec.dword[2] = byteswap_be<u32>(vec.dword[2]);
+  vec.dword[3] = byteswap_be<u32>(vec.dword[3]);
+
+  auto bytes = vec.bytes;
+  for (int i = 0; i < 16 - eb; ++i) {
+    MMUWrite8(ppuState, EA + i, bytes[i]);
+  }
+}
+
+// Store Vector Left Indexed 128
+void PPCInterpreter::PPCInterpreter_stvlx128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
+  const u8 eb = EA & 0xF;
+  EA &= ~0xF;
+
+  Vector128 vec = VR(VMX128_1_VD128);
+  vec.dword[0] = byteswap_be<u32>(vec.dword[0]);
+  vec.dword[1] = byteswap_be<u32>(vec.dword[1]);
+  vec.dword[2] = byteswap_be<u32>(vec.dword[2]);
+  vec.dword[3] = byteswap_be<u32>(vec.dword[3]);
+
+  auto bytes = vec.bytes;
+  for (int i = 0; i < 16 - eb; ++i) {
+    MMUWrite8(ppuState, EA + i, bytes[i]);
+  }
+}
+
+// Store Vector Left Indexed LRU 128
+void PPCInterpreter::PPCInterpreter_stvlxl128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
+  const u8 eb = EA & 0xF;
+  EA &= ~0xF;
+
+  Vector128 vec = VR(VMX128_1_VD128);
+  vec.dword[0] = byteswap_be<u32>(vec.dword[0]);
+  vec.dword[1] = byteswap_be<u32>(vec.dword[1]);
+  vec.dword[2] = byteswap_be<u32>(vec.dword[2]);
+  vec.dword[3] = byteswap_be<u32>(vec.dword[3]);
+
+  auto bytes = vec.bytes;
+  for (int i = 0; i < 16 - eb; ++i) {
     MMUWrite8(ppuState, EA + i, bytes[i]);
   }
 }
@@ -837,34 +898,6 @@ void PPCInterpreter::PPCInterpreter_stvxl(PPU_STATE *ppuState) {
   MMUWrite32(ppuState, EA + (sizeof(u32) * 1), VRi(vs).dword[1]);
   MMUWrite32(ppuState, EA + (sizeof(u32) * 2), VRi(vs).dword[2]);
   MMUWrite32(ppuState, EA + (sizeof(u32) * 3), VRi(vs).dword[3]);
-}
-
-// // Store Vector Left Indexed 128
-void PPCInterpreter::PPCInterpreter_stvlx128(PPU_STATE* ppuState) {
-  CHECK_VXU;
-
-  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
-  const u8 eb = EA & 0xF;
-  EA &= ~0xF;
-
-  auto bytes = VR(VMX128_1_VD128).bytes;
-  for (u32 i = 0; i < 16 - eb; i++) {
-    MMUWrite8(ppuState, EA + i, bytes[i]);
-  }
-}
-
-// Store Vector Left Indexed LRU 128
-void PPCInterpreter::PPCInterpreter_stvlxl128(PPU_STATE *ppuState) {
-  CHECK_VXU;
-
-  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
-  const u8 eb = EA & 0xF;
-  EA &= ~0xF;
-
-  auto bytes = VR(VMX128_1_VD128).bytes;
-  for (u32 i = 0; i < 16 - eb; i++) {
-    MMUWrite8(ppuState, EA + i, bytes[i]);
-  }
 }
 
 //
