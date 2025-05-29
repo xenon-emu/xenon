@@ -389,7 +389,7 @@ void PPCInterpreter::PPCInterpreter_vsrw(PPU_STATE* ppuState) {
 }
 
 static inline u8 vsldoiHelper(u8 sh, Base::Vector128 vra, Base::Vector128 vrb) {
-  return (sh < 16) ? vra.bytes[sh] : vrb.bytes[sh & 15];
+  return (sh < 16) ? vra.bytes[sh] : vrb.bytes[sh & 0xF];
 }
 
 // Vector Shift Left Double by Octet Immediate (x'1000 002C')
@@ -398,9 +398,38 @@ void PPCInterpreter::PPCInterpreter_vsldoi(PPU_STATE *ppuState) {
   vD <- ((vA) || (vB)) << ui (SHB || 0b000)
   */
 
-  for(u8 idx = 0; idx < 16; idx++) {
-    VRi(vd).bytes[idx] = vsldoiHelper(_instr.vsh + idx, VRi(va), VRi(vb));
+  const u8 sh = _instr.vsh;
+
+  // No shift.
+  if (sh == 0) {
+    VRi(vd) = VRi(va);
+    return;
+  } else if(sh == 16){
+    // Don't touch VA.
+    VRi(vd) = VRi(vb);
+    return;
   }
+
+  // TODO: Ugly, super slow, fix.
+
+  VRi(va).dword[0] = byteswap_be<u32>(VRi(va).dword[0]);
+  VRi(va).dword[1] = byteswap_be<u32>(VRi(va).dword[1]);
+  VRi(va).dword[2] = byteswap_be<u32>(VRi(va).dword[2]);
+  VRi(va).dword[3] = byteswap_be<u32>(VRi(va).dword[3]);
+
+  VRi(vb).dword[0] = byteswap_be<u32>(VRi(vb).dword[0]);
+  VRi(vb).dword[1] = byteswap_be<u32>(VRi(vb).dword[1]);
+  VRi(vb).dword[2] = byteswap_be<u32>(VRi(vb).dword[2]);
+  VRi(vb).dword[3] = byteswap_be<u32>(VRi(vb).dword[3]);
+
+  for(u8 idx = 0; idx < 16; idx++) {
+    VRi(vd).bytes[idx] = vsldoiHelper(sh + idx, VRi(va), VRi(vb));
+  }
+
+  VRi(vd).dword[0] = byteswap_be<u32>(VRi(vd).dword[0]);
+  VRi(vd).dword[1] = byteswap_be<u32>(VRi(vd).dword[1]);
+  VRi(vd).dword[2] = byteswap_be<u32>(VRi(vd).dword[2]);
+  VRi(vd).dword[3] = byteswap_be<u32>(VRi(vd).dword[3]);
 }
 
 // Vector Splat Byte (x'1000 020C')
