@@ -510,10 +510,17 @@ void PPCInterpreter::PPCInterpreter_vspltb(PPU_STATE *ppuState) {
 
   CHECK_VXU;
 
+  // Need to byteswap becuase of byte endianness.
+  Base::Vector128 vec = VRi(vb);
+  vec.dword[0] = byteswap_be<u32>(vec.dword[0]);
+  vec.dword[1] = byteswap_be<u32>(vec.dword[1]);
+  vec.dword[2] = byteswap_be<u32>(vec.dword[2]);
+  vec.dword[3] = byteswap_be<u32>(vec.dword[3]);
+
   const u8 uimm = _instr.vuimm;
 
   for (u8 idx = 0; idx < 16; idx++) {
-    VRi(vd).bytes[idx] = VRi(vb).bytes[uimm];
+    VRi(vd).bytes[idx] = vec.bytes[uimm];
   }
 }
 
