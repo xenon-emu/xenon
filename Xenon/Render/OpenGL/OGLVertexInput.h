@@ -10,8 +10,6 @@
 
 #ifndef NO_GFX
 
-#define GL_GLEXT_PROTOTYPES
-#include <KHR/khrplatform.h>
 #include <glad/glad.h>
 
 namespace Render {

@@ -6,8 +6,6 @@
 
 #ifndef NO_GFX
 
-#define GL_GLEXT_PROTOTYPES
-#include <KHR/khrplatform.h>
 #include <glad/glad.h>
 
 #define IMGUI_DEFINE_MATH_OPERATORS
