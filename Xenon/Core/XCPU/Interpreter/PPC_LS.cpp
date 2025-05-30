@@ -1806,6 +1806,11 @@ void PPCInterpreter::PPCInterpreter_lvlx(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
+  vector.dword[0] = byteswap_be<u32>(vector.dword[0]);
+  vector.dword[1] = byteswap_be<u32>(vector.dword[1]);
+  vector.dword[2] = byteswap_be<u32>(vector.dword[2]);
+  vector.dword[3] = byteswap_be<u32>(vector.dword[3]);
+
   u8 i = 0;
   for (i = 0; i < 16 - eb; ++i)
     VRi(vd).bytes[i] = vector.bytes[i + eb];
@@ -1813,6 +1818,11 @@ void PPCInterpreter::PPCInterpreter_lvlx(PPU_STATE *ppuState) {
   while (i < 16)
     VRi(vd).bytes[i++] = 0;
  
+  VRi(vd).dword[0] = byteswap_be<u32>(VRi(vd).dword[0]);
+  VRi(vd).dword[1] = byteswap_be<u32>(VRi(vd).dword[1]);
+  VRi(vd).dword[2] = byteswap_be<u32>(VRi(vd).dword[2]);
+  VRi(vd).dword[3] = byteswap_be<u32>(VRi(vd).dword[3]);
+
 #ifdef VXU_LOAD_DEBUG
   u8 vrd = _instr.vd;
   LOG_DEBUG(Xenon, "lvlx [EB {:#d}] vR{:#d} = [{:#x}, {:#x}, {:#x}, {:#x}]",
@@ -1851,6 +1861,11 @@ void PPCInterpreter::PPCInterpreter_lvrx(PPU_STATE *ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
+  vector.dword[0] = byteswap_be<u32>(vector.dword[0]);
+  vector.dword[1] = byteswap_be<u32>(vector.dword[1]);
+  vector.dword[2] = byteswap_be<u32>(vector.dword[2]);
+  vector.dword[3] = byteswap_be<u32>(vector.dword[3]);
+
   u8 i = 0;
 
   while (i < (16 - eb)) {
@@ -1862,6 +1877,11 @@ void PPCInterpreter::PPCInterpreter_lvrx(PPU_STATE *ppuState) {
     VRi(vd).bytes[i] = vector.bytes[i - (16 - eb)];
     ++i;
   }
+
+  VRi(vd).dword[0] = byteswap_be<u32>(VRi(vd).dword[0]);
+  VRi(vd).dword[1] = byteswap_be<u32>(VRi(vd).dword[1]);
+  VRi(vd).dword[2] = byteswap_be<u32>(VRi(vd).dword[2]);
+  VRi(vd).dword[3] = byteswap_be<u32>(VRi(vd).dword[3]);
 
 #ifdef VXU_LOAD_DEBUG
   u8 vrd = _instr.vd;
