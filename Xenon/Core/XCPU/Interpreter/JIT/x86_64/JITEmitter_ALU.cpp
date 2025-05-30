@@ -23,6 +23,23 @@ void PPCInterpreter::PPCInterpreterJIT_addi(PPU_STATE *ppuState, JITBlockBuilder
   }
 }
 
+// And (x'7C00 0038')
+void PPCInterpreter::PPCInterpreterJIT_andx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
+  /*
+    rA <- (rS) & (rB)
+  */
+
+  // rSTemp
+  x86::Gp rSTemp = newGP64();
+  COMP->mov(rSTemp, GPRPtr(instr.rs));
+
+  // rSTemp & rB
+  COMP->and_(rSTemp, GPRPtr(instr.rb));
+
+  // rA = rSTemp
+  COMP->mov(GPRPtr(instr.ra), rSTemp);
+}
+
 // Rotate Left Word Immediate then AND with Mask (x'5400 0000')
 void PPCInterpreter::PPCInterpreterJIT_rlwinmx(PPU_STATE *ppuState, JITBlockBuilder* b, PPCOpcode instr) {
   /*
