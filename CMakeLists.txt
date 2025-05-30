@@ -79,6 +79,10 @@ elseif (msvc)
   target_compile_options(Xenon PRIVATE /arch:SSE2)
 endif()
 
+if (WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  add_compile_options(-mssse3)
+endif()
+
 # Include Deps/ThirdParty and Packages
 if (GFX_ENABLED)
   find_package(SDL3 3.2.4 CONFIG)
