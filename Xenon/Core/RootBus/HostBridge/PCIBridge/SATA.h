@@ -40,6 +40,9 @@
 // Device Control Reg (Write)
 #define ATAPI_REG_DEVICE_CONTROL 0xA
 
+// Signature register
+#define ATAPI_REG_SIGNATURE 0x18
+
 // Registers Offsets from Control Block
 
 // Direct Memory Access Command

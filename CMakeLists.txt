@@ -71,6 +71,13 @@ endif()
 # Make microprofile use a custom config
 add_compile_definitions(MICROPROFILE_USE_CONFIG)
 
+# Enable SSE3
+if (gcc)
+  target_compile_options(Xenon PRIVATE -msse2)
+  target_compile_options(Xenon PRIVATE -mssse3)
+elseif (msvc)
+  target_compile_options(Xenon PRIVATE /arch:SSE2)
+endif()
 
 # Include Deps/ThirdParty and Packages
 if (GFX_ENABLED)

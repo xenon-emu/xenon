@@ -92,6 +92,14 @@ target_include_directories(GetOpcode PRIVATE
   ../Xenon
 )
 
+# Enable SSE3 for VPUTests
+if (gcc OR clang)
+  target_compile_options(VPUTests PRIVATE -msse2)
+  target_compile_options(VPUTests PRIVATE -mssse3)
+elseif (msvc)
+  target_compile_options(VPUTests PRIVATE /arch:SSE2)
+endif()
+
 add_executable(VPUTests
   vpu_tests.cpp
   ${SimpleBase}

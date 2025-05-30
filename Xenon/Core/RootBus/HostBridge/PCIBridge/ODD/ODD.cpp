@@ -14,6 +14,11 @@ void Xe::PCIDev::ODD::atapiReset() {
   atapiState.dataWriteBuffer.reset();
   atapiState.dataReadBuffer.init(ATAPI_CDROM_SECTOR_SIZE, true);
   atapiState.dataReadBuffer.reset();
+  // These seem to be used to detect the presence of a disc drive
+  atapiState.atapiRegs.unk_10 = 0x1;
+  atapiState.atapiRegs.unk_14 = 0x1;
+  atapiState.atapiRegs.signatureReg = 0xEB140101;
+  atapiState.atapiRegs.unk_1C = 0x1;
 
   // Set our Inquiry Data
   constexpr char vendorIdentification[] = "PLDS   16D2S";
@@ -311,6 +316,18 @@ void Xe::PCIDev::ODD::Read(u64 readAddress, u8 *data, u64 size) {
       std::this_thread::sleep_for(100ns);
       memcpy(data, &atapiState.atapiRegs.statusReg, size);
       return;
+    case 0x10:
+      memcpy(data, &atapiState.atapiRegs.unk_10, size);
+      return;
+    case 0x14:
+      memcpy(data, &atapiState.atapiRegs.unk_14, size);
+      return;
+    case ATAPI_REG_SIGNATURE:
+      memcpy(data, &atapiState.atapiRegs.signatureReg, size);
+      return;
+    case 0x1C:
+      memcpy(data, &atapiState.atapiRegs.unk_1C, size);
+      return;
     default:
       LOG_ERROR(ODD, "Unknown Command Register Block register being read, command code = 0x{:X}", atapiCommandReg);
       break;
@@ -418,6 +435,18 @@ void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
       memcpy(&atapiState.atapiRegs.devControlReg, data, size);
       return;
     } break;
+    case 0x10:
+      memcpy(&atapiState.atapiRegs.unk_10, data, size);
+      return;
+    case 0x14:
+      memcpy(&atapiState.atapiRegs.unk_14, data, size);
+      return;
+    case ATAPI_REG_SIGNATURE:
+      memcpy(&atapiState.atapiRegs.signatureReg, data, size);
+      return;
+    case 0x1C:
+      memcpy(&atapiState.atapiRegs.unk_1C, data, size);
+      return;
     default: {
       u64 tmp = 0;
       memcpy(&tmp, data, size);

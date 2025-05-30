@@ -255,7 +255,7 @@ static inline u8 vpermHelper(u8 idx, Base::Vector128 vra, Base::Vector128 vrb) {
   return (idx & 16) ? vrb.bytes[idx & 15] : vra.bytes[idx & 15];
 }
 
-// Vector Permute (x’1000 002B)
+// Vector Permute (x'1000 002B')
 void PPCInterpreter::PPCInterpreter_vperm(PPU_STATE* ppuState) {
   /*
   temp0:255 <- (vA) || (vB)
@@ -343,7 +343,7 @@ void PPCInterpreter::PPCInterpreter_vslw(PPU_STATE* ppuState) {
   VRi(rd).dword[3] = VRi(ra).dword[3] << (VRi(rb).dword[3] & 31);
 }
 
-// Vector Shift Right (x’1000 02C4
+// Vector Shift Right (x'1000 02C4')
 void PPCInterpreter::PPCInterpreter_vsr(PPU_STATE* ppuState) {
   /*
   sh <- (vB)125:127
@@ -355,9 +355,9 @@ void PPCInterpreter::PPCInterpreter_vsr(PPU_STATE* ppuState) {
   end
   */
 
-  // Let sh = vB[125–127]; sh is the shift count in bits (0<=sh<=7). The contents of vA are shifted right by sh bits. Bits 
+  // Let sh = vB[125-127]; sh is the shift count in bits (0<=sh<=7). The contents of vA are shifted right by sh bits. Bits
   // shifted out of bit 127 are lost. Zeros are supplied to the vacated bits on the left. The result is placed into vD.
-  
+
   CHECK_VXU;
 
   const auto sh = VRi(rb).bytes[15] & 0x7;
@@ -402,6 +402,51 @@ static inline u8 vsldoiHelper(u8 sh, Base::Vector128 vra, Base::Vector128 vrb) {
   return (sh < 16) ? vra.bytes[sh] : vrb.bytes[sh & 0xF];
 }
 
+#if defined(ARCH_X86_64)
+#ifdef __GNUC__
+__attribute__((target("ssse3")))
+#endif
+__m128i vsldoi_sse(__m128i va, __m128i vb, u8 shb) {
+  __m128i result = _mm_setzero_si128();
+  switch (shb) {
+#undef CASE
+#define CASE(i) case i: result = _mm_or_si128(_mm_srli_si128(va, i), _mm_slli_si128(vb, 16 - i)); break
+    CASE(0);
+    CASE(1);
+    CASE(2);
+    CASE(3);
+    CASE(4);
+    CASE(5);
+    CASE(6);
+    CASE(7);
+    CASE(8);
+    CASE(9);
+    CASE(10);
+    CASE(11);
+    CASE(12);
+    CASE(13);
+    CASE(14);
+    CASE(15);
+#undef CASE
+  }
+  return result;
+}
+
+#ifdef __GNUC__
+__attribute__((target("ssse3")))
+#endif
+inline __m128i byteswap_be_u32x4_ssse3(__m128i x) {
+  // Reverses bytes in each 32-bit word using SSSE3 shuffle_epi8
+  const __m128i shuffle = _mm_set_epi8(
+    12, 13, 14, 15,
+    8, 9, 10, 11,
+    4, 5, 6, 7,
+    0, 1, 2, 3
+  );
+  return _mm_shuffle_epi8(x, shuffle);
+}
+#endif
+
 // Vector Shift Left Double by Octet Immediate (x'1000 002C')
 void PPCInterpreter::PPCInterpreter_vsldoi(PPU_STATE *ppuState) {
   /*
@@ -409,17 +454,28 @@ void PPCInterpreter::PPCInterpreter_vsldoi(PPU_STATE *ppuState) {
   */
 
   const u8 sh = _instr.vsh;
-
-  // No shift.
+  // No shift
   if (sh == 0) {
     VRi(vd) = VRi(va);
     return;
-  } else if(sh == 16){
-    // Don't touch VA.
+  } else if (sh == 16) {
+    // Don't touch VA
     VRi(vd) = VRi(vb);
     return;
   }
 
+#if defined(ARCH_X86_64)
+  __m128i va = _mm_loadu_si128(reinterpret_cast<const __m128i*>(VRi(va).bytes.data()));
+  __m128i vb = _mm_loadu_si128(reinterpret_cast<const __m128i*>(VRi(vb).bytes.data()));
+  __m128i vd_sse = vsldoi_sse(va, vb, sh);
+
+  // Store raw result before byte swap
+  _mm_storeu_si128(reinterpret_cast<__m128i*>(VRi(vd).bytes.data()), vd_sse);
+  // Swap
+  __m128i result = _mm_loadu_si128(reinterpret_cast<__m128i*>(VRi(vd).bytes.data()));
+  result = byteswap_be_u32x4_ssse3(vd_sse);
+  _mm_storeu_si128(reinterpret_cast<__m128i*>(VRi(vd).bytes.data()), result);
+#else
   // TODO: Ugly, super slow, fix.
 
   VRi(va).dword[0] = byteswap_be<u32>(VRi(va).dword[0]);
@@ -432,7 +488,7 @@ void PPCInterpreter::PPCInterpreter_vsldoi(PPU_STATE *ppuState) {
   VRi(vb).dword[2] = byteswap_be<u32>(VRi(vb).dword[2]);
   VRi(vb).dword[3] = byteswap_be<u32>(VRi(vb).dword[3]);
 
-  for(u8 idx = 0; idx < 16; idx++) {
+  for (u8 idx = 0; idx < 16; idx++) {
     VRi(vd).bytes[idx] = vsldoiHelper(sh + idx, VRi(va), VRi(vb));
   }
 
@@ -440,6 +496,7 @@ void PPCInterpreter::PPCInterpreter_vsldoi(PPU_STATE *ppuState) {
   VRi(vd).dword[1] = byteswap_be<u32>(VRi(vd).dword[1]);
   VRi(vd).dword[2] = byteswap_be<u32>(VRi(vd).dword[2]);
   VRi(vd).dword[3] = byteswap_be<u32>(VRi(vd).dword[3]);
+#endif
 }
 
 // Vector Splat Byte (x'1000 020C')
@@ -527,7 +584,9 @@ void PPCInterpreter::PPCInterpreter_vspltisw128(PPU_STATE *ppuState) {
 
   s32 simm = 0;
 
-  if (VMX128_3_IMM) { simm = ((VMX128_3_IMM & 0x10) ? (VMX128_3_IMM | 0xFFFFFFF0) : VMX128_3_IMM); }
+  if (VMX128_3_IMM) {
+    simm = ((VMX128_3_IMM & 0x10) ? (VMX128_3_IMM | 0xFFFFFFF0) : VMX128_3_IMM);
+  }
 
   for (u8 idx = 0; idx < 4; idx++) {
     VR(VMX128_3_VD128).dsword[idx] = simm;

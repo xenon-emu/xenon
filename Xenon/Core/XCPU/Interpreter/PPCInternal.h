@@ -5,6 +5,7 @@
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
 #include <immintrin.h>
 #include <emmintrin.h>
+#include <tmmintrin.h>
 #elif defined(ARCH_AARCH64)
 #include <arm_neon.h>
 #endif

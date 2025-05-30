@@ -449,6 +449,14 @@ struct XE_ATAPI_REGISTERS {
     // When written
     u32 devControlReg;
   };
+  // Offset 0x10
+  u32 unk_10;
+  // Offset 0x14
+  u32 unk_14;
+  // Offset 0x18
+  u32 signatureReg;
+  // Offset 0x1C
+  u32 unk_1C;
 
   /* Control Block */
   // Offset 0x0
