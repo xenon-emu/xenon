@@ -53,8 +53,8 @@ void PPCInterpreter::PPCInterpreterJIT_mfspr(PPU_STATE *ppuState, JITBlockBuilde
     COMP->mov(rSValue, SharedSPRPtr(TB));
     break;
   case SPR_TBU_RO:
-    COMP->mov(rSValue, SharedSPRPtr(TB));
-    COMP->and_(rSValue, 0xFFFFFFFF00000000);
+    COMP->mov(rSValue, 0xFFFFFFFF00000000);
+    COMP->and_(rSValue, SharedSPRPtr(TB));
     break;
   case SPR_SPRG0:
     COMP->mov(rSValue, SPRPtr(SPRG0));
