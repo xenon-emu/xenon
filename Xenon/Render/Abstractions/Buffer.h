@@ -21,8 +21,8 @@ enum class eBufferType : u8 {
 class Buffer {
 public:
   virtual ~Buffer() = default;
-  virtual void CreateBuffer(u32 size, const void* data, eBufferUsage usage, eBufferType type) = 0;
-  virtual void UpdateBuffer(u32 offset, u32 size, const void* data) = 0;
+  virtual void CreateBuffer(u32 size, const void *data, eBufferUsage usage, eBufferType type) = 0;
+  virtual void UpdateBuffer(u32 offset, u32 size, const void *data) = 0;
   virtual void Bind(u32 binding = 1) = 0;
   virtual void Unbind() = 0;
   virtual void DestroyBuffer() = 0;

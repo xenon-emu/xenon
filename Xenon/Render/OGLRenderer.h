@@ -15,7 +15,9 @@
 #include "Core/RootBus/HostBridge/PCIe.h"
 #include "Render/Abstractions/Factory/ResourceFactory.h"
 #include "Render/Abstractions/Factory/ShaderFactory.h"
+#ifndef TOOL
 #include "Render/GUI/GUI.h"
+#endif
 
 namespace Render {
 

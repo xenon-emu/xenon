@@ -159,15 +159,19 @@ void OGLRenderer::Draw(Xe::XGPU::XeDrawParams params) {
   u32 numIndices = params.vgtDrawInitiator.numIndices;
   // Bind VAO
   glBindVertexArray(VAO);
-  if (auto buffer = createdBuffers.find("PixelConsts"_j); buffer != createdBuffers.end()) {
-    buffer->second->Bind(0);
+  auto &shader = params.shader;
+  // Bind buffers
+  if (shader.vertexShader) {
+    if (auto buffer = createdBuffers.find("VertexConsts"_j); buffer != createdBuffers.end())
+      buffer->second->Bind(0);
   }
-  if (auto buffer = createdBuffers.find("CommonBoolConsts"_j); buffer != createdBuffers.end()) {
+  if (shader.pixelShader) {
+    if (auto buffer = createdBuffers.find("PixelConsts"_j); buffer != createdBuffers.end())
+      buffer->second->Bind(2);
+  }
+  if (auto buffer = createdBuffers.find("CommonBoolConsts"_j); buffer != createdBuffers.end())
     buffer->second->Bind(1);
-  }
-  if (auto buffer = createdBuffers.find("VertexConsts"_j); buffer != createdBuffers.end()) {
-    buffer->second->Bind(2);
-  }
+
   // Configure vertex attributes from vertex fetches
   if (params.shader.vertexShader) {
     for (const auto *fetch : params.shader.vertexShader->vertexFetches) {

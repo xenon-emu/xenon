@@ -737,12 +737,13 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
   const u32 start = startSize >> 16;
   const u64 size = (startSize & 0xFFFF) * 4;
   u8 *addrPtr = ram->GetPointerToAddress(addr);
+  LOG_DEBUG(Xenos, "[CP::IM_LOAD] Shader Address: 0x{:X} | Shader Size: 0x{:X} (0x{:X}, 0x{:X})", addr, startSize, start, size);
 
   std::vector<u32> data{};
   u32 dwordCount = size / 4;
   data.resize(dwordCount);
   memcpy(data.data(), addrPtr, size);
-  for (u32 &value : data) {
+  for (u32 &value : data) { 
     value = byteswap_be(value);
   }
   

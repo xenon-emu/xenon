@@ -6,7 +6,9 @@
 #include "Render/OpenGL/Factory/OGLShaderFactory.h"
 #include "Render/OpenGL/OGLBuffer.h"
 #include "Render/OpenGL/OGLTexture.h"
+#ifndef TOOL
 #include "Render/GUI/OpenGL.h"
+#endif
 
 #ifndef NO_GFX
 namespace Render {
@@ -22,9 +24,11 @@ public:
   std::unique_ptr<Texture> CreateTexture() override {
     return std::make_unique<OGLTexture>();
   }
+#ifndef TOOL
   std::unique_ptr<GUI> CreateGUI() override {
     return std::make_unique<OpenGLGUI>();
   }
+#endif
 };
 
 } // namespace Render

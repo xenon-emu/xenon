@@ -11,3 +11,21 @@ set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
 if (NOT TARGET sirit)
   add_subdirectory(Sirit)
 endif()
+
+# GLAD
+if (NOT TARGET glad)
+  add_subdirectory(glad)
+endif()
+
+# SDL3
+if (NOT TARGET SDL3::SDL3)
+  set(SDL_DISKAUDIO OFF)
+  set(SDL_TEST_LIBRARY OFF)
+  set(SDL_PIPEWIRE OFF)
+  add_subdirectory(SDL3)
+endif()
+
+# Sirit
+if (NOT TARGET sirit)
+  add_subdirectory(Sirit)
+endif()

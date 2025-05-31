@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "Base/Types.h"
+
 #include <string>
 
 #ifndef NO_GFX

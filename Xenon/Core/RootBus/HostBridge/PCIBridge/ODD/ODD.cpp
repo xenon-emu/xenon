@@ -15,10 +15,10 @@ void Xe::PCIDev::ODD::atapiReset() {
   atapiState.dataReadBuffer.init(ATAPI_CDROM_SECTOR_SIZE, true);
   atapiState.dataReadBuffer.reset();
   // These seem to be used to detect the presence of a disc drive
-  atapiState.atapiRegs.unk_10 = 0x1;
-  atapiState.atapiRegs.unk_14 = 0x1;
+  atapiState.atapiRegs.unk_10 = 0x0;
+  atapiState.atapiRegs.unk_14 = 0x0;
   atapiState.atapiRegs.signatureReg = 0xEB140101;
-  atapiState.atapiRegs.unk_1C = 0x1;
+  atapiState.atapiRegs.unk_1C = 0x0;
 
   // Set our Inquiry Data
   constexpr char vendorIdentification[] = "PLDS   16D2S";

@@ -11,7 +11,9 @@
 #include "Core/XGPU/ShaderConstants.h"
 #include "Core/XeMain.h"
 
+#ifndef TOOL
 #include "Render/GUI/GUI.h"
+#endif
 
 namespace Render {
 
@@ -333,10 +335,10 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
   LOG_DEBUG(Xenos, "[CP] Copy state to EDRAM (address: 0x{:X}, size 0x{:X})", address, state->vertexData.size);
   // Clear
   if (colorClearEnabled) {
-    u8 r = (state->clearColor >> 24) & 0xFF;
+    u8 a = (state->clearColor >> 24) & 0xFF;
     u8 g = (state->clearColor >> 16) & 0xFF;
     u8 b = (state->clearColor >> 8) & 0xFF;
-    u8 a = (state->clearColor >> 0) & 0xFF;
+    u8 r = (state->clearColor >> 0) & 0xFF;
     UpdateClearColor(r, g, b, a);
     LOG_DEBUG(Xenos, "[CP] Clear color: {}, {}, {}, {}", r, g, b, a);
   }
@@ -388,8 +390,7 @@ void Renderer::Thread() {
 
         if (shaderType == Render::eShaderType::Vertex) {
           pendingVertexShaders[job.shaderCRC] = std::make_pair(job.shaderTree, job.binary);
-        }
-        else {
+        } else {
           pendingPixelShaders[job.shaderCRC] = std::make_pair(job.shaderTree, job.binary);
         }
 
@@ -470,7 +471,7 @@ void Renderer::Thread() {
       fbPointer = ramPointer->GetPointerToAddress(XeMain::xenos->GetSurface());
       // Profile
       MICROPROFILE_SCOPEI("[Xe::Render]", "Deswizle", MP_AUTO);
-      const u32 *ui_fbPointer = reinterpret_cast<u32 *>(fbPointer);
+      const u32 *ui_fbPointer = reinterpret_cast<u32*>(fbPointer);
       pixelSSBO->UpdateBuffer(0, pitch, ui_fbPointer);
 
       // Use the compute shader
@@ -518,8 +519,7 @@ void Renderer::Thread() {
       // Draw
       if (drawJob.indexed) {
         DrawIndexed(drawJob.params, drawJob.params.indexBufferInfo);
-      }
-      else {
+      } else {
         Draw(drawJob.params);
       }
     }

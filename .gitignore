@@ -431,6 +431,9 @@ Xenon.dir/*
 /Xenon/x64/*
 /Xenon/Debug/*
 /Tools/Tools/*
+Tools/AST/Deps/ThirdParty/glad
+Tools/AST/Deps/ThirdParty/SDL3
+Tools/AST/Deps/ThirdParty/Sirit
 result
 files
 # Specific to Xenon tooling

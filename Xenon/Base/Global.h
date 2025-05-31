@@ -7,8 +7,10 @@
 #include "Logging/Log.h"
 #include "Types.h"
 
+#ifndef TOOL
 #include "microprofile.h"
 #include "microprofile_html.h"
+#endif
 
 // Global running state
 inline volatile bool XeRunning{ true };

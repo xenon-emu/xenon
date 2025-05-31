@@ -2,7 +2,9 @@
 
 #pragma once
 
+#ifndef TOOL
 #include "Render/GUI/GUI.h"
+#endif
 
 #ifndef NO_GFX
 

@@ -36,11 +36,16 @@ void throw_fail_impl() {
 }
 
 void assert_fail_impl() {
+#ifndef TOOL
   if (Config::debug.softHaltOnAssertions) {
     if (XeMain::GetCPU())
       XeMain::GetCPU()->Halt();
     printf("Assertion Failed! Soft halting emulator...\n");
   }
+#else
+  printf("Assertion Failed!\n");
+  throw_fail_impl();
+#endif
 }
 
 [[noreturn]] void unreachable_impl() {

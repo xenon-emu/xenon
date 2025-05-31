@@ -29,21 +29,6 @@ enum class eEndianFormat : u32 {
   Format8in128
 };
 
-enum class ePrimitiveType : u32 {
-  None,
-  PointList,
-  LineList,
-  LineStrip,
-  TriangleList,
-  TriangleFan,
-  TriangleStrip,
-  Unknown7,
-  RectangleList,
-  LineLoop,
-  QuadList,
-  QuadStrip
-};
-
 enum class eShaderType : u32 {
   Vertex,
   Pixel,
