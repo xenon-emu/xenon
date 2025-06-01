@@ -101,6 +101,8 @@ void PPCInterpreter::PPCInterpreter_vcfux(PPU_STATE *ppuState) {
 
   // TODO: Rounding
 
+  CHECK_VXU;
+
   const f32 divisor = 1 << _instr.vuimm;
 
   VRi(vd).flt[0] = VRi(va).dword[0] / divisor;
@@ -452,6 +454,8 @@ void PPCInterpreter::PPCInterpreter_vsldoi(PPU_STATE *ppuState) {
   /*
   vD <- ((vA) || (vB)) << ui (SHB || 0b000)
   */
+
+  CHECK_VXU;
 
   const u8 sh = _instr.vsh;
   // No shift
