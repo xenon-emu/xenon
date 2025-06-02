@@ -294,6 +294,72 @@ void PPCInterpreter::PPCInterpreter_vperm128(PPU_STATE* ppuState) {
   VR(VMX128_2_VD128).dword[3] = byteswap_be<u32>(VR(VMX128_2_VD128).dword[3]);
 }
 
+// Vector128 Rotate Left Immediate and Mask Insert
+void PPCInterpreter::PPCInterpreter_vrlimi128(PPU_STATE* ppuState) {
+
+  /*
+  From Xenia:
+  This is just a fancy permute.
+  X Y Z W, rotated left by 2 = Z W X Y
+  Then mask select the results into the dest.
+  Sometimes rotation is zero, so fast path.
+  */
+
+  // Note: Already checked behavior against Xenia's tests. 
+
+  CHECK_VXU;
+
+  const uint32_t vd = _instr.VMX128_4.VD128l | (_instr.VMX128_4.VD128h << 5);
+  const uint32_t vb = _instr.VMX128_4.VB128l | (_instr.VMX128_4.VB128h << 5);
+  uint32_t blendMaskSource = _instr.VMX128_4.IMM;
+  uint32_t blendMask = 0;
+  blendMask |= (((blendMaskSource >> 3) & 0x1) ? 0 : 4) << 0;
+  blendMask |= (((blendMaskSource >> 2) & 0x1) ? 1 : 5) << 8;
+  blendMask |= (((blendMaskSource >> 1) & 0x1) ? 2 : 6) << 16;
+  blendMask |= (((blendMaskSource >> 0) & 0x1) ? 3 : 7) << 24;
+  uint32_t rotate = _instr.VMX128_4.z;
+
+  Base::Vector128 result = {};
+
+  if (rotate) {
+    switch (rotate)
+    {
+    case 1: // X Y Z W -> Y Z W X
+      result.flt[0] = VR(vb).flt[1];
+      result.flt[1] = VR(vb).flt[2];
+      result.flt[2] = VR(vb).flt[3];
+      result.flt[3] = VR(vb).flt[0];
+      break;
+    case 2: // X Y Z W -> Z W X Y
+      result.flt[0] = VR(vb).flt[2];
+      result.flt[1] = VR(vb).flt[3];
+      result.flt[2] = VR(vb).flt[0];
+      result.flt[3] = VR(vb).flt[1];
+      break;
+    case 3: // X Y Z W -> W X Y Z
+      result.flt[0] = VR(vb).flt[3];
+      result.flt[1] = VR(vb).flt[0];
+      result.flt[2] = VR(vb).flt[1];
+      result.flt[3] = VR(vb).flt[2];
+      break;
+    default:
+      LOG_ERROR(Xenos, "vrlimi128: Unhandled rotate amount.");
+      break;
+    }
+  } else {
+    result = VR(vb);
+  }
+
+  if (blendMask != 0x03020100) {
+    result.dword[3] = ((blendMask & 0xFF000000) == 0x03000000 ? result.dword[3] : VR(vd).dword[3]);
+    result.dword[2] = ((blendMask & 0x00FF0000) == 0x00020000 ? result.dword[2] : VR(vd).dword[2]);
+    result.dword[1] = ((blendMask & 0x0000FF00) == 0x00000100 ? result.dword[1] : VR(vd).dword[1]);
+    result.dword[0] = ((blendMask & 0x000000FF) == 0x00000000 ? result.dword[0] : VR(vd).dword[0]);
+  }
+
+  VR(vd) = result;
+}
+
 // Vector Multiply Add Floating Point (x'1000 002E')
 void PPCInterpreter::PPCInterpreter_vmaddfp(PPU_STATE *ppuState) {
   /*
