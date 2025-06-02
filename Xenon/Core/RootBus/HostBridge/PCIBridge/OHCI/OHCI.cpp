@@ -69,7 +69,8 @@ void Xe::PCIDev::OHCI::Read(u64 readAddress, u8 *data, u64 size) {
   default:
     if (offset >= 0x54 && offset < 0x54 + sizeof(HcRhPortStatus)) {
       u32 portIndex = (offset - 0x54) / 4;
-      ret = HcRhPortStatus[portIndex];
+      ret = 0;
+      LOG_DEBUG(OHCI, "{} HcRhPortStatus[{}] == 0x{:X}", instance, portIndex, ret);
     }
     break;
   }
@@ -133,7 +134,7 @@ void Xe::PCIDev::OHCI::Write(u64 writeAddress, const u8 *data, u64 size) {
     if (offset >= 0x54 && offset < 0x54 + sizeof(HcRhPortStatus)) {
       u32 portIndex = (offset - 0x54) / 4;
       LOG_DEBUG(OHCI, "{} HcRhPortStatus[{}] = 0x{:X}", instance, portIndex, value);
-      HcRhPortStatus[portIndex] = value;
+      HcRhPortStatus[portIndex] = 0;
     } else {
       LOG_WARNING(OHCI, "{} Write(0x{:X}, 0x{:X}, {})", instance, offset, value, size);
     }

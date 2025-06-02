@@ -15,7 +15,7 @@
 enum class XeRegister;
 
 struct XeShaderFloatConsts {
-  f32 values[256 * 4] = {};
+  f32 values[256 * 4 * 2] = {};
 };
 
 struct XeShaderBoolConsts {
@@ -161,6 +161,9 @@ public:
   u32 viewportYScale = 0;
   u32 viewportZScale = 0;
 
+  // SQ
+  u32 programCntl = 0;
+
   // D1CRTC
   u32 crtcControl = 0; // Checks if the RTC is active
 
@@ -208,8 +211,7 @@ public:
   u32 internalHeight = 720;
 
   // Internal buffers
-  XeShaderFloatConsts vsConsts = {};
-  XeShaderFloatConsts psConsts = {};
+  XeShaderFloatConsts floatConsts = {};
   XeShaderBoolConsts boolConsts = {};
 
   // Registers

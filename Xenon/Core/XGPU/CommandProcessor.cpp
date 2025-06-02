@@ -177,6 +177,20 @@ void CommandProcessor::cpExecuteIndirectBuffer(u32 bufferPtr, u32 bufferSize) {
   return;
 }
 
+void CommandProcessor::CPSetSQProgramCntl(u32 value) {
+  state->programCntl = value;
+
+  // Update shader hashes
+  u32 vsHash = render->currentVertexShader.load();
+  u32 psHash = render->currentPixelShader.load();
+  
+  if (vsHash && psHash) {
+    render->readyToLink.store(true);
+    render->pendingVertexShader = vsHash;
+    render->pendingPixelShader = psHash;
+  }
+}
+
 // Executes a single packet from the ringbuffer.
 bool CommandProcessor::ExecutePacket(RingBuffer *ringBuffer) {
   // Get packet data.
@@ -716,7 +730,7 @@ std::pair<Microcode::AST::Shader*, std::vector<u32>> LoadShader(eShaderType shad
   }*/
   Microcode::AST::Shader *shader = Microcode::AST::Shader::DecompileMicroCode(reinterpret_cast<const u8*>(data.data()), data.size() * 4, shaderType);
 #ifndef NO_GFX
-  Microcode::AST::ShaderCodeWriterSirit writer{ shaderType, shader };
+  Microcode::AST::ShaderCodeWriterSirit writer{ shaderType };
   if (shader) {
     shader->EmitShaderCode(writer);
   }
@@ -759,28 +773,17 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
 
   std::pair<Microcode::AST::Shader*, std::vector<u32>> shader = LoadShader(shaderType, data, baseString);
 
-#ifndef NO_GFX
-  {
-    std::lock_guard<std::mutex> lock(render->shaderQueueMutex);
-    render->shaderLoadQueue.push({
-      shaderType,
-      crc,
-      baseString,
-      shader.first,
-      shader.second
-    });
-  }
-#endif
-
   switch (shaderType) {
   case eShaderType::Pixel:{
 #ifndef NO_GFX
+    render->pendingPixelShaders[crc] = shader;
     render->currentPixelShader.store(crc);
 #endif
     LOG_DEBUG(Xenos, "[CP::IM_LOAD] PixelShader CRC: 0x{:08X}", crc);
   } break;
   case eShaderType::Vertex:{
 #ifndef NO_GFX
+    render->pendingVertexShaders[crc] = shader;
     render->currentVertexShader.store(crc);
 #endif
     LOG_DEBUG(Xenos, "[CP::IM_LOAD] VertexShader CRC: 0x{:08X}", crc);
@@ -821,28 +824,17 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuff
   
   std::pair<Microcode::AST::Shader*, std::vector<u32>> shader = LoadShader(shaderType, data, baseString);
 
-#ifndef NO_GFX
-  {
-    std::lock_guard<std::mutex> lock(render->shaderQueueMutex);
-    render->shaderLoadQueue.push({
-      shaderType,
-      crc,
-      baseString,
-      shader.first,
-      shader.second
-    });
-  }
-#endif
-
   switch (shaderType) {
   case eShaderType::Pixel:{
 #ifndef NO_GFX
+    render->pendingPixelShaders[crc] = shader;
     render->currentPixelShader.store(crc);
 #endif
     LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] PixelShader CRC: 0x{:08X}", crc);
   } break;
   case eShaderType::Vertex:{
 #ifndef NO_GFX
+    render->pendingVertexShaders[crc] = shader;
     render->currentVertexShader.store(crc);
 #endif
     LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] VertexShader CRC: 0x{:08X}", crc);
@@ -1160,12 +1152,6 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
       params.state = state;
       params.indexBufferInfo = indexBufferInfo;
       params.vgtDrawInitiator = state->vgtDrawInitiator;
-#ifndef NO_GFX
-      if (render->linkedShaderPrograms.find(combinedShaderHash) == render->linkedShaderPrograms.end()) {
-        LOG_ERROR(Xenos, "Shader hash 0x{:X} (VS:0x{:X}, PS:0x{:X}) not found in linkedShaderPrograms!", combinedShaderHash, render->currentVertexShader.load(), render->currentPixelShader.load());
-      }
-      params.shader = render->linkedShaderPrograms[combinedShaderHash];
-#endif
       if (state->vertexData.address > 0) {
         params.vertexBufferPtr = ram->GetPointerToAddress(state->vertexData.address);
         params.vertexBufferSize = state->vertexData.size;

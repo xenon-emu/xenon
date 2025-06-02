@@ -39,14 +39,6 @@ struct DrawJob {
   u64 shaderHash = 0;
 };
 
-struct ShaderLoadJob {
-  Xe::eShaderType shaderType = Xe::eShaderType::Unknown;
-  u32 shaderCRC = 0;
-  std::string name = {};
-  Xe::Microcode::AST::Shader *shaderTree = nullptr;
-  std::vector<u32> binary = {};
-};
-
 struct BufferLoadJob {
   BufferLoadJob(const std::string &name, const std::vector<u8> &data, const eBufferType type, const eBufferUsage usage) :
     name(name), data(data),
@@ -77,8 +69,8 @@ public:
   virtual void Clear() = 0;
 
   virtual void UpdateViewportFromState(const Xe::XGPU::XenosState *state) = 0;
-  virtual void Draw(Xe::XGPU::XeDrawParams params) = 0;
-  virtual void DrawIndexed(Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) = 0;
+  virtual void Draw(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params) = 0;
+  virtual void DrawIndexed(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) = 0;
 
   virtual void OnCompute() = 0;
   virtual void OnBind() = 0;
@@ -97,6 +89,8 @@ public:
   void UpdateConstants(Xe::XGPU::XenosState *state);
 
   bool IssueCopy(Xe::XGPU::XenosState *state);
+
+  void TryLinkShaderPair(u32 vsHash, u32 psHash);
 
   void HandleEvents();
 
@@ -140,8 +134,6 @@ public:
   std::queue<DrawJob> drawQueue{};
 
   // Shader load queue
-  std::mutex shaderQueueMutex{};
-  std::queue<ShaderLoadJob> shaderLoadQueue{};
   std::mutex bufferQueueMutex{};
   std::queue<BufferLoadJob> bufferLoadQueue{};
   std::unordered_map<u32, std::shared_ptr<Buffer>> createdBuffers{};
@@ -157,7 +149,10 @@ public:
   std::unordered_map<u32, std::pair<Xe::Microcode::AST::Shader*, std::vector<u32>>> pendingPixelShaders{};
   std::unordered_map<u64, Xe::XGPU::XeShader> linkedShaderPrograms{};
   std::atomic<u32> currentVertexShader = 0;
+  u32 pendingVertexShader = 0;
   std::atomic<u32> currentPixelShader = 0;
+  u32 pendingPixelShader = 0;
+  std::atomic<bool> readyToLink = false;
   std::mutex copyQueueMutex{};
   std::queue<Xe::XGPU::XenosState*> copyQueue{};
 private:

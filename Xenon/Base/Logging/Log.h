@@ -93,12 +93,14 @@ namespace fs = std::filesystem;
 
 #define LOG_BASE(x, s, ...) std::cout << "[" #x "] <" #s "> " << std::format(__VA_ARGS__)
 #define LOG_INFO_BASE(x, ...) LOG_BASE(x, Info, __VA_ARGS__)
+#define LOG_WARNING_BASE(x, ...) LOG_BASE(x, Warning, __VA_ARGS__)
 #define LOG_ERROR_BASE(x, ...) LOG_BASE(x, Error, __VA_ARGS__)
 #define LOG_CRITICAL_BASE(x, ...) LOG_BASE(x, Critical, __VA_ARGS__)
 #define LOG_DEBUG_BASE(x, ...) LOG_BASE(x, Debug, __VA_ARGS__)
 #define LOG_XBOX_BASE(x, ...) LOG_BASE(x, Xbox, __VA_ARGS__)
 
 #define LOG_INFO(x, ...) LOG_INFO_BASE(x, __VA_ARGS__) << std::endl
+#define LOG_WARNING(x, ...) LOG_WARNING_BASE(x, __VA_ARGS__) << std::endl
 #define LOG_ERROR(x, ...) LOG_ERROR_BASE(x, __VA_ARGS__) << std::endl
 #define LOG_CRITICAL(x, ...) LOG_CRITICAL_BASE(x, __VA_ARGS__) << std::endl
 #define LOG_DEBUG(x, ...) LOG_DEBUG_BASE(x, __VA_ARGS__) << std::endl

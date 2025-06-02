@@ -153,77 +153,48 @@ s32 ConvertToGLPrimitive(ePrimitiveType prim) {
   }
 }
 
-void OGLRenderer::Draw(Xe::XGPU::XeDrawParams params) {
+void OGLRenderer::Draw(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params) {
   ePrimitiveType type = params.vgtDrawInitiator.primitiveType;
   s32 glPrimitive = ConvertToGLPrimitive(params.vgtDrawInitiator.primitiveType);
   u32 numIndices = params.vgtDrawInitiator.numIndices;
-  // Bind VAO
+  // Bind the VAO
   glBindVertexArray(VAO);
-  auto &shader = params.shader;
-  // Bind buffers
+  // Bind the VBO
+  if (auto buffer = createdBuffers.find("VertexFetch"_j); buffer != createdBuffers.end())
+    buffer->second->Bind();
+  // Setup attribs
   if (shader.vertexShader) {
-    if (auto buffer = createdBuffers.find("VertexConsts"_j); buffer != createdBuffers.end())
-      buffer->second->Bind(0);
-  }
-  if (shader.pixelShader) {
-    if (auto buffer = createdBuffers.find("PixelConsts"_j); buffer != createdBuffers.end())
-      buffer->second->Bind(2);
-  }
-  if (auto buffer = createdBuffers.find("CommonBoolConsts"_j); buffer != createdBuffers.end())
-    buffer->second->Bind(1);
+    for (const auto *fetch : shader.vertexShader->vertexFetches) {
+      const u32 location = fetch->fetchSlot - 95; // c95 is first fetch slot
+      const u32 components = fetch->GetComponentCount(); // 1-4
+      const u32 type = fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT;
+      const u8 normalized = fetch->isNormalized ? GL_TRUE : GL_FALSE;
+      const u32 offset = fetch->fetchOffset;
+      const u32 stride = fetch->fetchStride;
 
-  // Configure vertex attributes from vertex fetches
-  if (params.shader.vertexShader) {
-    for (const auto *fetch : params.shader.vertexShader->vertexFetches) {
-      u32 slot = fetch->fetchSlot;
-      u32 offset = fetch->fetchOffset;
-      u32 stride = fetch->fetchStride;
-
-      glEnableVertexAttribArray(slot);
-      // TODO: Make this actually cleaner, by taking size of args, and the type
-      switch (fetch->format) {
-      case Xe::FMT_8_8_8_8:
-        glVertexAttribPointer(slot, 4, GL_UNSIGNED_BYTE, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
-        break;
-      case Xe::FMT_8_8:
-        glVertexAttribPointer(slot, 2, GL_UNSIGNED_BYTE, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
-        break;
-      case Xe::FMT_32:
-      case Xe::FMT_32_FLOAT:
-        glVertexAttribPointer(slot, 1, fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
-        break;
-      case Xe::FMT_16_16_16_16:
-        glVertexAttribPointer(slot, 4, GL_UNSIGNED_SHORT, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
-        break;
-      case Xe::FMT_16_16_16_16_FLOAT:
-        glVertexAttribPointer(slot, 4, GL_FLOAT, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
-        break;
-      case Xe::FMT_32_32:
-      case Xe::FMT_32_32_FLOAT:
-        glVertexAttribPointer(slot, 2, fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
-        break;
-      case Xe::FMT_32_32_32_32:
-      case Xe::FMT_32_32_32_32_FLOAT:
-        glVertexAttribPointer(slot, 4, fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT, fetch->isNormalized ? GL_TRUE : GL_FALSE, 0, (const void*)(u64)offset);
-        break;
-      default:
-        LOG_ERROR(Xenos, "[Render] Unhandled OpenGL conversion from Xenos vertex fetch!");
-        break;
-      }
+      glEnableVertexAttribArray(location);
+      glVertexAttribPointer(
+        location,
+        components,
+        type,
+        normalized,
+        stride,
+        reinterpret_cast<void*>((u64)offset)
+      );
     }
   }
   // Bind textures
-  for (u32 i = 0; i != params.shader.textures.size(); ++i) {
+  for (u32 i = 0; i != shader.textures.size(); ++i) {
     glActiveTexture(GL_TEXTURE0 + i);
-    params.shader.textures[i]->Bind();
+    shader.textures[i]->Bind();
   }
   // Perform draw
-  glDrawArrays(glPrimitive, 0, params.vgtDrawInitiator.numIndices);
+  glDrawArrays(glPrimitive, 0, numIndices);
   // Unbind VAO
   glBindVertexArray(0);
 }
 
-void OGLRenderer::DrawIndexed(Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) {
+void OGLRenderer::DrawIndexed(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) {
   ePrimitiveType type = params.vgtDrawInitiator.primitiveType;
   s32 glPrimitive = ConvertToGLPrimitive(params.vgtDrawInitiator.primitiveType);
   u32 numIndices = params.vgtDrawInitiator.numIndices;
@@ -233,63 +204,47 @@ void OGLRenderer::DrawIndexed(Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBu
   const u32 destArray = (destInfo >> 3) & 1;
   const u32 destSlice = (destInfo >> 4) & 1;
   const Xe::eColorFormat destformat = static_cast<Xe::eColorFormat>((destInfo >> 7) & 0x3F);
-  // Bind VAO
-  glBindVertexArray(VAO);
-  if (auto buffer = createdBuffers.find("PixelConsts"_j); buffer != createdBuffers.end()) {
+  // Bind the constants
+  if (auto buffer = createdBuffers.find("FloatConsts"_j); buffer != createdBuffers.end())
     buffer->second->Bind(0);
-  }
-  if (auto buffer = createdBuffers.find("CommonBoolConsts"_j); buffer != createdBuffers.end()) {
+  if (auto buffer = createdBuffers.find("CommonBoolConsts"_j); buffer != createdBuffers.end())
     buffer->second->Bind(1);
-  }
-  if (auto buffer = createdBuffers.find("VertexConsts"_j); buffer != createdBuffers.end()) {
-    buffer->second->Bind(2);
-  }
-  // Bind and upload index buffer
+  // Bind the shader
+  if (shader.program)
+    shader.program->Bind();
+  // Bind the VAO
+  glBindVertexArray(VAO);
+  // Bind the VBO
+  if (auto buffer = createdBuffers.find("VertexFetch"_j); buffer != createdBuffers.end())
+    buffer->second->Bind();
+  // Bind and upload index buffer (TODO: Fix this)
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexBufferInfo.count, indexBufferInfo.elements, GL_STATIC_DRAW);
-  // Configure vertex attributes from vertex fetches
-  if (params.shader.vertexShader) {
-    for (const auto *fetch : params.shader.vertexShader->vertexFetches) {
-      u32 slot = fetch->fetchSlot;
-      u32 offset = fetch->fetchOffset;
-      u32 stride = fetch->fetchStride;
+  // Setup attribs
+  if (shader.vertexShader) {
+    for (const auto *fetch : shader.vertexShader->vertexFetches) {
+      const u32 location = fetch->fetchSlot - 95; // c95 is first fetch slot
+      const u32 components = fetch->GetComponentCount(); // 1-4
+      const u32 type = fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT;
+      const u8 normalized = fetch->isNormalized ? GL_TRUE : GL_FALSE;
+      const u32 offset = fetch->fetchOffset;
+      const u32 stride = fetch->fetchStride;
 
-      glEnableVertexAttribArray(slot);
-      switch (fetch->format) {
-      case Xe::FMT_8_8_8_8:
-        glVertexAttribPointer(slot, 4, GL_UNSIGNED_BYTE, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
-        break;
-      case Xe::FMT_8_8:
-        glVertexAttribPointer(slot, 2, GL_UNSIGNED_BYTE, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
-        break;
-      case Xe::FMT_32:
-      case Xe::FMT_32_FLOAT:
-        glVertexAttribPointer(slot, 1, fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
-        break;
-      case Xe::FMT_16_16_16_16:
-        glVertexAttribPointer(slot, 4, GL_UNSIGNED_SHORT, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
-        break;
-      case Xe::FMT_16_16_16_16_FLOAT:
-        glVertexAttribPointer(slot, 4, GL_FLOAT, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
-        break;
-      case Xe::FMT_32_32:
-      case Xe::FMT_32_32_FLOAT:
-        glVertexAttribPointer(slot, 2, fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
-        break;
-      case Xe::FMT_32_32_32_32:
-      case Xe::FMT_32_32_32_32_FLOAT:
-        glVertexAttribPointer(slot, 4, fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT, fetch->isNormalized ? GL_TRUE : GL_FALSE, stride, (const void*)(u64)offset);
-        break;
-      default:
-        LOG_ERROR(Xenos, "[Render] Unhandled OpenGL conversion from Xenos vertex fetch!");
-        break;
-      }
+      glEnableVertexAttribArray(location);
+      glVertexAttribPointer(
+        location,
+        components,
+        type,
+        normalized,
+        stride,
+        reinterpret_cast<void*>((u64)offset)
+      );
     }
   }
   // Bind textures
-  for (u32 i = 0; i != params.shader.textures.size(); ++i) {
+  for (u32 i = 0; i != shader.textures.size(); ++i) {
     glActiveTexture(GL_TEXTURE0 + i);
-    params.shader.textures[i]->Bind();
+    shader.textures[i]->Bind();
   }
   // Perform draw
   glDrawElements(glPrimitive, numIndices, indexType, 0);

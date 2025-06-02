@@ -90,7 +90,7 @@ class Shader;
 #ifndef NO_GFX
 class ShaderCodeWriterSirit : public ShaderCodeWriterBase {
 public:
-  ShaderCodeWriterSirit(eShaderType shaderType, Shader *shader);
+  ShaderCodeWriterSirit(eShaderType shaderType);
 
   void BeginMain() override;
 
@@ -161,14 +161,12 @@ public:
     std::span<const eSwizzle> dstSwizzle,
     std::span<const eSwizzle> immediateValues) override;
 
-  Shader *shader = nullptr;
   eShaderType type{};
 
   std::unordered_map<u32, Chunk> texture_vars{};
 
+  std::unordered_map<u32, Sirit::Id> temp_regs{};
   std::unordered_map<u32, Sirit::Id> vertex_input_vars{};
-  std::unordered_set<u32> used_vertex_slots{};
-  std::unordered_set<eExportReg> used_exports{};
   std::unordered_map<std::string, Sirit::Id> input_vars{};
   std::unordered_map<eExportReg, Sirit::Id> output_vars{};
 

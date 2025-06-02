@@ -263,10 +263,10 @@ public:
       vfetch.push_back(reinterpret_cast<const VertexFetch*>(n.get()));
     }
     else if (n->GetType() == eExprType::TFETCH) {
-      tfetch.push_back(reinterpret_cast<const TextureFetch *>(n.get()));
+      tfetch.push_back(reinterpret_cast<const TextureFetch*>(n.get()));
     }
     else if (n->GetType() == eExprType::EXPORT) {
-      exports.push_back(reinterpret_cast<const WriteExportRegister *>(n.get()));
+      exports.push_back(reinterpret_cast<const WriteExportRegister*>(n.get()));
     }
     else {
       const s32 regIndex = n->GetRegisterIndex();

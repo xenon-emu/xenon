@@ -260,23 +260,26 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
   case XeRegister::PA_SC_WINDOW_SCISSOR_BR:
     value = windowScissorBr;
     break;
-  case XeRegister::PA_CL_VPORT_XOFFSET:
-    value = viewportXOffset;
-    break;
-  case XeRegister::PA_CL_VPORT_YOFFSET:
-    value = viewportYOffset;
-    break;
-  case XeRegister::PA_CL_VPORT_ZOFFSET:
-    value = viewportZOffset;
-    break;
   case XeRegister::PA_CL_VPORT_XSCALE:
     value = viewportXScale;
+    break;
+  case XeRegister::PA_CL_VPORT_XOFFSET:
+    value = viewportXOffset;
     break;
   case XeRegister::PA_CL_VPORT_YSCALE:
     value = viewportYScale;
     break;
+  case XeRegister::PA_CL_VPORT_YOFFSET:
+    value = viewportYOffset;
+    break;
   case XeRegister::PA_CL_VPORT_ZSCALE:
     value = viewportZScale;
+    break;
+  case XeRegister::PA_CL_VPORT_ZOFFSET:
+    value = viewportZOffset;
+    break;
+  case XeRegister::SQ_PROGRAM_CNTL:
+    value = programCntl;
     break;
   case XeRegister::VGT_MAX_VTX_INDX:
     value = maxVertexIndex;
@@ -598,23 +601,26 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
   case XeRegister::PA_SC_WINDOW_SCISSOR_BR:
     windowScissorBr = value;
     break;
+  case XeRegister::PA_CL_VPORT_XSCALE:
+    viewportXScale = value;
+    break;
   case XeRegister::PA_CL_VPORT_XOFFSET:
     viewportXOffset = value;
     break;
   case XeRegister::PA_CL_VPORT_YOFFSET:
     viewportYOffset = value;
     break;
-  case XeRegister::PA_CL_VPORT_ZOFFSET:
-    viewportZOffset = value;
-    break;
-  case XeRegister::PA_CL_VPORT_XSCALE:
-    viewportXScale = value;
-    break;
   case XeRegister::PA_CL_VPORT_YSCALE:
     viewportYScale = value;
     break;
   case XeRegister::PA_CL_VPORT_ZSCALE:
     viewportZScale = value;
+    break;
+  case XeRegister::PA_CL_VPORT_ZOFFSET:
+    viewportZOffset = value;
+    break;
+  case XeRegister::SQ_PROGRAM_CNTL:
+    commandProcessor->CPSetSQProgramCntl(value);
     break;
   case XeRegister::VGT_MAX_VTX_INDX:
     maxVertexIndex = value;

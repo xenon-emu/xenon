@@ -32,6 +32,7 @@
 #include "Core/XGPU/Xenos.h"
 #include "Core/XGPU/XenosState.h"
 
+#include "Render/Abstractions/Buffer.h"
 #include "Render/Abstractions/Shader.h"
 #include "Render/Abstractions/Texture.h"
 
@@ -68,9 +69,6 @@ struct XeDrawParams {
   XenosState *state = nullptr;
   XeIndexBufferInfo indexBufferInfo = {};
   VGT_DRAW_INITIATOR_REG vgtDrawInitiator = {};
-#ifndef NO_GFX
-  XeShader shader;
-#endif
   u8 *vertexBufferPtr = nullptr;
   u64 vertexBufferSize = 0;
   u32 maxVertexIndex = 0;
@@ -98,6 +96,8 @@ public:
   void CPUpdateRBSize(size_t newSize);
   // CP RB Write Ptr offset (from base in words)
   void CPUpdateRBWritePointer(u32 offset);
+
+  void CPSetSQProgramCntl(u32 value);
 
 private:
   // PCI Bridge pointer. Used for interrupts

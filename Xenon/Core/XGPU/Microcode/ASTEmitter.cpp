@@ -9,25 +9,11 @@
 #ifndef NO_GFX
 namespace Xe::Microcode::AST {
 
-ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType, Shader *shader) :
-  type(shaderType), shader(shader) {
+ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType) :
+  type(shaderType) {
   module.AddCapability(spv::Capability::Shader);
-  //StorageBufferStorageClass
-  //module.AddCapability(static_cast<spv::Capability>(4420));
   module.AddExtension("SPV_KHR_storage_buffer_storage_class");
   module.SetMemoryModel(spv::AddressingModel::Logical, spv::MemoryModel::GLSL450);
-
-  if (shader) {
-    for (const auto &tex : shader->usedTextures) {
-      Sirit::Id sampled_type = GetSampledImageType(tex.type);
-      Sirit::Id ptr_type = module.TypePointer(spv::StorageClass::UniformConstant, sampled_type);
-      Sirit::Id var = module.AddGlobalVariable(ptr_type, spv::StorageClass::UniformConstant);
-      module.Decorate(var, spv::Decoration::DescriptorSet, 0);
-      module.Decorate(var, spv::Decoration::Binding, tex.slot);
-      module.Name(var, FMT("TextureSlot{}", tex.slot));
-      texture_vars[tex.slot] = Chunk(var, sampled_type);
-    }
-  }
 
   std::string shaderTypeName = type == eShaderType::Pixel ? "Pixel" : "Vertex";
 
@@ -36,87 +22,25 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType, Shader *sha
   Sirit::Id float_type = module.TypeFloat(32);
   Sirit::Id vec4_type = module.TypeVector(float_type, 4);
   Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
-  Sirit::Id float_ptr_output = module.TypePointer(spv::StorageClass::Output, module.TypeFloat(32));
-
-  if (type == eShaderType::Pixel) {
-    if (shader) {
-      for (const auto &reg : shader->usedRegisters) {
-        eExportReg exportReg = static_cast<eExportReg>(reg);
-        auto &var = output_vars[exportReg];
-        switch (exportReg) {
-        case eExportReg::POSITION:
-          output_vars[eExportReg::POSITION] =
-            module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
-          module.Name(output_vars[eExportReg::POSITION], "POSITION");
-          module.Decorate(var, spv::Decoration::BuiltIn, spv::BuiltIn::Position);
-          break;
-        case eExportReg::POINTSIZE:
-          output_vars[eExportReg::POINTSIZE] = module.AddGlobalVariable(float_ptr_output, spv::StorageClass::Output);
-          module.Name(output_vars[eExportReg::POINTSIZE], "POINTSIZE");
-          module.Decorate(var, spv::Decoration::BuiltIn, spv::BuiltIn::PointSize);
-          break;
-        default:
-          if (exportReg >= eExportReg::COLOR0 && exportReg <= eExportReg::COLOR3) {
-            var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
-            module.Name(var, FMT("COLOR{}", reg - static_cast<u32>(eExportReg::COLOR0)));
-          } else if (exportReg >= eExportReg::INTERP0 && exportReg <= eExportReg::INTERP7) {
-            var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
-            module.Name(var, FMT("INTERP{}", reg - static_cast<u32>(eExportReg::INTERP0)));
-          } else {
-            LOG_ERROR(Xenos, "[AST::Sirit] Invalid output variable '{}'!", reg);
-          }
-          break;
-        }
-      }
-    }
-  } else {
-    // POSITION
-    output_vars[eExportReg::POSITION] =
-      module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
-    module.Name(output_vars[eExportReg::POSITION], "POSITION");
-    // POINTSIZE
-    output_vars[eExportReg::POINTSIZE] = module.AddGlobalVariable(float_ptr_output, spv::StorageClass::Output);
-    module.Name(output_vars[eExportReg::POINTSIZE], "POINTSIZE");
-    if (shader) {
-      for (const auto &reg : shader->usedRegisters) {
-        eExportReg exportReg = static_cast<eExportReg>(reg);
-        auto &var = output_vars[exportReg];
-        switch (exportReg) {
-        default:
-          if (exportReg >= eExportReg::COLOR0 && exportReg <= eExportReg::COLOR3) {
-            Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
-            var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
-            module.Name(var, FMT("COLOR{}", reg - static_cast<u32>(eExportReg::COLOR0)));
-          } else if (exportReg >= eExportReg::INTERP0 && exportReg <= eExportReg::INTERP7) {
-            Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
-            var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
-            module.Name(var, FMT("INTERP{}", reg - static_cast<u32>(eExportReg::INTERP0)));
-          } else {
-            LOG_ERROR(Xenos, "[AST::Sirit] Invalid output variable '{}'!", reg);
-          }
-          break;
-        }
-      }
-    }
-  }
+  Sirit::Id float_ptr_output = module.TypePointer(spv::StorageClass::Output, float_type);
 
   Sirit::Id bool_type = module.TypeBool();
   Sirit::Id bool_ptr_type = module.TypePointer(spv::StorageClass::Private, bool_type);
   Sirit::Id false_val = module.ConstantFalse(bool_type);
   predicate_var = module.AddGlobalVariable(bool_ptr_type, spv::StorageClass::Private, false_val);
  
-  // Vertex Constants
-  Sirit::Id const_256 = module.Constant(uint_type, 256);
-  Sirit::Id vec4_array_256 = module.TypeArray(vec4_type, const_256);
+  // Float Constants
+  Sirit::Id const_512 = module.Constant(uint_type, 512);
+  Sirit::Id vec4_array_512 = module.TypeArray(vec4_type, const_512);
   // Struct and UBO
-  Sirit::Id ubo_struct_v = module.TypeStruct(vec4_array_256);
+  Sirit::Id ubo_struct_v = module.TypeStruct(vec4_array_512);
   module.Decorate(ubo_struct_v, spv::Decoration::Block);
-  module.Name(ubo_struct_v, shaderTypeName + "Consts");
+  module.Name(ubo_struct_v, "ALUConsts");
   module.MemberName(ubo_struct_v, 0, "FloatConsts");
   ubo_type_v = module.TypePointer(spv::StorageClass::StorageBuffer, ubo_struct_v);
   ubo_var_v = module.AddGlobalVariable(ubo_type_v, spv::StorageClass::StorageBuffer);
   // For vec4 array inside struct
-  module.Decorate(vec4_array_256, spv::Decoration::ArrayStride, 16);
+  module.Decorate(vec4_array_512, spv::Decoration::ArrayStride, 16);
   module.MemberDecorate(ubo_struct_v, 0, spv::Decoration::Offset, 0);
 
   // For uint array inside struct
@@ -133,7 +57,7 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType, Shader *sha
 
   // Decorate UBO variable (binding, descriptor set)
   module.Decorate(ubo_var_v, spv::Decoration::DescriptorSet, 0);
-  u32 floatConstBinding = shaderType == eShaderType::Vertex ? 0 : 2;
+  u32 floatConstBinding = 0;
   module.Decorate(ubo_var_v, spv::Decoration::Binding, floatConstBinding);
 
   module.Decorate(ubo_var_b, spv::Decoration::DescriptorSet, 0);
@@ -152,29 +76,15 @@ void ShaderCodeWriterSirit::BeginMain() {
   Sirit::Id const_128 = module.Constant(module.TypeInt(32, false), 128);
 
   Sirit::Id uint_type = module.TypeInt(32, false);
-  if (type == eShaderType::Vertex) {
-    for (auto name : { "VertexID", "InstanceID" }) {
-      Sirit::Id ptr = module.TypePointer(spv::StorageClass::Input, uint_type);
-      input_vars[name] = module.AddGlobalVariable(ptr, spv::StorageClass::Input);
-    }
-  }
 }
 
 void ShaderCodeWriterSirit::FinalizeEntryPoint() {
   LOG_DEBUG(Xenos, "[AST::Sirit] FinalizeEntryPoint()");
   std::vector<Sirit::Id> interface_vars;
 
+  spv::ExecutionModel execModel = type == eShaderType::Pixel ? spv::ExecutionModel::Fragment : spv::ExecutionModel::Vertex;
   if (type == eShaderType::Pixel) {
-    for (const auto& [reg, var] : output_vars) {
-      u32 location = static_cast<u32>(reg) - static_cast<u32>(eExportReg::COLOR0);
-      if (location >= 4)
-        continue;
-      module.Decorate(var, spv::Decoration::Location, location);
-      interface_vars.push_back(var);
-    }
     module.AddExecutionMode(main_func, spv::ExecutionMode::OriginUpperLeft);
-    module.AddExecutionMode(main_func, spv::ExecutionMode::PixelCenterInteger);
-    module.AddEntryPoint(spv::ExecutionModel::Fragment, main_func, "main", interface_vars);
   } else {
     u32 i = 0;
     for (const auto &[name, var] : input_vars) {
@@ -187,31 +97,31 @@ void ShaderCodeWriterSirit::FinalizeEntryPoint() {
     for (const auto &[slot, var] : vertex_input_vars) {
       interface_vars.push_back(var);
     }
-    for (const auto& [reg, var] : output_vars) {
-      // Only use what's needed
-      if (!used_exports.count(reg))
-        continue;
-      switch (reg) {
-      case eExportReg::POSITION:
-        module.Decorate(var, spv::Decoration::BuiltIn, spv::BuiltIn::Position);
-        break;
-      case eExportReg::POINTSIZE:
-        module.Decorate(var, spv::Decoration::BuiltIn, spv::BuiltIn::PointSize);
-        break;
-      default:
-        if (reg >= eExportReg::INTERP0 && reg <= eExportReg::INTERP7) {
-          s32 location = static_cast<s32>(reg) - static_cast<s32>(eExportReg::INTERP0);
-          if (location >= 0)
-            module.Decorate(var, spv::Decoration::Location, static_cast<u32>(location));
-        } else {
-          LOG_ERROR(Xenos, "[AST::Sirit] Invalid output variable '{}'!", (u32)reg);
-        }
-        break;
-      }
-      interface_vars.push_back(var);
-    }
-    module.AddEntryPoint(spv::ExecutionModel::Vertex, main_func, "main", interface_vars);
   }
+  for (const auto &[reg, var] : output_vars) {
+    u32 location = -1;
+    spv::Decoration type = spv::Decoration::Location;
+    switch (reg) {
+    case eExportReg::POSITION: {
+      type = spv::Decoration::BuiltIn;
+      location = static_cast<u32>(spv::BuiltIn::Position);
+    } break;
+    case eExportReg::POINTSIZE: {
+      type = spv::Decoration::BuiltIn;
+      location = static_cast<u32>(spv::BuiltIn::PointSize);
+    } break;
+    default:
+      if (reg >= eExportReg::COLOR0 && reg <= eExportReg::COLOR3) {
+        location = static_cast<u32>(reg) - static_cast<u32>(eExportReg::COLOR0);
+      } else if (reg >= eExportReg::INTERP0 && reg <= eExportReg::INTERP7) {
+        location = static_cast<u32>(reg) - static_cast<u32>(eExportReg::INTERP0);
+      }
+      break;
+    }
+    module.Decorate(var, type, location);
+    interface_vars.push_back(var);
+  }
+  module.AddEntryPoint(execModel, main_func, "main", interface_vars);
 }
 
 void ShaderCodeWriterSirit::EndMain() {
@@ -221,16 +131,6 @@ void ShaderCodeWriterSirit::EndMain() {
   }
   Sirit::Id float_type = module.TypeFloat(32);
   Sirit::Id vec4_type = module.TypeVector(float_type, 4);
-  if (type == eShaderType::Vertex) {
-    for (auto& [reg, var] : output_vars) {
-      // Only use what's needed
-      if (!used_exports.count(reg))
-        continue;
-    }
-  }
-  for (auto fetch : shader->vertexFetches) {
-    FetchVertex({}, *fetch); // This ensures each slot gets declared and decorated
-  }
   module.OpReturn();
   module.OpFunctionEnd();
   FinalizeEntryPoint();
@@ -238,22 +138,34 @@ void ShaderCodeWriterSirit::EndMain() {
 
 Chunk ShaderCodeWriterSirit::GetExportDest(const eExportReg reg) {
   LOG_DEBUG(Xenos, "[AST::Sirit] GetExportDest({})", (u32)reg);
-  used_exports.insert(reg);
   Sirit::Id float_type = module.TypeFloat(32);
   Sirit::Id vec4_type = module.TypeVector(float_type, 4);
+  Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
+  Sirit::Id float_ptr_output = module.TypePointer(spv::StorageClass::Output, float_type);
   bool colorReg = false;
   auto it = output_vars.find(reg);
   if (it == output_vars.end()) {
     auto &var = output_vars[reg];
-    if (reg >= eExportReg::COLOR0 && reg <= eExportReg::COLOR3) {
-      colorReg = true;
-      Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
-      var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
-      module.Name(var, FMT("COLOR{}", static_cast<u32>(reg) - static_cast<u32>(eExportReg::COLOR0)));
-    } else if (reg >= eExportReg::INTERP0 && reg <= eExportReg::INTERP7) {
-      Sirit::Id vec4_ptr_output = module.TypePointer(spv::StorageClass::Output, vec4_type);
-      var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
-      module.Name(var, FMT("INTERP{}", static_cast<u32>(reg) - static_cast<u32>(eExportReg::INTERP0)));
+    switch (reg) {
+    case eExportReg::POSITION:
+      output_vars[eExportReg::POSITION] =
+        module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
+      module.Name(output_vars[eExportReg::POSITION], "POSITION");
+      break;
+    case eExportReg::POINTSIZE:
+      output_vars[eExportReg::POINTSIZE] = module.AddGlobalVariable(float_ptr_output, spv::StorageClass::Output);
+      module.Name(output_vars[eExportReg::POINTSIZE], "POINTSIZE");
+      break;
+    default:
+      if (reg >= eExportReg::COLOR0 && reg <= eExportReg::COLOR3) {
+        colorReg = true;
+        var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
+        module.Name(var, FMT("COLOR{}", static_cast<u32>(reg) - static_cast<u32>(eExportReg::COLOR0)));
+      } else if (reg >= eExportReg::INTERP0 && reg <= eExportReg::INTERP7) {
+        var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
+        module.Name(var, FMT("INTERP{}", static_cast<u32>(reg) - static_cast<u32>(eExportReg::INTERP0)));
+      }
+      break;
     }
     it = output_vars.find(reg);
   }
@@ -273,32 +185,37 @@ Chunk ShaderCodeWriterSirit::GetExportDest(const eExportReg reg) {
     }
   }
 
-  // Swizzles to RGBA from BGRA/ARGB
-  // XYZW = ARGB
-  // YZWX = RGBA
-  if (colorReg) {
-    loaded = Swizzle(Chunk(loaded, eChunkType::Vector), {
-      eSwizzle::Y,
-      eSwizzle::Z,
-      eSwizzle::W,
-      eSwizzle::X,
-    }).id;
-  }
-
   return Chunk(loaded, var_id, chunkType);
 }
 
 Chunk ShaderCodeWriterSirit::GetReg(u32 regIndex) {
   LOG_DEBUG(Xenos, "[AST::Sirit] GetReg({})", regIndex);
   Sirit::Id uint_type = module.TypeInt(32, false);
-  Sirit::Id vec4_type = module.TypeVector(module.TypeFloat(32), 4);
-  Sirit::Id vec4_ptr_type = module.TypePointer(spv::StorageClass::StorageBuffer, vec4_type);
+  Sirit::Id float_type = module.TypeFloat(32);
+  Sirit::Id vec4_type = module.TypeVector(float_type, 4);
+  Sirit::Id vec4_ptr_func = module.TypePointer(spv::StorageClass::Function, vec4_type);
+  Sirit::Id vec4_ptr_ubo = module.TypePointer(spv::StorageClass::StorageBuffer, vec4_type);
 
+  // Check for existing temp
+  if (temp_regs.contains(regIndex)) {
+    Sirit::Id ptr = temp_regs[regIndex];
+    Sirit::Id val = module.OpLoad(vec4_type, ptr);
+    return Chunk(val, ptr, eChunkType::Vector);
+  }
+
+  // Load from UBO (storage buffer)
   Sirit::Id index_id = module.Constant(uint_type, regIndex);
-  Sirit::Id ptr = module.OpAccessChain(vec4_ptr_type, ubo_var_v, module.Constant(uint_type, 0), index_id);
-  Sirit::Id val = module.OpLoad(vec4_type, ptr);
-  LOG_DEBUG(Xenos, "[AST::GetReg] {}, {}", val.value, ptr.value);
-  return Chunk(val, ptr, eChunkType::Vector);
+  Sirit::Id ubo_ptr = module.OpAccessChain(vec4_ptr_ubo, ubo_var_v, module.Constant(uint_type, 0), index_id);
+  Sirit::Id initial_val = module.OpLoad(vec4_type, ubo_ptr);
+
+  // Allocate local variable
+  Sirit::Id local_ptr = module.AddLocalVariable(vec4_ptr_func, spv::StorageClass::Function);
+  module.OpStore(local_ptr, initial_val);
+
+  temp_regs[regIndex] = local_ptr;
+
+  Sirit::Id val = module.OpLoad(vec4_type, local_ptr);
+  return Chunk(val, local_ptr, eChunkType::Vector);
 }
 
 Chunk ShaderCodeWriterSirit::GetBoolVal(const u32 boolRegIndex) {
@@ -430,16 +347,16 @@ Chunk ShaderCodeWriterSirit::FetchTexture(const Chunk &src, const TextureFetch &
   Sirit::Id coord = src.id;
   LOG_DEBUG(Xenos, "[AST::Sirit] FetchTexture({}, {})", coord.value, slot);
 
-  auto it = texture_vars.find(slot);
-  if (it == texture_vars.end()) {
-    LOG_ERROR(Xenos, "[AST::Emitter] Texture slot '{}' isn't registered!", slot);
-    return {};
-  }
+  Sirit::Id sampled_type = GetSampledImageType(instr.textureType);
+  Sirit::Id ptr_type = module.TypePointer(spv::StorageClass::UniformConstant, sampled_type);
+  Sirit::Id var = module.AddGlobalVariable(ptr_type, spv::StorageClass::UniformConstant);
+  module.Decorate(var, spv::Decoration::DescriptorSet, 0);
+  module.Decorate(var, spv::Decoration::Binding, slot);
+  module.Name(var, FMT("TextureSlot{}", slot));
 
   Sirit::Id float_type = module.TypeFloat(32);
   Sirit::Id vec4_type = module.TypeVector(float_type, 4);
-  Sirit::Id sampled_image = it->second.id;
-  Sirit::Id sampled_image_val = module.OpLoad(it->second.ptr, sampled_image);
+  Sirit::Id sampled_image_val = module.OpLoad(sampled_type, var);
   Sirit::Id sampled_result = module.OpImageSampleImplicitLod(vec4_type, sampled_image_val, coord);
   return Chunk(sampled_result, { 0 }, eChunkType::Fetch);
 }
@@ -447,8 +364,6 @@ Chunk ShaderCodeWriterSirit::FetchTexture(const Chunk &src, const TextureFetch &
 Chunk ShaderCodeWriterSirit::FetchVertex(const Chunk &src, const VertexFetch &instr) {
   const u32 slot = instr.fetchSlot;
   const u32 location = slot;
-
-  const u32 glLocation = static_cast<u32>(used_vertex_slots.size()); // map to 0..N
 
   const u32 componentCount = instr.GetComponentCount();
   const bool isFloat = instr.isFloat;
@@ -469,7 +384,6 @@ Chunk ShaderCodeWriterSirit::FetchVertex(const Chunk &src, const VertexFetch &in
     Sirit::Id input_var = module.AddGlobalVariable(ptr_type, spv::StorageClass::Input);
     module.Decorate(input_var, spv::Decoration::Location, glLocation); // remapped
 
-    used_vertex_slots.insert(slot);
     vertex_input_vars[slot] = input_var;
   }
 
