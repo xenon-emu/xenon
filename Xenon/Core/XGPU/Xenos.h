@@ -85,3 +85,46 @@ enum class eEndian : u32 {
   xe8in32 = 2,
   xe16in32 = 3,
 };
+
+inline uint16_t xeEndianSwap(uint16_t value, eEndian endianness) {
+  switch (endianness) {
+  case eEndian::xeNone:
+    // No swap.
+    return value;
+  case eEndian::xe8in16:
+    // Swap bytes in half words.
+    return ((value << 8) & 0xFF00FF00) | ((value >> 8) & 0x00FF00FF);
+  default:
+    LOG_ERROR(Xenos, "GPUSwap: Invalid endianness was passed in.");
+    return value;
+  }
+}
+
+inline uint32_t xeEndianSwap(uint32_t value, eEndian endianness) {
+  switch (endianness) {
+  default:
+  case eEndian::xeNone:
+    // No swap.
+    return value;
+  case eEndian::xe8in16:
+    // Swap bytes in half words.
+    return ((value << 8) & 0xFF00FF00) | ((value >> 8) & 0x00FF00FF);
+  case eEndian::xe8in32:
+    // Swap bytes.
+    // NOTE: we are likely doing two swaps here. Wasteful. Oh well.
+    return byteswap_be<u32>(value);
+  case eEndian::xe16in32:
+    // Swap half words.
+    return ((value >> 16) & 0xFFFF) | (value << 16);
+  }
+}
+
+inline float xeEndianSwap(float value, eEndian endianness) {
+  union {
+    uint32_t i;
+    float f;
+  } v;
+  v.f = value;
+  v.i = xeEndianSwap(v.i, endianness);
+  return v.f;
+}
