@@ -929,7 +929,7 @@ bool CommandProcessor::ExecutePacketType3_SET_SHADER_CONSTANTS(RingBuffer *ringB
 bool CommandProcessor::ExecutePacketType3_EVENT_WRITE_SHD(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
   // Generates a VS|PS_done event
   const u32 initiator = ringBuffer->ReadAndSwap<u32>();
-  const u32 address = ringBuffer->ReadAndSwap<u32>();
+  u32 address = ringBuffer->ReadAndSwap<u32>();
   const u32 value = ringBuffer->ReadAndSwap<u32>();
 
   // Writeback
@@ -942,6 +942,9 @@ bool CommandProcessor::ExecutePacketType3_EVENT_WRITE_SHD(RingBuffer *ringBuffer
     writeValue = value;
   }
 
+  auto endianness = static_cast<eEndian>(address & 0x3);
+  address &= ~0x3;
+  writeValue = xeEndianSwap(writeValue, endianness);
   u8 *addrPtr = ram->GetPointerToAddress(address);
   memcpy(addrPtr, &writeValue, sizeof(writeValue));
 
