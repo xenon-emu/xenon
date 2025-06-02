@@ -87,7 +87,6 @@ D_STUB(vmrghh)
 D_STUB(vpkuwum)
 D_STUB(vadduwm)
 D_STUB(vrlw)
-D_STUB(vcmpequw)
 D_STUB(vcmpequw_)
 D_STUB(vpkuhus)
 D_STUB(vcmpeqfp)
@@ -380,6 +379,7 @@ extern void PPCInterpreter_vaddfp(PPU_STATE *ppuState);
 extern void PPCInterpreter_vand(PPU_STATE *ppuState);
 extern void PPCInterpreter_vandc(PPU_STATE *ppuState);
 extern void PPCInterpreter_vcfux(PPU_STATE *ppuState);
+extern void PPCInterpreter_vcmpequwx(PPU_STATE *ppuState);
 extern void PPCInterpreter_vnor(PPU_STATE *ppuState);
 extern void PPCInterpreter_vor(PPU_STATE *ppuState);
 extern void PPCInterpreter_vspltw(PPU_STATE *ppuState);

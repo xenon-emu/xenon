@@ -111,6 +111,37 @@ void PPCInterpreter::PPCInterpreter_vcfux(PPU_STATE *ppuState) {
   VRi(vd).flt[3] = VRi(va).dword[3] / divisor;
 }
 
+// Vector Compare Equal-to Unsigned Word (x'1000 0086')
+void PPCInterpreter::PPCInterpreter_vcmpequwx(PPU_STATE* ppuState) {
+
+  CHECK_VXU;
+
+  VRi(vd).dword[0] = ((VRi(va).dword[0] == VRi(vb).dword[0]) ? 0xFFFFFFFF : 0x00000000);
+  VRi(vd).dword[1] = ((VRi(va).dword[1] == VRi(vb).dword[1]) ? 0xFFFFFFFF : 0x00000000);
+  VRi(vd).dword[2] = ((VRi(va).dword[2] == VRi(vb).dword[2]) ? 0xFFFFFFFF : 0x00000000);
+  VRi(vd).dword[3] = ((VRi(va).dword[3] == VRi(vb).dword[3]) ? 0xFFFFFFFF : 0x00000000);
+
+  if (_instr.vrc) {
+    u8 crValue = 0;
+    bool allEqual = false;
+    bool allNotEqual = false;
+
+    if (VRi(vd).dword[0] == 0xFFFFFFFF && VRi(vd).dword[1] == 0xFFFFFFFF
+      && VRi(vd).dword[2] == 0xFFFFFFFF && VRi(vd).dword[3] == 0xFFFFFFFF) {
+      allEqual = true;
+    }
+
+    if (VRi(vd).dword[0] == 0 && VRi(vd).dword[1] == 0 && VRi(vd).dword[2] == 0 && VRi(vd).dword[3] == 0) {
+      allNotEqual = true;
+    }
+
+    crValue |= allEqual ? 0b1000 : 0;
+    crValue |= allNotEqual ? 0b0010 : 0;
+
+    ppcUpdateCR(ppuState, 6, crValue);
+  }
+}
+
 // Vector Logical NOR (x'1000 0504')
 void PPCInterpreter::PPCInterpreter_vnor(PPU_STATE *ppuState) {
   /*
