@@ -103,7 +103,7 @@ void* DummyRenderer::GetBackendContext() {
 
 u32 DummyRenderer::GetBackendID() {
   LOG_INFO(Render, "DummyRenderer::GetBackendContext");
-  return "Dummy"_j;
+  return "Dummy"_jLower;
 }
 
 } // namespace Render

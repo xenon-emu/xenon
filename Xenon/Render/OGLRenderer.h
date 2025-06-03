@@ -50,7 +50,7 @@ public:
 private:
   // OpenGL Handles
   u32 dummyVAO;
-  u32 VAO, VBO, EBO;
+  u32 EBO;
   // SDL Context
   SDL_GLContext context;
   // Checks if ES
