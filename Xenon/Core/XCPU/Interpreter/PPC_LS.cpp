@@ -746,6 +746,18 @@ void PPCInterpreter::PPCInterpreter_stvx(PPU_STATE *ppuState) {
   MMUWrite32(ppuState, EA + (sizeof(u32) * 3), VRi(vs).dword[3]);
 }
 
+// Store Vector Indexed 128
+void PPCInterpreter::PPCInterpreter_stvx128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
+
+  MMUWrite32(ppuState, EA, VR(VMX128_1_VD128).dword[0]);
+  MMUWrite32(ppuState, EA + (sizeof(u32) * 1), VR(VMX128_1_VD128).dword[1]);
+  MMUWrite32(ppuState, EA + (sizeof(u32) * 2), VR(VMX128_1_VD128).dword[2]);
+  MMUWrite32(ppuState, EA + (sizeof(u32) * 3), VR(VMX128_1_VD128).dword[3]);
+}
+
 // Store Vector Element Word Indexed (x'7C00 018E')
 void PPCInterpreter::PPCInterpreter_stvewx(PPU_STATE* ppuState) {
   /*
@@ -1735,6 +1747,24 @@ void PPCInterpreter::PPCInterpreter_lvx128(PPU_STATE *ppuState) {
   LOG_DEBUG(Xenon, "lvx128 [EA {:#x}] vR{:#d} = [dw0: {:#x}, dw1: {:#x}, dw2: {:#x}, dw3: {:#x}]",
     (u32)EA, vrd, vector.dword[0], vector.dword[1], vector.dword[2], vector.dword[3]);
 #endif // VXU_LOAD_DEBUG
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  VR(VMX128_1_VD128) = vector;
+}
+
+// // Load Vector Indexed LRU 128
+void PPCInterpreter::PPCInterpreter_lvxl128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  Vector128 vector{};
+  const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
+
+  vector.dword[0] = MMURead32(ppuState, EA);
+  vector.dword[1] = MMURead32(ppuState, EA + (sizeof(u32) * 1));
+  vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
+  vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
