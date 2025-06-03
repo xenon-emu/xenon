@@ -96,6 +96,7 @@ public:
 
   void Thread();
 
+  u32 VAO;
   // CPU Handles
   RAM *ramPointer{};
   u8 *fbPointer{};

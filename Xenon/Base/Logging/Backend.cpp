@@ -171,7 +171,7 @@ public:
       .function = function,
       .message = message,
     };
-    if (Base::JoaatStringHash(Config::log.type) == "async"_j) {
+    if (Base::JoaatStringHash(Config::log.type) == "async"_jLower) {
       messageQueue.EmplaceWait(entry);
     } else {
       ForEachBackend([&entry](BaseBackend* backend) { if (backend) { backend->Write(entry); } });
@@ -195,7 +195,7 @@ public:
       .message = message,
       .formatted = false
     };
-    if (Base::JoaatStringHash(Config::log.type) == "async"_j) {
+    if (Base::JoaatStringHash(Config::log.type) == "async"_jLower) {
       messageQueue.EmplaceWait(entry);
     } else {
       ForEachBackend([&entry](BaseBackend* backend) { if (backend) { backend->Write(entry); } });

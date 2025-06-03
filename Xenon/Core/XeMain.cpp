@@ -13,12 +13,12 @@ void XeMain::Create() {
   Base::Log::SetGlobalFilter(logFilter);
   CreatePCIDevices();
 #ifndef NO_GFX
-  switch (Base::JoaatStringHash(Config::rendering.backend, false)) {
-  case "OpenGL"_j:
+  switch (Base::JoaatStringHash(Config::rendering.backend)) {
+  case "OpenGL"_jLower:
     renderer = std::make_unique<Render::OGLRenderer>(ram.get());
     renderer->Start();
     break;
-  case "Dummy"_j:
+  case "Dummy"_jLower:
     renderer = std::make_unique<Render::DummyRenderer>(ram.get());
     renderer->Start();
     break;
