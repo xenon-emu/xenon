@@ -253,9 +253,9 @@ void CreateBuffers(XeShaderFloatConsts psConsts, XeShaderFloatConsts vsConsts, X
   );
   std::shared_ptr<Render::Buffer> boolBuffer = resourceFactory->CreateBuffer();
   boolBuffer->CreateBuffer(static_cast<u32>(boolData.size()), boolData.data(), Render::eBufferUsage::DynamicDraw, Render::eBufferType::Storage);
-  createdBuffers.insert({ "VertexConsts"_j, vsBuffer });
-  createdBuffers.insert({ "PixelConsts"_j, psBuffer });
-  createdBuffers.insert({ "CommonBoolConsts"_j, boolBuffer });
+  createdBuffers.insert({ "VertexConsts"_jLower, vsBuffer });
+  createdBuffers.insert({ "PixelConsts"_jLower, psBuffer });
+  createdBuffers.insert({ "CommonBoolConsts"_jLower, boolBuffer });
 }
 
 } // namespace Xe::Microcode
@@ -492,14 +492,14 @@ void RenderFrame() {
   u64 combinedHash = (static_cast<u64>(Xe::Microcode::vertexShaderHash) << 32) | Xe::Microcode::pixelShaderHash;
   auto shader = Xe::Microcode::linkedShaderPrograms[combinedHash];
   if (shader.vertexShader) {
-    if (auto buffer = Xe::Microcode::createdBuffers.find("VertexConsts"_j); buffer != Xe::Microcode::createdBuffers.end())
+    if (auto buffer = Xe::Microcode::createdBuffers.find("VertexConsts"_jLower); buffer != Xe::Microcode::createdBuffers.end())
       buffer->second->Bind(0);
   }
   if (shader.pixelShader) {
-    if (auto buffer = Xe::Microcode::createdBuffers.find("PixelConsts"_j); buffer != Xe::Microcode::createdBuffers.end())
+    if (auto buffer = Xe::Microcode::createdBuffers.find("PixelConsts"_jLower); buffer != Xe::Microcode::createdBuffers.end())
       buffer->second->Bind(2);
   }
-  if (auto buffer = Xe::Microcode::createdBuffers.find("CommonBoolConsts"_j); buffer != Xe::Microcode::createdBuffers.end())
+  if (auto buffer = Xe::Microcode::createdBuffers.find("CommonBoolConsts"_jLower); buffer != Xe::Microcode::createdBuffers.end())
     buffer->second->Bind(1);
   if (shader.program)
     shader.program->Bind();
