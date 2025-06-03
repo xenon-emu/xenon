@@ -142,6 +142,19 @@ void PPCInterpreter::PPCInterpreter_vcmpequwx(PPU_STATE* ppuState) {
   }
 }
 
+// Vector128 Convert From Signed Fixed-Point Word to Floating-Point
+void PPCInterpreter::PPCInterpreter_vcsxwfp128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  // (VD) <- float(VB as signed) / 2^uimm
+
+  double div = (double)(1ULL << VMX128_3_IMM);
+  VR(VMX128_3_VD128).flt[0] = (float)(VR(VMX128_3_VB128).dsword[0] / div);
+  VR(VMX128_3_VD128).flt[1] = (float)(VR(VMX128_3_VB128).dsword[1] / div);
+  VR(VMX128_3_VD128).flt[2] = (float)(VR(VMX128_3_VB128).dsword[2] / div);
+  VR(VMX128_3_VD128).flt[3] = (float)(VR(VMX128_3_VB128).dsword[3] / div);
+}
+
 // Vector Logical NOR (x'1000 0504')
 void PPCInterpreter::PPCInterpreter_vnor(PPU_STATE *ppuState) {
   /*
