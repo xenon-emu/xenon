@@ -54,7 +54,7 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
   }
 
   // XAudioRenderDriverInitialize bypass 2.0.17489.0.
-  if (static_cast<u32>(thread.CIA) == 0x8018B0EC) {
+  if (static_cast<u32>(thread.CIA) == 0x80081830) {
     return;
   }
 
