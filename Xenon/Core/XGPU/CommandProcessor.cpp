@@ -316,78 +316,27 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
   case Xe::XGPU::PM4_NOP:
     result = ExecutePacketType3_NOP(ringBuffer, packetData, dataCount);
     break;
-  case Xe::XGPU::PM4_RECORD_PFP_TIMESTAMP:
-    break;
-  case Xe::XGPU::PM4_WAIT_MEM_WRITES:
-    break;
-  case Xe::XGPU::PM4_WAIT_FOR_ME:
-    break;
-  case Xe::XGPU::PM4_UNKNOWN_19:
-    break;
-  case Xe::XGPU::PM4_UNKNOWN_1A:
-    break;
-  case Xe::XGPU::PM4_PREEMPT_ENABLE:
-    break;
-  case Xe::XGPU::PM4_SKIP_IB2_ENABLE_GLOBAL:
-    break;
-  case Xe::XGPU::PM4_PREEMPT_TOKEN:
-    break;
   case Xe::XGPU::PM4_REG_RMW:
     result = ExecutePacketType3_REG_RMW(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_DRAW_INDX:
     result = ExecutePacketType3_DRAW_INDX(ringBuffer, packetData, dataCount);
     break;
-  case Xe::XGPU::PM4_VIZ_QUERY:
-    break;
-  case Xe::XGPU::PM4_DRAW_AUTO:
-    break;
-  case Xe::XGPU::PM4_SET_STATE:
-    break;
-  case Xe::XGPU::PM4_WAIT_FOR_IDLE:
-    break;
   case Xe::XGPU::PM4_IM_LOAD:
     result = ExecutePacketType3_IM_LOAD(ringBuffer, packetData, dataCount);
-    break;
-  case Xe::XGPU::PM4_DRAW_INDIRECT:
-    break;
-  case Xe::XGPU::PM4_DRAW_INDX_INDIRECT:
     break;
   case Xe::XGPU::PM4_IM_LOAD_IMMEDIATE:
     result = ExecutePacketType3_IM_LOAD_IMMEDIATE(ringBuffer, packetData, dataCount);
     break;
-  case Xe::XGPU::PM4_IM_STORE:
-    break;
   case Xe::XGPU::PM4_SET_CONSTANT:
     result = ExecutePacketType3_SET_CONSTANT(ringBuffer, packetData, dataCount);
-    break;
-  case Xe::XGPU::PM4_LOAD_CONSTANT_CONTEXT:
-    break;
-  case Xe::XGPU::PM4_LOAD_ALU_CONSTANT:
-    break;
-  case Xe::XGPU::PM4_LOAD_STATE:
-    break;
-  case Xe::XGPU::PM4_RUN_OPENCL:
-    break;
-  case Xe::XGPU::PM4_COND_INDIRECT_BUFFER_PFD:
-    break;
-  case Xe::XGPU::PM4_EXEC_CS:
-    break;
-  case Xe::XGPU::PM4_DRAW_INDX_BIN:
-    break;
-  case Xe::XGPU::PM4_DRAW_INDX_2_BIN:
     break;
   case Xe::XGPU::PM4_DRAW_INDX_2:
     result = ExecutePacketType3_DRAW_INDX_2(ringBuffer, packetData, dataCount);
     break;
+  case Xe::XGPU::PM4_INDIRECT_BUFFER:
   case Xe::XGPU::PM4_INDIRECT_BUFFER_PFD:
     result = ExecutePacketType3_INDIRECT_BUFFER(ringBuffer, packetData, dataCount);
-    break;
-  case Xe::XGPU::PM4_DRAW_INDX_OFFSET:
-    break;
-  case Xe::XGPU::PM4_UNK_39:
-    break;
-  case Xe::XGPU::PM4_COND_INDIRECT_BUFFER_PFE:
     break;
   case Xe::XGPU::PM4_INVALIDATE_STATE:
     result = ExecutePacketType3_INVALIDATE_STATE(ringBuffer, packetData, dataCount);
@@ -395,53 +344,20 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
   case Xe::XGPU::PM4_WAIT_REG_MEM:
     result = ExecutePacketType3_WAIT_REG_MEM(ringBuffer, packetData, dataCount);
     break;
-  case Xe::XGPU::PM4_MEM_WRITE:
-    break;
-  case Xe::XGPU::PM4_REG_TO_MEM:
-    break;
-  case Xe::XGPU::PM4_INDIRECT_BUFFER:
-    result = ExecutePacketType3_INDIRECT_BUFFER(ringBuffer, packetData, dataCount);
-    break;
-  case Xe::XGPU::PM4_EXEC_CS_INDIRECT:
-    break;
-  case Xe::XGPU::PM4_MEM_TO_REG:
-    break;
-  case Xe::XGPU::PM4_SET_DRAW_STATE:
-    break;
-  case Xe::XGPU::PM4_COND_EXEC:
-    break;
   case Xe::XGPU::PM4_COND_WRITE:
     result = ExecutePacketType3_COND_WRITE(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_EVENT_WRITE:
     result = ExecutePacketType3_EVENT_WRITE(ringBuffer, packetData, dataCount);
     break;
-  case Xe::XGPU::PM4_COND_REG_EXEC:
-    break;
   case Xe::XGPU::PM4_ME_INIT:
     result = ExecutePacketType3_ME_INIT(ringBuffer, packetData, dataCount);
-    break;
-  case Xe::XGPU::PM4_SET_SHADER_BASES:
-    break;
-  case Xe::XGPU::PM4_SET_BIN_BASE_OFFSET:
-    break;
-  case Xe::XGPU::PM4_SET_BIN:
-    break;
-  case Xe::XGPU::PM4_SCRATCH_TO_REG:
-    break;
-  case Xe::XGPU::PM4_UNKNOWN_4E:
-    break;
-  case Xe::XGPU::PM4_MEM_WRITE_CNTR:
     break;
   case Xe::XGPU::PM4_SET_BIN_MASK:
     result = ExecutePacketType3_SET_BIN_MASK(ringBuffer, packetData, dataCount);
     break;
   case Xe::XGPU::PM4_SET_BIN_SELECT:
     result = ExecutePacketType3_SET_BIN_SELECT(ringBuffer, packetData, dataCount);
-    break;
-  case Xe::XGPU::PM4_WAIT_REG_EQ:
-    break;
-  case Xe::XGPU::PM4_WAIT_REG_GTE:
     break;
   case Xe::XGPU::PM4_INTERRUPT:
     result = ExecutePacketType3_INTERRUPT(ringBuffer, packetData, dataCount);
@@ -455,20 +371,6 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
   case Xe::XGPU::PM4_EVENT_WRITE_SHD:
     result = ExecutePacketType3_EVENT_WRITE_SHD(ringBuffer, packetData, dataCount);
     break;
-  case Xe::XGPU::PM4_EVENT_WRITE_CFL:
-    break;
-  case Xe::XGPU::PM4_EVENT_WRITE_EXT:
-    break;
-  case Xe::XGPU::PM4_EVENT_WRITE_ZPD:
-    break;
-  case Xe::XGPU::PM4_WAIT_UNTIL_READ:
-    break;
-  case Xe::XGPU::PM4_WAIT_IB_PFD_COMPLETE:
-    break;
-  case Xe::XGPU::PM4_CONTEXT_UPDATE:
-    break;
-  case Xe::XGPU::PM4_SET_PROTECTED_MODE:
-    break;
   case Xe::XGPU::PM4_SET_BIN_MASK_LO:
     result = ExecutePacketType3_SET_BIN_MASK_LO(ringBuffer, packetData, dataCount);
     break;
@@ -481,29 +383,8 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
   case Xe::XGPU::PM4_SET_BIN_SELECT_HI:
     result = ExecutePacketType3_SET_BIN_SELECT_HI(ringBuffer, packetData, dataCount);
     break;
-  case Xe::XGPU::PM4_SET_VISIBILITY_OVERRIDE:
-    break;
-  case Xe::XGPU::PM4_SET_SECURE_MODE:
-    break;
-  case Xe::XGPU::PM4_PREEMPT_ENABLE_GLOBAL:
-    break;
-  case Xe::XGPU::PM4_PREEMPT_ENABLE_LOCAL:
-    break;
-  case Xe::XGPU::PM4_CONTEXT_SWITCH_YIELD:
-    break;
-  case Xe::XGPU::PM4_SET_RENDER_MODE:
-    break;
-  case Xe::XGPU::PM4_COMPUTE_CHECKPOINT:
-    break;
-  case Xe::XGPU::PM4_TEST_TWO_MEMS:
-    break;
-  case Xe::XGPU::PM4_MEM_TO_MEM:
-    break;
-  case Xe::XGPU::PM4_WIDE_REG_WRITE:
-    break;
-  case Xe::XGPU::PM4_REG_WR_NO_CTXT:
-    break;
   default:
+    LOG_ERROR(Xenos, "[CP]: Packet3 unimplemented opcode: {}", GetPM4Opcode(static_cast<u8>(currentOpCode)));
     break;
   }
 
@@ -895,6 +776,7 @@ bool CommandProcessor::ExecutePacketType3_INDIRECT_BUFFER(RingBuffer *ringBuffer
 bool CommandProcessor::ExecutePacketType3_INTERRUPT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
   // CPU(s) to interrupt
   const u32 cpuMask = ringBuffer->ReadAndSwap<u32>();
+  LOG_DEBUG(Xenos, "[CP]: Executing Packet3 INTERRUPT STUB.");
   return true;
 }
 
@@ -954,21 +836,41 @@ bool CommandProcessor::ExecutePacketType3_EVENT_WRITE_SHD(RingBuffer *ringBuffer
 bool CommandProcessor::ExecutePacketType3_WAIT_REG_MEM(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
   // Determines how long to wait for, and what to wait for
   const u32 waitInfo = ringBuffer->ReadAndSwap<u32>();
-  const XeRegister pollReg = static_cast<XeRegister>(ringBuffer->ReadAndSwap<u32>());
+  const u32 pollReg = ringBuffer->ReadAndSwap<u32>();
   const u32 ref = ringBuffer->ReadAndSwap<u32>();
   const u32 mask = ringBuffer->ReadAndSwap<u32>();
   // Time to live
   const u32 wait = ringBuffer->ReadAndSwap<u32>();
 
+  const bool isMemory = (waitInfo & 0x10) != 0;
+
   bool matched = false;
   do {
     u32 value = 0;
-    if (waitInfo & 0x10) {
-      u32 addr = static_cast<u32>(pollReg);
+    if (isMemory) {
+      u32 addr = pollReg & ~0x3;
       u8 *addrPtr = ram->GetPointerToAddress(addr);
       memcpy(&value, addrPtr, sizeof(value));
+      value = xeEndianSwap(value, static_cast<eEndian>(pollReg & 0x3));
     } else {
-      value = state->ReadRegister(pollReg);
+      value = state->ReadRegister(static_cast<XeRegister>(pollReg));
+      if (static_cast<XeRegister>(pollReg) == XeRegister::COHER_STATUS_HOST) {
+        auto statusHost = state->coherencyStatusHost;
+        const u32 baseHost = state->coherencyBaseHost;
+        const u32 sizeHost = state->coherencySizeHost;
+
+        if (statusHost.status) {
+          const char* action = "N/A";
+          if (statusHost.vcActionEnable && statusHost.tcActionEnable) { action = "VC | TC"; } 
+          else if (statusHost.tcActionEnable) { action = "TC"; } 
+          else if (statusHost.vcActionEnable) { action = "VC"; }
+
+          LOG_DEBUG(Xenos, "[CP]: Making {:#x} -> {:#x} coherent, performed action = {}", baseHost, baseHost + sizeHost, action);
+          state->coherencyStatusHost.hexValue = 0;
+        }
+
+        value = state->ReadRegister(static_cast<XeRegister>(pollReg));
+      }
     }
     switch (waitInfo & 0x7) {
     case 0: // Never

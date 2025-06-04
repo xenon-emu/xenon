@@ -120,8 +120,8 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
     value = mhStatus;
     break;
   case XeRegister::COHER_STATUS_HOST:
-    if ((coherencyStatusHost & 0x80000000ul)) {
-      coherencyStatusHost &= ~0x80000000ul;
+    if ((coherencyStatusHost.hexValue & 0x80000000ul)) {
+      coherencyStatusHost.hexValue &= ~0x80000000ul;
       LOG_DEBUG(Xenos, "[Xe] Flushing 0x{:X} with a size of 0x{:X}", coherencyBaseHost, coherencySizeHost);
       if (coherencyBaseHost == fbSurfaceAddress) {
         LOG_DEBUG(Xenos, "[CP] Flushing FB");
@@ -129,7 +129,7 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
       }
       ClearDirtyState();
     }
-    value = coherencyStatusHost;
+    value = coherencyStatusHost.hexValue;
     break;
   case XeRegister::COHER_SIZE_HOST:
     value = coherencySizeHost;
@@ -468,11 +468,11 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
     value = mhStatus;
     break;
   case XeRegister::COHER_STATUS_HOST:
-    coherencyStatusHost = value;
-    if (!(coherencyStatusHost & 0x80000000ul)) {
-      coherencyStatusHost |= 0x80000000ul;
+    coherencyStatusHost.hexValue = value;
+    if (!(coherencyStatusHost.hexValue & 0x80000000ul)) {
+      coherencyStatusHost.hexValue |= 0x80000000ul;
     }
-    value = coherencyStatusHost;
+    value = coherencyStatusHost.hexValue;
     break;
   case XeRegister::COHER_SIZE_HOST:
     coherencySizeHost = value;

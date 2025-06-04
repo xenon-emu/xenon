@@ -7143,3 +7143,25 @@ union alignas(u32) RB_COPY_DEST_PITCH_REG {
     u32 res1 : 2;                       // +30
   };
 };
+
+union alignas(u32) COHER_STATUS_HOST_REG {
+  u32 hexValue;
+  struct {
+    u32 matchingContexts : 8;      // +0
+    u32 rbCopyDestBaseEnable : 1;  // +8
+    u32 destBase0Enable : 1;        // +9
+    u32 destBase1Enable : 1;        // +10
+    u32 destBase2Enable : 1;        // +11
+    u32 destBase3Enable : 1;        // +12
+    u32 destBase4Enable : 1;        // +13
+    u32 destBase5Enable : 1;        // +14
+    u32 destBase6Enable : 1;        // +15
+    u32 destBase7Enable : 1;        // +16
+    u32 res0 : 7;                // +17
+    u32 vcActionEnable : 1;          // +24
+    u32 tcActionEnable : 1;          // +25
+    u32 pglbActionEnable : 1;        // +26
+    u32 res1 : 4;                // +27
+    u32 status : 1;                 // +31
+  };
+};

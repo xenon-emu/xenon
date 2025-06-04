@@ -179,7 +179,7 @@ public:
   // Coherency
   u32 coherencySizeHost = 0;
   u32 coherencyBaseHost = 0;
-  u32 coherencyStatusHost = 0;
+  COHER_STATUS_HOST_REG coherencyStatusHost = {};
 
   // EDRAM
   EDRAM *edram = nullptr;
