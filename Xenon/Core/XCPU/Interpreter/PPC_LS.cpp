@@ -1861,6 +1861,7 @@ void PPCInterpreter::PPCInterpreter_lvlx(PPU_STATE *ppuState) {
 }
 
 // Load Vector Left Indexed 128
+/*
 void PPCInterpreter::PPCInterpreter_lvlx128(PPU_STATE* ppuState) {
   CHECK_VXU;
 
@@ -1895,6 +1896,7 @@ void PPCInterpreter::PPCInterpreter_lvlx128(PPU_STATE* ppuState) {
   VR(VMX128_1_VD128).dword[2] = byteswap_be<u32>(VR(VMX128_1_VD128).dword[2]);
   VR(VMX128_1_VD128).dword[3] = byteswap_be<u32>(VR(VMX128_1_VD128).dword[3]);
 }
+*/
 
 // Load Vector Right Indexed (x'7C00 044E')
 void PPCInterpreter::PPCInterpreter_lvrx(PPU_STATE *ppuState) {
@@ -1957,6 +1959,7 @@ void PPCInterpreter::PPCInterpreter_lvrx(PPU_STATE *ppuState) {
 }
 
 // Load Vector Right Indexed 128
+/*
 void PPCInterpreter::PPCInterpreter_lvrx128(PPU_STATE* ppuState) {
   CHECK_VXU;
 
@@ -1996,6 +1999,7 @@ void PPCInterpreter::PPCInterpreter_lvrx128(PPU_STATE* ppuState) {
   VR(VMX128_1_VD128).dword[2] = byteswap_be<u32>(VR(VMX128_1_VD128).dword[2]);
   VR(VMX128_1_VD128).dword[3] = byteswap_be<u32>(VR(VMX128_1_VD128).dword[3]);
 }
+*/
 
 // Load Vector for Shift Left (x'7C00 000C')
 void PPCInterpreter::PPCInterpreter_lvsl(PPU_STATE* ppuState) {
