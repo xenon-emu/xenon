@@ -398,19 +398,18 @@ bool CommandProcessor::ExecutePacketType3_NOP(RingBuffer *ringBuffer, u32 packet
 }
 
 bool CommandProcessor::ExecutePacketType3_REG_RMW(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
-  const u32 rmwSetup = ringBuffer->ReadAndSwap<u32>();
+  const u32 rmwInfo = ringBuffer->ReadAndSwap<u32>();
   const u32 andMask = ringBuffer->ReadAndSwap<u32>();
   const u32 orMask = ringBuffer->ReadAndSwap<u32>();
 
-  const u32 regAddr = (rmwSetup & 0x1FFF);
+  const u32 regAddr = (rmwInfo & 0x1FFF);
   u32 value = state->ReadRawRegister(regAddr);
   const u32 oldValue = value;
 
   // OR value (with reg or immediate value)
-  if ((rmwSetup >> 30) & 0x1) {
+  if ((rmwInfo >> 30) & 0x1) {
     // | reg
-    const u32 orAddr = (orMask & 0x1FFF);
-    const u32 orValue = state->ReadRawRegister(orAddr);
+    const u32 orValue = state->ReadRawRegister(orMask & 0x1FFF);
     value |= orValue;
   } else {
     // | imm
@@ -418,17 +417,16 @@ bool CommandProcessor::ExecutePacketType3_REG_RMW(RingBuffer *ringBuffer, u32 pa
   }
 
   // AND value (with reg or immediate value)
-  if ((rmwSetup >> 30) & 0x1) {
+  if ((rmwInfo >> 31) & 0x1) {
     // & reg
-    const u32 andAddr = (andMask & 0x1FFF);
-    const u32 andValue = state->ReadRawRegister(andAddr);
-    value ^= andValue;
+    const u32 andValue = state->ReadRawRegister(andMask & 0x1FFF);
+    value &= andValue;
   } else {
     // & imm  
     value &= andMask;
   }
 
-  // Wrrite the value back
+  // Write the value back
   state->WriteRawRegister(regAddr, value);
   return true;
 }
