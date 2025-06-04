@@ -308,7 +308,7 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
 
   bool result = false;
 
-  LOG_TRACE(Xenos, "CP[ExecutePacketType3]: Executing {}", GetPM4Opcode(static_cast<u8>(currentOpCode)));
+  LOG_DEBUG(Xenos, "CP[ExecutePacketType3]: Executing {}", GetPM4Opcode(static_cast<u8>(currentOpCode)));
 
   // PM4 Commands execution, basically the heart of the command processor.
 
