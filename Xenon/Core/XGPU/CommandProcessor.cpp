@@ -442,7 +442,7 @@ bool CommandProcessor::ExecutePacketType3_EVENT_WRITE(RingBuffer *ringBuffer, u3
     // Unknown what should be done here
   } else {
     LOG_ERROR(Xenos, "CP[EP3] | EVENT_WRITE: Invalid type!");
-    ringBuffer->AdvanceRead(dataCount - 1);
+    ringBuffer->AdvanceRead((dataCount - 1) * sizeof(u32));
   }
 
   return true;
@@ -737,28 +737,26 @@ bool CommandProcessor::ExecutePacketType3_SET_CONSTANT(RingBuffer *ringBuffer, u
   // Get base index
   const u32 offsetType = ringBuffer->ReadAndSwap<u32>();
   // PM4_REG(reg) ((0x4 << 16) | (GSL_HAL_SUBBLOCK_OFFSET(reg)))
-  const u32 index = offsetType & 0xFFFF;
+  u32 index = offsetType & 0x7FF;
   const u32 type = (offsetType >> 16) & 0xFF;
-
-  u32 baseIndex = index;
   switch (type) {
   // ALU
-  case 0: baseIndex += 0x4000; break;
+  case 0: index += 0x4000; break;
   // FETCH
-  case 1: baseIndex += 0x4800; break;
+  case 1: index += 0x4800; break;
   // BOOL
-  case 2: baseIndex += 0x4900; break;
+  case 2: index += 0x4900; break;
   // LOOP
-  case 3: baseIndex += 0x4908; break;
+  case 3: index += 0x4908; break;
   // REGISTER_RAWS
-  case 4: baseIndex += 0x2000; break;
-  default: ringBuffer->AdvanceRead(dataCount - 1); return true; break;
+  case 4: index += 0x2000; break;
+  default: ringBuffer->AdvanceRead((dataCount - 1) * sizeof(u32)); return true; break;
   }
 
   // Write constants
-  for (u32 n = 0; n != dataCount - 1; ++n) {
+  for (u32 n = 0; n < dataCount - 1; n++, index++) {
     const u32 data = ringBuffer->ReadAndSwap<u32>();
-    state->WriteRegister(static_cast<XeRegister>(index + n), data);
+    state->WriteRegister(static_cast<XeRegister>(index), data);
   }
 
   return true;
@@ -787,12 +785,12 @@ bool CommandProcessor::ExecutePacketType3_INTERRUPT(RingBuffer *ringBuffer, u32 
 bool CommandProcessor::ExecutePacketType3_SET_CONSTANT2(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
   // Get base index
   const u32 offsetType = ringBuffer->ReadAndSwap<u32>();
-  const u32 index = offsetType & 0xFFFF;
+  u32 index = offsetType & 0xFFFF;
 
   // Write constants
-  for (u32 n = 0; n != dataCount - 1; ++n) {
+  for (u32 n = 0; n < dataCount - 1; n++, index++) {
     const u32 data = ringBuffer->ReadAndSwap<u32>();
-    state->WriteRegister(static_cast<XeRegister>(index + n), data);
+    state->WriteRegister(static_cast<XeRegister>(index), data);
   }
 
   return true;
@@ -801,14 +799,13 @@ bool CommandProcessor::ExecutePacketType3_SET_CONSTANT2(RingBuffer *ringBuffer, 
 bool CommandProcessor::ExecutePacketType3_SET_SHADER_CONSTANTS(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
   // Get base index
   const u32 offsetType = ringBuffer->ReadAndSwap<u32>();
-  const u32 index = offsetType & 0xFFFF;
+  u32 index = offsetType & 0xFFFF;
 
   // Write constants
-  for (u32 n = 0; n != dataCount - 1; ++n) {
+  for (u32 n = 0; n < dataCount - 1; n++, index++) {
     const u32 data = ringBuffer->ReadAndSwap<u32>();
-    state->WriteRegister(static_cast<XeRegister>(index + n), data);
+    state->WriteRegister(static_cast<XeRegister>(index), data);
   }
-
   return true;
 }
 
