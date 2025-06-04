@@ -142,6 +142,19 @@ void PPCInterpreter::PPCInterpreter_vcmpequwx(PPU_STATE* ppuState) {
   }
 }
 
+// Vector128 Convert From Signed Fixed-Point Word to Floating-Point
+void PPCInterpreter::PPCInterpreter_vcsxwfp128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  // (VD) <- float(VB as signed) / 2^uimm
+
+  double div = (double)(1ULL << VMX128_3_IMM);
+  VR(VMX128_3_VD128).flt[0] = (float)(VR(VMX128_3_VB128).dsword[0] / div);
+  VR(VMX128_3_VD128).flt[1] = (float)(VR(VMX128_3_VB128).dsword[1] / div);
+  VR(VMX128_3_VD128).flt[2] = (float)(VR(VMX128_3_VB128).dsword[2] / div);
+  VR(VMX128_3_VD128).flt[3] = (float)(VR(VMX128_3_VB128).dsword[3] / div);
+}
+
 // Vector Logical NOR (x'1000 0504')
 void PPCInterpreter::PPCInterpreter_vnor(PPU_STATE *ppuState) {
   /*
@@ -168,6 +181,16 @@ void PPCInterpreter::PPCInterpreter_vor(PPU_STATE *ppuState) {
   VRi(vd).dword[1] = VRi(va).dword[1] | VRi(vb).dword[1];
   VRi(vd).dword[2] = VRi(va).dword[2] | VRi(vb).dword[2];
   VRi(vd).dword[3] = VRi(va).dword[3] | VRi(vb).dword[3];
+}
+
+// Vector128 Logical OR
+void PPCInterpreter::PPCInterpreter_vor128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  VR(VMX128_VD128).dword[0] = VR(VMX128_VA128).dword[0] | VR(VMX128_VB128).dword[0];
+  VR(VMX128_VD128).dword[1] = VR(VMX128_VA128).dword[1] | VR(VMX128_VB128).dword[1];
+  VR(VMX128_VD128).dword[2] = VR(VMX128_VA128).dword[2] | VR(VMX128_VB128).dword[2];
+  VR(VMX128_VD128).dword[3] = VR(VMX128_VA128).dword[3] | VR(VMX128_VB128).dword[3];
 }
 
 // Vector Splat Word (x'1000 028C')
@@ -280,6 +303,36 @@ void PPCInterpreter::PPCInterpreter_vmrghw128(PPU_STATE *ppuState) {
   VR(VMX128_VD128).dword[1] = VR(VMX128_VB128).dword[0];
   VR(VMX128_VD128).dword[2] = VR(VMX128_VA128).dword[1];
   VR(VMX128_VD128).dword[3] = VR(VMX128_VB128).dword[1];
+}
+
+// Vector128 Maximum Floating-Point
+void PPCInterpreter::PPCInterpreter_vmaxfp128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  VR(VMX128_VD128).flt[0] = (VR(VMX128_VA128).flt[0] > VR(VMX128_VB128).flt[0]) ? VR(VMX128_VA128).flt[0] : VR(VMX128_VB128).flt[0];
+  VR(VMX128_VD128).flt[1] = (VR(VMX128_VA128).flt[1] > VR(VMX128_VB128).flt[1]) ? VR(VMX128_VA128).flt[1] : VR(VMX128_VB128).flt[1];
+  VR(VMX128_VD128).flt[2] = (VR(VMX128_VA128).flt[2] > VR(VMX128_VB128).flt[2]) ? VR(VMX128_VA128).flt[2] : VR(VMX128_VB128).flt[2];
+  VR(VMX128_VD128).flt[3] = (VR(VMX128_VA128).flt[3] > VR(VMX128_VB128).flt[3]) ? VR(VMX128_VA128).flt[3] : VR(VMX128_VB128).flt[3];
+}
+
+// Vector128 Minimum Floating-Point
+void PPCInterpreter::PPCInterpreter_vminfp128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  VR(VMX128_VD128).flt[0] = (VR(VMX128_VA128).flt[0] < VR(VMX128_VB128).flt[0]) ? VR(VMX128_VA128).flt[0] : VR(VMX128_VB128).flt[0];
+  VR(VMX128_VD128).flt[1] = (VR(VMX128_VA128).flt[1] < VR(VMX128_VB128).flt[1]) ? VR(VMX128_VA128).flt[1] : VR(VMX128_VB128).flt[1];
+  VR(VMX128_VD128).flt[2] = (VR(VMX128_VA128).flt[2] < VR(VMX128_VB128).flt[2]) ? VR(VMX128_VA128).flt[2] : VR(VMX128_VB128).flt[2];
+  VR(VMX128_VD128).flt[3] = (VR(VMX128_VA128).flt[3] < VR(VMX128_VB128).flt[3]) ? VR(VMX128_VA128).flt[3] : VR(VMX128_VB128).flt[3];
+}
+
+// Vector128 Merge Low Word
+void PPCInterpreter::PPCInterpreter_vmrglw128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  VR(VMX128_VD128).dword[0] = VR(VMX128_VA128).dword[2];
+  VR(VMX128_VD128).dword[1] = VR(VMX128_VB128).dword[2];
+  VR(VMX128_VD128).dword[2] = VR(VMX128_VA128).dword[3];
+  VR(VMX128_VD128).dword[3] = VR(VMX128_VB128).dword[3];
 }
 
 static const u8 reIndex[32] = { 3,2,1,0, 7,6,5,4, 11,10,9,8, 15,14,13,12, 19,18,17,16, 23,22,21,20, 27,26,25,24, 31,30,29,28 };
@@ -698,6 +751,48 @@ void PPCInterpreter::PPCInterpreter_vspltisw128(PPU_STATE *ppuState) {
 
   for (u8 idx = 0; idx < 4; idx++) {
     VR(VMX128_3_VD128).dsword[idx] = simm;
+  }
+}
+
+// Vector128 Subtract Floating-Point
+void PPCInterpreter::PPCInterpreter_vsubfp128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  // TODO: Rounding to Near.
+
+  VR(VMX128_VD128).flt[0] = VR(VMX128_VA128).flt[0] - VR(VMX128_VB128).flt[0];
+  VR(VMX128_VD128).flt[1] = VR(VMX128_VA128).flt[1] - VR(VMX128_VB128).flt[1];
+  VR(VMX128_VD128).flt[2] = VR(VMX128_VA128).flt[2] - VR(VMX128_VB128).flt[2];
+  VR(VMX128_VD128).flt[3] = VR(VMX128_VA128).flt[3] - VR(VMX128_VB128).flt[3];
+}
+
+// Vector Splat Word 128
+void PPCInterpreter::PPCInterpreter_vspltw128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  u8 uimm = VMX128_3_IMM & 0x3;
+
+  for (u8 idx = 0; idx < 4; idx++) {
+    VR(VMX128_3_VD128).dword[idx] = VR(VMX128_3_VB128).dword[uimm];
+  }
+}
+
+// Vector128 Multiply Sum 4-way Floating-Point
+void PPCInterpreter::PPCInterpreter_vmsum4fp128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  // Dot product XYZW.
+  // (VD.xyzw) = (VA.x * VB.x) + (VA.y * VB.y) + (VA.z * VB.z) + (VA.w * VB.w)
+
+  // NOTE: Checked against Xenia's tests.
+
+  float dotProduct = (VR(VMX128_VA128).flt[0] * VR(VMX128_VB128).flt[0]) +
+    (VR(VMX128_VA128).flt[1] * VR(VMX128_VB128).flt[1]) +
+    (VR(VMX128_VA128).flt[2] * VR(VMX128_VB128).flt[2]) +
+    (VR(VMX128_VA128).flt[3] * VR(VMX128_VB128).flt[3]);
+
+  for (u8 idx = 0; idx < 4; idx++) {
+    VR(VMX128_3_VD128).flt[idx] = dotProduct;
   }
 }
 

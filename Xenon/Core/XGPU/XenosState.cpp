@@ -120,8 +120,8 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
     value = mhStatus;
     break;
   case XeRegister::COHER_STATUS_HOST:
-    if ((coherencyStatusHost & 0x80000000ul)) {
-      coherencyStatusHost &= ~0x80000000ul;
+    if ((coherencyStatusHost.hexValue & 0x80000000ul)) {
+      coherencyStatusHost.hexValue &= ~0x80000000ul;
       LOG_DEBUG(Xenos, "[Xe] Flushing 0x{:X} with a size of 0x{:X}", coherencyBaseHost, coherencySizeHost);
       if (coherencyBaseHost == fbSurfaceAddress) {
         LOG_DEBUG(Xenos, "[CP] Flushing FB");
@@ -129,7 +129,7 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
       }
       ClearDirtyState();
     }
-    value = coherencyStatusHost;
+    value = coherencyStatusHost.hexValue;
     break;
   case XeRegister::COHER_SIZE_HOST:
     value = coherencySizeHost;
@@ -219,7 +219,7 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
     value = xdvoRegisterData;
     break;
   case XeRegister::RB_SURFACE_INFO:
-    value = surfaceInfo;
+    value = surfaceInfo.hexValue;
     break;
   case XeRegister::RB_COLOR_INFO:
     value = colorInfo;
@@ -319,7 +319,7 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
     value = tileControl;
     break;
   case XeRegister::RB_MODECONTROL:
-    value = modeControl;
+    value = modeControl.hexValue;
     break;
   case XeRegister::RB_BLENDCONTROL1:
     value = blendControl1;
@@ -331,16 +331,16 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
     value = blendControl3;
     break;
   case XeRegister::RB_COPY_CONTROL:
-    value = copyControl;
+    value = copyControl.hexValue;
     break;
   case XeRegister::RB_COPY_DEST_BASE:
     value = copyDestBase;
     break;
   case XeRegister::RB_COPY_DEST_PITCH:
-    value = copyDestPitch;
+    value = copyDestPitch.hexValue;
     break;
   case XeRegister::RB_COPY_DEST_INFO:
-    value = copyDestInfo;
+    value = copyDestInfo.hexValue;
     break;
   case XeRegister::RB_DEPTH_CLEAR:
     value = depthClear;
@@ -468,11 +468,11 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
     value = mhStatus;
     break;
   case XeRegister::COHER_STATUS_HOST:
-    coherencyStatusHost = value;
-    if (!(coherencyStatusHost & 0x80000000ul)) {
-      coherencyStatusHost |= 0x80000000ul;
+    coherencyStatusHost.hexValue = value;
+    if (!(coherencyStatusHost.hexValue & 0x80000000ul)) {
+      coherencyStatusHost.hexValue |= 0x80000000ul;
     }
-    value = coherencyStatusHost;
+    value = coherencyStatusHost.hexValue;
     break;
   case XeRegister::COHER_SIZE_HOST:
     coherencySizeHost = value;
@@ -563,7 +563,7 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
     xdvoRegisterData = value;
     break;
   case XeRegister::RB_SURFACE_INFO:
-    surfaceInfo = value;
+    surfaceInfo.hexValue = value;
     break;
   case XeRegister::RB_COLOR_INFO:
     colorInfo = value;
@@ -663,7 +663,7 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
     viewportControl = value;
     break;
   case XeRegister::RB_MODECONTROL:
-    modeControl = value;
+    modeControl.hexValue = value;
     break;
   case XeRegister::RB_BLENDCONTROL1:
     blendControl1 = value;
@@ -675,16 +675,16 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
     blendControl3 = value;
     break;
   case XeRegister::RB_COPY_CONTROL:
-    copyControl = value;
+    copyControl.hexValue = value;
     break;
   case XeRegister::RB_COPY_DEST_BASE:
     copyDestBase = value;
     break;
   case XeRegister::RB_COPY_DEST_PITCH:
-    copyDestPitch = value;
+    copyDestPitch.hexValue = value;
     break;
   case XeRegister::RB_COPY_DEST_INFO:
-    copyDestInfo = value;
+    copyDestInfo.hexValue = value;
     break;
   case XeRegister::RB_DEPTH_CLEAR:
     depthClear = value;

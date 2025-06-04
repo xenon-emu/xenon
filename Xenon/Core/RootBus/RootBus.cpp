@@ -142,7 +142,7 @@ bool RootBus::Write(u64 writeAddress, const u8 *data, u64 size, bool soc) {
 
   // Device or address not found
   if (!soc) {
-    LOG_ERROR(RootBus, "Write to 0x{:X} failed", writeAddress, *reinterpret_cast<const u64*>(data));
+    LOG_ERROR(RootBus, "Write to {:#x} failed, data {:#x}", writeAddress, *reinterpret_cast<const u64*>(data));
   }
   return false;
 }

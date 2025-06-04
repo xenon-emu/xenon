@@ -86,6 +86,104 @@ enum class eEndian : u32 {
   xe16in32 = 3,
 };
 
+enum class eEndian128 : u32 {
+  xeNone = 0,
+  xe8in16 = 1,
+  xe8in32 = 2,
+  xe16in32 = 3,
+  xe8in64 = 4,
+  xe8in128 = 5,
+};
+
+enum class eModeControl : u32 {
+  xeIgnore = 0,
+  xeColorDepth = 4,
+  // TODO: Verify whether kDepth means the pixel shader is ignored
+  // completely even if it writes depth, exports to memory or kills pixels.
+  // Hints suggesting that it should be completely ignored (which is desirable
+  // on real hardware to avoid scheduling the pixel shader at all and waiting
+  // for it especially since the Xbox 360 doesn't have early per-sample depth /
+  // stencil, only early hi-Z / hi-stencil, and other registers possibly
+  // toggling pixel shader execution are yet to be found):
+  // - Most of depth pre-pass draws in 415607E6 use the kDepth more with a
+  //   `oC0 = tfetch2D(tf0, r0.xy) * r1` shader, some use `oC0 = r0` though.
+  //   However, when alphatested surfaces are drawn, kColorDepth is explicitly
+  //   used with the same shader performing the texture fetch.
+  // - 5454082B has some kDepth draws with alphatest enabled, but the shader is
+  //   `oC0 = r0`, which makes no sense (alphatest based on an interpolant from
+  //   the vertex shader) as no texture alpha cutout is involved.
+  // - 5454082B also has kDepth draws with pretty complex shaders clearly for
+  //   use only in the color pass - even fetching and filtering a shadowmap.
+  // For now, based on these, let's assume the pixel shader is never used with
+  // kDepth.
+  xeDepth = 5,
+  xeCopy = 6,
+};
+
+enum class eMSAASamples : u32 {
+  MSAA1X = 0,
+  MSAA2X = 1,
+  MSAA4X = 2,
+};
+
+// a2xx_rb_copy_sample_select
+enum class eCopySampleSelect : u32 {
+  xe0,
+  xe1,
+  xe2,
+  xe3,
+  xe01,
+  xe23,
+  xe0123,
+};
+
+enum class eCopyCommand : u32 {
+  xeRaw = 0,
+  xeConvert = 1,
+  xeConstantOne = 2,
+  xeNull = 3,  // ?
+};
+
+// Subset of a2xx_sq_surfaceformat - formats that RTs can be resolved to.
+enum class eColorFormat : u32 {
+  xe_8 = 2,
+  xe_1_5_5_5 = 3,
+  xe_5_6_5 = 4,
+  xe_6_5_5 = 5,
+  xe_8_8_8_8 = 6,
+  xe_2_10_10_10 = 7,
+  xe_8_A = 8,
+  xe_8_B = 9,
+  xe_8_8 = 10,
+  xe_8_8_8_8_A = 14,
+  xe_4_4_4_4 = 15,
+  xe_10_11_11 = 16,
+  xe_11_11_10 = 17,
+  xe_16 = 24,
+  xe_16_16 = 25,
+  xe_16_16_16_16 = 26,
+  xe_16_FLOAT = 30,
+  xe_16_16_FLOAT = 31,
+  xe_16_16_16_16_FLOAT = 32,
+  xe_32_FLOAT = 36,
+  xe_32_32_FLOAT = 37,
+  xe_32_32_32_32_FLOAT = 38,
+  xe_8_8_8_8_AS_16_16_16_16 = 50,
+  xe_2_10_10_10_AS_16_16_16_16 = 54,
+  xe_10_11_11_AS_16_16_16_16 = 55,
+  xe_11_11_10_AS_16_16_16_16 = 56,
+};
+
+// SurfaceNumberX from yamato_enum.h.
+enum class eSurfaceNumberFormat : u32 {
+  xeUnsignedRepeatingFraction = 0,
+  // Microsoft-style, scale factor (2^(n-1))-1.
+  xeSignedRepeatingFraction = 1,
+  xeUnsignedInteger = 2,
+  xeSignedInteger = 3,
+  kFloat = 7,
+};
+
 inline uint16_t xeEndianSwap(uint16_t value, eEndian endianness) {
   switch (endianness) {
   case eEndian::xeNone:

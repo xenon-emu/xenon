@@ -54,18 +54,7 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
   }
 
   // XAudioRenderDriverInitialize bypass 2.0.17489.0.
-  if (static_cast<u32>(thread.CIA) == 0x8018B0EC) {
-    return;
-  }
-
-  // XamAppsIntilized Check bypass.
-  if (static_cast<u32>(thread.CIA) == 0x81751168) {
-    thread.GPR[3] = 1;
-  }
-
-  // XHVpCreateEngine XAM Call skip. Related to XAudio Microphone stuff.
-  if (static_cast<u32>(thread.CIA) == 0x81B17D88) {
-    thread.GPR[3] = -1;
+  if (static_cast<u32>(thread.CIA) == 0x80081830) {
     return;
   }
 

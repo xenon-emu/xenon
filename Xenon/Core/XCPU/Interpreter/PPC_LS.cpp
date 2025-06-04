@@ -746,6 +746,18 @@ void PPCInterpreter::PPCInterpreter_stvx(PPU_STATE *ppuState) {
   MMUWrite32(ppuState, EA + (sizeof(u32) * 3), VRi(vs).dword[3]);
 }
 
+// Store Vector Indexed 128
+void PPCInterpreter::PPCInterpreter_stvx128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
+
+  MMUWrite32(ppuState, EA, VR(VMX128_1_VD128).dword[0]);
+  MMUWrite32(ppuState, EA + (sizeof(u32) * 1), VR(VMX128_1_VD128).dword[1]);
+  MMUWrite32(ppuState, EA + (sizeof(u32) * 2), VR(VMX128_1_VD128).dword[2]);
+  MMUWrite32(ppuState, EA + (sizeof(u32) * 3), VR(VMX128_1_VD128).dword[3]);
+}
+
 // Store Vector Element Word Indexed (x'7C00 018E')
 void PPCInterpreter::PPCInterpreter_stvewx(PPU_STATE* ppuState) {
   /*
@@ -764,6 +776,16 @@ void PPCInterpreter::PPCInterpreter_stvewx(PPU_STATE* ppuState) {
   const u8 eb = EA & 0xF;
 
   MMUWrite32(ppuState, EA, VRi(vd).dword[eb / 4]);
+}
+
+// Store Vector Element Word Indexed 128
+void PPCInterpreter::PPCInterpreter_stvewx128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  u64 EA = ((_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~3);
+  const u8 eb = EA & 0xF;
+
+  MMUWrite32(ppuState, EA, VR(VMX128_1_VD128).dword[eb / 4]);
 }
 
 // Store Vector Right Indexed
@@ -1742,6 +1764,24 @@ void PPCInterpreter::PPCInterpreter_lvx128(PPU_STATE *ppuState) {
   VR(VMX128_1_VD128) = vector;
 }
 
+// // Load Vector Indexed LRU 128
+void PPCInterpreter::PPCInterpreter_lvxl128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  Vector128 vector{};
+  const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
+
+  vector.dword[0] = MMURead32(ppuState, EA);
+  vector.dword[1] = MMURead32(ppuState, EA + (sizeof(u32) * 1));
+  vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
+  vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  VR(VMX128_1_VD128) = vector;
+}
+
 // Load Vector Indexed LRU (x'7C00 02CE')
 void PPCInterpreter::PPCInterpreter_lvxl(PPU_STATE *ppuState) {
   /*
@@ -1830,6 +1870,43 @@ void PPCInterpreter::PPCInterpreter_lvlx(PPU_STATE *ppuState) {
 #endif // VXU_LOAD_DEBUG
 }
 
+// Load Vector Left Indexed 128
+void PPCInterpreter::PPCInterpreter_lvlx128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  Vector128 vector{};
+
+  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
+  const u8 eb = EA & 0xF;
+  EA &= ~0xF;
+
+  vector.dword[0] = MMURead32(ppuState, EA);
+  vector.dword[1] = MMURead32(ppuState, EA + (sizeof(u32) * 1));
+  vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
+  vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  vector.dword[0] = byteswap_be<u32>(vector.dword[0]);
+  vector.dword[1] = byteswap_be<u32>(vector.dword[1]);
+  vector.dword[2] = byteswap_be<u32>(vector.dword[2]);
+  vector.dword[3] = byteswap_be<u32>(vector.dword[3]);
+
+  u8 i = 0;
+  for (i = 0; i < 16 - eb; ++i)
+    VR(VMX128_1_VD128).bytes[i] = vector.bytes[i + eb];
+
+  while (i < 16)
+    VR(VMX128_1_VD128).bytes[i++] = 0;
+
+  VR(VMX128_1_VD128).dword[0] = byteswap_be<u32>(VR(VMX128_1_VD128).dword[0]);
+  VR(VMX128_1_VD128).dword[1] = byteswap_be<u32>(VR(VMX128_1_VD128).dword[1]);
+  VR(VMX128_1_VD128).dword[2] = byteswap_be<u32>(VR(VMX128_1_VD128).dword[2]);
+  VR(VMX128_1_VD128).dword[3] = byteswap_be<u32>(VR(VMX128_1_VD128).dword[3]);
+}
+
+
 // Load Vector Right Indexed (x'7C00 044E')
 void PPCInterpreter::PPCInterpreter_lvrx(PPU_STATE *ppuState) {
   /*
@@ -1888,6 +1965,47 @@ void PPCInterpreter::PPCInterpreter_lvrx(PPU_STATE *ppuState) {
   LOG_DEBUG(Xenon, "lvrx [EB {:#d}] vR{:#d} = [{:#x}, {:#x}, {:#x}, {:#x}]",
     eb, vrd, VRi(vd).dword[0], VRi(vd).dword[1], VRi(vd).dword[2], VRi(vd).dword[3]);
 #endif // VXU_LOAD_DEBUG
+}
+
+// Load Vector Right Indexed 128
+void PPCInterpreter::PPCInterpreter_lvrx128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  Vector128 vector{};
+
+  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
+  const u8 eb = EA & 0xF;
+  EA &= ~0xF;
+
+  vector.dword[0] = MMURead32(ppuState, EA);
+  vector.dword[1] = MMURead32(ppuState, EA + (sizeof(u32) * 1));
+  vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
+  vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  vector.dword[0] = byteswap_be<u32>(vector.dword[0]);
+  vector.dword[1] = byteswap_be<u32>(vector.dword[1]);
+  vector.dword[2] = byteswap_be<u32>(vector.dword[2]);
+  vector.dword[3] = byteswap_be<u32>(vector.dword[3]);
+
+  u8 i = 0;
+
+  while (i < (16 - eb)) {
+    VR(VMX128_1_VD128).bytes[i] = 0;
+    ++i;
+  }
+
+  while (i < 16) {
+    VR(VMX128_1_VD128).bytes[i] = vector.bytes[i - (16 - eb)];
+    ++i;
+  }
+
+  VR(VMX128_1_VD128).dword[0] = byteswap_be<u32>(VR(VMX128_1_VD128).dword[0]);
+  VR(VMX128_1_VD128).dword[1] = byteswap_be<u32>(VR(VMX128_1_VD128).dword[1]);
+  VR(VMX128_1_VD128).dword[2] = byteswap_be<u32>(VR(VMX128_1_VD128).dword[2]);
+  VR(VMX128_1_VD128).dword[3] = byteswap_be<u32>(VR(VMX128_1_VD128).dword[3]);
 }
 
 // Load Vector for Shift Left (x'7C00 000C')
