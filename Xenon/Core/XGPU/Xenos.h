@@ -86,6 +86,15 @@ enum class eEndian : u32 {
   xe16in32 = 3,
 };
 
+enum class eEndian128 : u32 {
+  xeNone = 0,
+  xe8in16 = 1,
+  xe8in32 = 2,
+  xe16in32 = 3,
+  xe8in64 = 4,
+  xe8in128 = 5,
+};
+
 enum class eModeControl : u32 {
   xeIgnore = 0,
   xeColorDepth = 4,
@@ -115,6 +124,64 @@ enum class eMSAASamples : u32 {
   MSAA1X = 0,
   MSAA2X = 1,
   MSAA4X = 2,
+};
+
+// a2xx_rb_copy_sample_select
+enum class eCopySampleSelect : u32 {
+  xe0,
+  xe1,
+  xe2,
+  xe3,
+  xe01,
+  xe23,
+  xe0123,
+};
+
+enum class eCopyCommand : u32 {
+  xeRaw = 0,
+  xeConvert = 1,
+  xeConstantOne = 2,
+  xeNull = 3,  // ?
+};
+
+// Subset of a2xx_sq_surfaceformat - formats that RTs can be resolved to.
+enum class eColorFormat : u32 {
+  xe_8 = 2,
+  xe_1_5_5_5 = 3,
+  xe_5_6_5 = 4,
+  xe_6_5_5 = 5,
+  xe_8_8_8_8 = 6,
+  xe_2_10_10_10 = 7,
+  xe_8_A = 8,
+  xe_8_B = 9,
+  xe_8_8 = 10,
+  xe_8_8_8_8_A = 14,
+  xe_4_4_4_4 = 15,
+  xe_10_11_11 = 16,
+  xe_11_11_10 = 17,
+  xe_16 = 24,
+  xe_16_16 = 25,
+  xe_16_16_16_16 = 26,
+  xe_16_FLOAT = 30,
+  xe_16_16_FLOAT = 31,
+  xe_16_16_16_16_FLOAT = 32,
+  xe_32_FLOAT = 36,
+  xe_32_32_FLOAT = 37,
+  xe_32_32_32_32_FLOAT = 38,
+  xe_8_8_8_8_AS_16_16_16_16 = 50,
+  xe_2_10_10_10_AS_16_16_16_16 = 54,
+  xe_10_11_11_AS_16_16_16_16 = 55,
+  xe_11_11_10_AS_16_16_16_16 = 56,
+};
+
+// SurfaceNumberX from yamato_enum.h.
+enum class eSurfaceNumberFormat : u32 {
+  xeUnsignedRepeatingFraction = 0,
+  // Microsoft-style, scale factor (2^(n-1))-1.
+  xeSignedRepeatingFraction = 1,
+  xeUnsignedInteger = 2,
+  xeSignedInteger = 3,
+  kFloat = 7,
 };
 
 inline uint16_t xeEndianSwap(uint16_t value, eEndian endianness) {

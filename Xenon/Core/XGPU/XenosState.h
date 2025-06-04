@@ -126,10 +126,10 @@ public:
   u32 blendControl1 = 0;
   u32 blendControl2 = 0;
   u32 blendControl3 = 0;
-  u32 copyControl = 0;
+  RB_COPY_CONTROL_REG copyControl = {};
   u32 copyDestBase = 0;
-  u32 copyDestPitch = 0;
-  u32 copyDestInfo = 0;
+  RB_COPY_DEST_PITCH_REG copyDestPitch = {};
+  RB_COPY_DEST_INFO_REG copyDestInfo = {};
   u32 depthClear = 0;
   u32 clearColor = 0;
   u32 clearColorLo = 0;

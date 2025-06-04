@@ -287,28 +287,27 @@ void Renderer::UpdateConstants(Xe::XGPU::XenosState *state) {
 }
 
 bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
-  // Master register
-  const u32 copyCtrl = state->copyControl;
   // Which render targets are affected (0-3 = colorRT, 4=depth)
-  const u32 copyRT = (copyCtrl & 0x7);
+  const u32 copyRT = state->copyControl.copySrcSelect;
   // Should we clear after copy?
-  const bool colorClearEnabled = (copyCtrl >> 8) & 1;
-  const bool depthClearEnabled = (copyCtrl >> 9) & 1;
+  const bool colorClearEnabled = state->copyControl.colorClearEnable;
+  const bool depthClearEnabled = state->copyControl.depthClearEnable;
   // Actual copy command
-  const Xe::eCopyCommand copyCommand = static_cast<Xe::eCopyCommand>((copyCtrl >> 20) & 3);
+  const eCopyCommand copyCommand = state->copyControl.copyCommand;
+
   // Target memory and format for the copy operation
-  const u32 destInfo = state->copyDestInfo;
-  const Xe::eEndianFormat endianFormat = static_cast<Xe::eEndianFormat>(destInfo & 7);
-  const u32 destArray = (destInfo >> 3) & 1;
-  const u32 destSlice = (destInfo >> 4) & 1;
-  const Xe::eColorFormat destFormat = static_cast<Xe::eColorFormat>((destInfo >> 7) & 0x3F);
-  const u32 destNumber = (destInfo >> 13) & 7;
-  const u32 destBias = (destInfo >> 16) & 0x3F;
-  const u32 destSwap = (destInfo >> 25) & 1;
+  const eEndian128 endianFormat = state->copyDestInfo.copyDestEndian;
+  const u32 destArray = state->copyDestInfo.copyDestArray;
+  const u32 destSlice = state->copyDestInfo.copyDestSlice;
+  const eColorFormat destFormat = state->copyDestInfo.copyDestFormat;
+  const eSurfaceNumberFormat destNumber = state->copyDestInfo.copyDestNumber;
+  const u32 destBias = state->copyDestInfo.copyDestExpBias;
+  const u32 destSwap = state->copyDestInfo.copyDestSwap;
   const u32 destBase = state->copyDestBase;
-  const u32 destPitchRaw = state->copyDestPitch;
-  const u32 destPitch = destPitchRaw & 0x3FFF;
-  const u32 destHeight = (destPitchRaw >> 16) & 0x3FFF;
+
+  const u32 destPitch = state->copyDestPitch.copyDestPitch;
+  const u32 destHeight = state->copyDestPitch.copyDestHeight;
+
   u64 combinedHash = (static_cast<u64>(currentVertexShader.load()) << 32) | currentPixelShader.load();
   auto shader = linkedShaderPrograms[combinedHash];
   if (shader.vertexShader) {
@@ -324,7 +323,7 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
         continue;
 
       u32 byteAddress = fetchData.address << 2;
-      u32 byteSize = fetchData.size << 2;
+      u32 byteSize = fetchData.size << 2; // Size in DWORDS.
 
       u8 *data = ramPointer->GetPointerToAddress(byteAddress);
       if (!data) {

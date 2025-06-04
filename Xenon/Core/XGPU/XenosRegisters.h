@@ -7088,7 +7088,7 @@ union alignas(u32) RB_MODECONTROL_REG {
   u32 hexValue;
   struct {
     eModeControl edramMode : 3;         // +0
-    uint32_t res0 : 29;                 // +3
+    u32 res0 : 29;                      // +3
   };
 };
 
@@ -7098,6 +7098,48 @@ union alignas(u32) RB_SURFACE_INFO_REG {
     u32 surfacePitch : 14;              // +0 in pixels.
     u32 res0 : 2;                       // +14
     eMSAASamples msaaSamples : 2;       // +16
-    uint32_t hizPitch : 14;             // +18
+    u32 hizPitch : 14;                  // +18
+  };
+};
+
+// Copy registers are very different than on Adreno.
+
+union alignas(u32) RB_COPY_CONTROL_REG {
+  u32 hexValue;
+  struct {
+    u32 copySrcSelect : 3;              // +0 Depth is 4.
+    u32 res0 : 1;                       // +3
+    eCopySampleSelect copySampleSelect : 3;  // +4
+    u32 res1 : 1;                       // +7
+    u32 colorClearEnable : 1;           // +8
+    u32 depthClearEnable : 1;           // +9
+    u32 res2 : 10;                      // +10
+    eCopyCommand copyCommand : 2;       // +20
+    u32 res3 : 10;                      // +22
+  };
+};
+
+union alignas(u32) RB_COPY_DEST_INFO_REG {
+  u32 hexValue;
+  struct {
+    eEndian128 copyDestEndian : 3;      // +0
+    u32 copyDestArray : 1;              // +3
+    u32 copyDestSlice : 3;              // +4
+    eColorFormat copyDestFormat : 6;    // +7
+    eSurfaceNumberFormat copyDestNumber : 3;  // +13
+    int32_t copyDestExpBias : 6;        // +16
+    u32 res0 : 2;                       // +22
+    u32 copyDestSwap : 1;               // +24
+    u32 res1 : 7;                       // +25
+  };
+};
+
+union alignas(u32) RB_COPY_DEST_PITCH_REG {
+  u32 hexValue;
+  struct {
+    u32 copyDestPitch : 14;             // +0
+    u32 res0 : 2;                       // +14
+    u32 copyDestHeight : 14;            // +16
+    u32 res1 : 2;                       // +30
   };
 };

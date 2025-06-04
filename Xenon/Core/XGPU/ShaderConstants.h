@@ -55,41 +55,6 @@ enum class eRenderTargetDepthFormat : u32 {
   Format_32_32_FLOAT = 15,
 };
 
-enum class eCopyCommand : u32 {
-  Raw,
-  Convert,
-  ConvertOne,
-  Null // Unknown
-};
-
-// Subset of instr_surf_fmt_t
-enum class eColorFormat : u32 {
-  Unknown,
-  Format_8 = 2,
-  Format_1_5_5_5,
-  Format_5_6_5,
-  Format_6_5_5,
-  Format_8_8_8_8,
-  Format_2_10_10_10,
-  Format_8_A,
-  Format_8_B,
-  Format_8_8,
-  Format_8_8_8_8_A = 14,
-  Format_4_4_4_4,
-  Format_10_11_11,
-  Format_11_11_10,
-  Format_16 = 24,
-  Format_16_16,
-  Format_16_16_16_16,
-  Format_16_FLOAT = 30,
-  Format_16_16_FLOAT,
-  Format_16_16_16_16_FLOAT,
-  Format_32_FLOAT = 36,
-  Format_32_32_FLOAT,
-  Format_32_32_32_32_FLOAT,
-  Format_2_10_10_10_FLOAT = 62,
-};
-
 enum class eCmpFunc : u32 {
   Never,
   Less,
