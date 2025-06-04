@@ -305,7 +305,6 @@ void PPCInterpreter::PPCInterpreter_vmrghw128(PPU_STATE *ppuState) {
   VR(VMX128_VD128).dword[3] = VR(VMX128_VB128).dword[1];
 }
 
-/*
 // Vector128 Maximum Floating-Point
 void PPCInterpreter::PPCInterpreter_vmaxfp128(PPU_STATE* ppuState) {
   CHECK_VXU;
@@ -325,10 +324,8 @@ void PPCInterpreter::PPCInterpreter_vminfp128(PPU_STATE* ppuState) {
   VR(VMX128_VD128).flt[2] = (VR(VMX128_VA128).flt[2] < VR(VMX128_VB128).flt[2]) ? VR(VMX128_VA128).flt[2] : VR(VMX128_VB128).flt[2];
   VR(VMX128_VD128).flt[3] = (VR(VMX128_VA128).flt[3] < VR(VMX128_VB128).flt[3]) ? VR(VMX128_VA128).flt[3] : VR(VMX128_VB128).flt[3];
 }
-*/
 
 // Vector128 Merge Low Word
-/*
 void PPCInterpreter::PPCInterpreter_vmrglw128(PPU_STATE* ppuState) {
   CHECK_VXU;
 
@@ -337,7 +334,6 @@ void PPCInterpreter::PPCInterpreter_vmrglw128(PPU_STATE* ppuState) {
   VR(VMX128_VD128).dword[2] = VR(VMX128_VA128).dword[3];
   VR(VMX128_VD128).dword[3] = VR(VMX128_VB128).dword[3];
 }
-*/
 
 static const u8 reIndex[32] = { 3,2,1,0, 7,6,5,4, 11,10,9,8, 15,14,13,12, 19,18,17,16, 23,22,21,20, 27,26,25,24, 31,30,29,28 };
 
@@ -758,8 +754,19 @@ void PPCInterpreter::PPCInterpreter_vspltisw128(PPU_STATE *ppuState) {
   }
 }
 
+// Vector128 Subtract Floating-Point
+void PPCInterpreter::PPCInterpreter_vsubfp128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  // TODO: Rounding to Near.
+
+  VR(VMX128_VD128).flt[0] = VR(VMX128_VA128).flt[0] - VR(VMX128_VB128).flt[0];
+  VR(VMX128_VD128).flt[1] = VR(VMX128_VA128).flt[1] - VR(VMX128_VB128).flt[1];
+  VR(VMX128_VD128).flt[2] = VR(VMX128_VA128).flt[2] - VR(VMX128_VB128).flt[2];
+  VR(VMX128_VD128).flt[3] = VR(VMX128_VA128).flt[3] - VR(VMX128_VB128).flt[3];
+}
+
 // Vector Splat Word 128
-/*
 void PPCInterpreter::PPCInterpreter_vspltw128(PPU_STATE* ppuState) {
   CHECK_VXU;
 
@@ -769,26 +776,25 @@ void PPCInterpreter::PPCInterpreter_vspltw128(PPU_STATE* ppuState) {
     VR(VMX128_3_VD128).dword[idx] = VR(VMX128_3_VB128).dword[uimm];
   }
 }
-*/
 
 // Vector128 Multiply Sum 4-way Floating-Point
-/*
 void PPCInterpreter::PPCInterpreter_vmsum4fp128(PPU_STATE* ppuState) {
   CHECK_VXU;
 
   // Dot product XYZW.
   // (VD.xyzw) = (VA.x * VB.x) + (VA.y * VB.y) + (VA.z * VB.z) + (VA.w * VB.w)
 
-  float dotProduct = (VR(VMX128_VA128).dword[0] * VR(VMX128_VB128).dword[0]) +
-    (VR(VMX128_VA128).dword[1] * VR(VMX128_VB128).dword[1]) +
-    (VR(VMX128_VA128).dword[2] * VR(VMX128_VB128).dword[2]) +
-    (VR(VMX128_VA128).dword[3] * VR(VMX128_VB128).dword[3]);
+  // NOTE: Checked against Xenia's tests.
+
+  float dotProduct = (VR(VMX128_VA128).flt[0] * VR(VMX128_VB128).flt[0]) +
+    (VR(VMX128_VA128).flt[1] * VR(VMX128_VB128).flt[1]) +
+    (VR(VMX128_VA128).flt[2] * VR(VMX128_VB128).flt[2]) +
+    (VR(VMX128_VA128).flt[3] * VR(VMX128_VB128).flt[3]);
 
   for (u8 idx = 0; idx < 4; idx++) {
     VR(VMX128_3_VD128).flt[idx] = dotProduct;
   }
 }
-*/
 
 // Vector Logical XOR (x'1000 04C4')
 void PPCInterpreter::PPCInterpreter_vxor(PPU_STATE *ppuState) {
