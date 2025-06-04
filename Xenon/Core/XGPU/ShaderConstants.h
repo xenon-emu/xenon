@@ -35,12 +35,6 @@ enum class eShaderType : u32 {
   Unknown
 };
 
-enum class eMSAASamples : u32 {
-  MSAA1X,
-  MSAA2X,
-  MSAA4X
-};
-
 enum class eRenderTargetColorFormat : u32 {
   D24S8,
   D24FS8
@@ -60,13 +54,6 @@ enum class eRenderTargetDepthFormat : u32 {
   Format_32_FLOAT = 14,
   Format_32_32_FLOAT = 15,
 };
-
-enum class eModeControl : u32 {
-  Ignore,
-  ColorDepth,
-  Depth,
-  Copy
-};  
 
 enum class eCopyCommand : u32 {
   Raw,

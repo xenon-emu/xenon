@@ -86,6 +86,37 @@ enum class eEndian : u32 {
   xe16in32 = 3,
 };
 
+enum class eModeControl : u32 {
+  xeIgnore = 0,
+  xeColorDepth = 4,
+  // TODO: Verify whether kDepth means the pixel shader is ignored
+  // completely even if it writes depth, exports to memory or kills pixels.
+  // Hints suggesting that it should be completely ignored (which is desirable
+  // on real hardware to avoid scheduling the pixel shader at all and waiting
+  // for it especially since the Xbox 360 doesn't have early per-sample depth /
+  // stencil, only early hi-Z / hi-stencil, and other registers possibly
+  // toggling pixel shader execution are yet to be found):
+  // - Most of depth pre-pass draws in 415607E6 use the kDepth more with a
+  //   `oC0 = tfetch2D(tf0, r0.xy) * r1` shader, some use `oC0 = r0` though.
+  //   However, when alphatested surfaces are drawn, kColorDepth is explicitly
+  //   used with the same shader performing the texture fetch.
+  // - 5454082B has some kDepth draws with alphatest enabled, but the shader is
+  //   `oC0 = r0`, which makes no sense (alphatest based on an interpolant from
+  //   the vertex shader) as no texture alpha cutout is involved.
+  // - 5454082B also has kDepth draws with pretty complex shaders clearly for
+  //   use only in the color pass - even fetching and filtering a shadowmap.
+  // For now, based on these, let's assume the pixel shader is never used with
+  // kDepth.
+  xeDepth = 5,
+  xeCopy = 6,
+};
+
+enum class eMSAASamples : u32 {
+  MSAA1X = 0,
+  MSAA2X = 1,
+  MSAA4X = 2,
+};
+
 inline uint16_t xeEndianSwap(uint16_t value, eEndian endianness) {
   switch (endianness) {
   case eEndian::xeNone:

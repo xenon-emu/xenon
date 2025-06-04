@@ -108,7 +108,7 @@ public:
   u32 rbbmSoftReset = 0;
 
   // RB
-  u32 surfaceInfo = 0;
+  RB_SURFACE_INFO_REG surfaceInfo = {};
   u32 colorInfo = 0;
   u32 depthInfo = 0;
   u32 color1Info = 0;
@@ -122,7 +122,7 @@ public:
   u32 depthControl = 0;
   u32 blendControl0 = 0;
   u32 tileControl = 0;
-  u32 modeControl = 0;
+  RB_MODECONTROL_REG modeControl = {};
   u32 blendControl1 = 0;
   u32 blendControl2 = 0;
   u32 blendControl3 = 0;

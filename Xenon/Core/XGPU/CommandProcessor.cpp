@@ -1123,20 +1123,19 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
   // Skip to the next command, if there are immediate indexes that we don't support yet.
   ringBuffer->AdvanceRead(dataCount * sizeof(u32));
 
-  const eModeControl modeControl = static_cast<eModeControl>((state->modeControl / 2) & 0x7);
+  const eModeControl modeControl = state->modeControl.edramMode;
   if (drawOk) {
     // Get surface info
-    const u32 surfaceInfo = state->surfaceInfo;
-    const u32 surfacePitch = surfaceInfo & 0x3FFF;
+    const u32 surfacePitch = state->surfaceInfo.surfacePitch;
     bool hasRT = surfacePitch != 0;
     if (!hasRT) {
       LOG_DEBUG(Xenos, "[CP] No render target");
       return true;
     }
     // Get surface MSAA
-    const eMSAASamples surfaceMSAA = static_cast<eMSAASamples>((surfaceInfo >> 16) & 0x3);
+    const eMSAASamples surfaceMSAA = state->surfaceInfo.msaaSamples;
     // Check the state of things
-    if (modeControl == eModeControl::Copy) {
+    if (modeControl == eModeControl::xeCopy) {
       // Copy to eDRAM, and clear if needed
 #ifndef NO_GFX
       {

@@ -219,7 +219,7 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
     value = xdvoRegisterData;
     break;
   case XeRegister::RB_SURFACE_INFO:
-    value = surfaceInfo;
+    value = surfaceInfo.hexValue;
     break;
   case XeRegister::RB_COLOR_INFO:
     value = colorInfo;
@@ -319,7 +319,7 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
     value = tileControl;
     break;
   case XeRegister::RB_MODECONTROL:
-    value = modeControl;
+    value = modeControl.hexValue;
     break;
   case XeRegister::RB_BLENDCONTROL1:
     value = blendControl1;
@@ -563,7 +563,7 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
     xdvoRegisterData = value;
     break;
   case XeRegister::RB_SURFACE_INFO:
-    surfaceInfo = value;
+    surfaceInfo.hexValue = value;
     break;
   case XeRegister::RB_COLOR_INFO:
     colorInfo = value;
@@ -663,7 +663,7 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
     viewportControl = value;
     break;
   case XeRegister::RB_MODECONTROL:
-    modeControl = value;
+    modeControl.hexValue = value;
     break;
   case XeRegister::RB_BLENDCONTROL1:
     blendControl1 = value;

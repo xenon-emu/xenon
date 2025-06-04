@@ -7083,3 +7083,21 @@ union alignas(u32) VGT_DRAW_INITIATOR_REG {
     u32 numIndices : 16;                // +16
   };
 };
+
+union alignas(u32) RB_MODECONTROL_REG {
+  u32 hexValue;
+  struct {
+    eModeControl edramMode : 3;         // +0
+    uint32_t res0 : 29;                 // +3
+  };
+};
+
+union alignas(u32) RB_SURFACE_INFO_REG {
+  u32 hexValue;
+  struct {
+    u32 surfacePitch : 14;              // +0 in pixels.
+    u32 res0 : 2;                       // +14
+    eMSAASamples msaaSamples : 2;       // +16
+    uint32_t hizPitch : 14;             // +18
+  };
+};
