@@ -457,12 +457,15 @@ bool CommandProcessor::ExecutePacketType3_COND_WRITE(RingBuffer *ringBuffer, u32
   const u32 mask = ringBuffer->ReadAndSwap<u32>();
   // Write data
   const XeRegister writeReg = static_cast<XeRegister>(ringBuffer->ReadAndSwap<u32>());
-  const u32 writeData = ringBuffer->ReadAndSwap<u32>();
+  u32 writeData = ringBuffer->ReadAndSwap<u32>();
 
   u32 value = 0;
   if (waitInfo & 0x10) {
-    u8 *addrPtr = ram->GetPointerToAddress(static_cast<u32>(pollReg));
+    // Memory.
+    auto endianness = static_cast<eEndian>(static_cast<u32>(pollReg) & 0x3);
+    u8 *addrPtr = ram->GetPointerToAddress(static_cast<u32>(pollReg) & ~0x3);
     memcpy(&value, addrPtr, sizeof(value));
+    value = xeEndianSwap(value, endianness);
   } else {
     value = state->ReadRegister(pollReg);
   }
@@ -495,10 +498,13 @@ bool CommandProcessor::ExecutePacketType3_COND_WRITE(RingBuffer *ringBuffer, u32
   }
 
   if (matched) {
-    if (waitInfo & 0x100) {
-      u8 *addrPtr = ram->GetPointerToAddress(static_cast<u32>(writeReg));
+    // Write.
+    if (waitInfo & 0x100) { // Memory
+      auto endianness = static_cast<eEndian>(static_cast<u32>(writeReg) & 0x3);
+      u8 *addrPtr = ram->GetPointerToAddress(static_cast<u32>(writeReg) & ~0x3);
+      writeData = xeEndianSwap(writeData, endianness);
       memcpy(addrPtr, &writeData, sizeof(writeData));
-    } else {
+    } else { // Register
       state->WriteRegister(writeReg, writeData);
     }
   }
