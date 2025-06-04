@@ -27,8 +27,6 @@ D_STUB(lvsl128)
 D_STUB(lvewx128)
 D_STUB(stvewx128)
 D_STUB(stvxl128)
-D_STUB(lvlx128)
-D_STUB(lvrx128)
 D_STUB(lvlxl128)
 D_STUB(lvrxl128)
 D_STUB(stvrxl128)
@@ -570,7 +568,9 @@ extern void PPCInterpreter_lvx128(PPU_STATE *ppuState);
 extern void PPCInterpreter_lvxl128(PPU_STATE *ppuState);
 extern void PPCInterpreter_lvxl(PPU_STATE *ppuState);
 extern void PPCInterpreter_lvlx(PPU_STATE *ppuState);
+extern void PPCInterpreter_lvlx128(PPU_STATE *ppuState);
 extern void PPCInterpreter_lvrx(PPU_STATE *ppuState);
+extern void PPCInterpreter_lvrx128(PPU_STATE *ppuState);
 extern void PPCInterpreter_lvsl(PPU_STATE *ppuState);
 
 
