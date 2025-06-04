@@ -184,7 +184,6 @@ void PPCInterpreter::PPCInterpreter_vor(PPU_STATE *ppuState) {
 }
 
 // Vector128 Logical OR
-/*
 void PPCInterpreter::PPCInterpreter_vor128(PPU_STATE* ppuState) {
   CHECK_VXU;
 
@@ -193,7 +192,6 @@ void PPCInterpreter::PPCInterpreter_vor128(PPU_STATE* ppuState) {
   VR(VMX128_VD128).dword[2] = VR(VMX128_VA128).dword[2] | VR(VMX128_VB128).dword[2];
   VR(VMX128_VD128).dword[3] = VR(VMX128_VA128).dword[3] | VR(VMX128_VB128).dword[3];
 }
-*/
 
 // Vector Splat Word (x'1000 028C')
 void PPCInterpreter::PPCInterpreter_vspltw(PPU_STATE *ppuState) {

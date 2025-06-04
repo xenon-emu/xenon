@@ -778,6 +778,16 @@ void PPCInterpreter::PPCInterpreter_stvewx(PPU_STATE* ppuState) {
   MMUWrite32(ppuState, EA, VRi(vd).dword[eb / 4]);
 }
 
+// Store Vector Element Word Indexed 128
+void PPCInterpreter::PPCInterpreter_stvewx128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  u64 EA = ((_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~3);
+  const u8 eb = EA & 0xF;
+
+  MMUWrite32(ppuState, EA, VR(VMX128_1_VD128).dword[eb / 4]);
+}
+
 // Store Vector Right Indexed
 void PPCInterpreter::PPCInterpreter_stvrx(PPU_STATE* ppuState) {
   CHECK_VXU;

@@ -25,12 +25,10 @@ D_STUB(mfsr)
 D_STUB(lvsr)
 D_STUB(lvsl128)
 D_STUB(lvewx128)
-D_STUB(stvewx128)
 D_STUB(stvxl128)
 D_STUB(lvlxl128)
 D_STUB(lvrxl128)
 D_STUB(stvrxl128)
-D_STUB(vor128)
 D_STUB(lvsr128)
 D_STUB(vsldoi128)
 D_STUB(vmrglw128)
@@ -426,6 +424,7 @@ extern void PPCInterpreter_vcmpequwx(PPU_STATE *ppuState);
 extern void PPCInterpreter_vcsxwfp128(PPU_STATE *ppuState);
 extern void PPCInterpreter_vnor(PPU_STATE *ppuState);
 extern void PPCInterpreter_vor(PPU_STATE *ppuState);
+extern void PPCInterpreter_vor128(PPU_STATE *ppuState);
 extern void PPCInterpreter_vspltw(PPU_STATE *ppuState);
 extern void PPCInterpreter_vmaxuw(PPU_STATE *ppuState);
 extern void PPCInterpreter_vminuw(PPU_STATE *ppuState);
@@ -502,6 +501,7 @@ extern void PPCInterpreter_stfiwx(PPU_STATE *ppuState);
 extern void PPCInterpreter_stvx(PPU_STATE *ppuState);
 extern void PPCInterpreter_stvx128(PPU_STATE *ppuState);
 extern void PPCInterpreter_stvewx(PPU_STATE *ppuState);
+extern void PPCInterpreter_stvewx128(PPU_STATE *ppuState);
 extern void PPCInterpreter_stvrx(PPU_STATE *ppuState);
 extern void PPCInterpreter_stvrx128(PPU_STATE *ppuState);
 extern void PPCInterpreter_stvlx(PPU_STATE *ppuState);
