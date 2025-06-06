@@ -202,14 +202,28 @@ void PPCInterpreter::PPCInterpreter_vspltw(PPU_STATE *ppuState) {
     end
   */
 
+  // NOTE: Checked against Xenia's tests.
+
   CHECK_VXU;
 
-  const u8 b = (_instr.va & 0x3);
+  const u8 b = (_instr.vuimm & 0x3);
 
-  VRi(vd).dword[0] = VRi(vb).dword[b];
-  VRi(vd).dword[1] = VRi(vb).dword[b];
-  VRi(vd).dword[2] = VRi(vb).dword[b];
-  VRi(vd).dword[3] = VRi(vb).dword[b];
+  for (u8 idx = 0; idx < 4; ++idx) {
+    VRi(vd).dword[idx] = VRi(vb).dword[b];
+  }
+}
+
+// Vector Splat Word 128
+void PPCInterpreter::PPCInterpreter_vspltw128(PPU_STATE* ppuState) {
+  // NOTE: Checked against Xenia's tests.
+
+  CHECK_VXU;
+
+  const u8 b = (VMX128_3_IMM & 0x3);
+
+  for (u8 idx = 0; idx < 4; ++idx) {
+    VR(VMX128_3_VD128).dword[idx] = VR(VMX128_3_VB128).dword[b];
+  }
 }
 
 // Vector Maximum Unsigned Word (x'1000 0082')
@@ -307,6 +321,8 @@ void PPCInterpreter::PPCInterpreter_vmrghw128(PPU_STATE *ppuState) {
 
 // Vector128 Maximum Floating-Point
 void PPCInterpreter::PPCInterpreter_vmaxfp128(PPU_STATE* ppuState) {
+  // NOTE: Checked against Xenia's tests.
+
   CHECK_VXU;
 
   VR(VMX128_VD128).flt[0] = (VR(VMX128_VA128).flt[0] > VR(VMX128_VB128).flt[0]) ? VR(VMX128_VA128).flt[0] : VR(VMX128_VB128).flt[0];
@@ -338,7 +354,7 @@ void PPCInterpreter::PPCInterpreter_vmrglw128(PPU_STATE* ppuState) {
 static const u8 reIndex[32] = { 3,2,1,0, 7,6,5,4, 11,10,9,8, 15,14,13,12, 19,18,17,16, 23,22,21,20, 27,26,25,24, 31,30,29,28 };
 
 static inline u8 vpermHelper(u8 idx, Base::Vector128 vra, Base::Vector128 vrb) {
-  return (idx & 16) ? vrb.bytes[idx & 15] : vra.bytes[idx & 15];
+  return (idx & 16) ? vrb.bytes[idx & 0xF] : vra.bytes[idx & 0xF];
 }
 
 // Vector Permute (x'1000 002B')
@@ -351,10 +367,19 @@ void PPCInterpreter::PPCInterpreter_vperm(PPU_STATE* ppuState) {
   end
   */
 
+  // NOTE: Checked against Xenia's tests.
+
   CHECK_VXU;
 
+  auto bytes = VRi(vc).bytes;
+
+  // Truncate in case of bigger than 32 value.
+  for (auto& byte : bytes) {
+    byte &= 0x1F;
+  }
+
   for (u8 idx = 0; idx < 16; idx++) {
-    VRi(vd).bytes[idx] = vpermHelper(reIndex[VRi(vc).bytes[reIndex[idx]]], VRi(va), VRi(rb));
+    VRi(vd).bytes[idx] = vpermHelper(reIndex[bytes[reIndex[idx]]], VRi(va), VRi(rb));
   }
 
   VRi(vd).dword[0] = byteswap_be<u32>(VRi(vd).dword[0]);
@@ -365,11 +390,19 @@ void PPCInterpreter::PPCInterpreter_vperm(PPU_STATE* ppuState) {
 
 // Vector Permute 128
 void PPCInterpreter::PPCInterpreter_vperm128(PPU_STATE* ppuState) {
+  // NOTE: Checked against Xenia's tests.
 
   CHECK_VXU;
 
+  auto bytes = VR(VMX128_2_VC).bytes;
+
+  // Truncate in case of bigger than 32 value.
+  for (auto& byte : bytes) {
+    byte &= 0x1F;
+  }
+
   for (u8 idx = 0; idx < 16; idx++) {
-    VR(VMX128_2_VD128).bytes[idx] = vpermHelper(reIndex[VR(VMX128_2_VC).bytes[reIndex[idx]]], VR(VMX128_2_VA128), VR(VMX128_2_VB128));
+    VR(VMX128_2_VD128).bytes[idx] = vpermHelper(reIndex[bytes[reIndex[idx]]], VR(VMX128_2_VA128), VR(VMX128_2_VB128));
   }
 
   VR(VMX128_2_VD128).dword[0] = byteswap_be<u32>(VR(VMX128_2_VD128).dword[0]);
@@ -389,7 +422,7 @@ void PPCInterpreter::PPCInterpreter_vrlimi128(PPU_STATE* ppuState) {
   Sometimes rotation is zero, so fast path.
   */
 
-  // Note: Already checked behavior against Xenia's tests. 
+  // NOTE: Checked against Xenia's tests.
 
   CHECK_VXU;
 
@@ -452,6 +485,7 @@ void PPCInterpreter::PPCInterpreter_vmaddfp(PPU_STATE *ppuState) {
   end
   */
 
+  // NOTE: Checked against Xenia's tests.
   // TODO: Rounding.
 
   CHECK_VXU;
@@ -471,6 +505,8 @@ void PPCInterpreter::PPCInterpreter_vslb(PPU_STATE *ppuState) {
   end
   */
 
+  // NOTE: Checked against Xenia's tests.
+
   CHECK_VXU;
 
   for (u8 idx = 0; idx < 16; idx++) {
@@ -488,6 +524,8 @@ void PPCInterpreter::PPCInterpreter_vslw(PPU_STATE* ppuState) {
   */
 
   CHECK_VXU;
+
+  // NOTE: Checked against Xenia's tests.
 
   VRi(rd).dword[0] = VRi(ra).dword[0] << (VRi(rb).dword[0] & 31);
   VRi(rd).dword[1] = VRi(ra).dword[1] << (VRi(rb).dword[1] & 31);
@@ -510,27 +548,20 @@ void PPCInterpreter::PPCInterpreter_vsr(PPU_STATE* ppuState) {
   // Let sh = vB[125-127]; sh is the shift count in bits (0<=sh<=7). The contents of vA are shifted right by sh bits. Bits
   // shifted out of bit 127 are lost. Zeros are supplied to the vacated bits on the left. The result is placed into vD.
 
+  // NOTE: Checked against Xenia's tests.
+
   CHECK_VXU;
 
-  const auto sh = VRi(rb).bytes[15] & 0x7;
-  const auto rsh = 8 - sh;
+  const u8 sh = VRi(rb).bytes[15] & 0x7;
 
-  VRi(rd).bytes[15] = VRi(ra).bytes[15] >> sh | (VRi(rd).bytes[14] << rsh);
-  VRi(rd).bytes[14] = VRi(ra).bytes[14] >> sh | (VRi(rd).bytes[13] << rsh);
-  VRi(rd).bytes[13] = VRi(ra).bytes[13] >> sh | (VRi(rd).bytes[12] << rsh);
-  VRi(rd).bytes[12] = VRi(ra).bytes[12] >> sh | (VRi(rd).bytes[11] << rsh);
-  VRi(rd).bytes[11] = VRi(ra).bytes[11] >> sh | (VRi(rd).bytes[10] << rsh);
-  VRi(rd).bytes[10] = VRi(ra).bytes[10] >> sh | (VRi(rd).bytes[9] << rsh);
-  VRi(rd).bytes[9] = VRi(ra).bytes[9] >> sh | (VRi(rd).bytes[8] << rsh);
-  VRi(rd).bytes[8] = VRi(ra).bytes[8] >> sh | (VRi(rd).bytes[7] << rsh);
-  VRi(rd).bytes[7] = VRi(ra).bytes[7] >> sh | (VRi(rd).bytes[6] << rsh);
-  VRi(rd).bytes[6] = VRi(ra).bytes[6] >> sh | (VRi(rd).bytes[5] << rsh);
-  VRi(rd).bytes[5] = VRi(ra).bytes[5] >> sh | (VRi(rd).bytes[4] << rsh);
-  VRi(rd).bytes[4] = VRi(ra).bytes[4] >> sh | (VRi(rd).bytes[3] << rsh);
-  VRi(rd).bytes[3] = VRi(ra).bytes[3] >> sh | (VRi(rd).bytes[2] << rsh);
-  VRi(rd).bytes[2] = VRi(ra).bytes[2] >> sh | (VRi(rd).bytes[1] << rsh);
-  VRi(rd).bytes[1] = VRi(ra).bytes[1] >> sh | (VRi(rd).bytes[0] << rsh);
-  VRi(rd).bytes[0] = VRi(ra).bytes[0] >> sh;
+  Base::Vector128 res = VRi(va);
+
+  for (int i = 15; i > 0; --i) {
+    res.bytes[i ^ 0x3] = (res.bytes[i ^ 0x3] >> sh) |
+      (res.bytes[(i - 1) ^ 0x3] << (8 - sh));
+  }
+
+  VRi(vd) = res;
 }
 
 // Vector Shift Right Word (x'1000 0284')
@@ -758,23 +789,13 @@ void PPCInterpreter::PPCInterpreter_vspltisw128(PPU_STATE *ppuState) {
 void PPCInterpreter::PPCInterpreter_vsubfp128(PPU_STATE* ppuState) {
   CHECK_VXU;
 
+  // NOTE: Checked against Xenia's tests.
   // TODO: Rounding to Near.
 
   VR(VMX128_VD128).flt[0] = VR(VMX128_VA128).flt[0] - VR(VMX128_VB128).flt[0];
   VR(VMX128_VD128).flt[1] = VR(VMX128_VA128).flt[1] - VR(VMX128_VB128).flt[1];
   VR(VMX128_VD128).flt[2] = VR(VMX128_VA128).flt[2] - VR(VMX128_VB128).flt[2];
   VR(VMX128_VD128).flt[3] = VR(VMX128_VA128).flt[3] - VR(VMX128_VB128).flt[3];
-}
-
-// Vector Splat Word 128
-void PPCInterpreter::PPCInterpreter_vspltw128(PPU_STATE* ppuState) {
-  CHECK_VXU;
-
-  u8 uimm = VMX128_3_IMM & 0x3;
-
-  for (u8 idx = 0; idx < 4; idx++) {
-    VR(VMX128_3_VD128).dword[idx] = VR(VMX128_3_VB128).dword[uimm];
-  }
 }
 
 // Vector128 Multiply Sum 4-way Floating-Point
