@@ -453,30 +453,35 @@ void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
           if (fetchData.size == 0 || fetchData.address == 0)
             continue;
 
-          u32 byteAddress = fetchData.address << 2;
-          u32 byteSize = fetchData.size << 2;
+          u32 fetchAddress = fetchData.address << 2;
+          u32 fetchSize = fetchData.size;
 
-          u8 *data = ramPointer->GetPointerToAddress(byteAddress);
+          u8 *data = ramPointer->GetPointerToAddress(fetchAddress);
           if (!data) {
-            LOG_WARNING(Xenos, "VertexFetch: Invalid memory for slot {} (addr=0x{:X})", fetchSlot, byteAddress);
+            LOG_WARNING(Xenos, "VertexFetch: Invalid memory for slot {} (addr=0x{:X})", fetchSlot, fetchAddress);
             continue;
           }
 
-          std::vector<u8> dataVec{};
-          dataVec.resize(byteSize);
-          if (byteSize == 0x02000004)
-            continue;
-          memcpy(dataVec.data(), data, byteSize);
+          std::vector<u32> dataVec{};
+          dataVec.resize(fetchSize / 4);
+          memcpy(dataVec.data(), data, fetchSize);
+          for (auto &v : dataVec)
+            v = byteswap_be<u32>(v);
 
           u32 hash = "VertexFetch"_jLower;
           if (auto it = createdBuffers.find(hash); it != createdBuffers.end()) {
             // Update existing buffer
             auto &buffer = it->second;
-            buffer->UpdateBuffer(0, static_cast<u32>(dataVec.size()), dataVec.data());
+            if (buffer->GetSize() > fetchSize) {
+              buffer->UpdateBuffer(0, static_cast<u32>(fetchSize), dataVec.data());
+            } else {
+              buffer->DestroyBuffer();
+              buffer->CreateBuffer(static_cast<u32>(fetchSize), dataVec.data(), Render::eBufferUsage::StaticDraw, Render::eBufferType::Vertex);
+            }
           } else {
             // Create new buffer
             std::shared_ptr<Buffer> buffer = resourceFactory->CreateBuffer();
-            buffer->CreateBuffer(static_cast<u32>(dataVec.size()), dataVec.data(), Render::eBufferUsage::StaticDraw, Render::eBufferType::Vertex);
+            buffer->CreateBuffer(static_cast<u32>(fetchSize), dataVec.data(), Render::eBufferUsage::StaticDraw, Render::eBufferType::Vertex);
             createdBuffers.insert({ hash, buffer });
           }
 
@@ -501,18 +506,18 @@ void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
                   type,
                   normalized,
                   stride,
-                  reinterpret_cast<void *>((u64)offset)
+                  reinterpret_cast<void*>((u64)offset)
                 );
               }
             }
           }
 
-          LOG_INFO(Xenos, "Uploaded vertex fetch buffer: slot={}, addr=0x{:X}, size={} bytes", fetchSlot, byteAddress, byteSize);
+          LOG_INFO(Xenos, "Uploaded vertex fetch buffer: slot={}, addr=0x{:X}, size={} bytes, regBase: 0x{:X}", fetchSlot, fetchAddress, fetchSize, regBase);
         }
       }
 
       linkedShaderPrograms[combinedHash] = xeShader;
-      LOG_INFO(Xenos, "Linked shader program 0x{:016X} (VS:0x{:08X}, PS:0x{:08X})", combinedHash, vsHash, psHash);
+        LOG_INFO(Xenos, "Linked shader program 0x{:016X} (VS:0x{:08X}, PS:0x{:08X})", combinedHash, vsHash, psHash);
     } else {
       LOG_ERROR(Xenos, "Failed to link shader program 0x{:016X} (VS:0x{:08X}, PS:0x{:08X})", combinedHash, vsHash, psHash);
     }
