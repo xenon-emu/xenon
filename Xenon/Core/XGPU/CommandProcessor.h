@@ -40,7 +40,9 @@
 // Handles all commands sent to the Xenos via the RingBuffer.
 // The RingBuffer is a dedicated area of memory used as storage for CP packets.
 
-namespace Render { class Renderer; }
+namespace Render {
+  class Renderer;
+}
 
 namespace Xe::XGPU {
 

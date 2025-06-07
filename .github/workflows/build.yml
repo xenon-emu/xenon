@@ -159,17 +159,17 @@ jobs:
           build
           Deps
 
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-xenon-clang-win64-deps-${{ hashFiles('build/x64-clang-${env.BUILD_TYPE}/Deps/ThirdParty/**/CMakeLists.txt', 'build/x64-clang-${env.BUILD_TYPE}/Deps/ThirdParty/**cmake/**') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-xenon-clang-w64-deps-${{ hashFiles('build/x64-clang-${env.BUILD_TYPE}/Deps/ThirdParty/**/CMakeLists.txt', 'build/x64-clang-${env.BUILD_TYPE}/Deps/ThirdParty/**cmake/**') }}
         restore-keys: |
-          ${{runner.os}}-${{env.BUILD_TYPE}}-xenon-clang-win64-deps-
+          ${{runner.os}}-${{env.BUILD_TYPE}}-xenon-clang-w64-deps-
 
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.18
       env:
-        cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-amd64-cache
+        cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-w64-cache
       with:
         append-timestamp: false
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-amd64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-w64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
 
     - name: Configure CMake (Clang)
       run: cmake -G Ninja -B "${{env.BUILD_DIR}}" -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
@@ -222,17 +222,17 @@ jobs:
           build
           Deps
 
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-xenon-gcc-amd64-deps-${{ hashFiles('build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**/CMakeLists.txt', 'build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**cmake/**') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-xenon-gcc-w64-deps-${{ hashFiles('build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**/CMakeLists.txt', 'build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**cmake/**') }}
         restore-keys: |
-          ${{runner.os}}-${{env.BUILD_TYPE}}-xenon-gcc-amd64-deps-
+          ${{runner.os}}-${{env.BUILD_TYPE}}-xenon-gcc-w64-deps-
 
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.18
       env:
-        cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-amd64-cache
+        cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-w64-cache
       with:
         append-timestamp: false
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-amd64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
+        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-w64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
 
     - name: Configure CMake (GCC)
       run: cmake -G Ninja -B "${{env.BUILD_DIR}}" -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
