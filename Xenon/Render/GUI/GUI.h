@@ -43,11 +43,14 @@ public:
   virtual void OnSwap(Texture *texture);
   virtual void EndSwap() = 0;
 
-  void Window(const std::string &title, std::function<void()> callback = {}, const ImVec2 &size = {}, ImGuiWindowFlags flags = 0, bool *conditon = nullptr, const ImVec2 &position = {}, ImGuiCond cond = ImGuiCond_Once);
-  void SimpleWindow(const std::string &title, std::function<void()> callback = {}, bool *conditon = nullptr, ImGuiWindowFlags flags = 0);
-  void Child(const std::string &title, std::function<void()> callback = {}, const ImVec2 &size = {}, ImGuiChildFlags flags = 0, ImGuiWindowFlags windowFlags = 0);
-  void Node(const std::string &title, std::function<void()> callback = {}, ImGuiTreeNodeFlags flags = 0);
-  void CollapsingHeader(const std::string &title, std::function<void()> callback = {}, ImGuiTreeNodeFlags flags = 0);
+  bool BeginWindow(const std::string &title, const ImVec2 &size = {}, ImGuiWindowFlags flags = 0, bool *conditon = nullptr, const ImVec2 &position = {}, ImGuiCond cond = ImGuiCond_Once);
+  bool BeginSimpleWindow(const std::string &title, bool *conditon = nullptr, ImGuiWindowFlags flags = 0);
+  void EndWindow();
+  bool BeginChild(const std::string &title, const ImVec2 &size = {}, ImGuiChildFlags flags = 0, ImGuiWindowFlags windowFlags = 0);
+  void EndChild();
+  bool BeginNode(const std::string &title, ImGuiTreeNodeFlags flags = 0);
+  void EndNode();
+  bool CollapsingHeader(const std::string &title, ImGuiTreeNodeFlags flags = 0);
   void IDGroup(const std::string &id, std::function<void()> callback = {});
   void IDGroup(s32 id, std::function<void()> callback = {});
   void Group(const std::string &label, std::function<void()> callback = {});
@@ -57,14 +60,18 @@ public:
   void TextCopySplit(const std::string &value, const std::string &copyValue);
   void TextCopySimple(const std::string &value);
   void SameLine(f32 xOffset = 0.f, f32 spacing = -1.f);
-  void MenuBar(std::function<void()> callback = {});
-  void MenuItem(const std::string &title, std::function<void()> callback = {}, bool enabled = true, bool selected = false, const std::string &shortcut = {});
-  void Menu(const std::string &title, std::function<void()> callback = {});
-  void TabBar(const std::string &title, std::function<void()> callback = {}, ImGuiTabBarFlags flags = 0);
-  void TabItem(const std::string &title, std::function<void()> callback = {}, bool *conditon = nullptr, ImGuiTabItemFlags flags = 0);
-  void TabItemButton(const std::string &title, std::function<void()> callback = {}, ImGuiTabItemFlags flags = 0);
-  bool Button(const std::string &label, std::function<void()> callback = {}, const ImVec2 &size = {});
-  bool Toggle(const std::string &label, bool *conditon = nullptr, std::function<void()> callback = {});
+  bool BeginMenuBar();
+  void EndMenuBar();
+  bool MenuItem(const std::string &title, bool enabled = true, bool selected = false, const std::string &shortcut = {});
+  bool BeginMenu(const std::string &title);
+  void EndMenu();
+  bool BeginTabBar(const std::string &title, ImGuiTabBarFlags flags = 0);
+  void EndTabBar();
+  bool BeginTabItem(const std::string &title, bool *conditon = nullptr, ImGuiTabItemFlags flags = 0);
+  void EndTabItem();
+  bool TabItemButton(const std::string &title, ImGuiTabItemFlags flags = 0);
+  bool Button(const std::string &label, const ImVec2 &size = {});
+  bool Toggle(const std::string &label, bool *conditon = nullptr);
   std::string InputText(const std::string &title, std::string initValue = {}, size_t maxCharacters = 256,
     const std::string &textHint = {}, ImGuiInputTextFlags flags = ImGuiInputTextFlags_None, ImVec2 size = {});
   template <typename T>

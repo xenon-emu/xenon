@@ -134,15 +134,16 @@ enum class eBorderColor : u32 {
   ACBCRY_BLACK
 };
 
-union VertexFetchData {
+union ShaderConstantFetch {
   u64 rawHex;
 #ifdef __LITTLE_ENDIAN__
   struct {
     u32 type : 2;
-    u32 address : 30;
+    u32 address : 29;
+    u32 unk1 : 1;
     u32 endian : 2;
     u32 size : 24;
-    u32 unk1 : 6;
+    u32 unk2 : 6;
   };
   struct {
     u32 dword0;
@@ -153,7 +154,8 @@ union VertexFetchData {
     u32 unk1 : 6;
     u32 size : 24;
     u32 endian : 2;
-    u32 address : 30;
+    u32 unk1 : 1;
+    u32 address : 29;
     u32 type : 2;
   };
   struct {

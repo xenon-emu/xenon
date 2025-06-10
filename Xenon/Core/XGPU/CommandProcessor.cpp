@@ -1067,10 +1067,6 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
       params.state = state;
       params.indexBufferInfo = indexBufferInfo;
       params.vgtDrawInitiator = state->vgtDrawInitiator;
-      if (state->vertexData.address > 0) {
-        params.vertexBufferPtr = ram->GetPointerToAddress(state->vertexData.address);
-        params.vertexBufferSize = state->vertexData.size;
-      }
       params.maxVertexIndex = state->maxVertexIndex;
       params.minVertexIndex = state->minVertexIndex;
       params.indexOffset = state->indexOffset;

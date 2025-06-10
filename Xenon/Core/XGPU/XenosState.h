@@ -144,7 +144,6 @@ public:
   u32 multiPrimitiveIndexBufferResetIndex = 0;
   u32 currentBinIdMin = 0;
 
-  VertexFetchData vertexData{};
   VGT_DRAW_INITIATOR_REG vgtDrawInitiator = {};
   u32 vgtDMABase = 0;
   VGT_DMA_SIZE_REG vgtDMASize = {};

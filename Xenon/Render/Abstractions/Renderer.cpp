@@ -446,7 +446,7 @@ void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
           u32 fetchSlot = fetch->fetchSlot;
           u32 regBase = static_cast<u32>(XeRegister::SHADER_CONSTANT_FETCH_00_0) + fetchSlot * 2;
 
-          Xe::VertexFetchData fetchData{};
+          Xe::ShaderConstantFetch fetchData{};
           fetchData.dword0 = byteswap_be<u32>(XeMain::xenos->xenosState->ReadRegister(static_cast<XeRegister>(regBase + 0)));
           fetchData.dword1 = byteswap_be<u32>(XeMain::xenos->xenosState->ReadRegister(static_cast<XeRegister>(regBase + 1)));
 
@@ -454,7 +454,7 @@ void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
             continue;
 
           u32 fetchAddress = fetchData.address << 2;
-          u32 fetchSize = fetchData.size;
+          u32 fetchSize = fetchData.size << 2;
 
           u8 *data = ramPointer->GetPointerToAddress(fetchAddress);
           if (!data) {
@@ -465,8 +465,6 @@ void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
           std::vector<u32> dataVec{};
           dataVec.resize(fetchSize / 4);
           memcpy(dataVec.data(), data, fetchSize);
-          for (auto &v : dataVec)
-            v = byteswap_be<u32>(v);
 
           u32 hash = "VertexFetch"_jLower;
           if (auto it = createdBuffers.find(hash); it != createdBuffers.end()) {
@@ -485,14 +483,13 @@ void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
             createdBuffers.insert({ hash, buffer });
           }
 
-          glGenVertexArrays(1, &VAO);
           // Bind VAO
           OnBind();
 
           // Setup attribs
           if (xeShader.vertexShader) {
             for (const auto *fetch : xeShader.vertexShader->vertexFetches) {
-              const u32 location = fetch->fetchSlot - 95; // c95 is first fetch slot
+              const u32 location = fetch->fetchSlot - 95; // 95 is first fetch slot
               const u32 components = fetch->GetComponentCount(); // 1-4
               const u32 type = fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT;
               const u8 normalized = fetch->isNormalized ? GL_TRUE : GL_FALSE;
