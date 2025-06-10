@@ -171,18 +171,36 @@ void Renderer::Shutdown() {
   SDL_Quit();
 }
 
-void Renderer::Resize(s32 x, s32 y) {
+void Renderer::Resize(u32 x, u32 y) {
   // Normalize our x and y for tiling
-  width = TILE(x);
-  height = TILE(y);
+  u32 newWidth = TILE(x);
+  u32 newHeight = TILE(y);
+  // Save old size
+  u32 oldWidth = width;
+  u32 oldHeight = height;
+  // Same our old pitch
+  u32 oldPitch = pitch;
+  std::vector<u32> oldPixels = std::move(pixels); // Move to avoid copy
   // Resize backend
   BackendResize(x, y);
   // Recreate our texture with the new size
-  backbuffer->ResizeTexture(width, height);
-  // Set our new pitch
+  backbuffer->ResizeTexture(newWidth, newHeight);
+  // Allocate new pixel buffer, initialized to grey
+  pixels.resize(newWidth * newHeight, COLOR(205, 205, 205, 205));
+  // Copy old pixels into the new buffer at (0, 0)
+  for (u32 row = 0; row < std::min(oldHeight, newHeight); ++row) {
+    std::memcpy(
+      &pixels[row * newWidth],
+      &oldPixels[row * oldWidth],
+      std::min(oldWidth, newWidth) * sizeof(u32)
+    );
+  }
+  // Update size
+  width = newWidth;
+  height = newHeight;
+  // Update pitch
   pitch = width * height * sizeof(u32);
-  // Resize our pixel buffer
-  pixels.resize(pitch);
+  // Update buffer
   pixelSSBO->UpdateBuffer(0, pixels.size(), pixels.data());
   LOG_DEBUG(Render, "Resized window to {}x{}", width, height);
 }
@@ -453,7 +471,7 @@ void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
           if (fetchData.size == 0 || fetchData.address == 0)
             continue;
 
-          u32 fetchAddress = fetchData.address << 2;
+          u32 fetchAddress = fetchData.address;
           u32 fetchSize = fetchData.size << 2;
 
           u8 *data = ramPointer->GetPointerToAddress(fetchAddress);
@@ -602,7 +620,7 @@ void Renderer::Thread() {
       fbPointer = ramPointer->GetPointerToAddress(XeMain::xenos->GetSurface());
       // Profile
       MICROPROFILE_SCOPEI("[Xe::Render]", "Deswizle", MP_AUTO);
-      const u32 *ui_fbPointer = reinterpret_cast<u32*>(fbPointer);
+      const u32 *ui_fbPointer = reinterpret_cast<const u32*>(fbPointer);
       pixelSSBO->UpdateBuffer(0, pitch, ui_fbPointer);
 
       // Use the compute shader

@@ -84,7 +84,7 @@ public:
   void Start();
   void CreateHandles();
   void Shutdown();
-  void Resize(s32 x, s32 y);
+  void Resize(u32 x, u32 y);
 
   void UpdateConstants(Xe::XGPU::XenosState *state);
 
@@ -118,7 +118,7 @@ public:
   volatile bool threadRunning = true;
 
   // FB Pitch
-  s32 pitch = 0;
+  u32 pitch = 0;
   // SDL Window data
   SDL_Window *mainWindow = nullptr;
   SDL_Event windowEvent = {};
