@@ -172,8 +172,6 @@ void OGLRenderer::Draw(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params)
   }
   // Perform draw
   glDrawArrays(glPrimitive, 0, numIndices);
-  // Unbind VAO
-  glBindVertexArray(0);
 }
 
 void OGLRenderer::DrawIndexed(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) {
