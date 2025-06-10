@@ -2,10 +2,10 @@
 
 #pragma once
 
-#include <string>
-#include <string_view>
 #include <algorithm>
 #include <cctype>
+#include <string>
+#include <string_view>
 
 #ifdef _WIN32
 #include <Windows.h>

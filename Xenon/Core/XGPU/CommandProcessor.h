@@ -71,8 +71,6 @@ struct XeDrawParams {
   XenosState *state = nullptr;
   XeIndexBufferInfo indexBufferInfo = {};
   VGT_DRAW_INITIATOR_REG vgtDrawInitiator = {};
-  u8 *vertexBufferPtr = nullptr;
-  u64 vertexBufferSize = 0;
   u32 maxVertexIndex = 0;
   u32 minVertexIndex = 0;
   u32 indexOffset = 0;
