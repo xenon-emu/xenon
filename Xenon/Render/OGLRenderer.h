@@ -49,6 +49,7 @@ public:
   u32 GetBackendID() override;
 private:
   // OpenGL Handles
+  u32 VAO;
   u32 dummyVAO;
   u32 EBO;
   // SDL Context

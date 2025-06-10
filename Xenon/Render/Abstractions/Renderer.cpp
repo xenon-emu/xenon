@@ -393,7 +393,11 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
 }
 
 std::vector<u32> CreateVertexShader() {
-  Sirit::Module module{};
+  Sirit::Module module{ 0x00010000 };
+  module.AddCapability(spv::Capability::Shader);
+  module.AddExtension("SPV_KHR_storage_buffer_storage_class");
+  module.SetMemoryModel(spv::AddressingModel::Logical, spv::MemoryModel::GLSL450);
+
   // Types
   auto void_type = module.TypeVoid();
   auto func_type = module.TypeFunction(void_type);
@@ -471,7 +475,7 @@ void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
           if (fetchData.size == 0 || fetchData.address == 0)
             continue;
 
-          u32 fetchAddress = fetchData.address;
+          u32 fetchAddress = fetchData.address << 2;
           u32 fetchSize = fetchData.size << 2;
 
           u8 *data = ramPointer->GetPointerToAddress(fetchAddress);
@@ -481,13 +485,17 @@ void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
           }
 
           std::vector<u32> dataVec{};
-          dataVec.resize(fetchSize / 4);
+          dataVec.resize(fetchSize);
           memcpy(dataVec.data(), data, fetchSize);
+          for (auto &v : dataVec) {
+            v = byteswap_be(v);
+          }
 
+          std::shared_ptr<Buffer> buffer = {};
           u32 hash = "VertexFetch"_jLower;
           if (auto it = createdBuffers.find(hash); it != createdBuffers.end()) {
             // Update existing buffer
-            auto &buffer = it->second;
+            buffer = it->second;
             if (buffer->GetSize() > fetchSize) {
               buffer->UpdateBuffer(0, static_cast<u32>(fetchSize), dataVec.data());
             } else {
@@ -496,23 +504,34 @@ void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
             }
           } else {
             // Create new buffer
-            std::shared_ptr<Buffer> buffer = resourceFactory->CreateBuffer();
+            buffer = resourceFactory->CreateBuffer();
             buffer->CreateBuffer(static_cast<u32>(fetchSize), dataVec.data(), Render::eBufferUsage::StaticDraw, Render::eBufferType::Vertex);
             createdBuffers.insert({ hash, buffer });
           }
+
+          // Bind the buffer
+          buffer->Bind();
 
           // Bind VAO
           OnBind();
 
           // Setup attribs
           if (xeShader.vertexShader) {
+            // Base location for attributes (start at 0)
+            u32 baseLocation = 0;
+
             for (const auto *fetch : xeShader.vertexShader->vertexFetches) {
-              const u32 location = fetch->fetchSlot - 95; // 95 is first fetch slot
+              // Instead of fetchSlot - 95, assign location based on offset divided by size of component (usually 4 bytes)
+              // This assumes fetchOffset is byte offset inside vertex data
+              // And that components are tightly packed
               const u32 components = fetch->GetComponentCount(); // 1-4
-              const u32 type = fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT;
+              const u32 typeSize = fetch->isFloat ? sizeof(f32) : sizeof(u32); // usually 4
+              const u32 location = baseLocation++;  // Assign consecutive locations starting at 0
+              const u32 type = fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT; 
               const u8 normalized = fetch->isNormalized ? GL_TRUE : GL_FALSE;
-              const u32 offset = fetch->fetchOffset;
-              const u32 stride = fetch->fetchStride;
+              const u32 offset = fetch->fetchOffset * 4;
+              const u32 stride = fetch->fetchStride * 4;
+
               if (location <= 32) {
                 glEnableVertexAttribArray(location);
                 glVertexAttribPointer(
@@ -521,7 +540,7 @@ void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
                   type,
                   normalized,
                   stride,
-                  reinterpret_cast<void*>((u64)offset)
+                  reinterpret_cast<void *>((uintptr_t)offset)
                 );
               }
             }

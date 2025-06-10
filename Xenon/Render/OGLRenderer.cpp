@@ -42,6 +42,7 @@ void OGLRenderer::BackendStart() {
   resourceFactory = std::make_unique<OGLResourceFactory>();
   // Create VAOs, and EBOs
   glGenVertexArrays(1, &dummyVAO);
+  glGenVertexArrays(1, &VAO);
   glGenBuffers(1, &EBO);
 
   // Set clear color
@@ -74,7 +75,7 @@ void OGLRenderer::BackendSDLInit() {
   SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4));
   SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3));
   // Set as compat
-  SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY));
+  SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE));
   // Create OpenGL handle for SDL
   context = SDL_GL_CreateContext(mainWindow);
   if (!context) {
