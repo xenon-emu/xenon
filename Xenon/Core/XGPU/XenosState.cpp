@@ -124,7 +124,9 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
       coherencyStatusHost.hexValue &= ~0x80000000ul;
       LOG_DEBUG(Xenos, "[Xe] Flushing 0x{:X} with a size of 0x{:X}", coherencyBaseHost, coherencySizeHost);
       if (coherencyBaseHost == fbSurfaceAddress) {
+#ifdef XE_DEBUG
         LOG_DEBUG(Xenos, "[CP] Flushing FB");
+#endif
         framebufferDisable = true;
       }
       ClearDirtyState();
@@ -458,7 +460,9 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
     if ((1 << scratchRegIndex) & scratchMask) {
       // Writeback
       const u32 memAddr = scratchAddr + (scratchRegIndex * 4);
+#ifdef XE_DEBUG
       LOG_DEBUG(Xenos, "[CP] Scratch {} was accessed, writing back to 0x{:X} with 0x{:X}", scratchRegIndex, memAddr, tmp);
+#endif
       u8 *memPtr = ramPtr->GetPointerToAddress(memAddr);
       memcpy(memPtr, &scratch[scratchRegIndex], sizeof(scratch[scratchRegIndex]));
     }

@@ -86,14 +86,6 @@ void ShaderCodeWriterSirit::FinalizeEntryPoint() {
   if (type == eShaderType::Pixel) {
     module.AddExecutionMode(main_func, spv::ExecutionMode::OriginUpperLeft);
   } else {
-    u32 i = 0;
-    for (const auto &[name, var] : input_vars) {
-      spv::BuiltIn builtin = name == std::string("VertexID") ? spv::BuiltIn::VertexIndex : spv::BuiltIn::InstanceIndex;
-      module.Decorate(input_vars[name], spv::Decoration::BuiltIn, builtin);
-      module.Decorate(input_vars[name], spv::Decoration::Location, i);
-      LOG_DEBUG(Xenos, "[AST::FinalizeEntryPoint] {}", input_vars[name].value);
-      interface_vars.push_back(input_vars[name]);
-    }
     for (const auto &[slot, var] : vertex_input_vars) {
       interface_vars.push_back(var);
     }
@@ -112,9 +104,9 @@ void ShaderCodeWriterSirit::FinalizeEntryPoint() {
     } break;
     default:
       if (reg >= eExportReg::COLOR0 && reg <= eExportReg::COLOR3) {
-        location = static_cast<u32>(reg) - static_cast<u32>(eExportReg::COLOR0);
+        location = vertex_input_vars.size() + (static_cast<u32>(reg) - static_cast<u32>(eExportReg::COLOR0));
       } else if (reg >= eExportReg::INTERP0 && reg <= eExportReg::INTERP7) {
-        location = static_cast<u32>(reg) - static_cast<u32>(eExportReg::INTERP0);
+        location = vertex_input_vars.size() + (static_cast<u32>(reg) - static_cast<u32>(eExportReg::INTERP0));
       }
       break;
     }
@@ -148,8 +140,7 @@ Chunk ShaderCodeWriterSirit::GetExportDest(const eExportReg reg) {
     auto &var = output_vars[reg];
     switch (reg) {
     case eExportReg::POSITION:
-      output_vars[eExportReg::POSITION] =
-        module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
+      output_vars[eExportReg::POSITION] = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
       module.Name(output_vars[eExportReg::POSITION], "POSITION");
       break;
     case eExportReg::POINTSIZE:
@@ -199,8 +190,7 @@ Chunk ShaderCodeWriterSirit::GetReg(u32 regIndex) {
   // Check for existing temp
   if (temp_regs.contains(regIndex)) {
     Sirit::Id ptr = temp_regs[regIndex];
-    Sirit::Id val = module.OpLoad(vec4_type, ptr);
-    return Chunk(val, ptr, eChunkType::Vector);
+    return AllocLocalVector(Chunk{ {}, ptr });
   }
 
   // Load from UBO (storage buffer)
@@ -382,7 +372,8 @@ Chunk ShaderCodeWriterSirit::FetchVertex(const Chunk &src, const VertexFetch &in
     }
 
     Sirit::Id input_var = module.AddGlobalVariable(ptr_type, spv::StorageClass::Input);
-    module.Decorate(input_var, spv::Decoration::Location, glLocation); // remapped
+    module.Decorate(input_var, spv::Decoration::Location, glLocation);
+    module.Name(input_var, FMT("INPUT_{}", glLocation));
 
     vertex_input_vars[slot] = input_var;
   }
@@ -592,10 +583,13 @@ Chunk ShaderCodeWriterSirit::AllocLocalImpl(Sirit::Id type, const Chunk &initCod
   // Declare local variable
   Sirit::Id local_ptr = module.AddLocalVariable(ptr_type, spv::StorageClass::Function);
 
-  // Store initial value
-  module.OpStore(local_ptr, initCode.id);
+  // Ensure the value is loaded if initCode.id is a pointer
+  Sirit::Id value = initCode.HasPointer() ? module.OpLoad(type, initCode.ptr) : initCode.id;
 
-  // Load it for use
+  // Store initial value
+  module.OpStore(local_ptr, value);
+
+  // Load value for usage
   Sirit::Id loaded = module.OpLoad(type, local_ptr);
 
   return Chunk{ loaded, local_ptr };

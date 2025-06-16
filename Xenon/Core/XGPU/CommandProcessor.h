@@ -40,9 +40,11 @@
 // Handles all commands sent to the Xenos via the RingBuffer.
 // The RingBuffer is a dedicated area of memory used as storage for CP packets.
 
-namespace Render {
-  class Renderer;
-}
+#ifdef _DEBUG
+#define XE_DEBUG
+#endif
+
+namespace Render { class Renderer; }
 
 namespace Xe::XGPU {
 
@@ -168,10 +170,6 @@ private:
   // Handles tiling type
   u64 binSelect = 0xFFFFFFFFULL;
   u64 binMask = 0xFFFFFFFFULL;
-
-  // Internal swap counters
-  std::atomic<u32> swapCount;
-  std::atomic<u32> vblankCount;
 
   // Execute a packet based on the Ringbuffer data.
   bool ExecutePacket(RingBuffer *ringBuffer);

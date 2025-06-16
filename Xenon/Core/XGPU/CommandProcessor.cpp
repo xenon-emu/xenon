@@ -128,8 +128,6 @@ void CommandProcessor::cpWorkerThreadLoop() {
     if (!cpWorkerThreadRunning)
       break;
 
-    LOG_INFO(Xenos, "CP: Command processor setup.");
-
     cpReadPtrIndex = cpExecutePrimaryBuffer(cpReadPtrIndex, writePtrIndex);
   }
 }
@@ -214,7 +212,9 @@ bool CommandProcessor::ExecutePacket(RingBuffer *ringBuffer) {
     return true;
   }
 
+#ifdef XE_DEBUG
   LOG_DEBUG(Xenos, "Executing packet type {} (0x{:X})", static_cast<u32>(packetType), packetData);
+#endif
 
   // Execute packet based on type.
   switch (packetType) {
@@ -254,7 +254,7 @@ bool CommandProcessor::ExecutePacketType0(RingBuffer *ringBuffer, u32 packetData
     u32 registerData = ringBuffer->Read<u32>();
     // Target register index.
     u32 targetRegIndex = singleRegWrite ? baseIndex : baseIndex + idx;
-    LOG_DEBUG(Xenos, "CP[ExecutePacketType0]: Writing to {} (0x{:X}), data 0x{:X}", Xe::XGPU::GetRegisterNameById(targetRegIndex), targetRegIndex, registerData);
+    //LOG_DEBUG(Xenos, "CP[ExecutePacketType0]: Writing to {} (0x{:X}), data 0x{:X}", Xe::XGPU::GetRegisterNameById(targetRegIndex), targetRegIndex, registerData);
     state->WriteRegister(static_cast<XeRegister>(targetRegIndex), registerData);
   }
 
@@ -313,7 +313,9 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
 
   bool result = false;
 
+#ifdef XE_DEBUG
   LOG_DEBUG(Xenos, "CP[ExecutePacketType3]: Executing {}", GetPM4Opcode(static_cast<u8>(currentOpCode)));
+#endif
 
   // PM4 Commands execution, basically the heart of the command processor.
 
@@ -680,9 +682,14 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
   } break;
   case eShaderType::Unknown:
   default: {
-    LOG_DEBUG(Xenos, "[CP::IM_LOAD] Unknown shader type '{}'", static_cast<u32>(shaderType));
+    LOG_WARNING(Xenos, "[CP::IM_LOAD] Unknown shader type '{}'", static_cast<u32>(shaderType));
   } break;
   }
+  {
+    std::lock_guard<std::mutex> lock(render->frameReadyMutex);
+    render->frameReady = true;
+  }
+  render->frameReadyCondVar.notify_one(); // Wake up the renderer
 
   return true;
 }
@@ -731,9 +738,14 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuff
   } break;
   case eShaderType::Unknown:
   default: {
-    LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] Unknown shader type '{}'", static_cast<u32>(shaderType));
+    LOG_WARNING(Xenos, "[CP::IM_LOAD_IMMEDIATE] Unknown shader type '{}'", static_cast<u32>(shaderType));
   } break;
   }
+  {
+    std::lock_guard<std::mutex> lock(render->frameReadyMutex);
+    render->frameReady = true;
+  }
+  render->frameReadyCondVar.notify_one(); // Wake up the renderer
 
   return true;
 }
@@ -825,9 +837,14 @@ bool CommandProcessor::ExecutePacketType3_EVENT_WRITE_SHD(RingBuffer *ringBuffer
   // Writeback
   state->vgtDrawInitiator.hexValue = initiator & 0x3F;
 
+  {
+    std::lock_guard<std::mutex> lock(render->frameReadyMutex);
+    render->frameReady = true;
+  }
+  render->frameReadyCondVar.notify_one(); // Wake up the renderer
   u32 writeValue = 0;
   if ((initiator >> 31) & 0x1) {
-    writeValue = swapCount;
+    writeValue = render->swapCount;
   } else {
     writeValue = value;
   }
@@ -911,6 +928,8 @@ bool CommandProcessor::ExecutePacketType3_WAIT_REG_MEM(RingBuffer *ringBuffer, u
     }
 
     if (!matched) {
+      render->waiting = true;
+      render->waitTime = wait;
       if (wait >= 0x100) {
         // Wait
         std::this_thread::sleep_for(std::chrono::milliseconds(wait / 0x100));
@@ -1042,7 +1061,6 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
     const u32 surfacePitch = state->surfaceInfo.surfacePitch;
     bool hasRT = surfacePitch != 0;
     if (!hasRT) {
-      LOG_DEBUG(Xenos, "[CP] No render target");
       return true;
     }
     // Get surface MSAA
@@ -1056,6 +1074,11 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
         render->copyQueue.push(state);
       }
 #endif
+      {
+        std::lock_guard<std::mutex> lock(render->frameReadyMutex);
+        render->frameReady = true;
+      }
+      render->frameReadyCondVar.notify_one(); // Wake up the renderer
       return true;
     }
     {
@@ -1096,6 +1119,11 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
       (u32)state->vgtDrawInitiator.primitiveType,
       state->vgtDrawInitiator.numIndices);
 #endif
+    {
+      std::lock_guard<std::mutex> lock(render->frameReadyMutex);
+      render->frameReady = true;
+    }
+    render->frameReadyCondVar.notify_one(); // Wake up the renderer
     state->ClearDirtyState();
   } else {
     LOG_ERROR(Xenos, "[CP] Invalid draw");
