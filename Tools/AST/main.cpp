@@ -102,7 +102,8 @@ void Handle() {
 
 void Run(u32 hash) {
   eShaderType shaderType = eShaderType::Unknown;
-  fs::path shaderPath{ "shaders" };
+  fs::path shaderPath{ fs::current_path() / "shaders" };
+  LOG_INFO(Base, "Shader path: {}", shaderPath.string());
   std::string fileName = std::format("vertex_shader_{:X}.bin", hash);
   std::ifstream f{ shaderPath / fileName, std::ios::in | std::ios::binary };
   if (!f.is_open()) {
@@ -525,84 +526,78 @@ s32 main(s32 argc, char *argv[]) {
     ::Base::Param::Help();
     return 0;
   }
-  u32 crcHash = PARAM_crc.Get<u32>();
-  if (crcHash == 0) {
-    // Vertex: 0x8825F002
-    // Pixel: 0xDE9ADE64
-    crcHash = 0x8825F002;
-  }
-  Xe::Microcode::pixelShaderHash = 0xDE9ADE64;
-  Xe::Microcode::vertexShaderHash = 0x8825F002;
+  Xe::Microcode::pixelShaderHash = 0x3D0F8ECE;
+  Xe::Microcode::vertexShaderHash = 0x490721B7;
   Xe::Microcode::Run(Xe::Microcode::pixelShaderHash);
   Xe::Microcode::Run(Xe::Microcode::vertexShaderHash);
   Xe::Microcode::Handle();
-  // Unused
-  memset(boolConsts.values, 0, sizeof(boolConsts.values));
-  // VertexConsts[0]
-  float rows[3][4] = {
-    { -1.f, -1.f, 1.f, 1.f },
-    {  0.f,  1.f, 1.f, 1.f },
-    {  1.f, -1.f, 1.f, 1.f }
-  };
+  //// Unused
+  //memset(boolConsts.values, 0, sizeof(boolConsts.values));
+  //// VertexConsts[0]
+  //float rows[3][4] = {
+  //  { -1.f, -1.f, 1.f, 1.f },
+  //  {  0.f,  1.f, 1.f, 1.f },
+  //  {  1.f, -1.f, 1.f, 1.f }
+  //};
 
-  float matMV[16];
-  float matP[16];
-  // Identity modelview matrix
-  memset(matMV, 0, sizeof(matMV));
-  matMV[0] = 1.0f;
-  matMV[5] = 1.0f;
-  matMV[10] = 1.0f;
-  matMV[15] = 1.0f;
+  //float matMV[16];
+  //float matP[16];
+  //// Identity modelview matrix
+  //memset(matMV, 0, sizeof(matMV));
+  //matMV[0] = 1.0f;
+  //matMV[5] = 1.0f;
+  //matMV[10] = 1.0f;
+  //matMV[15] = 1.0f;
 
-  // Translate Z back a bit
-  matMV[14] = -5.0f;
+  //// Translate Z back a bit
+  //matMV[14] = -5.0f;
 
-  // Simple perspective projection matrix
-  float fov = 60.0f * (3.1415926535f / 180.0f);
-  float aspect = 640.0f / 480.0f;
-  float znear = 0.1f, zfar = 100.0f;
-  float f = 1.0f / tanf(fov / 2.0f);
+  //// Simple perspective projection matrix
+  //float fov = 60.0f * (3.1415926535f / 180.0f);
+  //float aspect = 640.0f / 480.0f;
+  //float znear = 0.1f, zfar = 100.0f;
+  //float f = 1.0f / tanf(fov / 2.0f);
 
-  memset(matP, 0, sizeof(matP));
-  matP[0] = f / aspect;
-  matP[5] = f;
-  matP[10] = (zfar + znear) / (znear - zfar);
-  matP[11] = -1.0f;
-  matP[14] = (2.0f * zfar * znear) / (znear - zfar);
+  //memset(matP, 0, sizeof(matP));
+  //matP[0] = f / aspect;
+  //matP[5] = f;
+  //matP[10] = (zfar + znear) / (znear - zfar);
+  //matP[11] = -1.0f;
+  //matP[14] = (2.0f * zfar * znear) / (znear - zfar);
 
-  memcpy(&vsConsts.values[0], matP, sizeof(matP));        // c0–c3
-  memcpy(&vsConsts.values[16], matMV, sizeof(matMV));     // c4–c7
+  //memcpy(&vsConsts.values[0], matP, sizeof(matP));        // c0–c3
+  //memcpy(&vsConsts.values[16], matMV, sizeof(matMV));     // c4–c7
 
-  memcpy(&vsConsts.values[95 * 4], rows, sizeof(rows));
+  //memcpy(&vsConsts.values[95 * 4], rows, sizeof(rows));
 
-  // PixelConsts[0] = red
-  for (int i = 0; i != (3 * 4); i += 4) {
-    psConsts.values[i + 0] = 0.0f;
-    psConsts.values[i + 1] = 1.0f;
-    psConsts.values[i + 2] = 0.0f;
-    psConsts.values[i + 3] = 1.0f;
-  }
+  //// PixelConsts[0] = red
+  //for (int i = 0; i != (3 * 4); i += 4) {
+  //  psConsts.values[i + 0] = 0.0f;
+  //  psConsts.values[i + 1] = 1.0f;
+  //  psConsts.values[i + 2] = 0.0f;
+  //  psConsts.values[i + 3] = 1.0f;
+  //}
 
-  LOG_INFO(Xenos, "VS[95]: x = {}, y = {}, z = {}, w = {}", vsConsts.values[(95*4)+0], vsConsts.values[(95*4)+1], vsConsts.values[(95*4)+2], vsConsts.values[(95*4)+3]);
+  //LOG_INFO(Xenos, "VS[95]: x = {}, y = {}, z = {}, w = {}", vsConsts.values[(95*4)+0], vsConsts.values[(95*4)+1], vsConsts.values[(95*4)+2], vsConsts.values[(95*4)+3]);
 
-  CreateWindow();
-  InitOpenGL();
-  Xe::Microcode::CreateShader();
-  Xe::Microcode::CreateBuffers(psConsts, vsConsts, boolConsts);
-  u64 combinedHash = (static_cast<u64>(Xe::Microcode::vertexShaderHash) << 32) | Xe::Microcode::pixelShaderHash;
-  auto shader = Xe::Microcode::linkedShaderPrograms[combinedHash];
-  CreateVAOAndVBOFromShader(shader.vertexShader, VAO, VBO);
-  while (XeRunning) {
-    HandleEvents();
-    RenderFrame();
-  }
-  glDeleteVertexArrays(1, &VAO);
-  glDeleteBuffers(1, &VBO);
-  shaderFactory->Destroy();
-  shaderFactory.reset();
-  resourceFactory.reset();
-  SDL_GL_DestroyContext(context);
-  SDL_DestroyWindow(mainWindow);
-  SDL_Quit();
+  //CreateWindow();
+  //InitOpenGL();
+  //Xe::Microcode::CreateShader();
+  //Xe::Microcode::CreateBuffers(psConsts, vsConsts, boolConsts);
+  //u64 combinedHash = (static_cast<u64>(Xe::Microcode::vertexShaderHash) << 32) | Xe::Microcode::pixelShaderHash;
+  //auto shader = Xe::Microcode::linkedShaderPrograms[combinedHash];
+  //CreateVAOAndVBOFromShader(shader.vertexShader, VAO, VBO);
+  //while (XeRunning) {
+  //  HandleEvents();
+  //  RenderFrame();
+  //}
+  //glDeleteVertexArrays(1, &VAO);
+  //glDeleteBuffers(1, &VBO);
+  //shaderFactory->Destroy();
+  //shaderFactory.reset();
+  //resourceFactory.reset();
+  //SDL_GL_DestroyContext(context);
+  //SDL_DestroyWindow(mainWindow);
+  //SDL_Quit();
   return 0;
 }
