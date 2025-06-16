@@ -63,6 +63,27 @@ void PPCInterpreter::PPCInterpreter_vaddfp(PPU_STATE *ppuState) {
   VRi(vd).flt[3] = VRi(va).flt[3] + VRi(vb).flt[3];
 }
 
+static inline u32 vecSaturate32(PPU_STATE* ppuState, u64 inValue) {
+  if (inValue > UINT_MAX) {
+    // Set SAT bit in VSCR and truncate to 2^32 - 1.
+    curThread.VSCR.SAT = 1;
+    inValue = UINT_MAX;
+  }
+  return static_cast<u32>(inValue);
+}
+
+// Vector Add Unsigned Word Saturate (x'1000 0280')
+void PPCInterpreter::PPCInterpreter_vadduws(PPU_STATE* ppuState) {
+  // TODO: Check behavior, logic seems okay.
+
+  CHECK_VXU;
+
+  VRi(vd).dword[0] = vecSaturate32(ppuState, static_cast<u64>(VRi(va).dword[0]) + static_cast<u64>(VRi(vb).dword[0]));
+  VRi(vd).dword[1] = vecSaturate32(ppuState, static_cast<u64>(VRi(va).dword[1]) + static_cast<u64>(VRi(vb).dword[1]));
+  VRi(vd).dword[2] = vecSaturate32(ppuState, static_cast<u64>(VRi(va).dword[2]) + static_cast<u64>(VRi(vb).dword[2]));
+  VRi(vd).dword[3] = vecSaturate32(ppuState, static_cast<u64>(VRi(va).dword[3]) + static_cast<u64>(VRi(vb).dword[3]));
+}
+
 // Vector Logical AND (x'1000 0404')
 void PPCInterpreter::PPCInterpreter_vand(PPU_STATE *ppuState) {
   /*
@@ -155,6 +176,61 @@ void PPCInterpreter::PPCInterpreter_vcsxwfp128(PPU_STATE* ppuState) {
   VR(VMX128_3_VD128).flt[3] = (float)(VR(VMX128_3_VB128).dsword[3] / div);
 }
 
+static inline s32 vcfpsxwsHelper(const double inFloat) {
+  if (inFloat < (double)INT_MIN) { return INT_MIN; }
+  else if (inFloat > (double)INT_MAX) { return INT_MAX; }
+  else { return (s32)inFloat; }
+}
+
+// Vector128 Convert From Floating-Point to Signed Fixed - Point Word Saturate
+void PPCInterpreter::PPCInterpreter_vcfpsxws128(PPU_STATE* ppuState) {
+  // (VD) <- int_sat(VB as signed * 2^uimm)
+
+  // TODO: Check correct behavior and if the SAT bit should be set, logic should be okay.
+
+  CHECK_VXU;
+
+  u32 uimm = VMX128_3_IMM;
+  float fltuimm = static_cast<float>(std::exp2(uimm));
+
+  VR(VMX128_3_VD128).flt[0] = vcfpsxwsHelper(static_cast<double>(VR(VMX128_3_VB128).flt[0] * fltuimm));
+  VR(VMX128_3_VD128).flt[1] = vcfpsxwsHelper(static_cast<double>(VR(VMX128_3_VB128).flt[1] * fltuimm));
+  VR(VMX128_3_VD128).flt[2] = vcfpsxwsHelper(static_cast<double>(VR(VMX128_3_VB128).flt[2] * fltuimm));
+  VR(VMX128_3_VD128).flt[3] = vcfpsxwsHelper(static_cast<double>(VR(VMX128_3_VB128).flt[3] * fltuimm));
+}
+
+static inline float vexptefpHelper(const float inFloat) {
+  if (inFloat == -std::numeric_limits<float>::infinity()) return 0.0f;
+  if (inFloat == std::numeric_limits<float>::infinity()) return std::numeric_limits<float>::infinity();
+  return powf(2.0f, inFloat);
+}
+
+// Vector 2 Raised to the Exponent Estimate Floating Point (x'1000 018A')
+void PPCInterpreter::PPCInterpreter_vexptefp(PPU_STATE* ppuState) {
+  // NOTE: Checked against Xenia's tests.
+  
+  CHECK_VXU;
+
+  VRi(vd).flt[0] = vexptefpHelper(VRi(vb).flt[0]);
+  VRi(vd).flt[1] = vexptefpHelper(VRi(vb).flt[1]);
+  VRi(vd).flt[2] = vexptefpHelper(VRi(vb).flt[2]);
+  VRi(vd).flt[3] = vexptefpHelper(VRi(vb).flt[3]);
+}
+
+// Vector128 2 Raised to the Exponent Estimate Floating Point
+void PPCInterpreter::PPCInterpreter_vexptefp128(PPU_STATE* ppuState) {
+  // (VD) <- pow2(VB)
+
+  // NOTE: Checked against Xenia's tests.
+
+  CHECK_VXU;
+  
+  VR(VMX128_3_VD128).flt[0] = vexptefpHelper(VR(VMX128_3_VB128).flt[0]);
+  VR(VMX128_3_VD128).flt[1] = vexptefpHelper(VR(VMX128_3_VB128).flt[1]);
+  VR(VMX128_3_VD128).flt[2] = vexptefpHelper(VR(VMX128_3_VB128).flt[2]);
+  VR(VMX128_3_VD128).flt[3] = vexptefpHelper(VR(VMX128_3_VB128).flt[3]);
+}
+
 // Vector Logical NOR (x'1000 0504')
 void PPCInterpreter::PPCInterpreter_vnor(PPU_STATE *ppuState) {
   /*
@@ -242,6 +318,18 @@ void PPCInterpreter::PPCInterpreter_vmaxuw(PPU_STATE *ppuState) {
   VRi(vd).dword[1] = (VRi(va).dword[1] > VRi(vb).dword[1]) ? VRi(va).dword[1] : VRi(vb).dword[1];
   VRi(vd).dword[2] = (VRi(va).dword[2] > VRi(vb).dword[2]) ? VRi(va).dword[2] : VRi(vb).dword[2];
   VRi(vd).dword[3] = (VRi(va).dword[3] > VRi(vb).dword[3]) ? VRi(va).dword[3] : VRi(vb).dword[3];
+}
+
+// Vector Maximum Signed Word (x'1000 0182')
+void PPCInterpreter::PPCInterpreter_vmaxsw(PPU_STATE* ppuState) {
+  // TODO: Check behavior, logic seems ok.
+
+  CHECK_VXU;
+
+  VRi(vd).dword[0] = (VRi(va).dsword[0] > VRi(vb).dsword[0]) ? VRi(va).dsword[0] : VRi(vb).dsword[0];
+  VRi(vd).dword[1] = (VRi(va).dsword[1] > VRi(vb).dsword[1]) ? VRi(va).dsword[1] : VRi(vb).dsword[1];
+  VRi(vd).dword[2] = (VRi(va).dsword[2] > VRi(vb).dsword[2]) ? VRi(va).dsword[2] : VRi(vb).dsword[2];
+  VRi(vd).dword[3] = (VRi(va).dsword[3] > VRi(vb).dsword[3]) ? VRi(va).dsword[3] : VRi(vb).dsword[3];
 }
 
 // Vector Minimum Unsigned Word (x'1000 0282')
@@ -477,6 +565,31 @@ void PPCInterpreter::PPCInterpreter_vrlimi128(PPU_STATE* ppuState) {
   VR(vd) = result;
 }
 
+// Vector Round to Floating - Point Integer Nearest (x'1000 020A')
+void PPCInterpreter::PPCInterpreter_vrfin(PPU_STATE* ppuState) {
+  // NOTE: Checked against Xenia's tests.
+
+  CHECK_VXU;
+
+  VRi(vd).flt[0] = round(VRi(vb).flt[0]);
+  VRi(vd).flt[1] = round(VRi(vb).flt[1]);
+  VRi(vd).flt[2] = round(VRi(vb).flt[2]);
+  VRi(vd).flt[3] = round(VRi(vb).flt[3]);
+
+}
+
+// Vector128 Round to Floating - Point Integer Nearest
+void PPCInterpreter::PPCInterpreter_vrfin128(PPU_STATE* ppuState) {
+  // NOTE: Checked against Xenia's tests.
+
+  CHECK_VXU;
+
+  VR(VMX128_3_VD128).flt[0] = round(VR(VMX128_3_VB128).flt[0]);
+  VR(VMX128_3_VD128).flt[1] = round(VR(VMX128_3_VB128).flt[1]);
+  VR(VMX128_3_VD128).flt[2] = round(VR(VMX128_3_VB128).flt[2]);
+  VR(VMX128_3_VD128).flt[3] = round(VR(VMX128_3_VB128).flt[3]);
+}
+
 // Vector Multiply Add Floating Point (x'1000 002E')
 void PPCInterpreter::PPCInterpreter_vmaddfp(PPU_STATE *ppuState) {
   /*
@@ -581,6 +694,18 @@ void PPCInterpreter::PPCInterpreter_vsrw(PPU_STATE* ppuState) {
   VRi(rd).dword[3] = VRi(ra).dword[3] >> (VRi(rb).dword[3] & 31);
 }
 
+// Vector128 Shift Right Arithmetic Word
+void PPCInterpreter::PPCInterpreter_vsraw128(PPU_STATE* ppuState) {
+  // TODO: Verify behavior, logic seems ok.
+
+  CHECK_VXU;
+
+  VR(VMX128_VD128).dsword[0] = VR(VMX128_VA128).dsword[0] >> (VR(VMX128_VB128).dsword[0] & 31);
+  VR(VMX128_VD128).dsword[1] = VR(VMX128_VA128).dsword[1] >> (VR(VMX128_VB128).dsword[1] & 31);
+  VR(VMX128_VD128).dsword[2] = VR(VMX128_VA128).dsword[2] >> (VR(VMX128_VB128).dsword[2] & 31);
+  VR(VMX128_VD128).dsword[3] = VR(VMX128_VA128).dsword[3] >> (VR(VMX128_VB128).dsword[3] & 31);
+}
+
 static inline u8 vsldoiHelper(u8 sh, Base::Vector128 vra, Base::Vector128 vrb) {
   return (sh < 16) ? vra.bytes[sh] : vrb.bytes[sh & 0xF];
 }
@@ -681,6 +806,58 @@ void PPCInterpreter::PPCInterpreter_vsldoi(PPU_STATE *ppuState) {
   VRi(vd).dword[1] = byteswap_be<u32>(VRi(vd).dword[1]);
   VRi(vd).dword[2] = byteswap_be<u32>(VRi(vd).dword[2]);
   VRi(vd).dword[3] = byteswap_be<u32>(VRi(vd).dword[3]);
+#endif
+}
+
+// Vector128 Shift Left Double by Octet Immediate
+void PPCInterpreter::PPCInterpreter_vsldoi128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  const u8 sh = VMX128_5_SH;
+  // No shift
+  if (sh == 0) {
+    VR(VMX128_5_VD128) = VR(VMX128_5_VA128);
+    return;
+  }
+  else if (sh == 16) {
+    // Don't touch VA
+    VR(VMX128_5_VD128) = VR(VMX128_5_VB128);
+    return;
+  }
+
+
+#if defined(ARCH_X86_64)
+  __m128i va = _mm_loadu_si128(reinterpret_cast<const __m128i*>(VR(VMX128_5_VA128).bytes.data()));
+  __m128i vb = _mm_loadu_si128(reinterpret_cast<const __m128i*>(VR(VMX128_5_VB128).bytes.data()));
+  __m128i vd_sse = vsldoi_sse(va, vb, sh);
+
+  // Store raw result before byte swap
+  _mm_storeu_si128(reinterpret_cast<__m128i*>(VR(VMX128_5_VD128).bytes.data()), vd_sse);
+  // Swap
+  __m128i result = _mm_loadu_si128(reinterpret_cast<__m128i*>(VR(VMX128_5_VD128).bytes.data()));
+  result = byteswap_be_u32x4_ssse3(vd_sse);
+  _mm_storeu_si128(reinterpret_cast<__m128i*>(VR(VMX128_5_VD128).bytes.data()), result);
+#else
+  // TODO: Ugly, super slow, fix.
+
+  VR(VMX128_5_VA128).dword[0] = byteswap_be<u32>(VR(VMX128_5_VA128).dword[0]);
+  VR(VMX128_5_VA128).dword[1] = byteswap_be<u32>(VR(VMX128_5_VA128).dword[1]);
+  VR(VMX128_5_VA128).dword[2] = byteswap_be<u32>(VR(VMX128_5_VA128).dword[2]);
+  VR(VMX128_5_VA128).dword[3] = byteswap_be<u32>(VR(VMX128_5_VA128).dword[3]);
+
+  VR(VMX128_5_VB128).dword[0] = byteswap_be<u32>(VR(VMX128_5_VB128).dword[0]);
+  VR(VMX128_5_VB128).dword[1] = byteswap_be<u32>(VR(VMX128_5_VB128).dword[1]);
+  VR(VMX128_5_VB128).dword[2] = byteswap_be<u32>(VR(VMX128_5_VB128).dword[2]);
+  VR(VMX128_5_VB128).dword[3] = byteswap_be<u32>(VR(VMX128_5_VB128).dword[3]);
+
+  for (u8 idx = 0; idx < 16; idx++) {
+    VR(VMX128_5_VD128).bytes[idx] = vsldoiHelper(sh + idx, VR(VMX128_5_VA128), VR(VMX128_5_VB128));
+  }
+
+  VR(VMX128_5_VD128).dword[0] = byteswap_be<u32>(VR(VMX128_5_VD128).dword[0]);
+  VR(VMX128_5_VD128).dword[1] = byteswap_be<u32>(VR(VMX128_5_VD128).dword[1]);
+  VR(VMX128_5_VD128).dword[2] = byteswap_be<u32>(VR(VMX128_5_VD128).dword[2]);
+  VR(VMX128_5_VD128).dword[3] = byteswap_be<u32>(VR(VMX128_5_VD128).dword[3]);
 #endif
 }
 
@@ -814,6 +991,72 @@ void PPCInterpreter::PPCInterpreter_vmsum4fp128(PPU_STATE* ppuState) {
 
   for (u8 idx = 0; idx < 4; idx++) {
     VR(VMX128_3_VD128).flt[idx] = dotProduct;
+  }
+}
+
+enum ePackType : u32 {
+  PACK_TYPE_D3DCOLOR = 0,
+  PACK_TYPE_FLOAT16_2 = 1,
+  PACK_TYPE_SHORT_4 = 2,
+  PACK_TYPE_FLOAT16_4 = 3,
+  PACK_TYPE_SHORT_2 = 4,
+  PACK_TYPE_UINT_2101010 = 5,
+};
+
+static inline float MakePackedFloatUnsigned(const u32 x){
+  union {
+    float f;
+    u32 u;
+  } ret;
+
+  ret.f = 1.0f;
+  ret.u |= x;
+  return ret.f;
+}
+
+// Vector128 Unpack D3Dtype
+void PPCInterpreter::PPCInterpreter_vupkd3d128(PPU_STATE* ppuState) {
+  //CHECK_VXU;
+
+  // Research from Xenia:
+  // Can't find many docs on this. Best reference is
+  // http://worldcraft.googlecode.com/svn/trunk/src/qylib/math/xmmatrix.inl,
+  // which shows how it's used in some cases. Since it's all intrinsics,
+  // finding it in code is pretty easy.
+  const uint32_t vrd = _instr.VMX128_3.VD128l | (_instr.VMX128_3.VD128h << 5);
+  const uint32_t vrb = _instr.VMX128_3.VB128l | (_instr.VMX128_3.VB128h << 5);
+  const uint32_t packType = _instr.VMX128_3.IMM >> 2;
+  const u32 val = VR(vrb).dword[3];
+
+  // NOTE: Implemented means it was tested against xenia's tests.
+
+  switch (packType)
+  {
+  case PACK_TYPE_D3DCOLOR:
+    LOG_DEBUG(Xenon, "VXU[vupkd3d128]: Pack type: PACK_TYPE_D3DCOLOR");
+    VR(vrd).flt[0] = MakePackedFloatUnsigned((val >> 16) & 0xFF);
+    VR(vrd).flt[1] = MakePackedFloatUnsigned((val >> 8) & 0xFF);
+    VR(vrd).flt[2] = MakePackedFloatUnsigned((val >> 0) & 0xFF);
+    VR(vrd).flt[3] = MakePackedFloatUnsigned((val >> 24) & 0xFF);
+    break;
+  case PACK_TYPE_FLOAT16_2:
+    LOG_WARNING(Xenon, "VXU[vupkd3d128]: UNIMPLEMENTED Pack type: PACK_TYPE_FLOAT16_2");
+    break;
+  case PACK_TYPE_SHORT_4:
+    LOG_WARNING(Xenon, "VXU[vupkd3d128]: UNIMPLEMENTED Pack type: PACK_TYPE_SHORT_4");
+    break;
+  case PACK_TYPE_FLOAT16_4:
+    LOG_WARNING(Xenon, "VXU[vupkd3d128]: UNIMPLEMENTED Pack type: PACK_TYPE_FLOAT16_4");
+    break;
+  case PACK_TYPE_SHORT_2:
+    LOG_WARNING(Xenon, "VXU[vupkd3d128]: UNIMPLEMENTED Pack type: PACK_TYPE_SHORT_2");
+    break;
+  case PACK_TYPE_UINT_2101010:
+    LOG_WARNING(Xenon, "VXU[vupkd3d128]: UNIMPLEMENTED Pack type: PACK_TYPE_UINT_2101010");
+    break;
+  default:
+    LOG_ERROR(Xenon, "VXU[vupkd3d128]: Unknown Pack Type. Please report to Xenon devs.");
+    break;
   }
 }
 
