@@ -131,6 +131,7 @@ public:
 
   // Shader texture queue
   std::mutex drawQueueMutex{};
+  std::vector<DrawJob> previousJobs{};
   std::queue<DrawJob> drawQueue{};
 
   // Shader load queue
@@ -153,8 +154,17 @@ public:
   std::atomic<u32> currentPixelShader = 0;
   u32 pendingPixelShader = 0;
   std::atomic<bool> readyToLink = false;
+  std::atomic<bool> readyForFrame = false;
   std::mutex copyQueueMutex{};
   std::queue<Xe::XGPU::XenosState*> copyQueue{};
+  // Frame wait
+  std::atomic<bool> waiting = false;
+  std::atomic<u32> waitTime = 0;
+  // Internal swap counter
+  std::atomic<u32> swapCount;
+  std::mutex frameReadyMutex;
+  std::condition_variable frameReadyCondVar;
+  bool frameReady = false;
 private:
   // Thread handle
   std::thread thread;

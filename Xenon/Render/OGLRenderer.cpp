@@ -228,15 +228,14 @@ void OGLRenderer::UpdateViewportFromState(const Xe::XGPU::XenosState *state) {
   f32 zoffset = f(state->viewportZOffset);
 
   // Compute viewport rectangle
-  s32 width = static_cast<s32>(std::abs(xscale * 2));
-  s32 height = static_cast<s32>(std::abs(yscale * 2));
+  s32 newWidth = static_cast<s32>(std::abs(xscale * 2));
+  s32 newHeight = static_cast<s32>(std::abs(yscale * 2));
   s32 x = static_cast<s32>(xoffset - std::abs(xscale));
   s32 y = static_cast<s32>(yoffset - std::abs(yscale));
 
-  if (width != 32 && height != 32) {
-    LOG_DEBUG(Xenos, "Resizing viewport pos: {}x{}, size: {}x{}", x, y, width, height);
-    Resize(width, height);
-    glViewport(x, y, width, height);
+  if (newWidth != 32 && newHeight != 32) {
+    Resize(newWidth, newHeight);
+    glViewport(x, y, newWidth, newHeight);
   }
 
   // Clamp to valid ranges (just in case)
