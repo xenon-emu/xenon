@@ -11,10 +11,6 @@
 #include "Base/PathUtil.h"
 #include "Base/Logging/Log.h"
 
-//#ifdef _DEBUG
-#define XE_DEBUG
-//#endif
-
 Xe::Xenos::XGPU::XGPU(Render::Renderer *renderer, RAM *ram, PCIBridge *pciBridge) :
   render(renderer),
   ramPtr(ram), parentBus(pciBridge) {

@@ -12,8 +12,7 @@ namespace Xe::XGPU {
     std::lock_guard lock(mutex);
     if (_readOffset + count < _capacity) {
       _readOffset += count;
-    }
-    else {
+    } else {
       size_t left_half = _capacity - _readOffset;
       size_t right_half = count - left_half;
       _readOffset = right_half;
@@ -24,8 +23,7 @@ namespace Xe::XGPU {
     std::lock_guard lock(mutex);
     if (_writeOffset + count < _capacity) {
       _writeOffset += count;
-    }
-    else {
+    } else {
       size_t left_half = _capacity - _writeOffset;
       size_t right_half = count - left_half;
       _writeOffset = right_half;
@@ -38,10 +36,10 @@ namespace Xe::XGPU {
     if (!count) {
       return { nullptr };
     }
+
     if (_readOffset + count < _capacity) {
       return { _buffer + _readOffset, count, nullptr, 0 };
-    }
-    else {
+    } else {
       size_t left_half = _capacity - _readOffset;
       size_t right_half = count - left_half;
       return { _buffer + _readOffset, left_half, _buffer, right_half };
@@ -68,8 +66,7 @@ namespace Xe::XGPU {
     // Sanity check: Make sure we don't read over the write offset.
     if (_readOffset < _writeOffset) {
       assert(_readOffset + count <= _writeOffset);
-    }
-    else if (_readOffset + count >= _capacity) {
+    } else if (_readOffset + count >= _capacity) {
       size_t left_half = _capacity - _readOffset;
       assert(count - left_half <= _writeOffset);
     }
@@ -77,8 +74,7 @@ namespace Xe::XGPU {
     if (_readOffset + count < _capacity) {
       std::memcpy(buffer, _buffer + _readOffset, count);
       _readOffset += count;
-    }
-    else {
+    } else {
       size_t left_half = _capacity - _readOffset;
       size_t right_half = count - left_half;
       std::memcpy(buffer, _buffer + _readOffset, left_half);
@@ -99,8 +95,7 @@ namespace Xe::XGPU {
     // Sanity check: Make sure we don't write over the read offset.
     if (_writeOffset < _readOffset) {
       assert(_writeOffset + count <= _readOffset);
-    }
-    else if (_writeOffset + count >= _capacity) {
+    } else if (_writeOffset + count >= _capacity) {
       size_t left_half = _capacity - _writeOffset;
       assert(count - left_half <= _readOffset);
     }
@@ -108,8 +103,7 @@ namespace Xe::XGPU {
     if (_writeOffset + count < _capacity) {
       std::memcpy(_buffer + _writeOffset, buffer, count);
       _writeOffset += count;
-    }
-    else {
+    } else {
       size_t left_half = _capacity - _writeOffset;
       size_t right_half = count - left_half;
       std::memcpy(_buffer + _writeOffset, buffer, left_half);

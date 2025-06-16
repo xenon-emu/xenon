@@ -48,10 +48,11 @@ namespace PPCInterpreter {
         value(v), ptr0(*p), ptrRc(*pRc), magn(m)
       {}
 
-      u32 value;
       T ptr0;
       T ptrRc;
+      u32 value;
       u32 magn; // Non-zero for "columns" (effectively, number of most significant bits "eaten")
+      u32 mask;
     };
   public:
     void fillTables();
@@ -111,22 +112,6 @@ namespace PPCInterpreter {
         { 0x35, GET(stfsu) },
         { 0x36, GET(stfd) },
         { 0x37, GET(stfdu) },
-      });
-      // Special case opcodes
-      fillTable<std::string>(nameTable, 0x04, 11, 11, {
-        { 0x945, GET(vperm128) },
-        { 0x7193, GET(stvewx128) },
-        { 0x7393, GET(stvrx128) },
-        { 0x73C4, GET(stvx128) },
-        { 0xB705, GET(vor128) },
-        { 0x30C4, GET(lvx128) },
-        { 0x2405, GET(vmulfp128) },
-        { 0x141C4, GET(stvlx128) },
-        { 0x151C4, GET(stvrx128) },
-        { 0x1D8C6, GET(vmrglw128) },
-        { 0x1C8C6, GET(vmrghw128) },        
-        { 0x1C1C4, GET(stvlxl128) },
-        { 0x1DD06, GET(vspltisw128) },
       });
       // Group 0x04 opcodes (field 21..31)
       fillTable<std::string>(nameTable, 0x04, 11, 0, {
@@ -548,12 +533,12 @@ namespace PPCInterpreter {
       if (instr == 0x60000000) {
         return &PPCInterpreter_nop;
       }
+
       instructionHandler handler = getTable()[PPCDecode(instr)];
       if (handler != PPCInterpreter_invalid) {
         return handler;
-      }
-      else {
-#define GET_HANDLER(name) &PPCInterpreter_##name
+      } else {
+        #define GET_HANDLER(name) &PPCInterpreter_##name
         // VMX128 Lookup.
         switch (ExtractBits(instr, 0, 5)) {
         case 4:
@@ -806,7 +791,7 @@ namespace PPCInterpreter {
           }
           break;
         }
-#undef GET_HANDLER
+        #undef GET_HANDLER
         return handler;
       }
     }
@@ -819,13 +804,6 @@ namespace PPCInterpreter {
     std::string decodeName(u32 instr) const noexcept {
       return getNameTable()[PPCDecode(instr)];
     }
-    bool isBranch(u32 decoded) const noexcept {
-      return decoded == 0x0012 // b
-          || decoded == 0x0010 // bc
-          || decoded == 0x6490 // bclr (0x13 << 11 | 0x010)
-          || decoded == 0x7290 // bcctr (0x13 << 11 | 0x210)
-          || decoded == 0x6590;// rfid  (0x13 << 11 | 0x012)
-    }
   private:
     // Fast lookup table
     std::array<instructionHandler, 0x20000> table;
@@ -833,22 +811,35 @@ namespace PPCInterpreter {
     std::array<std::string, 0x20000> nameTable;
 
     template <typename T>
-    void fillTable(std::array<T, 0x20000> &t, u32 mainOp, u32 count, u32 sh, std::initializer_list<InstrInfo<T>> entries) noexcept {
-      if (sh < 11) {
-        for (const auto& v : entries) {
+    void fillTable(std::array<T, 0x20000> &t, u32 mainOp, u32 count, u32 sh,
+      std::initializer_list<InstrInfo<T>> entries) noexcept {
+      const bool isVxuMode = (count == static_cast<u32>(-1)) &&
+        std::any_of(entries.begin(), entries.end(), [](const InstrInfo<T> &v) {
+        return v.mask != 0;
+      });
+
+      for (const auto &v : entries) {
+        if (isVxuMode) {
+          // VXU-style masked mode
+          for (u32 i = 0; i < 1u << 11; i++) {
+            const u32 instr = i << 21;
+            if ((instr & v.mask) == v.value) {
+              const u32 key = (i << 6) | mainOp;
+              c_at(t, key) = (i & 1) ? v.ptrRc : v.ptr0;
+            }
+          }
+        } else if (sh < 11) {
+          // Old-style table expansion
           for (u32 i = 0; i < 1u << (v.magn + (11 - sh - count)); i++) {
             for (u32 j = 0; j < 1u << sh; j++) {
               const u32 k = (((i << (count - v.magn)) | v.value) << sh) | j;
-              c_at(t, (k << 6) | mainOp) = k & 1 ? v.ptrRc : v.ptr0;
+              c_at(t, (k << 6) | mainOp) = (k & 1) ? v.ptrRc : v.ptr0;
             }
           }
-        }
-      }
-      else {
-        // Special case opcodes
-        for (const auto& v : entries) {
+        } else {
+          // Special fallback
           for (u32 i = 0; i < 1u << 11; i++) {
-            c_at(t, i << 6 | v.value) = i & 1 ? v.ptrRc : v.ptr0;
+            c_at(t, (i << 6) | v.value) = (i & 1) ? v.ptrRc : v.ptr0;
           }
         }
       }
