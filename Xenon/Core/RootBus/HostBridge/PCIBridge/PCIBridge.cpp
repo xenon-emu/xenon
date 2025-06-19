@@ -72,9 +72,9 @@ PCIBridge::PCIBridge() {
   case Config::eConsoleRevision::Zephyr:
   case Config::eConsoleRevision::Falcon:
   case Config::eConsoleRevision::Jasper:
+  case Config::eConsoleRevision::Trinity:
     pciBridgeConfig.configSpaceHeader.reg2.revID = 0x60;
     break;
-  case Config::eConsoleRevision::Trinity:
   case Config::eConsoleRevision::Corona:
   case Config::eConsoleRevision::Corona4GB:
   case Config::eConsoleRevision::Winchester:
