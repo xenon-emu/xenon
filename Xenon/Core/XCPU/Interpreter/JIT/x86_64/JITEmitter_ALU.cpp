@@ -105,6 +105,23 @@ void PPCInterpreter::PPCInterpreterJIT_andi(PPU_STATE *ppuState, JITBlockBuilder
   J_ppuSetCR_LOGICAL(b, res, 0);
 }
 
+// XOR (x'7C00 0278')
+void PPCInterpreter::PPCInterpreterJIT_xor(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+    rA <- (rS) ^ (rB)
+  */
+
+  // rS
+  x86::Gp rSTemp = newGP64();
+  COMP->mov(rSTemp, GPRPtr(instr.rs));
+
+  // rSTemp ^ rB
+  COMP->xor_(rSTemp, GPRPtr(instr.rb));
+
+  // rA = rSTemp
+  COMP->mov(GPRPtr(instr.ra), rSTemp);
+}
+
 // XOR Immediate (x'6800 0000')
 void PPCInterpreter::PPCInterpreterJIT_xori(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode t_instr) {
   /*
