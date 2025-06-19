@@ -536,26 +536,68 @@ void Xe::PCIDev::SMC::smcMainThread() {
           smcCoreState.fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
           smcCoreState.fifoDataBuffer[1] = 0; // Unlock Succeeded.
           break;
-        case 0x10: // SMC_READ_ANA
+        case 0x10: // SMC_READ_SMBUS_I2C
           smcCoreState.fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
           smcCoreState.fifoDataBuffer[1] = 0x0;
-          smcCoreState.fifoDataBuffer[3] =
+          if (smcCoreState.fifoDataBuffer[5] == 0xF0) {
+            // SMBus read (HANA)
+            smcCoreState.fifoDataBuffer[4] =
               (hanaState[smcCoreState.fifoDataBuffer[6]] & 0xFF);
-          smcCoreState.fifoDataBuffer[4] =
+            smcCoreState.fifoDataBuffer[5] =
               ((hanaState[smcCoreState.fifoDataBuffer[6]] >> 8) & 0xFF);
-          smcCoreState.fifoDataBuffer[5] =
+            smcCoreState.fifoDataBuffer[6] =
               ((hanaState[smcCoreState.fifoDataBuffer[6]] >> 16) & 0xFF);
-          smcCoreState.fifoDataBuffer[6] =
+            smcCoreState.fifoDataBuffer[7] =
               ((hanaState[smcCoreState.fifoDataBuffer[6]] >> 24) & 0xFF);
+          } else {
+            // I2C read (PMW IC's, Audio IC's, etc...)
+            switch (smcCoreState.fifoDataBuffer[6] + (smcCoreState.fifoDataBuffer[3] == 0x8D ? 0x200 : 0x100)) { // Address
+            case 0x102:
+              smcCoreState.fifoDataBuffer[3] = 0x53;
+              smcCoreState.fifoDataBuffer[4] = 0x92;
+              smcCoreState.fifoDataBuffer[5] = 0;
+              smcCoreState.fifoDataBuffer[6] = 0;
+              break;
+            default:
+              LOG_WARNING(SMC, "[I2C] Reading from I2C at address {:#x}, unimplemented, returning 0.", 
+                smcCoreState.fifoDataBuffer[6] + (smcCoreState.fifoDataBuffer[3] == 0x8D ? 0x200 : 0x100));
+              smcCoreState.fifoDataBuffer[3] = 0;
+              smcCoreState.fifoDataBuffer[4] = 0;
+              smcCoreState.fifoDataBuffer[5] = 0;
+              smcCoreState.fifoDataBuffer[6] = 0;
+              break;
+            }
+          }
           break;
-        case 0x60: // SMC_WRITE_ANA
+        case 0x11: // SMC_I2C_DDC_READ
+          LOG_WARNING(SMC, "[I2C] DDC Read (STUB). Address = {:#x}, returning 0.", smcCoreState.fifoDataBuffer[6] + 0x1D0);
+          smcCoreState.fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
+          smcCoreState.fifoDataBuffer[1] = 0; // Read Succeeded.
+          smcCoreState.fifoDataBuffer[3] = 0;
+          smcCoreState.fifoDataBuffer[4] = 0;
+          smcCoreState.fifoDataBuffer[5] = 0;
+          smcCoreState.fifoDataBuffer[6] = 0;
+          break;
+        case 0x20: // SMC_I2C_WRITE
+          LOG_WARNING(SMC, "[I2C] Write (STUB). Address = {:#x}, value = {:#x}.", smcCoreState.fifoDataBuffer[6] + 
+            (smcCoreState.fifoDataBuffer[3] == 0x8D ? 0x200 : 0x100), smcCoreState.fifoDataBuffer[7]);
+          smcCoreState.fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
+          smcCoreState.fifoDataBuffer[1] = 0; // Write Succeeded.
+          break;
+        case 0x21: // SMC_I2C_DDC_WRITE
+          LOG_WARNING(SMC, "[I2C] DDC Write (STUB). Address = {:#x}, value = {:#x}.", smcCoreState.fifoDataBuffer[6] + 0x1D0,
+            smcCoreState.fifoDataBuffer[7]);
+          smcCoreState.fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
+          smcCoreState.fifoDataBuffer[1] = 0; // Write Succeeded.
+          break;
+        case 0x60: // SMC_WRITE_SMBUS
           smcCoreState.fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
           smcCoreState.fifoDataBuffer[1] = 0x0;
           hanaState[smcCoreState.fifoDataBuffer[6]] =
-              smcCoreState.fifoDataBuffer[4] |
-              (smcCoreState.fifoDataBuffer[5] << 8) |
-              (smcCoreState.fifoDataBuffer[6] << 16) |
-              (smcCoreState.fifoDataBuffer[7] << 24);
+            smcCoreState.fifoDataBuffer[8] |
+            (smcCoreState.fifoDataBuffer[9] << 8) |
+            (smcCoreState.fifoDataBuffer[10] << 16) |
+            (smcCoreState.fifoDataBuffer[11] << 24);
           break;
         default:
           LOG_WARNING(SMC, "SMC_I2C_READ_WRITE: Unimplemented command 0x{:X}", smcCoreState.fifoDataBuffer[1]);
