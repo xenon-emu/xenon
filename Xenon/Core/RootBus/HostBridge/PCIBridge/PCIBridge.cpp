@@ -66,6 +66,21 @@ PCIBridge::PCIBridge() {
 
   // PCI Bridge Config regs
   pciBridgeState.REG_EA00000C = 0x7CFF; // Software writes here to enable interrupts (Bus IRQL)
+
+  // Set Revision based on system config.
+  switch (Config::highlyExperimental.consoleRevison) {
+  case Config::eConsoleRevision::Zephyr:
+  case Config::eConsoleRevision::Falcon:
+  case Config::eConsoleRevision::Jasper:
+    pciBridgeConfig.configSpaceHeader.reg2.revID = 0x60;
+    break;
+  case Config::eConsoleRevision::Trinity:
+  case Config::eConsoleRevision::Corona:
+  case Config::eConsoleRevision::Corona4GB:
+  case Config::eConsoleRevision::Winchester:
+    pciBridgeConfig.configSpaceHeader.reg2.revID = 0x90;
+    break;
+  }
 }
 
 PCIBridge::~PCIBridge() {
