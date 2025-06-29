@@ -17,6 +17,7 @@
 [submodule "third_party/microprofile"]
 	path = Deps/ThirdParty/microprofile
 	url = https://github.com/jonasmr/microprofile.git
+	ignore = dirty
 [submodule "Deps/ThirdParty/Sirit"]
 	path = Deps/ThirdParty/Sirit
 	url = https://github.com/Vali0004/sirit.git
