@@ -27,7 +27,10 @@ namespace Xe::XGPU {
 
 CommandProcessor::CommandProcessor(RAM *ramPtr, XenosState *statePtr, Render::Renderer *renderer, PCIBridge *pciBridge) :
   ram(ramPtr),
-  state(statePtr), render(renderer),
+  state(statePtr),
+#ifndef NO_GFX
+  render(renderer),
+#endif
   parentBus(pciBridge) {
   cpWorkerThread = std::thread(&CommandProcessor::cpWorkerThreadLoop, this);
 
@@ -180,6 +183,7 @@ void CommandProcessor::cpExecuteIndirectBuffer(u32 bufferPtr, u32 bufferSize) {
 void CommandProcessor::CPSetSQProgramCntl(u32 value) {
   state->programCntl = value;
 
+#ifndef NO_GFX
   // Update shader hashes
   u32 vsHash = render->currentVertexShader.load();
   u32 psHash = render->currentPixelShader.load();
@@ -189,6 +193,7 @@ void CommandProcessor::CPSetSQProgramCntl(u32 value) {
     render->pendingVertexShader = vsHash;
     render->pendingPixelShader = psHash;
   }
+#endif
 }
 
 // Executes a single packet from the ringbuffer.
