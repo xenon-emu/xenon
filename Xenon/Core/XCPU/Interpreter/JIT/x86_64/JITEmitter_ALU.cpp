@@ -40,6 +40,24 @@ void PPCInterpreter::PPCInterpreterJIT_andx(PPU_STATE *ppuState, JITBlockBuilder
   COMP->mov(GPRPtr(instr.ra), rSTemp);
 }
 
+// Multiply Low Doubleword (x'7C00 01D2')
+void PPCInterpreter::PPCInterpreterJIT_mulld(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
+  /*
+    prod[0-127] <- (rA) * (rB)
+    rD <- prod[64-127]
+  */
+
+  // rATemp
+  x86::Gp rATemp = newGP64();
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+
+  // rATemp * rB
+  COMP->mul(rATemp, GPRPtr(instr.rb));
+
+  // rD = rATemp
+  COMP->mov(GPRPtr(instr.rd), rATemp);
+}
+
 // Rotate Left Word Immediate then AND with Mask (x'5400 0000')
 void PPCInterpreter::PPCInterpreterJIT_rlwinmx(PPU_STATE *ppuState, JITBlockBuilder* b, PPCOpcode instr) {
   /*
@@ -148,6 +166,23 @@ void PPCInterpreter::PPCInterpreterJIT_xoris(PPU_STATE* ppuState, JITBlockBuilde
   COMP->mov(val1, shImm);
   COMP->xor_(tmp, val1);
   COMP->mov(GPRPtr(t_instr.ra), tmp);
+}
+
+// OR (x'7C00 0378')
+void PPCInterpreter::PPCInterpreterJIT_or(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+    rA <- (rS) | (rB)
+  */
+
+  // rSTemp
+  x86::Gp rSTemp = newGP64();
+  COMP->mov(rSTemp, GPRPtr(instr.rs));
+
+  // rSTemp | rB
+  COMP->or_(rSTemp, GPRPtr(instr.rb));
+
+  // rA = rSTemp
+  COMP->mov(GPRPtr(instr.ra), rSTemp);
 }
 
 // OR Immediate (x'6000 0000')
