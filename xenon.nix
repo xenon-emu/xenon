@@ -18,6 +18,12 @@ let
     rev = "356dddbc5508dd65f466098da26a2e47584eafdb";
     hash = "sha256-j/Ft9hVU1bXPM70jOC5uyirvs7aWZF2yUtyYK9kQZ/8=";
   };
+  cryptopp = fetchFromGitHub {
+    owner = "weidai11";
+    repo = "cryptopp";
+    rev = "60f81a77e0c9a0e7ffc1ca1bc438ddfa2e43b78e";
+    hash = "sha256-I94xGY0XVQu/RAtccf3dPbIuo1vtgVWvu56G7CaSth0=";
+  };
   imgui = if withGraphics
     then fetchFromGitHub {
       owner = "ocornut";
@@ -66,8 +72,10 @@ stdenv.mkDerivation {
       cp -r ${sirit} $sourceRoot/Deps/ThirdParty/Sirit
     ''}
     rm -rf $sourceRoot/Deps/ThirdParty/asmjit
+    rm -rf $sourceRoot/Deps/ThirdParty/cryptopp
     rm -rf $sourceRoot/Deps/ThirdParty/microprofile
     cp -r ${asmjit} $sourceRoot/Deps/ThirdParty/asmjit
+    cp -r ${cryptopp} $sourceRoot/Deps/ThirdParty/cryptopp
     cp -r ${microprofile} $sourceRoot/Deps/ThirdParty/microprofile
     chmod -R +w $sourceRoot
   '';

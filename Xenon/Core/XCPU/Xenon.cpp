@@ -48,32 +48,36 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPa
     }
   }
 
-  // Load 1BL from path.
-  std::ifstream file(blPath, std::ios_base::in | std::ios_base::binary);
-  if (!file.is_open()) {
-    LOG_CRITICAL(Xenon, "Unable to open file: {} for reading. Check your file path. System Stopped!", blPath);
-    Base::SystemPause();
-  } else {
-    u64 fileSize = 0;
-    // fs::file_size can cause a exception if it is not a valid file
-    try {
-      std::error_code ec;
-      fileSize = std::filesystem::file_size(blPath, ec);
-      if (fileSize == -1 || !fileSize) {
-        fileSize = 0;
-        LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of {} (Error: {})", blPath, ec.message());
+  // Load 1BL binary if needed.
+  if (!Config::xcpu.simulate1BL) {
+    // Load 1BL from path.
+    std::ifstream file(blPath, std::ios_base::in | std::ios_base::binary);
+    if (!file.is_open()) {
+      LOG_CRITICAL(Xenon, "Unable to open file: {} for reading. Check your file path. System Stopped!", blPath);
+      Base::SystemPause();
+    }
+    else {
+      u64 fileSize = 0;
+      // fs::file_size can cause a exception if it is not a valid file
+      try {
+        std::error_code ec;
+        fileSize = std::filesystem::file_size(blPath, ec);
+        if (fileSize == -1 || !fileSize) {
+          fileSize = 0;
+          LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of {} (Error: {})", blPath, ec.message());
+        }
+      }
+      catch (const std::exception& ex) {
+        LOG_ERROR(Base_Filesystem, "Exception trying to get file size. Reason: {}", ex.what());
+        return;
+      }
+      if (fileSize == XE_SROM_SIZE) {
+        file.read(reinterpret_cast<char*>(xenonContext.SROM), XE_SROM_SIZE);
+        LOG_INFO(Xenon, "1BL Loaded.");
       }
     }
-    catch (const std::exception& ex) {
-      LOG_ERROR(Base_Filesystem, "Exception trying to get file size. Reason: {}", ex.what());
-      return;
-    }
-    if (fileSize == XE_SROM_SIZE) {
-      file.read(reinterpret_cast<char*>(xenonContext.SROM), XE_SROM_SIZE);
-      LOG_INFO(Xenon, "1BL Loaded.");
-    }
+    file.close();
   }
-  file.close();
 
   // Asign Interpreter global variables
   PPCInterpreter::CPUContext = &xenonContext;

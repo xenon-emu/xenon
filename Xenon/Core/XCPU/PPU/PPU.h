@@ -157,4 +157,6 @@ private:
   void UpdateTimeBase();
   // Gets the current running threads.
   u8 GetCurrentRunningThreads();
+  // Simulates the behavior of the 1BL inside the Xenon Secure ROM.
+  bool Simulate1Bl();
 };

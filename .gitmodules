@@ -24,3 +24,6 @@
 [submodule "Deps/ThirdParty/asmjit"]
 	path = Deps/ThirdParty/asmjit
 	url = https://github.com/asmjit/asmjit
+[submodule "Deps/ThirdParty/cryptopp"]
+	path = Deps/ThirdParty/cryptopp
+	url = https://github.com/weidai11/cryptopp

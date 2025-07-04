@@ -192,6 +192,8 @@ void PPU::StartExecution(bool setHRMOR) {
     ppuState->SPR.CTRL = 0x800000UL; // CTRL[TE0] = 1;
     ppuState->SPR.HRMOR = 0x20000000000ULL;
     ppuState->ppuThread[ePPUThread_Zero].NIA = resetVector;
+    // Also simulate 1BL if we're told to.
+    if (Config::xcpu.simulate1BL) { Simulate1Bl(); }
   }
 
   ppuThread = std::thread(&PPU::ThreadLoop, this);
@@ -894,4 +896,56 @@ u8 PPU::GetCurrentRunningThreads() {
 
   // Directly map ctrlTE to thread states using bit shifting
   return (ctrlTE & 0b01) * ePPUThreadBit_One | (ctrlTE & 0b10) / 2 * ePPUThreadBit_Zero;
+}
+
+// Does a mostly complete simulation of the 1Bl inside the SROM.
+// This piece of code, in a nutshell does the following:
+// * Trains the CPU's FSB TX and RX lines.
+// * Verifies the offset of CB from NAND.
+// * Fetches and validates the CB header from NAND.
+// * Copies the encrypted the CB header from NAND to internal Secure ROM.
+// * Generates the CB's HMAC key.
+// * Initializes the CB's RC4 decryption key.
+// * RC4 decrypts CB and verifies it.
+// * Sets up some states and registers and jumps to CB in the Secure ROM.
+bool PPU::Simulate1Bl() {
+  LOG_INFO(Xenon, "1BL Simulation started:");
+  // Since we dont actually have a FSB to make use of (nor we need one ofc) we can simply bypass this.
+  
+  // Zero out Secure RAM:
+  LOG_INFO(Xenon, " * Zeroing SRAM.");
+  PPCInterpreter::MMUMemSet(ppuState.get(), 0x10000, 0, 0x10000);
+
+  // Verify CB's offset in NAND and fetch its header contents.
+  // CB's offset should be stored in the NAND header at location 0x8.
+  u32 cbOffset = PPCInterpreter::MMURead32(ppuState.get(), NAND_MEMORY_MAPPED_ADDR + 8);
+  
+  // Verification is nothing but a mere address alignment and a not zero check.
+  if (cbOffset == 0) {
+    LOG_CRITICAL(Xenos, "CB Offset verification failed, returned address is {:#x}.", cbOffset);
+    return false;
+  }
+
+  // Read CB header, we don't print anything as SFCX code should have already done this.
+  Xe::PCIDev::BL_HEADER cbHeader = {};
+  PPCInterpreter::MMURead(xenonContext, ppuState.get(), NAND_MEMORY_MAPPED_ADDR + cbOffset, 16, reinterpret_cast<u8*>(&cbHeader));
+
+  // Byteswap header data.
+  cbHeader.entryPoint = byteswap_be(cbHeader.entryPoint);
+  cbHeader.lenght = byteswap_be(cbHeader.lenght);
+
+  LOG_INFO(Xenon, " * Found CB Header at offset {:#x}, entry point {:#x}, size {:#x}.", cbOffset, cbHeader.entryPoint,
+    cbHeader.lenght);
+
+  // Copy CB data from NAND.
+  LOG_INFO(Xenon, " * Fetching CB data.");
+  std::vector<u8> cbData;
+  for (size_t idx = 0; idx < cbHeader.lenght; idx++) {
+    cbData.push_back(PPCInterpreter::MMURead8(ppuState.get(), NAND_MEMORY_MAPPED_ADDR + cbOffset + idx));
+  }
+
+  // Initialize HMAC key.
+
+  // All good.
+  return true;
 }

@@ -174,7 +174,8 @@ inline struct _xcpu {
   bool overrideInitSkip = false;
   u64 HW_INIT_SKIP_1 = 0;
   u64 HW_INIT_SKIP_2 = 0;
-
+  // 1BL Simulation
+  bool simulate1BL = false;
   // TOML Conversion
   void to_toml(toml::value &value);
   void from_toml(const toml::value &value);
