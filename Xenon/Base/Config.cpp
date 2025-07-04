@@ -280,6 +280,7 @@ void _xcpu::from_toml(const toml::value &value) {
   overrideInitSkip = toml::find_or<bool>(value, "OverrideHWInit", overrideInitSkip);
   HW_INIT_SKIP_1 = toml::find_or<u64&>(value, "HW_INIT_SKIP1", HW_INIT_SKIP_1);
   HW_INIT_SKIP_2 = toml::find_or<u64&>(value, "HW_INIT_SKIP2", HW_INIT_SKIP_2);
+  simulate1BL = toml::find_or<bool>(value, "Simulate1BL", simulate1BL);
 }
 void _xcpu::to_toml(toml::value &value) {
   value["RAMSize"].comments().clear();
@@ -316,6 +317,11 @@ void _xcpu::to_toml(toml::value &value) {
   value["HW_INIT_SKIP2"].comments().push_back("# Manual Hardware Init Skip address 2 override");
   value["HW_INIT_SKIP2"].comments().push_back("# RGH3 Trinity: 0x3003FDC");
   value["HW_INIT_SKIP2"].comments().push_back("# RGH3 Corona:  0x3003E54");
+
+  value["Simulate1BL"].comments().clear();
+  value["Simulate1BL"] = simulate1BL;
+  value["Simulate1BL"].comments().push_back("# Simulates the behavior of the 1BL inside the XCPU. Allows for bootup without said binary being required.");
+  value["Simulate1BL"].comments().push_back("# Currently WIP, do not use.");
 }
 bool _xcpu::verify_toml(toml::value &value) {
   to_toml(value);
@@ -325,6 +331,7 @@ bool _xcpu::verify_toml(toml::value &value) {
   cache_value(overrideInitSkip);
   cache_value(HW_INIT_SKIP_1);
   cache_value(HW_INIT_SKIP_2);
+  cache_value(simulate1BL);
   from_toml(value);
   verify_value(ramSize);
   verify_value(elfLoader);
@@ -332,6 +339,7 @@ bool _xcpu::verify_toml(toml::value &value) {
   verify_value(overrideInitSkip);
   verify_value(HW_INIT_SKIP_1);
   verify_value(HW_INIT_SKIP_2);
+  verify_value(simulate1BL);
   return true;
 }
 
