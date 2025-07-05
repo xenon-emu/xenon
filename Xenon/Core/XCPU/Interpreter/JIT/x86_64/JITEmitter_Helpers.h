@@ -106,7 +106,7 @@ inline void J_ppuSetCR(JITBlockBuilder *b, x86::Gp value, u32 index) {
   Label use64 = COMP->newLabel();
   Label done = COMP->newLabel();
 
-  x86::Gp tempMSR = newGP32();
+  x86::Gp tempMSR = newGP64();
   x86::Gp tempCR = newGP32();
 
   // Load MSR and check SF bit
