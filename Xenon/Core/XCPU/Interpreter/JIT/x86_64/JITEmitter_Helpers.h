@@ -56,25 +56,38 @@ inline x86::Gp J_BuildCR(JITBlockBuilder *b, x86::Gp lhs, x86::Gp rhs) {
   x86::Gp crValue = newGP32();
   x86::Gp tmp = newGP8();
 
-  COMP->cmp(lhs, rhs); // Compare lhs and rhs
   COMP->xor_(crValue, crValue);
 
-  // lt (less than)
-  COMP->setl(tmp);
-  COMP->shl(tmp, imm(3 - CR_BIT_LT));
+  // Declare labels:
+  Label gt = COMP->newLabel(); // Self explanatory.
+  Label lt = COMP->newLabel(); // Self explanatory.
+  Label end = COMP->newLabel(); // Self explanatory.
+
+  COMP->cmp(lhs, rhs); // Compare lhs and rhs
+  // Check Greater Than.
+  COMP->jg(gt);
+  // Check Lower Than.
+  COMP->jl(lt);
+  // Equal to zero.
+  COMP->mov(tmp, imm(2));
+  COMP->or_(crValue.r8(), tmp.r8());
+  COMP->jmp(end);
+
+  // Greater than:
+  COMP->bind(gt);
+  COMP->mov(tmp, imm(4));
+  COMP->or_(crValue.r8(), tmp.r8());
+  COMP->jmp(end);
+
+  // Lower than:
+  COMP->bind(lt);
+  COMP->mov(tmp, imm(8));
   COMP->or_(crValue.r8(), tmp.r8());
 
-  // gt (greater than)
-  COMP->setg(tmp);
-  COMP->shl(tmp, imm(3 - CR_BIT_GT));
-  COMP->or_(crValue.r8(), tmp.r8());
+  COMP->bind(end);
 
-  // eq (equal)
-  COMP->sete(tmp);
-  COMP->shl(tmp, imm(3 - CR_BIT_EQ));
-  COMP->or_(crValue.r8(), tmp.r8());
-
-  // so (summary overflow)
+  // SO bit (summary overflow)
+  // TODO: Check this.
 #ifdef __LITTLE_ENDIAN__
   COMP->mov(tmp.r32(), SPRPtr(XER));
   COMP->shr(tmp.r32(), imm(31));
@@ -84,6 +97,7 @@ inline x86::Gp J_BuildCR(JITBlockBuilder *b, x86::Gp lhs, x86::Gp rhs) {
 #endif
   COMP->shl(tmp, imm(3 - CR_BIT_SO));
   COMP->or_(crValue.r8(), tmp.r8());
+
   return crValue;
 }
 
@@ -117,7 +131,7 @@ inline void J_ppuSetCR0(JITBlockBuilder* b, x86::Gp inValue) {
   // Check for MSR[SF]:
   x86::Gp tempMSR = newGP64(); // MSR is 64 bits wide.
   COMP->mov(tempMSR, SPRPtr(MSR)); // Get MSR value.
-  COMP->bt(tempMSR, 0); // Check for bit 0 (SF) on MSR.
+  COMP->bt(tempMSR, 63); // Check for bit 0(BE)(SF) on MSR.
   COMP->jc(sfBitMode); // If set, use 64-bit compare. (checks for carry flag from previous operation).
 
   // 32 Bit mode:

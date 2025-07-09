@@ -65,8 +65,8 @@ namespace PPCInterpreter {
     fillTable<instructionHandlerJIT>(jitTable, 0x00, 6, -1, {
       //{ 0x0E, GET(addi) },
       //{ 0x12, GET(b) },
-      //{ 0x15, GETRC(rlwinm) },
-      //{ 0x17, GETRC(rlwnm) },
+      { 0x15, GETRC(rlwinm) },
+      { 0x17, GETRC(rlwnm) },
       //{ 0x18, GET(ori) },
       //{ 0x19, GET(oris) },
       //{ 0x1A, GET(xori) },
