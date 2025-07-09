@@ -580,8 +580,10 @@ extern void PPCInterpreter_lvsl(PPU_STATE *ppuState);
 //
 extern void PPCInterpreterJIT_addi(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
 extern void PPCInterpreterJIT_andi(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+extern void PPCInterpreterJIT_andis(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
 extern void PPCInterpreterJIT_andx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
 extern void PPCInterpreterJIT_b(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+extern void PPCInterpreterJIT_cntlzdx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
 extern void PPCInterpreterJIT_mfspr(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
 extern void PPCInterpreterJIT_mulldx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
 extern void PPCInterpreterJIT_orx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);

@@ -131,6 +131,23 @@ void PPCInterpreter::PPCInterpreterJIT_andi(PPU_STATE *ppuState, JITBlockBuilder
   J_ppuSetCR0(b, res);
 }
 
+// And Immediate Shifted (x'7400 0000')
+void PPCInterpreter::PPCInterpreterJIT_andis(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+  rA <- (rS) + ((32)0 || UIMM || (16)0)
+  */
+
+  x86::Gp rsTemp = newGP64();
+  COMP->mov(rsTemp, GPRPtr(instr.rs));
+  x86::Gp sh = newGP64();
+  u64 shImm = (u64{ instr.uimm16 } << 16);
+  COMP->mov(sh, shImm);
+  COMP->and_(rsTemp, sh);
+  COMP->mov(GPRPtr(instr.ra), rsTemp);
+
+  J_ppuSetCR0(b, rsTemp);
+}
+
 // XOR (x'7C00 0278')
 void PPCInterpreter::PPCInterpreterJIT_xorx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
   /*
@@ -219,5 +236,23 @@ void PPCInterpreter::PPCInterpreterJIT_oris(PPU_STATE *ppuState, JITBlockBuilder
   COMP->mov(val1, shImm);
   COMP->or_(tmp, val1);
   COMP->mov(GPRPtr(instr.ra), tmp);
+}
+
+// Count Leading Zeros Double Word (x'7C00 0074')
+void PPCInterpreter::PPCInterpreterJIT_cntlzdx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+  n <- 0
+  do while n < 64
+    if rS[n] = 1 then leave
+    n <- n + 1
+  rA <- n
+  */
+  x86::Gp tmp = newGP64();
+  COMP->lzcnt(tmp, GPRPtr(instr.rs));
+  COMP->mov(GPRPtr(instr.ra), tmp);
+
+  // RC
+  if (instr.rc)
+    J_ppuSetCR0(b, tmp);
 }
 #endif

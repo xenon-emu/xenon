@@ -72,11 +72,13 @@ namespace PPCInterpreter {
       { 0x1A, GET(xori) },
       { 0x1B, GET(xoris) },
       { 0x1C, GET(andi) },
+      { 0x1D, GET(andis) },
     });
 
     // Group 0x1F opcodes (field 21..30)
     fillTable<instructionHandlerJIT>(jitTable, 0x1F, 10, 1, {
       { 0x01C, GETRC(and) },
+      { 0x03A, GETRC(cntlzd) },
       //{ 0x0E9, GETRC(mulld) },
       { 0x13C, GETRC(xor) },
       //{ 0x153, GET(mfspr) },
