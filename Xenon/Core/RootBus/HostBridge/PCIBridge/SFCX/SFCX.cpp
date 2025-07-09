@@ -75,12 +75,14 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
   if (!nandFile.is_open()) {
     LOG_CRITICAL(SFCX, "Fatal error! Please make sure your NAND (or NAND path) is valid!");
     Base::SystemPause();
+    return;
   }
 
   // Check file magic
   if (!checkMagic()) {
     LOG_CRITICAL(SFCX, "Fatal error! The loaded 'nand.bin' doesn't correspond to a Xbox 360 NAND.");
     Base::SystemPause();
+    return;
   }
 
   // Read NAND Image data
