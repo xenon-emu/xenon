@@ -33,12 +33,8 @@ void PPCInterpreter::PPCInterpreterJIT_andx(PPU_STATE *ppuState, JITBlockBuilder
   x86::Gp rSTemp = newGP64();
   COMP->mov(rSTemp, GPRPtr(instr.rs));
 
-  // rBTemp
-  x86::Gp rBTemp = newGP64();
-  COMP->mov(rBTemp, GPRPtr(instr.rb));
-
   // rS & rB
-  COMP->and_(rSTemp, rBTemp);
+  COMP->and_(rSTemp, GPRPtr(instr.rb));
 
   // rA = rSTemp
   COMP->mov(GPRPtr(instr.ra), rSTemp);
@@ -136,7 +132,7 @@ void PPCInterpreter::PPCInterpreterJIT_andi(PPU_STATE *ppuState, JITBlockBuilder
 }
 
 // XOR (x'7C00 0278')
-void PPCInterpreter::PPCInterpreterJIT_xor(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_xorx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
   /*
     rA <- (rS) ^ (rB)
   */
@@ -150,38 +146,38 @@ void PPCInterpreter::PPCInterpreterJIT_xor(PPU_STATE* ppuState, JITBlockBuilder*
 
   // rA = rSTemp
   COMP->mov(GPRPtr(instr.ra), rSTemp);
+
+  if (instr.rc)
+    J_ppuSetCR0(b, rSTemp);
 }
 
 // XOR Immediate (x'6800 0000')
-void PPCInterpreter::PPCInterpreterJIT_xori(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode t_instr) {
+void PPCInterpreter::PPCInterpreterJIT_xori(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
   /*
     rA <- (rS) ^ ((4816)0 || UIMM)
   */
-  x86::Gp tmp = newGP64();
-  x86::Gp val1 = newGP64();
-  u64 shImm = (u64{ t_instr.uimm16 });
-  COMP->mov(tmp, GPRPtr(t_instr.rs));
-  COMP->mov(val1, shImm);
-  COMP->xor_(tmp, val1);
-  COMP->mov(GPRPtr(t_instr.ra), tmp);
+  x86::Gp rsTemp = newGP64();
+  COMP->mov(rsTemp, GPRPtr(instr.rs));
+  COMP->xor_(rsTemp, imm<u64>(instr.uimm16));
+  COMP->mov(GPRPtr(instr.ra), rsTemp);
 }
 
 // XOR Immediate Shifted (x'6C00 0000')
-void PPCInterpreter::PPCInterpreterJIT_xoris(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode t_instr) {
+void PPCInterpreter::PPCInterpreterJIT_xoris(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
   /*
     rA <- (rS) | ((32)0 || UIMM || (16)0)
   */
   x86::Gp tmp = newGP64();
   x86::Gp val1 = newGP64();
-  u64 shImm = (u64{ t_instr.uimm16 } << 16);
-  COMP->mov(tmp, GPRPtr(t_instr.rs));
+  u64 shImm = (u64{ instr.uimm16 } << 16);
+  COMP->mov(tmp, GPRPtr(instr.rs));
   COMP->mov(val1, shImm);
   COMP->xor_(tmp, val1);
-  COMP->mov(GPRPtr(t_instr.ra), tmp);
+  COMP->mov(GPRPtr(instr.ra), tmp);
 }
 
 // OR (x'7C00 0378')
-void PPCInterpreter::PPCInterpreterJIT_or(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_orx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
   /*
     rA <- (rS) | (rB)
   */
@@ -195,20 +191,20 @@ void PPCInterpreter::PPCInterpreterJIT_or(PPU_STATE* ppuState, JITBlockBuilder* 
 
   // rA = rSTemp
   COMP->mov(GPRPtr(instr.ra), rSTemp);
+
+  if (instr.rc)
+    J_ppuSetCR0(b, rSTemp);
 }
 
 // OR Immediate (x'6000 0000')
-void PPCInterpreter::PPCInterpreterJIT_ori(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode t_instr) {
+void PPCInterpreter::PPCInterpreterJIT_ori(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
   /*
     rA <- (rS) | ((4816)0 || UIMM)
   */
-  x86::Gp tmp = newGP64();
-  x86::Gp val1 = newGP64();
-  u64 shImm = (u64{ t_instr.uimm16 });
-  COMP->mov(tmp, GPRPtr(t_instr.rs));
-  COMP->mov(val1, shImm);
-  COMP->or_(tmp, val1);
-  COMP->mov(GPRPtr(t_instr.ra), tmp);
+  x86::Gp rsTemp = newGP64();
+  COMP->mov(rsTemp, GPRPtr(instr.rs));
+  COMP->or_(rsTemp, imm<u64>(instr.uimm16));
+  COMP->mov(GPRPtr(instr.ra), rsTemp);
 }
 
 // OR Immediate Shifted (x'6400 0000')
