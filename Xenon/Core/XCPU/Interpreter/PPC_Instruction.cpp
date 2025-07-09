@@ -63,20 +63,22 @@ namespace PPCInterpreter {
     // Main opcodes (field 0..5)
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
     fillTable<instructionHandlerJIT>(jitTable, 0x00, 6, -1, {
-      { 0x0E, GET(addi) },
-      { 0x12, GET(b) },
-      { 0x15, GETRC(rlwinm) },
-      { 0x17, GETRC(rlwnm) },
-      { 0x18, GET(ori) },
-      { 0x19, GET(oris) },
-      { 0x1A, GET(xori) },
-      { 0x1B, GET(xoris) },
-      { 0x1C, GET(andi) },
+      //{ 0x0E, GET(addi) },
+      //{ 0x12, GET(b) },
+      //{ 0x15, GETRC(rlwinm) },
+      //{ 0x17, GETRC(rlwnm) },
+      //{ 0x18, GET(ori) },
+      //{ 0x19, GET(oris) },
+      //{ 0x1A, GET(xori) },
+      //{ 0x1B, GET(xoris) },
+      //{ 0x1C, GET(andi) },
     });
 
     // Group 0x1F opcodes (field 21..30)
     fillTable<instructionHandlerJIT>(jitTable, 0x1F, 10, 1, {
-      { 0x153, GET(mfspr) },
+      //{ 0x01C, GETRC(and) },
+      //{ 0x0E9, GETRC(mulld) },
+      //{ 0x153, GET(mfspr) },
     });
 #endif // defined ARCH_X86 || ARCH_X86_64
 

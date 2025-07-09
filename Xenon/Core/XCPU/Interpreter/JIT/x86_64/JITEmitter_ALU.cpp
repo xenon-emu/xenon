@@ -33,29 +33,41 @@ void PPCInterpreter::PPCInterpreterJIT_andx(PPU_STATE *ppuState, JITBlockBuilder
   x86::Gp rSTemp = newGP64();
   COMP->mov(rSTemp, GPRPtr(instr.rs));
 
-  // rSTemp & rB
-  COMP->and_(rSTemp, GPRPtr(instr.rb));
+  // rBTemp
+  x86::Gp rBTemp = newGP64();
+  COMP->mov(rBTemp, GPRPtr(instr.rb));
+
+  // rS & rB
+  COMP->and_(rSTemp, rBTemp);
 
   // rA = rSTemp
   COMP->mov(GPRPtr(instr.ra), rSTemp);
+
+  if (instr.rc)
+    J_ppuSetCR0(b, rSTemp);
 }
 
 // Multiply Low Doubleword (x'7C00 01D2')
-void PPCInterpreter::PPCInterpreterJIT_mulld(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_mulldx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
   /*
     prod[0-127] <- (rA) * (rB)
     rD <- prod[64-127]
   */
 
-  // rATemp
   x86::Gp rATemp = newGP64();
-  COMP->mov(rATemp, GPRPtr(instr.ra));
+  x86::Gp rBTemp = newGP64();
 
-  // rATemp * rB
-  COMP->mul(rATemp, GPRPtr(instr.rb));
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+  COMP->mov(rBTemp, GPRPtr(instr.rb));
+
+  // rA * rB
+  COMP->imul(rATemp, rBTemp); // Multiplication is signed.
 
   // rD = rATemp
   COMP->mov(GPRPtr(instr.rd), rATemp);
+
+  if (instr.rc)
+    J_ppuSetCR0(b, rATemp);
 }
 
 // Rotate Left Word Immediate then AND with Mask (x'5400 0000')
@@ -80,7 +92,7 @@ void PPCInterpreter::PPCInterpreterJIT_rlwinmx(PPU_STATE *ppuState, JITBlockBuil
 
   // _rc
   if (instr.rc)
-    J_ppuSetCR_LOGICAL(b, dup, 0);
+    J_ppuSetCR0(b, dup);
 }
 
 // Rotate Left Word then AND with Mask (x'5C00 0000')
@@ -106,7 +118,7 @@ void PPCInterpreter::PPCInterpreterJIT_rlwnmx(PPU_STATE *ppuState, JITBlockBuild
 
   // _rc
   if (instr.rc)
-    J_ppuSetCR(b, dup, 0);
+    J_ppuSetCR0(b, dup);
 }
 
 
@@ -120,7 +132,7 @@ void PPCInterpreter::PPCInterpreterJIT_andi(PPU_STATE *ppuState, JITBlockBuilder
   COMP->and_(res, imm<u16>(instr.uimm16));
   COMP->mov(GPRPtr(instr.ra), res);
 
-  J_ppuSetCR_LOGICAL(b, res, 0);
+  J_ppuSetCR0(b, res);
 }
 
 // XOR (x'7C00 0278')

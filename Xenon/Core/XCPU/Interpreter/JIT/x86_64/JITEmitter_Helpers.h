@@ -84,22 +84,66 @@ inline x86::Gp J_BuildCR(JITBlockBuilder *b, x86::Gp lhs, x86::Gp rhs) {
 #endif
   COMP->shl(tmp, imm(3 - CR_BIT_SO));
   COMP->or_(crValue.r8(), tmp.r8());
-
   return crValue;
 }
 
+// Sets a given CR field using the specified value.
 inline void J_SetCRField(JITBlockBuilder *b, x86::Gp field, u32 index) {
+  // Temp storage for the CR current value.
   x86::Gp tempCR = newGP32();
-
-  u32 sh = (7 - index) * 4; // Shift formula
+  // Shift formula
+  u32 sh = (7 - index) * 4; 
   uint32_t clearMask = ~(0xF << sh);
 
+  // Load CR value to temp storage.
   COMP->mov(tempCR, CRValPtr());
-  COMP->and_(tempCR, clearMask); // Clear field 
-  COMP->shl(field, sh); // Shift field bits to position
-  COMP->or_(tempCR, field); // Apply bits
+  // Clear field to be modified. 
+  COMP->and_(tempCR, clearMask); 
+  // Left shift field bits to position.
+  COMP->shl(field, sh); 
+  // Apply bits.
+  COMP->or_(tempCR, field); 
+  // Store updated value back to CR.
+  COMP->mov(CRValPtr(), tempCR); 
+}
 
-  COMP->mov(CRValPtr(), tempCR); // Store updated value back
+// Performs a comparison between the given input value and zero, and stores it in CR0 field.
+// * Takes into account the current computation mode (MSR[SF]).
+inline void J_ppuSetCR0(JITBlockBuilder* b, x86::Gp inValue) {
+  // Declare labels:
+  Label sfBitMode = COMP->newLabel(); // Determines if the compare is done using 64 bit mode.
+  Label end = COMP->newLabel(); // Self explanatory.
+
+  // Check for MSR[SF]:
+  x86::Gp tempMSR = newGP64(); // MSR is 64 bits wide.
+  COMP->mov(tempMSR, SPRPtr(MSR)); // Get MSR value.
+  COMP->bt(tempMSR, 0); // Check for bit 0 (SF) on MSR.
+  COMP->jc(sfBitMode); // If set, use 64-bit compare. (checks for carry flag from previous operation).
+
+  // 32 Bit mode:
+  {
+    // Set a zero filled 32 bit value for the comaprison.
+    x86::Gp zero32 = newGP32();
+    COMP->xor_(zero32, zero32);
+    // Compare and store in CR0 based on input value and zero filled variable.
+    x86::Gp field = J_BuildCR(b, inValue.r32(), zero32);
+    J_SetCRField(b, field, 0);
+    // Done.
+    COMP->jmp(end);
+  }
+
+  // 64 Bit mode:
+  COMP->bind(sfBitMode);
+  {
+    // Set a zero filled 64 bit value for the comaprison.
+    x86::Gp zero64 = newGP64();
+    COMP->xor_(zero64, zero64);
+    // Compare and store in CR0 based on input value and zero filled variable.
+    x86::Gp field = J_BuildCR(b, inValue.r64(), zero64);
+    J_SetCRField(b, field, 0);
+  }
+  
+  COMP->bind(end);
 }
 
 inline void J_ppuSetCR(JITBlockBuilder *b, x86::Gp value, u32 index) {
@@ -133,33 +177,6 @@ inline void J_ppuSetCR(JITBlockBuilder *b, x86::Gp value, u32 index) {
   }
 
   COMP->bind(done);
-}
-
-inline void J_ppuSetCR_LOGICAL(JITBlockBuilder *b, x86::Gp value, u32 index) {
-  x86::Gp tempCR = newGP32();
-  x86::Gp field = newGP32();
-
-  // Zero compare (logical)
-  Label is_zero = COMP->newLabel();
-  Label done = COMP->newLabel();
-
-  COMP->xor_(field, field); // Clear field
-
-  COMP->test(value, value); // Logical test
-  COMP->jz(is_zero);
-
-  // result != 0: GT = 1
-  COMP->mov(field, imm(1 << (3 - CR_BIT_GT)));
-  COMP->jmp(done);
-
-  COMP->bind(is_zero);
-  // result == 0: EQ = 1
-  COMP->mov(field, imm(1 << (3 - CR_BIT_EQ)));
-
-  COMP->bind(done);
-
-  // Set field in CR
-  J_SetCRField(b, field, index);
 }
 
 #endif
