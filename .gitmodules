@@ -1,29 +1,34 @@
-[submodule "third_party/SDL3"]
+[submodule "Deps/ThirdParty/SDL3"]
 	path = Deps/ThirdParty/SDL3
 	url = https://github.com/libsdl-org/SDL.git
 	shallow = true
-[submodule "third_party/toml11"]
+[submodule "Deps/ThirdParty/toml11"]
 	path = Deps/ThirdParty/toml11
 	url = https://github.com/ToruNiina/toml11.git
 	shallow = true
-[submodule "third_party/fmt"]
+[submodule "Deps/ThirdParty/fmt"]
 	path = Deps/ThirdParty/fmt
 	url = https://github.com/fmtlib/fmt.git
 	shallow = true
-[submodule "third_party/ImGui"]
+[submodule "Deps/ThirdParty/ImGui"]
 	path = Deps/ThirdParty/ImGui
-	url = https://github.com/ocornut/imgui
+	url = https://github.com/ocornut/imgui.git
+	shallow = true
 	branch = docking
-[submodule "third_party/microprofile"]
+[submodule "Deps/ThirdParty/microprofile"]
 	path = Deps/ThirdParty/microprofile
 	url = https://github.com/jonasmr/microprofile.git
+	shallow = true
 	ignore = dirty
 [submodule "Deps/ThirdParty/Sirit"]
 	path = Deps/ThirdParty/Sirit
 	url = https://github.com/Vali0004/sirit.git
+	shallow = true
 [submodule "Deps/ThirdParty/asmjit"]
 	path = Deps/ThirdParty/asmjit
-	url = https://github.com/asmjit/asmjit
+	url = https://github.com/asmjit/asmjit.git
+	shallow = true
 [submodule "Deps/ThirdParty/cryptopp"]
 	path = Deps/ThirdParty/cryptopp
-	url = https://github.com/weidai11/cryptopp
+	url = https://github.com/weidai11/cryptopp.git
+	shallow = true
