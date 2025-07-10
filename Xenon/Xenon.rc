@@ -1,38 +1,35 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
-#include "winresrc.h"
+#include <winres.h>
 
 #define xstr(s) str(s)
 #define str(s) #s
-
-// NEUTRAL LANG
-LANGUAGE LANG_NEUTRAL, SUBLANG_NEUTRAL
 
 // ICON
 IDI_ICON1 ICON "../Deps/Icon/Xenon.ico"
 
 // VERSION
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION    EMULATOR_VERSION_MAJOR, EMULATOR_VERSION_MINOR, EMULATOR_VERSION_PATCH, 0
- PRODUCTVERSION EMULATOR_VERSION_MAJOR, EMULATOR_VERSION_MINOR, EMULATOR_VERSION_PATCH, 0
- FILEFLAGSMASK 0x3fL
- FILEFLAGS 0x0L
- FILEOS 0x40004L
- FILETYPE 0x2L
- FILESUBTYPE 0x0L
+  FILEVERSION     EMULATOR_VERSION_MAJOR, EMULATOR_VERSION_MINOR, EMULATOR_VERSION_PATCH, 0
+  PRODUCTVERSION  EMULATOR_VERSION_MAJOR, EMULATOR_VERSION_MINOR, EMULATOR_VERSION_PATCH, 0
+  FILEFLAGSMASK 0x3fL
+  FILEFLAGS 0x0L
+  FILEOS 0x40004L
+  FILETYPE 0x2L
+  FILESUBTYPE 0x0L
+
 BEGIN
     BLOCK "StringFileInfo"
     BEGIN
         BLOCK "040904b0"
         BEGIN
-            VALUE "CompanyName", "\0"
-            VALUE "FileDescription", "Xenon - Xbox 360 Emulator\0"
-            VALUE "FileVersion", xstr(EMULATOR_VERSION_MAJOR) "." xstr(EMULATOR_VERSION_MINOR) "." xstr(EMULATOR_VERSION_PATCH) ".0\0"
-            VALUE "InternalName", "Xenon\0"
-            VALUE "LegalCopyright", "Copyright 2025 Xenon Team\0"
-            VALUE "OriginalFilename", "Xenon.exe\0"
-            VALUE "ProductName", "Xenon\0"
-            VALUE "ProductVersion", xstr(EMULATOR_VERSION_MAJOR) "." xstr(EMULATOR_VERSION_MINOR) "." xstr(EMULATOR_VERSION_PATCH) ".0\0"
+            VALUE "FileDescription", "Xenon - Xbox 360 Emulator"
+            VALUE "FileVersion", xstr(EMULATOR_VERSION_MAJOR) "." xstr(EMULATOR_VERSION_MINOR) "." xstr(EMULATOR_VERSION_PATCH) ".0"
+            VALUE "InternalName", "Xenon"
+            VALUE "LegalCopyright", "Copyright 2025 Xenon Team"
+            VALUE "OriginalFilename", "Xenon.exe"
+            VALUE "ProductName", "Xenon"
+            VALUE "ProductVersion", xstr(EMULATOR_VERSION_MAJOR) "." xstr(EMULATOR_VERSION_MINOR) "." xstr(EMULATOR_VERSION_PATCH) ".0"
         END
     END
     BLOCK "VarFileInfo"
