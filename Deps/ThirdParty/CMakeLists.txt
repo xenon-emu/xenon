@@ -7,6 +7,7 @@ set_directory_properties(PROPERTIES EXCLUDE_FROM_ALL ON SYSTEM ON)
 # Set CMP0069 policy to "NEW" for building external targets with LTO enabled
 set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
 
+set(ASMJIT_NO_CUSTOM_FLAGS TRUE)
 set(ASMJIT_STATIC TRUE)
 
 # asmjit
