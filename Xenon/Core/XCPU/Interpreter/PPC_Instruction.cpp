@@ -77,9 +77,12 @@ namespace PPCInterpreter {
 
     // Group 0x1F opcodes (field 21..30)
     fillTable<instructionHandlerJIT>(jitTable, 0x1F, 10, 1, {
+      //{ 0x01B, GETRC(sld) },
       { 0x01C, GETRC(and) },
       { 0x03A, GETRC(cntlzd) },
+      { 0x03C, GETRC(andc) },
       //{ 0x0E9, GETRC(mulld) },
+      { 0x10A, GETRC(add) },
       { 0x13C, GETRC(xor) },
       //{ 0x153, GET(mfspr) },
       { 0x1BC, GETRC(or ) },
