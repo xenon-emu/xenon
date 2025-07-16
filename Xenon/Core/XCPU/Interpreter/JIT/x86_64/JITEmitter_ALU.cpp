@@ -130,6 +130,32 @@ void PPCInterpreter::PPCInterpreterJIT_mulldx(PPU_STATE *ppuState, JITBlockBuild
     J_ppuSetCR0(b, rATemp);
 }
 
+// NAND
+void PPCInterpreter::PPCInterpreterJIT_nandx(PPU_STATE *ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+    rA <- ~((rS) & (rB))
+  */
+
+  x86::Gp rSTemp = newGP64();
+  x86::Gp rBTemp = newGP64();
+
+  COMP->mov(rSTemp, GPRPtr(instr.rs));
+  COMP->mov(rBTemp, GPRPtr(instr.ra));
+
+  // rS & rB
+  COMP->and_(rSTemp, rBTemp);
+
+  // ~rS
+  COMP->not_(rSTemp);
+
+  // rD = rSTemp
+  COMP->mov(GPRPtr(instr.rd), rSTemp);
+
+  // _rc
+  if (instr.rc)
+    J_ppuSetCR0(b, rSTemp);
+}
+
 // Rotate Left Word Immediate then AND with Mask (x'5400 0000')
 void PPCInterpreter::PPCInterpreterJIT_rlwinmx(PPU_STATE *ppuState, JITBlockBuilder* b, PPCOpcode instr) {
   /*
