@@ -172,6 +172,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
       compiler.mov(jitBuilder->threadCtx->array(&PPU_THREAD_REGISTERS::GPR).Ptr(reg), temp);
     };
     switch (thread.CIA) {
+    case 0x80081830: skip = true; break;
     case 0x0200C870: patchGPR(5, 0); break;
     // RGH 2 17489 in a JRunner Corona XDKBuild
     case 0x0200C7F0: patchGPR(3, 0); break;

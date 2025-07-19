@@ -11,25 +11,28 @@ if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 
+project(Xenon)
+
+set(COMPILER ${CMAKE_CXX_COMPILER_ID})
+message(STATUS "Using ${COMPILER} Version ${CMAKE_CXX_COMPILER_VERSION}")
+
 # Set compiler ID
-if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-  set(msvc TRUE)
-elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-  set(gcc TRUE)
-elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  set(clang TRUE)
+if (COMPILER STREQUAL "MSVC")
+  set(msvc ON)
+elseif (COMPILER STREQUAL "GNU")
+  set(GCC ON)
+elseif (COMPILER STREQUAL "Clang")
+  set(Clang ON)
 endif()
 
 # Optimizations
-set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
-if (msvc)
-  add_compile_options($<$<CONFIG:Release>:/Oi>)
-  add_compile_options($<$<CONFIG:Release>:/Ot>)
-elseif (CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo")
-  add_link_options(-O3)
+if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
+  set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+  if (MSVC)
+    add_compile_options($<$<CONFIG:Release>:/Oi>)
+    add_compile_options($<$<CONFIG:Release>:/Ot>)
+  endif()
 endif()
-
-project(Xenon)
 
 # Options
 option(GFX_ENABLED "Enable graphics" ON)
@@ -62,24 +65,16 @@ if (NOT "${COMMIT_COUNT}" STREQUAL "" AND NOT "${BRANCH}" STREQUAL "")
   add_compile_definitions(COMMIT_COUNT="${COMMIT_COUNT}")
   if (NOT "${BRANCH}" STREQUAL "main")
     add_compile_definitions(BRANCH="${BRANCH}")
-    message(STATUS "Title: Xenon Experimental ${EMULATOR_VERSION_MAJOR}.${EMULATOR_VERSION_MINOR}.${EMULATOR_VERSION_PATCH}-${COMMIT_COUNT} - ${BRANCH}")
+    message(STATUS "Building: Xenon Experimental ${EMULATOR_VERSION_MAJOR}.${EMULATOR_VERSION_MINOR}.${EMULATOR_VERSION_PATCH}-${COMMIT_COUNT} - ${BRANCH}")
   else()
-    message(STATUS "Title: Xenon Experimental ${EMULATOR_VERSION_MAJOR}.${EMULATOR_VERSION_MINOR}.${EMULATOR_VERSION_PATCH}-${COMMIT_COUNT}")
+    message(STATUS "Building: Xenon Experimental ${EMULATOR_VERSION_MAJOR}.${EMULATOR_VERSION_MINOR}.${EMULATOR_VERSION_PATCH}-${COMMIT_COUNT}")
   endif()
 endif()
 
-# Make microprofile use a custom config
-add_compile_definitions(MICROPROFILE_USE_CONFIG)
-
 # Enable SSE3
-if (gcc)
-  target_compile_options(Xenon PRIVATE -msse2)
-  target_compile_options(Xenon PRIVATE -mssse3)
-elseif (msvc)
-  target_compile_options(Xenon PRIVATE /arch:SSE2)
-endif()
-
-if (WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+if (msvc)
+  add_compile_options(/arch:SSE2)
+elseif (NOT APPLE)
   add_compile_options(-mssse3)
 endif()
 
@@ -120,6 +115,7 @@ endif()
 
 file(GLOB_RECURSE include Xenon/include/*.cpp Xenon/include/*.h)
 
+add_compile_definitions(MICROPROFILE_USE_CONFIG)
 set(microprofile_dir Deps/ThirdParty/microprofile)
 file(GLOB microprofile ${microprofile_dir}/*.cpp ${microprofile_dir}/*.h)
 
@@ -140,7 +136,7 @@ else()
   add_compile_definitions(NO_GFX)
 endif()
 
-if (CMAKE_BUILD_TYPE STREQUAL "RelWithDebInfo" OR "Debug")
+if (NOT CMAKE_BUILD_TYPE STREQUAL "Release")
   add_compile_definitions(DEBUG_BUILD)
 endif()
 
@@ -156,7 +152,7 @@ if (GFX_ENABLED)
     target_include_directories(Xenon PRIVATE ${ImGuiDir})
 endif()
 
-# Add defines specific to windows
+# Add defines specific to Windows
 if (WIN32)
   target_link_libraries(Xenon PRIVATE ws2_32)
   add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
@@ -168,11 +164,9 @@ if (WIN32)
   target_sources(Xenon PRIVATE Xenon/Xenon.rc)
 endif()
 
-
 # Specific to MSVC, forces system version so the autodetected 8.1 SDK isn't used
 # Also enables multi-processor (multithreaded) compiling on MSVC
-if (msvc AND NOT clang)
+if (CMAKE_GENERATOR MATCHES "Visual Studio")
   set(CMAKE_GENERATOR_PLATFORM x64)
-  set(CMAKE_SYSTEM_VERSION 10.0.19041.0)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
 endif()

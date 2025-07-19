@@ -3,6 +3,21 @@
 #include "JITEmitter_Helpers.h"
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
+
+// Add (x'7C00 0214')
+void PPCInterpreter::PPCInterpreterJIT_addx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr){
+  /*
+  rD <- (rA) + (rB)
+  */
+
+  x86::Gp rATemp = newGP64();
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+  COMP->add(rATemp, GPRPtr(instr.rb));
+  COMP->mov(GPRPtr(instr.rd), rATemp);
+
+  if (instr.rc)
+    J_ppuSetCR0(b, rATemp);
+}
 // Add Immediate (x'3800 0000')
 void PPCInterpreter::PPCInterpreterJIT_addi(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
   /*
@@ -33,29 +48,86 @@ void PPCInterpreter::PPCInterpreterJIT_andx(PPU_STATE *ppuState, JITBlockBuilder
   x86::Gp rSTemp = newGP64();
   COMP->mov(rSTemp, GPRPtr(instr.rs));
 
-  // rSTemp & rB
+  // rS & rB
   COMP->and_(rSTemp, GPRPtr(instr.rb));
 
   // rA = rSTemp
   COMP->mov(GPRPtr(instr.ra), rSTemp);
+
+  if (instr.rc)
+    J_ppuSetCR0(b, rSTemp);
+}
+
+// AND with Complement (x'7C00 0078')
+void PPCInterpreter::PPCInterpreterJIT_andcx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+  rA <- (rS) + ~(rB)
+  */
+
+  x86::Gp rBTemp = newGP64();
+  COMP->mov(rBTemp, GPRPtr(instr.rb));
+  COMP->not_(rBTemp);
+  // rS & rB
+  COMP->and_(rBTemp, GPRPtr(instr.rs));
+
+  // rA = rSTemp
+  COMP->mov(GPRPtr(instr.ra), rBTemp);
+
+  if (instr.rc)
+    J_ppuSetCR0(b, rBTemp);
+}
+
+// And Immediate (x'7000 0000')
+void PPCInterpreter::PPCInterpreterJIT_andi(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+    rA <- (rS) & ((48)0 || UIMM)
+  */
+  x86::Gp res = newGP64();
+  COMP->mov(res, GPRPtr(instr.rs));
+  COMP->and_(res, imm<u16>(instr.uimm16));
+  COMP->mov(GPRPtr(instr.ra), res);
+
+  J_ppuSetCR0(b, res);
+}
+
+// And Immediate Shifted (x'7400 0000')
+void PPCInterpreter::PPCInterpreterJIT_andis(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+  rA <- (rS) + ((32)0 || UIMM || (16)0)
+  */
+
+  x86::Gp rsTemp = newGP64();
+  COMP->mov(rsTemp, GPRPtr(instr.rs));
+  x86::Gp sh = newGP64();
+  u64 shImm = (u64{ instr.uimm16 } << 16);
+  COMP->mov(sh, shImm);
+  COMP->and_(rsTemp, sh);
+  COMP->mov(GPRPtr(instr.ra), rsTemp);
+
+  J_ppuSetCR0(b, rsTemp);
 }
 
 // Multiply Low Doubleword (x'7C00 01D2')
-void PPCInterpreter::PPCInterpreterJIT_mulld(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_mulldx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
   /*
     prod[0-127] <- (rA) * (rB)
     rD <- prod[64-127]
   */
 
-  // rATemp
   x86::Gp rATemp = newGP64();
-  COMP->mov(rATemp, GPRPtr(instr.ra));
+  x86::Gp rBTemp = newGP64();
 
-  // rATemp * rB
-  COMP->mul(rATemp, GPRPtr(instr.rb));
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+  COMP->mov(rBTemp, GPRPtr(instr.rb));
+
+  // rA * rB
+  COMP->imul(rATemp, rBTemp); // Multiplication is signed.
 
   // rD = rATemp
   COMP->mov(GPRPtr(instr.rd), rATemp);
+
+  if (instr.rc)
+    J_ppuSetCR0(b, rATemp);
 }
 
 // Rotate Left Word Immediate then AND with Mask (x'5400 0000')
@@ -80,7 +152,50 @@ void PPCInterpreter::PPCInterpreterJIT_rlwinmx(PPU_STATE *ppuState, JITBlockBuil
 
   // _rc
   if (instr.rc)
-    J_ppuSetCR_LOGICAL(b, dup, 0);
+    J_ppuSetCR0(b, dup);
+}
+
+// Shift Left Double Word (x'7C00 0036') STUB
+void PPCInterpreter::PPCInterpreterJIT_sldx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+  n <- rB[58-63]
+  r <- ROTL[64](rS, n)
+  if rB[57] = 0 then
+    m <- MASK(0, 63 - n)
+  else m <- (64)0
+  rA <- r & m
+  */
+
+  Label zero = COMP->newLabel();
+  Label end = COMP->newLabel();
+
+  // Shift amount:
+  x86::Gp n = newGP32();
+  COMP->mov(n, GPRPtr(instr.rb));
+  COMP->and_(n, imm(0x7F));
+
+  // Return value.
+  x86::Gp rsTemp = newGP64();
+
+  // Condition check.
+  COMP->bt(n, 0x40);
+  COMP->jnc(zero);
+
+  // Do the shift.
+  COMP->mov(rsTemp, GPRPtr(instr.rs));
+  COMP->shl(rsTemp, n);
+  COMP->jmp(end);
+
+  // Clear out the return value.
+  COMP->bind(zero);
+  COMP->xor_(rsTemp, rsTemp);
+
+  COMP->bind(end);
+  COMP->mov(GPRPtr(instr.ra), rsTemp);
+
+  // RC
+  if (instr.rc)
+    J_ppuSetCR0(b, rsTemp);
 }
 
 // Rotate Left Word then AND with Mask (x'5C00 0000')
@@ -106,25 +221,11 @@ void PPCInterpreter::PPCInterpreterJIT_rlwnmx(PPU_STATE *ppuState, JITBlockBuild
 
   // _rc
   if (instr.rc)
-    J_ppuSetCR(b, dup, 0);
-}
-
-
-// And Immediate (x'7000 0000')
-void PPCInterpreter::PPCInterpreterJIT_andi(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
-  /*
-    rA <- (rS) & ((48)0 || UIMM)
-  */
-  x86::Gp res = newGP64();
-  COMP->mov(res, GPRPtr(instr.rs)); 
-  COMP->and_(res, imm<u16>(instr.uimm16));
-  COMP->mov(GPRPtr(instr.ra), res);
-
-  J_ppuSetCR_LOGICAL(b, res, 0);
+    J_ppuSetCR0(b, dup);
 }
 
 // XOR (x'7C00 0278')
-void PPCInterpreter::PPCInterpreterJIT_xor(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_xorx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
   /*
     rA <- (rS) ^ (rB)
   */
@@ -138,38 +239,38 @@ void PPCInterpreter::PPCInterpreterJIT_xor(PPU_STATE* ppuState, JITBlockBuilder*
 
   // rA = rSTemp
   COMP->mov(GPRPtr(instr.ra), rSTemp);
+
+  if (instr.rc)
+    J_ppuSetCR0(b, rSTemp);
 }
 
 // XOR Immediate (x'6800 0000')
-void PPCInterpreter::PPCInterpreterJIT_xori(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode t_instr) {
+void PPCInterpreter::PPCInterpreterJIT_xori(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
   /*
     rA <- (rS) ^ ((4816)0 || UIMM)
   */
-  x86::Gp tmp = newGP64();
-  x86::Gp val1 = newGP64();
-  u64 shImm = (u64{ t_instr.uimm16 });
-  COMP->mov(tmp, GPRPtr(t_instr.rs));
-  COMP->mov(val1, shImm);
-  COMP->xor_(tmp, val1);
-  COMP->mov(GPRPtr(t_instr.ra), tmp);
+  x86::Gp rsTemp = newGP64();
+  COMP->mov(rsTemp, GPRPtr(instr.rs));
+  COMP->xor_(rsTemp, imm<u64>(instr.uimm16));
+  COMP->mov(GPRPtr(instr.ra), rsTemp);
 }
 
 // XOR Immediate Shifted (x'6C00 0000')
-void PPCInterpreter::PPCInterpreterJIT_xoris(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode t_instr) {
+void PPCInterpreter::PPCInterpreterJIT_xoris(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
   /*
     rA <- (rS) | ((32)0 || UIMM || (16)0)
   */
   x86::Gp tmp = newGP64();
   x86::Gp val1 = newGP64();
-  u64 shImm = (u64{ t_instr.uimm16 } << 16);
-  COMP->mov(tmp, GPRPtr(t_instr.rs));
+  u64 shImm = (u64{ instr.uimm16 } << 16);
+  COMP->mov(tmp, GPRPtr(instr.rs));
   COMP->mov(val1, shImm);
   COMP->xor_(tmp, val1);
-  COMP->mov(GPRPtr(t_instr.ra), tmp);
+  COMP->mov(GPRPtr(instr.ra), tmp);
 }
 
 // OR (x'7C00 0378')
-void PPCInterpreter::PPCInterpreterJIT_or(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_orx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
   /*
     rA <- (rS) | (rB)
   */
@@ -183,20 +284,20 @@ void PPCInterpreter::PPCInterpreterJIT_or(PPU_STATE* ppuState, JITBlockBuilder* 
 
   // rA = rSTemp
   COMP->mov(GPRPtr(instr.ra), rSTemp);
+
+  if (instr.rc)
+    J_ppuSetCR0(b, rSTemp);
 }
 
 // OR Immediate (x'6000 0000')
-void PPCInterpreter::PPCInterpreterJIT_ori(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode t_instr) {
+void PPCInterpreter::PPCInterpreterJIT_ori(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
   /*
     rA <- (rS) | ((4816)0 || UIMM)
   */
-  x86::Gp tmp = newGP64();
-  x86::Gp val1 = newGP64();
-  u64 shImm = (u64{ t_instr.uimm16 });
-  COMP->mov(tmp, GPRPtr(t_instr.rs));
-  COMP->mov(val1, shImm);
-  COMP->or_(tmp, val1);
-  COMP->mov(GPRPtr(t_instr.ra), tmp);
+  x86::Gp rsTemp = newGP64();
+  COMP->mov(rsTemp, GPRPtr(instr.rs));
+  COMP->or_(rsTemp, imm<u64>(instr.uimm16));
+  COMP->mov(GPRPtr(instr.ra), rsTemp);
 }
 
 // OR Immediate Shifted (x'6400 0000')
@@ -211,5 +312,23 @@ void PPCInterpreter::PPCInterpreterJIT_oris(PPU_STATE *ppuState, JITBlockBuilder
   COMP->mov(val1, shImm);
   COMP->or_(tmp, val1);
   COMP->mov(GPRPtr(instr.ra), tmp);
+}
+
+// Count Leading Zeros Double Word (x'7C00 0074')
+void PPCInterpreter::PPCInterpreterJIT_cntlzdx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+  n <- 0
+  do while n < 64
+    if rS[n] = 1 then leave
+    n <- n + 1
+  rA <- n
+  */
+  x86::Gp tmp = newGP64();
+  COMP->lzcnt(tmp, GPRPtr(instr.rs));
+  COMP->mov(GPRPtr(instr.ra), tmp);
+
+  // RC
+  if (instr.rc)
+    J_ppuSetCR0(b, tmp);
 }
 #endif
