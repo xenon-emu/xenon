@@ -11,9 +11,9 @@ void ListStatement::Visit(Visitor &visitor) const {
   statementB->Visit(visitor);
 }
 
-void ListStatement::EmitShaderCode(ShaderCodeWriterBase &writer) {
-  statementA->EmitShaderCode(writer);
-  statementB->EmitShaderCode(writer);
+void ListStatement::EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) {
+  statementA->EmitShaderCode(writer, shader);
+  statementB->EmitShaderCode(writer, shader);
 }
 
 void ConditionalStatement::Visit(Visitor &visitor) const {
@@ -22,13 +22,13 @@ void ConditionalStatement::Visit(Visitor &visitor) const {
   visitor.OnConditionPop();
 }
 
-void ConditionalStatement::EmitShaderCode(ShaderCodeWriterBase &writer) {
+void ConditionalStatement::EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) {
   if (condition) {
-    Chunk cond = writer.AllocLocalBool(condition->EmitShaderCode(writer));
+    Chunk cond = writer.AllocLocalBool(condition->EmitShaderCode(writer, shader));
     writer.BeingCondition(cond);
   }
 
-  statement->EmitShaderCode(writer);
+  statement->EmitShaderCode(writer, shader);
 
   if (condition) {
     writer.EndCondition();
@@ -38,8 +38,8 @@ void ConditionalStatement::EmitShaderCode(ShaderCodeWriterBase &writer) {
 void SetPredicateStatement::Visit(Visitor &visitor) const
 {}
 
-void SetPredicateStatement::EmitShaderCode(ShaderCodeWriterBase &writer) {
-  Chunk value = expression->EmitShaderCode(writer);
+void SetPredicateStatement::EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) {
+  Chunk value = expression->EmitShaderCode(writer, shader);
   LOG_DEBUG(Xenos, "[AST::Sirit] SetPredicateStatement::EmitShaderCode({})", value.id.value);
   writer.SetPredicate(value);
 }
@@ -48,9 +48,9 @@ void WriteWithMaskStatement::Visit(Visitor &visitor) const {
   visitor.OnWrite(target, source, mask);
 }
 
-void WriteWithMaskStatement::EmitShaderCode(ShaderCodeWriterBase &writer) {
+void WriteWithMaskStatement::EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) {
   // evaluate destination register
-  Chunk destChunk = target->EmitShaderCode(writer);
+  Chunk destChunk = target->EmitShaderCode(writer, shader);
 
   // Check if we have any values copied from source
   std::array<eSwizzle, 4> src = {}, dest = {};
@@ -81,7 +81,7 @@ void WriteWithMaskStatement::EmitShaderCode(ShaderCodeWriterBase &writer) {
   // Nothing to output
   if (!numSpecialChannels && !numSourceSwizzles) {
     // We still need to evaluate the source
-    Chunk src = source->EmitShaderCode(writer);
+    Chunk src = source->EmitShaderCode(writer, shader);
     writer.Emit(src);
     return;
   }
@@ -89,8 +89,8 @@ void WriteWithMaskStatement::EmitShaderCode(ShaderCodeWriterBase &writer) {
   if (numSourceSwizzles > 0) {
     std::span<const eSwizzle> dstSpan(dest.data(), numSourceSwizzles);
     std::span<const eSwizzle> srcSpan(src.data(), numSourceSwizzles);
-    Chunk src = source->EmitShaderCode(writer);
-    Chunk dst = target->EmitShaderCode(writer);
+    Chunk src = source->EmitShaderCode(writer, shader);
+    Chunk dst = target->EmitShaderCode(writer, shader);
     LOG_DEBUG(Xenos, "[AST::WriteWithMaskStatement::Masked]: {} -> {}", source->GetName(), target->GetName());
     writer.AssignMasked(src, dst, dstSpan, srcSpan);
   }
@@ -108,7 +108,7 @@ void WriteWithMaskStatement::EmitShaderCode(ShaderCodeWriterBase &writer) {
       }
     }
 
-    Chunk dst = target->EmitShaderCode(writer);
+    Chunk dst = target->EmitShaderCode(writer, shader);
     LOG_DEBUG(Xenos, "[WriteWithMaskStatement::Immediate]: {}", target->GetName());
     writer.AssignImmediate(dst,
                            std::span(destImmediateSwizzle.data(), index),

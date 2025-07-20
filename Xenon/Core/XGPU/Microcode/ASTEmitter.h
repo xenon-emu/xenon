@@ -19,7 +19,13 @@ public:
   virtual void BeginMain() = 0;
   virtual void EndMain() = 0;
   virtual Chunk GetExportDest(const eExportReg reg) = 0;
+  // TODO(chelseab): This GetReg function should be deprecated.
+  // Register access should be explicit about the type (temp, constant, input).
   virtual Chunk GetReg(u32 regIndex) = 0;
+  virtual Chunk GetTemporaryReg(u32 regIndex) = 0;
+  virtual Chunk GetConstantReg(u32 regIndex) = 0;
+  virtual Chunk GetVertexInputReg(u32 regIndex) = 0;
+  virtual Chunk GetPixelInputReg(u32 regIndex) = 0; // Maps to interpolated values from VS
   virtual Chunk GetBoolVal(const u32 boolRegIndex) = 0;
   virtual Chunk GetFloatVal(const u32 floatRegIndex) = 0;
   virtual Chunk GetFloatValRelative(const u32 floatRegOffset) = 0;
@@ -31,7 +37,7 @@ public:
   virtual Chunk Saturate(const Chunk &value) = 0;
   virtual Chunk Swizzle(const Chunk &value, std::array<eSwizzle, 4> swizzle) = 0;
 
-  virtual Chunk FetchVertex(const Chunk &src, const VertexFetch &instr) = 0;
+  virtual Chunk FetchVertex(const Chunk &src, const VertexFetch &instr, const Shader *shader) = 0;
   virtual Chunk FetchTexture(const Chunk &src, const TextureFetch &instr) = 0;
 
   virtual Chunk VectorFunc1(instr_vector_opc_t instr, const Chunk &a) = 0;
@@ -99,7 +105,11 @@ public:
   void EndMain() override;
 
   Chunk GetExportDest(const eExportReg reg) override;
-  Chunk GetReg(u32 regIndex) override;
+  Chunk GetReg(u32 regIndex) override; // Deprecated, see comment in ShaderCodeWriterBase
+  Chunk GetTemporaryReg(u32 regIndex) override;
+  Chunk GetConstantReg(u32 regIndex) override;
+  Chunk GetVertexInputReg(u32 regIndex) override;
+  Chunk GetPixelInputReg(u32 regIndex) override;
   Chunk GetBoolVal(const u32 boolRegIndex) override;
   Chunk GetFloatVal(const u32 floatRegIndex) override;
   Chunk GetFloatValRelative(const u32 floatRegOffset) override;
@@ -113,7 +123,7 @@ public:
 
   Sirit::Id GetSampledImageType(instr_dimension_t dim);
 
-  Chunk FetchVertex(const Chunk &src, const VertexFetch &instr) override;
+  Chunk FetchVertex(const Chunk &src, const VertexFetch &instr, const Shader *shader) override;
   Chunk FetchTexture(const Chunk &src, const TextureFetch &instr) override;
 
   Chunk VectorFunc1(instr_vector_opc_t instr, const Chunk &a) override;
@@ -122,7 +132,7 @@ public:
 
   Chunk ScalarFunc0(instr_scalar_opc_t instr) override;
   Chunk ScalarFunc1(instr_scalar_opc_t instr, const Chunk &a) override;
-  Chunk ScalarFunc2(instr_scalar_opc_t instr, const Chunk &a, const Chunk &b) override; 
+  Chunk ScalarFunc2(instr_scalar_opc_t instr, const Chunk &a, const Chunk &b) override;  
 
   Chunk AllocLocalImpl(Sirit::Id type, const Chunk &initCode);
 
@@ -167,7 +177,7 @@ public:
 
   std::unordered_map<u32, Sirit::Id> temp_regs{};
   std::unordered_map<u32, Sirit::Id> vertex_input_vars{};
-  std::unordered_map<std::string, Sirit::Id> input_vars{};
+  std::unordered_map<u32, Sirit::Id> input_vars{}; // Changed to u32 for Location mapping
   std::unordered_map<eExportReg, Sirit::Id> output_vars{};
 
   Sirit::Id main_func = { 0 };
@@ -198,6 +208,29 @@ private:
   Sirit::Id current_block_label = { 0 };
   Sirit::Id next_block_label = { 0 };
   std::unordered_map<u32, Sirit::Id> address_to_label = {};
+
+  // Helper to get export semantic index, typically from ASTNode.cpp
+  // Copied here for completeness, but ideally should be part of a shared utility
+  s32 GetExportSemanticIndex(const eExportReg reg) {
+    switch (reg) {
+    case eExportReg::POSITION: return 0;
+    case eExportReg::POINTSIZE: return 1;
+    case eExportReg::COLOR0: return 2;
+    case eExportReg::COLOR1: return 3;
+    case eExportReg::COLOR2: return 4;
+    case eExportReg::COLOR3: return 5;
+    case eExportReg::INTERP0: return 6;
+    case eExportReg::INTERP1: return 7;
+    case eExportReg::INTERP2: return 8;
+    case eExportReg::INTERP3: return 9;
+    case eExportReg::INTERP4: return 10;
+    case eExportReg::INTERP5: return 11;
+    case eExportReg::INTERP6: return 12;
+    case eExportReg::INTERP7: return 13;
+    // INTERP8 could be 14 if needed, but GPU_INTERPOLATORS is 16.
+    default: return -1;
+    }
+  }
 };
 #endif
 

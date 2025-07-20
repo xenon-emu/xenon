@@ -452,19 +452,35 @@ void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
         xeShader.textures.push_back(resourceFactory->CreateTexture());
       for (u64 i = 0; i != xeShader.vertexShader->usedTextures.size(); ++i)
         xeShader.textures.push_back(resourceFactory->CreateTexture());
-      for (auto& texture : xeShader.textures)
+      for (auto &texture : xeShader.textures)
         texture->CreateTextureHandle(width, height, GetXenosFlags());
 
       if (xeShader.vertexShader) {
-        for (const auto *fetch : xeShader.vertexShader->vertexFetches) {
+        // Bind VAO once for this shader program's attributes setup.
+        // Assuming OnBind creates/binds an appropriate VAO for the current context/shader.
+        OnBind();
+
+        for (const auto &[fetch_key, location] : xeShader.vertexShader->attributeLocationMap) {
+          // Find the original full fetch definition from the shader's list
+          const Xe::Microcode::AST::VertexFetch *fetch = nullptr;
+          for (const auto *f : xeShader.vertexShader->vertexFetches) {
+            if (f->fetchSlot == fetch_key.slot && f->fetchOffset == fetch_key.offset && f->fetchStride == fetch_key.stride) {
+              fetch = f;
+              break;
+            }
+          }
+          if (!fetch)
+            continue;
+
           u32 fetchSlot = fetch->fetchSlot;
           u32 regBase = static_cast<u32>(XeRegister::SHADER_CONSTANT_FETCH_00_0) + fetchSlot * 2;
 
           Xe::ShaderConstantFetch fetchData{};
           for (u32 i = 0; i != 6; ++i)
             fetchData.rawHex[i] = byteswap_be<u32>(XeMain::xenos->xenosState->ReadRegister(static_cast<XeRegister>(regBase + i)));
+
           if (fetchData.Vertex[0].Type == Xe::eConstType::Texture) {
-            // I don't want to fucking deal with this right now
+              // Texture fetches for vertex shaders are currently skipped as per original code.
             continue;
           } else if (fetchData.Vertex[0].Type == Xe::eConstType::Vertex) {
             u32 fetchAddress = fetchData.Vertex[0].BaseAddress << 2;
@@ -476,69 +492,60 @@ void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
               continue;
             }
 
-            std::vector<f32> dataVec{};
-            dataVec.resize(fetchSize);
+            // Prepare data for OpenGL: byteswap and copy to a float vector
+            std::vector<f32> dataVec(fetchSize / sizeof(f32)); // Resize based on number of floats
             memcpy(dataVec.data(), data, fetchSize);
-            for (auto &v : dataVec) {
-              v = std::bit_cast<f32>(byteswap_be(std::bit_cast<u32>(v)));
+            for (u32 i = 0; i < dataVec.size(); ++i) {
+              dataVec[i] = std::bit_cast<f32>(byteswap_be(std::bit_cast<u32>(dataVec[i])));
             }
 
-            std::shared_ptr<Buffer> buffer = {};
-            u32 hash = "VertexFetch"_jLower;
-            if (auto it = createdBuffers.find(hash); it != createdBuffers.end()) {
-              // Update existing buffer
+            // Use a unique key for the buffer based on its memory address and size.
+            // This allows for proper caching and updates of specific vertex buffers.
+            u64 bufferKey = (static_cast<u64>(fetchAddress) << 32) | fetchSize;
+
+            std::shared_ptr<Buffer> buffer = nullptr;
+            auto it = createdBuffers.find(bufferKey);
+            if (it != createdBuffers.end()) {
               buffer = it->second;
-              if (buffer->GetSize() > fetchSize) {
-                buffer->UpdateBuffer(0, static_cast<u32>(fetchSize), dataVec.data());
-              } else {
+              if (buffer->GetSize() < fetchSize) {
+                  // Existing buffer is too small, destroy and recreate
                 buffer->DestroyBuffer();
                 buffer->CreateBuffer(static_cast<u32>(fetchSize), dataVec.data(), Render::eBufferUsage::StaticDraw, Render::eBufferType::Vertex);
+              } else {
+                  // Existing buffer is large enough, just update its content
+                buffer->UpdateBuffer(0, static_cast<u32>(fetchSize), dataVec.data());
               }
             } else {
-              // Create new buffer
+              // Create a new buffer
               buffer = resourceFactory->CreateBuffer();
               buffer->CreateBuffer(static_cast<u32>(fetchSize), dataVec.data(), Render::eBufferUsage::StaticDraw, Render::eBufferType::Vertex);
-              createdBuffers.insert({ hash, buffer });
+              createdBuffers.insert({ bufferKey, buffer });
             }
 
-            // Bind the buffer
+            // Bind the buffer to the current VAO for attribute setup
             buffer->Bind();
 
-            // Bind VAO
-            OnBind();
+            // Setup vertex attributes for this fetch.
+            // `GetComponentCount()` gives the number of components (1-4).
+            // `fetchOffset` and `fetchStride` are in DWords (4 bytes), so multiply by 4 for byte offsets/strides.
+            const u32 components = fetch->GetComponentCount();
+            const u32 type = fetch->isFloat?GL_FLOAT:GL_UNSIGNED_INT;
+            const u8 normalized = fetch->isNormalized?GL_TRUE:GL_FALSE;
+            const u32 offset = fetch->fetchOffset * 4;
+            const u32 stride = fetch->fetchStride * 4;
 
-            // Setup attribs
-            if (xeShader.vertexShader) {
-              // Base location for attributes (start at 0)
-              u32 baseLocation = 0;
-
-              for (const auto *fetch : xeShader.vertexShader->vertexFetches) {
-                // Instead of fetchSlot - 95, assign location based on offset divided by size of component (usually 4 bytes)
-                // This assumes fetchOffset is byte offset inside vertex data
-                // And that components are tightly packed
-                const u32 components = fetch->GetComponentCount(); // 1-4
-                const u32 typeSize = fetch->isFloat ? sizeof(f32) : sizeof(u32); // usually 4
-                const u32 location = baseLocation++;  // Assign consecutive locations starting at 0
-                const u32 type = fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT;
-                const u8 normalized = fetch->isNormalized ? GL_TRUE : GL_FALSE;
-                const u32 offset = fetch->fetchOffset * 4;
-                const u32 stride = fetch->fetchStride * 4;
-
-                if (location <= 32) {
-                  glEnableVertexAttribArray(location);
-                  glVertexAttribPointer(
-                    location,
-                    components,
-                    type,
-                    normalized,
-                    stride,
-                    reinterpret_cast<void *>((uintptr_t)offset)
-                  );
-                }
-              }
+            // Assign consecutive attribute locations starting from `currentAttributeLocation`.
+            if (location <= 32) { // Check against a reasonable maximum for vertex attributes
+              glEnableVertexAttribArray(location);
+              glVertexAttribPointer(
+                location,
+                components,
+                type,
+                normalized,
+                stride,
+                reinterpret_cast<void *>((uintptr_t)offset)
+              );
             }
-
-            //LOG_DEBUG(Xenos, "Uploaded vertex fetch buffer: slot={}, addr=0x{:X}, size={} bytes, regBase: 0x{:X}", fetchSlot, fetchAddress, fetchSize, regBase);
           }
         }
       }
