@@ -129,6 +129,7 @@ void PPCInterpreter::ppcResetException(PPU_STATE *ppuState) {
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & (QMASK(0, 32) | QMASK(37, 41) | QMASK(48, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | (QMASK(0, 0) | QMASK(3, 3));
+  // We can't just ignore this, have it die if it's nullptr
   thread.NIA = 0x100;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
@@ -142,7 +143,8 @@ void PPCInterpreter::ppcDataStorageException(PPU_STATE *ppuState) {
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & (QMASK(0, 32) | QMASK(37, 41) | QMASK(48, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | (QMASK(0, 0) | QMASK(3, 3));
-  thread.NIA = 0x300;
+  if (MMURead8(ppuState, 0x300) != 0x00)
+    thread.NIA = 0x300;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
@@ -155,7 +157,8 @@ void PPCInterpreter::ppcDataSegmentException(PPU_STATE *ppuState) {
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & (QMASK(0, 32) | QMASK(37, 41) | QMASK(48, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | (QMASK(0, 0) | QMASK(3, 3));
-  thread.NIA = 0x380;
+  if (MMURead8(ppuState, 0x380) != 0x00)
+    thread.NIA = 0x380;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
@@ -169,7 +172,8 @@ void PPCInterpreter::ppcInstStorageException(PPU_STATE *ppuState) {
   thread.SPR.SRR1 |= QMASK(33, 33);
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | (QMASK(0, 0) | QMASK(3, 3));
-  thread.NIA = 0x400;
+  if (MMURead8(ppuState, 0x400) != 0x00)
+    thread.NIA = 0x400;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
@@ -182,7 +186,8 @@ void PPCInterpreter::ppcInstSegmentException(PPU_STATE *ppuState) {
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & (QMASK(0, 32) | QMASK(37, 41) | QMASK(48, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | (QMASK(0, 0) | QMASK(3, 3));
-  thread.NIA = 0x480;
+  if (MMURead8(ppuState, 0x480) != 0x00)
+    thread.NIA = 0x480;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
@@ -195,7 +200,8 @@ void PPCInterpreter::ppcExternalException(PPU_STATE *ppuState) {
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & (QMASK(0, 32) | QMASK(37, 41) | QMASK(48, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | (QMASK(0, 0) | QMASK(3, 3));
-  thread.NIA = 0x500;
+  if (MMURead8(ppuState, 0x500) != 0x00)
+    thread.NIA = 0x500;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
@@ -209,7 +215,8 @@ void PPCInterpreter::ppcProgramException(PPU_STATE *ppuState) {
   BSET(thread.SPR.SRR1, 64, thread.progExceptionType);
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | (QMASK(0, 0) | QMASK(3, 3));
-  thread.NIA = 0x700;
+  if (MMURead8(ppuState, 0x700) != 0x00)
+    thread.NIA = 0x700;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
@@ -222,7 +229,8 @@ void PPCInterpreter::ppcDecrementerException(PPU_STATE *ppuState) {
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & (QMASK(0, 32) | QMASK(37, 41) | QMASK(48, 63));
   thread.SPR.MSR.MSR_Hex =  thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | QMASK(0, 0) | (QMASK(3, 3));
-  thread.NIA = 0x900;
+  if (MMURead8(ppuState, 0x900) != 0x00)
+    thread.NIA = 0x900;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
@@ -236,7 +244,8 @@ void PPCInterpreter::ppcSystemCallException(PPU_STATE *ppuState) {
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & (QMASK(0, 32) | QMASK(37, 41) | QMASK(48, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | QMASK(0, 0) | (thread.exceptHVSysCall ? 0 : QMASK(3, 3));
-  thread.NIA = 0xC00;
+  if (MMURead8(ppuState, 0xC00) != 0x00)
+    thread.NIA = 0xC00;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
@@ -324,6 +333,9 @@ void PPCInterpreter::ppcFPUnavailableException(PPU_STATE *ppuState) {
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | QMASK(0, 0) | (QMASK(3, 3));
   thread.NIA = 0x800;
+  // Just jump over.
+  if (MMURead8(ppuState, thread.NIA) == 0x00)
+    thread.NIA = thread.CIA + 4;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }
@@ -337,6 +349,9 @@ void PPCInterpreter::ppcVXUnavailableException(PPU_STATE *ppuState) {
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex & ~(QMASK(48, 50) | QMASK(52, 55) | QMASK(58, 59) | QMASK(61, 63));
   thread.SPR.MSR.MSR_Hex = thread.SPR.MSR.MSR_Hex | QMASK(0, 0) | (QMASK(3, 3));
   thread.NIA = 0xF20;
+  // Just jump over.
+  if (MMURead8(ppuState, thread.NIA) == 0x00)
+    thread.NIA = thread.CIA + 4;
   thread.SPR.MSR.DR = 0;
   thread.SPR.MSR.IR = 0;
 }

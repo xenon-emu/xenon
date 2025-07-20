@@ -36,17 +36,37 @@ public:
   void ConnectTarget(Block *targetBlock);
   // Next block to execute (NULL only for END and RET)
   void ConnectContinuation(Block *nextBlock);
-  void EmitShaderCode(AST::ShaderCodeWriterBase& writer) const;
-  inline Block* GetTarget() const { return target; }
-  inline std::vector<Block*> GetSources() const { return sources; }
-  inline Block* GetContinuation() const { return continuation; }
-  inline AST::ExpressionNode::Ptr GetCondition() const { return condition; }
-  inline AST::StatementNode::Ptr GetCode() const { return codeStatement; }
-  inline AST::StatementNode::Ptr GetPreamble() const { return preambleStatement; }
-  inline u32 GetAddress() const { return address; }
-  inline u32 GetTargetAddress() const { return targetAddress; }
-  inline eBlockType GetType() const { return type; }
-  inline bool IsUnconditional() const { return !condition; }
+  void EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) const;
+  inline Block *GetTarget() const {
+    return target;
+  }
+  inline std::vector<Block *> GetSources() const {
+    return sources;
+  }
+  inline Block *GetContinuation() const {
+    return continuation;
+  }
+  inline ExpressionNode::Ptr GetCondition() const {
+    return condition;
+  }
+  inline StatementNode::Ptr GetCode() const {
+    return codeStatement;
+  }
+  inline StatementNode::Ptr GetPreamble() const {
+    return preambleStatement;
+  }
+  inline u32 GetAddress() const {
+    return address;
+  }
+  inline u32 GetTargetAddress() const {
+    return targetAddress;
+  }
+  inline eBlockType GetType() const {
+    return type;
+  }
+  inline bool IsUnconditional() const {
+    return !condition;
+  }
 private:
   // Block type
   eBlockType type;
@@ -55,13 +75,13 @@ private:
   // Target address - only for JUMP and CALL
   u32 targetAddress = 0;
   // Condition for this block of code
-  std::shared_ptr<AST::ExpressionNode> condition = nullptr;
+  std::shared_ptr<ExpressionNode> condition = nullptr;
   // Code for this block (executed inside conditional branch)
-  std::shared_ptr<AST::StatementNode> codeStatement = nullptr;
+  std::shared_ptr<StatementNode> codeStatement = nullptr;
   // Part of code executed outside the conditional branch
-  std::shared_ptr<AST::StatementNode> preambleStatement = nullptr;
+  std::shared_ptr<StatementNode> preambleStatement = nullptr;
   // Blocks jumping to this block
-  std::vector<Block*> sources = {};
+  std::vector<Block *> sources = {};
   // Resolved target block, only for JUMP and CALL
   Block *target = nullptr;
   // Continuation block (branchless case, simply put, the next block to execute)
@@ -77,22 +97,28 @@ public:
     }
   }
 
-  Block* GetStartBlock() const { return blocks.front(); }
-  u32 GetNumBlocks() const { return static_cast<u32>(blocks.size()); }
-  Block* GetBlock(u32 index) const { return blocks[index]; }
+  Block *GetStartBlock() const {
+    return blocks.front();
+  }
+  u32 GetNumBlocks() const {
+    return static_cast<u32>(blocks.size());
+  }
+  Block *GetBlock(u32 index) const {
+    return blocks[index];
+  }
   u32 GetEntryPointAddress() const {
     return roots[0]->GetAddress();
   }
 
-  static ControlFlowGraph* DecompileMicroCode(const void* code, u32 codeLength, eShaderType shaderType);
+  static ControlFlowGraph *DecompileMicroCode(const void *code, u32 codeLength, eShaderType shaderType);
 
-  void EmitShaderCode(AST::ShaderCodeWriterBase& writer) const;
+  void EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) const;
 
 private:
-  std::vector<Block*> blocks;
-  std::vector<Block*> roots;
+  std::vector<Block *> blocks;
+  std::vector<Block *> roots;
 
-  static void ExtractBlocks(const Block* block, std::vector<const Block*>& out, std::set<const Block*>& visited);
+  static void ExtractBlocks(const Block *block, std::vector<const Block *> &out, std::set<const Block *> &visited);
 };
 
 struct TextureRef {
@@ -104,14 +130,15 @@ class Shader {
 public:
   ~Shader();
 
-  static Shader* DecompileMicroCode(const void *code, const u32 codeLength, eShaderType shaderType);
+  static Shader *DecompileMicroCode(const void *code, const u32 codeLength, eShaderType shaderType);
 
-  void EmitShaderCode(AST::ShaderCodeWriterBase &writer);
+  void EmitShaderCode(ShaderCodeWriterBase &writer);
 
   ControlFlowGraph *controlFlow = nullptr;
-  
-  std::vector<const VertexFetch*> vertexFetches{};
-  std::vector<const WriteExportRegister*> exports{};
+
+  std::vector<const VertexFetch *> vertexFetches{};
+  std::map<VertexFetchKey, u32> attributeLocationMap{};
+  std::vector<const WriteExportRegister *> exports{};
 
   std::vector<u32> usedRegisters{};
   std::vector<TextureRef> usedTextures{};
