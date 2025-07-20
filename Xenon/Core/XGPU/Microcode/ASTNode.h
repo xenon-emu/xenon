@@ -12,6 +12,18 @@
 
 namespace Xe::Microcode::AST {
 
+// A key to uniquely identify a vertex attribute definition from a VTX_FETCH instruction.
+struct VertexFetchKey {
+  u32 slot;
+  u32 offset;
+  u32 stride;
+  instr_surf_fmt_t format;
+
+  bool operator<(const VertexFetchKey &other) const {
+    return std::tie(slot, offset, stride, format) < std::tie(other.slot, other.offset, other.stride, other.format);
+  }
+};
+
 // Forward declare
 class ShaderCodeWriterBase;
 
@@ -31,7 +43,7 @@ public:
   virtual eExprType GetType() const { return eExprType::ALU; }
   virtual std::string GetName() const { return "ExpressionNode"; }
   virtual s32 GetRegisterIndex() const { return -1; }
-  virtual Chunk EmitShaderCode(ShaderCodeWriterBase &writer) = 0;
+  virtual Chunk EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) = 0;
   virtual std::shared_ptr<ExpressionNode> CloneExpr() const = 0;
   std::shared_ptr<NodeBase> Clone() const override {
     return CloneExpr();
@@ -51,38 +63,48 @@ protected:
   Children children{};
 };
 
+enum class eRegisterType : u8 {
+  Temporary,
+  Constant,
+  VertexInput,
+  PixelInput,
+  Invalid
+};
+
 class ReadRegister : public ExpressionNode {
 public:
-  ReadRegister(s32 index) :
-    regIndex(index)
+  ReadRegister(s32 index, eRegisterType type = eRegisterType::Temporary) :
+    regIndex(index), regType(type)
   {}
   s32 GetRegisterIndex() const override { return regIndex; }
   std::string GetName() const override {
     return "ReadRegister";
   }
-  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<ReadRegister>(regIndex);
   }
 
   s32 regIndex = 0;
+  eRegisterType regType = eRegisterType::Temporary;
 };
 
 class WriteRegister : public ExpressionNode {
 public:
-  WriteRegister(s32 index) :
-    regIndex(index)
+  WriteRegister(s32 index, eRegisterType type = eRegisterType::Temporary) :
+    regIndex(index), regType(type)
   {}
   s32 GetRegisterIndex() const override { return regIndex; }
   std::string GetName() const override {
     return "WriteRegister";
   }
-  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
-    return std::make_unique<WriteRegister>(regIndex);
+    return std::make_unique<WriteRegister>(regIndex, regType);
   }
-private:
+
   s32 regIndex = 0;
+  eRegisterType regType = eRegisterType::Temporary;
 };
 
 // Exported Register Write
@@ -95,7 +117,7 @@ public:
   std::string GetName() const override {
     return "WriteExportRegister";
   }
-  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<WriteExportRegister>(exportReg);
   }
@@ -116,7 +138,7 @@ public:
   std::string GetName() const override {
     return "BoolConstant";
   }
-  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<BoolConstant>(pixelShader, index);
   }
@@ -134,7 +156,7 @@ public:
   std::string GetName() const override {
     return "FloatConstant";
   }
-  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<FloatConstant>(pixelShader, index);
   }
@@ -151,7 +173,7 @@ public:
   std::string GetName() const override {
     return "FloatRelativeConstant";
   }
-  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<FloatRelativeConstant>(pixelShader, relativeOffset);
   }
@@ -163,7 +185,7 @@ public:
 // Unary Operations
 class GetPredicate : public ExpressionNode {
 public:
-  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_unique<GetPredicate>(*this);
   }
@@ -177,7 +199,7 @@ public:
   std::string GetName() const override {
     return "Abs";
   }
-  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<Abs>(children[0]->CloneExpr());
   }
@@ -191,7 +213,7 @@ public:
   std::string GetName() const override {
     return "Negate";
   }
-  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<Negate>(children[0]->CloneExpr());
   }
@@ -205,7 +227,7 @@ public:
   std::string GetName() const override {
     return "Not";
   }
-  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<Not>(children[0]->CloneExpr());
   }
@@ -219,7 +241,7 @@ public:
   std::string GetName() const override {
     return "Saturate";
   }
-  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<Saturate>(children[0]->CloneExpr());
   }
@@ -237,7 +259,7 @@ public:
   std::string GetName() const override {
     return "Swizzle";
   }
-  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<Swizzle>(children[0]->CloneExpr(), swizzle[0], swizzle[1], swizzle[2], swizzle[3]);
   }
@@ -265,7 +287,7 @@ public:
     return "VertexFetch";
   }
   eExprType GetType() const override { return eExprType::VFETCH; }
-  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<VertexFetch>(children[0]->CloneExpr(), fetchSlot, fetchOffset, fetchStride, format, isFloat, isSigned, isNormalized);
   }
@@ -318,7 +340,7 @@ public:
     return "TextureFetch";
   }
   eExprType GetType() const override { return eExprType::TFETCH; }
-  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<TextureFetch>(children[0]->CloneExpr(), fetchSlot, textureType);
   }
@@ -338,7 +360,7 @@ public:
   std::string GetName() const override {
     return "VectorFunc1";
   }
-  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<VectorFunc1>(vectorInstr, children[0]->CloneExpr());
   }
@@ -356,7 +378,7 @@ public:
   std::string GetName() const override {
     return "VectorFunc2";
   }
-  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<VectorFunc2>(vectorInstr, children[0]->CloneExpr(), children[1]->CloneExpr());
   }
@@ -375,7 +397,7 @@ public:
   std::string GetName() const override {
     return "VectorFunc3";
   }
-  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<VectorFunc3>(vectorInstr, children[0]->CloneExpr(), children[1]->CloneExpr(), children[2]->CloneExpr());
   }
@@ -392,7 +414,7 @@ public:
   std::string GetName() const override {
     return "ScalarFunc0";
   }
-  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<ScalarFunc0>(scalarInstr);
   }
@@ -409,7 +431,7 @@ public:
   std::string GetName() const override {
     return "ScalarFunc1";
   }
-  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<ScalarFunc1>(scalarInstr, children[0]->CloneExpr());
   }
@@ -427,7 +449,7 @@ public:
   std::string GetName() const override {
     return "ScalarFunc2";
   }
-  Chunk EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  Chunk EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<ExpressionNode> CloneExpr() const override {
     return std::make_shared<ScalarFunc2>(scalarInstr, children[0]->CloneExpr(), children[1]->CloneExpr());
   }

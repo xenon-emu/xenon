@@ -203,7 +203,7 @@ void CreateShader() {
   u64 combinedHash = (static_cast<u64>(vertexShaderHash) << 32) | pixelShaderHash;
 
   auto shader = std::make_shared<Render::OGLShader>();
-  auto vertexShaderBinary = CreateVertexShader();
+  auto vertexShaderBinary = vertexShader.first;
   auto fragmentShaderBinary = pixelShader.first;
   Write(vertexShaderHash, eShaderType::Vertex, vertexShaderBinary);
   Write(pixelShaderHash, eShaderType::Pixel, fragmentShaderBinary);

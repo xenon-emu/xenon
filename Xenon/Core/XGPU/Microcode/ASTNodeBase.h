@@ -12,6 +12,8 @@
 
 namespace Xe::Microcode::AST {
 
+class Shader;
+
 // General expression type
 enum class eExprType : u8 {
   ALU,

@@ -94,8 +94,8 @@ public:
   //
   // Building Blocks
   //
-  Expression EmitReadReg(u32 idx);
-  Expression EmitWriteReg(bool pixelShader, u32 exported, u32 idx);
+  Expression EmitReadReg(u32 idx, eRegisterType type);
+  Expression EmitWriteReg(bool pixelShader, u32 exported, u32 idx, eRegisterType type);
   // Access boolean constant
   Expression EmitBoolConst(bool pixelShader, u32 idx);
   // Access to float const table at given index
