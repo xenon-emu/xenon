@@ -69,6 +69,9 @@ PCIBridge::PCIBridge() {
 
   // Set Revision based on system config.
   switch (Config::highlyExperimental.consoleRevison) {
+  case Config::eConsoleRevision::Xenon:
+    pciBridgeConfig.configSpaceHeader.reg2.revID = 0x2;
+    break;
   case Config::eConsoleRevision::Zephyr:
   case Config::eConsoleRevision::Falcon:
   case Config::eConsoleRevision::Jasper:

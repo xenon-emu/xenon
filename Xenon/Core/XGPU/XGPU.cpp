@@ -32,9 +32,13 @@ Xe::Xenos::XGPU::XGPU(Render::Renderer *renderer, RAM *ram, PCIBridge *pciBridge
   PCI_CONFIG_HDR_REG2 &gpuRevision = xgpuConfigSpace.configSpaceHeader.reg2;
   revision.vendorID = 0x1414;
   switch (Config::highlyExperimental.consoleRevison) {
+  case Config::eConsoleRevision::Xenon: {
+    gpuRevision.revID = 0x02;
+    revision.deviceID = 0x5801;
+  } break;
   case Config::eConsoleRevision::Zephyr: {
-    // gpuRevision.revID = ... ;
-    // revision.deviceID = ... ;
+    gpuRevision.revID = 0x02;
+    revision.deviceID = 0x5821;
   } break;
   case Config::eConsoleRevision::Falcon: {
     gpuRevision.revID = 0x10;
@@ -69,6 +73,7 @@ Xe::Xenos::XGPU::XGPU(Render::Renderer *renderer, RAM *ram, PCIBridge *pciBridge
   // TODO: Fix for Valhalla (Winchester)
   // TODO: Fix for Slims
   switch (Config::highlyExperimental.consoleRevison) {
+  case Config::eConsoleRevision::Xenon:
   case Config::eConsoleRevision::Zephyr:
   case Config::eConsoleRevision::Falcon:
   case Config::eConsoleRevision::Jasper: {

@@ -128,8 +128,11 @@ PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 P
 
   // Set PVR and PIR
   switch (Config::highlyExperimental.consoleRevison) {
+  case Config::eConsoleRevision::Xenon: {
+    ppuState->SPR.PVR.PVR_Hex = 0x00710200;
+  } break;
   case Config::eConsoleRevision::Zephyr: {
-    // ppuState->SPR.PVR.PVR_Hex = ... ;
+    ppuState->SPR.PVR.PVR_Hex = 0x00710300;
   } break;
   case Config::eConsoleRevision::Falcon: {
     ppuState->SPR.PVR.PVR_Hex = 0x00710500;

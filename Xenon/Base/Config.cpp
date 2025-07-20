@@ -458,7 +458,7 @@ void _highlyExperimental::to_toml(toml::value &value) {
   value["ConsoleRevison"].comments().clear();
   value["ConsoleRevison"] = static_cast<u32>(consoleRevison);
   value["ConsoleRevison"].comments().push_back("# Console motherboard revision, used for PVR and XGPU Init");
-  value["ConsoleRevison"].comments().push_back("# Zephyr = 0 | Falcon = 1 | Jasper = 2 | Trinity = 3 | Corona = 4 | Corona 4GB = 5 | Winchester = 6");
+  value["ConsoleRevison"].comments().push_back("# Xenon = 0 | Zephyr = 1 | Falcon = 2 | Jasper = 3 | Trinity = 4 | Corona = 5 | Corona 4GB = 6 | Winchester = 7");
   value["CPUExecutor"].comments().clear();
   value["CPUExecutor"] = cpuExecutor;
   value["CPUExecutor"].comments().push_back("# PowerPC CPU Executor:");

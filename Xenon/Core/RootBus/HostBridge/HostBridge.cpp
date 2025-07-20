@@ -8,6 +8,12 @@
 HostBridge::HostBridge(u64 ramSize) {
   // TODO: Fix these to pull the right data
   switch (Config::highlyExperimental.consoleRevison) {
+  case Config::eConsoleRevision::Xenon: {
+    // Device/Vendor ID
+    hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = 0x58301414;
+    // Device Type/Revision
+    hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = 0x06000010;
+  } break;
   case Config::eConsoleRevision::Zephyr: {
     // Device/Vendor ID
     hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = 0x58301414;
