@@ -780,6 +780,9 @@ void PPUDockSpace(Render::GUI *gui, PPU *PPU) {
         else
           PPU->Halt();
       }
+      if (halted && gui->MenuItem("Step")) {
+        PPU->Step();
+      }
       if (PPU->IsHaltedByGuest()) {
         if (gui->MenuItem("Continue From Exception Handler")) {
           PPU->ContinueFromException();

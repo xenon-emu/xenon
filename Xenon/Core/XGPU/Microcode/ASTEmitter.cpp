@@ -140,23 +140,23 @@ Chunk ShaderCodeWriterSirit::GetExportDest(const eExportReg reg) {
     auto &var = output_vars[reg];
     switch (reg) {
     case eExportReg::POSITION:
-      output_vars[eExportReg::POSITION] = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
-      module.Name(output_vars[eExportReg::POSITION], "POSITION");
-      break;
+    output_vars[eExportReg::POSITION] = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
+    module.Name(output_vars[eExportReg::POSITION], "POSITION");
+    break;
     case eExportReg::POINTSIZE:
-      output_vars[eExportReg::POINTSIZE] = module.AddGlobalVariable(float_ptr_output, spv::StorageClass::Output);
-      module.Name(output_vars[eExportReg::POINTSIZE], "POINTSIZE");
-      break;
+    output_vars[eExportReg::POINTSIZE] = module.AddGlobalVariable(float_ptr_output, spv::StorageClass::Output);
+    module.Name(output_vars[eExportReg::POINTSIZE], "POINTSIZE");
+    break;
     default:
-      if (reg >= eExportReg::COLOR0 && reg <= eExportReg::COLOR3) {
-        colorReg = true;
-        var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
-        module.Name(var, FMT("COLOR{}", static_cast<u32>(reg) - static_cast<u32>(eExportReg::COLOR0)));
-      } else if (reg >= eExportReg::INTERP0 && reg <= eExportReg::INTERP7) {
-        var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
-        module.Name(var, FMT("INTERP{}", static_cast<u32>(reg) - static_cast<u32>(eExportReg::INTERP0)));
-      }
-      break;
+    if (reg >= eExportReg::COLOR0 && reg <= eExportReg::COLOR3) {
+      colorReg = true;
+      var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
+      module.Name(var, FMT("COLOR{}", static_cast<u32>(reg) - static_cast<u32>(eExportReg::COLOR0)));
+    } else if (reg >= eExportReg::INTERP0 && reg <= eExportReg::INTERP7) {
+      var = module.AddGlobalVariable(vec4_ptr_output, spv::StorageClass::Output);
+      module.Name(var, FMT("INTERP{}", static_cast<u32>(reg) - static_cast<u32>(eExportReg::INTERP0)));
+    }
+    break;
     }
     it = output_vars.find(reg);
   }
@@ -170,8 +170,7 @@ Chunk ShaderCodeWriterSirit::GetExportDest(const eExportReg reg) {
     if (reg == eExportReg::POINTSIZE) {
       chunkType = eChunkType::Scalar;
       loaded = module.OpLoad(float_type, var_id);
-    }
-    else {
+    } else {
       loaded = module.OpLoad(vec4_type, var_id);
     }
   }
@@ -180,32 +179,69 @@ Chunk ShaderCodeWriterSirit::GetExportDest(const eExportReg reg) {
 }
 
 Chunk ShaderCodeWriterSirit::GetReg(u32 regIndex) {
-  LOG_DEBUG(Xenos, "[AST::Sirit] GetReg({})", regIndex);
+  // This function is generally for temporary registers (r#).
+  // For other register types (c#, v#, i#), the specific Get*Reg functions should be used.
+  // This is a placeholder for older code that might not differentiate.
+  LOG_WARNING(Xenos, "Using deprecated GetReg for index {}. Consider using specific Get*Reg functions.", regIndex);
+  return GetTemporaryReg(regIndex);
+}
+
+Chunk ShaderCodeWriterSirit::GetTemporaryReg(u32 regIndex) {
+  Sirit::Id vec4_type = module.TypeVector(module.TypeFloat(32), 4);
+  auto it = temp_regs.find(regIndex);
+  if (it == temp_regs.end()) {
+    Sirit::Id ptr_type = module.TypePointer(spv::StorageClass::Function, vec4_type);
+    Sirit::Id var = module.AddLocalVariable(ptr_type, spv::StorageClass::Function);
+    module.Name(var, FMT("r{}", regIndex));
+    temp_regs[regIndex] = var;
+    it = temp_regs.find(regIndex);
+  }
+  Sirit::Id load_id = module.OpLoad(vec4_type, it->second);
+  return Chunk(load_id, it->second, eChunkType::Vector);
+}
+
+Chunk ShaderCodeWriterSirit::GetConstantReg(u32 regIndex) {
   Sirit::Id uint_type = module.TypeInt(32, false);
   Sirit::Id float_type = module.TypeFloat(32);
   Sirit::Id vec4_type = module.TypeVector(float_type, 4);
-  Sirit::Id vec4_ptr_func = module.TypePointer(spv::StorageClass::Function, vec4_type);
-  Sirit::Id vec4_ptr_ubo = module.TypePointer(spv::StorageClass::StorageBuffer, vec4_type);
 
-  // Check for existing temp
-  if (temp_regs.contains(regIndex)) {
-    Sirit::Id ptr = temp_regs[regIndex];
-    return AllocLocalVector(Chunk{ {}, ptr });
+  // Constants for accessing the UBO
+  Sirit::Id zero_const = module.Constant(uint_type, 0); // Index for the array within the struct
+  Sirit::Id reg_index_const = module.Constant(uint_type, regIndex);
+
+  // Access the specific constant in the UBO
+  Sirit::Id ptr_to_constant = module.OpAccessChain(module.TypePointer(spv::StorageClass::Uniform, vec4_type), ubo_var_v, zero_const, reg_index_const);
+  Sirit::Id load_id = module.OpLoad(vec4_type, ptr_to_constant);
+  module.Name(load_id, FMT("c{}", regIndex));
+  return Chunk(load_id, ptr_to_constant, eChunkType::Vector);
+}
+
+Chunk ShaderCodeWriterSirit::GetVertexInputReg(u32 regIndex) {
+  Sirit::Id vec4_type = module.TypeVector(module.TypeFloat(32), 4);
+  auto it = vertex_input_vars.find(regIndex);
+  if (it == vertex_input_vars.end()) {
+    Sirit::Id ptr_type = module.TypePointer(spv::StorageClass::Input, vec4_type);
+    Sirit::Id var = module.AddGlobalVariable(ptr_type, spv::StorageClass::Input);
+    module.Name(var, FMT("v{}", regIndex));
+    vertex_input_vars[regIndex] = var;
+    it = vertex_input_vars.find(regIndex);
   }
+  Sirit::Id load_id = module.OpLoad(vec4_type, it->second);
+  return Chunk(load_id, it->second, eChunkType::Vector);
+}
 
-  // Load from UBO (storage buffer)
-  Sirit::Id index_id = module.Constant(uint_type, regIndex);
-  Sirit::Id ubo_ptr = module.OpAccessChain(vec4_ptr_ubo, ubo_var_v, module.Constant(uint_type, 0), index_id);
-  Sirit::Id initial_val = module.OpLoad(vec4_type, ubo_ptr);
-
-  // Allocate local variable
-  Sirit::Id local_ptr = module.AddLocalVariable(vec4_ptr_func, spv::StorageClass::Function);
-  module.OpStore(local_ptr, initial_val);
-
-  temp_regs[regIndex] = local_ptr;
-
-  Sirit::Id val = module.OpLoad(vec4_type, local_ptr);
-  return Chunk(val, local_ptr, eChunkType::Vector);
+Chunk ShaderCodeWriterSirit::GetPixelInputReg(u32 regIndex) {
+  Sirit::Id vec4_type = module.TypeVector(module.TypeFloat(32), 4);
+  auto it = input_vars.find(regIndex);
+  if (it == input_vars.end()) {
+    Sirit::Id ptr_type = module.TypePointer(spv::StorageClass::Input, vec4_type);
+    Sirit::Id var = module.AddGlobalVariable(ptr_type, spv::StorageClass::Input);
+    module.Name(var, FMT("i{}", regIndex));
+    input_vars[regIndex] = var;
+    it = input_vars.find(regIndex);
+  }
+  Sirit::Id load_id = module.OpLoad(vec4_type, it->second);
+  return Chunk(load_id, it->second, eChunkType::Vector);
 }
 
 Chunk ShaderCodeWriterSirit::GetBoolVal(const u32 boolRegIndex) {
@@ -230,7 +266,7 @@ Chunk ShaderCodeWriterSirit::GetBoolVal(const u32 boolRegIndex) {
 
 Chunk ShaderCodeWriterSirit::GetFloatVal(const u32 floatRegIndex) {
   LOG_DEBUG(Xenos, "[AST::Sirit] GetFloatVal({})", floatRegIndex);
-  Chunk chunk = GetReg(floatRegIndex);
+  Chunk chunk = GetConstantReg(floatRegIndex);
   return Chunk(chunk.id, chunk.ptr, chunk.type);
 }
 
@@ -351,7 +387,7 @@ Chunk ShaderCodeWriterSirit::FetchTexture(const Chunk &src, const TextureFetch &
   return Chunk(sampled_result, { 0 }, eChunkType::Fetch);
 }
 
-Chunk ShaderCodeWriterSirit::FetchVertex(const Chunk &src, const VertexFetch &instr) {
+Chunk ShaderCodeWriterSirit::FetchVertex(const Chunk &src, const VertexFetch &instr, const Shader *shader) {
   const u32 slot = instr.fetchSlot;
   const u32 location = slot;
 
@@ -365,15 +401,17 @@ Chunk ShaderCodeWriterSirit::FetchVertex(const Chunk &src, const VertexFetch &in
   if (!vertex_input_vars.contains(slot)) {
     Sirit::Id ptr_type = module.TypePointer(spv::StorageClass::Input, input_type);
 
-    u32 glLocation = static_cast<u32>(vertex_input_vars.size());
-    if (glLocation >= 32) {
-      LOG_ERROR(Xenos, "Too many vertex input slots! Max supported is 32.");
+    VertexFetchKey key = { instr.fetchSlot, instr.fetchOffset, instr.fetchStride, instr.format };
+    auto it = shader->attributeLocationMap.find(key);
+    if (it == shader->attributeLocationMap.end()) {
+      LOG_ERROR(Xenos, "Could not find remapped location for vertex fetch!");
       return {};
     }
+    u32 location = it->second;
 
     Sirit::Id input_var = module.AddGlobalVariable(ptr_type, spv::StorageClass::Input);
-    module.Decorate(input_var, spv::Decoration::Location, glLocation);
-    module.Name(input_var, FMT("INPUT_{}", glLocation));
+    module.Decorate(input_var, spv::Decoration::Location, location);
+    module.Name(input_var, FMT("INPUT_{}", location));
 
     vertex_input_vars[slot] = input_var;
   }
