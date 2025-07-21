@@ -7,7 +7,7 @@
 
 using namespace Base;
 
-// #define VXU_LOAD_DEBUG
+//#define VXU_LOAD_DEBUG
 
 //
 // Utilities
@@ -1692,17 +1692,20 @@ void PPCInterpreter::PPCInterpreter_lvewx(PPU_STATE* ppuState) {
 
   CHECK_VXU;
 
-  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
+  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~3;
 
-  u8 eb = EA & 0x3;
-  EA &= ~0x3;
+  u8 eb = (EA >> 2) & 0x3;
 
   u32 data = MMURead32(ppuState, EA);
+
+#ifdef VXU_LOAD_DEBUG
+  LOG_DEBUG(Xenon, "lvewx [EA = {:#x}, eb = {:#x} data = {:#x}]", (u32)EA, eb, data);
+#endif // VXU_LOAD_DEBUG
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  VRi(vd).dword[eb] = data;
+  VRi(vd).dword[3 - eb] = data;
 }
 
 // Load Vector Indexed (x'7C00 00CE')
@@ -1775,6 +1778,12 @@ void PPCInterpreter::PPCInterpreter_lvxl128(PPU_STATE* ppuState) {
   vector.dword[1] = MMURead32(ppuState, EA + (sizeof(u32) * 1));
   vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
   vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
+
+#ifdef VXU_LOAD_DEBUG
+  u8 vrd = VMX128_1_VD128;
+  LOG_DEBUG(Xenon, "lvxl128 [EA {:#x}] vR{:#d} = [{:#x}, {:#x}, {:#x}, {:#x}]",
+    (u32)EA, vrd, vector.dword[0], vector.dword[1], vector.dword[2], vector.dword[3]);
+#endif // VXU_LOAD_DEBUG
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1885,6 +1894,11 @@ void PPCInterpreter::PPCInterpreter_lvlx128(PPU_STATE* ppuState) {
   vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
   vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
 
+#ifdef VXU_LOAD_DEBUG
+  LOG_DEBUG(Xenon, "lvlx128 [EA {:#x}] Temp VR = [{:#x}, {:#x}, {:#x}, {:#x}]",
+    (u32)EA, vector.dword[0], vector.dword[1], vector.dword[2], vector.dword[3]);
+#endif // VXU_LOAD_DEBUG
+
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
@@ -1904,6 +1918,12 @@ void PPCInterpreter::PPCInterpreter_lvlx128(PPU_STATE* ppuState) {
   VR(VMX128_1_VD128).dword[1] = byteswap_be<u32>(VR(VMX128_1_VD128).dword[1]);
   VR(VMX128_1_VD128).dword[2] = byteswap_be<u32>(VR(VMX128_1_VD128).dword[2]);
   VR(VMX128_1_VD128).dword[3] = byteswap_be<u32>(VR(VMX128_1_VD128).dword[3]);
+
+#ifdef VXU_LOAD_DEBUG
+  u8 vrd = VMX128_1_VD128;
+  LOG_DEBUG(Xenon, "lvlx128 [EB {:#d}] vR{:#d} = [{:#x}, {:#x}, {:#x}, {:#x}]",
+    eb, vrd, VR(VMX128_1_VD128).dword[0], VR(VMX128_1_VD128).dword[1], VR(VMX128_1_VD128).dword[2], VR(VMX128_1_VD128).dword[3]);
+#endif // VXU_LOAD_DEBUG
 }
 
 
@@ -1982,6 +2002,11 @@ void PPCInterpreter::PPCInterpreter_lvrx128(PPU_STATE* ppuState) {
   vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
   vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
 
+#ifdef VXU_LOAD_DEBUG
+  LOG_DEBUG(Xenon, "lvrx128 [EA {:#x}] Temp VR = [{:#x}, {:#x}, {:#x}, {:#x}]",
+    (u32)EA, vector.dword[0], vector.dword[1], vector.dword[2], vector.dword[3]);
+#endif // VXU_LOAD_DEBUG
+
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
@@ -2006,6 +2031,12 @@ void PPCInterpreter::PPCInterpreter_lvrx128(PPU_STATE* ppuState) {
   VR(VMX128_1_VD128).dword[1] = byteswap_be<u32>(VR(VMX128_1_VD128).dword[1]);
   VR(VMX128_1_VD128).dword[2] = byteswap_be<u32>(VR(VMX128_1_VD128).dword[2]);
   VR(VMX128_1_VD128).dword[3] = byteswap_be<u32>(VR(VMX128_1_VD128).dword[3]);
+
+#ifdef VXU_LOAD_DEBUG
+  u8 vrd = VMX128_1_VD128;
+  LOG_DEBUG(Xenon, "lvrx128 [EB {:#d}] vR{:#d} = [{:#x}, {:#x}, {:#x}, {:#x}]",
+    eb, vrd, VR(VMX128_1_VD128).dword[0], VR(VMX128_1_VD128).dword[1], VR(VMX128_1_VD128).dword[2], VR(VMX128_1_VD128).dword[3]);
+#endif // VXU_LOAD_DEBUG
 }
 
 // Load Vector for Shift Left (x'7C00 000C')
