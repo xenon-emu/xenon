@@ -26,6 +26,9 @@
     packages = {
       inherit (pkgs) xenon xenon-cli xenon-static xenon-cli-static;
     };
+    hydraJobs = {
+      inherit (self) packages;
+    };
     devShell = pkgs.xenon;
   })) // {
     overlay = self: super:
@@ -62,6 +65,16 @@
           hash = "sha256-SEL/JIenmueYayxZlWlMO3lTUOcqiaZZC6RJbbH4DmE=";
         };
       });
+    };
+    nix.settings = {
+      substituters = [
+        "https://cache.fuckk.lol"
+        "https://cache.nixos.org/"
+      ];
+      trusted-public-keys = [
+        "cache.fuckk.lol:CLzn/YtOOlQGxt4ud48+zaq2WMROFSTBUVV3AtwtKC0="
+        "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
+      ];
     };
   };
 }
