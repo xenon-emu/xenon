@@ -68,11 +68,11 @@
     };
     nix.settings = {
       substituters = [
-        "https://cache.fuckk.lol"
+        "https://hydra.fuckk.lol"
         "https://cache.nixos.org/"
       ];
       trusted-public-keys = [
-        "cache.fuckk.lol:CLzn/YtOOlQGxt4ud48+zaq2WMROFSTBUVV3AtwtKC0="
+        "hydra.fuckk.lol:6+mPv9GwAFx/9J+mIL0I41pU8k4HX0KiGi1LUHJf7LY="
         "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY="
       ];
     };
