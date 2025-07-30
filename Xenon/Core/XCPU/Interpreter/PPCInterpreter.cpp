@@ -93,10 +93,10 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
     LOG_INFO(SMC, "Faked XboxHardwareInfo bit 3 to skip HalRecordArgonErrors");
   }
 
-  // Skip bootanim (for now).
-  if (static_cast<u32>(thread.CIA) == 0x80081EA4) {
-    LOG_INFO(Xenon, "Skipping bootanim load.");
-    thread.GPR[3] = 0;
+  // Fakes EDRAM Training result.
+  if (static_cast<u32>(thread.CIA) == 0x800FC288) {
+    thread.GPR[3] = 0; // Succeded
+    LOG_INFO(SMC, "Faked VdRetrainEDRAM result.");
   }
 
   if (static_cast<u32>(thread.CIA) == 0x800FC288) {
