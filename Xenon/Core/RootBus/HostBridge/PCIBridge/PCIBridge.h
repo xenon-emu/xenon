@@ -101,7 +101,7 @@ public:
 
   void RegisterIIC(Xe::XCPU::IIC::XenonIIC *xenonIICPtr);
 
-  bool RouteInterrupt(u8 prio);
+  bool RouteInterrupt(u8 prio, u32 targetCPU = 0);
   void CancelInterrupt(u8 prio);
 
 private:
