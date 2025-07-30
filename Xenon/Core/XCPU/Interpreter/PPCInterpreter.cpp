@@ -98,6 +98,12 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
     LOG_INFO(SMC, "Faked XboxHardwareInfo bit 3 to skip HalRecordArgonErrors");
   }
 
+  // Fakes EDRAM Training result.
+  if (static_cast<u32>(thread.CIA) == 0x800FC288) {
+    thread.GPR[3] = 0; // Succeded
+    LOG_INFO(SMC, "Faked VdRetrainEDRAM result.");
+  }
+  
   // This is just to set a PC breakpoint in any PPU/Thread.
   if (static_cast<u32>(thread.CIA) == 0x8009CE40) {
     u8 a = 0;
