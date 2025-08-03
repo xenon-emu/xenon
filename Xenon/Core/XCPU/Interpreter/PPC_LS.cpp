@@ -2069,11 +2069,43 @@ void PPCInterpreter::PPCInterpreter_lvsl(PPU_STATE* ppuState) {
 
   CHECK_VXU;
 
+  Vector128 vector{};
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
   const u8 sh = EA & 0xF;
 
-  for (s32 idx = 0; idx < 16; idx++) {
-    const u8 regIdx = (idx & ~3) | (3 - (idx & 3));
-    VRi(vd).bytes[regIdx] = idx + sh;
+#ifdef VXU_LOAD_DEBUG
+  u8 vrd = _instr.vd;
+  LOG_DEBUG(Xenon, "lvsl: EA {:#x}, sh {:#x}, VrD {:#d} = [{:#x},{:#x},{:#x},{:#x}]", EA, sh, vrd, VRi(vd).dword[0], 
+    VRi(vd).dword[1], VRi(vd).dword[2], VRi(vd).dword[3]);
+#endif // VXU_LOAD_DEBUG
+
+#define MAKE_VECTOR(x,y,z,w) vector.dword[0] = x; vector.dword[1] = y; vector.dword[2] = z; vector.dword[3] = w;
+
+  switch (sh) {
+  case 0x0:  MAKE_VECTOR(0x00010203, 0x04050607, 0x08090A0B, 0x0C0D0E0F); break;
+  case 0x1:  MAKE_VECTOR(0x01020304, 0x05060708, 0x090A0B0C, 0x0D0E0F10); break;
+  case 0x2:  MAKE_VECTOR(0x02030405, 0x06070809, 0x0A0B0C0D, 0x0E0F1011); break;
+  case 0x3:  MAKE_VECTOR(0x03040506, 0x0708090A, 0x0B0C0D0E, 0x0F101112); break;
+  case 0x4:  MAKE_VECTOR(0x04050607, 0x08090A0B, 0x0C0D0E0F, 0x10111213); break;
+  case 0x5:  MAKE_VECTOR(0x05060708, 0x090A0B0C, 0x0D0E0F10, 0x11121314); break;
+  case 0x6:  MAKE_VECTOR(0x06070809, 0x0A0B0C0D, 0x0E0F1011, 0x12131415); break;
+  case 0x7:  MAKE_VECTOR(0x0708090A, 0x0B0C0D0E, 0x0F101112, 0x13141516); break;
+  case 0x8:  MAKE_VECTOR(0x08090A0B, 0x0C0D0E0F, 0x10111213, 0x14151617); break;
+  case 0x9:  MAKE_VECTOR(0x090A0B0C, 0x0D0E0F10, 0x11121314, 0x15161718); break;
+  case 0xA:  MAKE_VECTOR(0x0A0B0C0D, 0x0E0F1011, 0x12131415, 0x16171819); break;
+  case 0xB:  MAKE_VECTOR(0x0B0C0D0E, 0x0F101112, 0x13141516, 0x1718191A); break;
+  case 0xC:  MAKE_VECTOR(0x0C0D0E0F, 0x10111213, 0x14151617, 0x18191A1B); break;
+  case 0xD:  MAKE_VECTOR(0x0D0E0F10, 0x11121314, 0x15161718, 0x191A1B1C); break;
+  case 0xE:  MAKE_VECTOR(0x0E0F1011, 0x12131415, 0x16171819, 0x1A1B1C1D); break;
+  case 0xF:  MAKE_VECTOR(0x0F101112, 0x13141516, 0x1718191A, 0x1B1C1D1E); break;
   }
+
+#undef MAKE_VECTOR
+
+  VRi(vd) = vector;
+
+#ifdef VXU_LOAD_DEBUG
+  LOG_DEBUG(Xenon, "lvsl: VrD {:#d} = [{:#x},{:#x},{:#x},{:#x}]", vrd, VRi(vd).dword[0],
+    VRi(vd).dword[1], VRi(vd).dword[2], VRi(vd).dword[3]);
+#endif // VXU_LOAD_DEBUG
 }
