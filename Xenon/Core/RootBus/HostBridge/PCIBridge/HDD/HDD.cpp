@@ -4,6 +4,8 @@
 
 #include "Base/Logging/Log.h"
 
+#define HDD_DEBUG
+
 Xe::PCIDev::HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentPCIBridge) :
   PCIDevice(deviceName, size) {
   // Note:
@@ -39,7 +41,7 @@ Xe::PCIDev::HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentP
 
   // Set the SCR's at offset 0xC0 (SiS-like).
   // SStatus.
-  data = 0x00000000;
+  data = 0x00000113;
   memcpy(&pciConfigSpace.data[0xC0], &data, 4); // SSTATUS_DET_NO_DEVICE_DETECTED.
                                                 // SSTATUS_SPD_NO_SPEED.
                                                 // SSTATUS_IPM_NO_DEVICE.
@@ -57,187 +59,105 @@ Xe::PCIDev::HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentP
   // Assign our PCI Bridge pointer
   parentBus = parentPCIBridge;
 
+  // Set regs as if power on with a present HDD.
+  ataState.regs.data = 0;
+  ataState.regs.error = 0;
+  ataState.regs.sectorCount = 0x50;
+  ataState.regs.lbaLow = 0xFFFFFFFF;
+  ataState.regs.lbaMiddle = 0x00000113;
+  ataState.regs.lbaHigh = 0x001d0003;
+  ataState.regs.deviceSelect = 0x00000300;
+  ataState.regs.command = 0x00000040;
+  ataState.regs.deviceControl = 0;
+
   // Device ready to receive commands.
-  ataDeviceState.ataReadState.status = ATA_STATUS_DRDY;
+  ataState.regs.status = ATA_STATUS_DRDY;
 }
 
 void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
-  const u32 regOffset = (readAddress & 0xFF) * 4;
+  const u8 regOffset = static_cast<u8>(readAddress - pciConfigSpace.configSpaceHeader.BAR0);
 
-  if (regOffset < sizeof(ATA_REG_STATE)) {
-    switch (regOffset) {
-    case ATA_REG_DATA:
-      if (!ataDeviceState.readBuffer.empty()) {
-        // First clear the DATA Request.
-        if (ataDeviceState.ataReadState.status & ATA_STATUS_DRQ) {
-          ataDeviceState.ataReadState.status &= ~ATA_STATUS_DRQ;
-        }
-        // We have some data to send out.
-        // Make sure we send the right amount of data.
-        size = (size < ataDeviceState.readBuffer.capacity()
-                         ? size
-                         : ataDeviceState.readBuffer.capacity());
-        // Do the actual copy of data.
-        memcpy(data, ataDeviceState.readBuffer.data(), size);
-        // Remove the readed bytes of the conatiner.
-        ataDeviceState.readBuffer.erase(ataDeviceState.readBuffer.begin(),
-                                        ataDeviceState.readBuffer.begin() +
-                                            size);
-        return;
-      }
-      break;
-    default:
-      break;
-    }
+#ifdef HDD_DEBUG
+  LOG_DEBUG(HDD, "[Read]: Address {:#x}, reg offset {:#x}", readAddress, regOffset);
+#endif // HDD_DEBUG
 
-    memcpy(data, (u8*)&ataDeviceState.ataReadState + regOffset, size);
-  } else {
-    LOG_ERROR(HDD, "Unknown register! Attempted to read 0x{:X}", regOffset);
-    memset(data, 0, size);
+  switch (regOffset)
+  {
+  case ATA_REG_DATA:
+    memcpy(data, &ataState.regs.data, size);
+    break;
+  case ATA_REG_ERROR_FEATURES:
+    memcpy(data, &ataState.regs.error, size);
+    break;
+  case ATA_REG_SECTORCOUNT:
+    memcpy(data, &ataState.regs.sectorCount, size);
+    break;
+  case ATA_REG_LBA_LOW:
+    memcpy(data, &ataState.regs.lbaLow, size);
+    break;
+  case ATA_REG_LBA_MED:
+    memcpy(data, &ataState.regs.lbaMiddle, size);
+    break;
+  case ATA_REG_LBA_HI:
+    memcpy(data, &ataState.regs.lbaHigh, size);
+    break;
+  case ATA_REG_DEV_SEL:
+    memcpy(data, &ataState.regs.deviceSelect, size);
+    break;
+  case ATA_REG_CMD_STATUS:
+    memcpy(data, &ataState.regs.status, size);
+    break;
+  case ATA_REG_DEV_CTRL_ALT_STATUS:
+    memcpy(data, &ataState.regs.altStatus, size);
+    break;
+  default:
+    LOG_ERROR(HDD, "Unknown register {:#x} being read. Byte count = {:#d}", regOffset, size);
+    break;
   }
 }
 
 void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
-  const u32 regOffset = (writeAddress & 0xFF) * 4;
+  const u8 regOffset = static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR0);
 
-  if (regOffset < sizeof(ATA_REG_STATE)) {
-    switch (regOffset) {
-    case ATA_REG_CMD_STATUS:
-      u64 value = 0;
-      memcpy(&value, data, size);
-      switch (value) {
-      case ATA_COMMAND_DEVICE_RESET:
-        break;
-      case ATA_COMMAND_READ_SECTORS:
-        break;
-      case ATA_COMMAND_READ_DMA_EXT:
-        break;
-      case ATA_COMMAND_WRITE_SECTORS:
-        break;
-      case ATA_COMMAND_WRITE_DMA_EXT:
-        break;
-      case ATA_COMMAND_VERIFY:
-        break;
-      case ATA_COMMAND_VERIFY_EXT:
-        break;
-      case ATA_COMMAND_SET_DEVICE_PARAMETERS:
-        break;
-      case ATA_COMMAND_PACKET:
-        break;
-      case ATA_COMMAND_IDENTIFY_PACKET_DEVICE:
-        break;
-      case ATA_COMMAND_READ_MULTIPLE:
-        break;
-      case ATA_COMMAND_WRITE_MULTIPLE:
-        break;
-      case ATA_COMMAND_SET_MULTIPLE_MODE:
-        break;
-      case ATA_COMMAND_READ_DMA:
-        break;
-      case ATA_COMMAND_WRITE_DMA:
-        break;
-      case ATA_COMMAND_STANDBY_IMMEDIATE:
-        break;
-      case ATA_COMMAND_FLUSH_CACHE:
-        break;
-      case ATA_COMMAND_IDENTIFY_DEVICE:
-        // Copy the device indetification data to our read buffer.
-        ataCopyIdentifyDeviceData();
-        // Set data ready flag.
-        ataDeviceState.ataReadState.status |= ATA_STATUS_DRQ;
-        // Raise an interrupt.
-        parentBus->RouteInterrupt(PRIO_SATA_HDD);
-        break;
-      case ATA_COMMAND_SET_FEATURES:
-        break;
-      case ATA_COMMAND_SECURITY_SET_PASSWORD:
-        break;
-      case ATA_COMMAND_SECURITY_UNLOCK:
-        break;
-      case ATA_COMMAND_SECURITY_DISABLE_PASSWORD:
-        break;
-      default:
-        break;
-      }
+#ifdef HDD_DEBUG
+  LOG_DEBUG(HDD, "[Write]: Address {:#x}, reg offset {:#x}", writeAddress, regOffset);
+#endif // HDD_DEBUG
+
+  switch (regOffset)
+  {
+    /*
+  case ATA_REG_DATA:
+    break;
+  case ATA_REG_ERROR_FEATURES:
+    break;
+  case ATA_REG_SECTORCOUNT:
+    break;
+  case ATA_REG_LBA_LOW:
+    break;
+  case ATA_REG_LBA_MED:
+    break;
+  case ATA_REG_LBA_HI:
+    break;
+  case ATA_REG_DEV_SEL:
+    break;
+  case ATA_REG_CMD_STATUS:
+    break;
+  case ATA_REG_DEV_CTRL_ALT_STATUS:
+    break;
+    */
+  default:
+    {
+    u32 inData = 0;
+    memcpy(&inData, data, size);
+    LOG_ERROR(HDD, "Unknown register {:#x} being written. Data {:#x}", regOffset, inData);
     }
-
-    memcpy(reinterpret_cast<u8*>(&ataDeviceState.ataWriteState + regOffset), data, size);
-  } else {
-    LOG_ERROR(HDD, "Unknown register being accessed: (Write) 0x{:X}", regOffset);
+    break;
   }
 }
 
 void Xe::PCIDev::HDD::MemSet(u64 writeAddress, s32 data, u64 size) {
   const u32 regOffset = (writeAddress & 0xFF) * 4;
-
-  if (regOffset < sizeof(ATA_REG_STATE)) {
-    switch (regOffset) {
-    case ATA_REG_CMD_STATUS:
-      u64 value = 0;
-      memset(&value, data, size);
-      switch (value) {
-      case ATA_COMMAND_DEVICE_RESET:
-        break;
-      case ATA_COMMAND_READ_SECTORS:
-        break;
-      case ATA_COMMAND_READ_DMA_EXT:
-        break;
-      case ATA_COMMAND_WRITE_SECTORS:
-        break;
-      case ATA_COMMAND_WRITE_DMA_EXT:
-        break;
-      case ATA_COMMAND_VERIFY:
-        break;
-      case ATA_COMMAND_VERIFY_EXT:
-        break;
-      case ATA_COMMAND_SET_DEVICE_PARAMETERS:
-        break;
-      case ATA_COMMAND_PACKET:
-        break;
-      case ATA_COMMAND_IDENTIFY_PACKET_DEVICE:
-        break;
-      case ATA_COMMAND_READ_MULTIPLE:
-        break;
-      case ATA_COMMAND_WRITE_MULTIPLE:
-        break;
-      case ATA_COMMAND_SET_MULTIPLE_MODE:
-        break;
-      case ATA_COMMAND_READ_DMA:
-        break;
-      case ATA_COMMAND_WRITE_DMA:
-        break;
-      case ATA_COMMAND_STANDBY_IMMEDIATE:
-        break;
-      case ATA_COMMAND_FLUSH_CACHE:
-        break;
-      case ATA_COMMAND_IDENTIFY_DEVICE:
-        // Copy the device indetification data to our read buffer.
-        if (!ataDeviceState.readBuffer.empty())
-          LOG_ERROR(HDD, "Read buffer not empty!");
-        ataDeviceState.readBuffer.resize(sizeof(ATA_IDENTIFY_DATA));
-        memset(ataDeviceState.readBuffer.data(), data, sizeof(ATA_IDENTIFY_DATA));
-        // Set data ready flag.
-        ataDeviceState.ataReadState.status |= ATA_STATUS_DRQ;
-        // Raise an interrupt.
-        parentBus->RouteInterrupt(PRIO_SATA_HDD);
-        break;
-      case ATA_COMMAND_SET_FEATURES:
-        break;
-      case ATA_COMMAND_SECURITY_SET_PASSWORD:
-        break;
-      case ATA_COMMAND_SECURITY_UNLOCK:
-        break;
-      case ATA_COMMAND_SECURITY_DISABLE_PASSWORD:
-        break;
-      default:
-        break;
-      }
-    }
-
-    memset(reinterpret_cast<u8*>(&ataDeviceState.ataWriteState + regOffset), data, size);
-  } else {
-    LOG_ERROR(HDD, "Unknown register! Attempted to write 0x{:X}", regOffset);
-  }
+  LOG_ERROR(HDD, "Unknown register! Attempted to MEMSET {:#x}", regOffset);
 }
 
 void Xe::PCIDev::HDD::ConfigRead(u64 readAddress, u8 *data, u64 size) {
@@ -271,9 +191,9 @@ void Xe::PCIDev::HDD::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
 }
 
 void Xe::PCIDev::HDD::ataCopyIdentifyDeviceData() {
-  if (!ataDeviceState.readBuffer.empty())
+  if (!ataState.readBuffer.empty())
     LOG_ERROR(HDD, "Read buffer not empty!");
 
-  ataDeviceState.readBuffer.resize(sizeof(ATA_IDENTIFY_DATA));
-  memcpy(ataDeviceState.readBuffer.data(), &ataDeviceState.ataIdentifyData, sizeof(ATA_IDENTIFY_DATA));
+  ataState.readBuffer.resize(sizeof(ATA_IDENTIFY_DATA));
+  memcpy(ataState.readBuffer.data(), &ataState.ataIdentifyData, sizeof(ATA_IDENTIFY_DATA));
 }

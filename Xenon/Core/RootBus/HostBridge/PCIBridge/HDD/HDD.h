@@ -51,14 +51,14 @@ namespace PCIDev {
 
 // ATA Registers Offsets
 #define ATA_REG_DATA 0x0
-#define ATA_REG_ERROR 0x4
+#define ATA_REG_ERROR_FEATURES 0x4
 #define ATA_REG_SECTORCOUNT 0x8
 #define ATA_REG_LBA_LOW 0xC
 #define ATA_REG_LBA_MED 0x10
 #define ATA_REG_LBA_HI 0x14
 #define ATA_REG_DEV_SEL 0x18
 #define ATA_REG_CMD_STATUS 0x1C
-#define ATA_REG_DEV_CTRL 0x20
+#define ATA_REG_DEV_CTRL_ALT_STATUS 0x20
 
 // ATA Identify Data
 // This contains all info and parameters of a specific device.
@@ -324,27 +324,29 @@ struct ATA_IDENTIFY_DATA {
 struct ATA_REG_STATE {
   // Command
   u32 data;         // Address 0x00
-  u32 error;        // Address 0x04
+  union {           // Address 0x04
+    u32 error;      // When Read
+    u32 features;   // When Written
+  };                
   u32 sectorCount;  // Address 0x08
   u32 lbaLow;       // Address 0x0C
   u32 lbaMiddle;    // Address 0x10
   u32 lbaHigh;      // Address 0x14
   u32 deviceSelect; // Address 0x18
   union {           // Address 0x1C
-    u32 command;
-    u32 status;
+    u32 status;     // When Read
+    u32 command;    // When Written
   };
   // Control
-  union { // Address 0x20
-    u32 deviceControl;
-    u32 altStatus;
+  union {           // Address 0x20
+    u32 altStatus;      // When Read
+    u32 deviceControl;  // When Written
   };
 };
 
 // ATA Device State
 struct ATA_DEV_STATE {
-  ATA_REG_STATE ataReadState = {0};
-  ATA_REG_STATE ataWriteState = {0};
+  ATA_REG_STATE regs = {0};
   ATA_IDENTIFY_DATA ataIdentifyData = {0};
   std::vector<u8> readBuffer;
   std::vector<u8> writeBufferl;
@@ -365,7 +367,7 @@ private:
   PCIBridge *parentBus;
 
   // Device State
-  ATA_DEV_STATE ataDeviceState = {};
+  ATA_DEV_STATE ataState = {};
 
   void ataCopyIdentifyDeviceData();
 };
