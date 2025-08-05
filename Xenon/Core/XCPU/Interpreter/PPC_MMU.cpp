@@ -130,26 +130,17 @@ inline bool mmuComparePTE(u64 VA, u64 VPN, u64 pte0, u64 pte1, u8 p, bool L, boo
   bool match = false;
 
   // Behave differently for pre-calculated VPN's.
-  if (VPN != 0) {
-    u64 compareMask = 0;
-    switch (p) {
-    case MMU_PAGE_SIZE_4KB:   compareMask = 0xFFFFFFFFFFF00000; break; // VA[0:59]
-    case MMU_PAGE_SIZE_64KB:  compareMask = 0xFFFFFFFFFF000000; break; // VA[0:55]
-    case MMU_PAGE_SIZE_16MB:  compareMask = 0xFFFFFFFF00000000; break; // VA[0:47]
-    }
-
-    const u64 pteVPNAndMask = VPN & compareMask;
-    const u64 vaAndMask = VA & compareMask;
-
-    if (pteVPNAndMask == vaAndMask) { match = true; }
-  } else {
-    // if p < 28, PTEAVPN[52:51 + q] = VA[52 : 51 + q]
-    if (p < 28) {
-      const u64 pteAVPNMask = (PPCRotateMask(52, 51 + q) & pte0);
-      const u64 vaMask = ((PPCRotateMask(36, 35 + q) & VA) >> 16);
-      if (pteAVPNMask == vaMask) { match = true; }
-    }
+  u64 compareMask = 0;
+  switch (p) {
+  case MMU_PAGE_SIZE_4KB:   compareMask = 0xFFFFFFFFFFF00000; break; // VA[0:59]
+  case MMU_PAGE_SIZE_64KB:  compareMask = 0xFFFFFFFFFF000000; break; // VA[0:55]
+  case MMU_PAGE_SIZE_16MB:  compareMask = 0xFFFFFFFF00000000; break; // VA[0:47]
   }
+
+  const u64 pteVPNAndMask = VPN & compareMask;
+  const u64 vaAndMask = VA & compareMask;
+
+  if (pteVPNAndMask == vaAndMask) { match = true; }
 
   // Match
   if (match) {
