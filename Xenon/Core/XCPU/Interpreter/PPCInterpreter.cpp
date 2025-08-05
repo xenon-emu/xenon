@@ -53,11 +53,6 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
     return;
   }
 
-  // XAudioRenderDriverInitialize bypass 2.0.17489.0.
-  if (static_cast<u32>(thread.CIA) == 0x80081830) {
-    return;
-  }
-
   // XamSetPowerMode call to KeSetPowerMode bypass.
   if (static_cast<u32>(thread.CIA) == 0x817AC968) {
     return;
@@ -96,6 +91,12 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
   if (static_cast<u32>(thread.CIA) == 0x80081A60) {
     thread.GPR[11] |= 0x08; // Set bit 3 (ARGON present)
     LOG_INFO(SMC, "Faked XboxHardwareInfo bit 3 to skip HalRecordArgonErrors");
+  }
+
+  // Skip bootanim (for now).
+  if (static_cast<u32>(thread.CIA) == 0x80081EA4) {
+    LOG_INFO(Xenon, "Skipping bootanim load.");
+    thread.GPR[3] = 0;
   }
 
   // This is just to set a PC breakpoint in any PPU/Thread.
