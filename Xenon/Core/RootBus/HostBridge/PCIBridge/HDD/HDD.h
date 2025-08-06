@@ -264,24 +264,31 @@ namespace PCIDev {
 struct ATA_REG_STATE {
   // Command
   u32 data;         // Address 0x00
-  struct {          // Address 0x04
+  struct {          // Address 0x01
     u32 error;      // When Read
     u32 features;   // When Written
   };                
-  u32 sectorCount;  // Address 0x08
-  u32 lbaLow;       // Address 0x0C
-  u32 lbaMiddle;    // Address 0x10
-  u32 lbaHigh;      // Address 0x14
-  u32 deviceSelect; // Address 0x18
-  struct {          // Address 0x1C
+  u32 sectorCount;  // Address 0x02
+  u32 lbaLow;       // Address 0x03
+  u32 lbaMiddle;    // Address 0x04
+  u32 lbaHigh;      // Address 0x05
+  u32 deviceSelect; // Address 0x06
+  struct {          // Address 0x07
     u32 status;     // When Read
     u32 command;    // When Written
   };
   // Control
-  struct {           // Address 0x20
+  struct {           // Address 0xA
     u32 altStatus;      // When Read
     u32 deviceControl;  // When Written
   };
+  u32 SStatus;      // Address 0x10 (4 bytes) 
+  u32 SError;       // Address 0x14 (4 bytes) 
+  u32 SControl;     // Address 0x18 (4 bytes) 
+  u32 SActive;      // Address 0x1C (4 bytes) 
+
+  // Transfer mode, set by the set features command using the subcommand 0x3.
+  u32 ataTransferMode;
 };
 
 // ATA Device State
@@ -311,7 +318,12 @@ private:
   // Device State
   ATA_DEV_STATE ataState = {};
 
+  void ataIssueInterrupt();
+
   void ataCopyIdentifyDeviceData();
+
+  // Utilities
+  static const std::string getATACommandName(u32 commandID);
 };
 
 } // namespace PCIDev

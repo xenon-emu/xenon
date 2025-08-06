@@ -6,6 +6,25 @@
 
 #define HDD_DEBUG
 
+// Describes the ATA transfer modes available to the SET_TRNASFER_MODE subcommand.
+enum class ATA_TRANSFER_MODE {
+  PIO = 0x00,
+  PIO_NO_IORDY = 0x01,
+  PIO_FLOW_CONTROL_MODE3 = 0x08,
+  PIO_FLOW_CONTROL_MODE4 = 0x09,
+  MULTIWORD_DMA_MODE0 = 0x20,
+  MULTIWORD_DMA_MODE1 = 0x21,
+  MULTIWORD_DMA_MODE2 = 0x22,
+  MULTIWORD_DMA_MODE3 = 0x23,
+  ULTRA_DMA_MODE0 = 0x40,
+  ULTRA_DMA_MODE1 = 0x41,
+  ULTRA_DMA_MODE2 = 0x42,
+  ULTRA_DMA_MODE3 = 0x43,
+  ULTRA_DMA_MODE4 = 0x44,
+  ULTRA_DMA_MODE5 = 0x45,
+  ULTRA_DMA_MODE6 = 0x46,
+};
+
 Xe::PCIDev::HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentPCIBridge) :
   PCIDevice(deviceName, size) {
   // Note:
@@ -42,15 +61,22 @@ Xe::PCIDev::HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentP
   // Set the SCR's at offset 0xC0 (SiS-like).
   // SStatus.
   data = 0x00000113;
+  ataState.regs.SStatus = data;
   memcpy(&pciConfigSpace.data[0xC0], &data, 4); // SSTATUS_DET_COM_ESTABLISHED.
                                                 // SSTATUS_SPD_GEN1_COM_SPEED.
                                                 // SSTATUS_IPM_INTERFACE_ACTIVE_STATE.
   // SError.
-  data = 0x001F0201;
+  data = 0x001D0003;
+  ataState.regs.SError = data;
   memcpy(&pciConfigSpace.data[0xC4], &data, 4);
   // SControl.
   data = 0x00000300;
+  ataState.regs.SControl = data;
   memcpy(&pciConfigSpace.data[0xC8], &data, 4); // SCONTROL_IPM_ALL_PM_DISABLED.
+  // SActive
+  data = 0x00000040;
+  ataState.regs.SActive = data;
+  memcpy(&pciConfigSpace.data[0xCC], &data, 4);
 
   // Set our PCI Dev Sizes
   pciDevSizes[0] = 0x20; // BAR0
@@ -59,19 +85,11 @@ Xe::PCIDev::HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentP
   // Assign our PCI Bridge pointer
   parentBus = parentPCIBridge;
 
-  // Set regs as if power on with a present HDD.
-  ataState.regs.data = 0;
-  ataState.regs.error = 0;
-  ataState.regs.sectorCount = 0x50;
-  ataState.regs.lbaLow = 0xFFFFFFFF;
-  ataState.regs.lbaMiddle = 0x00000113;
-  ataState.regs.lbaHigh = 0x001d0003;
-  ataState.regs.deviceSelect = 0x00000300;
-  ataState.regs.command = 0x00000040;
-  ataState.regs.deviceControl = 0;
-
   // Device ready to receive commands.
   ataState.regs.status = ATA_STATUS_DRDY;
+
+  // Mount our HDD image according to config.
+  ataState.mountedHDDImage = std::make_unique<STRIP_UNIQUE(ataState.mountedHDDImage)>(Config::filepaths.hddImage);
 }
 
 void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
@@ -110,6 +128,18 @@ void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
   case ATA_REG_ALT_STATUS:
     memcpy(data, &ataState.regs.altStatus, size);
     break;
+  case ATA_REG_SSTATUS:
+    memcpy(data, &ataState.regs.SStatus, size);
+    break;
+  case ATA_REG_SERROR:
+    memcpy(data, &ataState.regs.SError, size);
+    break;
+  case ATA_REG_SCONTROL:
+    memcpy(data, &ataState.regs.SControl, size);
+    break;
+  case ATA_REG_SACTIVE:
+    memcpy(data, &ataState.regs.SActive, size);
+    break;
   default:
     LOG_ERROR(HDD, "Unknown register {:#x} being read. Byte count = {:#d}", regOffset, size);
     break;
@@ -118,39 +148,142 @@ void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
 
 void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
   const u8 regOffset = static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR0);
+  u32 inData = 0;
+  memcpy(&inData, data, size);
 
 #ifdef HDD_DEBUG
-  LOG_DEBUG(HDD, "[Write]: Address {:#x}, reg offset {:#x}", writeAddress, regOffset);
+  LOG_DEBUG(HDD, "[Write]: Address {:#x}, reg offset {:#x}, data {:#x}", writeAddress, regOffset, inData);
 #endif // HDD_DEBUG
 
   switch (regOffset)
   {
-    /*
   case ATA_REG_DATA:
+    memcpy(&ataState.regs.data, data, size);
     break;
-  case ATA_REG_ERROR_FEATURES:
+  case ATA_REG_FEATURES:
+    memcpy(&ataState.regs.features, data, size);
     break;
   case ATA_REG_SECTORCOUNT:
+    memcpy(&ataState.regs.sectorCount, data, size);
     break;
   case ATA_REG_LBA_LOW:
+    memcpy(&ataState.regs.lbaLow, data, size);
     break;
   case ATA_REG_LBA_MED:
+    memcpy(&ataState.regs.lbaMiddle, data, size);
     break;
   case ATA_REG_LBA_HI:
+    memcpy(&ataState.regs.lbaHigh, data, size);
     break;
   case ATA_REG_DEV_SEL:
+    memcpy(&ataState.regs.deviceSelect, data, size);
     break;
-  case ATA_REG_CMD_STATUS:
-    break;
-  case ATA_REG_DEV_CTRL_ALT_STATUS:
-    break;
-    */
-  default:
+  case ATA_REG_CMD:
+    memcpy(&ataState.regs.command, data, size);
+
+#ifdef HDD_DEBUG
+    LOG_DEBUG(HDD, "[CMD]: Received Command {}", getATACommandName(ataState.regs.command));
+#endif // HDD_DEBUG
+
+    switch (ataState.regs.command)
     {
-    u32 inData = 0;
-    memcpy(&inData, data, size);
-    LOG_ERROR(HDD, "Unknown register {:#x} being written. Data {:#x}", regOffset, inData);
+    case ATA_COMMAND_SET_FEATURES:
+      switch (ataState.regs.features)
+      {
+      case ATA_SF_SUBCOMMAND_SET_TRANSFER_MODE:
+        switch (static_cast<ATA_TRANSFER_MODE>(inData))
+        {
+        case ATA_TRANSFER_MODE::PIO:
+          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to PIO");
+          break;
+        case ATA_TRANSFER_MODE::PIO_NO_IORDY:
+          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to PIO_NO_IORDY");
+          break;
+        case ATA_TRANSFER_MODE::PIO_FLOW_CONTROL_MODE3:
+          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to PIO_FLOW_CONTROL_MODE3");
+          break;
+        case ATA_TRANSFER_MODE::PIO_FLOW_CONTROL_MODE4:
+          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to PIO_FLOW_CONTROL_MODE4");
+          break;
+        case ATA_TRANSFER_MODE::MULTIWORD_DMA_MODE0:
+          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to MULTIWORD_DMA_MODE0");
+          break;
+        case ATA_TRANSFER_MODE::MULTIWORD_DMA_MODE1:
+          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to MULTIWORD_DMA_MODE1");
+          break;
+        case ATA_TRANSFER_MODE::MULTIWORD_DMA_MODE2:
+          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to MULTIWORD_DMA_MODE2");
+          break;
+        case ATA_TRANSFER_MODE::MULTIWORD_DMA_MODE3:
+          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to MULTIWORD_DMA_MODE3");
+          break;
+        case ATA_TRANSFER_MODE::ULTRA_DMA_MODE0:
+          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE0");
+          break;
+        case ATA_TRANSFER_MODE::ULTRA_DMA_MODE1:
+          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE1");
+          break;
+        case ATA_TRANSFER_MODE::ULTRA_DMA_MODE2:
+          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE2");
+          break;
+        case ATA_TRANSFER_MODE::ULTRA_DMA_MODE3:
+          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE3");
+          break;
+        case ATA_TRANSFER_MODE::ULTRA_DMA_MODE4:
+          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE4");
+          break;
+        case ATA_TRANSFER_MODE::ULTRA_DMA_MODE5:
+          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE5");
+          break;
+        case ATA_TRANSFER_MODE::ULTRA_DMA_MODE6:
+          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE6");
+          break;
+        default:
+          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to {:#x}", ataState.regs.sectorCount);
+          break;
+        }
+        
+        ataState.regs.ataTransferMode = inData;
+        break;
+      default:
+        LOG_ERROR(HDD, "[CMD]: Set features {:#x} subcommand unknown.", ataState.regs.features);
+        break;
+      }
+      // Request interrupt.
+      ataIssueInterrupt();
+      break;
+    default:
+      LOG_ERROR(HDD,"Unhandled command received {}", getATACommandName(ataState.regs.command));
+      break;
     }
+
+    break;
+  case ATA_REG_DEV_CTRL:
+    memcpy(&ataState.regs.deviceControl, data, size);
+    break;
+  case ATA_REG_SSTATUS:
+    memcpy(&ataState.regs.SStatus, data, size);
+    // Write also on PCI config space data.
+    memcpy(&pciConfigSpace.data[0xC0], &data, 4);
+    break;
+  case ATA_REG_SERROR:
+    memcpy(&ataState.regs.SError, data, size);
+    // Write also on PCI config space data.
+    memcpy(&pciConfigSpace.data[0xC4], &data, 4);
+    break;
+  case ATA_REG_SCONTROL:
+    memcpy(&ataState.regs.SControl, data, size);
+    // Write also on PCI config space data.
+    memcpy(&pciConfigSpace.data[0xC8], &data, 4);
+
+    if(ataState.regs.SControl & 1)
+    LOG_DEBUG(HDD, "[SCONTROL]: Resetting SATA link!");
+    break;
+  case ATA_REG_SACTIVE:
+    memcpy(&ataState.regs.SActive, data, size);
+    break;
+  default:
+    LOG_ERROR(HDD, "Unknown register {:#x} being written. Data {:#x}", regOffset, inData);
     break;
   }
 }
@@ -191,6 +324,54 @@ void Xe::PCIDev::HDD::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &tmp, size);
 }
 
+// Issues an interrupt to the XCPU.
+void Xe::PCIDev::HDD::ataIssueInterrupt() {
+  parentBus->RouteInterrupt(PRIO_SATA_HDD);
+}
+
 void Xe::PCIDev::HDD::ataCopyIdentifyDeviceData() {
   
+}
+
+
+//
+// Utilities
+//
+
+static const std::unordered_map<u32, const std::string> ataCommandNameMap = {
+    { 0x08, "DEVICE_RESET" },
+    { 0x20, "READ_SECTORS" },
+    { 0x25, "READ_DMA_EXT" },
+    { 0x30, "WRITE_SECTORS" },
+    { 0x35, "WRITE_DMA_EXT" },
+    { 0x40, "READ_VERIFY_SECTORS" },
+    { 0x42, "READ_VERIFY_SECTORS_EXT" },
+    { 0x60, "READ_FPDMA_QUEUED" },
+    { 0x91, "SET_DEVICE_PARAMETERS" },
+    { 0xA0, "PACKET" },
+    { 0xA1, "IDENTIFY_PACKET_DEVICE" },
+    { 0xC4, "READ_MULTIPLE" },
+    { 0xC5, "WRITE_MULTIPLE" },
+    { 0xC6, "SET_MULTIPLE_MODE" },
+    { 0xC8, "READ_DMA" },
+    { 0xCA, "WRITE_DMA" },
+    { 0xE0, "STANDBY_IMMEDIATE" },
+    { 0xE7, "FLUSH_CACHE" },
+    { 0xEC, "IDENTIFY_DEVICE" },
+    { 0xEF, "SET_FEATURES" },
+    { 0xF1, "SECURITY_SET_PASSWORD" },
+    { 0xF2, "SECURITY_UNLOCK" },
+    { 0xF6, "SECURITY_DISABLE_PASSWORD" }
+};
+
+// Returns the command name as an std::string.
+const std::string Xe::PCIDev::HDD::getATACommandName(u32 commandID) {
+  auto it = ataCommandNameMap.find(commandID);
+  if (it != ataCommandNameMap.end()) {
+    return it->second;
+  }
+  else {
+    LOG_ERROR(Xenos, "Unknown Command: {:#x}", commandID);
+    return "Unknown Command";
+  }
 }

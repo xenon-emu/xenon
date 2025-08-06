@@ -74,26 +74,34 @@
 // Features Reg (Write)
 #define ATA_REG_FEATURES      0x1
 // Sector Count Reg (Read/Write)
-#define ATA_REG_SECTORCOUNT   0x8
+#define ATA_REG_SECTORCOUNT   0x2
 // LBA Low Reg (Read/Write)
-#define ATA_REG_LBA_LOW       0xC
+#define ATA_REG_LBA_LOW       0x3
 // LBA Med Reg (Read/Write)
-#define ATA_REG_LBA_MED       0x10
+#define ATA_REG_LBA_MED       0x4
 // LBA High Reg (Read/Write)
-#define ATA_REG_LBA_HI        0x14
+#define ATA_REG_LBA_HI        0x5
 // Device Reg (Read/Write)
-#define ATA_REG_DEV_SEL       0x18
+#define ATA_REG_DEV_SEL       0x6
 // Status Reg (Read)
-#define ATA_REG_STATUS        0x1C
+#define ATA_REG_STATUS        0x7
 // Command Reg (Write)
-#define ATA_REG_CMD           0x1C
+#define ATA_REG_CMD           0x7
 
 // Control Block registers
 
 // Data Reg (Read/Write)
-#define ATA_REG_ALT_STATUS    0x20
+#define ATA_REG_ALT_STATUS    0xA
 // Data Reg (Read/Write)
-#define ATA_REG_DEV_CTRL      0x20
+#define ATA_REG_DEV_CTRL      0xA
+
+// SStatus, SError, SControl and SActive are also accessible thru bridge registers, this means
+// software does not need to access config space for reading them.
+
+#define ATA_REG_SSTATUS   0x10
+#define ATA_REG_SERROR    0x14
+#define ATA_REG_SCONTROL  0x18
+#define ATA_REG_SACTIVE   0x1C // TODO: Verify this.
 
 
 //
@@ -296,6 +304,14 @@
 #define ATA_COMMAND_SECURITY_SET_PASSWORD 0xF1
 #define ATA_COMMAND_SECURITY_UNLOCK 0xF2
 #define ATA_COMMAND_SECURITY_DISABLE_PASSWORD 0xF6
+
+//
+// Set Features Subcommnads list
+//
+
+// Note: Adding as per needed.
+
+#define ATA_SF_SUBCOMMAND_SET_TRANSFER_MODE 0x3
 
 //
 // IDE feature flags for an ATAPI device
