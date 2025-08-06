@@ -32,15 +32,15 @@ void Xe::PCIDev::ODD::atapiIdentifyPacketDeviceCommand() {
   // This command is only for ATAPI devices
   LOG_DEBUG(ODD, "ATAPI_IDENTIFY_PACKET_DEVICE_COMMAND");
 
-  if (!atapiState.dataReadBuffer.init(sizeof(XE_ATA_IDENTIFY_DATA), true)) {
+  if (!atapiState.dataReadBuffer.init(sizeof(XE_ATAPI_IDENTIFY_DATA), true)) {
     LOG_ERROR(ODD, "Failed to initialize data buffer for atapiIdentifyPacketDeviceCommand");
   }
 
-  XE_ATA_IDENTIFY_DATA* identifyData;
+  XE_ATAPI_IDENTIFY_DATA* identifyData;
 
   // Reset the pointer
   atapiState.dataReadBuffer.reset();
-  identifyData = (XE_ATA_IDENTIFY_DATA*)atapiState.dataReadBuffer.get();
+  identifyData = (XE_ATAPI_IDENTIFY_DATA*)atapiState.dataReadBuffer.get();
 
   // The data is stored in little endian
   constexpr u8 serialNumber[] = { 0x38, 0x44, 0x33, 0x31, 0x42, 0x42, 0x34, 0x32,
@@ -76,7 +76,7 @@ void Xe::PCIDev::ODD::atapiIdentifyPacketDeviceCommand() {
 
   // Set the transfer size:
   // bytecount = LBA High << 8 | LBA Mid
-  constexpr size_t dataSize = sizeof(XE_ATA_IDENTIFY_DATA);
+  constexpr size_t dataSize = sizeof(XE_ATAPI_IDENTIFY_DATA);
 
   atapiState.atapiRegs.lbaLowReg = 1;
   atapiState.atapiRegs.byteCountLowReg = dataSize & 0xFF;
@@ -240,8 +240,8 @@ Xe::PCIDev::ODD::ODD(const char* deviceName, u64 size,
   // Set the SCR's at offset 0xC0 (SiS-like)
   // SStatus
   data = 0x00000113;
-  memcpy(&pciConfigSpace.data[0xC0], &data, 4); // SSTATUS_DET_COM_ESTABLISHED
-                                                // SSTATUS_SPD_GEN1_COM_SPEED
+  memcpy(&pciConfigSpace.data[0xC0], &data, 4); // SSTATUS_DET_COM_ESTABLISHED.
+                                                // SSTATUS_SPD_GEN1_COM_SPEED.
                                                 // SSTATUS_IPM_INTERFACE_ACTIVE_STATE
   // SError
   data = 0x001F0201;
@@ -554,7 +554,7 @@ void Xe::PCIDev::ODD::MemSet(u64 writeAddress, s32 data, u64 size) {
         memset(atapiState.dataReadBuffer.get(), data, size);
         // Set the transfer size:
         // bytecount = LBA High << 8 | LBA Mid
-        constexpr size_t dataSize = sizeof(XE_ATA_IDENTIFY_DATA);
+        constexpr size_t dataSize = sizeof(XE_ATAPI_IDENTIFY_DATA);
         atapiState.atapiRegs.lbaLowReg = 1;
         atapiState.atapiRegs.byteCountLowReg = dataSize & 0xFF;
         atapiState.atapiRegs.byteCountHighReg = (dataSize >> 8) & 0xFF;
