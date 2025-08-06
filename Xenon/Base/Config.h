@@ -207,6 +207,8 @@ inline struct _filepaths {
   std::string nand = "nand.bin";
   // ODD Image path
   std::string oddImage = "xenon.iso";
+  // HDD Image path
+  std::string hddImage = "xenonHDD.img";
   // Elf binary path
   std::string elfBinary = "kernel.elf";
 
@@ -220,6 +222,8 @@ inline struct _filepaths {
     nand = nandPath.string();
     auto oddImagePath = basePath / oddImage;
     oddImage = oddImagePath.string();
+    auto hddImagePath = basePath / hddImage;
+    hddImage = hddImagePath.string();
     auto elfBinaryPath = basePath / elfBinary;
     elfBinary = elfBinaryPath.string();
   }

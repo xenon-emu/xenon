@@ -365,6 +365,7 @@ void _filepaths::from_toml(const toml::value &value) {
   oneBl = toml::find_or<std::string>(value, "OneBL", oneBl);
   nand = toml::find_or<std::string>(value, "Nand", nand);
   oddImage = toml::find_or<std::string>(value, "ODDImage", oddImage);
+  hddImage = toml::find_or<std::string>(value, "HDDImage", hddImage);
   elfBinary = toml::find_or<std::string>(value, "ElfBinary", elfBinary);
 }
 void _filepaths::to_toml(toml::value &value) {
@@ -372,10 +373,12 @@ void _filepaths::to_toml(toml::value &value) {
   value.comments().push_back("# Only Fuses, OneBL, and Nand are required");
   value.comments().push_back("# ElfBinary is used in the elf loader");
   value.comments().push_back("# ODDImage is Optical Disc Drive Image, takes an ISO file for Linux");
+  value.comments().push_back("# HDDImage is the Hard Drive Disc Image, takes an Xbox360 Formatted (FATX) HDD image for the Xbox System/Linux storage purposes");
   value["Fuses"] = fuses;
   value["OneBL"] = oneBl;
   value["Nand"] = nand;
   value["ODDImage"] = oddImage;
+  value["HDDImage"] = hddImage;
   value["ElfBinary"] = elfBinary;
 }
 bool _filepaths::verify_toml(toml::value &value) {
@@ -384,12 +387,14 @@ bool _filepaths::verify_toml(toml::value &value) {
   cache_value(oneBl);
   cache_value(nand);
   cache_value(oddImage);
+  cache_value(hddImage);
   cache_value(elfBinary);
   from_toml(value);
   verify_value(fuses);
   verify_value(oneBl);
   verify_value(nand);
   verify_value(oddImage);
+  verify_value(hddImage);
   verify_value(elfBinary);
   return true;
 }
