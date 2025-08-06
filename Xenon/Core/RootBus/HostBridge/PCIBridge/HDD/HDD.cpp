@@ -93,199 +93,244 @@ Xe::PCIDev::HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentP
 }
 
 void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
-  const u8 regOffset = static_cast<u8>(readAddress - pciConfigSpace.configSpaceHeader.BAR0);
+  // PCI BAR0 is the Primary Command Block Base Address
+  u8 ataCommandReg =
+    static_cast<u8>(readAddress - pciConfigSpace.configSpaceHeader.BAR0);
+
+  // PCI BAR1 is the DMA Block Base Address
+  u8 ataControlReg =
+    static_cast<u8>(readAddress - pciConfigSpace.configSpaceHeader.BAR1);
 
 #ifdef HDD_DEBUG
-  LOG_DEBUG(HDD, "[Read]: Address {:#x}, reg offset {:#x}", readAddress, regOffset);
+  LOG_DEBUG(HDD, "[Read]: Address {:#x}, reg offset {:#x}", readAddress, readAddress & 0xFF);
 #endif // HDD_DEBUG
 
-  switch (regOffset)
-  {
-  case ATA_REG_DATA:
-    memcpy(data, &ataState.regs.data, size);
-    break;
-  case ATA_REG_ERROR:
-    memcpy(data, &ataState.regs.error, size);
-    break;
-  case ATA_REG_SECTORCOUNT:
-    memcpy(data, &ataState.regs.sectorCount, size);
-    break;
-  case ATA_REG_LBA_LOW:
-    memcpy(data, &ataState.regs.lbaLow, size);
-    break;
-  case ATA_REG_LBA_MED:
-    memcpy(data, &ataState.regs.lbaMiddle, size);
-    break;
-  case ATA_REG_LBA_HI:
-    memcpy(data, &ataState.regs.lbaHigh, size);
-    break;
-  case ATA_REG_DEV_SEL:
-    memcpy(data, &ataState.regs.deviceSelect, size);
-    break;
-  case ATA_REG_STATUS:
-    memcpy(data, &ataState.regs.status, size);
-    break;
-  case ATA_REG_ALT_STATUS:
-    memcpy(data, &ataState.regs.altStatus, size);
-    break;
-  case ATA_REG_SSTATUS:
-    memcpy(data, &ataState.regs.SStatus, size);
-    break;
-  case ATA_REG_SERROR:
-    memcpy(data, &ataState.regs.SError, size);
-    break;
-  case ATA_REG_SCONTROL:
-    memcpy(data, &ataState.regs.SControl, size);
-    break;
-  case ATA_REG_SACTIVE:
-    memcpy(data, &ataState.regs.SActive, size);
-    break;
-  default:
-    LOG_ERROR(HDD, "Unknown register {:#x} being read. Byte count = {:#d}", regOffset, size);
-    break;
+  // Command Registers
+  if (ataCommandReg < (pciConfigSpace.configSpaceHeader.BAR1 -
+    pciConfigSpace.configSpaceHeader.BAR0)) {
+
+    switch (ataCommandReg)
+    {
+    case ATA_REG_DATA:
+      memcpy(data, &ataState.regs.data, size);
+      break;
+    case ATA_REG_ERROR:
+      memcpy(data, &ataState.regs.error, size);
+      break;
+    case ATA_REG_SECTORCOUNT:
+      memcpy(data, &ataState.regs.sectorCount, size);
+      break;
+    case ATA_REG_LBA_LOW:
+      memcpy(data, &ataState.regs.lbaLow, size);
+      break;
+    case ATA_REG_LBA_MED:
+      memcpy(data, &ataState.regs.lbaMiddle, size);
+      break;
+    case ATA_REG_LBA_HI:
+      memcpy(data, &ataState.regs.lbaHigh, size);
+      break;
+    case ATA_REG_DEV_SEL:
+      memcpy(data, &ataState.regs.deviceSelect, size);
+      break;
+    case ATA_REG_STATUS:
+      memcpy(data, &ataState.regs.status, size);
+      break;
+    case ATA_REG_ALT_STATUS:
+      memcpy(data, &ataState.regs.altStatus, size);
+      break;
+    case ATA_REG_SSTATUS:
+      memcpy(data, &ataState.regs.SStatus, size);
+      break;
+    case ATA_REG_SERROR:
+      memcpy(data, &ataState.regs.SError, size);
+      break;
+    case ATA_REG_SCONTROL:
+      memcpy(data, &ataState.regs.SControl, size);
+      break;
+    case ATA_REG_SACTIVE:
+      memcpy(data, &ataState.regs.SActive, size);
+      break;
+    default:
+      LOG_ERROR(HDD, "Unknown command register {:#x} being read. Byte count = {:#d}", ataCommandReg, size);
+      break;
+    }
+  } else {  // Control (DMA) registers   
+    switch (ataControlReg)
+    {
+    default:
+      LOG_ERROR(HDD, "Unknown control register {:#x} being read. Byte count = {:#d}", ataControlReg, size);
+      break;
+    }
   }
 }
 
 void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
-  const u8 regOffset = static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR0);
+
+  // PCI BAR0 is the Primary Command Block Base Address
+  u8 ataCommandReg =
+    static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR0);
+
+  // PCI BAR1 is the DMA Block Base Address
+  u8 ataControlReg =
+    static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR1);
+  
   u32 inData = 0;
   memcpy(&inData, data, size);
 
 #ifdef HDD_DEBUG
-  LOG_DEBUG(HDD, "[Write]: Address {:#x}, reg offset {:#x}, data {:#x}", writeAddress, regOffset, inData);
+  LOG_DEBUG(HDD, "[Write]: Address {:#x}, reg offset {:#x}, data {:#x}", writeAddress, writeAddress & 0xFF, inData);
 #endif // HDD_DEBUG
 
-  switch (regOffset)
-  {
-  case ATA_REG_DATA:
-    memcpy(&ataState.regs.data, data, size);
-    break;
-  case ATA_REG_FEATURES:
-    memcpy(&ataState.regs.features, data, size);
-    break;
-  case ATA_REG_SECTORCOUNT:
-    memcpy(&ataState.regs.sectorCount, data, size);
-    break;
-  case ATA_REG_LBA_LOW:
-    memcpy(&ataState.regs.lbaLow, data, size);
-    break;
-  case ATA_REG_LBA_MED:
-    memcpy(&ataState.regs.lbaMiddle, data, size);
-    break;
-  case ATA_REG_LBA_HI:
-    memcpy(&ataState.regs.lbaHigh, data, size);
-    break;
-  case ATA_REG_DEV_SEL:
-    memcpy(&ataState.regs.deviceSelect, data, size);
-    break;
-  case ATA_REG_CMD:
-    memcpy(&ataState.regs.command, data, size);
+  // Command Registers
+  if (ataCommandReg < (pciConfigSpace.configSpaceHeader.BAR1 -
+    pciConfigSpace.configSpaceHeader.BAR0)) {
+    const u8 regOffset = static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR0);
+
+    switch (regOffset)
+    {
+    case ATA_REG_DATA:
+      memcpy(&ataState.regs.data, data, size);
+      break;
+    case ATA_REG_FEATURES:
+      memcpy(&ataState.regs.features, data, size);
+      break;
+    case ATA_REG_SECTORCOUNT:
+      memcpy(&ataState.regs.sectorCount, data, size);
+      break;
+    case ATA_REG_LBA_LOW:
+      memcpy(&ataState.regs.lbaLow, data, size);
+      break;
+    case ATA_REG_LBA_MED:
+      memcpy(&ataState.regs.lbaMiddle, data, size);
+      break;
+    case ATA_REG_LBA_HI:
+      memcpy(&ataState.regs.lbaHigh, data, size);
+      break;
+    case ATA_REG_DEV_SEL:
+      memcpy(&ataState.regs.deviceSelect, data, size);
+      break;
+    case ATA_REG_CMD:
+      memcpy(&ataState.regs.command, data, size);
 
 #ifdef HDD_DEBUG
-    LOG_DEBUG(HDD, "[CMD]: Received Command {}", getATACommandName(ataState.regs.command));
+      LOG_DEBUG(HDD, "[CMD]: Received Command {}", getATACommandName(ataState.regs.command));
 #endif // HDD_DEBUG
 
-    switch (ataState.regs.command)
-    {
-    case ATA_COMMAND_SET_FEATURES:
-      switch (ataState.regs.features)
+      switch (ataState.regs.command)
       {
-      case ATA_SF_SUBCOMMAND_SET_TRANSFER_MODE:
-        switch (static_cast<ATA_TRANSFER_MODE>(inData))
+      case ATA_COMMAND_SET_FEATURES:
+        switch (ataState.regs.features)
         {
-        case ATA_TRANSFER_MODE::PIO:
-          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to PIO");
-          break;
-        case ATA_TRANSFER_MODE::PIO_NO_IORDY:
-          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to PIO_NO_IORDY");
-          break;
-        case ATA_TRANSFER_MODE::PIO_FLOW_CONTROL_MODE3:
-          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to PIO_FLOW_CONTROL_MODE3");
-          break;
-        case ATA_TRANSFER_MODE::PIO_FLOW_CONTROL_MODE4:
-          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to PIO_FLOW_CONTROL_MODE4");
-          break;
-        case ATA_TRANSFER_MODE::MULTIWORD_DMA_MODE0:
-          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to MULTIWORD_DMA_MODE0");
-          break;
-        case ATA_TRANSFER_MODE::MULTIWORD_DMA_MODE1:
-          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to MULTIWORD_DMA_MODE1");
-          break;
-        case ATA_TRANSFER_MODE::MULTIWORD_DMA_MODE2:
-          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to MULTIWORD_DMA_MODE2");
-          break;
-        case ATA_TRANSFER_MODE::MULTIWORD_DMA_MODE3:
-          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to MULTIWORD_DMA_MODE3");
-          break;
-        case ATA_TRANSFER_MODE::ULTRA_DMA_MODE0:
-          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE0");
-          break;
-        case ATA_TRANSFER_MODE::ULTRA_DMA_MODE1:
-          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE1");
-          break;
-        case ATA_TRANSFER_MODE::ULTRA_DMA_MODE2:
-          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE2");
-          break;
-        case ATA_TRANSFER_MODE::ULTRA_DMA_MODE3:
-          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE3");
-          break;
-        case ATA_TRANSFER_MODE::ULTRA_DMA_MODE4:
-          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE4");
-          break;
-        case ATA_TRANSFER_MODE::ULTRA_DMA_MODE5:
-          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE5");
-          break;
-        case ATA_TRANSFER_MODE::ULTRA_DMA_MODE6:
-          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE6");
-          break;
+        case ATA_SF_SUBCOMMAND_SET_TRANSFER_MODE:
+        {
+          ATA_TRANSFER_MODE mode = static_cast<ATA_TRANSFER_MODE>(ataState.regs.sectorCount);
+          switch (mode)
+          {
+          case ATA_TRANSFER_MODE::PIO:
+            LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to PIO");
+            break;
+          case ATA_TRANSFER_MODE::PIO_NO_IORDY:
+            LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to PIO_NO_IORDY");
+            break;
+          case ATA_TRANSFER_MODE::PIO_FLOW_CONTROL_MODE3:
+            LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to PIO_FLOW_CONTROL_MODE3");
+            break;
+          case ATA_TRANSFER_MODE::PIO_FLOW_CONTROL_MODE4:
+            LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to PIO_FLOW_CONTROL_MODE4");
+            break;
+          case ATA_TRANSFER_MODE::MULTIWORD_DMA_MODE0:
+            LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to MULTIWORD_DMA_MODE0");
+            break;
+          case ATA_TRANSFER_MODE::MULTIWORD_DMA_MODE1:
+            LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to MULTIWORD_DMA_MODE1");
+            break;
+          case ATA_TRANSFER_MODE::MULTIWORD_DMA_MODE2:
+            LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to MULTIWORD_DMA_MODE2");
+            break;
+          case ATA_TRANSFER_MODE::MULTIWORD_DMA_MODE3:
+            LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to MULTIWORD_DMA_MODE3");
+            break;
+          case ATA_TRANSFER_MODE::ULTRA_DMA_MODE0:
+            LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE0");
+            break;
+          case ATA_TRANSFER_MODE::ULTRA_DMA_MODE1:
+            LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE1");
+            break;
+          case ATA_TRANSFER_MODE::ULTRA_DMA_MODE2:
+            LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE2");
+            break;
+          case ATA_TRANSFER_MODE::ULTRA_DMA_MODE3:
+            LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE3");
+            break;
+          case ATA_TRANSFER_MODE::ULTRA_DMA_MODE4:
+            LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE4");
+            break;
+          case ATA_TRANSFER_MODE::ULTRA_DMA_MODE5:
+            LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE5");
+            break;
+          case ATA_TRANSFER_MODE::ULTRA_DMA_MODE6:
+            LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE6");
+            break;
+          default:
+            LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to {:#x}", ataState.regs.sectorCount);
+            break;
+          }
+
+          ataState.regs.ataTransferMode = inData;
+        }
+        break;
         default:
-          LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to {:#x}", ataState.regs.sectorCount);
+          LOG_ERROR(HDD, "[CMD]: Set features {:#x} subcommand unknown.", ataState.regs.features);
           break;
         }
-        
-        ataState.regs.ataTransferMode = inData;
+        // Request interrupt.
+        ataIssueInterrupt();
         break;
       default:
-        LOG_ERROR(HDD, "[CMD]: Set features {:#x} subcommand unknown.", ataState.regs.features);
+        LOG_ERROR(HDD, "Unhandled command received {}", getATACommandName(ataState.regs.command));
         break;
       }
-      // Request interrupt.
-      ataIssueInterrupt();
+
+      break;
+    case ATA_REG_DEV_CTRL:
+      memcpy(&ataState.regs.deviceControl, data, size);
+      break;
+    case ATA_REG_SSTATUS:
+      memcpy(&ataState.regs.SStatus, data, size);
+      // Write also on PCI config space data.
+      memcpy(&pciConfigSpace.data[0xC0], &data, 4);
+      break;
+    case ATA_REG_SERROR:
+      memcpy(&ataState.regs.SError, data, size);
+      // Write also on PCI config space data.
+      memcpy(&pciConfigSpace.data[0xC4], &data, 4);
+      break;
+    case ATA_REG_SCONTROL:
+      memcpy(&ataState.regs.SControl, data, size);
+      // Write also on PCI config space data.
+      memcpy(&pciConfigSpace.data[0xC8], &data, 4);
+
+      if (ataState.regs.SControl & 1)
+        LOG_DEBUG(HDD, "[SCONTROL]: Resetting SATA link!");
+      break;
+    case ATA_REG_SACTIVE:
+      memcpy(&ataState.regs.SActive, data, size);
       break;
     default:
-      LOG_ERROR(HDD,"Unhandled command received {}", getATACommandName(ataState.regs.command));
+      LOG_ERROR(HDD, "Unknown register {:#x} being written. Data {:#x}", regOffset, inData);
       break;
     }
-
-    break;
-  case ATA_REG_DEV_CTRL:
-    memcpy(&ataState.regs.deviceControl, data, size);
-    break;
-  case ATA_REG_SSTATUS:
-    memcpy(&ataState.regs.SStatus, data, size);
-    // Write also on PCI config space data.
-    memcpy(&pciConfigSpace.data[0xC0], &data, 4);
-    break;
-  case ATA_REG_SERROR:
-    memcpy(&ataState.regs.SError, data, size);
-    // Write also on PCI config space data.
-    memcpy(&pciConfigSpace.data[0xC4], &data, 4);
-    break;
-  case ATA_REG_SCONTROL:
-    memcpy(&ataState.regs.SControl, data, size);
-    // Write also on PCI config space data.
-    memcpy(&pciConfigSpace.data[0xC8], &data, 4);
-
-    if(ataState.regs.SControl & 1)
-    LOG_DEBUG(HDD, "[SCONTROL]: Resetting SATA link!");
-    break;
-  case ATA_REG_SACTIVE:
-    memcpy(&ataState.regs.SActive, data, size);
-    break;
-  default:
-    LOG_ERROR(HDD, "Unknown register {:#x} being written. Data {:#x}", regOffset, inData);
-    break;
-  }
+  } else {
+    // Control (DMA) registers
+    const u8 regOffset = static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR1);
+  
+    switch (regOffset)
+    {
+    default:
+      LOG_ERROR(HDD, "Unknown control register {:#x} being written. Byte count = {:#d}", regOffset, size);
+      break;
+    }
+}
 }
 
 void Xe::PCIDev::HDD::MemSet(u64 writeAddress, s32 data, u64 size) {
