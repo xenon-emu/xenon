@@ -42,9 +42,9 @@ Xe::PCIDev::HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentP
   // Set the SCR's at offset 0xC0 (SiS-like).
   // SStatus.
   data = 0x00000113;
-  memcpy(&pciConfigSpace.data[0xC0], &data, 4); // SSTATUS_DET_NO_DEVICE_DETECTED.
-                                                // SSTATUS_SPD_NO_SPEED.
-                                                // SSTATUS_IPM_NO_DEVICE.
+  memcpy(&pciConfigSpace.data[0xC0], &data, 4); // SSTATUS_DET_COM_ESTABLISHED.
+                                                // SSTATUS_SPD_GEN1_COM_SPEED.
+                                                // SSTATUS_IPM_INTERFACE_ACTIVE_STATE.
   // SError.
   data = 0x001F0201;
   memcpy(&pciConfigSpace.data[0xC4], &data, 4);
@@ -86,7 +86,7 @@ void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
   case ATA_REG_DATA:
     memcpy(data, &ataState.regs.data, size);
     break;
-  case ATA_REG_ERROR_FEATURES:
+  case ATA_REG_ERROR:
     memcpy(data, &ataState.regs.error, size);
     break;
   case ATA_REG_SECTORCOUNT:
@@ -104,10 +104,10 @@ void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
   case ATA_REG_DEV_SEL:
     memcpy(data, &ataState.regs.deviceSelect, size);
     break;
-  case ATA_REG_CMD_STATUS:
+  case ATA_REG_STATUS:
     memcpy(data, &ataState.regs.status, size);
     break;
-  case ATA_REG_DEV_CTRL_ALT_STATUS:
+  case ATA_REG_ALT_STATUS:
     memcpy(data, &ataState.regs.altStatus, size);
     break;
   default:
@@ -160,10 +160,11 @@ void Xe::PCIDev::HDD::MemSet(u64 writeAddress, s32 data, u64 size) {
   LOG_ERROR(HDD, "Unknown register! Attempted to MEMSET {:#x}", regOffset);
 }
 
+// Config read.
 void Xe::PCIDev::HDD::ConfigRead(u64 readAddress, u8 *data, u64 size) {
   memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], size);
 }
-
+// Config write.
 void Xe::PCIDev::HDD::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   // Check if we're being scanned
   u64 tmp = 0;
@@ -191,9 +192,5 @@ void Xe::PCIDev::HDD::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
 }
 
 void Xe::PCIDev::HDD::ataCopyIdentifyDeviceData() {
-  if (!ataState.readBuffer.empty())
-    LOG_ERROR(HDD, "Read buffer not empty!");
-
-  ataState.readBuffer.resize(sizeof(ATA_IDENTIFY_DATA));
-  memcpy(ataState.readBuffer.data(), &ataState.ataIdentifyData, sizeof(ATA_IDENTIFY_DATA));
+  
 }
