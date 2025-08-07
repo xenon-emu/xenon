@@ -109,8 +109,7 @@ void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
   if (ataCommandReg < (pciConfigSpace.configSpaceHeader.BAR1 -
     pciConfigSpace.configSpaceHeader.BAR0)) {
 
-    switch (ataCommandReg)
-    {
+    switch (ataCommandReg) {
     case ATA_REG_DATA:
       memcpy(data, &ataState.regs.data, size);
       break;
@@ -154,9 +153,8 @@ void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
       LOG_ERROR(HDD, "Unknown command register {:#x} being read. Byte count = {:#d}", ataCommandReg, size);
       break;
     }
-  } else {  // Control (DMA) registers   
-    switch (ataControlReg)
-    {
+  } else {  // Control (DMA) registers
+    switch (ataControlReg) {
     default:
       LOG_ERROR(HDD, "Unknown control register {:#x} being read. Byte count = {:#d}", ataControlReg, size);
       break;
@@ -173,7 +171,7 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
   // PCI BAR1 is the DMA Block Base Address
   u8 ataControlReg =
     static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR1);
-  
+
   u32 inData = 0;
   memcpy(&inData, data, size);
 
@@ -216,16 +214,12 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
       LOG_DEBUG(HDD, "[CMD]: Received Command {}", getATACommandName(ataState.regs.command));
 #endif // HDD_DEBUG
 
-      switch (ataState.regs.command)
-      {
+      switch (ataState.regs.command) {
       case ATA_COMMAND_SET_FEATURES:
-        switch (ataState.regs.features)
-        {
-        case ATA_SF_SUBCOMMAND_SET_TRANSFER_MODE:
-        {
+        switch (ataState.regs.features) {
+        case ATA_SF_SUBCOMMAND_SET_TRANSFER_MODE: {
           ATA_TRANSFER_MODE mode = static_cast<ATA_TRANSFER_MODE>(ataState.regs.sectorCount);
-          switch (mode)
-          {
+          switch (mode) {
           case ATA_TRANSFER_MODE::PIO:
             LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to PIO");
             break;
@@ -275,7 +269,6 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
             LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to {:#x}", ataState.regs.sectorCount);
             break;
           }
-
           ataState.regs.ataTransferMode = inData;
         }
         break;
@@ -283,7 +276,7 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
           LOG_ERROR(HDD, "[CMD]: Set features {:#x} subcommand unknown.", ataState.regs.features);
           break;
         }
-        // Request interrupt.
+        // Request interrupt
         ataIssueInterrupt();
         break;
       default:
@@ -297,7 +290,7 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
       break;
     case ATA_REG_SSTATUS:
       memcpy(&ataState.regs.SStatus, data, size);
-      // Write also on PCI config space data.
+      // Write also on PCI config space data
       memcpy(&pciConfigSpace.data[0xC0], &data, 4);
       break;
     case ATA_REG_SERROR:
@@ -323,14 +316,13 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
   } else {
     // Control (DMA) registers
     const u8 regOffset = static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR1);
-  
-    switch (regOffset)
-    {
+
+    switch (regOffset) {
     default:
       LOG_ERROR(HDD, "Unknown control register {:#x} being written. Byte count = {:#d}", regOffset, size);
       break;
     }
-}
+  }
 }
 
 void Xe::PCIDev::HDD::MemSet(u64 writeAddress, s32 data, u64 size) {
