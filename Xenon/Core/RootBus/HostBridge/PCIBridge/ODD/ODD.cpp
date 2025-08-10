@@ -14,11 +14,6 @@ void Xe::PCIDev::ODD::atapiReset() {
   atapiState.dataWriteBuffer.reset();
   atapiState.dataReadBuffer.init(ATAPI_CDROM_SECTOR_SIZE, true);
   atapiState.dataReadBuffer.reset();
-  // These seem to be used to detect the presence of a disc drive
-  atapiState.atapiRegs.unk_10 = 0x0;
-  atapiState.atapiRegs.unk_14 = 0x0;
-  atapiState.atapiRegs.signatureReg = 0xEB140101;
-  atapiState.atapiRegs.unk_1C = 0x0;
 
   // Set our Inquiry Data
   constexpr char vendorIdentification[] = "PLDS   16D2S";
@@ -240,15 +235,22 @@ Xe::PCIDev::ODD::ODD(const char* deviceName, u64 size,
   // Set the SCR's at offset 0xC0 (SiS-like)
   // SStatus
   data = 0x00000113;
+  atapiState.atapiRegs.SStatus = data;
   memcpy(&pciConfigSpace.data[0xC0], &data, 4); // SSTATUS_DET_COM_ESTABLISHED.
                                                 // SSTATUS_SPD_GEN1_COM_SPEED.
                                                 // SSTATUS_IPM_INTERFACE_ACTIVE_STATE
   // SError
   data = 0x001F0201;
+  atapiState.atapiRegs.SError = data;
   memcpy(&pciConfigSpace.data[0xC4], &data, 4);
   // SControl
   data = 0x00000300;
+  atapiState.atapiRegs.SControl = data;
   memcpy(&pciConfigSpace.data[0xC8], &data, 4); // SCONTROL_IPM_ALL_PM_DISABLED
+  // SActive
+  data = 0x00000040;
+  atapiState.atapiRegs.SActive = data;
+  memcpy(&pciConfigSpace.data[0xCC], &data, 4);
 
   // Set our PCI device sizes
   pciDevSizes[0] = 0x20; // BAR0
@@ -316,17 +318,17 @@ void Xe::PCIDev::ODD::Read(u64 readAddress, u8 *data, u64 size) {
       std::this_thread::sleep_for(100ns);
       memcpy(data, &atapiState.atapiRegs.statusReg, size);
       return;
-    case 0x10:
-      memcpy(data, &atapiState.atapiRegs.unk_10, size);
+    case ATA_REG_SSTATUS:
+      memcpy(data, &atapiState.atapiRegs.SStatus, size);
       return;
-    case 0x14:
-      memcpy(data, &atapiState.atapiRegs.unk_14, size);
+    case ATA_REG_SERROR:
+      memcpy(data, &atapiState.atapiRegs.SError, size);
       return;
-    case ATAPI_REG_SIGNATURE:
-      memcpy(data, &atapiState.atapiRegs.signatureReg, size);
+    case ATA_REG_SCONTROL:
+      memcpy(data, &atapiState.atapiRegs.SControl, size);
       return;
-    case 0x1C:
-      memcpy(data, &atapiState.atapiRegs.unk_1C, size);
+    case ATA_REG_SACTIVE:
+      memcpy(data, &atapiState.atapiRegs.SActive, size);
       return;
     default:
       LOG_ERROR(ODD, "Unknown Command Register Block register being read, command code = 0x{:X}", atapiCommandReg);
@@ -435,17 +437,17 @@ void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
       memcpy(&atapiState.atapiRegs.devControlReg, data, size);
       return;
     } break;
-    case 0x10:
-      memcpy(&atapiState.atapiRegs.unk_10, data, size);
+    case ATA_REG_SSTATUS:
+      memcpy(&atapiState.atapiRegs.SStatus, data, size);
       return;
-    case 0x14:
-      memcpy(&atapiState.atapiRegs.unk_14, data, size);
+    case ATA_REG_SERROR:
+      memcpy(&atapiState.atapiRegs.SError, data, size);
       return;
-    case ATAPI_REG_SIGNATURE:
-      memcpy(&atapiState.atapiRegs.signatureReg, data, size);
+    case ATA_REG_SCONTROL:
+      memcpy(&atapiState.atapiRegs.SControl, data, size);
       return;
-    case 0x1C:
-      memcpy(&atapiState.atapiRegs.unk_1C, data, size);
+    case ATA_REG_SACTIVE:
+      memcpy(&atapiState.atapiRegs.SActive, data, size);
       return;
     default: {
       u64 tmp = 0;
