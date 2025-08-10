@@ -244,7 +244,7 @@ void XeMain::CreatePCIDevices() {
     }
     {
       MICROPROFILE_SCOPEI("[Xe::Main::PCI::Create]", "HDD", MP_AUTO);
-      hdd = std::make_shared<STRIP_UNIQUE(hdd)>("HDD", HDD_DEV_SIZE, pciBridge.get());
+      hdd = std::make_shared<STRIP_UNIQUE(hdd)>("HDD", HDD_DEV_SIZE, pciBridge.get(), ram.get());
       pciBridge->AddPCIDevice(hdd);
     }
     {

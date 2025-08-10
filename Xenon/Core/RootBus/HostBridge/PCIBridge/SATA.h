@@ -103,6 +103,21 @@
 #define ATA_REG_SCONTROL  0x18
 #define ATA_REG_SACTIVE   0x1C // TODO: Verify this.
 
+// Direct Memory Access Command
+#define ATA_REG_DMA_COMMAND 0x0
+// Direct Memory Access Status
+#define ATA_REG_DMA_STATUS 0x2
+// Direct Memory Access Table Offset
+#define ATA_REG_DMA_TABLE_OFFSET 0x4
+
+// DMA Status
+#define XE_ATA_DMA_ACTIVE 0x1
+#define XE_ATA_DMA_ERR 0x2
+#define XE_ATA_DMA_INTR 0x4
+#define XE_ATA_DMA_WR 0x8
+
+// Sector size for ATA disks
+#define ATA_SECTOR_SIZE 512
 
 //
 // ATA Status Register

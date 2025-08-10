@@ -15,6 +15,7 @@
 #include <string>
 #include <thread>
 
+#include "Core/RAM/RAM.h"
 #include "Core/XCPU/Interpreter/PPCInternal.h"
 #include "Core/RootBus/HostBridge/PCIBridge/SATA.h"
 #include "Core/RootBus/HostBridge/PCIBridge/PCIBridge.h"
@@ -69,9 +70,13 @@ public:
       (cbWritten == cu8s));
   }
 
-private:
-  HANDLE hFile;
-};
+    bool isHandleValid() {
+      return (hFile != INVALID_HANDLE_VALUE);
+    }
+
+  private:
+    HANDLE hFile;
+  };
 #else
 class ReadWriteStorage {
 public:
@@ -102,6 +107,42 @@ private:
   int fd;
 };
 #endif // ifdef _WIN32
+
+//
+// Data Buffers
+//
+
+  class HDDDataBuffer {
+  public:
+    bool empty(void) { return _pointer >= _size; }
+    u32 count(void) { return _size - _pointer; }
+    u32 size(void) { return _pointer; }
+    u8* get(void) { return _data.get() + _pointer; }
+    void resize(u32 v) { _pointer += v; }
+    void reset(void) { _pointer = 0; }
+    bool init(u32 maxLength, bool clear) {
+      if (_data && (maxLength > _size)) {
+        _data.reset();
+        _size = 0;
+        reset();
+      }
+      if (!_data) {
+        _data = std::make_unique<STRIP_UNIQUE_ARR(_data)>(maxLength);
+      }
+      if (_data) {
+        _size = std::max(_size, maxLength);
+        _pointer = _size; // Empty()
+        if (clear)
+          memset(_data.get(), 0, maxLength);
+        return true;
+      }
+      return false;
+    }
+  private:
+    std::unique_ptr<u8[]> _data;
+    u32 _size;
+    u32 _pointer;
+  };
 
 /*
 * This structure is returned by the IDENTIFY_DEVICE and IDENTIFY_PACKET_DEVICE commands
@@ -258,24 +299,40 @@ struct XE_ATA_IDENTIFY_DATA {
 };
 #pragma pack(pop)
 
+  //
+  // DMA related structures
+  //
+  
+  // DMA Physical Region Descriptor
+  struct XE_ATA_DMA_PRD {
+    u32 physAddress; // physical memory address of a data buffer
+    u16 sizeInBytes;
+    u16 control;
+  };
+
+  struct XE_ATA_DMA_STATE {
+    XE_ATA_DMA_PRD currentPRD = {0};
+    u32 currentTableOffset = 0;
+  };
+
 //
 // ATA Register State
 //
 struct ATA_REG_STATE {
   // Command
-  u32 data;             // Address 0x00
-  struct {              // Address 0x01
-    u32 error;          // When Read
-    u32 features;       // When Written
-  };
-  u32 sectorCount;      // Address 0x02
-  u32 lbaLow;           // Address 0x03
-  u32 lbaMiddle;        // Address 0x04
-  u32 lbaHigh;          // Address 0x05
-  u32 deviceSelect;     // Address 0x06
-  struct {              // Address 0x07
-    u32 status;         // When Read
-    u32 command;        // When Written
+  u32 data;         // Address 0x00
+  struct {          // Address 0x01
+    u32 error;      // When Read
+    u32 features;   // When Written
+  };                
+  u8 sectorCount;  // Address 0x02
+  u8 lbaLow;       // Address 0x03
+  u8 lbaMiddle;    // Address 0x04
+  u8 lbaHigh;      // Address 0x05
+  u32 deviceSelect; // Address 0x06
+  struct {          // Address 0x07
+    u32 status;     // When Read
+    u32 command;    // When Written
   };
   // Control
   struct {              // Address 0xA
@@ -289,6 +346,18 @@ struct ATA_REG_STATE {
 
   // Transfer mode, set by the set features command using the subcommand 0x3.
   u32 ataTransferMode;
+
+  // DMA registers
+  u32 dmaCommand;
+  u32 dmaStatus;
+  u32 dmaTableOffset;
+
+  // Previous LBA and sector count.
+  // Used in LBA 48 addressing.
+  u8 prevLBALow;
+  u8 prevLBAMiddle;
+  u8 prevLBAHigh;
+  u8 prevSectorCount;
 };
 
 // ATA Device State
@@ -299,12 +368,20 @@ struct ATA_DEV_STATE {
   XE_ATA_IDENTIFY_DATA ataIdentifyData = {0};
   // Mounted HDD Image.
   std::unique_ptr<ReadWriteStorage> mountedHDDImage{};
+  // Input/Output buffers.
+  HDDDataBuffer dataInBuffer;
+  HDDDataBuffer dataOutBuffer;
+  // DMA State
+  XE_ATA_DMA_STATE dmaState = {0};
+  // Do we have an image?
+  bool isImageDetected = false;
 };
 
 class HDD : public PCIDevice {
 public:
   HDD(const std::string &deviceName, u64 size,
-    PCIBridge *parentPCIBridge);
+    PCIBridge *parentPCIBridge, RAM* ram);
+  ~HDD();
   void Read(u64 readAddress, u8 *data, u64 size) override;
   void Write(u64 writeAddress, const u8 *data, u64 size) override;
   void MemSet(u64 writeAddress, s32 data, u64 size) override;
@@ -315,15 +392,34 @@ private:
   // PCI Bridge pointer. Used for Interrupts.
   PCIBridge *parentBus;
 
+  // RAM Pointer for DMA ops.
+  RAM* ramPtr;
+
   // Device State
   ATA_DEV_STATE ataState = {};
 
-  void ataIssueInterrupt();
+  // Worker Thread for DMA requests.
+  std::thread hddWorkerThread;
 
-  void ataCopyIdentifyDeviceData();
+  // Thread running
+  volatile bool hddThreadRunning = false;
+
+  // Thread loop for processing DMA requests, etc...
+  void hddThreadLoop();
+
+  // ATA Commands.
+  void ataReadDMAExtCommand();
+  void ataWriteDMACommand();
+  void ataIdentifyDeviceCommand();
 
   // Utilities
+
+  // Returns the name of a given command.
   static const std::string getATACommandName(u32 commandID);
+  // DMA Worker.
+  void doDMA();
+  // Issues an interrupt if allowed.
+  void ataIssueInterrupt();
 };
 
 } // namespace PCIDev
