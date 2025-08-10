@@ -5,6 +5,25 @@
 #include "Base/Config.h"
 #include "Base/Logging/Log.h"
 
+// Describes the ATA transfer modes available to the SET_TRNASFER_MODE subcommand.
+enum class ATA_TRANSFER_MODE {
+  PIO = 0x00,
+  PIO_NO_IORDY = 0x01,
+  PIO_FLOW_CONTROL_MODE3 = 0x08,
+  PIO_FLOW_CONTROL_MODE4 = 0x09,
+  MULTIWORD_DMA_MODE0 = 0x20,
+  MULTIWORD_DMA_MODE1 = 0x21,
+  MULTIWORD_DMA_MODE2 = 0x22,
+  MULTIWORD_DMA_MODE3 = 0x23,
+  ULTRA_DMA_MODE0 = 0x40,
+  ULTRA_DMA_MODE1 = 0x41,
+  ULTRA_DMA_MODE2 = 0x42,
+  ULTRA_DMA_MODE3 = 0x43,
+  ULTRA_DMA_MODE4 = 0x44,
+  ULTRA_DMA_MODE5 = 0x45,
+  ULTRA_DMA_MODE6 = 0x46,
+};
+
 void Xe::PCIDev::ODD::atapiReset() {
   // Set status to ready
   atapiState.atapiRegs.statusReg = ATA_STATUS_DRDY;
@@ -362,6 +381,9 @@ void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
   u8 atapiControlReg =
       static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR1);
 
+  u32 inData = 0;
+  memcpy(&inData, data, size);
+
   // Who are we writing to?
   if (atapiCommandReg < (pciConfigSpace.configSpaceHeader.BAR1 -
                          pciConfigSpace.configSpaceHeader.BAR0)) {
@@ -428,6 +450,66 @@ void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
         atapiIdentifyCommand();
         return;
       } break;
+      case ATA_COMMAND_SET_FEATURES:
+        switch (atapiState.atapiRegs.featuresReg) {
+        case ATA_SF_SUBCOMMAND_SET_TRANSFER_MODE: {
+          ATA_TRANSFER_MODE mode = static_cast<ATA_TRANSFER_MODE>(atapiState.atapiRegs.sectorCountReg);
+          switch (mode) {
+          case ATA_TRANSFER_MODE::PIO:
+            LOG_DEBUG(ODD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to PIO");
+            break;
+          case ATA_TRANSFER_MODE::PIO_NO_IORDY:
+            LOG_DEBUG(ODD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to PIO_NO_IORDY");
+            break;
+          case ATA_TRANSFER_MODE::PIO_FLOW_CONTROL_MODE3:
+            LOG_DEBUG(ODD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to PIO_FLOW_CONTROL_MODE3");
+            break;
+          case ATA_TRANSFER_MODE::PIO_FLOW_CONTROL_MODE4:
+            LOG_DEBUG(ODD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to PIO_FLOW_CONTROL_MODE4");
+            break;
+          case ATA_TRANSFER_MODE::MULTIWORD_DMA_MODE0:
+            LOG_DEBUG(ODD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to MULTIWORD_DMA_MODE0");
+            break;
+          case ATA_TRANSFER_MODE::MULTIWORD_DMA_MODE1:
+            LOG_DEBUG(ODD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to MULTIWORD_DMA_MODE1");
+            break;
+          case ATA_TRANSFER_MODE::MULTIWORD_DMA_MODE2:
+            LOG_DEBUG(ODD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to MULTIWORD_DMA_MODE2");
+            break;
+          case ATA_TRANSFER_MODE::MULTIWORD_DMA_MODE3:
+            LOG_DEBUG(ODD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to MULTIWORD_DMA_MODE3");
+            break;
+          case ATA_TRANSFER_MODE::ULTRA_DMA_MODE0:
+            LOG_DEBUG(ODD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE0");
+            break;
+          case ATA_TRANSFER_MODE::ULTRA_DMA_MODE1:
+            LOG_DEBUG(ODD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE1");
+            break;
+          case ATA_TRANSFER_MODE::ULTRA_DMA_MODE2:
+            LOG_DEBUG(ODD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE2");
+            break;
+          case ATA_TRANSFER_MODE::ULTRA_DMA_MODE3:
+            LOG_DEBUG(ODD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE3");
+            break;
+          case ATA_TRANSFER_MODE::ULTRA_DMA_MODE4:
+            LOG_DEBUG(ODD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE4");
+            break;
+          case ATA_TRANSFER_MODE::ULTRA_DMA_MODE5:
+            LOG_DEBUG(ODD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE5");
+            break;
+          case ATA_TRANSFER_MODE::ULTRA_DMA_MODE6:
+            LOG_DEBUG(ODD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to ULTRA_DMA_MODE6");
+            break;
+          default:
+            LOG_DEBUG(ODD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to {:#x}", atapiState.atapiRegs.sectorCountReg);
+            break;
+          }
+          atapiState.atapiRegs.ataTransferMode = inData;
+          }
+          // Request interrupt
+          parentBus->RouteInterrupt(PRIO_SATA_CDROM);
+        }
+        break;
       default: {
         LOG_ERROR(ODD, "Unknown command, command code = 0x{:X}", atapiState.atapiRegs.commandReg);
       }  break;

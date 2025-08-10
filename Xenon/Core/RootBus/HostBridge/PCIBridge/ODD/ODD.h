@@ -620,6 +620,9 @@ struct XE_ATAPI_REGISTERS {
   u32 dmaStatusReg;
   // Offset 0x4
   u32 dmaTableOffsetReg;
+
+  // Transfer mode, set by the set features command using the subcommand 0x3.
+  u32 ataTransferMode;
 };
 
 //
