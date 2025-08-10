@@ -234,8 +234,7 @@ void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
       break;
     }
   } else {  // Control (DMA) registers   
-    switch (ataControlReg)
-    {
+    switch (ataControlReg) {
     case ATA_REG_DMA_COMMAND:
       memcpy(data, &ataState.regs.dmaCommand, size);
         break;
@@ -274,8 +273,7 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
     pciConfigSpace.configSpaceHeader.BAR0)) {
     const u8 regOffset = static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR0);
 
-    switch (regOffset)
-    {
+    switch (regOffset) {
     case ATA_REG_DATA:
       memcpy(&ataState.regs.data, data, size);
       break;
@@ -308,10 +306,9 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
       LOG_DEBUG(HDD, "[CMD]: Received Command {}", getATACommandName(ataState.regs.command));
 #endif // HDD_DEBUG
 
-      switch (ataState.regs.command)
-      {
-      case ATA_COMMAND_READ_DMA_EXT:
-        {
+      switch (ataState.regs.command) {
+      case ATA_COMMAND_READ_DMA_EXT: {
+#ifdef HDD_DEBUG
           u64 offset = (ataState.regs.prevLBAHigh << 40) |
             (ataState.regs.prevLBAMiddle << 32) |
             (ataState.regs.prevLBALow << 24) |
@@ -322,6 +319,7 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
           u32 sectorCount = (ataState.regs.prevSectorCount << 8) | ataState.regs.sectorCount;
           LOG_DEBUG(HDD, "[CMD]: [READ DMA EXT] LBA48: {:#x}, sector count {:#x}",
             offset, sectorCount);
+#endif // HDD_DEBUG
         }
         ataReadDMAExtCommand();
         break;
@@ -401,7 +399,6 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
         LOG_ERROR(HDD, "Unhandled command received {}", getATACommandName(ataState.regs.command));
         break;
       }
-
       break;
     case ATA_REG_DEV_CTRL:
       memcpy(&ataState.regs.deviceControl, data, size);
@@ -435,8 +432,7 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
     // Control (DMA) registers
     const u8 regOffset = static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR1);
   
-    switch (regOffset)
-    {
+    switch (regOffset) {
     case ATA_REG_DMA_COMMAND:
       memcpy(&ataState.regs.dmaCommand, data, size);
       break;
@@ -584,8 +580,7 @@ const std::string Xe::PCIDev::HDD::getATACommandName(u32 commandID) {
   auto it = ataCommandNameMap.find(commandID);
   if (it != ataCommandNameMap.end()) {
     return it->second;
-  }
-  else {
+  } else {
     LOG_ERROR(HDD, "Unknown Command: {:#x}", commandID);
     return "Unknown Command";
   }

@@ -103,6 +103,10 @@ public:
     return bytesRead == static_cast<ssize_t>(cu8s);
   }
 
+  bool isHandleValid() {
+    return (fd != -1);
+  }
+
 private:
   int fd;
 };
