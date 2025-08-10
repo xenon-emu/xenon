@@ -506,12 +506,12 @@ void Xe::PCIDev::HDD::ataIdentifyDeviceCommand() {
 
 // ATA READ DMA EXT (LBA 48 Bit)
 void Xe::PCIDev::HDD::ataReadDMAExtCommand() {
-  u64 offset = (ataState.regs.prevLBAHigh << 40) |
-    (ataState.regs.prevLBAMiddle << 32) |
-    (ataState.regs.prevLBALow << 24) |
-    (ataState.regs.lbaHigh << 16) |
-    (ataState.regs.lbaMiddle << 8) |
-    (ataState.regs.lbaLow);
+  u64 offset = (static_cast<u64>(ataState.regs.prevLBAHigh) << 40) |
+    (static_cast<u64>(ataState.regs.prevLBAMiddle) << 32) |
+    (static_cast<u64>(ataState.regs.prevLBALow) << 24) |
+    (static_cast<u64>(ataState.regs.lbaHigh) << 16) |
+    (static_cast<u64>(ataState.regs.lbaMiddle) << 8) |
+    (static_cast<u64>(ataState.regs.lbaLow));
 
   u32 sectorCount = (ataState.regs.prevSectorCount << 8) | ataState.regs.sectorCount;
   // If sector count = 0 then 65 536 logical sectors shall be transfered.
