@@ -103,7 +103,6 @@ void Xe::PCIDev::ODD::atapiIdentifyPacketDeviceCommand() {
   parentBus->RouteInterrupt(PRIO_SATA_CDROM);
 }
 
-
 void Xe::PCIDev::ODD::atapiIdentifyCommand() {
   // Used by software to decide whether the device is an ATA or ATAPI device
   /*
@@ -254,7 +253,7 @@ Xe::PCIDev::ODD::ODD(const char* deviceName, u64 size,
   // Set the SCR's at offset 0xC0 (SiS-like)
   // SStatus
   data = 0x00000113;
-  atapiState.atapiRegs.SStatus = data;
+  // atapiState.atapiRegs.SStatus = data; Disable for now, until I can fix it for xboxkrnl.
   memcpy(&pciConfigSpace.data[0xC0], &data, 4); // SSTATUS_DET_COM_ESTABLISHED.
                                                 // SSTATUS_SPD_GEN1_COM_SPEED.
                                                 // SSTATUS_IPM_INTERFACE_ACTIVE_STATE
