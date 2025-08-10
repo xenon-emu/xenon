@@ -774,6 +774,9 @@ void PPCInterpreter::PPCInterpreter_vsldoi(PPU_STATE *ppuState) {
     return;
   }
 
+  Base::Vector128 vra = VRi(va);
+  Base::Vector128 vrb = VRi(vb);
+
 #if defined(FIX) // Fix this, causes incorrect behavior.
   __m128i va = _mm_loadu_si128(reinterpret_cast<const __m128i*>(VRi(va).bytes.data()));
   __m128i vb = _mm_loadu_si128(reinterpret_cast<const __m128i*>(VRi(vb).bytes.data()));
@@ -790,18 +793,18 @@ void PPCInterpreter::PPCInterpreter_vsldoi(PPU_STATE *ppuState) {
 
   // NOTE: Checked against Xenia's tests.
 
-  VRi(va).dword[0] = byteswap_be<u32>(VRi(va).dword[0]);
-  VRi(va).dword[1] = byteswap_be<u32>(VRi(va).dword[1]);
-  VRi(va).dword[2] = byteswap_be<u32>(VRi(va).dword[2]);
-  VRi(va).dword[3] = byteswap_be<u32>(VRi(va).dword[3]);
+  vra.dword[0] = byteswap_be<u32>(vra.dword[0]);
+  vra.dword[1] = byteswap_be<u32>(vra.dword[1]);
+  vra.dword[2] = byteswap_be<u32>(vra.dword[2]);
+  vra.dword[3] = byteswap_be<u32>(vra.dword[3]);
 
-  VRi(vb).dword[0] = byteswap_be<u32>(VRi(vb).dword[0]);
-  VRi(vb).dword[1] = byteswap_be<u32>(VRi(vb).dword[1]);
-  VRi(vb).dword[2] = byteswap_be<u32>(VRi(vb).dword[2]);
-  VRi(vb).dword[3] = byteswap_be<u32>(VRi(vb).dword[3]);
+  vrb.dword[0] = byteswap_be<u32>(vrb.dword[0]);
+  vrb.dword[1] = byteswap_be<u32>(vrb.dword[1]);
+  vrb.dword[2] = byteswap_be<u32>(vrb.dword[2]);
+  vrb.dword[3] = byteswap_be<u32>(vrb.dword[3]);
 
   for (u8 idx = 0; idx < 16; idx++) {
-    VRi(vd).bytes[idx] = vsldoiHelper(sh + idx, VRi(va), VRi(vb));
+    VRi(vd).bytes[idx] = vsldoiHelper(sh + idx, vra, vrb);
   }
 
   VRi(vd).dword[0] = byteswap_be<u32>(VRi(vd).dword[0]);
@@ -827,6 +830,8 @@ void PPCInterpreter::PPCInterpreter_vsldoi128(PPU_STATE* ppuState) {
     return;
   }
 
+  Base::Vector128 vra = VR(VMX128_5_VA128);
+  Base::Vector128 vrb = VR(VMX128_5_VB128);
 
 #if defined(FIX)
   __m128i va = _mm_loadu_si128(reinterpret_cast<const __m128i*>(VR(VMX128_5_VA128).bytes.data()));
@@ -844,18 +849,18 @@ void PPCInterpreter::PPCInterpreter_vsldoi128(PPU_STATE* ppuState) {
 
   // NOTE: Checked against Xenia's tests.
 
-  VR(VMX128_5_VA128).dword[0] = byteswap_be<u32>(VR(VMX128_5_VA128).dword[0]);
-  VR(VMX128_5_VA128).dword[1] = byteswap_be<u32>(VR(VMX128_5_VA128).dword[1]);
-  VR(VMX128_5_VA128).dword[2] = byteswap_be<u32>(VR(VMX128_5_VA128).dword[2]);
-  VR(VMX128_5_VA128).dword[3] = byteswap_be<u32>(VR(VMX128_5_VA128).dword[3]);
+  vra.dword[0] = byteswap_be<u32>(vra.dword[0]);
+  vra.dword[1] = byteswap_be<u32>(vra.dword[1]);
+  vra.dword[2] = byteswap_be<u32>(vra.dword[2]);
+  vra.dword[3] = byteswap_be<u32>(vra.dword[3]);
 
-  VR(VMX128_5_VB128).dword[0] = byteswap_be<u32>(VR(VMX128_5_VB128).dword[0]);
-  VR(VMX128_5_VB128).dword[1] = byteswap_be<u32>(VR(VMX128_5_VB128).dword[1]);
-  VR(VMX128_5_VB128).dword[2] = byteswap_be<u32>(VR(VMX128_5_VB128).dword[2]);
-  VR(VMX128_5_VB128).dword[3] = byteswap_be<u32>(VR(VMX128_5_VB128).dword[3]);
+  vrb.dword[0] = byteswap_be<u32>(vrb.dword[0]);
+  vrb.dword[1] = byteswap_be<u32>(vrb.dword[1]);
+  vrb.dword[2] = byteswap_be<u32>(vrb.dword[2]);
+  vrb.dword[3] = byteswap_be<u32>(vrb.dword[3]);
 
   for (u8 idx = 0; idx < 16; idx++) {
-    VR(VMX128_5_VD128).bytes[idx] = vsldoiHelper(sh + idx, VR(VMX128_5_VA128), VR(VMX128_5_VB128));
+    VR(VMX128_5_VD128).bytes[idx] = vsldoiHelper(sh + idx, vra, vrb);
   }
 
   VR(VMX128_5_VD128).dword[0] = byteswap_be<u32>(VR(VMX128_5_VD128).dword[0]);
