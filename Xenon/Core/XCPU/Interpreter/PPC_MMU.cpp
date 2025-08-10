@@ -910,8 +910,11 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
               continue;
             }
 
+            // Get our VPN for comparisson.
+            u64 VPN = (VA >> p) << p;
+
             // Perform the compare
-            if (!mmuComparePTE(VA, 0, pteg0[i].pte0, pteg0[i].pte1, p, L, LP, &RPN)) {
+            if (!mmuComparePTE(VA, VPN, pteg0[i].pte0, pteg0[i].pte1, p, L, LP, &RPN)) {
               continue;
             }
 
@@ -963,8 +966,11 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
               continue;
             }
 
+            // Get our VPN for comparisson.
+            u64 VPN = (VA >> p) << p;
+
             // Perform the compare
-            if (!mmuComparePTE(VA, 0, pteg1[i].pte0, pteg1[i].pte1, p, L, LP, &RPN)) {
+            if (!mmuComparePTE(VA, VPN, pteg1[i].pte0, pteg1[i].pte1, p, L, LP, &RPN)) {
               continue;
             }
 
