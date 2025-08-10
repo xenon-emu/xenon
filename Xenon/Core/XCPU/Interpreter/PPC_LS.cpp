@@ -846,7 +846,6 @@ void PPCInterpreter::PPCInterpreter_stvlx(PPU_STATE* ppuState) {
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
   const u8 eb = EA & 0xF;
-  EA &= ~0xF;
 
   // Need to byteswap the bytes prior to the operation because of endianness.
   Vector128 vec = VRi(vs);
@@ -867,7 +866,6 @@ void PPCInterpreter::PPCInterpreter_stvlx128(PPU_STATE* ppuState) {
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
   const u8 eb = EA & 0xF;
-  EA &= ~0xF;
 
   Vector128 vec = VR(VMX128_1_VD128);
   vec.dword[0] = byteswap_be<u32>(vec.dword[0]);
@@ -887,7 +885,6 @@ void PPCInterpreter::PPCInterpreter_stvlxl128(PPU_STATE* ppuState) {
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
   const u8 eb = EA & 0xF;
-  EA &= ~0xF;
 
   Vector128 vec = VR(VMX128_1_VD128);
   vec.dword[0] = byteswap_be<u32>(vec.dword[0]);
