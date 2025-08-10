@@ -103,6 +103,13 @@ public:
     return bytesRead == static_cast<ssize_t>(cu8s);
   }
 
+  bool Write(u64 Offset, u8* Source, u32 cu8s) {
+    if (lseek(fd, Offset, SEEK_SET) == (off_t)-1)
+      return false;
+    ssize_t bytesWritten = write(fd, Source, cu8s);
+    return bytesWritten == static_cast<ssize_t>(cu8s);
+  }
+
   bool isHandleValid() {
     return (fd != -1);
   }
