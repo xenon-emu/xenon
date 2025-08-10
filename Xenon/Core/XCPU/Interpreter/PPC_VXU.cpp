@@ -774,7 +774,7 @@ void PPCInterpreter::PPCInterpreter_vsldoi(PPU_STATE *ppuState) {
     return;
   }
 
-#if defined(ARCH_X86_64)
+#if defined(FIX) // Fix this, causes incorrect behavior.
   __m128i va = _mm_loadu_si128(reinterpret_cast<const __m128i*>(VRi(va).bytes.data()));
   __m128i vb = _mm_loadu_si128(reinterpret_cast<const __m128i*>(VRi(vb).bytes.data()));
   __m128i vd_sse = vsldoi_sse(va, vb, sh);
@@ -787,6 +787,8 @@ void PPCInterpreter::PPCInterpreter_vsldoi(PPU_STATE *ppuState) {
   _mm_storeu_si128(reinterpret_cast<__m128i*>(VRi(vd).bytes.data()), result);
 #else
   // TODO: Ugly, super slow, fix.
+
+  // NOTE: Checked against Xenia's tests.
 
   VRi(va).dword[0] = byteswap_be<u32>(VRi(va).dword[0]);
   VRi(va).dword[1] = byteswap_be<u32>(VRi(va).dword[1]);
@@ -826,7 +828,7 @@ void PPCInterpreter::PPCInterpreter_vsldoi128(PPU_STATE* ppuState) {
   }
 
 
-#if defined(ARCH_X86_64)
+#if defined(FIX)
   __m128i va = _mm_loadu_si128(reinterpret_cast<const __m128i*>(VR(VMX128_5_VA128).bytes.data()));
   __m128i vb = _mm_loadu_si128(reinterpret_cast<const __m128i*>(VR(VMX128_5_VB128).bytes.data()));
   __m128i vd_sse = vsldoi_sse(va, vb, sh);
@@ -839,6 +841,8 @@ void PPCInterpreter::PPCInterpreter_vsldoi128(PPU_STATE* ppuState) {
   _mm_storeu_si128(reinterpret_cast<__m128i*>(VR(VMX128_5_VD128).bytes.data()), result);
 #else
   // TODO: Ugly, super slow, fix.
+
+  // NOTE: Checked against Xenia's tests.
 
   VR(VMX128_5_VA128).dword[0] = byteswap_be<u32>(VR(VMX128_5_VA128).dword[0]);
   VR(VMX128_5_VA128).dword[1] = byteswap_be<u32>(VR(VMX128_5_VA128).dword[1]);
