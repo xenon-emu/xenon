@@ -599,6 +599,8 @@ void Xe::PCIDev::HDD::hddThreadLoop() {
       ataState.regs.dmaCommand &= ~1; // Clear active status.
       ataState.regs.dmaStatus = XE_ATA_DMA_INTR; // Signal Interrupt.
     }
+    // Sleep for some time.
+    std::this_thread::sleep_for(5ms);
   }
 
   LOG_INFO(HDD, "Exiting HDD worker thread.");
@@ -630,18 +632,20 @@ void Xe::PCIDev::HDD::doDMA() {
       // Reading from us
       size = std::fmin(static_cast<u32>(size), ataState.dataOutBuffer.count());
 
-      // Buffer overrun?
-      if (size == 0)
-        return;
+      // Buffer overrun? Apparently there can be entries in the PRDT which have a zero byte count.
+      if (size == 0) {
+        LOG_WARNING(HDD, "[DMA Worker Read] Entry read size is zero.");
+      }
+
       memcpy(bufferInMemory, ataState.dataOutBuffer.get(), size);
       ataState.dataOutBuffer.resize(size);
-    }
-    else {
+    } else {
       // Writing to us
       size = std::fmin(static_cast<u32>(size), ataState.dataInBuffer.count());
-      // Buffer overrun?
-      if (size == 0)
-        return;
+      // Buffer overrun? Apparently there can be entries in the PRDT which have a zero byte count.
+      if (size == 0) {
+        LOG_WARNING(HDD, "[DMA Worker Write] Entry write size is zero.");
+      }
       memcpy(ataState.dataInBuffer.get(), bufferInMemory, size);
       ataState.dataInBuffer.resize(size);
     }
