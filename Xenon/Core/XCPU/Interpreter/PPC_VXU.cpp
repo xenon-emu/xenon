@@ -63,6 +63,26 @@ void PPCInterpreter::PPCInterpreter_vaddfp(PPU_STATE *ppuState) {
   VRi(vd).flt[3] = VRi(va).flt[3] + VRi(vb).flt[3];
 }
 
+static inline u8 vecSaturateU8(PPU_STATE* ppuState, u32 inValue) {
+  if (inValue > 255) {
+    // Set SAT bit in VSCR and truncate to 255.
+    curThread.VSCR.SAT = 1;
+    inValue = 255;
+  }
+  return static_cast<u8>(inValue);
+}
+
+// Vector Add Unsigned Byte Saturate ('x1000 0200')
+void PPCInterpreter::PPCInterpreter_vaddubs(PPU_STATE* ppuState) {
+  // TODO: Check behavior, logic seems okay.
+
+  CHECK_VXU;
+
+  for (u8 idx = 0; idx < 16; idx++) {
+    VRi(vd).bytes[idx] = vecSaturateU8(ppuState, static_cast<u32>(VRi(va).bytes[idx]) + static_cast<u32>(VRi(vb).bytes[idx]));
+  }
+}
+
 static inline u32 vecSaturate32(PPU_STATE* ppuState, u64 inValue) {
   if (inValue > UINT_MAX) {
     // Set SAT bit in VSCR and truncate to 2^32 - 1.
@@ -609,6 +629,39 @@ void PPCInterpreter::PPCInterpreter_vrfin128(PPU_STATE* ppuState) {
   VR(VMX128_3_VD128).flt[1] = round(VR(VMX128_3_VB128).flt[1]);
   VR(VMX128_3_VD128).flt[2] = round(VR(VMX128_3_VB128).flt[2]);
   VR(VMX128_3_VD128).flt[3] = round(VR(VMX128_3_VB128).flt[3]);
+}
+
+static f32 vrefpHelper(const f32 inFloat) {
+  if (inFloat == 0.0f) return std::numeric_limits<float>::infinity();
+  if (inFloat == -0.0f) return -std::numeric_limits<float>::infinity();
+  return 1.0f / inFloat;
+}
+
+// Vector Reciprocal Estimate Floating Point (x'1000 010A')
+void PPCInterpreter::PPCInterpreter_vrefp(PPU_STATE* ppuState) {
+  /*
+  do i=0 to 127 by 32
+  x <- (vB)i:i+31
+  (vD)i:i+31 <- 1/x
+  end
+  */
+
+  CHECK_VXU;
+
+  VRi(vd).flt[0] = vrefpHelper(VRi(vb).flt[0]);
+  VRi(vd).flt[1] = vrefpHelper(VRi(vb).flt[1]);
+  VRi(vd).flt[2] = vrefpHelper(VRi(vb).flt[2]);
+  VRi(vd).flt[3] = vrefpHelper(VRi(vb).flt[3]);
+}
+
+void PPCInterpreter::PPCInterpreter_vrefp128(PPU_STATE* ppuState) {
+
+  CHECK_VXU;
+
+  VR(VMX128_3_VD128).flt[0] = vrefpHelper(VR(VMX128_3_VB128).flt[0]);
+  VR(VMX128_3_VD128).flt[1] = vrefpHelper(VR(VMX128_3_VB128).flt[1]);
+  VR(VMX128_3_VD128).flt[2] = vrefpHelper(VR(VMX128_3_VB128).flt[2]);
+  VR(VMX128_3_VD128).flt[3] = vrefpHelper(VR(VMX128_3_VB128).flt[3]);
 }
 
 // Vector Conditional Select (x'1000 002A')
