@@ -152,6 +152,67 @@ void PPCInterpreter::PPCInterpreter_vcfux(PPU_STATE *ppuState) {
   VRi(vd).flt[3] = VRi(va).dword[3] / divisor;
 }
 
+// Vector Compare Equal-to-Floating Point (x'1000 00C6')
+void PPCInterpreter::PPCInterpreter_vcmpeqfp(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  VRi(vd).dword[0] = ((VRi(va).flt[0] == VRi(vb).flt[0]) ? 0xFFFFFFFF : 0x00000000);
+  VRi(vd).dword[1] = ((VRi(va).flt[1] == VRi(vb).flt[1]) ? 0xFFFFFFFF : 0x00000000);
+  VRi(vd).dword[2] = ((VRi(va).flt[2] == VRi(vb).flt[2]) ? 0xFFFFFFFF : 0x00000000);
+  VRi(vd).dword[3] = ((VRi(va).flt[3] == VRi(vb).flt[3]) ? 0xFFFFFFFF : 0x00000000);
+
+  if (_instr.vrc) {
+    u8 crValue = 0;
+    bool allEqual = false;
+    bool allNotEqual = false;
+
+    if (VRi(vd).dword[0] == 0xFFFFFFFF && VRi(vd).dword[1] == 0xFFFFFFFF
+      && VRi(vd).dword[2] == 0xFFFFFFFF && VRi(vd).dword[3] == 0xFFFFFFFF) {
+      allEqual = true;
+    }
+
+    if (VRi(vd).dword[0] == 0 && VRi(vd).dword[1] == 0 && VRi(vd).dword[2] == 0 && VRi(vd).dword[3] == 0) {
+      allNotEqual = true;
+    }
+
+    crValue |= allEqual ? 0b1000 : 0;
+    crValue |= allNotEqual ? 0b0010 : 0;
+
+    ppcUpdateCR(ppuState, 6, crValue);
+  }
+}
+
+// Vector128 Compare Equal-to Floating Point
+void PPCInterpreter::PPCInterpreter_vcmpeqfp128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  VR(VMX128_R_VD128).dword[0] = ((VR(VMX128_R_VB128).flt[0] == VR(VMX128_R_VB128).flt[0]) ? 0xFFFFFFFF : 0x00000000);
+  VR(VMX128_R_VD128).dword[1] = ((VR(VMX128_R_VB128).flt[1] == VR(VMX128_R_VB128).flt[1]) ? 0xFFFFFFFF : 0x00000000);
+  VR(VMX128_R_VD128).dword[2] = ((VR(VMX128_R_VB128).flt[2] == VR(VMX128_R_VB128).flt[2]) ? 0xFFFFFFFF : 0x00000000);
+  VR(VMX128_R_VD128).dword[3] = ((VR(VMX128_R_VB128).flt[3] == VR(VMX128_R_VB128).flt[3]) ? 0xFFFFFFFF : 0x00000000);
+
+  if (_instr.vrc) {
+    u8 crValue = 0;
+    bool allEqual = false;
+    bool allNotEqual = false;
+
+    if (VR(VMX128_R_VD128).dword[0] == 0xFFFFFFFF && VR(VMX128_R_VD128).dword[1] == 0xFFFFFFFF
+      && VR(VMX128_R_VD128).dword[2] == 0xFFFFFFFF && VR(VMX128_R_VD128).dword[3] == 0xFFFFFFFF) {
+      allEqual = true;
+    }
+
+    if (VR(VMX128_R_VD128).dword[0] == 0 && VR(VMX128_R_VD128).dword[1] == 0 
+      && VR(VMX128_R_VD128).dword[2] == 0 && VR(VMX128_R_VD128).dword[3] == 0) {
+      allNotEqual = true;
+    }
+
+    crValue |= allEqual ? 0b1000 : 0;
+    crValue |= allNotEqual ? 0b0010 : 0;
+
+    ppcUpdateCR(ppuState, 6, crValue);
+  }
+}
+
 // Vector Compare Equal-to Unsigned Word (x'1000 0086')
 void PPCInterpreter::PPCInterpreter_vcmpequwx(PPU_STATE* ppuState) {
 
@@ -655,13 +716,43 @@ void PPCInterpreter::PPCInterpreter_vrefp(PPU_STATE* ppuState) {
 }
 
 void PPCInterpreter::PPCInterpreter_vrefp128(PPU_STATE* ppuState) {
-
   CHECK_VXU;
 
   VR(VMX128_3_VD128).flt[0] = vrefpHelper(VR(VMX128_3_VB128).flt[0]);
   VR(VMX128_3_VD128).flt[1] = vrefpHelper(VR(VMX128_3_VB128).flt[1]);
   VR(VMX128_3_VD128).flt[2] = vrefpHelper(VR(VMX128_3_VB128).flt[2]);
   VR(VMX128_3_VD128).flt[3] = vrefpHelper(VR(VMX128_3_VB128).flt[3]);
+}
+
+static f32 vrsqrtefpHelper(const f32 inFloat) {
+  if (inFloat == 0.0f) return std::numeric_limits<float>::infinity();
+  if (inFloat == -0.0f) return -std::numeric_limits<float>::infinity();
+  if (inFloat < 0.0f) return std::numeric_limits<float>::quiet_NaN();
+  return 1.0f / sqrtf(inFloat);
+}
+
+// Vector Reciprocal Square Root Estimate Floating Point (x'1000 014A')
+void PPCInterpreter::PPCInterpreter_vrsqrtefp(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  // TODO: Check for handling of infinity, minus infinity and NaN's.
+
+  VRi(vd).flt[0] = vrsqrtefpHelper(VRi(vb).flt[0]);
+  VRi(vd).flt[1] = vrsqrtefpHelper(VRi(vb).flt[1]);
+  VRi(vd).flt[2] = vrsqrtefpHelper(VRi(vb).flt[2]);
+  VRi(vd).flt[3] = vrsqrtefpHelper(VRi(vb).flt[3]);
+}
+
+// Vector128 Reciprocal Square Root Estimate Floating Point
+void PPCInterpreter::PPCInterpreter_vrsqrtefp128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  // TODO: Check for handling of infinity, minus infinity and NaN's.
+
+  VR(VMX128_3_VD128).flt[0] = vrsqrtefpHelper(VR(VMX128_3_VB128).flt[0]);
+  VR(VMX128_3_VD128).flt[1] = vrsqrtefpHelper(VR(VMX128_3_VB128).flt[1]);
+  VR(VMX128_3_VD128).flt[2] = vrsqrtefpHelper(VR(VMX128_3_VB128).flt[2]);
+  VR(VMX128_3_VD128).flt[3] = vrsqrtefpHelper(VR(VMX128_3_VB128).flt[3]);
 }
 
 // Vector Conditional Select (x'1000 002A')
