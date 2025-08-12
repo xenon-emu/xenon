@@ -611,6 +611,35 @@ void PPCInterpreter::PPCInterpreter_vrfin128(PPU_STATE* ppuState) {
   VR(VMX128_3_VD128).flt[3] = round(VR(VMX128_3_VB128).flt[3]);
 }
 
+// Vector Conditional Select (x'1000 002A')
+void PPCInterpreter::PPCInterpreter_vsel(PPU_STATE* ppuState) {
+  /*
+   do i=0 to 127
+   if (vC)i=0 then vDi <- (vA)i
+   else (vD)i <- (vB)i
+   end
+  */
+
+  // NOTE: Checked against Xenia's tests.
+
+  CHECK_VXU;
+
+  VRi(vd).dword[0] = (VRi(va).dword[0] & ~VRi(vc).dword[0]) | (VRi(vb).dword[0] & VRi(vc).dword[0]);
+  VRi(vd).dword[1] = (VRi(va).dword[1] & ~VRi(vc).dword[1]) | (VRi(vb).dword[1] & VRi(vc).dword[1]);
+  VRi(vd).dword[2] = (VRi(va).dword[2] & ~VRi(vc).dword[2]) | (VRi(vb).dword[2] & VRi(vc).dword[2]);
+  VRi(vd).dword[3] = (VRi(va).dword[3] & ~VRi(vc).dword[3]) | (VRi(vb).dword[3] & VRi(vc).dword[3]);
+}
+
+// Vector128 Conditional Select
+void PPCInterpreter::PPCInterpreter_vsel128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  VR(VMX128_VD128).dword[0] = (VR(VMX128_VA128).dword[0] & ~VR(VMX128_VD128).dword[0]) | (VR(VMX128_VB128).dword[0] & VR(VMX128_VD128).dword[0]);
+  VR(VMX128_VD128).dword[1] = (VR(VMX128_VA128).dword[1] & ~VR(VMX128_VD128).dword[1]) | (VR(VMX128_VB128).dword[1] & VR(VMX128_VD128).dword[1]);
+  VR(VMX128_VD128).dword[2] = (VR(VMX128_VA128).dword[2] & ~VR(VMX128_VD128).dword[2]) | (VR(VMX128_VB128).dword[2] & VR(VMX128_VD128).dword[2]);
+  VR(VMX128_VD128).dword[3] = (VR(VMX128_VA128).dword[3] & ~VR(VMX128_VD128).dword[3]) | (VR(VMX128_VB128).dword[3] & VR(VMX128_VD128).dword[3]);
+}
+
 // Vector Multiply Add Floating Point (x'1000 002E')
 void PPCInterpreter::PPCInterpreter_vmaddfp(PPU_STATE *ppuState) {
   /*
@@ -1125,4 +1154,14 @@ void PPCInterpreter::PPCInterpreter_vxor(PPU_STATE *ppuState) {
   VRi(vd).dword[1] = VRi(va).dword[1] ^ VRi(vb).dword[1];
   VRi(vd).dword[2] = VRi(va).dword[2] ^ VRi(vb).dword[2];
   VRi(vd).dword[3] = VRi(va).dword[3] ^ VRi(vb).dword[3];
+}
+
+// Vector128 Logical XOR
+void PPCInterpreter::PPCInterpreter_vxor128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  VR(VMX128_VD128).dword[0] = VR(VMX128_VA128).dword[0] ^ VR(VMX128_VB128).dword[0];
+  VR(VMX128_VD128).dword[1] = VR(VMX128_VA128).dword[1] ^ VR(VMX128_VB128).dword[1];
+  VR(VMX128_VD128).dword[2] = VR(VMX128_VA128).dword[2] ^ VR(VMX128_VB128).dword[2];
+  VR(VMX128_VD128).dword[3] = VR(VMX128_VA128).dword[3] ^ VR(VMX128_VB128).dword[3];
 }
