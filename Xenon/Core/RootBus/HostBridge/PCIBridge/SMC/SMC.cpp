@@ -517,8 +517,24 @@ void Xe::PCIDev::SMC::smcMainThread() {
         break;
       case Xe::PCIDev::SMC_QUERY_TEMP_SENS:
         smcCoreState.fifoDataBuffer[0] = SMC_QUERY_TEMP_SENS;
-        smcCoreState.fifoDataBuffer[1] = 0x3C;
-        LOG_WARNING(SMC, "SMC_FIFO_CMD: SMC_QUERY_TEMP_SENS, returning 3C");
+        // There apepars to be 4 different 2 byte reads from this.
+        // Value 0: val1 | (val2 << 8);
+        // Value 1: val3 | (val4 << 8);
+        // Value 2: val5 | (val6 << 8);
+        // Value 3: val7 | (val8 << 8);
+        // Should be CPU, GPU, eDRAM and Chassis.
+        // TODO: Dump correct values. These where taken from free60's wiki.
+        smcCoreState.fifoDataBuffer[1] = 0x24;
+        smcCoreState.fifoDataBuffer[2] = 0x1B;
+        smcCoreState.fifoDataBuffer[3] = 0x2F;
+        smcCoreState.fifoDataBuffer[4] = 0xA4;
+        // eDRAM Temp.
+        smcCoreState.fifoDataBuffer[5] = 0x2C;
+        smcCoreState.fifoDataBuffer[6] = 0x24;
+        smcCoreState.fifoDataBuffer[7] = 0x26;
+        smcCoreState.fifoDataBuffer[8] = 0x2C;
+        LOG_WARNING(SMC, "SMC_FIFO_CMD: SMC_QUERY_TEMP_SENS: {:#d}, {:#d}, {:#d}, {:#d}",
+          (0x241b / 255), (0x2FA4 / 255), (0x2C24 / 255), (0x262C / 255));
         break;
       case Xe::PCIDev::SMC_QUERY_TRAY_STATE:
         smcCoreState.fifoDataBuffer[0] = SMC_QUERY_TRAY_STATE;
