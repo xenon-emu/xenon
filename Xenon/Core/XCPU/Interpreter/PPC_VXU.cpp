@@ -667,6 +667,18 @@ void PPCInterpreter::PPCInterpreter_vslw(PPU_STATE* ppuState) {
   VRi(rd).dword[3] = VRi(ra).dword[3] << (VRi(rb).dword[3] & 31);
 }
 
+// Vector128 Shift Left Word
+void PPCInterpreter::PPCInterpreter_vslw128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  // NOTE: Checked against Xenia's tests.
+
+  VR(VMX128_VD128).dword[0] = VR(VMX128_VA128).dword[0] << (VR(VMX128_VB128).dword[0] & 31);
+  VR(VMX128_VD128).dword[1] = VR(VMX128_VA128).dword[1] << (VR(VMX128_VB128).dword[1] & 31);
+  VR(VMX128_VD128).dword[2] = VR(VMX128_VA128).dword[2] << (VR(VMX128_VB128).dword[2] & 31);
+  VR(VMX128_VD128).dword[3] = VR(VMX128_VA128).dword[3] << (VR(VMX128_VB128).dword[3] & 31);
+}
+
 // Vector Shift Right (x'1000 02C4')
 void PPCInterpreter::PPCInterpreter_vsr(PPU_STATE* ppuState) {
   /*
@@ -713,6 +725,17 @@ void PPCInterpreter::PPCInterpreter_vsrw(PPU_STATE* ppuState) {
   VRi(rd).dword[1] = VRi(ra).dword[1] >> (VRi(rb).dword[1] & 31);
   VRi(rd).dword[2] = VRi(ra).dword[2] >> (VRi(rb).dword[2] & 31);
   VRi(rd).dword[3] = VRi(ra).dword[3] >> (VRi(rb).dword[3] & 31);
+}
+
+// Vector128 Shift Right Word
+void PPCInterpreter::PPCInterpreter_vsrw128(PPU_STATE* ppuState) {
+
+  CHECK_VXU;
+
+  VR(VMX128_VD128).dword[0] = VR(VMX128_VA128).dword[0] >> (VR(VMX128_VB128).dword[0] & 31);
+  VR(VMX128_VD128).dword[1] = VR(VMX128_VA128).dword[1] >> (VR(VMX128_VB128).dword[1] & 31);
+  VR(VMX128_VD128).dword[2] = VR(VMX128_VA128).dword[2] >> (VR(VMX128_VB128).dword[2] & 31);
+  VR(VMX128_VD128).dword[3] = VR(VMX128_VA128).dword[3] >> (VR(VMX128_VB128).dword[3] & 31);
 }
 
 // Vector128 Shift Right Arithmetic Word
