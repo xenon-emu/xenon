@@ -66,7 +66,6 @@ D_STUB(vmsumshm)
 D_STUB(vmsumshs)
 D_STUB(vsel)
 D_STUB(vnmsubfp)
-D_STUB(vpermwi128)
 D_STUB(vadduhm)
 D_STUB(vmaxuh)
 D_STUB(vrlh)
@@ -426,6 +425,7 @@ extern void PPCInterpreter_vmrglw(PPU_STATE *ppuState);
 extern void PPCInterpreter_vmrglw128(PPU_STATE *ppuState);
 extern void PPCInterpreter_vperm(PPU_STATE *ppuState);
 extern void PPCInterpreter_vperm128(PPU_STATE *ppuState);
+extern void PPCInterpreter_vpermwi128(PPU_STATE *ppuState);
 extern void PPCInterpreter_vrlimi128(PPU_STATE *ppuState);
 extern void PPCInterpreter_vrfin(PPU_STATE *ppuState);
 extern void PPCInterpreter_vrfin128(PPU_STATE *ppuState);

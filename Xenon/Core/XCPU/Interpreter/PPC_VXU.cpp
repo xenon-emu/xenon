@@ -499,6 +499,27 @@ void PPCInterpreter::PPCInterpreter_vperm128(PPU_STATE* ppuState) {
   VR(VMX128_2_VD128).dword[3] = byteswap_be<u32>(VR(VMX128_2_VD128).dword[3]);
 }
 
+// Vector128 Permutate Word Immediate
+void PPCInterpreter::PPCInterpreter_vpermwi128(PPU_STATE* ppuState) {
+  // (VD.x) = (VB.uimm[6-7])
+  // (VD.y) = (VB.uimm[4-5])
+  // (VD.z) = (VB.uimm[2-3])
+  // (VD.w) = (VB.uimm[0-1])
+
+  // NOTE: Checked against Xenia's tests.
+
+  CHECK_VXU;
+
+  const u32 vrd = _instr.VMX128_P.VD128l | (_instr.VMX128_P.VD128h << 5);
+  const u32 vrb = _instr.VMX128_P.VB128l | (_instr.VMX128_P.VB128h << 5);
+  u32 uimm = _instr.VMX128_P.PERMl | (_instr.VMX128_P.PERMh << 5);
+
+  VR(vrd).dword[0] = VR(vrb).dword[(uimm >> 6) & 3];
+  VR(vrd).dword[1] = VR(vrb).dword[(uimm >> 4) & 3];
+  VR(vrd).dword[2] = VR(vrb).dword[(uimm >> 2) & 3];
+  VR(vrd).dword[3] = VR(vrb).dword[(uimm >> 0) & 3];
+}
+
 // Vector128 Rotate Left Immediate and Mask Insert
 void PPCInterpreter::PPCInterpreter_vrlimi128(PPU_STATE* ppuState) {
 
