@@ -99,6 +99,16 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
     thread.GPR[3] = 0;
   }
 
+  if (static_cast<u32>(thread.CIA) == 0x800FC288) {
+    LOG_INFO(Xenon, "VdRetrainEDRAM returning 0.");
+    thread.GPR[3] = 0;
+  }
+  
+  if (static_cast<u32>(thread.CIA) == 0x800F9130) {
+    LOG_INFO(Xenon, "VdIsHSIOTrainingSucceeded returning 1.");
+    thread.GPR[3] = 1;
+  }
+
   // This is just to set a PC breakpoint in any PPU/Thread.
   if (static_cast<u32>(thread.CIA) == 0x8009CE40) {
     u8 a = 0;
