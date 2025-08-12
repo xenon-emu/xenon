@@ -244,6 +244,36 @@ void PPCInterpreter::PPCInterpreter_vcmpequwx(PPU_STATE* ppuState) {
   }
 }
 
+// Vector128 Compare Equal-to Unsigned Word
+void PPCInterpreter::PPCInterpreter_vcmpequw128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  VR(VMX128_R_VD128).dword[0] = ((VR(VMX128_R_VA128).dword[0] == VR(VMX128_R_VB128).dword[0]) ? 0xFFFFFFFF : 0x00000000);
+  VR(VMX128_R_VD128).dword[1] = ((VR(VMX128_R_VA128).dword[1] == VR(VMX128_R_VB128).dword[1]) ? 0xFFFFFFFF : 0x00000000);
+  VR(VMX128_R_VD128).dword[2] = ((VR(VMX128_R_VA128).dword[2] == VR(VMX128_R_VB128).dword[2]) ? 0xFFFFFFFF : 0x00000000);
+  VR(VMX128_R_VD128).dword[3] = ((VR(VMX128_R_VA128).dword[3] == VR(VMX128_R_VB128).dword[3]) ? 0xFFFFFFFF : 0x00000000);
+
+  if (_instr.vrc) {
+    u8 crValue = 0;
+    bool allEqual = false;
+    bool allNotEqual = false;
+
+    if (VR(VMX128_R_VD128).dword[0] == 0xFFFFFFFF && VR(VMX128_R_VD128).dword[1] == 0xFFFFFFFF
+      && VR(VMX128_R_VD128).dword[2] == 0xFFFFFFFF && VR(VMX128_R_VD128).dword[3] == 0xFFFFFFFF) {
+      allEqual = true;
+    }
+
+    if (VR(VMX128_R_VD128).dword[0] == 0 && VR(VMX128_R_VD128).dword[1] == 0 && VR(VMX128_R_VD128).dword[2] == 0 && VR(VMX128_R_VD128).dword[3] == 0) {
+      allNotEqual = true;
+    }
+
+    crValue |= allEqual ? 0b1000 : 0;
+    crValue |= allNotEqual ? 0b0010 : 0;
+
+    ppcUpdateCR(ppuState, 6, crValue);
+  }
+}
+
 // Vector128 Convert From Signed Fixed-Point Word to Floating-Point
 void PPCInterpreter::PPCInterpreter_vcsxwfp128(PPU_STATE* ppuState) {
   CHECK_VXU;
@@ -310,6 +340,30 @@ void PPCInterpreter::PPCInterpreter_vexptefp128(PPU_STATE* ppuState) {
   VR(VMX128_3_VD128).flt[1] = vexptefpHelper(VR(VMX128_3_VB128).flt[1]);
   VR(VMX128_3_VD128).flt[2] = vexptefpHelper(VR(VMX128_3_VB128).flt[2]);
   VR(VMX128_3_VD128).flt[3] = vexptefpHelper(VR(VMX128_3_VB128).flt[3]);
+}
+
+static f32 vNaN(f32 inFloat) {
+  const u32 posNaN = 0x7FC00000;
+  return (float&)posNaN;
+}
+
+static f32 vectorNegate(f32 inFloat) {
+  (u32&)inFloat ^= 0x80000000; // Invert the sign of the result.
+  return inFloat;
+}
+
+static u32 vnmsubfpHelper(f32 fra, f32 frb, f32 frc) {
+  return vectorNegate((fra * frb) - frc);
+}
+
+// Vector Negative Multiply-Subtract Floating Point (x'1000 002F')
+void PPCInterpreter::PPCInterpreter_vnmsubfp(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  VRi(vd).flt[0] = vnmsubfpHelper(VRi(va).flt[0], VRi(vb).flt[0], VRi(vc).flt[0]);
+  VRi(vd).flt[1] = vnmsubfpHelper(VRi(va).flt[1], VRi(vb).flt[1], VRi(vc).flt[1]);
+  VRi(vd).flt[2] = vnmsubfpHelper(VRi(va).flt[2], VRi(vb).flt[2], VRi(vc).flt[2]);
+  VRi(vd).flt[3] = vnmsubfpHelper(VRi(va).flt[3], VRi(vb).flt[3], VRi(vc).flt[3]);
 }
 
 // Vector Logical NOR (x'1000 0504')
