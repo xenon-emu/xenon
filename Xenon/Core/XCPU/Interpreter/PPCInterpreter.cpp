@@ -109,6 +109,11 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
     thread.GPR[3] = 1;
   }
 
+  // Skip media detection in XAM for now.
+  if (static_cast<u32>(thread.CIA) == 0x8175E61C) {
+    thread.GPR[3] = 0;
+  }
+
   // This is just to set a PC breakpoint in any PPU/Thread.
   if (static_cast<u32>(thread.CIA) == 0x8009CE40) {
     u8 a = 0;
