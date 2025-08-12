@@ -2106,3 +2106,72 @@ void PPCInterpreter::PPCInterpreter_lvsl(PPU_STATE* ppuState) {
     VRi(vd).dword[1], VRi(vd).dword[2], VRi(vd).dword[3]);
 #endif // VXU_LOAD_DEBUG
 }
+
+// Load Vector for Shift Right (x'7C00 004C')
+void PPCInterpreter::PPCInterpreter_lvsr(PPU_STATE* ppuState) {
+  /*
+   if rA = 0 then  b <- 0
+   else            b <- (rA)
+   EA <- b + (rB)
+   sh <- EA[60:63]
+
+   if sh=0x0 then (vD) <- 0x101112131415161718191A1B1C1D1E1F
+   if sh=0x1 then (vD) <- 0x0F101112131415161718191A1B1C1D1E
+   if sh=0x2 then (vD) <- 0x0E0F101112131415161718191A1B1C1D
+   if sh=0x3 then (vD) <- 0x0D0E0F101112131415161718191A1B1C
+   if sh=0x4 then (vD) <- 0x0C0D0E0F101112131415161718191A1B
+   if sh=0x5 then (vD) <- 0x0B0C0D0E0F101112131415161718191A
+   if sh=0x6 then (vD) <- 0x0A0B0C0D0E0F10111213141516171819
+   if sh=0x7 then (vD) <- 0x090A0B0C0D0E0F101112131415161718
+   if sh=0x8 then (vD) <- 0x08090A0B0C0D0E0F1011121314151617
+   if sh=0x9 then (vD) <- 0x0708090A0B0C0D0E0F10111213141516
+   if sh=0xA then (vD) <- 0x060708090A0B0C0D0E0F101112131415
+   if sh=0xB then (vD) <- 0x05060708090A0B0C0D0E0F1011121314
+   if sh=0xC then (vD) <- 0x0405060708090A0B0C0D0E0F10111213
+   if sh=0xD then (vD) <- 0x030405060708090A0B0C0D0E0F101112
+   if sh=0xE then (vD) <- 0x02030405060708090A0B0C0D0E0F1011
+   if sh=0xF then (vD) <- 0x0102030405060708090A0B0C0D0E0F10
+  */
+
+  CHECK_VXU;
+
+  Vector128 vector{};
+  const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
+  const u8 sh = EA & 0xF;
+
+#ifdef VXU_LOAD_DEBUG
+  u8 vrd = _instr.vd;
+  LOG_DEBUG(Xenon, "lvsr: EA {:#x}, sh {:#x}, VrD {:#d} = [{:#x},{:#x},{:#x},{:#x}]", EA, sh, vrd, VRi(vd).dword[0],
+    VRi(vd).dword[1], VRi(vd).dword[2], VRi(vd).dword[3]);
+#endif // VXU_LOAD_DEBUG
+
+#define MAKE_VECTOR(x,y,z,w) vector.dword[0] = x; vector.dword[1] = y; vector.dword[2] = z; vector.dword[3] = w;
+
+  switch (sh) {
+  case 0x0:  MAKE_VECTOR(0x10111213, 0x14151617, 0x18191A1B, 0x1C1D1E1F); break;
+  case 0x1:  MAKE_VECTOR(0x0F101112, 0x13141516, 0x1718191A, 0x1B1C1D1E); break;
+  case 0x2:  MAKE_VECTOR(0x0E0F1011, 0x12131415, 0x16171819, 0x1A1B1C1D); break;
+  case 0x3:  MAKE_VECTOR(0x0D0E0F10, 0x11121314, 0x15161718, 0x191A1B1C); break;
+  case 0x4:  MAKE_VECTOR(0x0C0D0E0F, 0x10111213, 0x14151617, 0x18191A1B); break;
+  case 0x5:  MAKE_VECTOR(0x0B0C0D0E, 0x0F101112, 0x13141516, 0x1718191A); break;
+  case 0x6:  MAKE_VECTOR(0x0A0B0C0D, 0x0E0F1011, 0x12131415, 0x16171819); break;
+  case 0x7:  MAKE_VECTOR(0x090A0B0C, 0x0D0E0F10, 0x11121314, 0x15161718); break;
+  case 0x8:  MAKE_VECTOR(0x08090A0B, 0x0C0D0E0F, 0x10111213, 0x14151617); break;
+  case 0x9:  MAKE_VECTOR(0x0708090A, 0x0B0C0D0E, 0x0F101112, 0x13141516); break;
+  case 0xA:  MAKE_VECTOR(0x06070809, 0x0A0B0C0D, 0x0E0F1011, 0x12131415); break;
+  case 0xB:  MAKE_VECTOR(0x05060708, 0x090A0B0C, 0x0D0E0F10, 0x11121314); break;
+  case 0xC:  MAKE_VECTOR(0x04050607, 0x08090A0B, 0x0C0D0E0F, 0x10111213); break;
+  case 0xD:  MAKE_VECTOR(0x03040506, 0x0708090A, 0x0B0C0D0E, 0x0F101112); break;
+  case 0xE:  MAKE_VECTOR(0x02030405, 0x06070809, 0x0A0B0C0D, 0x0E0F1011); break;
+  case 0xF:  MAKE_VECTOR(0x01020304, 0x05060708, 0x090A0B0C, 0x0D0E0F10); break;
+  }
+
+#undef MAKE_VECTOR
+
+  VRi(vd) = vector;
+
+#ifdef VXU_LOAD_DEBUG
+  LOG_DEBUG(Xenon, "lvsr: VrD {:#d} = [{:#x},{:#x},{:#x},{:#x}]", vrd, VRi(vd).dword[0],
+    VRi(vd).dword[1], VRi(vd).dword[2], VRi(vd).dword[3]);
+#endif // VXU_LOAD_DEBUG
+}

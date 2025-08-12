@@ -22,7 +22,6 @@ D_STUBRC(mtfsfi)
 D_STUBRC(fres)
 D_STUB(mfsrin)
 D_STUB(mfsr)
-D_STUB(lvsr)
 D_STUB(lvsl128)
 D_STUB(lvewx128)
 D_STUB(stvxl128)
@@ -572,6 +571,7 @@ extern void PPCInterpreter_lvlx128(PPU_STATE *ppuState);
 extern void PPCInterpreter_lvrx(PPU_STATE *ppuState);
 extern void PPCInterpreter_lvrx128(PPU_STATE *ppuState);
 extern void PPCInterpreter_lvsl(PPU_STATE *ppuState);
+extern void PPCInterpreter_lvsr(PPU_STATE *ppuState);
 
 
 // @Aleblbl probably better to move it into a separate file for the JIT emitters
