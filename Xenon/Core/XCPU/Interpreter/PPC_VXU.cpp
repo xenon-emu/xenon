@@ -1008,31 +1008,40 @@ static inline u8 vsldoiHelper(u8 sh, Base::Vector128 vra, Base::Vector128 vrb) {
   return (sh < 16) ? vra.bytes[sh] : vrb.bytes[sh & 0xF];
 }
 
-#if defined(ARCH_X86_64)
+#ifdef ARCH_X86_64
 #ifdef __GNUC__
-__attribute__((target("ssse3")))
-#endif
-__m128i vsldoi_sse(__m128i va, __m128i vb, u8 shb) {
+  #define SSSE3_ATTR __attribute__((target("ssse3"), always_inline))
+#else
+  #define SSSE3_ATTR
+#endif // ifdef __GNUC__
+
+template <s32 N>
+static inline SSSE3_ATTR __m128i palignr_imm(__m128i a, __m128i b) {
+  static_assert(N >= 0 && N <= 31, "palignr imm must be 0..31");
+  return _mm_alignr_epi8(b, a, N);
+}
+
+static inline SSSE3_ATTR __m128i vsldoi_sse(__m128i va, __m128i vb, u8 shb) {
   __m128i result = _mm_setzero_si128();
-  switch (shb) {
+  switch (shb & 0xF) {
 #undef CASE
-#define CASE(i) case i: result = _mm_or_si128(_mm_srli_si128(va, i), _mm_slli_si128(vb, 16 - i)); break
-    CASE(0);
-    CASE(1);
-    CASE(2);
-    CASE(3);
-    CASE(4);
-    CASE(5);
-    CASE(6);
-    CASE(7);
-    CASE(8);
-    CASE(9);
-    CASE(10);
-    CASE(11);
-    CASE(12);
-    CASE(13);
-    CASE(14);
-    CASE(15);
+#define CASE(i) case i: return palignr_imm<16 - i>(va, vb)
+  CASE(0);
+  CASE(1);
+  CASE(2);
+  CASE(3);
+  CASE(4);
+  CASE(5);
+  CASE(6);
+  CASE(7);
+  CASE(8);
+  CASE(9);
+  CASE(10);
+  CASE(11);
+  CASE(12);
+  CASE(13);
+  CASE(14);
+  CASE(15);
 #undef CASE
   }
   return result;
@@ -1040,7 +1049,7 @@ __m128i vsldoi_sse(__m128i va, __m128i vb, u8 shb) {
 
 #ifdef __GNUC__
 __attribute__((target("ssse3")))
-#endif
+#endif // ifdef __GNUC__
 inline __m128i byteswap_be_u32x4_ssse3(__m128i x) {
   // Reverses bytes in each 32-bit word using SSSE3 shuffle_epi8
   const __m128i shuffle = _mm_set_epi8(
@@ -1051,7 +1060,7 @@ inline __m128i byteswap_be_u32x4_ssse3(__m128i x) {
   );
   return _mm_shuffle_epi8(x, shuffle);
 }
-#endif
+#endif // ifdef ARCH_X86_64
 
 // Vector Shift Left Double by Octet Immediate (x'1000 002C')
 void PPCInterpreter::PPCInterpreter_vsldoi(PPU_STATE *ppuState) {
