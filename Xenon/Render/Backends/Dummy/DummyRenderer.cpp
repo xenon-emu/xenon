@@ -15,6 +15,7 @@ DummyRenderer::DummyRenderer(RAM *ram) :
 void DummyRenderer::BackendStart() {
   LOG_INFO(Render, "DummyRenderer::BackendStart");
   resourceFactory = std::make_unique<DummyResourceFactory>();
+  shaderFactory = resourceFactory->CreateShaderFactory();
   fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) };
   shaderPath /= "dummy";
   computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {

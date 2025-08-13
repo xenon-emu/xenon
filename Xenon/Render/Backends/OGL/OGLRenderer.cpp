@@ -32,6 +32,7 @@ std::string OGLRenderer::GLRenderer() const {
 void OGLRenderer::BackendStart() {
   // Create the resource factory
   resourceFactory = std::make_unique<OGLResourceFactory>();
+  shaderFactory = resourceFactory->CreateShaderFactory();
   fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) };
   bool gles = GetBackendID() == "GLES"_jLower;
   std::string versionString = FMT("#version {} {}\n", gles ? 310 : 430, gles ? "es" : "compatibility");
