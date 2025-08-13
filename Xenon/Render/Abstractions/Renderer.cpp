@@ -78,7 +78,6 @@ void Renderer::Start() {
 void Renderer::CreateHandles() {
   MICROPROFILE_SCOPEI("[Xe::Render]", "Create", MP_AUTO);
   // Create factories
-  shaderFactory = resourceFactory->CreateShaderFactory();
   BackendStart();
 
   // Create our backbuffer
