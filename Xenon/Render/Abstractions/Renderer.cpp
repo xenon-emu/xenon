@@ -78,59 +78,8 @@ void Renderer::Start() {
 void Renderer::CreateHandles() {
   MICROPROFILE_SCOPEI("[Xe::Render]", "Create", MP_AUTO);
   // Create factories
-  BackendStart();
   shaderFactory = resourceFactory->CreateShaderFactory();
-
-  fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) };
-  // Init shader handles
-  switch (GetBackendID()) {
-  case "GLES"_jLower:
-  case "OpenGL"_jLower: {
-    bool gles = GetBackendID() == "GLES"_jLower;
-    std::string versionString = FMT("#version {} {}\n", gles ? 310 : 430, gles ? "es" : "compatibility");
-    shaderPath /= "opengl";
-    computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
-      { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
-    });
-    if (!computeShaderProgram) {
-      std::ofstream f{ shaderPath / "fb_deswizzle.comp" };
-      f.write(versionString.data(), versionString.size());
-      f.write(computeShaderSource, sizeof(computeShaderSource));
-      f.close();
-      computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
-        { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
-      });
-    }
-    renderShaderPrograms = shaderFactory->LoadFromFiles("Render", {
-      { eShaderType::Vertex, shaderPath / "framebuffer.vert" },
-      { eShaderType::Fragment, shaderPath / "framebuffer.frag" }
-    });
-    if (!renderShaderPrograms) {
-      std::ofstream vert{ shaderPath / "framebuffer.vert" };
-      vert.write(versionString.data(), versionString.size());
-      vert.write(vertexShaderSource, sizeof(vertexShaderSource));
-      vert.close();
-      std::ofstream frag{ shaderPath / "framebuffer.frag" };
-      frag.write(versionString.data(), versionString.size());
-      frag.write(fragmentShaderSource, sizeof(fragmentShaderSource));
-      frag.close();
-      renderShaderPrograms = shaderFactory->LoadFromFiles("Render", {
-        { eShaderType::Vertex, shaderPath / "framebuffer.vert" },
-        { eShaderType::Fragment, shaderPath / "framebuffer.frag" }
-      });
-    }
-  } break;
-  case "Dummy"_jLower: {
-    shaderPath /= "dummy";
-    computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
-      { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
-    });
-    renderShaderPrograms = shaderFactory->LoadFromFiles("Render", {
-      { eShaderType::Vertex, shaderPath / "framebuffer.vert" },
-      { eShaderType::Fragment, shaderPath / "framebuffer.frag" }
-    });
-  } break;
-  }
+  BackendStart();
 
   // Create our backbuffer
   backbuffer = resourceFactory->CreateTexture();

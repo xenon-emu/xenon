@@ -6,6 +6,7 @@
 #include "Render/OpenGL/Factory/OGLResourceFactory.h"
 #include "Render/OpenGL/OGLTexture.h"
 #include "Render/Backends/OGL/OGLRenderer.h"
+#include "Render/Backends/OGL/OGLShaders.h"
 
 #define SANITY_CHECK(x) if (!x) { LOG_ERROR(Xenon, "Failed to initialize SDL: {}", SDL_GetError()); }
 
@@ -16,30 +17,56 @@ OGLRenderer::OGLRenderer(RAM *ram) :
   Renderer(ram)
 {}
 
-std::string OGLRenderer::gl_version() const {
-  const GLubyte* version = glGetString(GL_VERSION);
-  const char* c_version = reinterpret_cast<const char*>(version);
-
-  return c_version;
+std::string OGLRenderer::GLVersion() const {
+  return reinterpret_cast<const char *>(glGetString(GL_VERSION));
 }
 
-std::string OGLRenderer::gl_vendor() const {
-  const GLubyte* vendor = glGetString(GL_VENDOR);
-  const char* c_vendor = reinterpret_cast<const char*>(vendor);
-
-  return c_vendor;
+std::string OGLRenderer::GLVendor() const {
+  return reinterpret_cast<const char *>(glGetString(GL_VENDOR));
 }
 
-std::string OGLRenderer::gl_renderer() const {
-  const GLubyte* renderer = glGetString(GL_RENDERER);
-  const char* c_renderer = reinterpret_cast<const char*>(renderer);
-
-  return c_renderer;
+std::string OGLRenderer::GLRenderer() const {
+  return reinterpret_cast<const char *>(glGetString(GL_RENDERER));
 }
 
 void OGLRenderer::BackendStart() {
   // Create the resource factory
   resourceFactory = std::make_unique<OGLResourceFactory>();
+  fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) };
+  bool gles = GetBackendID() == "GLES"_jLower;
+  std::string versionString = FMT("#version {} {}\n", gles ? 310 : 430, gles ? "es" : "compatibility");
+  shaderPath /= "opengl";
+  computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
+    { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
+  });
+  if (!computeShaderProgram) {
+    std::ofstream f{ shaderPath / "fb_deswizzle.comp" };
+    f.write(versionString.data(), versionString.size());
+    f.write(computeShaderSource, sizeof(computeShaderSource));
+    f.close();
+    computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
+      { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
+    });
+  }
+  renderShaderPrograms = shaderFactory->LoadFromFiles("Render", {
+    { eShaderType::Vertex, shaderPath / "framebuffer.vert" },
+    { eShaderType::Fragment, shaderPath / "framebuffer.frag" }
+  });
+  if (!renderShaderPrograms) {
+    std::ofstream vert{ shaderPath / "framebuffer.vert" };
+    vert.write(versionString.data(), versionString.size());
+    vert.write(vertexShaderSource, sizeof(vertexShaderSource));
+    vert.close();
+    std::ofstream frag{ shaderPath / "framebuffer.frag" };
+    frag.write(versionString.data(), versionString.size());
+    frag.write(fragmentShaderSource, sizeof(fragmentShaderSource));
+    frag.close();
+    renderShaderPrograms = shaderFactory->LoadFromFiles("Render", {
+      { eShaderType::Vertex, shaderPath / "framebuffer.vert" },
+      { eShaderType::Fragment, shaderPath / "framebuffer.frag" }
+    });
+  }
+
   // Create VAOs, and EBOs
   glGenVertexArrays(1, &dummyVAO);
   glGenVertexArrays(1, &VAO);
@@ -96,9 +123,9 @@ void OGLRenderer::BackendSDLInit() {
   if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress)) {
     LOG_ERROR(Render, "Failed to initialize GL: {}", SDL_GetError());
   } else {
-    LOG_INFO(Render, "{} Version: {}", gles ? "GLES" : "OpenGL", OGLRenderer::gl_version());
-    LOG_INFO(Render, "OpenGL Vendor: {}", OGLRenderer::gl_vendor());
-    LOG_INFO(Render, "OpenGL Renderer: {}", OGLRenderer::gl_renderer());
+    LOG_INFO(Render, "{} Version: {}", gles ? "GLES" : "OpenGL", OGLRenderer::GLVersion());
+    LOG_INFO(Render, "OpenGL Vendor: {}", OGLRenderer::GLVendor());
+    LOG_INFO(Render, "OpenGL Renderer: {}", OGLRenderer::GLRenderer());
   }
   if (gles) {
     if (!gladLoadGLES2Loader((GLADloadproc)SDL_GL_GetProcAddress)) {
