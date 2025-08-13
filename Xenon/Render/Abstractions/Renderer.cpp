@@ -333,50 +333,6 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
   return true;
 }
 
-std::vector<u32> CreateVertexShader() {
-  Sirit::Module module{ 0x00010000 };
-  module.AddCapability(spv::Capability::Shader);
-  module.AddExtension("SPV_KHR_storage_buffer_storage_class");
-  module.SetMemoryModel(spv::AddressingModel::Logical, spv::MemoryModel::GLSL450);
-
-  // Types
-  auto void_type = module.TypeVoid();
-  auto func_type = module.TypeFunction(void_type);
-  auto float_type = module.TypeFloat(32);
-  auto vec4_type = module.TypeVector(float_type, 4);
-
-  // Input and output
-  auto input_ptr = module.TypePointer(spv::StorageClass::Input, vec4_type);
-  auto output_ptr = module.TypePointer(spv::StorageClass::Output, vec4_type);
-
-  // Variables
-  auto aPos = module.AddGlobalVariable(input_ptr, spv::StorageClass::Input);
-  module.Name(aPos, "aPos");
-  module.Decorate(aPos, spv::Decoration::Location, 0);
-
-  auto gl_Position = module.AddGlobalVariable(output_ptr, spv::StorageClass::Output);
-  module.Name(gl_Position, "gl_Position");
-  module.Decorate(gl_Position, spv::Decoration::BuiltIn, spv::BuiltIn::Position);
-
-  // Function
-  auto func = module.OpFunction(void_type, spv::FunctionControlMask::MaskNone, func_type);
-  module.Name(func, "main");
-  module.AddEntryPoint(spv::ExecutionModel::Vertex, func, "main", aPos, gl_Position);
-
-  auto label = module.AddLabel();
-
-  // Load input
-  auto pos_val = module.OpLoad(vec4_type, aPos);
-
-  // Write to gl_Position
-  module.OpStore(gl_Position, pos_val);
-
-  // Return
-  module.OpReturn();
-  module.OpFunctionEnd();
-  return module.Assemble();
-}
-
 void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
   auto vsIt = pendingVertexShaders.find(vsHash);
   auto psIt = pendingPixelShaders.find(psHash);
@@ -475,26 +431,10 @@ void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
             buffer->Bind();
 
             // Setup vertex attributes for this fetch.
-            // `GetComponentCount()` gives the number of components (1-4).
-            // `fetchOffset` and `fetchStride` are in DWords (4 bytes), so multiply by 4 for byte offsets/strides.
             const u32 components = fetch->GetComponentCount();
-            const u32 type = fetch->isFloat?GL_FLOAT:GL_UNSIGNED_INT;
-            const u8 normalized = fetch->isNormalized?GL_TRUE:GL_FALSE;
             const u32 offset = fetch->fetchOffset * 4;
             const u32 stride = fetch->fetchStride * 4;
-
-            // Assign consecutive attribute locations starting from `currentAttributeLocation`.
-            if (location <= 32) { // Check against a reasonable maximum for vertex attributes
-              glEnableVertexAttribArray(location);
-              glVertexAttribPointer(
-                location,
-                components,
-                type,
-                normalized,
-                stride,
-                reinterpret_cast<void *>((uintptr_t)offset)
-              );
-            }
+            VertexFetch(location, components, fetch->isFloat, fetch->isNormalized, offset, stride);
           }
         }
       }

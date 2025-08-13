@@ -179,6 +179,22 @@ s32 ConvertToGLPrimitive(ePrimitiveType prim) {
   }
 }
 
+void OGLRenderer::VertexFetch(const u32 location, const u32 components, bool isFloat, bool isNormalized, const u32 fetchOffset, const u32 fetchStride) {
+  const u32 type = isFloat ? GL_FLOAT:GL_UNSIGNED_INT;
+  const u8 normalized = isNormalized ? GL_TRUE : GL_FALSE;
+  if (location <= 32) {
+    glEnableVertexAttribArray(location);
+    glVertexAttribPointer(
+      location,
+      components,
+      type,
+      normalized,
+      fetchStride,
+      reinterpret_cast<void *>((u64)fetchOffset)
+    );
+  }
+}
+
 void OGLRenderer::Draw(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params) {
   ePrimitiveType type = params.vgtDrawInitiator.primitiveType;
   s32 glPrimitive = ConvertToGLPrimitive(params.vgtDrawInitiator.primitiveType);
