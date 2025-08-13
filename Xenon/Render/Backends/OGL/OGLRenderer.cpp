@@ -2,10 +2,10 @@
 
 #include "Core/XeMain.h"
 
-#include "GUI/OpenGL.h"
-#include "OpenGL/Factory/OGLResourceFactory.h"
-#include "OpenGL/OGLTexture.h"
-#include "OGLRenderer.h"
+#include "Render/GUI/OpenGL.h"
+#include "Render/OpenGL/Factory/OGLResourceFactory.h"
+#include "Render/OpenGL/OGLTexture.h"
+#include "Render/Backends/OGL/OGLRenderer.h"
 
 #define SANITY_CHECK(x) if (!x) { LOG_ERROR(Xenon, "Failed to initialize SDL: {}", SDL_GetError()); }
 
