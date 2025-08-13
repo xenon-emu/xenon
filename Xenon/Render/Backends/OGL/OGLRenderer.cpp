@@ -35,7 +35,7 @@ void OGLRenderer::BackendStart() {
   shaderFactory = resourceFactory->CreateShaderFactory();
   fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) };
   bool gles = GetBackendID() == "GLES"_jLower;
-  std::string versionString = FMT("#version {} {}\n", gles ? 310 : 430, gles ? "es" : "compatibility");
+  std::string versionString = FMT("#version {} {}\n", gles ? 310 : 430, gles ? "es" : "core");
   shaderPath /= "opengl";
   computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
     { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
