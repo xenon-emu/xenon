@@ -2,6 +2,8 @@
 
 cmake_minimum_required(VERSION 3.22)
 
+project(Xenon)
+
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED TRUE)
@@ -10,8 +12,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
-
-project(Xenon)
 
 set(COMPILER ${CMAKE_CXX_COMPILER_ID})
 message(STATUS "Using ${COMPILER} Version ${CMAKE_CXX_COMPILER_VERSION}")
@@ -29,20 +29,26 @@ endif()
 if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
   if (MSVC)
-    add_compile_options($<$<CONFIG:Release>:/Oi>)
-    add_compile_options($<$<CONFIG:Release>:/Ot>)
+    add_compile_options($<$<CONFIG:Release>:/Oi> $<$<CONFIG:Release>:/Ot>)
   endif()
 endif()
 
 # Options
 option(GFX_ENABLED "Enable graphics" ON)
+option(XENON_USE_SYSTEM_DEPS "Prefer system-installed packages (find_package first)" ON)
+option(XENON_ALLOW_BUNDLED_DEPS "If a package isn't found, fall back to bundled subdirs" ON)
+set(XENON_THIRDPARTY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Deps/ThirdParty" CACHE PATH "Bundled deps root")
 
-# Set Version
+# Version
 set(EMULATOR_VERSION_MAJOR "0")
 set(EMULATOR_VERSION_MINOR "0")
 set(EMULATOR_VERSION_PATCH "1")
 
-set_source_files_properties(Xenon/Xenon.rc PROPERTIES COMPILE_DEFINITIONS "EMULATOR_VERSION_MAJOR=${EMULATOR_VERSION_MAJOR};EMULATOR_VERSION_MINOR=${EMULATOR_VERSION_MINOR};EMULATOR_VERSION_PATCH=${EMULATOR_VERSION_PATCH}")
+set_property(SOURCE Xenon/Xenon.rc APPEND PROPERTY COMPILE_DEFINITIONS
+  EMULATOR_VERSION_MAJOR=${EMULATOR_VERSION_MAJOR}
+  EMULATOR_VERSION_MINOR=${EMULATOR_VERSION_MINOR}
+  EMULATOR_VERSION_PATCH=${EMULATOR_VERSION_PATCH}
+)
 add_compile_definitions(APP_VERSION="${EMULATOR_VERSION_MAJOR}.${EMULATOR_VERSION_MINOR}.${EMULATOR_VERSION_PATCH}")
 
 # COMMIT_COUNT on Xenon (with Git)
@@ -71,33 +77,86 @@ if (NOT "${COMMIT_COUNT}" STREQUAL "" AND NOT "${BRANCH}" STREQUAL "")
   endif()
 endif()
 
-# Enable SSE3
+# CPU features
 if (msvc)
   add_compile_options(/arch:SSE2)
 elseif (NOT APPLE)
   add_compile_options(-mssse3)
 endif()
 
-# Include Deps/ThirdParty and Packages
+# Try system first, else add_subdirectory for the specific dep
+macro(xenon_dep pkg target subdir)
+  set(found_system OFF)
+  if (XENON_USE_SYSTEM_DEPS)
+    # Try config mode first, then module mode
+    find_package(${pkg} CONFIG QUIET)
+    if (NOT TARGET ${target})
+      find_package(${pkg} QUIET)
+    endif()
+
+    if (TARGET ${target})
+      # Check for library or header-only target
+      get_target_property(lib_location ${target} IMPORTED_LOCATION)
+      get_target_property(lib_location_debug ${target} IMPORTED_LOCATION_DEBUG)
+      get_target_property(lib_location_release ${target} IMPORTED_LOCATION_RELEASE)
+      get_target_property(type ${target} TYPE)
+
+      if (lib_location OR lib_location_debug OR lib_location_release)
+        message(STATUS "Using system ${pkg} (prebuilt library)")
+        set(found_system ON)
+      elseif (type STREQUAL "STATIC_LIBRARY" OR type STREQUAL "SHARED_LIBRARY" OR type STREQUAL "MODULE_LIBRARY")
+        message(STATUS "Using system ${pkg} (build target)")
+        set(found_system ON)
+      elseif (type STREQUAL "INTERFACE_LIBRARY")
+        message(STATUS "Using system ${pkg} (header-only)")
+        set(found_system ON)
+      else()
+        message(WARNING "System ${pkg} found but unusable — falling back to bundled")
+      endif()
+    endif()
+  endif()
+
+  if (NOT found_system)
+    if (NOT XENON_ALLOW_BUNDLED_DEPS)
+      message(FATAL_ERROR "Package ${pkg} not found and bundled deps disabled (XENON_ALLOW_BUNDLED_DEPS=OFF).")
+    endif()
+
+    if (NOT TARGET ${target})
+      # Per-dep settings
+      if (${pkg} STREQUAL "toml11")
+        set(TOML11_INSTALL OFF CACHE BOOL "" FORCE)
+      elseif (${pkg} STREQUAL "SDL3")
+        set(SDL_DISKAUDIO OFF CACHE BOOL "" FORCE)
+        set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+        set(SDL_PIPEWIRE OFF CACHE BOOL "" FORCE)
+      elseif (${pkg} STREQUAL "asmjit")
+        set(ASMJIT_NO_CUSTOM_FLAGS TRUE CACHE BOOL "" FORCE)
+        set(ASMJIT_STATIC TRUE CACHE BOOL "" FORCE)
+      endif()
+
+      message(STATUS "Using bundled ${pkg}")
+      add_subdirectory(${XENON_THIRDPARTY_DIR}/${subdir} ${subdir} EXCLUDE_FROM_ALL)
+    endif()
+  endif()
+endmacro()
+
+xenon_dep(fmt fmt::fmt fmt)
+xenon_dep(asmjit asmjit::asmjit asmjit)
+xenon_dep(toml11 toml11::toml11 toml11)
 if (GFX_ENABLED)
-  find_package(SDL3 3.2.4 CONFIG)
-  find_package(sirit CONFIG)
+  xenon_dep(glad glad glad)
+  xenon_dep(SDL3 SDL3::SDL3 SDL3)
+  xenon_dep(sirit sirit Sirit)
 endif()
 
-find_package(asmjit CONFIG)
-find_package(fmt 10.2.1 CONFIG)
-find_package(toml11 4.4.0 CONFIG)
-
-include_directories(Xenon)
-add_subdirectory(Deps/ThirdParty)
-
 # Include Files
-file(GLOB_RECURSE Base Xenon/Base/*.cpp Xenon/Base/*.h)
+include_directories(Xenon)
 
+file(GLOB_RECURSE Base Xenon/Base/*.cpp Xenon/Base/*.h)
 file(GLOB_RECURSE Core Xenon/Core/*.cpp Xenon/Core/*.h)
 
 if (GFX_ENABLED)
-  set(ImGuiDir Deps/ThirdParty/ImGui)
+  set(ImGuiDir ${XENON_THIRDPARTY_DIR}/ImGui)
   set(ImGuiBackends
     ${ImGuiDir}/backends/imgui_impl_opengl3.cpp
     ${ImGuiDir}/backends/imgui_impl_opengl3.h
@@ -116,7 +175,7 @@ endif()
 file(GLOB_RECURSE include Xenon/include/*.cpp Xenon/include/*.h)
 
 add_compile_definitions(MICROPROFILE_USE_CONFIG)
-set(microprofile_dir Deps/ThirdParty/microprofile)
+set(microprofile_dir ${XENON_THIRDPARTY_DIR}/microprofile)
 file(GLOB microprofile ${microprofile_dir}/*.cpp ${microprofile_dir}/*.h)
 
 add_executable(Xenon
@@ -146,10 +205,10 @@ if (GFX_ENABLED)
   target_link_libraries(Xenon PRIVATE glad sirit SDL3::SDL3)
 endif()
 
-# Add includes
+# Includes
 target_include_directories(Xenon PRIVATE ${microprofile_dir} Xenon/include)
 if (GFX_ENABLED)
-    target_include_directories(Xenon PRIVATE ${ImGuiDir})
+  target_include_directories(Xenon SYSTEM PRIVATE ${ImGuiDir})
 endif()
 
 # Add defines specific to Windows
