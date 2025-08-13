@@ -137,7 +137,7 @@ public:
   // Shader load queue
   std::mutex bufferQueueMutex{};
   std::queue<BufferLoadJob> bufferLoadQueue{};
-  std::unordered_map<u32, std::shared_ptr<Buffer>> createdBuffers{};
+  std::unordered_map<u64, std::shared_ptr<Buffer>> createdBuffers{};
 
   // GUI Helpers
   bool DebuggerActive();

@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Abstractions/Renderer.h"
+#include "Render/Abstractions/Renderer.h"
 
 #ifndef NO_GFX
 #include <SDL3/SDL.h>

@@ -26,8 +26,8 @@
 #include "Core/XCPU/Xenon.h"
 #include "Core/XGPU/XGPU.h"
 
-#include "Render/OGLRenderer.h"
-#include "Render/DummyRenderer.h"
+#include "Render/Backends/OGL/OGLRenderer.h"
+#include "Render/Backends/Dummy/DummyRenderer.h"
 
 // Global thread state
 namespace XeMain {

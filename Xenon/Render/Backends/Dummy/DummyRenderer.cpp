@@ -1,8 +1,8 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
-#include "DummyRenderer.h"
+#include "Render/Backends/Dummy/DummyRenderer.h"
 
-#include "Dummy/Factory/DummyResourceFactory.h"
+#include "Render/Dummy/Factory/DummyResourceFactory.h"
 
 #ifndef NO_GFX
 namespace Render {
