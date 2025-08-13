@@ -35,10 +35,10 @@ let
   sirit = if withGraphics
     then fetchFromGitHub {
       fetchSubmodules = true;
-      owner = "Vali0004";
+      owner = "shadps4-emu";
       repo = "sirit";
-      rev = "e9f33a21066234f9479383233d4883837b7ea807";
-      hash = "sha256-o/Cju5KHu1Dh+swO1K4HFRBn+dxqYvqU3CgZoUjebek=";
+      rev = "282083a595dcca86814dedab2f2b0363ef38f1ec";
+      hash = "sha256-/nPJ4gJ48gWtpxJ2Tlz4Az07mdBLrL4w/gdb0Xjq47o= ";
     }
     else {};
   microprofile = fetchFromGitHub {

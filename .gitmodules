@@ -22,7 +22,7 @@
 	ignore = dirty
 [submodule "Deps/ThirdParty/Sirit"]
 	path = Deps/ThirdParty/Sirit
-	url = https://github.com/Vali0004/sirit.git
+	url = https://github.com/shadps4-emu/sirit.git
 	shallow = true
 [submodule "Deps/ThirdParty/asmjit"]
 	path = Deps/ThirdParty/asmjit

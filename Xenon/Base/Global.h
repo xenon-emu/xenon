@@ -31,7 +31,11 @@ inline void SystemPause() {
 #else
   printf("Press Enter to continue...");
 #endif
-  (void)::getchar();
+  s32 c = getchar();
+  if (c == EOF && errno == EINTR) {
+    // Interrupted by signal — let main loop handle shutdown
+    return;
+  }
 }
 
 } // namespace Base
