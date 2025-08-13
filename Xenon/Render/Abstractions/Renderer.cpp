@@ -321,15 +321,15 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
       u32 fetchSlot = fetch->fetchSlot;
       u32 regBase = static_cast<u32>(XeRegister::SHADER_CONSTANT_FETCH_00_0) + fetchSlot * 2;
 
-      Xe::VertexFetchData fetchData{};
-      fetchData.dword0 = byteswap_be<u32>(state->ReadRegister(static_cast<XeRegister>(regBase + 0)));
-      fetchData.dword1 = byteswap_be<u32>(state->ReadRegister(static_cast<XeRegister>(regBase + 1)));
+      Xe::VertexFetchConstant fetchData{};
+      fetchData.rawHex[0] = byteswap_be<u32>(state->ReadRegister(static_cast<XeRegister>(regBase + 0)));
+      fetchData.rawHex[1] = byteswap_be<u32>(state->ReadRegister(static_cast<XeRegister>(regBase + 1)));
 
-      if (fetchData.size == 0 || fetchData.address == 0)
+      if (fetchData.Size == 0 || fetchData.BaseAddress == 0)
         continue;
 
-      u32 byteAddress = fetchData.address << 2;
-      u32 byteSize = fetchData.size << 2; // Size in DWORDS.
+      u32 byteAddress = fetchData.BaseAddress << 2;
+      u32 byteSize = fetchData.Size << 2; // Size in DWORDS.
 
       u8 *data = ramPointer->GetPointerToAddress(byteAddress);
       if (!data) {
@@ -338,7 +338,7 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
       }
 
       std::vector<u32> floatVec{};
-      floatVec.resize(fetchData.size);
+      floatVec.resize(fetchData.Size);
       memcpy(floatVec.data(), data, byteSize);
       for (auto &f : floatVec) {
         LOG_INFO(Xenos, "TEST: 0x{:X}, 0x{:X}", f, std::byteswap<u32>(f));
