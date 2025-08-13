@@ -15,6 +15,15 @@ DummyRenderer::DummyRenderer(RAM *ram) :
 void DummyRenderer::BackendStart() {
   LOG_INFO(Render, "DummyRenderer::BackendStart");
   resourceFactory = std::make_unique<DummyResourceFactory>();
+  fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) };
+  shaderPath /= "dummy";
+  computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
+    { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
+  });
+  renderShaderPrograms = shaderFactory->LoadFromFiles("Render", {
+    { eShaderType::Vertex, shaderPath / "framebuffer.vert" },
+    { eShaderType::Fragment, shaderPath / "framebuffer.frag" }
+  });
 }
 
 void DummyRenderer::BackendSDLProperties(SDL_PropertiesID properties) {

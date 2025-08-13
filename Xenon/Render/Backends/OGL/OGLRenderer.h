@@ -58,9 +58,9 @@ private:
   bool gles = false;
 
   // OpenGL Infos
-  std::string gl_version() const;
-  std::string gl_vendor() const;
-  std::string gl_renderer() const;
+  std::string GLVersion() const;
+  std::string GLVendor() const;
+  std::string GLRenderer() const;
 };
 
 } // namespace Render
