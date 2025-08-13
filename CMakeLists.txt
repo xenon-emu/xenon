@@ -8,6 +8,7 @@ set(CMAKE_C_STANDARD 17)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED TRUE)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 if (NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
@@ -208,10 +209,24 @@ if (GFX_ENABLED)
 endif()
 
 # Includes
-target_include_directories(Xenon PRIVATE ${microprofile_dir} Xenon/include)
+target_include_directories(Xenon PRIVATE
+  ${microprofile_dir}
+  Xenon/include
+  Xenon
+)
 if (GFX_ENABLED)
-  target_include_directories(Xenon SYSTEM PRIVATE ${ImGuiDir})
+  target_include_directories(Xenon SYSTEM PRIVATE
+    ${ImGuiDir}
+    ${XENON_THIRDPARTY_DIR}/glad
+    ${XENON_THIRDPARTY_DIR}/SDL3/include
+    ${XENON_THIRDPARTY_DIR}/Sirit/include
+  )
 endif()
+target_include_directories(Xenon SYSTEM PRIVATE
+  ${XENON_THIRDPARTY_DIR}/fmt/include
+  ${XENON_THIRDPARTY_DIR}/toml11
+  ${XENON_THIRDPARTY_DIR}/asmjit/src
+)
 
 # Add defines specific to Windows
 if (WIN32)
@@ -230,4 +245,4 @@ endif()
 if (CMAKE_GENERATOR MATCHES "Visual Studio")
   set(CMAKE_GENERATOR_PLATFORM x64)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
-endif()
+endif() 

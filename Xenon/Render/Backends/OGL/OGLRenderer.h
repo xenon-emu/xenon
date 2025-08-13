@@ -37,6 +37,7 @@ public:
   void UpdateViewportFromState(const Xe::XGPU::XenosState *state) override;
   void Clear() override;
 
+  void VertexFetch(const u32 location, const u32 components, bool isFloat, bool isNormalized, const u32 fetchOffset, const u32 fetchStride) override;
   void Draw(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params) override;
   void DrawIndexed(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) override;
 
