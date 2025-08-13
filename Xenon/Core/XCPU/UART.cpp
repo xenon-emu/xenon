@@ -3,7 +3,11 @@
 #include "UART.h"
 
 #include "Base/Error.h"
+#include "Base/Global.h"
 #include "Base/Thread.h"
+#ifndef _WIN32
+#include <signal.h>
+#endif //ifndef _WIN32
 
 #define COM_TEST 0
 
@@ -18,9 +22,12 @@ void HW_UART_SOCK::uartMainThread() {
     if (!uartTxBuffer.empty()) {
       char c = uartTxBuffer.front();
       if (socketCreated) {
-        send(sockHandle, &c, 1, 0);
-      }
-      else {
+        if (send(sockHandle, &c, 1, MSG_NOSIGNAL) <= 0) {
+          LOG_WARNING(UART, "Socket send failed: {}", strerror(errno));
+          socketCreated = false;
+          socketclose(sockHandle);
+        }
+      } else {
         if (c != -1 && c != '\0')
           printf("%c", c);
       }
@@ -42,8 +49,20 @@ void HW_UART_SOCK::uartReceiveThread() {
     ioctlsocket(sockHandle, FIONBIO, &mode);
     bytesReceived = recv(sockHandle, &c, 1, 0);
 #else
-    bytesReceived = recv(sockHandle, &c, 1, 0 | MSG_DONTWAIT);
-#endif
+    bytesReceived = recv(sockHandle, &c, 1, MSG_DONTWAIT);
+    if (bytesReceived == 0) {
+      // Peer closed connection
+      LOG_INFO(UART, "UART socket closed by peer.");
+      socketCreated = false;
+      socketclose(sockHandle);
+      break;
+    } else if (bytesReceived < 0 && errno != EWOULDBLOCK && errno != EAGAIN) {
+      LOG_WARNING(UART, "UART recv error: {}", strerror(errno));
+      socketCreated = false;
+      socketclose(sockHandle);
+      break;
+    }
+#endif //ifndef _WIN32
     if (c != -1 && bytesReceived != 0) {
       uartRxBuffer.push(c);
     }
@@ -52,6 +71,11 @@ void HW_UART_SOCK::uartReceiveThread() {
 }
 
 void HW_UART_SOCK::Init(void *uartConfig) {
+#ifndef _WIN32
+  // Ignore SIGPIPE, we handle it per-call anyways
+  signal(SIGPIPE, SIG_IGN);
+#endif // ifndef _WIN32
+
   HW_UART_SOCK_CONFIG *sock = reinterpret_cast<decltype(sock)>(uartConfig);
   printMode = sock->usePrint;
   socketCreated = true;
@@ -68,7 +92,7 @@ void HW_UART_SOCK::Init(void *uartConfig) {
       socketCreated = false;
       Base::SystemPause();
     }
-#endif // _WIN32
+#endif // ifdef _WIN32
     sockHandle = socket(AF_INET, SOCK_STREAM, 0);
     int socketConnect = connect(sockHandle, (struct sockaddr*)&sockAddr, sizeof(sockAddr));
     if (socketConnect != 0) {

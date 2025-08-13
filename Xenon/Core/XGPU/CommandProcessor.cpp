@@ -685,11 +685,13 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
     LOG_WARNING(Xenos, "[CP::IM_LOAD] Unknown shader type '{}'", static_cast<u32>(shaderType));
   } break;
   }
+#ifndef NO_GFX
   {
     std::lock_guard<std::mutex> lock(render->frameReadyMutex);
     render->frameReady = true;
   }
-  render->frameReadyCondVar.notify_one(); // Wake up the renderer
+  render->frameReadyCondVar.notify_one();
+#endif
 
   return true;
 }
@@ -741,11 +743,13 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuff
     LOG_WARNING(Xenos, "[CP::IM_LOAD_IMMEDIATE] Unknown shader type '{}'", static_cast<u32>(shaderType));
   } break;
   }
+#ifndef NO_GFX
   {
     std::lock_guard<std::mutex> lock(render->frameReadyMutex);
     render->frameReady = true;
   }
-  render->frameReadyCondVar.notify_one(); // Wake up the renderer
+  render->frameReadyCondVar.notify_one();
+#endif
 
   return true;
 }
@@ -837,14 +841,20 @@ bool CommandProcessor::ExecutePacketType3_EVENT_WRITE_SHD(RingBuffer *ringBuffer
   // Writeback
   state->vgtDrawInitiator.hexValue = initiator & 0x3F;
 
+#ifndef NO_GFX
   {
     std::lock_guard<std::mutex> lock(render->frameReadyMutex);
     render->frameReady = true;
   }
-  render->frameReadyCondVar.notify_one(); // Wake up the renderer
+  render->frameReadyCondVar.notify_one();
+#endif
   u32 writeValue = 0;
   if ((initiator >> 31) & 0x1) {
+#ifndef NO_GFX
     writeValue = render->swapCount;
+#else
+    writeValue = value;
+#endif
   } else {
     writeValue = value;
   }
@@ -928,8 +938,10 @@ bool CommandProcessor::ExecutePacketType3_WAIT_REG_MEM(RingBuffer *ringBuffer, u
     }
 
     if (!matched) {
+#ifndef NO_GFX
       render->waiting = true;
       render->waitTime = wait;
+#endif
       if (wait >= 0x100) {
         // Wait
         std::this_thread::sleep_for(std::chrono::milliseconds(wait / 0x100));
@@ -1119,11 +1131,13 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
       (u32)state->vgtDrawInitiator.primitiveType,
       state->vgtDrawInitiator.numIndices);
 #endif
+#ifndef NO_GFX
     {
       std::lock_guard<std::mutex> lock(render->frameReadyMutex);
       render->frameReady = true;
     }
-    render->frameReadyCondVar.notify_one(); // Wake up the renderer
+    render->frameReadyCondVar.notify_one();
+#endif
     state->ClearDirtyState();
   } else {
     LOG_ERROR(Xenos, "[CP] Invalid draw");
