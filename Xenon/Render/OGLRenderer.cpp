@@ -181,11 +181,11 @@ void OGLRenderer::DrawIndexed(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams 
   u32 numIndices = params.vgtDrawInitiator.numIndices;
   s32 indexType = indexBufferInfo.indexFormat == eIndexFormat::xeInt16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
 
-  const u32 destInfo = params.state->copyDestInfo;
+  const u32 destInfo = params.state->copyDestInfo.hexValue;
   const Xe::eEndianFormat endianFormat = static_cast<Xe::eEndianFormat>(destInfo & 7);
   const u32 destArray = (destInfo >> 3) & 1;
   const u32 destSlice = (destInfo >> 4) & 1;
-  const Xe::eColorFormat destformat = static_cast<Xe::eColorFormat>((destInfo >> 7) & 0x3F);
+  const eColorFormat destformat = static_cast<eColorFormat>((destInfo >> 7) & 0x3F);
   // Bind the constants
   if (auto buffer = createdBuffers.find("FloatConsts"_j); buffer != createdBuffers.end())
     buffer->second->Bind(0);
