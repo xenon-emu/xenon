@@ -647,6 +647,8 @@ u64 PPU::loadElfImage(u8* data, u64 size) {
 bool PPU::PPUReadNextInstruction() {
   ePPUThread thrId = curThreadId;
   PPU_THREAD_REGISTERS &thread = ppuState->ppuThread[thrId];
+  // Update previous instruction address
+  thread.PIA = thread.CIA;
   // Update current instruction address
   thread.CIA = thread.NIA;
   // Increase next instruction address

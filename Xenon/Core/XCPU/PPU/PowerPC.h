@@ -693,6 +693,8 @@ struct PPU_THREAD_REGISTERS {
   u64 CIA;
   // Next Instruction Address
   u64 NIA;
+  // Previous Instruction Address (Useful for debugging purposes)
+  u64 PIA;
   // Current instruction data
   PPCOpcode CI;
   // Instruction fetch flag

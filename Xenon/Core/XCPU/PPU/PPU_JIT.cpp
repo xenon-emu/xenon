@@ -146,6 +146,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
 
     // Fetch instruction
     auto &thread = curThread;
+    thread.PIA = thread.CIA;
     thread.CIA = thread.NIA;
     thread.NIA += 4;
     thread.instrFetch = true;
