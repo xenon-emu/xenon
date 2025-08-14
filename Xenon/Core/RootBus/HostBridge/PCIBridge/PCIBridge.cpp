@@ -97,7 +97,7 @@ void PCIBridge::RegisterIIC(Xe::XCPU::IIC::XenonIIC *xenonIICPtr) {
   xenonIIC = xenonIICPtr;
 }
 
-bool PCIBridge::RouteInterrupt(u8 prio) {
+bool PCIBridge::RouteInterrupt(u8 prio, u8 targetCPU) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "PCIBridge::RouteInterrupt", MP_AUTO);
   switch (prio) {
   case PRIO_CLOCK:
@@ -167,9 +167,10 @@ bool PCIBridge::RouteInterrupt(u8 prio) {
     }
     break;
   case PRIO_GRAPHICS:
-    if (pciBridgeState.PRIO_REG_GRAPHICS.intEnabled) {
-      xenonIIC->genInterrupt(PRIO_GRAPHICS,
-        pciBridgeState.PRIO_REG_GRAPHICS.targetCPU);
+    if (targetCPU != 0xFF) {
+      xenonIIC->genInterrupt(PRIO_GRAPHICS, targetCPU);
+    } else {
+      LOG_ERROR(PCIBridge, "Routing GFX interrupt without target CPU index.");
     }
     break;
   case PRIO_SFCX:
