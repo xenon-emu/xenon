@@ -385,7 +385,7 @@ struct ATA_DEV_STATE {
   // DMA State
   XE_ATA_DMA_STATE dmaState = {0};
   // Do we have an image?
-  bool isImageDetected = false;
+  bool imageAttached = false;
 };
 
 class HDD : public PCIDevice {

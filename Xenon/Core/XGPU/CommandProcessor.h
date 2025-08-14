@@ -16,8 +16,9 @@
 #pragma once
 
 #include <atomic>
-#include <thread>
+#include <condition_variable>
 #include <memory>
+#include <thread>
 #include <unordered_map>
 
 #include "Base/Logging/Log.h"
@@ -40,9 +41,11 @@
 // Handles all commands sent to the Xenos via the RingBuffer.
 // The RingBuffer is a dedicated area of memory used as storage for CP packets.
 
-namespace Render {
-  class Renderer;
-}
+#ifdef _DEBUG
+#define XE_DEBUG
+#endif
+
+namespace Render { class Renderer; }
 
 namespace Xe::XGPU {
 
@@ -71,8 +74,6 @@ struct XeDrawParams {
   XenosState *state = nullptr;
   XeIndexBufferInfo indexBufferInfo = {};
   VGT_DRAW_INITIATOR_REG vgtDrawInitiator = {};
-  u8 *vertexBufferPtr = nullptr;
-  u64 vertexBufferSize = 0;
   u32 maxVertexIndex = 0;
   u32 minVertexIndex = 0;
   u32 indexOffset = 0;
@@ -170,10 +171,6 @@ private:
   // Handles tiling type
   u64 binSelect = 0xFFFFFFFFULL;
   u64 binMask = 0xFFFFFFFFULL;
-
-  // Internal swap counters
-  std::atomic<u32> swapCount;
-  std::atomic<u32> vblankCount;
 
   // Execute a packet based on the Ringbuffer data.
   bool ExecutePacket(RingBuffer *ringBuffer);

@@ -1,8 +1,8 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
-#include "DummyRenderer.h"
+#include "Render/Backends/Dummy/DummyRenderer.h"
 
-#include "Dummy/Factory/DummyResourceFactory.h"
+#include "Render/Dummy/Factory/DummyResourceFactory.h"
 
 #ifndef NO_GFX
 namespace Render {
@@ -15,6 +15,16 @@ DummyRenderer::DummyRenderer(RAM *ram) :
 void DummyRenderer::BackendStart() {
   LOG_INFO(Render, "DummyRenderer::BackendStart");
   resourceFactory = std::make_unique<DummyResourceFactory>();
+  shaderFactory = resourceFactory->CreateShaderFactory();
+  fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) };
+  shaderPath /= "dummy";
+  computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
+    { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
+  });
+  renderShaderPrograms = shaderFactory->LoadFromFiles("Render", {
+    { eShaderType::Vertex, shaderPath / "framebuffer.vert" },
+    { eShaderType::Fragment, shaderPath / "framebuffer.frag" }
+  });
 }
 
 void DummyRenderer::BackendSDLProperties(SDL_PropertiesID properties) {
@@ -61,6 +71,11 @@ void DummyRenderer::UpdateViewportFromState(const Xe::XGPU::XenosState *state) {
   LOG_INFO(Render, "DummyRenderer::UpdateViewportFromState");
 }
 
+void DummyRenderer::VertexFetch(const u32 location, const u32 components, bool isFloat, bool isNormalized, const u32 fetchOffset, const u32 fetchStride) {
+  LOG_INFO(Render, "DummyRenderer::VertexFetch: loc:{}, comps:{}, float:{}, normalized:{}, offset:{}, stride:{}", location, components, isFloat ? "yes" : "no",
+    isNormalized ? "yes" : "no", fetchOffset, fetchStride);
+}
+
 void DummyRenderer::Draw(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params) {
   LOG_INFO(Render, "DummyRenderer::Draw");
 }
@@ -103,7 +118,7 @@ void* DummyRenderer::GetBackendContext() {
 
 u32 DummyRenderer::GetBackendID() {
   LOG_INFO(Render, "DummyRenderer::GetBackendContext");
-  return "Dummy"_j;
+  return "Dummy"_jLower;
 }
 
 } // namespace Render

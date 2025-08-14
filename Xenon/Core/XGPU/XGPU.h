@@ -57,6 +57,9 @@ public:
   bool RenderingTo2DFramebuffer() {
     return !xenosState->framebufferDisable;
   }
+
+  // GPU State
+  std::unique_ptr<Xe::XGPU::XenosState> xenosState = {};
 private:
   // PCI Bridge pointer. Used for Interrupts.
   PCIBridge *parentBus = nullptr;
@@ -72,9 +75,6 @@ private:
 
   // Render handle
   Render::Renderer *render = nullptr;
-
-  // GPU State
-  std::unique_ptr<Xe::XGPU::XenosState> xenosState = {};
 
   // EDRAM
   std::unique_ptr<Xe::XGPU::EDRAM> edram = {};

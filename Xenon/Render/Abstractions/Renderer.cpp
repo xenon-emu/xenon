@@ -79,58 +79,6 @@ void Renderer::CreateHandles() {
   MICROPROFILE_SCOPEI("[Xe::Render]", "Create", MP_AUTO);
   // Create factories
   BackendStart();
-  shaderFactory = resourceFactory->CreateShaderFactory();
-
-  fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) };
-  // Init shader handles
-  switch (GetBackendID()) {
-  case "GLES"_j:
-  case "OpenGL"_j: {
-    bool gles = GetBackendID() == "GLES"_j;
-    std::string versionString = FMT("#version {} {}\n", gles ? 310 : 430, gles ? "es" : "compatibility");
-    shaderPath /= "opengl";
-    computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
-      { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
-    });
-    if (!computeShaderProgram) {
-      std::ofstream f{ shaderPath / "fb_deswizzle.comp" };
-      f.write(versionString.data(), versionString.size());
-      f.write(computeShaderSource, sizeof(computeShaderSource));
-      f.close();
-      computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
-        { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
-      });
-    }
-    renderShaderPrograms = shaderFactory->LoadFromFiles("Render", {
-      { eShaderType::Vertex, shaderPath / "framebuffer.vert" },
-      { eShaderType::Fragment, shaderPath / "framebuffer.frag" }
-    });
-    if (!renderShaderPrograms) {
-      std::ofstream vert{ shaderPath / "framebuffer.vert" };
-      vert.write(versionString.data(), versionString.size());
-      vert.write(vertexShaderSource, sizeof(vertexShaderSource));
-      vert.close();
-      std::ofstream frag{ shaderPath / "framebuffer.frag" };
-      frag.write(versionString.data(), versionString.size());
-      frag.write(fragmentShaderSource, sizeof(fragmentShaderSource));
-      frag.close();
-      renderShaderPrograms = shaderFactory->LoadFromFiles("Render", {
-        { eShaderType::Vertex, shaderPath / "framebuffer.vert" },
-        { eShaderType::Fragment, shaderPath / "framebuffer.frag" }
-      });
-    }
-  } break;
-  case "Dummy"_j: {
-    shaderPath /= "dummy";
-    computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
-      { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
-    });
-    renderShaderPrograms = shaderFactory->LoadFromFiles("Render", {
-      { eShaderType::Vertex, shaderPath / "framebuffer.vert" },
-      { eShaderType::Fragment, shaderPath / "framebuffer.frag" }
-    });
-  } break;
-  }
 
   // Create our backbuffer
   backbuffer = resourceFactory->CreateTexture();
@@ -171,18 +119,39 @@ void Renderer::Shutdown() {
   SDL_Quit();
 }
 
-void Renderer::Resize(s32 x, s32 y) {
+void Renderer::Resize(u32 x, u32 y) {
   // Normalize our x and y for tiling
-  width = TILE(x);
-  height = TILE(y);
+  u32 newWidth = TILE(x);
+  u32 newHeight = TILE(y);
+  // Save old size
+  u32 oldWidth = width;
+  u32 oldHeight = height;
+
+  // Just don't do anything, no need to resize if it's the same
+  if (newWidth == oldWidth && newHeight == oldHeight)
+    return;
+
+  std::vector<u32> oldPixels = std::move(pixels); // Move to avoid copy
   // Resize backend
   BackendResize(x, y);
   // Recreate our texture with the new size
-  backbuffer->ResizeTexture(width, height);
-  // Set our new pitch
+  backbuffer->ResizeTexture(newWidth, newHeight);
+  // Allocate new pixel buffer, initialized to grey
+  pixels.resize(newWidth * newHeight, COLOR(205, 205, 205, 205));
+  // Copy old pixels into the new buffer at (0, 0)
+  for (u32 row = 0; row < std::min(oldHeight, newHeight); ++row) {
+    std::memcpy(
+      &pixels[row * newWidth],
+      &oldPixels[row * oldWidth],
+      std::min(oldWidth, newWidth) * sizeof(u32)
+    );
+  }
+  // Update size
+  width = newWidth;
+  height = newHeight;
+  // Update pitch
   pitch = width * height * sizeof(u32);
-  // Resize our pixel buffer
-  pixels.resize(pitch);
+  // Update buffer
   pixelSSBO->UpdateBuffer(0, pixels.size(), pixels.data());
   LOG_DEBUG(Render, "Resized window to {}x{}", width, height);
 }
@@ -222,19 +191,6 @@ void Renderer::HandleEvents() {
   }
 }
 
-void DumpConstantsToFile(const XeShaderFloatConsts &floatConsts, const XeShaderBoolConsts &boolConsts) {
-  std::ofstream out("shader_consts_dump.bin", std::ios::binary);
-  if (!out.is_open()) {
-    LOG_WARNING(Xenos, "Failed to open consts dump file for writing.");
-    return;
-  }
-
-  out.write(reinterpret_cast<const char*>(floatConsts.values), sizeof(floatConsts.values));
-  out.write(reinterpret_cast<const char*>(boolConsts.values), sizeof(boolConsts.values));
-
-  out.close();
-}
-
 void Renderer::UpdateConstants(Xe::XGPU::XenosState *state) {
   XeShaderFloatConsts &floatConsts = state->floatConsts;
   XeShaderBoolConsts &boolConsts = state->boolConsts;
@@ -254,8 +210,6 @@ void Renderer::UpdateConstants(Xe::XGPU::XenosState *state) {
       memcpy(dest, ptr, sizeof(u32) * 8);
     }
   }
-
-  DumpConstantsToFile(floatConsts, boolConsts);
 
   Render::BufferLoadJob floatBufferJob = {
     "FloatConsts",
@@ -315,15 +269,15 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
       u32 fetchSlot = fetch->fetchSlot;
       u32 regBase = static_cast<u32>(XeRegister::SHADER_CONSTANT_FETCH_00_0) + fetchSlot * 2;
 
-      Xe::VertexFetchData fetchData{};
-      fetchData.dword0 = byteswap_be<u32>(state->ReadRegister(static_cast<XeRegister>(regBase + 0)));
-      fetchData.dword1 = byteswap_be<u32>(state->ReadRegister(static_cast<XeRegister>(regBase + 1)));
+      Xe::VertexFetchConstant fetchData{};
+      fetchData.rawHex[0] = byteswap_be<u32>(state->ReadRegister(static_cast<XeRegister>(regBase + 0)));
+      fetchData.rawHex[1] = byteswap_be<u32>(state->ReadRegister(static_cast<XeRegister>(regBase + 1)));
 
-      if (fetchData.size == 0 || fetchData.address == 0)
+      if (fetchData.Size == 0 || fetchData.BaseAddress == 0)
         continue;
 
-      u32 byteAddress = fetchData.address << 2;
-      u32 byteSize = fetchData.size << 2; // Size in DWORDS.
+      u32 byteAddress = fetchData.BaseAddress << 2;
+      u32 byteSize = fetchData.Size << 2; // Size in DWORDS.
 
       u8 *data = ramPointer->GetPointerToAddress(byteAddress);
       if (!data) {
@@ -332,7 +286,7 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
       }
 
       std::vector<u32> floatVec{};
-      floatVec.resize(fetchData.size);
+      floatVec.resize(fetchData.Size);
       memcpy(floatVec.data(), data, byteSize);
       for (auto &f : floatVec) {
         LOG_INFO(Xenos, "TEST: 0x{:X}, 0x{:X}", f, std::byteswap<u32>(f));
@@ -362,56 +316,20 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
     u8 b = (state->clearColor >> 8) & 0xFF;
     u8 r = (state->clearColor >> 0) & 0xFF;
     UpdateClearColor(r, g, b, a);
+#ifdef XE_DEBUG
     LOG_DEBUG(Xenos, "[CP] Clear color: {}, {}, {}, {}", r, g, b, a);
+#endif
   }
   if (depthClearEnabled) {
     const f32 clearDepthValue = (state->depthClear & 0xFFFFFF00) / (f32)0xFFFFFF00;
+#ifdef XE_DEBUG
     LOG_DEBUG(Xenos, "[CP] Clear depth: {}", clearDepthValue);
+#endif
     UpdateClearDepth(clearDepthValue);
   }
   UpdateConstants(state);
   UpdateViewportFromState(state);
   return true;
-}
-
-std::vector<u32> CreateVertexShader() {
-  Sirit::Module module{};
-  // Types
-  auto void_type = module.TypeVoid();
-  auto func_type = module.TypeFunction(void_type);
-  auto float_type = module.TypeFloat(32);
-  auto vec4_type = module.TypeVector(float_type, 4);
-
-  // Input and output
-  auto input_ptr = module.TypePointer(spv::StorageClass::Input, vec4_type);
-  auto output_ptr = module.TypePointer(spv::StorageClass::Output, vec4_type);
-
-  // Variables
-  auto aPos = module.AddGlobalVariable(input_ptr, spv::StorageClass::Input);
-  module.Name(aPos, "aPos");
-  module.Decorate(aPos, spv::Decoration::Location, 0);
-
-  auto gl_Position = module.AddGlobalVariable(output_ptr, spv::StorageClass::Output);
-  module.Name(gl_Position, "gl_Position");
-  module.Decorate(gl_Position, spv::Decoration::BuiltIn, spv::BuiltIn::Position);
-
-  // Function
-  auto func = module.OpFunction(void_type, spv::FunctionControlMask::MaskNone, func_type);
-  module.Name(func, "main");
-  module.AddEntryPoint(spv::ExecutionModel::Vertex, func, "main", aPos, gl_Position);
-
-  auto label = module.AddLabel();
-
-  // Load input
-  auto pos_val = module.OpLoad(vec4_type, aPos);
-
-  // Write to gl_Position
-  module.OpStore(gl_Position, pos_val);
-
-  // Return
-  module.OpReturn();
-  module.OpFunctionEnd();
-  return module.Assemble();
 }
 
 void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
@@ -420,10 +338,8 @@ void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
 
   if (vsIt != pendingVertexShaders.end() && psIt != pendingPixelShaders.end()) {
     u64 combinedHash = (static_cast<u64>(vsHash) << 32) | psHash;
-    if (linkedShaderPrograms.contains(combinedHash)) return;
-
     std::shared_ptr<Shader> shader = shaderFactory->LoadFromBinary(fmt::format("VS{:08X}_PS{:08X}", vsHash, psHash), {
-      { Render::eShaderType::Vertex, CreateVertexShader() },
+      { Render::eShaderType::Vertex, vsIt->second.second },
       { Render::eShaderType::Fragment, psIt->second.second }
     });
 
@@ -440,11 +356,90 @@ void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
         xeShader.textures.push_back(resourceFactory->CreateTexture());
       for (u64 i = 0; i != xeShader.vertexShader->usedTextures.size(); ++i)
         xeShader.textures.push_back(resourceFactory->CreateTexture());
-      for (auto& texture : xeShader.textures)
+      for (auto &texture : xeShader.textures)
         texture->CreateTextureHandle(width, height, GetXenosFlags());
 
-      linkedShaderPrograms.insert({ combinedHash, xeShader });
-      LOG_INFO(Xenos, "Linked shader program 0x{:016X} (VS:0x{:08X}, PS:0x{:08X})", combinedHash, vsHash, psHash);
+      if (xeShader.vertexShader) {
+        // Bind VAO once for this shader program's attributes setup.
+        // Assuming OnBind creates/binds an appropriate VAO for the current context/shader.
+        OnBind();
+
+        for (const auto &[fetch_key, location] : xeShader.vertexShader->attributeLocationMap) {
+          // Find the original full fetch definition from the shader's list
+          const Xe::Microcode::AST::VertexFetch *fetch = nullptr;
+          for (const auto *f : xeShader.vertexShader->vertexFetches) {
+            if (f->fetchSlot == fetch_key.slot && f->fetchOffset == fetch_key.offset && f->fetchStride == fetch_key.stride) {
+              fetch = f;
+              break;
+            }
+          }
+          if (!fetch)
+            continue;
+
+          u32 fetchSlot = fetch->fetchSlot;
+          u32 regBase = static_cast<u32>(XeRegister::SHADER_CONSTANT_FETCH_00_0) + fetchSlot * 2;
+
+          Xe::ShaderConstantFetch fetchData{};
+          for (u32 i = 0; i != 6; ++i)
+            fetchData.rawHex[i] = byteswap_be<u32>(XeMain::xenos->xenosState->ReadRegister(static_cast<XeRegister>(regBase + i)));
+
+          if (fetchData.Vertex[0].Type == Xe::eConstType::Texture) {
+              // Texture fetches for vertex shaders are currently skipped as per original code.
+            continue;
+          } else if (fetchData.Vertex[0].Type == Xe::eConstType::Vertex) {
+            u32 fetchAddress = fetchData.Vertex[0].BaseAddress << 2;
+            u32 fetchSize = fetchData.Vertex[0].Size << 2;
+
+            u8 *data = ramPointer->GetPointerToAddress(fetchAddress);
+            if (!data) {
+              LOG_WARNING(Xenos, "VertexFetch: Invalid memory for slot {} (addr=0x{:X})", fetchSlot, fetchAddress);
+              continue;
+            }
+
+            // Prepare data for OpenGL: byteswap and copy to a float vector
+            std::vector<f32> dataVec(fetchSize / sizeof(f32)); // Resize based on number of floats
+            memcpy(dataVec.data(), data, fetchSize);
+            for (u32 i = 0; i < dataVec.size(); ++i) {
+              dataVec[i] = std::bit_cast<f32>(byteswap_be(std::bit_cast<u32>(dataVec[i])));
+            }
+
+            // Use a unique key for the buffer based on its memory address and size.
+            // This allows for proper caching and updates of specific vertex buffers.
+            u64 bufferKey = (static_cast<u64>(fetchAddress) << 32) | fetchSize;
+
+            std::shared_ptr<Buffer> buffer = nullptr;
+            auto it = createdBuffers.find(bufferKey);
+            if (it != createdBuffers.end()) {
+              buffer = it->second;
+              if (buffer->GetSize() < fetchSize) {
+                  // Existing buffer is too small, destroy and recreate
+                buffer->DestroyBuffer();
+                buffer->CreateBuffer(static_cast<u32>(fetchSize), dataVec.data(), Render::eBufferUsage::StaticDraw, Render::eBufferType::Vertex);
+              } else {
+                  // Existing buffer is large enough, just update its content
+                buffer->UpdateBuffer(0, static_cast<u32>(fetchSize), dataVec.data());
+              }
+            } else {
+              // Create a new buffer
+              buffer = resourceFactory->CreateBuffer();
+              buffer->CreateBuffer(static_cast<u32>(fetchSize), dataVec.data(), Render::eBufferUsage::StaticDraw, Render::eBufferType::Vertex);
+              createdBuffers.insert({ bufferKey, buffer });
+            }
+
+            // Bind the buffer to the current VAO for attribute setup
+            buffer->Bind();
+
+            // Setup vertex attributes for this fetch.
+            const u32 components = fetch->GetComponentCount();
+            const u32 offset = fetch->fetchOffset * 4;
+            const u32 stride = fetch->fetchStride * 4;
+            VertexFetch(location, components, fetch->isFloat, fetch->isNormalized, offset, stride);
+          }
+        }
+      }
+
+      linkedShaderPrograms[combinedHash] = xeShader;
+      //LOG_DEBUG(Xenos, "Linked shader program 0x{:016X} (VS:0x{:08X}, PS:0x{:08X})", combinedHash, vsHash, psHash);
     } else {
       LOG_ERROR(Xenos, "Failed to link shader program 0x{:016X} (VS:0x{:08X}, PS:0x{:08X})", combinedHash, vsHash, psHash);
     }
@@ -475,47 +470,48 @@ void Renderer::Thread() {
     if (!threadRunning || !XeRunning)
       break;
 
+    // Buffer load
+    {
+      std::lock_guard<std::mutex> lock(bufferQueueMutex);
+      while (!bufferLoadQueue.empty()) {
+        BufferLoadJob job = bufferLoadQueue.front();
+        bufferLoadQueue.pop();
+
+        auto &bufferEntry = createdBuffers[job.hash];
+        if (bufferEntry) {
+          bufferEntry->UpdateBuffer(0, static_cast<u32>(job.data.size()), job.data.data());
+#ifdef XE_DEBUG
+          LOG_DEBUG(Xenos, "Updated buffer '{}', size: {}", job.name, job.data.size());
+#endif
+        } else {
+          bufferEntry = resourceFactory->CreateBuffer();
+          bufferEntry->CreateBuffer(static_cast<u32>(job.data.size()), job.data.data(), job.usage, job.type);
+#ifdef XE_DEBUG
+          LOG_DEBUG(Xenos, "Created buffer '{}', size: {}", job.name, job.data.size());
+#endif
+        }
+      }
+    }
+
     if (readyToLink.load()) {
       const bool hasVS = pendingVertexShaders.contains(pendingVertexShader);
       const bool hasPS = pendingPixelShaders.contains(pendingPixelShader);
 
-      if (!hasVS || !hasPS) {
-        LOG_WARNING(Xenos, "Deferring shader link: {}{} missing",
-          hasVS ? "" : "VS ", hasPS ? "" : "PS");
-      }
-
       if (hasVS && hasPS) {
         u64 combined = (static_cast<u64>(pendingVertexShader) << 32) | pendingPixelShader;
-        if (!linkedShaderPrograms.contains(combined)) {
-          LOG_INFO(Xenos, "Linking VS: 0x{:08X}, PS: 0x{:08X}", pendingVertexShader, pendingPixelShader);
-          TryLinkShaderPair(pendingVertexShader, pendingPixelShader);
-        }
+#ifdef XE_DEBUG
+        LOG_DEBUG(Xenos, "Linking VS: 0x{:08X}, PS: 0x{:08X}", pendingVertexShader, pendingPixelShader);
+#endif
+        TryLinkShaderPair(pendingVertexShader, pendingPixelShader);
         readyToLink.store(false);
       }
     }
 
-    {
-      std::lock_guard<std::mutex> lock(bufferQueueMutex);
-      while (threadRunning && !bufferLoadQueue.empty()) {
-        if (!threadRunning || !XeRunning)
-          break;
-        BufferLoadJob job = bufferLoadQueue.front();
-        bufferLoadQueue.pop();
-
-        std::shared_ptr<Buffer> buffer = resourceFactory->CreateBuffer();
-        buffer->CreateBuffer(static_cast<u32>(job.data.size()), job.data.data(), job.usage, job.type);
-
-        createdBuffers.insert({ job.hash, buffer });
-        LOG_DEBUG(Xenos, "Created buffer '{}', size: {}", job.name, job.data.size());
-      }
-    }
-
+    // Copy job
     {
       std::lock_guard<std::mutex> lock(copyQueueMutex);
-      // Handle issue copy (OpenGL things, needs to be in the same thread)
       if (!copyQueue.empty()) {
-        auto job = copyQueue.front();
-        IssueCopy(job);
+        IssueCopy(copyQueue.front());
         copyQueue.pop();
       }
     }
@@ -525,17 +521,17 @@ void Renderer::Thread() {
       Clear();
 
     if (XeMain::xenos && XeMain::xenos->RenderingTo2DFramebuffer() && !focusLost) {
-      // Upload buffer
-      // Framebuffer pointer from main memory
       fbPointer = ramPointer->GetPointerToAddress(XeMain::xenos->GetSurface());
-      // Profile
-      MICROPROFILE_SCOPEI("[Xe::Render]", "Deswizle", MP_AUTO);
-      const u32 *ui_fbPointer = reinterpret_cast<u32*>(fbPointer);
-      pixelSSBO->UpdateBuffer(0, pitch, ui_fbPointer);
 
-      // Use the compute shader
+      {
+        MICROPROFILE_SCOPEI("[Xe::Render]", "Deswizle", MP_AUTO);
+        const u32 *ui_fbPointer = reinterpret_cast<const u32*>(fbPointer);
+        pixelSSBO->UpdateBuffer(0, pitch, ui_fbPointer);
+      }
+
       computeShaderProgram->Bind();
       pixelSSBO->Bind();
+
       if (XeMain::xenos) {
         computeShaderProgram->SetUniformInt("internalWidth", XeMain::xenos->GetWidth());
         computeShaderProgram->SetUniformInt("internalHeight", XeMain::xenos->GetHeight());
@@ -544,41 +540,66 @@ void Renderer::Thread() {
       computeShaderProgram->SetUniformInt("resHeight", height);
       OnCompute();
 
-      // Render the texture
-      MICROPROFILE_SCOPEI("[Xe::Render]", "BindTexture", MP_AUTO);
-      renderShaderPrograms->Bind();
-      backbuffer->Bind();
-      OnBind();
-      backbuffer->Unbind();
-      renderShaderPrograms->Unbind();
+      {
+        MICROPROFILE_SCOPEI("[Xe::Render]", "BindTexture", MP_AUTO);
+        renderShaderPrograms->Bind();
+        backbuffer->Bind();
+        OnBind();
+        backbuffer->Unbind();
+        renderShaderPrograms->Unbind();
+      }
     }
 
-    DrawJob drawJob = {};
-    bool jobProcessed = false;
-    while (!drawQueue.empty()) {
-      DrawJob &queuedJob = drawQueue.front();
-      u64 combinedHash = (static_cast<u64>(queuedJob.shaderVS) << 32) | queuedJob.shaderPS;
-      drawJob = std::move(queuedJob);
-      jobProcessed = true;
-      drawQueue.pop();
-      break;
-    }
-
+    // Frame sync
     if (XeMain::xenos && !XeMain::xenos->RenderingTo2DFramebuffer()) {
-      // Bind the constants
-      if (auto buffer = createdBuffers.find("FloatConsts"_j); buffer != createdBuffers.end())
-        buffer->second->Bind(0);
-      if (auto buffer = createdBuffers.find("CommonBoolConsts"_j); buffer != createdBuffers.end())
-        buffer->second->Bind(1);
-      u64 combinedHash = (static_cast<u64>(drawJob.shaderVS) << 32) | drawJob.shaderPS;
-      // Bind the shader
-      if (auto shader = linkedShaderPrograms.find(combinedHash); shader != linkedShaderPrograms.end() && shader->second.program) {
-        shader->second.program->Bind();
-        if (drawJob.indexed) {
-          DrawIndexed(shader->second, drawJob.params, drawJob.params.indexBufferInfo);
-        } else {
-          Draw(shader->second, drawJob.params);
+      std::vector<DrawJob> currentFrameJobs;
+      {
+        std::lock_guard<std::mutex> lock(drawQueueMutex);
+        while (!drawQueue.empty()) {
+          currentFrameJobs.push_back(std::move(drawQueue.front()));
+          drawQueue.pop();
         }
+      }
+
+      static int emptyDrawCount = 0;
+      if (!currentFrameJobs.empty()) {
+        emptyDrawCount = 0;
+        previousJobs = std::move(currentFrameJobs);
+      } else if (previousJobs.empty()) {
+        if (++emptyDrawCount > 5) {
+          LOG_WARNING(Xenos, "Draw queue was empty too many frames in a row");
+        }
+        if (XeMain::xenos && !XeMain::xenos->RenderingTo2DFramebuffer()) {
+          // If there's no previous frame to reuse, skip rendering
+          continue;
+        }
+      }
+      std::unique_lock<std::mutex> lock(frameReadyMutex);
+      frameReadyCondVar.wait_for(lock, 10s, [this] { return frameReady || !XeRunning; });
+      frameReady = false;
+
+      for (const auto &drawJob : previousJobs) {
+        u64 combinedHash = (static_cast<u64>(drawJob.shaderVS) << 32) | drawJob.shaderPS;
+        auto shaderIt = linkedShaderPrograms.find(combinedHash);
+        if (shaderIt != linkedShaderPrograms.end() && shaderIt->second.program) {
+          shaderIt->second.program->Bind();
+          if (drawJob.indexed) {
+            DrawIndexed(shaderIt->second, drawJob.params, drawJob.params.indexBufferInfo);
+          } else {
+            Draw(shaderIt->second, drawJob.params);
+          }
+        }
+      }
+    }
+
+    if (waiting) {
+      waiting = false;
+      if (waitTime >= 0x100) {
+        // Wait
+        std::this_thread::sleep_for(std::chrono::milliseconds(waitTime / 0x100));
+      } else {
+        // Yield
+        std::this_thread::yield();
       }
     }
 
@@ -588,8 +609,9 @@ void Renderer::Thread() {
       gui->Render(backbuffer.get());
     }
 
-    // GL Swap
+    // Swap
     MICROPROFILE_SCOPEI("[Xe::Render]", "Swap", MP_AUTO);
+    swapCount.fetch_add(1);
     OnSwap(mainWindow);
   }
 }
@@ -611,7 +633,7 @@ void Renderer::SetDebuggerActive(s8 specificPPU) {
       for (bool &a : gui.get()->ppcDebuggerActive) {
         a = true;
       }
-    } else if (specificPPU <= 3) {
+    } else if (specificPPU <= 3 && specificPPU > 0) {
       gui.get()->ppcDebuggerActive[specificPPU - 1] = true;
     }
   }
