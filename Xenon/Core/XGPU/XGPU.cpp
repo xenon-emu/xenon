@@ -11,9 +11,9 @@
 #include "Base/PathUtil.h"
 #include "Base/Logging/Log.h"
 
-//#ifdef _DEBUG
+#ifdef _DEBUG
 #define XE_DEBUG
-//#endif
+#endif
 
 Xe::Xenos::XGPU::XGPU(Render::Renderer *renderer, RAM *ram, PCIBridge *pciBridge) :
   render(renderer),
@@ -134,7 +134,12 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
     u32 value = xenosState->ReadRegister(reg, size);
     memcpy(data, &value, size);
 #ifdef XE_DEBUG
-    if (reg != XeRegister::D1MODE_VBLANK_STATUS)
+    // Silence VBLank interrupt related registers.
+    if (reg != XeRegister::D1MODE_VBLANK_STATUS
+      && reg != XeRegister::D1MODE_VLINE_STATUS
+      && reg != XeRegister::D1MODE_VBLANK_VLINE_STATUS
+      && reg != XeRegister::D1MODE_INT_MASK
+      && reg != XeRegister::MASTER_INT_SIGNAL)
       LOG_DEBUG(Xenos, "Read from {} (0x{:X}), index: 0x{:X}, value: 0x{:X}, size: 0x{:X}", Xe::XGPU::GetRegisterNameById(regIndex), readAddress, regIndex, value, size);
 #endif
     return true;
@@ -153,7 +158,15 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
     memcpy(&value, data, size);
     xenosState->WriteRegister(reg, value);
 #ifdef XE_DEBUG
+    // Silence VBLank interrupt related registers.
+    if (reg != XeRegister::D1MODE_VBLANK_STATUS
+      && reg != XeRegister::D1MODE_VLINE_STATUS
+      && reg != XeRegister::D1MODE_VBLANK_VLINE_STATUS
+      && reg != XeRegister::D1MODE_INT_MASK
+      && reg != XeRegister::MASTER_INT_SIGNAL) {
+
     LOG_DEBUG(Xenos, "Write to {} (addr: 0x{:X}), index 0x{:X}, data = 0x{:X}", Xe::XGPU::GetRegisterNameById(regIndex), writeAddress, regIndex, value);
+  }
 #endif
     return true;
   }
@@ -249,12 +262,12 @@ void Xe::Xenos::XGPU::xeVSyncWorkerThreadLoop() {
     // Measure elapsed time since last check.
     std::chrono::steady_clock::time_point timerNow =
       std::chrono::steady_clock::now();
-
-    if (timerNow >= timerStart + 1s && (xenosState.get()->d1modeIntMask & 0x40000011)) {
+    // Should be a 60Hz (16.6ms) timer, for testing purposes and because we're currently too slow we're setting up to 5s.
+    if (timerNow >= timerStart + 5s && (xenosState.get()->d1modeIntMask & 0x40000011)) {
       // Set  VBLANK Pending
-      xenosState.get()->vblankVlineStatus |= 1;
+      xenosState.get()->vblankVlineStatus |= 0x11000100; // Hardware dump shows this (byteswapped) value at interrupt time.
       xenosState.get()->d1modeIntMask &= ~0x40000011;
-      parentBus->RouteInterrupt(PRIO_GRAPHICS);
+      parentBus->RouteInterrupt(PRIO_GRAPHICS, 4); // Debugging on hardware shows #2 is the correct CPU ID.
 
       // Update internal timer.
       timerStart = std::chrono::steady_clock::now();
