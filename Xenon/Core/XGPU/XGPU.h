@@ -81,6 +81,17 @@ private:
 
   // Command Processor
   std::unique_ptr<Xe::XGPU::CommandProcessor> commandProcessor = {};
+
+  // Vertical Sync Worker thread
+  std::thread xeVSyncWorkerThread;
+
+  // VSYNC Worker thread running
+  volatile bool xeVsyncWorkerThreadRunning = true;
+
+  // Vertical Sync Worker Thread Loop
+  // Should fire an interrupt to a given CPU every time a vertical sync event happens.
+  // Normally this is the spped of the display's refresh rate.
+  void xeVSyncWorkerThreadLoop();
 };
 } // namespace Xenos
 } // namespace Xe

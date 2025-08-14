@@ -108,12 +108,21 @@ Xe::Xenos::XGPU::XGPU(Render::Renderer *renderer, RAM *ram, PCIBridge *pciBridge
 
   commandProcessor = std::make_unique<STRIP_UNIQUE(commandProcessor)>(ramPtr, xenosState.get(), render, parentBus);
   xenosState->commandProcessor = commandProcessor.get(); // CP expects xenosState, xenosState expects CP, this fixes it.
+
+  // VSync Worker thread.
+  xeVsyncWorkerThreadRunning = true;
+  xeVSyncWorkerThread = std::thread(&XGPU::xeVSyncWorkerThreadLoop, this);
 }
 
 Xe::Xenos::XGPU::~XGPU() {
   commandProcessor.reset();
   xenosState.reset();
   edram.reset();
+  // Kill VSync Thread
+  xeVsyncWorkerThreadRunning = false;
+  if (xeVSyncWorkerThread.joinable()) {
+    xeVSyncWorkerThread.join();
+  }
 }
 
 bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
@@ -227,4 +236,29 @@ void Xe::Xenos::XGPU::DumpFB(const std::filesystem::path &path, int pitch) {
     LOG_INFO(Xenos, "Framebuffer dumped to '{}'", path.string());
   }
   f.close();
+}
+
+void Xe::Xenos::XGPU::xeVSyncWorkerThreadLoop() {
+  LOG_INFO(Xenos, "Entering VSYNC Worker thread.");
+
+  // VSync timer start
+  std::chrono::steady_clock::time_point timerStart =
+    std::chrono::steady_clock::now();
+
+  while (xeVsyncWorkerThreadRunning) {
+    // Measure elapsed time since last check.
+    std::chrono::steady_clock::time_point timerNow =
+      std::chrono::steady_clock::now();
+
+    if (timerNow >= timerStart + 1s && (xenosState.get()->d1modeIntMask & 0x40000011)) {
+      // Set  VBLANK Pending
+      xenosState.get()->vblankVlineStatus |= 1;
+      xenosState.get()->d1modeIntMask &= ~0x40000011;
+      parentBus->RouteInterrupt(PRIO_GRAPHICS);
+
+      // Update internal timer.
+      timerStart = std::chrono::steady_clock::now();
+    }
+  }
+  LOG_INFO(Xenos, "Exiting VSYNC Worker thread.");
 }
