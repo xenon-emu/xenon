@@ -833,6 +833,9 @@ bool CommandProcessor::ExecutePacketType3_EVENT_WRITE_SHD(RingBuffer *ringBuffer
   auto endianness = static_cast<eEndian>(address & 0x3);
   address &= ~0x3;
   writeValue = xeEndianSwap(writeValue, endianness);
+
+  LOG_DEBUG(Xenos, "[CP][PT3](EVENT_WRITE_SHD): Writing value {:#x} to address {:#x}", writeValue, address);
+
   u8 *addrPtr = ram->GetPointerToAddress(address);
   memcpy(addrPtr, &writeValue, sizeof(writeValue));
 

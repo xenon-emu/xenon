@@ -170,6 +170,9 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
   case XeRegister::D1MODE_VBLANK_VLINE_STATUS:
     value = vblankVlineStatus;
     break;
+  case XeRegister::D1MODE_INT_MASK:
+    value = d1modeIntMask;
+    break;
   case XeRegister::D1MODE_VIEWPORT_SIZE:
     value = modeViewportSize;
     break;
@@ -516,6 +519,9 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
     break;
   case XeRegister::D1MODE_VIEWPORT_SIZE:
     modeViewportSize = value;
+    break;  
+  case XeRegister::D1MODE_INT_MASK:
+    d1modeIntMask = value;
     break;
   case XeRegister::XDVO_ENABLE:
     xdvoEnable = value;

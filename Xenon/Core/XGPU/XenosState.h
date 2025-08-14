@@ -172,6 +172,7 @@ public:
   u32 vCounter = 720;
   u32 vblankStatus = 0x1000;
   u32 vblankVlineStatus = 1;
+  u32 d1modeIntMask = 0;
 
   // MH
   u32 mhStatus = 0;
