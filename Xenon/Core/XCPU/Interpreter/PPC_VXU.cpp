@@ -596,19 +596,21 @@ void PPCInterpreter::PPCInterpreter_vperm(PPU_STATE* ppuState) {
 
   auto bytes = VRi(vc).bytes;
 
+  Base::Vector128 vector{};
+  
   // Truncate in case of bigger than 32 value.
   for (auto& byte : bytes) {
     byte &= 0x1F;
   }
 
   for (u8 idx = 0; idx < 16; idx++) {
-    VRi(vd).bytes[idx] = vpermHelper(reIndex[bytes[reIndex[idx]]], VRi(va), VRi(rb));
+    vector.bytes[idx] = vpermHelper(reIndex[bytes[reIndex[idx]]], VRi(va), VRi(rb));
   }
 
-  VRi(vd).dword[0] = byteswap_be<u32>(VRi(vd).dword[0]);
-  VRi(vd).dword[1] = byteswap_be<u32>(VRi(vd).dword[1]);
-  VRi(vd).dword[2] = byteswap_be<u32>(VRi(vd).dword[2]);
-  VRi(vd).dword[3] = byteswap_be<u32>(VRi(vd).dword[3]);
+  VRi(vd).dword[0] = byteswap_be<u32>(vector.dword[0]);
+  VRi(vd).dword[1] = byteswap_be<u32>(vector.dword[1]);
+  VRi(vd).dword[2] = byteswap_be<u32>(vector.dword[2]);
+  VRi(vd).dword[3] = byteswap_be<u32>(vector.dword[3]);
 }
 
 // Vector Permute 128
@@ -619,19 +621,21 @@ void PPCInterpreter::PPCInterpreter_vperm128(PPU_STATE* ppuState) {
 
   auto bytes = VR(VMX128_2_VC).bytes;
 
+  Base::Vector128 vector{};
+
   // Truncate in case of bigger than 32 value.
   for (auto& byte : bytes) {
     byte &= 0x1F;
   }
 
   for (u8 idx = 0; idx < 16; idx++) {
-    VR(VMX128_2_VD128).bytes[idx] = vpermHelper(reIndex[bytes[reIndex[idx]]], VR(VMX128_2_VA128), VR(VMX128_2_VB128));
+    vector.bytes[idx] = vpermHelper(reIndex[bytes[reIndex[idx]]], VR(VMX128_2_VA128), VR(VMX128_2_VB128));
   }
 
-  VR(VMX128_2_VD128).dword[0] = byteswap_be<u32>(VR(VMX128_2_VD128).dword[0]);
-  VR(VMX128_2_VD128).dword[1] = byteswap_be<u32>(VR(VMX128_2_VD128).dword[1]);
-  VR(VMX128_2_VD128).dword[2] = byteswap_be<u32>(VR(VMX128_2_VD128).dword[2]);
-  VR(VMX128_2_VD128).dword[3] = byteswap_be<u32>(VR(VMX128_2_VD128).dword[3]);
+  VR(VMX128_2_VD128).dword[0] = byteswap_be<u32>(vector.dword[0]);
+  VR(VMX128_2_VD128).dword[1] = byteswap_be<u32>(vector.dword[1]);
+  VR(VMX128_2_VD128).dword[2] = byteswap_be<u32>(vector.dword[2]);
+  VR(VMX128_2_VD128).dword[3] = byteswap_be<u32>(vector.dword[3]);
 }
 
 // Vector128 Permutate Word Immediate
