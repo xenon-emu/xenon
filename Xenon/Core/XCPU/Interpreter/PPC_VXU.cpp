@@ -1013,38 +1013,50 @@ static inline u8 vsldoiHelper(u8 sh, Base::Vector128 vra, Base::Vector128 vrb) {
   #define SSSE3_ATTR __attribute__((target("ssse3"), always_inline))
 #else
   #define SSSE3_ATTR
-#endif // ifdef __GNUC__
+#endif // __GNUC__
 
-template <s32 N>
-static inline SSSE3_ATTR __m128i palignr_imm(__m128i a, __m128i b) {
-  static_assert(N >= 0 && N <= 31, "palignr imm must be 0..31");
-  return _mm_alignr_epi8(b, a, N);
+template <int N>
+static inline SSSE3_ATTR __m128i srli_si128_imm(__m128i a) {
+  static_assert(N >= 0 && N <= 15, "shift imm must be 0..15");
+#ifdef __GNUC__
+  return (__m128i)__builtin_ia32_psrldqi128(a, N * 8);
+#else
+  constexpr int k = N;
+  return _mm_srli_si128(a, k);
+#endif // __GNUC__
 }
 
-static inline SSSE3_ATTR __m128i vsldoi_sse(__m128i va, __m128i vb, u8 shb) {
-  __m128i result = _mm_setzero_si128();
-  switch (shb & 0xF) {
-#undef CASE
-#define CASE(i) case i: return palignr_imm<16 - i>(va, vb)
-  CASE(0);
-  CASE(1);
-  CASE(2);
-  CASE(3);
-  CASE(4);
-  CASE(5);
-  CASE(6);
-  CASE(7);
-  CASE(8);
-  CASE(9);
-  CASE(10);
-  CASE(11);
-  CASE(12);
-  CASE(13);
-  CASE(14);
-  CASE(15);
-#undef CASE
+template <int N>
+static inline SSSE3_ATTR __m128i slli_si128_imm(__m128i a) {
+  static_assert(N >= 0 && N <= 15, "shift imm must be 0..15");
+#ifdef __GNUC__
+  return (__m128i)__builtin_ia32_pslldqi128(a, N * 8);
+#else
+  constexpr int k = N;
+  return _mm_slli_si128(a, k);
+#endif // __GNUC__
+}
+
+static inline SSSE3_ATTR __m128i vsldoi_sse(__m128i va, __m128i vb, const u8 shb) {
+  switch (shb & 0x0F) {
+  case  0: return va;
+  case  1: return _mm_or_si128(srli_si128_imm<1>(va), slli_si128_imm<15>(vb));
+  case  2: return _mm_or_si128(srli_si128_imm<2>(va), slli_si128_imm<14>(vb));
+  case  3: return _mm_or_si128(srli_si128_imm<3>(va), slli_si128_imm<13>(vb));
+  case  4: return _mm_or_si128(srli_si128_imm<4>(va), slli_si128_imm<12>(vb));
+  case  5: return _mm_or_si128(srli_si128_imm<5>(va), slli_si128_imm<11>(vb));
+  case  6: return _mm_or_si128(srli_si128_imm<6>(va), slli_si128_imm<10>(vb));
+  case  7: return _mm_or_si128(srli_si128_imm<7>(va), slli_si128_imm<9>(vb));
+  case  8: return _mm_or_si128(srli_si128_imm<8>(va), slli_si128_imm<8>(vb));
+  case  9: return _mm_or_si128(srli_si128_imm<9>(va), slli_si128_imm<7>(vb));
+  case 10: return _mm_or_si128(srli_si128_imm<10>(va), slli_si128_imm<6>(vb));
+  case 11: return _mm_or_si128(srli_si128_imm<11>(va), slli_si128_imm<5>(vb));
+  case 12: return _mm_or_si128(srli_si128_imm<12>(va), slli_si128_imm<4>(vb));
+  case 13: return _mm_or_si128(srli_si128_imm<13>(va), slli_si128_imm<3>(vb));
+  case 14: return _mm_or_si128(srli_si128_imm<14>(va), slli_si128_imm<2>(vb));
+  case 15: return _mm_or_si128(srli_si128_imm<15>(va), slli_si128_imm<1>(vb));
   }
-  return result;
+  return _mm_setzero_si128(); // unreachable
 }
 
 #ifdef __GNUC__
@@ -1121,8 +1133,7 @@ void PPCInterpreter::PPCInterpreter_vsldoi(PPU_STATE *ppuState) {
 #endif
 }
 
-// Vector128 Shift Left Double by Octet Immediate
-void PPCInterpreter::PPCInterpreter_vsldoi128(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_vsldoi128(PPU_STATE *ppuState) {
   CHECK_VXU;
 
   const u8 sh = VMX128_5_SH;
@@ -1131,31 +1142,27 @@ void PPCInterpreter::PPCInterpreter_vsldoi128(PPU_STATE* ppuState) {
     VR(VMX128_5_VD128) = VR(VMX128_5_VA128);
     return;
   }
-  else if (sh == 16) {
+  if (sh == 16) {
     // Don't touch VA
     VR(VMX128_5_VD128) = VR(VMX128_5_VB128);
     return;
   }
 
-  Base::Vector128 vra = VR(VMX128_5_VA128);
-  Base::Vector128 vrb = VR(VMX128_5_VB128);
-
-#if defined(FIX)
+#ifdef ARCH_X86_64
+  // Load
   __m128i va = _mm_loadu_si128(reinterpret_cast<const __m128i*>(VR(VMX128_5_VA128).bytes.data()));
   __m128i vb = _mm_loadu_si128(reinterpret_cast<const __m128i*>(VR(VMX128_5_VB128).bytes.data()));
-  __m128i vd_sse = vsldoi_sse(va, vb, sh);
 
-  // Store raw result before byte swap
-  _mm_storeu_si128(reinterpret_cast<__m128i*>(VR(VMX128_5_VD128).bytes.data()), vd_sse);
-  // Swap
-  __m128i result = _mm_loadu_si128(reinterpret_cast<__m128i*>(VR(VMX128_5_VD128).bytes.data()));
-  result = byteswap_be_u32x4_ssse3(vd_sse);
-  _mm_storeu_si128(reinterpret_cast<__m128i*>(VR(VMX128_5_VD128).bytes.data()), result);
+  // Sswap inputs from BE, do the op, swap back.
+  va = byteswap_be_u32x4_ssse3(va);
+  vb = byteswap_be_u32x4_ssse3(vb);
+
+  __m128i vd = vsldoi_sse(va, vb, sh);
+
+  vd = byteswap_be_u32x4_ssse3(vd);
+  _mm_storeu_si128(reinterpret_cast<__m128i*>(VR(VMX128_5_VD128).bytes.data()), vd);
 #else
-  // TODO: Ugly, super slow, fix.
-
-  // NOTE: Checked against Xenia's tests.
-
+  // Fallback, very very slow
   vra.dword[0] = byteswap_be<u32>(vra.dword[0]);
   vra.dword[1] = byteswap_be<u32>(vra.dword[1]);
   vra.dword[2] = byteswap_be<u32>(vra.dword[2]);
@@ -1214,7 +1221,9 @@ void PPCInterpreter::PPCInterpreter_vspltish(PPU_STATE *ppuState) {
 
   s32 simm = 0;
 
-  if (_instr.vsimm) { simm = ((_instr.vsimm & 0x10) ? (_instr.vsimm | 0xFFFFFFF0) : _instr.vsimm); }
+  if (_instr.vsimm) {
+    simm = ((_instr.vsimm & 0x10) ? (_instr.vsimm | 0xFFFFFFF0) : _instr.vsimm);
+  }
 
   for (u8 idx = 0; idx < 8; idx++) {
     VRi(vd).sword[idx] = static_cast<s16>(simm);
@@ -1233,7 +1242,9 @@ void PPCInterpreter::PPCInterpreter_vspltisw(PPU_STATE *ppuState) {
 
   s32 simm = 0;
 
-  if (_instr.vsimm) { simm = ((_instr.vsimm & 0x10) ? (_instr.vsimm | 0xFFFFFFF0) : _instr.vsimm); }
+  if (_instr.vsimm) {
+    simm = ((_instr.vsimm & 0x10) ? (_instr.vsimm | 0xFFFFFFF0) : _instr.vsimm);
+  }
 
   for (u8 idx = 0; idx < 4; idx++) {
     VRi(vd).dsword[idx] = simm;
@@ -1252,7 +1263,9 @@ void PPCInterpreter::PPCInterpreter_vspltisb(PPU_STATE *ppuState) {
 
   s32 simm = 0;
 
-  if (_instr.vsimm) { simm = ((_instr.vsimm & 0x10) ? (_instr.vsimm | 0xFFFFFFF0) : _instr.vsimm); }
+  if (_instr.vsimm) {
+    simm = ((_instr.vsimm & 0x10) ? (_instr.vsimm | 0xFFFFFFF0) : _instr.vsimm);
+  }
 
   for (u8 idx = 0; idx < 16; idx++) {
     VRi(vd).bytes[idx] = static_cast<s8>(simm);
@@ -1357,8 +1370,7 @@ void PPCInterpreter::PPCInterpreter_vupkd3d128(PPU_STATE* ppuState) {
 
   // NOTE: Implemented means it was tested against xenia's tests.
 
-  switch (packType)
-  {
+  switch (packType) {
   case PACK_TYPE_D3DCOLOR:
     LOG_DEBUG(Xenon, "VXU[vupkd3d128]: Pack type: PACK_TYPE_D3DCOLOR");
     VR(vrd).flt[0] = MakePackedFloatUnsigned((val >> 16) & 0xFF);

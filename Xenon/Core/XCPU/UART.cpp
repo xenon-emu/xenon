@@ -22,7 +22,11 @@ void HW_UART_SOCK::uartMainThread() {
     if (!uartTxBuffer.empty()) {
       char c = uartTxBuffer.front();
       if (socketCreated) {
-        if (send(sockHandle, &c, 1, MSG_NOSIGNAL) <= 0) {
+        s32 flags = 0;
+#ifndef _WIN32
+        flags = MSG_NOSIGNAL;
+#endif // ifndef _WIN32
+        if (send(sockHandle, &c, 1, flags) <= 0) {
           LOG_WARNING(UART, "Socket send failed: {}", strerror(errno));
           socketCreated = false;
           socketclose(sockHandle);
