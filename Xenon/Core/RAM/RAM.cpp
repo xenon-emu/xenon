@@ -20,7 +20,7 @@ RAM::RAM(const std::string &deviceName, u64 startAddress, std::string size, bool
   } else {
     u64 charPos = size.find_first_of(firstChar);
     if (charPos != -1) {
-      std::string number = size.substr(0, size.length() - charPos);
+      std::string number = size.substr(0, charPos);
       std::string unit = size.substr(charPos);
       f64 ramSizeF = std::stod(number.c_str());
       f64 unitF = 0;
