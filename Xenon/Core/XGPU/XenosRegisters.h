@@ -3466,7 +3466,8 @@ constexpr std::string_view GetRegisterNameById(u8 opcode) {
     }
   }
 
-  return std::format("UNK_OP_0x{:X}", opcode);
+  const std::string retString = std::format("UNK_OP_0x{:X}", opcode);
+  return retString;
 }
 
 } // namespace Xe::XGPU

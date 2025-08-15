@@ -241,7 +241,8 @@ constexpr std::string_view GetPM4Opcode(u8 opcode) {
       return reg.name;
     }
   }
-  return std::format("UNK_OP_0x{:X}", opcode);
+  const std::string retString = std::format("UNK_OP_0x{:X}", opcode);
+  return retString;
 }
 
 } // namespace Xe::XGPU
