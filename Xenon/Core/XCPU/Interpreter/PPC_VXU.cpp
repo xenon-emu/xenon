@@ -2,202 +2,6 @@
 
 #include "PPCInterpreter.h"
 
-#if defined(__ARM_NEON) || defined(__ARM_NEON__)
-#include <arm_neon.h>
-#define PPC_HAVE_NEON 1
-#endif
-#if defined(__SSE2__)
-#include <emmintrin.h>
-#define PPC_HAVE_SSE2 1
-#endif
-#if defined(__SSSE3__)
-#include <tmmintrin.h>
-#define PPC_HAVE_SSSE3 1
-#endif
-#if defined(__SSE4_1__)
-#include <smmintrin.h>
-#define PPC_HAVE_SSE41 1
-#endif
-#ifdef ARCH_X86_64
-#ifdef __GNUC__
-  #define SSSE3_ATTR __attribute__((target("ssse3"), always_inline))
-#else
-  #define SSSE3_ATTR
-#endif // __GNUC__
-#endif
-
-#if defined(PPC_HAVE_SSSE3) && PPC_HAVE_SSSE3
-template <int N>
-static inline SSSE3_ATTR __m128i srli_si128_imm(__m128i a) {
-  static_assert(N >= 0 && N <= 15, "shift imm must be 0..15");
-#ifdef __GNUC__
-  return (__m128i)__builtin_ia32_psrldqi128(a, N * 8);
-#else
-  constexpr int k = N;
-  return _mm_srli_si128(a, k);
-#endif // __GNUC__
-}
-
-template <int N>
-static inline SSSE3_ATTR __m128i slli_si128_imm(__m128i a) {
-  static_assert(N >= 0 && N <= 15, "shift imm must be 0..15");
-#ifdef __GNUC__
-  return (__m128i)__builtin_ia32_pslldqi128(a, N * 8);
-#else
-  constexpr int k = N;
-  return _mm_slli_si128(a, k);
-#endif // __GNUC__
-}
-#endif
-
-// Byte-swap each u32 lane in a 128-bit value.
-static inline void byteswap_be_u32x4(u32 d[4]) {
-#if defined(PPC_HAVE_SSSE3) && PPC_HAVE_SSSE3
-  __m128i x = _mm_loadu_si128((const __m128i *)d);
-  const __m128i shuf = _mm_set_epi8(12, 13, 14, 15, 8, 9, 10, 11, 4, 5, 6, 7, 0, 1, 2, 3);
-  x = _mm_shuffle_epi8(x, shuf);
-  _mm_storeu_si128((__m128i *)d, x);
-#elif defined(PPC_HAVE_NEON) && PPC_HAVE_NEON
-  uint8x16_t v = vld1q_u8(reinterpret_cast<const u8 *>(d));
-  // reverse bytes within 32-bit lanes
-  v = vrev32q_u8(v);
-  vst1q_u8(reinterpret_cast<u8 *>(d), v);
-#else
-  d[0] = byteswap_be(d[0]);
-  d[1] = byteswap_be(d[1]);
-  d[2] = byteswap_be(d[2]);
-  d[3] = byteswap_be(d[3]);
-#endif
-}
-
-// Branchless reduction helpers for CR updates:
-static inline u32 and4(const std::array<u32, 4> a) {
-  return a[0] & a[1] & a[2] & a[3];
-}
-static inline u32 or4(const std::array<u32, 4> a) {
-  return a[0] | a[1] | a[2] | a[3];
-}
-
-// Unsigned 32-bit saturating add (per-lane).
-static inline void u32_sat_add_4(u32 out[4], const u32 a[4], const u32 b[4]) {
-#if defined(PPC_HAVE_NEON) && PPC_HAVE_NEON
-  uint32x4_t va = vld1q_u32(a), vb = vld1q_u32(b);
-  uint32x4_t vr = vqaddq_u32(va, vb); // native saturating add
-  vst1q_u32(out, vr);
-#elif defined(PPC_HAVE_SSE2) && PPC_HAVE_SSE2
-  // SSE2 has no 32-bit unsigned saturated add; emulate:
-  __m128i va = _mm_loadu_si128((const __m128i *)a);
-  __m128i vb = _mm_loadu_si128((const __m128i *)b);
-  __m128i sum = _mm_add_epi32(va, vb);
-  // overflow if (sum < va) in unsigned sense. Convert to signed space via XOR 0x80000000.
-  const __m128i sign = _mm_set1_epi32(0x80000000u);
-  __m128i sumS = _mm_xor_si128(sum, sign);
-  __m128i vaS = _mm_xor_si128(va, sign);
-  __m128i ov = _mm_cmplt_epi32(sumS, vaS);          // 0xFFFFFFFF where overflow
-  __m128i maxv = _mm_set1_epi32(0xFFFFFFFFu);
-  __m128i res = _mm_or_si128(_mm_and_si128(ov, maxv), _mm_andnot_si128(ov, sum));
-  _mm_storeu_si128((__m128i *)out, res);
-#else
-  for (u8 i = 0; i != 4; i++) {
-    u32 s = a[i] + b[i];
-    out[i] = (s < a[i]) ? 0xFFFFFFFFu : s;
-  }
-#endif
-}
-
-// Per-lane conditional select: dst = (a & ~mask) | (b & mask)
-static inline void bitselect_128(std::array<u32, 4> dst, const std::array<u32, 4> a, const std::array<u32, 4> b, const std::array<u32, 4> mask) {
-#if defined(PPC_HAVE_SSE2) && PPC_HAVE_SSE2
-  __m128i va = _mm_loadu_si128(((const __m128i *)a.data()));
-  __m128i vb = _mm_loadu_si128(((const __m128i *)b.data()));
-  __m128i vm = _mm_loadu_si128(((const __m128i *)mask.data()));
-  __m128i r = _mm_or_si128(_mm_and_si128(va, _mm_xor_si128(vm, _mm_set1_epi32(-1))),
-    _mm_and_si128(vb, vm));
-  _mm_storeu_si128((__m128i *)dst, r);
-#elif defined(PPC_HAVE_NEON) && PPC_HAVE_NEON
-  uint32x4_t va = vld1q_u32(a), vb = vld1q_u32(b), vm = vld1q_u32(mask);
-  uint32x4_t r = vorrq_u32(vandq_u32(va, vmvnq_u32(vm)), vandq_u32(vb, vm));
-  vst1q_u32(dst, r);
-#else
-  for (u8 i = 0; i != 4; i++)
-    dst[i] = (a[i] & ~mask[i]) | (b[i] & mask[i]);
-#endif
-}
-
-// vsldoi: left shift ((a||b)) by sh bytes (0..16), selecting 16 result bytes.
-static inline void vsldoi_bytes(u8 out[16], const u8 a[16], const u8 b[16], int sh /*0..16*/) {
-  if (sh <= 0) {
-    for (u8 i = 0; i<16; i++)
-      out[i] = a[i];
-    return;
-  }
-  if (sh >=16) {
-    for (u8 i = 0; i != 16; i++)
-      out[i] = b[i];
-    return;
-  }
-#if defined(PPC_HAVE_SSE3) && PPC_HAVE_SSE3
-  __m128i va = _mm_loadu_si128((const __m128i *)a);
-  __m128i vb = _mm_loadu_si128((const __m128i *)b);
-  // vsldoi is exactly _mm_alignr_epi8 with (16 - sh) reversed args
-  __m128i r = _mm_alignr_epi8(vb, va, sh);
-  _mm_storeu_si128((__m128i *)out, r);
-#elif defined(PPC_HAVE_NEON) && PPC_HAVE_NEON
-  uint8x16_t va = vld1q_u8(a), vb = vld1q_u8(b);
-  uint8x16_t r = vextq_u8(va, vb, sh & 15);
-  vst1q_u8(out, r);
-#else
-  // scalar
-  for (u8 i = 0; i != 16; i++) {
-    u8 src = i + sh;
-    out[i] = (src < 16) ? a[src] : b[src - 16];
-  }
-#endif
-}
-
-// Fast estimates that match VMX intent
-static inline void recip4(float dst[4], const float src[4]) {
-#if defined(PPC_HAVE_SSE2) && PPC_HAVE_SSE2
-  __m128 v = _mm_loadu_ps(src);
-  v = _mm_rcp_ps(v); // 12-bit estimate
-  __m128 two = _mm_set1_ps(2.f);
-  v = _mm_mul_ps(v, _mm_sub_ps(two, _mm_mul_ps(_mm_loadu_ps(src), v)));
-  _mm_storeu_ps(dst, v);
-#elif defined(PPC_HAVE_NEON) && PPC_HAVE_NEON
-  float32x4_t x = vld1q_f32(src);
-  float32x4_t r = vrecpeq_f32(x);
-  // One NR step
-  r = vmulq_f32(r, vrecpsq_f32(x, r));
-  vst1q_f32(dst, r);
-#else
-  dst[0] = 1.f / src[0];
-  dst[1] = 1.f / src[1];
-  dst[2] = 1.f / src[2];
-  dst[3] = 1.f / src[3];
-#endif
-}
-
-static inline void rsqrt4(std::array<f32, 4> dst, const std::array<f32, 4> src) {
-#if defined(PPC_HAVE_SSE2) && PPC_HAVE_SSE2
-  __m128 v = _mm_loadu_ps(src.data());
-  v = _mm_rsqrt_ps(v);
-  // Refine for accuracy, TODO: Add a toggle for FPU accuracy
-  __m128 x = _mm_loadu_ps(src.data());
-  __m128 half = _mm_set1_ps(0.5f);
-  __m128 three = _mm_set1_ps(3.f);
-  v = _mm_mul_ps(half, _mm_mul_ps(v, _mm_sub_ps(three, _mm_mul_ps(_mm_mul_ps(x, v), v))));
-  _mm_storeu_ps(dst, v);
-#elif defined(PPC_HAVE_NEON) && PPC_HAVE_NEON
-  float32x4_t x = vld1q_f32(src.data());
-  float32x4_t r = vrsqrteq_f32(x);
-  r = vmulq_f32(r, vrsqrtsq_f32(x, vmulq_f32(r, r)));
-  vst1q_f32(dst, r);
-#else
-  dst[0] = 1.f / ::sqrt(src[0]); dst[1] = 1.f / ::sqrt(src[1]);
-  dst[2] = 1.f / ::sqrt(src[2]); dst[3] = 1.f / ::sqrt(src[3]);
-#endif
-}
-
 // Data Stream Touch for Store
 void PPCInterpreter::PPCInterpreter_dss(PPU_STATE *ppuState) {
   CHECK_VXU;
@@ -246,7 +50,7 @@ void PPCInterpreter::PPCInterpreter_vaddfp(PPU_STATE *ppuState) {
 /*
   do i = 0,127,32
     (vD)i:i+31 <- RndToNearFP32((vA)i:i+31 + fp (vB)i:i+31)
-  end 
+  end
 */
 
   // TODO: Rounding and NJ mode check.
@@ -308,21 +112,10 @@ void PPCInterpreter::PPCInterpreter_vand(PPU_STATE *ppuState) {
 
   CHECK_VXU;
 
-#if defined(PPC_HAVE_SSE2) && PPC_HAVE_SSE2
-  __m128i va = _mm_loadu_si128((const __m128i *)VRi(va).dword);
-  __m128i vb = _mm_loadu_si128((const __m128i *)VRi(vb).dword);
-  __m128i vd = _mm_and_si128(va, vb);
-  _mm_storeu_si128((__m128i *)VRi(vd).dword, vd);
-#elif defined(PPC_HAVE_NEON) && PPC_HAVE_NEON
-  uint32x4_t va = vld1q_u32(VRi(va).dword);
-  uint32x4_t vb = vld1q_u32(VRi(vb).dword);
-  vst1q_u32(VRi(vd).dword, vandq_u32(va, vb));
-#else
   VRi(vd).dword[0] = VRi(va).dword[0] & VRi(vb).dword[0];
   VRi(vd).dword[1] = VRi(va).dword[1] & VRi(vb).dword[1];
   VRi(vd).dword[2] = VRi(va).dword[2] & VRi(vb).dword[2];
   VRi(vd).dword[3] = VRi(va).dword[3] & VRi(vb).dword[3];
-#endif
 }
 
 // Vector Logical AND with Complement (x'1000 0444')
@@ -408,7 +201,7 @@ void PPCInterpreter::PPCInterpreter_vcmpeqfp128(PPU_STATE* ppuState) {
       allEqual = true;
     }
 
-    if (VR(VMX128_R_VD128).dword[0] == 0 && VR(VMX128_R_VD128).dword[1] == 0 
+    if (VR(VMX128_R_VD128).dword[0] == 0 && VR(VMX128_R_VD128).dword[1] == 0
       && VR(VMX128_R_VD128).dword[2] == 0 && VR(VMX128_R_VD128).dword[3] == 0) {
       allNotEqual = true;
     }
@@ -425,27 +218,29 @@ void PPCInterpreter::PPCInterpreter_vcmpequwx(PPU_STATE* ppuState) {
 
   CHECK_VXU;
 
-#if defined(PPC_HAVE_SSE2) && PPC_HAVE_SSE2
-  __m128i va = _mm_loadu_si128(((const __m128i *)VRi(va).dword.data()));
-  __m128i vb = _mm_loadu_si128(((const __m128i *)VRi(vb).dword.data()));
-  __m128i vd = _mm_cmpeq_epi32(va, vb);
-  _mm_storeu_si128(((__m128i *)VRi(vd).dword.data()), vd);
-#elif defined(PPC_HAVE_NEON) && PPC_HAVE_NEON
-  uint32x4_t va = vld1q_u32(VRi(va).dword.data());
-  uint32x4_t vb = vld1q_u32(VRi(vb).dword.data());
-  uint32x4_t vd = vceqq_u32(va, vb);
-  vst1q_u32(VRi(vd).dword.data(), vd);
-#else
-  for (u8 i = 0; i != 4; i++)
-    VRi(vd).dword[i] = (VRi(va).dword[i] == VRi(vb).dword[i]) ? 0xFFFFFFFF : 0x00000000;
-#endif
+  VRi(vd).dword[0] = ((VRi(va).dword[0] == VRi(vb).dword[0]) ? 0xFFFFFFFF : 0x00000000);
+  VRi(vd).dword[1] = ((VRi(va).dword[1] == VRi(vb).dword[1]) ? 0xFFFFFFFF : 0x00000000);
+  VRi(vd).dword[2] = ((VRi(va).dword[2] == VRi(vb).dword[2]) ? 0xFFFFFFFF : 0x00000000);
+  VRi(vd).dword[3] = ((VRi(va).dword[3] == VRi(vb).dword[3]) ? 0xFFFFFFFF : 0x00000000);
 
   if (_instr.vrc) {
-    const std::array<u32, 4> r = VRi(vd).dword;
-    const bool allEq = and4(r) == 0xFFFFFFFFu;
-    const bool allNotEq = or4(r) == 0;
-    u8 cr = (allEq ? 0b1000 : 0) | (allNotEq ? 0b0010 : 0);
-    ppcUpdateCR(ppuState, 6, cr);
+    u8 crValue = 0;
+    bool allEqual = false;
+    bool allNotEqual = false;
+
+    if (VRi(vd).dword[0] == 0xFFFFFFFF && VRi(vd).dword[1] == 0xFFFFFFFF
+      && VRi(vd).dword[2] == 0xFFFFFFFF && VRi(vd).dword[3] == 0xFFFFFFFF) {
+      allEqual = true;
+    }
+
+    if (VRi(vd).dword[0] == 0 && VRi(vd).dword[1] == 0 && VRi(vd).dword[2] == 0 && VRi(vd).dword[3] == 0) {
+      allNotEqual = true;
+    }
+
+    crValue |= allEqual ? 0b1000 : 0;
+    crValue |= allNotEqual ? 0b0010 : 0;
+
+    ppcUpdateCR(ppuState, 6, crValue);
   }
 }
 
@@ -485,14 +280,14 @@ void PPCInterpreter::PPCInterpreter_vcsxwfp128(PPU_STATE* ppuState) {
 
   // (VD) <- float(VB as signed) / 2^uimm
 
-  double div = (double)(1ULL << VMX128_3_IMM);
+  f64 div = (f64)(1ULL << VMX128_3_IMM);
   VR(VMX128_3_VD128).flt[0] = (float)(VR(VMX128_3_VB128).dsword[0] / div);
   VR(VMX128_3_VD128).flt[1] = (float)(VR(VMX128_3_VB128).dsword[1] / div);
   VR(VMX128_3_VD128).flt[2] = (float)(VR(VMX128_3_VB128).dsword[2] / div);
   VR(VMX128_3_VD128).flt[3] = (float)(VR(VMX128_3_VB128).dsword[3] / div);
 }
 
-static inline s32 vcfpsxwsHelper(const double inFloat) {
+static inline s32 vcfpsxwsHelper(const f64 inFloat) {
   if (inFloat < (f64)INT_MIN) {
     return INT_MIN;
   } else if (inFloat > (f64)INT_MAX) {
@@ -513,13 +308,13 @@ void PPCInterpreter::PPCInterpreter_vcfpsxws128(PPU_STATE* ppuState) {
   u32 uimm = VMX128_3_IMM;
   f32 fltuimm = static_cast<f32>(std::exp2(uimm));
 
-  VR(VMX128_3_VD128).flt[0] = vcfpsxwsHelper(static_cast<double>(VR(VMX128_3_VB128).flt[0] * fltuimm));
-  VR(VMX128_3_VD128).flt[1] = vcfpsxwsHelper(static_cast<double>(VR(VMX128_3_VB128).flt[1] * fltuimm));
-  VR(VMX128_3_VD128).flt[2] = vcfpsxwsHelper(static_cast<double>(VR(VMX128_3_VB128).flt[2] * fltuimm));
-  VR(VMX128_3_VD128).flt[3] = vcfpsxwsHelper(static_cast<double>(VR(VMX128_3_VB128).flt[3] * fltuimm));
+  VR(VMX128_3_VD128).flt[0] = vcfpsxwsHelper(static_cast<f64>(VR(VMX128_3_VB128).flt[0] * fltuimm));
+  VR(VMX128_3_VD128).flt[1] = vcfpsxwsHelper(static_cast<f64>(VR(VMX128_3_VB128).flt[1] * fltuimm));
+  VR(VMX128_3_VD128).flt[2] = vcfpsxwsHelper(static_cast<f64>(VR(VMX128_3_VB128).flt[2] * fltuimm));
+  VR(VMX128_3_VD128).flt[3] = vcfpsxwsHelper(static_cast<f64>(VR(VMX128_3_VB128).flt[3] * fltuimm));
 }
 
-static inline float vexptefpHelper(const f32 inFloat) {
+static inline f32 vexptefpHelper(const f32 inFloat) {
   if (inFloat == -std::numeric_limits<f32>::infinity())
     return 0.f;
   if (inFloat == std::numeric_limits<f32>::infinity())
@@ -530,7 +325,7 @@ static inline float vexptefpHelper(const f32 inFloat) {
 // Vector 2 Raised to the Exponent Estimate Floating Point (x'1000 018A')
 void PPCInterpreter::PPCInterpreter_vexptefp(PPU_STATE* ppuState) {
   // NOTE: Checked against Xenia's tests.
-  
+
   CHECK_VXU;
 
   VRi(vd).flt[0] = vexptefpHelper(VRi(vb).flt[0]);
@@ -546,7 +341,7 @@ void PPCInterpreter::PPCInterpreter_vexptefp128(PPU_STATE* ppuState) {
   // NOTE: Checked against Xenia's tests.
 
   CHECK_VXU;
-  
+
   VR(VMX128_3_VD128).flt[0] = vexptefpHelper(VR(VMX128_3_VB128).flt[0]);
   VR(VMX128_3_VD128).flt[1] = vexptefpHelper(VR(VMX128_3_VB128).flt[1]);
   VR(VMX128_3_VD128).flt[2] = vexptefpHelper(VR(VMX128_3_VB128).flt[2]);
@@ -599,21 +394,10 @@ void PPCInterpreter::PPCInterpreter_vor(PPU_STATE *ppuState) {
 
   CHECK_VXU;
 
-#if defined(PPC_HAVE_SSE2) && PPC_HAVE_SSE2
-  __m128i va = _mm_loadu_si128((const __m128i *)VRi(va).dword);
-  __m128i vb = _mm_loadu_si128((const __m128i *)VRi(vb).dword);
-  __m128i vd = _mm_or_si128(va, vb);
-  _mm_storeu_si128((__m128i *)VRi(vd).dword, vd);
-#elif defined(PPC_HAVE_NEON) && PPC_HAVE_NEON
-  uint32x4_t va = vld1q_u32(VRi(va).dword.data());
-  uint32x4_t vb = vld1q_u32(VRi(vb).dword.data());
-  vst1q_u32(VRi(vd).dword, vorrq_u32(va, vb));
-#else
   VRi(vd).dword[0] = VRi(va).dword[0] | VRi(vb).dword[0];
   VRi(vd).dword[1] = VRi(va).dword[1] | VRi(vb).dword[1];
   VRi(vd).dword[2] = VRi(va).dword[2] | VRi(vb).dword[2];
-  VRi(vd).dword[3] = VRi(vb).dword[3] | VRi(va).dword[3];
-#endif
+  VRi(vd).dword[3] = VRi(va).dword[3] | VRi(vb).dword[3];
 }
 
 // Vector128 Logical OR
@@ -818,19 +602,21 @@ void PPCInterpreter::PPCInterpreter_vperm(PPU_STATE* ppuState) {
 
   auto bytes = VRi(vc).bytes;
 
+  Base::Vector128 vector{};
+
   // Truncate in case of bigger than 32 value.
   for (auto& byte : bytes) {
     byte &= 0x1F;
   }
 
   for (u8 idx = 0; idx < 16; idx++) {
-    VRi(vd).bytes[idx] = vpermHelper(reIndex[bytes[reIndex[idx]]], VRi(va), VRi(rb));
+    vector.bytes[idx] = vpermHelper(reIndex[bytes[reIndex[idx]]], VRi(va), VRi(rb));
   }
 
-  VRi(vd).dword[0] = byteswap_be<u32>(VRi(vd).dword[0]);
-  VRi(vd).dword[1] = byteswap_be<u32>(VRi(vd).dword[1]);
-  VRi(vd).dword[2] = byteswap_be<u32>(VRi(vd).dword[2]);
-  VRi(vd).dword[3] = byteswap_be<u32>(VRi(vd).dword[3]);
+  VRi(vd).dword[0] = byteswap_be<u32>(vector.dword[0]);
+  VRi(vd).dword[1] = byteswap_be<u32>(vector.dword[1]);
+  VRi(vd).dword[2] = byteswap_be<u32>(vector.dword[2]);
+  VRi(vd).dword[3] = byteswap_be<u32>(vector.dword[3]);
 }
 
 // Vector Permute 128
@@ -841,19 +627,21 @@ void PPCInterpreter::PPCInterpreter_vperm128(PPU_STATE* ppuState) {
 
   auto bytes = VR(VMX128_2_VC).bytes;
 
+  Base::Vector128 vector{};
+
   // Truncate in case of bigger than 32 value.
   for (auto& byte : bytes) {
     byte &= 0x1F;
   }
 
   for (u8 idx = 0; idx < 16; idx++) {
-    VR(VMX128_2_VD128).bytes[idx] = vpermHelper(reIndex[bytes[reIndex[idx]]], VR(VMX128_2_VA128), VR(VMX128_2_VB128));
+    vector.bytes[idx] = vpermHelper(reIndex[bytes[reIndex[idx]]], VR(VMX128_2_VA128), VR(VMX128_2_VB128));
   }
 
-  VR(VMX128_2_VD128).dword[0] = byteswap_be<u32>(VR(VMX128_2_VD128).dword[0]);
-  VR(VMX128_2_VD128).dword[1] = byteswap_be<u32>(VR(VMX128_2_VD128).dword[1]);
-  VR(VMX128_2_VD128).dword[2] = byteswap_be<u32>(VR(VMX128_2_VD128).dword[2]);
-  VR(VMX128_2_VD128).dword[3] = byteswap_be<u32>(VR(VMX128_2_VD128).dword[3]);
+  VR(VMX128_2_VD128).dword[0] = byteswap_be<u32>(vector.dword[0]);
+  VR(VMX128_2_VD128).dword[1] = byteswap_be<u32>(vector.dword[1]);
+  VR(VMX128_2_VD128).dword[2] = byteswap_be<u32>(vector.dword[2]);
+  VR(VMX128_2_VD128).dword[3] = byteswap_be<u32>(vector.dword[3]);
 }
 
 // Vector128 Permutate Word Immediate
@@ -1017,7 +805,10 @@ void PPCInterpreter::PPCInterpreter_vrsqrtefp(PPU_STATE* ppuState) {
 
   // TODO: Check for handling of infinity, minus infinity and NaN's.
 
-  rsqrt4(VRi(vd).flt, VRi(vb).flt);
+  VRi(vd).flt[0] = vrsqrtefpHelper(VRi(vb).flt[0]);
+  VRi(vd).flt[1] = vrsqrtefpHelper(VRi(vb).flt[1]);
+  VRi(vd).flt[2] = vrsqrtefpHelper(VRi(vb).flt[2]);
+  VRi(vd).flt[3] = vrsqrtefpHelper(VRi(vb).flt[3]);
 }
 
 // Vector128 Reciprocal Square Root Estimate Floating Point
@@ -1045,7 +836,10 @@ void PPCInterpreter::PPCInterpreter_vsel(PPU_STATE* ppuState) {
 
   CHECK_VXU;
 
-  bitselect_128(VRi(vd).dword, VRi(va).dword, VRi(vb).dword, VRi(vc).dword);
+  VRi(vd).dword[0] = (VRi(va).dword[0] & ~VRi(vc).dword[0]) | (VRi(vb).dword[0] & VRi(vc).dword[0]);
+  VRi(vd).dword[1] = (VRi(va).dword[1] & ~VRi(vc).dword[1]) | (VRi(vb).dword[1] & VRi(vc).dword[1]);
+  VRi(vd).dword[2] = (VRi(va).dword[2] & ~VRi(vc).dword[2]) | (VRi(vb).dword[2] & VRi(vc).dword[2]);
+  VRi(vd).dword[3] = (VRi(va).dword[3] & ~VRi(vc).dword[3]) | (VRi(vb).dword[3] & VRi(vc).dword[3]);
 }
 
 // Vector128 Conditional Select
@@ -1201,9 +995,39 @@ static inline u8 vsldoiHelper(u8 sh, Base::Vector128 vra, Base::Vector128 vrb) {
   return (sh < 16) ? vra.bytes[sh] : vrb.bytes[sh & 0xF];
 }
 
+#if defined(ARCH_X86_64)
 #ifdef __GNUC__
 __attribute__((target("ssse3")))
-#endif // ifdef __GNUC__
+#endif
+__m128i vsldoi_sse(__m128i va, __m128i vb, u8 shb) {
+  __m128i result = _mm_setzero_si128();
+  switch (shb) {
+#undef CASE
+#define CASE(i) case i: result = _mm_or_si128(_mm_srli_si128(va, i), _mm_slli_si128(vb, 16 - i)); break
+    CASE(0);
+    CASE(1);
+    CASE(2);
+    CASE(3);
+    CASE(4);
+    CASE(5);
+    CASE(6);
+    CASE(7);
+    CASE(8);
+    CASE(9);
+    CASE(10);
+    CASE(11);
+    CASE(12);
+    CASE(13);
+    CASE(14);
+    CASE(15);
+#undef CASE
+  }
+  return result;
+}
+
+#ifdef __GNUC__
+__attribute__((target("ssse3")))
+#endif
 inline __m128i byteswap_be_u32x4_ssse3(__m128i x) {
   // Reverses bytes in each 32-bit word using SSSE3 shuffle_epi8
   const __m128i shuffle = _mm_set_epi8(
@@ -1214,6 +1038,7 @@ inline __m128i byteswap_be_u32x4_ssse3(__m128i x) {
   );
   return _mm_shuffle_epi8(x, shuffle);
 }
+#endif
 
 // Vector Shift Left Double by Octet Immediate (x'1000 002C')
 void PPCInterpreter::PPCInterpreter_vsldoi(PPU_STATE *ppuState) {
@@ -1235,10 +1060,48 @@ void PPCInterpreter::PPCInterpreter_vsldoi(PPU_STATE *ppuState) {
     return;
   }
 
-  vsldoi_bytes(VRi(vd).bytes.data(), VRi(va).bytes.data(), VRi(vb).bytes.data(), sh);
+  Base::Vector128 vra = VRi(va);
+  Base::Vector128 vrb = VRi(vb);
+
+#if defined(FIX) // Fix this, causes incorrect behavior.
+  __m128i va = _mm_loadu_si128(reinterpret_cast<const __m128i*>(VRi(va).bytes.data()));
+  __m128i vb = _mm_loadu_si128(reinterpret_cast<const __m128i*>(VRi(vb).bytes.data()));
+  __m128i vd_sse = vsldoi_sse(va, vb, sh);
+
+  // Store raw result before byte swap
+  _mm_storeu_si128(reinterpret_cast<__m128i*>(VRi(vd).bytes.data()), vd_sse);
+  // Swap
+  __m128i result = _mm_loadu_si128(reinterpret_cast<__m128i*>(VRi(vd).bytes.data()));
+  result = byteswap_be_u32x4_ssse3(vd_sse);
+  _mm_storeu_si128(reinterpret_cast<__m128i*>(VRi(vd).bytes.data()), result);
+#else
+  // TODO: Ugly, super slow, fix.
+
+  // NOTE: Checked against Xenia's tests.
+
+  vra.dword[0] = byteswap_be<u32>(vra.dword[0]);
+  vra.dword[1] = byteswap_be<u32>(vra.dword[1]);
+  vra.dword[2] = byteswap_be<u32>(vra.dword[2]);
+  vra.dword[3] = byteswap_be<u32>(vra.dword[3]);
+
+  vrb.dword[0] = byteswap_be<u32>(vrb.dword[0]);
+  vrb.dword[1] = byteswap_be<u32>(vrb.dword[1]);
+  vrb.dword[2] = byteswap_be<u32>(vrb.dword[2]);
+  vrb.dword[3] = byteswap_be<u32>(vrb.dword[3]);
+
+  for (u8 idx = 0; idx < 16; idx++) {
+    VRi(vd).bytes[idx] = vsldoiHelper(sh + idx, vra, vrb);
+  }
+
+  VRi(vd).dword[0] = byteswap_be<u32>(VRi(vd).dword[0]);
+  VRi(vd).dword[1] = byteswap_be<u32>(VRi(vd).dword[1]);
+  VRi(vd).dword[2] = byteswap_be<u32>(VRi(vd).dword[2]);
+  VRi(vd).dword[3] = byteswap_be<u32>(VRi(vd).dword[3]);
+#endif
 }
 
-void PPCInterpreter::PPCInterpreter_vsldoi128(PPU_STATE *ppuState) {
+// Vector128 Shift Left Double by Octet Immediate
+void PPCInterpreter::PPCInterpreter_vsldoi128(PPU_STATE* ppuState) {
   CHECK_VXU;
 
   const u8 sh = VMX128_5_SH;
@@ -1253,40 +1116,43 @@ void PPCInterpreter::PPCInterpreter_vsldoi128(PPU_STATE *ppuState) {
     return;
   }
 
-  const u8 *pa = VR(VMX128_5_VA128).bytes.data();
-  const u8 *pb = VR(VMX128_5_VB128).bytes.data();
-  u8 *pd = VR(VMX128_5_VD128).bytes.data();
+  Base::Vector128 vra = VR(VMX128_5_VA128);
+  Base::Vector128 vrb = VR(VMX128_5_VB128);
 
-#if defined(PPC_HAVE_NEON) && PPC_HAVE_NEON
-  // NEON: vext concatenates A||B and extracts starting at byte 'sh'
-  uint8x16_t va = vld1q_u8(pa);
-  uint8x16_t vb = vld1q_u8(pb);
-  uint8x16_t vd = vextq_u8(va, vb, sh); // sh in [1..15]
-  vst1q_u8(pd, vd);
+#if defined(FIX)
+  __m128i va = _mm_loadu_si128(reinterpret_cast<const __m128i*>(VR(VMX128_5_VA128).bytes.data()));
+  __m128i vb = _mm_loadu_si128(reinterpret_cast<const __m128i*>(VR(VMX128_5_VB128).bytes.data()));
+  __m128i vd_sse = vsldoi_sse(va, vb, sh);
 
-#elif defined(PPC_HAVE_SSE3) && PPC_HAVE_SSE3
-  __m128i va = _mm_loadu_si128(reinterpret_cast<const __m128i *>(pa));
-  __m128i vb = _mm_loadu_si128(reinterpret_cast<const __m128i *>(pb));
-  // palignr(b,a,imm): take bytes [imm..imm+15] from (a||b)
-  __m128i vd = _mm_alignr_epi8(vb, va, sh);
-  _mm_storeu_si128(reinterpret_cast<__m128i *>(pd), vd);
-
-#elif defined(PPC_HAVE_SSE2) && PPC_HAVE_SSE2
-  __m128i va = _mm_loadu_si128(reinterpret_cast<const __m128i *>(pa));
-  __m128i vb = _mm_loadu_si128(reinterpret_cast<const __m128i *>(pb));
-  // emulate alignr(b,a,sh) with byte shifts
-  __m128i left = _mm_slli_si128(vb, 16 - sh); // bring left part from VB
-  __m128i right = _mm_srli_si128(va, sh); // bring right part from VA
-  __m128i vd = _mm_or_si128(right, left);
-  _mm_storeu_si128(reinterpret_cast<__m128i *>(pd), vd);
-
+  // Store raw result before byte swap
+  _mm_storeu_si128(reinterpret_cast<__m128i*>(VR(VMX128_5_VD128).bytes.data()), vd_sse);
+  // Swap
+  __m128i result = _mm_loadu_si128(reinterpret_cast<__m128i*>(VR(VMX128_5_VD128).bytes.data()));
+  result = byteswap_be_u32x4_ssse3(vd_sse);
+  _mm_storeu_si128(reinterpret_cast<__m128i*>(VR(VMX128_5_VD128).bytes.data()), result);
 #else
-  // Scalar: pd[i] = (i+sh < 16) ? pa[i+sh] : pb[i+sh-16]
-  // (No endian swapping - byte op)
-  for (s32 i = 0; i != 16; ++i) {
-    const s32 src = i + sh;
-    pd[i] = (src < 16) ? pa[src] : pb[src - 16];
+  // TODO: Ugly, super slow, fix.
+
+  // NOTE: Checked against Xenia's tests.
+
+  vra.dword[0] = byteswap_be<u32>(vra.dword[0]);
+  vra.dword[1] = byteswap_be<u32>(vra.dword[1]);
+  vra.dword[2] = byteswap_be<u32>(vra.dword[2]);
+  vra.dword[3] = byteswap_be<u32>(vra.dword[3]);
+
+  vrb.dword[0] = byteswap_be<u32>(vrb.dword[0]);
+  vrb.dword[1] = byteswap_be<u32>(vrb.dword[1]);
+  vrb.dword[2] = byteswap_be<u32>(vrb.dword[2]);
+  vrb.dword[3] = byteswap_be<u32>(vrb.dword[3]);
+
+  for (u8 idx = 0; idx < 16; idx++) {
+    VR(VMX128_5_VD128).bytes[idx] = vsldoiHelper(sh + idx, vra, vrb);
   }
+
+  VR(VMX128_5_VD128).dword[0] = byteswap_be<u32>(VR(VMX128_5_VD128).dword[0]);
+  VR(VMX128_5_VD128).dword[1] = byteswap_be<u32>(VR(VMX128_5_VD128).dword[1]);
+  VR(VMX128_5_VD128).dword[2] = byteswap_be<u32>(VR(VMX128_5_VD128).dword[2]);
+  VR(VMX128_5_VD128).dword[3] = byteswap_be<u32>(VR(VMX128_5_VD128).dword[3]);
 #endif
 }
 
@@ -1419,7 +1285,7 @@ void PPCInterpreter::PPCInterpreter_vmsum4fp128(PPU_STATE* ppuState) {
 
   // NOTE: Checked against Xenia's tests.
 
-  float dotProduct = (VR(VMX128_VA128).flt[0] * VR(VMX128_VB128).flt[0]) +
+  f32 dotProduct = (VR(VMX128_VA128).flt[0] * VR(VMX128_VB128).flt[0]) +
     (VR(VMX128_VA128).flt[1] * VR(VMX128_VB128).flt[1]) +
     (VR(VMX128_VA128).flt[2] * VR(VMX128_VB128).flt[2]) +
     (VR(VMX128_VA128).flt[3] * VR(VMX128_VB128).flt[3]);
