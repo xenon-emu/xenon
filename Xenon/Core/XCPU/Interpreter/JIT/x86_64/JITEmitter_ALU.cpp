@@ -140,7 +140,7 @@ void PPCInterpreter::PPCInterpreterJIT_nandx(PPU_STATE *ppuState, JITBlockBuilde
   x86::Gp rBTemp = newGP64();
 
   COMP->mov(rSTemp, GPRPtr(instr.rs));
-  COMP->mov(rBTemp, GPRPtr(instr.ra));
+  COMP->mov(rBTemp, GPRPtr(instr.rb));
 
   // rS & rB
   COMP->and_(rSTemp, rBTemp);
@@ -149,7 +149,33 @@ void PPCInterpreter::PPCInterpreterJIT_nandx(PPU_STATE *ppuState, JITBlockBuilde
   COMP->not_(rSTemp);
 
   // rD = rSTemp
-  COMP->mov(GPRPtr(instr.rd), rSTemp);
+  COMP->mov(GPRPtr(instr.ra), rSTemp);
+
+  // _rc
+  if (instr.rc)
+    J_ppuSetCR0(b, rSTemp);
+}
+
+// NOR (x'7C00 00F8')
+void PPCInterpreter::PPCInterpreterJIT_norx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+    rA <- ~((rS) | (rB))
+  */
+
+  x86::Gp rSTemp = newGP64();
+  x86::Gp rBTemp = newGP64();
+
+  COMP->mov(rSTemp, GPRPtr(instr.rs));
+  COMP->mov(rBTemp, GPRPtr(instr.rb));
+
+  // rS | rB
+  COMP->or_(rSTemp, rBTemp);
+
+  // ~rS
+  COMP->not_(rSTemp);
+
+  // rA = rSTemp
+  COMP->mov(GPRPtr(instr.ra), rSTemp);
 
   // _rc
   if (instr.rc)
@@ -303,10 +329,37 @@ void PPCInterpreter::PPCInterpreterJIT_orx(PPU_STATE* ppuState, JITBlockBuilder*
 
   // rSTemp
   x86::Gp rSTemp = newGP64();
-  COMP->mov(rSTemp, GPRPtr(instr.rs));
+  x86::Gp rBTemp = newGP64();
 
-  // rSTemp | rB
-  COMP->or_(rSTemp, GPRPtr(instr.rb));
+  COMP->mov(rSTemp, GPRPtr(instr.rs));
+  COMP->mov(rBTemp, GPRPtr(instr.rb));
+
+  // rSTemp | rBTemp
+  COMP->or_(rSTemp, rBTemp);
+
+  // rA = rSTemp
+  COMP->mov(GPRPtr(instr.ra), rSTemp);
+
+  if (instr.rc)
+    J_ppuSetCR0(b, rSTemp);
+}
+
+// OR with Complement (x'7C00 0338')
+void PPCInterpreter::PPCInterpreterJIT_orcx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+  rA <- (rS) | ~(rB)
+  */
+
+  x86::Gp rSTemp = newGP64();
+  x86::Gp rBTemp = newGP64();
+
+  COMP->mov(rSTemp, GPRPtr(instr.rs));
+  COMP->mov(rBTemp, GPRPtr(instr.rb));
+
+  COMP->not_(rBTemp); // rB = ~rB
+
+  // rS | rB
+  COMP->or_(rSTemp, rBTemp);
 
   // rA = rSTemp
   COMP->mov(GPRPtr(instr.ra), rSTemp);

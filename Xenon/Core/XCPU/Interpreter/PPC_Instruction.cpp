@@ -81,11 +81,14 @@ namespace PPCInterpreter {
       { 0x01C, GETRC(and) },
       { 0x03A, GETRC(cntlzd) },
       { 0x03C, GETRC(andc) },
+      { 0x07C, GETRC(nor) },
       //{ 0x0E9, GETRC(mulld) },
       { 0x10A, GETRC(add) },
       { 0x13C, GETRC(xor) },
       //{ 0x153, GET(mfspr) },
-      { 0x1BC, GETRC(or ) },
+      { 0x19C, GETRC(orc) },
+      { 0x1BC, GETRC(or) },
+      { 0x1DC, GETRC(nand) },
     });
 #endif // defined ARCH_X86 || ARCH_X86_64
 
