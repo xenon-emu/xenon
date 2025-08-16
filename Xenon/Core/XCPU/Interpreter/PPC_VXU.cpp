@@ -366,6 +366,17 @@ void PPCInterpreter::PPCInterpreter_vnmsubfp(PPU_STATE* ppuState) {
   VRi(vd).flt[3] = vnmsubfpHelper(VRi(va).flt[3], VRi(vb).flt[3], VRi(vc).flt[3]);
 }
 
+// Vector128 Negative Multiply-Subtract Floating Point
+void PPCInterpreter::PPCInterpreter_vnmsubfp128(PPU_STATE* ppuState) {
+
+  CHECK_VXU;
+
+  VR(VMX128_VD128).flt[0] = vnmsubfpHelper(VR(VMX128_VA128).flt[0], VR(VMX128_VD128).flt[0], VR(VMX128_VB128).flt[0]);
+  VR(VMX128_VD128).flt[1] = vnmsubfpHelper(VR(VMX128_VA128).flt[1], VR(VMX128_VD128).flt[1], VR(VMX128_VB128).flt[1]);
+  VR(VMX128_VD128).flt[2] = vnmsubfpHelper(VR(VMX128_VA128).flt[2], VR(VMX128_VD128).flt[2], VR(VMX128_VB128).flt[2]);
+  VR(VMX128_VD128).flt[3] = vnmsubfpHelper(VR(VMX128_VA128).flt[3], VR(VMX128_VD128).flt[3], VR(VMX128_VB128).flt[3]);
+}
+
 // Vector Logical NOR (x'1000 0504')
 void PPCInterpreter::PPCInterpreter_vnor(PPU_STATE *ppuState) {
   /*
@@ -497,6 +508,18 @@ void PPCInterpreter::PPCInterpreter_vmulfp128(PPU_STATE *ppuState) {
   VR(VMX128_VD128).flt[1] = VR(VMX128_VA128).flt[1] * VR(VMX128_VB128).flt[1];
   VR(VMX128_VD128).flt[2] = VR(VMX128_VA128).flt[2] * VR(VMX128_VB128).flt[2];
   VR(VMX128_VD128).flt[3] = VR(VMX128_VA128).flt[3] * VR(VMX128_VB128).flt[3];
+}
+
+// Vector128 Multiply Add Floating Point
+void PPCInterpreter::PPCInterpreter_vmaddcfp128(PPU_STATE* ppuState) {
+  // (VD) <- ((VA) * (VD)) + (VB)
+
+  CHECK_VXU;
+
+  VR(VMX128_VD128).flt[0] = (VR(VMX128_VA128).flt[0] * VR(VMX128_VD128).flt[0]) + VR(VMX128_VB128).flt[0];
+  VR(VMX128_VD128).flt[1] = (VR(VMX128_VA128).flt[1] * VR(VMX128_VD128).flt[1]) + VR(VMX128_VB128).flt[1];
+  VR(VMX128_VD128).flt[2] = (VR(VMX128_VA128).flt[2] * VR(VMX128_VD128).flt[2]) + VR(VMX128_VB128).flt[2];
+  VR(VMX128_VD128).flt[3] = (VR(VMX128_VA128).flt[3] * VR(VMX128_VD128).flt[3]) + VR(VMX128_VB128).flt[3];
 }
 
 // Vector Merge High Word (x'1000 008C')
@@ -1298,6 +1321,17 @@ static inline float MakePackedFloatUnsigned(const u32 x){
   return ret.f;
 }
 
+static inline float MakePackedFloatSigned(const int32_t x) {
+  union {
+    float f;
+    u32 i;
+  } ret;
+
+  ret.f = 3.0f;
+  ret.i += x;
+  return ret.f;
+}
+
 // Vector128 Unpack D3Dtype
 void PPCInterpreter::PPCInterpreter_vupkd3d128(PPU_STATE* ppuState) {
   //CHECK_VXU;
@@ -1323,8 +1357,12 @@ void PPCInterpreter::PPCInterpreter_vupkd3d128(PPU_STATE* ppuState) {
     VR(vrd).flt[2] = MakePackedFloatUnsigned((val >> 0) & 0xFF);
     VR(vrd).flt[3] = MakePackedFloatUnsigned((val >> 24) & 0xFF);
     break;
-  case PACK_TYPE_FLOAT16_2:
-    LOG_WARNING(Xenon, "VXU[vupkd3d128]: UNIMPLEMENTED Pack type: PACK_TYPE_FLOAT16_2");
+  case PACK_TYPE_FLOAT16_2: // Untested.
+    LOG_DEBUG(Xenon, "VXU[vupkd3d128]:Pack type: PACK_TYPE_FLOAT16_2");
+    VR(vrd).flt[0] = MakePackedFloatSigned(VR(vrb).sword[6]);
+    VR(vrd).flt[1] = MakePackedFloatSigned(VR(vrb).sword[7]);
+    VR(vrd).flt[2] = 0.0f;
+    VR(vrd).flt[3] = 1.0f;
     break;
   case PACK_TYPE_SHORT_4:
     LOG_WARNING(Xenon, "VXU[vupkd3d128]: UNIMPLEMENTED Pack type: PACK_TYPE_SHORT_4");
