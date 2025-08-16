@@ -135,7 +135,7 @@ void Xe::PCIDev::SMC::Read(u64 readAddress, u8 *data, u64 size) {
     // the TX/RX.
     smcPCIState.uartStatusReg = smcCoreState.uartHandle->ReadStatus();
     // Check if UART is already initialized.
-    if (!smcCoreState.uartHandle.get()->uartInitialized) {
+    if (smcCoreState.uartHandle->SetupNeeded()) {
       // XeLL doesn't initialize UART before sending data trough it. Initialize
       // it first then.
       setupUART(0x1E6); // 115200,8,N,1.
