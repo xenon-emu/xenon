@@ -783,7 +783,9 @@ bool CommandProcessor::ExecutePacketType3_INDIRECT_BUFFER(RingBuffer *ringBuffer
 bool CommandProcessor::ExecutePacketType3_INTERRUPT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
   // CPU(s) to interrupt
   const u32 cpuMask = ringBuffer->ReadAndSwap<u32>();
-  LOG_DEBUG(Xenos, "[CP]: Executing Packet3 INTERRUPT STUB.");
+  LOG_DEBUG(Xenos, "[CP]: Executing Packet3 XPS INTERRUPT. CPU Mask {:#x}", cpuMask);
+  std::this_thread::sleep_for(100ms);
+  parentBus->RouteInterrupt(PRIO_XPS, cpuMask);
   return true;
 }
 

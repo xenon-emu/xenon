@@ -173,6 +173,14 @@ bool PCIBridge::RouteInterrupt(u8 prio, u8 targetCPU) {
       LOG_ERROR(PCIBridge, "Routing GFX interrupt without target CPU index.");
     }
     break;
+  case PRIO_XPS:
+    if (targetCPU != 0xFF) {
+      xenonIIC->genInterrupt(PRIO_XPS, targetCPU);
+    }
+    else {
+      LOG_ERROR(PCIBridge, "Routing GFX interrupt without target CPU index.");
+    }
+    break;
   case PRIO_SFCX:
     if (pciBridgeState.PRIO_REG_SFCX.intEnabled) {
       xenonIIC->genInterrupt(PRIO_SFCX,
