@@ -219,9 +219,9 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
       initSkip2 = 0x03009BA4;
       LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: 0x{:X}", cbVersion, initSkip2);
       break;
-    // CB_B 9188, 15432
+    // CB_B 6752, 9188, 15432
+    case 6752:
     case 9188:
-    case 15432:
       initSkip1 = 0x03003DC0;
       LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, initSkip1);
       initSkip2 = 0x03003E54;
@@ -229,6 +229,7 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
       break;
     // CB_B 14352
     case 14352:
+    case 15432:
       initSkip1 = 0x03003F48;
       LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, initSkip1);
       initSkip2 = 0x03003FDC;
