@@ -4,7 +4,7 @@
 
 #include "Base/Logging/Log.h"
 
-//#define HDD_DEBUG
+#define HDD_DEBUG
 
 // Data was pulled off of an Hitachi 250Gb retail HDD.
 const u8 identifyDataBytes[] = { 0x5a, 0x04, 0xff, 0x3f,
@@ -215,7 +215,10 @@ void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
       memcpy(data, &ataState.regs.status, size);
       break;
     case ATA_REG_ALT_STATUS:
-      memcpy(data, &ataState.regs.altStatus, size);
+      // Reading to the alternate status register returns the contents of the Status register,
+      // but it does not clean pending interrupts. Also wastes 100ns
+      std::this_thread::sleep_for(100ns);
+      memcpy(data, &ataState.regs.status, size);
       break;
     case ATA_REG_SSTATUS:
       memcpy(data, &ataState.regs.SStatus, size);
