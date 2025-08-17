@@ -419,6 +419,7 @@ private:
   void hddThreadLoop();
 
   // ATA Commands.
+  void ataReadDMACommand();
   void ataReadDMAExtCommand();
   void ataWriteDMACommand();
   void ataIdentifyDeviceCommand();

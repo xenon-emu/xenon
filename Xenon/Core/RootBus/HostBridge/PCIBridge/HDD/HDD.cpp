@@ -184,10 +184,9 @@ void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
         size = std::fmin(size, ataState.dataOutBuffer.count());
         memcpy(&ataState.regs.data, ataState.dataOutBuffer.get(), size);
         ataState.dataOutBuffer.resize(size);
-
+        ataState.regs.status &= 0xFFFFFFF7; // Clear DRQ.
         // Check for a completed read.
         if (ataState.dataOutBuffer.count() == 0) {
-          ataState.regs.status &= 0xFFFFFFF7; // Clear DRQ.
           ataState.dataOutBuffer.reset(); // Reset pointer.
         }
       }
@@ -310,14 +309,27 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
 #endif // HDD_DEBUG
 
       switch (ataState.regs.command) {
+      case ATA_COMMAND_READ_DMA: {
+#ifdef HDD_DEBUG
+        u64 offset = (ataState.regs.lbaHigh << 16) |
+          (ataState.regs.lbaMiddle << 8) |
+          (ataState.regs.lbaLow);
+
+        u32 sectorCount = ataState.regs.sectorCount;
+        LOG_DEBUG(HDD, "[CMD]: [READ DMA] LBA28: {:#x}, sector count {:#x}",
+          offset, sectorCount);
+#endif // HDD_DEBUG
+      }
+        ataReadDMACommand();
+        break;
       case ATA_COMMAND_READ_DMA_EXT: {
 #ifdef HDD_DEBUG
-          u64 offset = (ataState.regs.prevLBAHigh << 40) |
-            (ataState.regs.prevLBAMiddle << 32) |
-            (ataState.regs.prevLBALow << 24) |
-            (ataState.regs.lbaHigh << 16) |
-            (ataState.regs.lbaMiddle << 8) |
-            (ataState.regs.lbaLow);
+        u64 offset = (static_cast<u64>(ataState.regs.prevLBAHigh) << 40) |
+          (static_cast<u64>(ataState.regs.prevLBAMiddle) << 32) |
+          (static_cast<u64>(ataState.regs.prevLBALow) << 24) |
+          (static_cast<u64>(ataState.regs.lbaHigh) << 16) |
+          (static_cast<u64>(ataState.regs.lbaMiddle) << 8) |
+          (static_cast<u64>(ataState.regs.lbaLow));
 
           u32 sectorCount = (ataState.regs.prevSectorCount << 8) | ataState.regs.sectorCount;
           LOG_DEBUG(HDD, "[CMD]: [READ DMA EXT] LBA48: {:#x}, sector count {:#x}",
@@ -505,6 +517,26 @@ void Xe::PCIDev::HDD::ataIdentifyDeviceCommand() {
   // Device ready, data request.
   ataState.regs.status |= ATA_STATUS_DRDY | ATA_STATUS_DRQ;
   ataState.regs.SActive = 0x40; // SActive to 0x40, SATA driver in xboxkrnl checks this.
+}
+
+// ATA READ DMA (LBA 28 Bit)
+void Xe::PCIDev::HDD::ataReadDMACommand() {
+  u64 offset = (static_cast<u64>(ataState.regs.lbaHigh) << 16) |
+    (static_cast<u64>(ataState.regs.lbaMiddle) << 8) |
+    (static_cast<u64>(ataState.regs.lbaLow));
+
+  u32 sectorCount = ataState.regs.sectorCount;
+  // If sector count = 0 then 256 logical sectors shall be transfered.
+  if (sectorCount == 0) { sectorCount = 256; }
+
+  // Image offset.
+  offset = offset * ATA_SECTOR_SIZE;
+  // Read count in bytes.
+  sectorCount = sectorCount * ATA_SECTOR_SIZE;
+
+  ataState.dataOutBuffer.init(sectorCount, false);
+  ataState.dataOutBuffer.reset();
+  ataState.mountedHDDImage->Read(offset, ataState.dataOutBuffer.get(), sectorCount);
 }
 
 // ATA READ DMA EXT (LBA 48 Bit)
