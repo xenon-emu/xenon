@@ -593,6 +593,13 @@ extern void PPCInterpreterJIT_orx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOp
 extern void PPCInterpreterJIT_orcx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
 extern void PPCInterpreterJIT_ori(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
 extern void PPCInterpreterJIT_oris(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+extern void PPCInterpreterJIT_rldclx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+extern void PPCInterpreterJIT_rldcrx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+extern void PPCInterpreterJIT_rldicx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+extern void PPCInterpreterJIT_rldiclx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+extern void PPCInterpreterJIT_rldicrx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+extern void PPCInterpreterJIT_rldimix(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+extern void PPCInterpreterJIT_rlwimix(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
 extern void PPCInterpreterJIT_rlwnmx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
 extern void PPCInterpreterJIT_rlwinmx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
 extern void PPCInterpreterJIT_sldx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);

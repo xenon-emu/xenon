@@ -65,6 +65,7 @@ namespace PPCInterpreter {
     fillTable<instructionHandlerJIT>(jitTable, 0x00, 6, -1, {
       { 0x0E, GET(addi) },
       { 0x12, GET(b) },
+      { 0x14, GETRC(rlwimi) },
       { 0x15, GETRC(rlwinm) },
       { 0x17, GETRC(rlwnm) },
       { 0x18, GET(ori) },
@@ -74,7 +75,19 @@ namespace PPCInterpreter {
       { 0x1C, GET(andi) },
       { 0x1D, GET(andis) },
     });
-
+    // Group 0x1E opcodes (field 27..30)
+    fillTable<instructionHandlerJIT>(jitTable, 0x1E, 4, 1, {
+      { 0x0, GETRC(rldicl) },
+      { 0x1, GETRC(rldicl) },
+      { 0x2, GETRC(rldicr) },
+      { 0x3, GETRC(rldicr) },
+      { 0x4, GETRC(rldic) },
+      { 0x5, GETRC(rldic) },
+      { 0x6, GETRC(rldimi) },
+      { 0x7, GETRC(rldimi) },
+      { 0x8, GETRC(rldcl) },
+      { 0x9, GETRC(rldcr) },
+      });
     // Group 0x1F opcodes (field 21..30)
     fillTable<instructionHandlerJIT>(jitTable, 0x1F, 10, 1, {
       //{ 0x01B, GETRC(sld) },

@@ -393,6 +393,209 @@ void PPCInterpreter::PPCInterpreterJIT_oris(PPU_STATE *ppuState, JITBlockBuilder
   COMP->mov(GPRPtr(instr.ra), tmp);
 }
 
+// Rotate Left Double Word then Clear Left (x'7800 0010')
+void PPCInterpreter::PPCInterpreterJIT_rldclx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+    n <- rB[58-63]
+    r <- ROTL[64](rS, n)
+    b <- mb[5] || mb[0-4]
+    m <- MASK(b, 63)
+    rA <- r & m
+  */
+
+  x86::Gp n = newGP64();
+  COMP->mov(n, GPRPtr(instr.rb));
+  COMP->and_(n, 0x3F); // n = rB & 0x3F (rot amount)
+
+  x86::Gp rs = newGP64();
+  COMP->mov(rs, GPRPtr(instr.rs));
+  COMP->rol(rs, n); // rol64 by variable
+
+  u64 rotMask = (~0ull >> instr.mbe64);
+  x86::Gp mask = newGP64();
+  COMP->mov(mask, rotMask);
+  COMP->and_(rs, mask);
+  COMP->mov(GPRPtr(instr.ra), rs);
+
+  // _rc
+  if (instr.rc)
+    J_ppuSetCR0(b, rs);
+}
+
+// Rotate Left Double Word then Clear Right (x'7800 0012')
+void PPCInterpreter::PPCInterpreterJIT_rldcrx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+    n <- rB[58-63]
+    r <- ROTL[64](rS, n)
+    e <- me[5] || me[0-4]
+    m <- MASK(0, e)
+    rA <- r & m
+  */
+
+  x86::Gp n = newGP64();
+  COMP->mov(n, GPRPtr(instr.rb));
+  COMP->and_(n, 0x3F); // n = rB & 0x3F (rot amount)
+
+  x86::Gp rs = newGP64();
+  COMP->mov(rs, GPRPtr(instr.rs));
+  COMP->rol(rs, n); // rol64 by variable
+
+  u64 rotMask = (~0ull << (instr.mbe64 ^ 63));
+  x86::Gp mask = newGP64();
+  COMP->mov(mask, rotMask);
+  COMP->and_(rs, mask);
+  COMP->mov(GPRPtr(instr.ra), rs);
+
+  // _rc
+  if (instr.rc)
+    J_ppuSetCR0(b, rs);
+}
+
+// Rotate Left Double Word Immediate then Clear (x'7800 0008')
+void PPCInterpreter::PPCInterpreterJIT_rldicx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+    n <- sh[5] || sh[0-4]
+    r <- ROTL[64](rS, n)
+    b <- mb[5] || mb[0-4]
+    m <- MASK(b, ~ n)
+    rA <- r & m
+  */
+
+  x86::Gp sh = newGP64();
+  COMP->mov(sh, u64(instr.sh64));
+  x86::Gp rs = newGP64();
+  COMP->mov(rs, GPRPtr(instr.rs));
+  COMP->rol(rs, sh);
+
+  u64 rotMask = PPCRotateMask(instr.mbe64, instr.sh64 ^ 63);
+  x86::Gp mask = newGP64();
+  COMP->mov(mask, rotMask);
+  COMP->and_(rs, mask);
+  COMP->mov(GPRPtr(instr.ra), rs);
+
+  // _rc
+  if (instr.rc)
+    J_ppuSetCR0(b, rs);
+}
+
+// Rotate Left Double Word Immediate then Clear Left (x'7800 0000')
+void PPCInterpreter::PPCInterpreterJIT_rldiclx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+    n <- sh[5] || sh[0-4]
+    r <- ROTL[64](rS, n)
+    b <- mb[5] || mb[0-4]
+    m <- MASK(b, 63)
+    rA <- r & m
+  */
+
+  x86::Gp sh = newGP64();
+  COMP->mov(sh, u64(instr.sh64));
+  x86::Gp rs = newGP64();
+  COMP->mov(rs, GPRPtr(instr.rs));
+  COMP->rol(rs, sh);
+
+  u64 rotMask = (~0ull >> instr.mbe64);
+  x86::Gp mask = newGP64();
+  COMP->mov(mask, rotMask);
+  COMP->and_(rs, mask);
+  COMP->mov(GPRPtr(instr.ra), rs);
+
+  // _rc
+  if (instr.rc)
+    J_ppuSetCR0(b, rs);
+}
+
+// Rotate Left Double Word Immediate then Clear Right (x'7800 0004')
+void PPCInterpreter::PPCInterpreterJIT_rldicrx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+    n <- sh[5] || sh[0-4]
+    r <- ROTL[64](rS, n)
+    e <- me[5] || me[0-4]
+    m <- MASK(0, e)
+    rA <- r & m
+  */
+
+  x86::Gp sh = newGP64();
+  COMP->mov(sh, u64(instr.sh64));
+  x86::Gp rs = newGP64();
+  COMP->mov(rs, GPRPtr(instr.rs));
+  COMP->rol(rs, sh);
+
+  u64 rotMask = (~0ull << (instr.mbe64 ^ 63));
+  x86::Gp mask = newGP64();
+  COMP->mov(mask, rotMask);
+  COMP->and_(rs, mask);
+  COMP->mov(GPRPtr(instr.ra), rs);
+
+  // _rc
+  if (instr.rc)
+    J_ppuSetCR0(b, rs);
+}
+
+// Rotate Left Double Word Immediate then Mask Insert (x'7800 000C')
+void PPCInterpreter::PPCInterpreterJIT_rldimix(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+    n <- sh[5] || sh[0-4]
+    r <- ROTL[64](rS, n)
+    b <- mb[5] || mb[0-4]
+    m <- MASK(b, ~n)
+    rA <- (r & m) | (rA & ~m)
+  */
+
+  x86::Gp sh = newGP64();
+  COMP->mov(sh, u64(instr.sh64));
+  x86::Gp rs = newGP64();
+  COMP->mov(rs, GPRPtr(instr.rs));
+  x86::Gp ra = newGP64();
+  COMP->mov(ra, GPRPtr(instr.ra));
+
+  COMP->rol(rs, sh); // Rotate left.
+  u64 rotMask = PPCRotateMask(instr.mbe64, instr.sh64 ^ 63); // Create mask.
+  x86::Gp mask = newGP64();
+  COMP->mov(mask, rotMask);
+  COMP->and_(rs, mask); // AND rotation result with mask.
+  COMP->not_(mask); // Invert mask.
+  COMP->and_(ra, mask); // And ra with mask.
+  COMP->or_(rs, ra); // Or rs with ra.
+  COMP->mov(GPRPtr(instr.ra), rs); // Store rs in ra.
+
+  // _rc
+  if (instr.rc)
+    J_ppuSetCR0(b, rs);
+}
+
+// Rotate Left Word Immediate then Mask Insert (x'5000 0000')
+void PPCInterpreter::PPCInterpreterJIT_rlwimix(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+    n <- SH
+    r <- ROTL[32](rS[32-63], n)
+    m <- MASK(MB + 32, ME + 32)
+    rA <- (r & m) | (rA & ~m)
+  */
+
+  x86::Gp sh = newGP32();
+  COMP->mov(sh, u64(instr.sh32));
+  x86::Gp rs = newGP32();
+  COMP->mov(rs, GPRPtr(instr.rs));
+  x86::Gp ra = newGP64();
+  COMP->mov(ra, GPRPtr(instr.ra));
+
+  COMP->rol(rs, sh); // Rotate left.
+  x86::Gp dup = Jduplicate32(b, rs);
+  u64 rotMask = PPCRotateMask(32 + instr.mb32, 32 + instr.me32); // Create mask.
+  x86::Gp mask = newGP64();
+  COMP->mov(mask, rotMask);
+  COMP->and_(dup, mask); // AND rotation result with mask.
+  COMP->not_(mask); // Invert mask.
+  COMP->and_(ra, mask); // And ra with mask.
+  COMP->or_(ra, dup); // Or rs with ra.
+  COMP->mov(GPRPtr(instr.ra), ra); // Store rs in ra.
+
+  // _rc
+  if (instr.rc)
+    J_ppuSetCR0(b, ra);
+}
+
 // Count Leading Zeros Double Word (x'7C00 0074')
 void PPCInterpreter::PPCInterpreterJIT_cntlzdx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
   /*
