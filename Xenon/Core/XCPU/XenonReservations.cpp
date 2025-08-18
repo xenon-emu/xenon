@@ -23,7 +23,7 @@ void XenonReservations::Scan(u64 PhysAddress) {
 
   for (int i = 0; i < processors; i++) {
     // NB: order of checks matters!
-    if (reservations[i]->valid && PhysAddress >= reservations[i]->reservedAddr) {
+    if (reservations[i]->valid && PhysAddress == reservations[i]->reservedAddr) {
       reservations[i]->valid = false;
       numReservations--;
     }
