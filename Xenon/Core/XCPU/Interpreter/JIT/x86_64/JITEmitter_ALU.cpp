@@ -27,19 +27,34 @@ void PPCInterpreter::PPCInterpreterJIT_addcx(PPU_STATE* ppuState, JITBlockBuilde
 
   // TODO: Overflow Enable.
   Label end = COMP->newLabel(); // Self explanatory.
+
+  // Get rA value.
   x86::Gp rATemp = newGP64();
   COMP->mov(rATemp, GPRPtr(instr.ra));
-  COMP->add(rATemp, GPRPtr(instr.rb));
-  COMP->jnc(end);
+
+  // XER[CA] Clear.
   x86::Gp xer = newGP64();
   COMP->mov(xer, SPRPtr(XER));
 #ifdef __LITTLE_ENDIAN__
-  COMP->or_(xer, 0x20000000); // XER[CA]
+  COMP->btr(xer, 29); // Clear XER[CA] bit.
 #else
-  COMP->or_(xer, 0x4); // XER[CA]
+  COMP->btr(xer, 2); // Clear XER[CA] bit.
 #endif // LITTLE_ENDIAN
-  COMP->mov(SPRPtr(XER), xer);
+
+  // Perform the Add.
+  COMP->add(rATemp, GPRPtr(instr.rb));
+  // Check for carry.
+  COMP->jnc(end);
+#ifdef __LITTLE_ENDIAN__
+  COMP->bts(xer, 29); // Set XER[CA] bit.
+#else
+  COMP->bts(xer, 2); // Set XER[CA] bit.
+#endif // LITTLE_ENDIAN
+
   COMP->bind(end);
+  // Set XER[CA] value.
+  COMP->mov(SPRPtr(XER), xer);
+  // Set rD value.
   COMP->mov(GPRPtr(instr.rd), rATemp);
 
   if (instr.rc)
@@ -59,19 +74,19 @@ void PPCInterpreter::PPCInterpreterJIT_addex(PPU_STATE* ppuState, JITBlockBuilde
   x86::Gp xer = newGP32();
   COMP->mov(xer, SPRPtr(XER));
 #ifdef __LITTLE_ENDIAN__
-  COMP->bt(xer, 29); // Test for CA bit of XER
+  COMP->btr(xer, 29); // Get CA bit of XER and store it in Carry flag.
 #else
-  COMP->bt(xer, 2); // Test for CA bit of XER
+  COMP->btr(xer, 2);
 #endif // LITTLE_ENDIAN
   COMP->adc(rATemp, GPRPtr(instr.rb));
   COMP->jnc(end);
 #ifdef __LITTLE_ENDIAN__
-  COMP->or_(xer, 0x20000000); // XER[CA]
+  COMP->bts(xer, 29); // Set XER[CA] bit.
 #else
-  COMP->or_(xer, 0x4); // XER[CA]
+  COMP->bts(xer, 2); // Set XER[CA] bit.
 #endif // LITTLE_ENDIAN
-  COMP->mov(SPRPtr(XER), xer);
   COMP->bind(end);
+  COMP->mov(SPRPtr(XER), xer);
   COMP->mov(GPRPtr(instr.rd), rATemp);
 
   if (instr.rc)
@@ -394,6 +409,49 @@ void PPCInterpreter::PPCInterpreterJIT_srwx(PPU_STATE* ppuState, JITBlockBuilder
   COMP->shr(rsTemp.r32(), n); // Bit count is masked by instr.
   COMP->bind(end);
   COMP->mov(GPRPtr(instr.ra), rsTemp);
+
+  // RC
+  if (instr.rc)
+    J_ppuSetCR0(b, rsTemp);
+}
+
+// Shift Right Algebraic Double Word Immediate (x'7C00 0674')
+void PPCInterpreter::PPCInterpreterJIT_sradix(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+    n <- sh[5] || sh[0-4]
+    r <- ROTL[64](rS, 64 - n)
+    m <- MASK(n, 63)
+    S <- rS[0]
+    rA <- (r & m) | (((64)S) & ~m)
+    XER[CA] <- S & ((r & ~m) != 0)
+  */
+  Label end = COMP->newLabel();
+  x86::Gp sh = newGP64();
+  COMP->mov(sh, u64(instr.sh64));
+  x86::Gp rsTemp = newGP64();
+  COMP->mov(rsTemp, GPRPtr(instr.rs));
+  x86::Gp xer = newGP64();
+  COMP->mov(xer, SPRPtr(XER));
+#ifdef __LITTLE_ENDIAN__
+  COMP->btr(xer, 29); // Clear XER[CA] bit.
+#else
+  COMP->btr(xer, 2); // Clear XER[CA] bit.
+#endif // LITTLE_ENDIAN
+  COMP->sar(rsTemp, sh);
+  COMP->mov(GPRPtr(instr.ra), rsTemp);
+  COMP->cmp(rsTemp.r32(), 0);
+  COMP->jae(end); // If rsTemp >= 0, then we dont set XER[CA].
+  COMP->shl(rsTemp, sh);
+  COMP->cmp(rsTemp, GPRPtr(instr.rs));
+  COMP->je(end);
+  // Set XER[CA]
+#ifdef __LITTLE_ENDIAN__
+  COMP->bts(xer, 29); // Set XER[CA] bit.
+#else
+  COMP->bts(xer, 2); // Set XER[CA] bit.
+#endif // LITTLE_ENDIAN
+  COMP->bind(end);
+  COMP->mov(SPRPtr(XER), xer);
 
   // RC
   if (instr.rc)
