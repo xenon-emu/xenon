@@ -4,8 +4,6 @@
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
 void PPCInterpreter::PPCInterpreterJIT_mfspr(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
-  u64 rS = 0, crm = 0;
-  PPC_OPC_TEMPL_XFX(instr.opcode, rS, crm);
   u32 sprNum = instr.spr;
   sprNum = ((sprNum & 0x1F) << 5) | ((sprNum >> 5) & 0x1F);
   u64 value = 0;
@@ -14,7 +12,7 @@ void PPCInterpreter::PPCInterpreterJIT_mfspr(PPU_STATE *ppuState, JITBlockBuilde
 
   switch (sprNum) {
   case SPR_XER:
-    COMP->mov(rSValue, SPRPtr(XER).Base());
+    COMP->mov(rSValue, SPRPtr(XER));
     break;
   case SPR_LR:
     COMP->mov(rSValue, SPRPtr(LR));
@@ -121,6 +119,6 @@ void PPCInterpreter::PPCInterpreterJIT_mfspr(PPU_STATE *ppuState, JITBlockBuilde
     break;
   }
 
-  COMP->mov(GPRPtr(rS), rSValue);
+  COMP->mov(GPRPtr(instr.rs), rSValue);
 }
 #endif

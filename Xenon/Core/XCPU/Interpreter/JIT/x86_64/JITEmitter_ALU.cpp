@@ -218,30 +218,22 @@ void PPCInterpreter::PPCInterpreterJIT_sldx(PPU_STATE* ppuState, JITBlockBuilder
   rA <- r & m
   */
 
-  Label zero = COMP->newLabel();
   Label end = COMP->newLabel();
-
-  // Shift amount:
-  x86::Gp n = newGP32();
-  COMP->mov(n, GPRPtr(instr.rb));
-  COMP->and_(n, imm(0x7F));
 
   // Return value.
   x86::Gp rsTemp = newGP64();
-
+  COMP->xor_(rsTemp, rsTemp);
+  x86::Gp rBTemp = newGP64();
+  COMP->mov(rBTemp, GPRPtr(instr.rb));
+  // Shift amount:
+  x86::Gp n = newGP64();
+  COMP->mov(n, GPRPtr(instr.rb));
   // Condition check.
-  COMP->bt(n, 0x40);
-  COMP->jnc(zero);
-
+  COMP->bt(n, 57);
+  COMP->jc(end);
   // Do the shift.
   COMP->mov(rsTemp, GPRPtr(instr.rs));
-  COMP->shl(rsTemp, n);
-  COMP->jmp(end);
-
-  // Clear out the return value.
-  COMP->bind(zero);
-  COMP->xor_(rsTemp, rsTemp);
-
+  COMP->shl(rsTemp, rBTemp);
   COMP->bind(end);
   COMP->mov(GPRPtr(instr.ra), rsTemp);
 
@@ -403,13 +395,11 @@ void PPCInterpreter::PPCInterpreterJIT_rldclx(PPU_STATE* ppuState, JITBlockBuild
     rA <- r & m
   */
 
-  x86::Gp n = newGP64();
-  COMP->mov(n, GPRPtr(instr.rb));
-  COMP->and_(n, 0x3F); // n = rB & 0x3F (rot amount)
-
+  x86::Gp rb = newGP64();
+  COMP->mov(rb, GPRPtr(instr.rb));
   x86::Gp rs = newGP64();
   COMP->mov(rs, GPRPtr(instr.rs));
-  COMP->rol(rs, n); // rol64 by variable
+  COMP->rol(rs, rb); // rol64 by variable
 
   u64 rotMask = (~0ull >> instr.mbe64);
   x86::Gp mask = newGP64();
@@ -432,13 +422,11 @@ void PPCInterpreter::PPCInterpreterJIT_rldcrx(PPU_STATE* ppuState, JITBlockBuild
     rA <- r & m
   */
 
-  x86::Gp n = newGP64();
-  COMP->mov(n, GPRPtr(instr.rb));
-  COMP->and_(n, 0x3F); // n = rB & 0x3F (rot amount)
-
+  x86::Gp rb = newGP64();
+  COMP->mov(rb, GPRPtr(instr.rb));
   x86::Gp rs = newGP64();
   COMP->mov(rs, GPRPtr(instr.rs));
-  COMP->rol(rs, n); // rol64 by variable
+  COMP->rol(rs,rb); // rol64 by variable
 
   u64 rotMask = (~0ull << (instr.mbe64 ^ 63));
   x86::Gp mask = newGP64();
