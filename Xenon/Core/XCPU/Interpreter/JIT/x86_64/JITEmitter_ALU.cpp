@@ -18,6 +18,66 @@ void PPCInterpreter::PPCInterpreterJIT_addx(PPU_STATE* ppuState, JITBlockBuilder
   if (instr.rc)
     J_ppuSetCR0(b, rATemp);
 }
+
+// Add Carrying (x'7C00 0014')
+void PPCInterpreter::PPCInterpreterJIT_addcx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+  rD <- (rA) + (rB)
+  */
+
+  // TODO: Overflow Enable.
+  Label end = COMP->newLabel(); // Self explanatory.
+  x86::Gp rATemp = newGP64();
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+  COMP->add(rATemp, GPRPtr(instr.rb));
+  COMP->jnc(end);
+  x86::Gp xer = newGP64();
+  COMP->mov(xer, SPRPtr(XER));
+#ifdef __LITTLE_ENDIAN__
+  COMP->or_(xer, 0x20000000); // XER[CA]
+#else
+  COMP->or_(xer, 0x4); // XER[CA]
+#endif // LITTLE_ENDIAN
+  COMP->mov(SPRPtr(XER), xer);
+  COMP->bind(end);
+  COMP->mov(GPRPtr(instr.rd), rATemp);
+
+  if (instr.rc)
+    J_ppuSetCR0(b, rATemp);
+}
+
+// Add Extended (x'7C00 0114')
+void PPCInterpreter::PPCInterpreterJIT_addex(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+    rD <- (rA) + (rB) + XER[CA]
+  */
+
+  // TODO: Overflow Enable.
+  Label end = COMP->newLabel(); // Self explanatory.
+  x86::Gp rATemp = newGP64();
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+  x86::Gp xer = newGP32();
+  COMP->mov(xer, SPRPtr(XER));
+#ifdef __LITTLE_ENDIAN__
+  COMP->bt(xer, 29); // Test for CA bit of XER
+#else
+  COMP->bt(xer, 2); // Test for CA bit of XER
+#endif // LITTLE_ENDIAN
+  COMP->adc(rATemp, GPRPtr(instr.rb));
+  COMP->jnc(end);
+#ifdef __LITTLE_ENDIAN__
+  COMP->or_(xer, 0x20000000); // XER[CA]
+#else
+  COMP->or_(xer, 0x4); // XER[CA]
+#endif // LITTLE_ENDIAN
+  COMP->mov(SPRPtr(XER), xer);
+  COMP->bind(end);
+  COMP->mov(GPRPtr(instr.rd), rATemp);
+
+  if (instr.rc)
+    J_ppuSetCR0(b, rATemp);
+}
+
 // Add Immediate (x'3800 0000')
 void PPCInterpreter::PPCInterpreterJIT_addi(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
   /*

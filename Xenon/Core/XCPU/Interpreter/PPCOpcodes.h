@@ -578,6 +578,8 @@ extern void PPCInterpreter_lvsr(PPU_STATE *ppuState);
 //	JIT emitters
 //
 extern void PPCInterpreterJIT_addx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+extern void PPCInterpreterJIT_addcx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+extern void PPCInterpreterJIT_addex(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
 extern void PPCInterpreterJIT_addi(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
 extern void PPCInterpreterJIT_andi(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
 extern void PPCInterpreterJIT_andis(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
