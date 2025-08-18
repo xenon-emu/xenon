@@ -1085,12 +1085,12 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
         std::lock_guard<std::mutex> lock(render->copyQueueMutex);
         render->copyQueue.push(state);
       }
-#endif
       {
         std::lock_guard<std::mutex> lock(render->frameReadyMutex);
         render->frameReady = true;
       }
       render->frameReadyCondVar.notify_one(); // Wake up the renderer
+#endif
       return true;
     }
     {
