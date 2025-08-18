@@ -283,7 +283,7 @@ jobs:
 
       - name: Install Dependencies (macOS)
         run: |
-          brew install ninja llvm
+          brew install llvm
 
       - name: Cache CMake Configuration
         uses: actions/cache@main
