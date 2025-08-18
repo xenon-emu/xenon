@@ -91,7 +91,8 @@ namespace PPCInterpreter {
     // Group 0x1F opcodes (field 21..30)
     fillTable<instructionHandlerJIT>(jitTable, 0x1F, 10, 1, {
       { 0x00A, GETRC(addc) },
-      //{ 0x01B, GETRC(sld) },
+      { 0x018, GETRC(slw) },
+      { 0x01B, GETRC(sld) },
       { 0x01C, GETRC(and) },
       { 0x03A, GETRC(cntlzd) },
       { 0x03C, GETRC(andc) },
@@ -104,6 +105,8 @@ namespace PPCInterpreter {
       { 0x19C, GETRC(orc) },
       { 0x1BC, GETRC(or) },
       { 0x1DC, GETRC(nand) },
+      { 0x218, GETRC(srw) },
+      { 0x21B, GETRC(srd) },
     });
 #endif // defined ARCH_X86 || ARCH_X86_64
 

@@ -605,6 +605,9 @@ extern void PPCInterpreterJIT_rlwimix(PPU_STATE *ppuState, JITBlockBuilder *b, P
 extern void PPCInterpreterJIT_rlwnmx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
 extern void PPCInterpreterJIT_rlwinmx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
 extern void PPCInterpreterJIT_sldx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+extern void PPCInterpreterJIT_slwx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+extern void PPCInterpreterJIT_srdx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+extern void PPCInterpreterJIT_srwx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
 extern void PPCInterpreterJIT_xorx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
 extern void PPCInterpreterJIT_xori(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
 extern void PPCInterpreterJIT_xoris(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);

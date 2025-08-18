@@ -279,21 +279,119 @@ void PPCInterpreter::PPCInterpreterJIT_sldx(PPU_STATE* ppuState, JITBlockBuilder
   */
 
   Label end = COMP->newLabel();
-
-  // Return value.
   x86::Gp rsTemp = newGP64();
   COMP->xor_(rsTemp, rsTemp);
-  x86::Gp rBTemp = newGP64();
-  COMP->mov(rBTemp, GPRPtr(instr.rb));
-  // Shift amount:
   x86::Gp n = newGP64();
   COMP->mov(n, GPRPtr(instr.rb));
   // Condition check.
+#ifdef __LITTLE_ENDIAN__
+  COMP->bt(n, 6);
+#else
   COMP->bt(n, 57);
+#endif // LITTLE_ENDIAN
   COMP->jc(end);
   // Do the shift.
   COMP->mov(rsTemp, GPRPtr(instr.rs));
-  COMP->shl(rsTemp, rBTemp);
+  COMP->shl(rsTemp, n); // Bit count is masked by instr.
+  COMP->bind(end);
+  COMP->mov(GPRPtr(instr.ra), rsTemp);
+
+  // RC
+  if (instr.rc)
+    J_ppuSetCR0(b, rsTemp);
+}
+
+// Shift Left Word (x'7C00 0030')
+void PPCInterpreter::PPCInterpreterJIT_slwx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+    n <- rB[59-63]
+    r <- ROTL[32](rS[32-63], n)
+    if rB[58] = 0 then m <- MASK(32, 63 - n)
+    else m <- (64)0
+    rA <- r & m
+  */
+
+  Label end = COMP->newLabel();
+  x86::Gp rsTemp = newGP64();
+  COMP->xor_(rsTemp, rsTemp);
+  x86::Gp n = newGP64();
+  COMP->mov(n, GPRPtr(instr.rb));
+  // Condition check.
+#ifdef __LITTLE_ENDIAN__
+  COMP->bt(n, 5);
+#else
+  COMP->bt(n, 58);
+#endif // LITTLE_ENDIAN
+  COMP->jc(end);
+  // Do the shift.
+  COMP->mov(rsTemp, GPRPtr(instr.rs));
+  COMP->shl(rsTemp.r32(), n); // Bit count is masked by instr.
+  COMP->bind(end);
+  COMP->mov(GPRPtr(instr.ra), rsTemp);
+
+  // RC
+  if (instr.rc)
+    J_ppuSetCR0(b, rsTemp);
+}
+
+// Shift Right Double Word (x'7C00 0436')
+void PPCInterpreter::PPCInterpreterJIT_srdx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+    n <- rB[59-63]
+    r <- ROTL[32](rS[32-63], n)
+    if rB[58] = 0 then m <- MASK(32, 63 - n)
+    else m <- (64)0
+    rA <- r & m
+  */
+
+  Label end = COMP->newLabel();
+  x86::Gp rsTemp = newGP64();
+  COMP->xor_(rsTemp, rsTemp);
+  x86::Gp n = newGP64();
+  COMP->mov(n, GPRPtr(instr.rb));
+  // Condition check.
+#ifdef __LITTLE_ENDIAN__
+  COMP->bt(n, 6);
+#else
+  COMP->bt(n, 57);
+#endif // LITTLE_ENDIAN
+  COMP->jc(end);
+  // Do the shift.
+  COMP->mov(rsTemp, GPRPtr(instr.rs));
+  COMP->shr(rsTemp, n); // Bit count is masked by instr.
+  COMP->bind(end);
+  COMP->mov(GPRPtr(instr.ra), rsTemp);
+
+  // RC
+  if (instr.rc)
+    J_ppuSetCR0(b, rsTemp);
+}
+
+// Shift Right Word (x'7C00 0430')
+void PPCInterpreter::PPCInterpreterJIT_srwx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  /*
+    n <- rB[58-63]
+    r <- ROTL[64](rS, 64 - n)
+    if rB[57] = 0 then
+      m <- MASK(n, 63)
+    else m <- (64)0
+    rA <- r & m
+  */
+  Label end = COMP->newLabel();
+  x86::Gp rsTemp = newGP64();
+  COMP->xor_(rsTemp, rsTemp);
+  x86::Gp n = newGP64();
+  COMP->mov(n, GPRPtr(instr.rb));
+  // Condition check.
+#ifdef __LITTLE_ENDIAN__
+  COMP->bt(n, 5);
+#else
+  COMP->bt(n, 58);
+#endif // LITTLE_ENDIAN
+  COMP->jc(end);
+  // Do the shift.
+  COMP->mov(rsTemp, GPRPtr(instr.rs));
+  COMP->shr(rsTemp.r32(), n); // Bit count is masked by instr.
   COMP->bind(end);
   COMP->mov(GPRPtr(instr.ra), rsTemp);
 
