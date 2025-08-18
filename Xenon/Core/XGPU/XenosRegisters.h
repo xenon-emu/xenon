@@ -3,6 +3,7 @@
 #pragma once
 
 #include <mutex>
+#include <string>
 #include <string_view>
 #include <unordered_map>
 
@@ -3459,15 +3460,13 @@ constexpr RegisterPair registerMap[] = {
   { 0x5002, "SHADER_CONSTANT_FLUSH_FETCH_2" }
 };
 
-constexpr std::string_view GetRegisterNameById(u8 opcode) {
+inline std::string GetRegisterNameById(u8 opcode) {
   for (const auto &reg : registerMap) {
     if (reg.value == opcode) {
-      return reg.name;
+      return std::string(reg.name); // copy to string
     }
   }
-
-  const std::string retString = std::format("UNK_OP_0x{:X}", opcode);
-  return retString;
+  return std::format("UNK_OP_0x{:X}", opcode);
 }
 
 } // namespace Xe::XGPU

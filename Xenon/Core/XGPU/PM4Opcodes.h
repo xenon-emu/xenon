@@ -15,6 +15,7 @@
 
 #pragma once
 
+#include <string>
 #include <unordered_map>
 
 #include "Base/Types.h"
@@ -235,14 +236,13 @@ constexpr OpcodePair opcodeNames[] = {
   { 0x78, "PM4_REG_WR_NO_CTXT" }
 };
 
-constexpr std::string_view GetPM4Opcode(u8 opcode) {
+inline std::string GetPM4Opcode(u8 opcode) {
   for (const auto &reg : opcodeNames) {
     if (reg.opcode == opcode) {
-      return reg.name;
+      return std::string(reg.name);
     }
   }
-  const std::string retString = std::format("UNK_OP_0x{:X}", opcode);
-  return retString;
+  return std::format("UNK_OP_0x{:X}", opcode);
 }
 
 } // namespace Xe::XGPU
