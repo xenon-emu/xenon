@@ -62,10 +62,10 @@ jobs:
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.18
       env:
-        cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-amd64-cache
+        cache-name: xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-cache
       with:
         append-timestamp: false
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-amd64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
+        key: xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
 
     - name: Configure CMake (Clang)
       run: cmake -G Ninja -B ${{env.BUILD_DIR}} -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
@@ -117,10 +117,10 @@ jobs:
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.18
       env:
-        cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-amd64-cache
+        cache-name: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-cache
       with:
         append-timestamp: false
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-amd64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
+        key: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
 
     - name: Configure CMake (GCC)
       run: cmake -G Ninja -B ${{env.BUILD_DIR}} -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
@@ -166,10 +166,10 @@ jobs:
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.18
       env:
-        cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-w64-cache
+        cache-name: xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-cache
       with:
         append-timestamp: false
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-w64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
+        key: xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
 
     - name: Configure CMake (Clang)
       run: cmake -G Ninja -B "${{env.BUILD_DIR}}" -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
@@ -224,15 +224,15 @@ jobs:
 
         key: ${{runner.os}}-${{env.BUILD_TYPE}}-xenon-gcc-w64-deps-${{ hashFiles('build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**/CMakeLists.txt', 'build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**cmake/**') }}
         restore-keys: |
-          ${{runner.os}}-${{env.BUILD_TYPE}}-xenon-gcc-w64-deps-
+          xenon-${{runner.os}}-gcc-${{env.BUILD_TYPE}}-deps-
 
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.18
       env:
-        cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-w64-cache
+        cache-name: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-cache
       with:
         append-timestamp: false
-        key: ${{runner.os}}-${{env.BUILD_TYPE}}-gcc-w64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
+        key: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
 
     - name: Configure CMake (GCC)
       run: cmake -G Ninja -B "${{env.BUILD_DIR}}" -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
@@ -299,10 +299,10 @@ jobs:
       - name: Cache CMake Build
         uses: hendrikmuhs/ccache-action@v1.2.18
         env:
-          cache-name: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-arm64-cache
+          cache-name: xenon-arm64-clang-${{runner.os}}-${{env.BUILD_TYPE}}-cache
         with:
           append-timestamp: false
-          key: ${{runner.os}}-${{env.BUILD_TYPE}}-clang-arm64-cache-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
+          key: xenon-arm64-clang-${{runner.os}}-${{env.BUILD_TYPE}}-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
 
       - name: Configure CMake
         run: cmake -G Ninja -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_C_COMPILER=$(brew --prefix llvm)/bin/clang -DCMAKE_CXX_COMPILER=$(brew --prefix llvm)/bin/clang++ -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
