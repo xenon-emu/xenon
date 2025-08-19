@@ -42,14 +42,14 @@ void Block::ConnectContinuation(Block *nextBlock) {
   continuation = nextBlock;
 }
 
-void Block::EmitShaderCode(ShaderCodeWriterBase &writer) const {
+void Block::EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) const {
   // Emit preamble (outside the conditional block)
   if (preambleStatement)
-    preambleStatement->EmitShaderCode(writer);
+    preambleStatement->EmitShaderCode(writer, shader);
 
   // each block can have condition
   if (condition)
-    writer.BeingCondition(condition->EmitShaderCode(writer));
+    writer.BeingCondition(condition->EmitShaderCode(writer, shader));
   switch (type) {
   case eBlockType::JUMP: {
     writer.ControlFlowCall(target->GetAddress());
@@ -64,7 +64,7 @@ void Block::EmitShaderCode(ShaderCodeWriterBase &writer) const {
     writer.ControlFlowEnd();
   } break;
   case eBlockType::EXEC: {
-    codeStatement->EmitShaderCode(writer);
+    codeStatement->EmitShaderCode(writer, shader);
   } break;
   case eBlockType::LOOP_BEGIN: {
     writer.LoopBegin(target->GetAddress());
@@ -166,7 +166,7 @@ ControlFlowGraph* ControlFlowGraph::DecompileMicroCode(const void *code, u32 cod
   return graph;
 }
 
-void ControlFlowGraph::EmitShaderCode(AST::ShaderCodeWriterBase &writer) const {
+void ControlFlowGraph::EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) const {
   for (Block *root : roots) {
     u32 entryAddr = root->GetAddress();
 
@@ -210,7 +210,7 @@ void ControlFlowGraph::EmitShaderCode(AST::ShaderCodeWriterBase &writer) const {
       const Block *curr = base;
       while (curr) {
         if (next && curr->GetAddress() == next->GetAddress()) break;
-        curr->EmitShaderCode(writer);
+        curr->EmitShaderCode(writer, shader);
         curr = curr->GetContinuation();
       }
 
@@ -323,9 +323,21 @@ Shader* Shader::DecompileMicroCode(const void *code, const u32 codeLength, eShad
   shader->vertexFetches = std::move(instructionExtractor.vfetch);
   shader->exports = std::move(instructionExtractor.exports);
 
+  u32 nextLocation = 0;
+  for (const auto *fetch : shader->vertexFetches) {
+    VertexFetchKey key = { fetch->fetchSlot, fetch->fetchOffset, fetch->fetchStride, fetch->format };
+
+    // If we haven't seen this unique attribute before, add it to the map
+    // and assign it to the next available GL location.
+    if (shader->attributeLocationMap.find(key) == shader->attributeLocationMap.end()) {
+      shader->attributeLocationMap[key] = nextLocation;
+      nextLocation++;
+    }
+  }
+
   shader->textureFetchSlotMask = 0;
   for (auto &tfetch : instructionExtractor.tfetch) {
-    // find in existing list
+    // Find in existing list
     bool found = false;
     for (const auto &usedTexture : shader->usedTextures) {
       if (usedTexture.slot == tfetch->fetchSlot) {
@@ -360,8 +372,8 @@ Shader* Shader::DecompileMicroCode(const void *code, const u32 codeLength, eShad
   return shader;
 }
 
-void Shader::EmitShaderCode(AST::ShaderCodeWriterBase &writer) {
-  controlFlow->EmitShaderCode(writer);
+void Shader::EmitShaderCode(ShaderCodeWriterBase &writer) {
+  controlFlow->EmitShaderCode(writer, this);
   writer.EndMain();
 }
 

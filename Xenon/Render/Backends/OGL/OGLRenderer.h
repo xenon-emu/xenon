@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Abstractions/Renderer.h"
+#include "Render/Abstractions/Renderer.h"
 
 #ifndef NO_GFX
 #include <SDL3/SDL.h>
@@ -37,6 +37,7 @@ public:
   void UpdateViewportFromState(const Xe::XGPU::XenosState *state) override;
   void Clear() override;
 
+  void VertexFetch(const u32 location, const u32 components, bool isFloat, bool isNormalized, const u32 fetchOffset, const u32 fetchStride) override;
   void Draw(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params) override;
   void DrawIndexed(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) override;
 
@@ -49,17 +50,18 @@ public:
   u32 GetBackendID() override;
 private:
   // OpenGL Handles
+  u32 VAO;
   u32 dummyVAO;
-  u32 VAO, VBO, EBO;
+  u32 EBO;
   // SDL Context
   SDL_GLContext context;
   // Checks if ES
   bool gles = false;
 
   // OpenGL Infos
-  std::string gl_version() const;
-  std::string gl_vendor() const;
-  std::string gl_renderer() const;
+  std::string GLVersion() const;
+  std::string GLVendor() const;
+  std::string GLRenderer() const;
 };
 
 } // namespace Render

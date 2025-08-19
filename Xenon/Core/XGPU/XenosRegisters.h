@@ -4,7 +4,10 @@
 
 #include <mutex>
 #include <string>
+#include <string_view>
 #include <unordered_map>
+
+#include "Base/StringUtil.h"
 
 #include "Xenos.h"
 
@@ -15,7 +18,12 @@ namespace Xe::XGPU {
 // 2 -> https://github.com/freedreno/freedreno/blob/master/includes/a2xx.xml.h
 // 3 -> https://github.com/freedreno/amd-gpu/blob/master/include/reg/yamato/22/yamato_offset.h
 
-static const std::unordered_map<u32, const std::string> registerMap = {
+struct RegisterPair {
+  u32 value;
+  std::string_view name;
+};
+
+constexpr RegisterPair registerMap[] = {
   { 0x0000, "RBBM_RTL_RELEASE" },
   { 0x0001, "RBBM_PATCH_RELEASE" },
   { 0x0002, "RBBM_AUXILIARY_CONFIG" },
@@ -3451,14 +3459,14 @@ static const std::unordered_map<u32, const std::string> registerMap = {
   { 0x5001, "SHADER_CONSTANT_FLUSH_FETCH_1" },
   { 0x5002, "SHADER_CONSTANT_FLUSH_FETCH_2" }
 };
-static const std::string GetRegisterNameById(u32 id) {
-  auto it = registerMap.find(id);
-  if (it != registerMap.end()) {
-    return it->second;
-  } else {
-    LOG_ERROR(Xenos, "Unknown register: 0x{:X}", id);
-    return "UNK_REG";
+
+inline std::string GetRegisterNameById(u8 opcode) {
+  for (const auto &reg : registerMap) {
+    if (reg.value == opcode) {
+      return std::string(reg.name); // copy to string
+    }
   }
+  return std::format("UNK_OP_0x{:X}", opcode);
 }
 
 } // namespace Xe::XGPU

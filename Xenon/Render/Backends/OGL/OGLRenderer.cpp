@@ -1,10 +1,12 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
-#include "OGLRenderer.h"
+#include "Core/XeMain.h"
 
-#include "OpenGL/Factory/OGLResourceFactory.h"
-#include "OpenGL/OGLTexture.h"
-#include "GUI/OpenGL.h"
+#include "Render/GUI/OpenGL.h"
+#include "Render/OpenGL/Factory/OGLResourceFactory.h"
+#include "Render/OpenGL/OGLTexture.h"
+#include "Render/Backends/OGL/OGLRenderer.h"
+#include "Render/Backends/OGL/OGLShaders.h"
 
 #define SANITY_CHECK(x) if (!x) { LOG_ERROR(Xenon, "Failed to initialize SDL: {}", SDL_GetError()); }
 
@@ -15,34 +17,60 @@ OGLRenderer::OGLRenderer(RAM *ram) :
   Renderer(ram)
 {}
 
-std::string OGLRenderer::gl_version() const {
-  const GLubyte* version = glGetString(GL_VERSION);
-  const char* c_version = reinterpret_cast<const char*>(version);
-
-  return c_version;
+std::string OGLRenderer::GLVersion() const {
+  return reinterpret_cast<const char *>(glGetString(GL_VERSION));
 }
 
-std::string OGLRenderer::gl_vendor() const {
-  const GLubyte* vendor = glGetString(GL_VENDOR);
-  const char* c_vendor = reinterpret_cast<const char*>(vendor);
-
-  return c_vendor;
+std::string OGLRenderer::GLVendor() const {
+  return reinterpret_cast<const char *>(glGetString(GL_VENDOR));
 }
 
-std::string OGLRenderer::gl_renderer() const {
-  const GLubyte* renderer = glGetString(GL_RENDERER);
-  const char* c_renderer = reinterpret_cast<const char*>(renderer);
-
-  return c_renderer;
+std::string OGLRenderer::GLRenderer() const {
+  return reinterpret_cast<const char *>(glGetString(GL_RENDERER));
 }
 
 void OGLRenderer::BackendStart() {
   // Create the resource factory
   resourceFactory = std::make_unique<OGLResourceFactory>();
-  // Create VAOs, VBOs and EBOs
-  glGenVertexArrays(1, &VAO);
+  shaderFactory = resourceFactory->CreateShaderFactory();
+  fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) };
+  bool gles = GetBackendID() == "GLES"_jLower;
+  std::string versionString = FMT("#version {} {}\n", gles ? 310 : 430, gles ? "es" : "core");
+  shaderPath /= "opengl";
+  computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
+    { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
+  });
+  if (!computeShaderProgram) {
+    std::ofstream f{ shaderPath / "fb_deswizzle.comp" };
+    f.write(versionString.data(), versionString.size());
+    f.write(computeShaderSource, sizeof(computeShaderSource));
+    f.close();
+    computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
+      { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
+    });
+  }
+  renderShaderPrograms = shaderFactory->LoadFromFiles("Render", {
+    { eShaderType::Vertex, shaderPath / "framebuffer.vert" },
+    { eShaderType::Fragment, shaderPath / "framebuffer.frag" }
+  });
+  if (!renderShaderPrograms) {
+    std::ofstream vert{ shaderPath / "framebuffer.vert" };
+    vert.write(versionString.data(), versionString.size());
+    vert.write(vertexShaderSource, sizeof(vertexShaderSource));
+    vert.close();
+    std::ofstream frag{ shaderPath / "framebuffer.frag" };
+    frag.write(versionString.data(), versionString.size());
+    frag.write(fragmentShaderSource, sizeof(fragmentShaderSource));
+    frag.close();
+    renderShaderPrograms = shaderFactory->LoadFromFiles("Render", {
+      { eShaderType::Vertex, shaderPath / "framebuffer.vert" },
+      { eShaderType::Fragment, shaderPath / "framebuffer.frag" }
+    });
+  }
+
+  // Create VAOs, and EBOs
   glGenVertexArrays(1, &dummyVAO);
-  glGenBuffers(1, &VBO);
+  glGenVertexArrays(1, &VAO);
   glGenBuffers(1, &EBO);
 
   // Set clear color
@@ -75,7 +103,7 @@ void OGLRenderer::BackendSDLInit() {
   SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4));
   SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3));
   // Set as compat
-  SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY));
+  SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE));
   // Create OpenGL handle for SDL
   context = SDL_GL_CreateContext(mainWindow);
   if (!context) {
@@ -96,9 +124,9 @@ void OGLRenderer::BackendSDLInit() {
   if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress)) {
     LOG_ERROR(Render, "Failed to initialize GL: {}", SDL_GetError());
   } else {
-    LOG_INFO(Render, "{} Version: {}", gles ? "GLES" : "OpenGL", OGLRenderer::gl_version());
-    LOG_INFO(Render, "OpenGL Vendor: {}", OGLRenderer::gl_vendor());
-    LOG_INFO(Render, "OpenGL Renderer: {}", OGLRenderer::gl_renderer());
+    LOG_INFO(Render, "{} Version: {}", gles ? "GLES" : "OpenGL", OGLRenderer::GLVersion());
+    LOG_INFO(Render, "OpenGL Vendor: {}", OGLRenderer::GLVendor());
+    LOG_INFO(Render, "OpenGL Renderer: {}", OGLRenderer::GLRenderer());
   }
   if (gles) {
     if (!gladLoadGLES2Loader((GLADloadproc)SDL_GL_GetProcAddress)) {
@@ -119,7 +147,6 @@ void OGLRenderer::BackendSDLInit() {
 void OGLRenderer::BackendShutdown() {
   glDeleteVertexArrays(1, &dummyVAO);
   glDeleteVertexArrays(1, &VAO);
-  glDeleteBuffers(1, &VBO);
   glDeleteBuffers(1, &EBO);
 }
 void OGLRenderer::BackendSDLShutdown() {
@@ -153,36 +180,36 @@ s32 ConvertToGLPrimitive(ePrimitiveType prim) {
   }
 }
 
+void OGLRenderer::VertexFetch(const u32 location, const u32 components, bool isFloat, bool isNormalized, const u32 fetchOffset, const u32 fetchStride) {
+  const u32 type = isFloat ? GL_FLOAT:GL_UNSIGNED_INT;
+  const u8 normalized = isNormalized ? GL_TRUE : GL_FALSE;
+  if (location <= 32) {
+    glEnableVertexAttribArray(location);
+    glVertexAttribPointer(
+      location,
+      components,
+      type,
+      normalized,
+      fetchStride,
+      reinterpret_cast<void *>((u64)fetchOffset)
+    );
+  }
+}
+
 void OGLRenderer::Draw(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params) {
   ePrimitiveType type = params.vgtDrawInitiator.primitiveType;
   s32 glPrimitive = ConvertToGLPrimitive(params.vgtDrawInitiator.primitiveType);
   u32 numIndices = params.vgtDrawInitiator.numIndices;
+  // Bind the constants
+  if (auto buffer = createdBuffers.find("FloatConsts"_jLower); buffer != createdBuffers.end())
+    buffer->second->Bind(0);
+  if (auto buffer = createdBuffers.find("CommonBoolConsts"_jLower); buffer != createdBuffers.end())
+    buffer->second->Bind(1);
   // Bind the VAO
   glBindVertexArray(VAO);
   // Bind the VBO
-  if (auto buffer = createdBuffers.find("VertexFetch"_j); buffer != createdBuffers.end())
+  if (auto buffer = createdBuffers.find("VertexFetch"_jLower); buffer != createdBuffers.end())
     buffer->second->Bind();
-  // Setup attribs
-  if (shader.vertexShader) {
-    for (const auto *fetch : shader.vertexShader->vertexFetches) {
-      const u32 location = fetch->fetchSlot - 95; // c95 is first fetch slot
-      const u32 components = fetch->GetComponentCount(); // 1-4
-      const u32 type = fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT;
-      const u8 normalized = fetch->isNormalized ? GL_TRUE : GL_FALSE;
-      const u32 offset = fetch->fetchOffset;
-      const u32 stride = fetch->fetchStride;
-
-      glEnableVertexAttribArray(location);
-      glVertexAttribPointer(
-        location,
-        components,
-        type,
-        normalized,
-        stride,
-        reinterpret_cast<void*>((u64)offset)
-      );
-    }
-  }
   // Bind textures
   for (u32 i = 0; i != shader.textures.size(); ++i) {
     glActiveTexture(GL_TEXTURE0 + i);
@@ -190,8 +217,6 @@ void OGLRenderer::Draw(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params)
   }
   // Perform draw
   glDrawArrays(glPrimitive, 0, numIndices);
-  // Unbind VAO
-  glBindVertexArray(0);
 }
 
 void OGLRenderer::DrawIndexed(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) {
@@ -200,10 +225,11 @@ void OGLRenderer::DrawIndexed(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams 
   u32 numIndices = params.vgtDrawInitiator.numIndices;
   s32 indexType = indexBufferInfo.indexFormat == eIndexFormat::xeInt16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
 
-  const eEndian128 endianFormat = params.state->copyDestInfo.copyDestEndian;
-  const u32 destArray = params.state->copyDestInfo.copyDestArray;
-  const u32 destSlice = params.state->copyDestInfo.copyDestSlice;
-  const eColorFormat destformat = params.state->copyDestInfo.copyDestFormat;
+  const u32 destInfo = params.state->copyDestInfo.hexValue;
+  const Xe::eEndianFormat endianFormat = static_cast<Xe::eEndianFormat>(destInfo & 7);
+  const u32 destArray = (destInfo >> 3) & 1;
+  const u32 destSlice = (destInfo >> 4) & 1;
+  const eColorFormat destformat = static_cast<eColorFormat>((destInfo >> 7) & 0x3F);
   // Bind the constants
   if (auto buffer = createdBuffers.find("FloatConsts"_j); buffer != createdBuffers.end())
     buffer->second->Bind(0);
@@ -215,32 +241,11 @@ void OGLRenderer::DrawIndexed(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams 
   // Bind the VAO
   glBindVertexArray(VAO);
   // Bind the VBO
-  if (auto buffer = createdBuffers.find("VertexFetch"_j); buffer != createdBuffers.end())
+  if (auto buffer = createdBuffers.find("VertexFetch"_jLower); buffer != createdBuffers.end())
     buffer->second->Bind();
   // Bind and upload index buffer (TODO: Fix this)
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexBufferInfo.count, indexBufferInfo.elements, GL_STATIC_DRAW);
-  // Setup attribs
-  if (shader.vertexShader) {
-    for (const auto *fetch : shader.vertexShader->vertexFetches) {
-      const u32 location = fetch->fetchSlot - 95; // c95 is first fetch slot
-      const u32 components = fetch->GetComponentCount(); // 1-4
-      const u32 type = fetch->isFloat ? GL_FLOAT : GL_UNSIGNED_INT;
-      const u8 normalized = fetch->isNormalized ? GL_TRUE : GL_FALSE;
-      const u32 offset = fetch->fetchOffset;
-      const u32 stride = fetch->fetchStride;
-
-      glEnableVertexAttribArray(location);
-      glVertexAttribPointer(
-        location,
-        components,
-        type,
-        normalized,
-        stride,
-        reinterpret_cast<void*>((u64)offset)
-      );
-    }
-  }
   // Bind textures
   for (u32 i = 0; i != shader.textures.size(); ++i) {
     glActiveTexture(GL_TEXTURE0 + i);
@@ -267,14 +272,15 @@ void OGLRenderer::UpdateViewportFromState(const Xe::XGPU::XenosState *state) {
   f32 zoffset = f(state->viewportZOffset);
 
   // Compute viewport rectangle
-  s32 width = static_cast<s32>(std::abs(xscale * 2));
-  s32 height = static_cast<s32>(std::abs(yscale * 2));
+  s32 newWidth = static_cast<s32>(std::abs(xscale * 2));
+  s32 newHeight = static_cast<s32>(std::abs(yscale * 2));
   s32 x = static_cast<s32>(xoffset - std::abs(xscale));
   s32 y = static_cast<s32>(yoffset - std::abs(yscale));
 
-  LOG_DEBUG(Xenos, "Resizing viewport pos: {}x{}, size: {}x{}", x, y, width, height);
-  Resize(width, height);
-  glViewport(x, y, width, height);
+  if (newWidth != 32 && newHeight != 32) {
+    Resize(newWidth, newHeight);
+    glViewport(x, y, newWidth, newHeight);
+  }
 
   // Clamp to valid ranges (just in case)
   f32 nearZ = std::max(0.f, std::min(1.f, zoffset));
@@ -297,12 +303,17 @@ void OGLRenderer::OnCompute() {
 }
 
 void OGLRenderer::OnBind() {
-  // Bind VAO
-  glBindVertexArray(dummyVAO);
-  // Draw fullscreen triangle
-  glDrawArrays(GL_TRIANGLE_FAN, 0, 3);
-  // Unbind VAO
-  glBindVertexArray(0);
+  if (XeMain::xenos && XeMain::xenos->RenderingTo2DFramebuffer()) {
+    // Bind VAO
+    glBindVertexArray(dummyVAO);
+    // Draw fullscreen triangle
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 3);
+    // Unbind VAO
+    glBindVertexArray(0);
+  } else {
+    // Bind the VAO
+    glBindVertexArray(VAO);
+  }
 }
 
 void OGLRenderer::OnSwap(SDL_Window *window) {
@@ -328,7 +339,7 @@ void* OGLRenderer::GetBackendContext() {
 }
 
 u32 OGLRenderer::GetBackendID() {
-  return gles ? "GLES"_j : "OpenGL"_j;
+  return gles ? "GLES"_jLower : "OpenGL"_jLower;
 }
 
 } //namespace Render

@@ -13,6 +13,8 @@
 
 namespace Xe::Microcode::AST {
 
+class Shader;
+
 // Statement type
 enum class eStatementType : u8 {
   List,
@@ -36,7 +38,7 @@ public:
   using Ptr = std::shared_ptr<StatementNode>;
   virtual eStatementType GetType() const = 0;
   virtual void Visit(Visitor &vistor) const = 0;
-  virtual void EmitShaderCode(ShaderCodeWriterBase &writer) = 0;
+  virtual void EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) = 0;
   virtual std::shared_ptr<StatementNode> CloneStatement() const = 0;
   std::shared_ptr<NodeBase> Clone() const override {
     return CloneStatement();
@@ -51,7 +53,7 @@ public:
   }
   eStatementType GetType() const override final { return eStatementType::List; }
   void Visit(Visitor &vistor) const override;
-  void EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  void EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<StatementNode> CloneStatement() const override {
     return std::make_unique<ListStatement>(statementA, statementB);
   }
@@ -68,7 +70,7 @@ public:
   }
   eStatementType GetType() const override final { return eStatementType::Conditional; }
   void Visit(Visitor &vistor) const override;
-  void EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  void EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<StatementNode> CloneStatement() const override {
     return std::make_unique<ConditionalStatement>(statement, condition);
   }
@@ -84,7 +86,7 @@ public:
   }
   eStatementType GetType() const override final { return eStatementType::Write; }
   void Visit(Visitor &vistor) const override;
-  void EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  void EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<StatementNode> CloneStatement() const override {
     return std::make_unique<SetPredicateStatement>(expression);
   }
@@ -104,7 +106,7 @@ public:
   }
   eStatementType GetType() const override final { return eStatementType::Write; }
   void Visit(Visitor &vistor) const override;
-  void EmitShaderCode(ShaderCodeWriterBase &writer) override;
+  void EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) override;
   std::shared_ptr<StatementNode> CloneStatement() const override {
     return std::make_unique<WriteWithMaskStatement>(target, source, mask[0],  mask[1],  mask[2],  mask[3]);
   }

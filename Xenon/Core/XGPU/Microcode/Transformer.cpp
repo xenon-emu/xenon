@@ -25,10 +25,10 @@ void ShaderNodeWriter::TransformShader(AST::NodeWriter &nodeWriter, const u32 *w
     cfa.dword_1 = words[i+1] & 0xFFFF;
     cfb.dword_1 = words[i+2] >> 16;
 
-    LOG_DEBUG(Xenos, "[ShaderNodeWriter::TransformShader] Opcode: {}, 0x{:X}",
+    /*LOG_DEBUG(Xenos, "[ShaderNodeWriter::TransformShader] Opcode: {}, 0x{:X}",
       GetCFOpcodeName(static_cast<instr_cf_opc_t>(cfa.opc)), static_cast<u32>(cfa.opc));
     LOG_DEBUG(Xenos, "[ShaderNodeWriter::TransformShader] Opcode: {}, 0x{:X}",
-      GetCFOpcodeName(static_cast<instr_cf_opc_t>(cfb.opc)), static_cast<u32>(cfb.opc));
+      GetCFOpcodeName(static_cast<instr_cf_opc_t>(cfb.opc)), static_cast<u32>(cfb.opc));*/
 
     TransformBlock(nodeWriter, words, numWords, cfa, pc);
     TransformBlock(nodeWriter, words, numWords, cfb, pc);
@@ -336,10 +336,12 @@ AST::Statement ShaderNodeWriter::EmitVertexFetch(AST::NodeWriter &nodeWriter, co
   const bool isSigned = vtx.format_comp_all != 0;
   const bool isNormalized = !vtx.num_format_all;
   // Get the source register
-  AST::Expression source = nodeWriter.EmitReadReg(vtx.src_reg);
+  bool isPixel = shaderType == eShaderType::Pixel;
+  AST::eRegisterType regType = isPixel ? AST::eRegisterType::PixelInput : AST::eRegisterType::VertexInput;
+  AST::Expression source = nodeWriter.EmitReadReg(vtx.src_reg, regType);
   // create the value fetcher (returns single expression with fetch result)
   const AST::Expression fetch = nodeWriter.EmitVertexFetch(source, fetchSlot, fetchOffset, fetchStride, fetchFormat, isFloat, isSigned, isNormalized);
-  const AST::Expression dest = nodeWriter.EmitWriteReg(shaderType == eShaderType::Pixel, false, vtx.dst_reg);
+  const AST::Expression dest = nodeWriter.EmitWriteReg(isPixel, false, vtx.dst_reg, AST::eRegisterType::Constant);
   // Setup target swizzle
   eSwizzle swizzle[4] = { eSwizzle::Unused, eSwizzle::Unused, eSwizzle::Unused, eSwizzle::Unused };
   for (u32 i = 0; i < 4; i++) {
@@ -368,8 +370,9 @@ AST::Statement ShaderNodeWriter::EmitVertexFetch(AST::NodeWriter &nodeWriter, co
 }
 
 AST::Statement ShaderNodeWriter::EmitTextureFetch(AST::NodeWriter &nodeWriter, const instr_fetch_tex_t &tex, const bool sync) {
-  const AST::Expression dest = nodeWriter.EmitWriteReg(shaderType == eShaderType::Pixel, false, tex.dst_reg);
-  const AST::Expression src = nodeWriter.EmitReadReg(tex.src_reg);
+  AST::eRegisterType regType = shaderType == eShaderType::Pixel ? AST::eRegisterType::PixelInput : AST::eRegisterType::VertexInput;
+  const AST::Expression dest = nodeWriter.EmitWriteReg(shaderType == eShaderType::Pixel, false, tex.dst_reg, AST::eRegisterType::Constant);
+  const AST::Expression src = nodeWriter.EmitReadReg(tex.src_reg, regType);
   const eSwizzle srcX = static_cast<const eSwizzle>((tex.src_swiz >> 0) & 3);
   const eSwizzle srcY = static_cast<const eSwizzle>((tex.src_swiz >> 2) & 3);
   const eSwizzle srcZ = static_cast<const eSwizzle>((tex.src_swiz >> 4) & 3);
@@ -412,7 +415,7 @@ AST::Expression ShaderNodeWriter::EmitSrcReg(AST::NodeWriter &nodeWriter, const 
   if (type) {
     // Runtime register
     const u32 regIndex = num & 0x7F;
-    reg = nodeWriter.EmitReadReg(regIndex);
+    reg = nodeWriter.EmitReadReg(regIndex, AST::eRegisterType::Constant);
     // Take abs value
     if (num & 0x80)
       reg = nodeWriter.EmitAbs(reg);
@@ -471,7 +474,7 @@ AST::Expression ShaderNodeWriter::EmitSrcScalarReg2(AST::NodeWriter &nodeWriter,
 AST::Statement ShaderNodeWriter::EmitVectorResult(AST::NodeWriter &nodeWriter, const instr_alu_t &instr, const AST::Expression &code) {
   // Clamp value to 0-1 range
   AST::Expression input = instr.vector_clamp ? nodeWriter.EmitSaturate(code) : code;
-  AST::Expression dest = nodeWriter.EmitWriteReg(shaderType == eShaderType::Pixel, instr.export_data, instr.vector_dest);
+  AST::Expression dest = nodeWriter.EmitWriteReg(shaderType == eShaderType::Pixel, instr.export_data, instr.vector_dest, AST::eRegisterType::Constant);
   // Prepare to write swizzle
   eSwizzle swizzle[4] = { eSwizzle::Unused, eSwizzle::Unused, eSwizzle::Unused, eSwizzle::Unused };
   if (instr.export_data) {
@@ -507,7 +510,7 @@ AST::Statement ShaderNodeWriter::EmitScalarResult(AST::NodeWriter &nodeWriter, c
   // Clamp value to 0-1 range
   AST::Expression input = instr.vector_clamp ? nodeWriter.EmitSaturate(code) : code;
   // During export scalar operation can still write into the vector, so we check if it's a pure scalar operation, or a vector operation
-  AST::Expression dest = nodeWriter.EmitWriteReg(shaderType == eShaderType::Pixel, instr.export_data, instr.export_data ? instr.vector_dest : instr.scalar_dest);
+  AST::Expression dest = nodeWriter.EmitWriteReg(shaderType == eShaderType::Pixel, instr.export_data, instr.export_data ? instr.vector_dest : instr.scalar_dest, AST::eRegisterType::Constant);
   u32 writeMask = instr.export_data ? instr.scalar_write_mask & ~instr.vector_write_mask : instr.scalar_write_mask;
   // Prepare to write swizzle
   eSwizzle swizzle[4] = { eSwizzle::Unused, eSwizzle::Unused, eSwizzle::Unused, eSwizzle::Unused };

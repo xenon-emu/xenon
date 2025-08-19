@@ -134,33 +134,122 @@ enum class eBorderColor : u32 {
   ACBCRY_BLACK
 };
 
-union VertexFetchData {
-  u64 rawHex;
-#ifdef __LITTLE_ENDIAN__
+enum class eConstType : u32 {
+  InvalidTexture = 0,
+  InvalidVertex = 1,
+  Texture = 2,
+  Vertex = 3,
+};
+
+// No need to swap these fields, we can handle it where the data is parsed.
+// Just something to keep in mind
+struct TextureSize1D {
+  u32 Width : 24;
+  u32 : 8;
+};
+
+struct TextureSize2D {
+  u32 Width : 13;
+  u32 Height : 13;
+  u32 : 6;
+};
+
+struct TextureSize3D {
+  u32 Width : 11;
+  u32 Height : 11;
+  u32 Depth : 10;
+};
+
+struct TextureSizeStack {
+  u32 Width : 13;
+  u32 Height : 13;
+  u32 Depth : 6;
+};
+
+union TextureFetchConstant {
   struct {
-    u32 type : 2;
-    u32 address : 30;
-    u32 endian : 2;
-    u32 size : 24;
-    u32 unk1 : 6;
+    // u32[0]
+    eConstType Type : 2;
+    u32 SignX : 2;
+    u32 SignY : 2;
+    u32 SignZ : 2;
+    u32 SignW : 2;
+    u32 ClampX : 3;
+    u32 ClampY : 3;
+    u32 ClampZ : 3; 
+    u32 : 2;
+    u32 : 1;
+    u32 Pitch : 9;
+    u32 Tiled : 1;
+    // u32[1]
+    u32 DataFormat : 6;
+    u32 Endian : 2;
+    u32 RequestSize : 2;
+    u32 Stacked : 1;
+    u32 ClampPolicy : 1;
+    u32 BaseAddress : 20;
+    // u32[2]
+    union {
+      TextureSize1D OneD;
+      TextureSize2D TwoD;
+      TextureSize3D ThreeD;
+      TextureSizeStack Stack;
+    } Size;
+    // u32[3]
+    u32 NumFormat : 1;
+    u32 SwizzleX : 3;
+    u32 SwizzleY : 3;
+    u32 SwizzleZ : 3;
+    u32 SwizzleW : 3;
+    s32 ExpAdjust : 6;
+    u32 MagFilter : 2;
+    u32 MinFilter : 2;
+    u32 MipFilter : 2;
+    u32 AnisoFilter : 3;
+    u32 : 3;
+    u32 BorderSize : 1;
+    // u32[4]
+    u32 VolMagFilter : 1;
+    u32 VolMinFilter : 1;
+    u32 MinMipLevel : 4;
+    u32 MaxMipLevel : 4;
+    u32 MagAnisoWalk : 1;
+    u32 MinAnisoWalk : 1;
+    s32 LODBias : 10;
+    s32 GradExpAdjustH : 5;
+    s32 GradExpAdjustV : 5;
+    // u32[5]
+    u32 BorderColor : 2;
+    u32 ForceBCWToMax : 1;
+    u32 TriClamp : 2;
+    s32 AnisoBias : 4;
+    u32 Dimension : 2;
+    u32 PackedMips : 1;
+    u32 MipAddress : 20;
   };
+  u32 rawHex[6];
+};
+
+union VertexFetchConstant {
   struct {
-    u32 dword0;
-    u32 dword1;
+    // u32[0]
+    eConstType Type : 2;
+    u32 BaseAddress : 30;
+    // u32[1]
+    u32 Endian : 2;
+    u32 Size : 24;
+    u32 AddressClamp : 1;
+    u32 : 1;
+    u32 RequestSize : 2;
+    u32 ClampDisable : 2;
   };
-#else
-  struct {
-    u32 unk1 : 6;
-    u32 size : 24;
-    u32 endian : 2;
-    u32 address : 30;
-    u32 type : 2;
-  };
-  struct {
-    u32 dword0;
-    u32 dword1;
-  };
-#endif
+  u32 rawHex[2];
+};
+
+union ShaderConstantFetch {
+  TextureFetchConstant Texture;
+  VertexFetchConstant Vertex[3];
+  u32 rawHex[6];
 };
 
 } // namespace Xe

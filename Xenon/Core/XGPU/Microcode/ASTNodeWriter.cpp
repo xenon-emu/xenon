@@ -5,11 +5,11 @@
 
 namespace Xe::Microcode::AST {
 
-Expression NodeWriter::EmitReadReg(u32 idx) {
-  return { std::make_shared<ReadRegister>(idx) };
+Expression NodeWriter::EmitReadReg(u32 idx, eRegisterType type) {
+  return { std::make_shared<ReadRegister>(idx, type) };
 }
 
-Expression NodeWriter::EmitWriteReg(bool pixelShader, u32 exported, u32 idx) {
+Expression NodeWriter::EmitWriteReg(bool pixelShader, u32 exported, u32 idx, eRegisterType type) {
   if (exported) {
     if (pixelShader) {
       switch (idx) {
@@ -35,7 +35,7 @@ Expression NodeWriter::EmitWriteReg(bool pixelShader, u32 exported, u32 idx) {
       }
     }
   }
-  return { std::make_shared<WriteRegister>(idx) };
+  return { std::make_shared<WriteRegister>(idx, type) };
 }
 
 Expression NodeWriter::EmitBoolConst(bool pixelShader, u32 idx) {

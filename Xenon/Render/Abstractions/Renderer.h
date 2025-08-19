@@ -69,6 +69,7 @@ public:
   virtual void Clear() = 0;
 
   virtual void UpdateViewportFromState(const Xe::XGPU::XenosState *state) = 0;
+  virtual void VertexFetch(const u32 location, const u32 components, bool isFloat, bool isNormalized, const u32 fetchOffset, const u32 fetchStride) = 0;
   virtual void Draw(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params) = 0;
   virtual void DrawIndexed(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) = 0;
 
@@ -84,7 +85,7 @@ public:
   void Start();
   void CreateHandles();
   void Shutdown();
-  void Resize(s32 x, s32 y);
+  void Resize(u32 x, u32 y);
 
   void UpdateConstants(Xe::XGPU::XenosState *state);
 
@@ -117,7 +118,7 @@ public:
   volatile bool threadRunning = true;
 
   // FB Pitch
-  s32 pitch = 0;
+  u32 pitch = 0;
   // SDL Window data
   SDL_Window *mainWindow = nullptr;
   SDL_Event windowEvent = {};
@@ -131,12 +132,13 @@ public:
 
   // Shader texture queue
   std::mutex drawQueueMutex{};
+  std::vector<DrawJob> previousJobs{};
   std::queue<DrawJob> drawQueue{};
 
   // Shader load queue
   std::mutex bufferQueueMutex{};
   std::queue<BufferLoadJob> bufferLoadQueue{};
-  std::unordered_map<u32, std::shared_ptr<Buffer>> createdBuffers{};
+  std::unordered_map<u64, std::shared_ptr<Buffer>> createdBuffers{};
 
   // GUI Helpers
   bool DebuggerActive();
@@ -153,8 +155,21 @@ public:
   std::atomic<u32> currentPixelShader = 0;
   u32 pendingPixelShader = 0;
   std::atomic<bool> readyToLink = false;
+  std::atomic<bool> readyForFrame = false;
   std::mutex copyQueueMutex{};
   std::queue<Xe::XGPU::XenosState*> copyQueue{};
+  // Frame wait
+  std::atomic<bool> waiting = false;
+  std::atomic<u32> waitTime = 0;
+  // Internal swap counter
+  std::atomic<u32> swapCount;
+  std::mutex frameReadyMutex;
+  std::condition_variable frameReadyCondVar;
+  bool frameReady = false;
+
+  // Shaders
+  std::shared_ptr<Shader> computeShaderProgram{};
+  std::shared_ptr<Shader> renderShaderPrograms{};
 private:
   // Thread handle
   std::thread thread;
@@ -165,94 +180,7 @@ private:
   // Pixel buffer
   std::unique_ptr<Buffer> pixelSSBO{};
   std::vector<u32> pixels{};
-
-  // Shaders
-  std::shared_ptr<Shader> computeShaderProgram{};
-  std::shared_ptr<Shader> renderShaderPrograms{};
 };
-
-// Shaders
-
-inline constexpr const char vertexShaderSource[] = R"glsl(
-out vec2 o_texture_coord;
-
-void main() {
-  o_texture_coord = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
-  gl_Position = vec4(o_texture_coord * vec2(2.0f, -2.0f) + vec2(-1.0f, 1.0f), 0.0f, 1.0f);
-})glsl";
-
-inline constexpr const char fragmentShaderSource[] = R"glsl(
-precision highp float;
-precision highp int;
-precision highp sampler2D;
-precision highp usampler2D;
-precision highp uimage2D;
-
-in vec2 o_texture_coord;
-
-out vec4 o_color;
-
-uniform usampler2D u_texture;
-void main() {
-  uint pixel = texture(u_texture, o_texture_coord).r;
-  // Gotta love BE vs LE (X360 works in BGRA, so we work in ARGB)
-  float a = float((pixel >> 24u) & 0xFFu) / 255.0;
-  float r = float((pixel >> 16u) & 0xFFu) / 255.0;
-  float g = float((pixel >> 8u) & 0xFFu) / 255.0;
-  float b = float((pixel >> 0u) & 0xFFu) / 255.0;
-  o_color = vec4(r, g, b, a);
-})glsl";
-
-inline constexpr const char computeShaderSource[] = R"glsl(
-precision highp float;
-precision highp int;
-precision highp sampler2D;
-precision highp usampler2D;
-precision highp uimage2D;
-
-layout (local_size_x = 16, local_size_y = 16) in;
-
-layout (r32ui, binding = 0) uniform writeonly uimage2D o_texture;
-layout (std430, binding = 1) buffer pixel_buffer {
-  uint pixel_data[];
-};
-
-uniform int internalWidth;
-uniform int internalHeight;
-
-uniform int resWidth;
-uniform int resHeight;
-
-// This is black magic to convert tiles to linear, just don't touch it
-int xeFbConvert(int width, int addr) {
-  int y = addr / (width * 4);
-  int x = (addr % (width * 4)) / 4;
-  return ((((y & ~31) * width) + (x & ~31) * 32) +
-         (((x & 3) + ((y & 1) << 2) + ((x & 28) << 1) + ((y & 30) << 5)) ^
-         ((y & 8) << 2)));
-}
-
-void main() {
-  ivec2 texel_pos = ivec2(gl_GlobalInvocationID.xy);
-  // OOB check, but shouldn't be needed
-  if (texel_pos.x >= resWidth || texel_pos.y >= resHeight)
-    return;
-
-  // Scale accordingly
-  float scaleX = float(internalWidth) / float(resWidth);
-  float scaleY = float(internalHeight) / float(resHeight);
-
-  // Map to source resolution
-  int srcX = int(float(texel_pos.x) * scaleX);
-  int srcY = int(float(texel_pos.y) * scaleY);
-
-  // God only knows how this indexing works
-  int stdIndex = (srcY * internalWidth + srcX);
-  int xeIndex = xeFbConvert(internalWidth, stdIndex * 4);
-
-  uint packedColor = pixel_data[xeIndex];
-  imageStore(o_texture, texel_pos, uvec4(packedColor, 0, 0, 0));
-})glsl";
 
 } // namespace Render
 #endif

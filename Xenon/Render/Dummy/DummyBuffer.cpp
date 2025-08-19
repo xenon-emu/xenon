@@ -3,11 +3,11 @@
 #include "DummyBuffer.h"
 
 #ifndef NO_GFX
-void Render::DummyBuffer::CreateBuffer(u32 size, const void *data, eBufferUsage usage, eBufferType type) {
+void Render::DummyBuffer::CreateBuffer(u64 size, const void *data, eBufferUsage usage, eBufferType type) {
   LOG_INFO(Render, "DummyBuffer::CreateBuffer: {}, {}, {}", size, static_cast<u8>(usage), static_cast<u8>(size));
 }
 
-void Render::DummyBuffer::UpdateBuffer(u32 offset, u32 size, const void *data) {
+void Render::DummyBuffer::UpdateBuffer(u64 offset, u64 size, const void *data) {
   LOG_INFO(Render, "DummyBuffer::UpdateBuffer: {}, {}", offset, size);
 }
 
