@@ -221,7 +221,7 @@ private:
   // Erase NAND Block
   void sfcxEraseBlock();
   // Does a DMA operation from NAND to physical memory.
-  void sfcxDoDMAfromNAND();
+  void sfcxDoDMAfromNAND(bool physical);
   // Does a DMA operation from physical memory to NAND.
   void sfcxDoDMAtoNAND();
   // RAW NAND Data from loaded image.

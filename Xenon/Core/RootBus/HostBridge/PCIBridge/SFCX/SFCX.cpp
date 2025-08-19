@@ -491,8 +491,11 @@ void Xe::PCIDev::SFCX::sfcxMainLoop() {
       case LOG_PAGE_TO_BUF:
         sfcxReadPageFromNAND(false);
         break;
+      case DMA_LOG_TO_RAM:
+        sfcxDoDMAfromNAND(false);
+        break;
       case DMA_PHY_TO_RAM:
-        sfcxDoDMAfromNAND();
+        sfcxDoDMAfromNAND(true);
         break;
       case DMA_RAM_TO_PHY:
         sfcxDoDMAtoNAND();
@@ -583,14 +586,14 @@ void Xe::PCIDev::SFCX::sfcxEraseBlock() {
     cpi = XeMain::GetCPU()->GetCPI();
 #ifndef SFCX_DEBUG
   // Simulate the time required to erase
-  std::this_thread::sleep_for(2ms * cpi);
+  std::this_thread::sleep_for(50ns * cpi);
 #endif
 
   // Perform the erase
   memset(&rawImageData[nandOffset], 0, sfcxState.blockSizePhys);
 }
 
-void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND() {
+void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND(bool physical) {
   // Physical address when doing DMA
   u32 physAddr = sfcxState.addressReg;
   // Calculate Physical address offset for starting page
@@ -601,8 +604,11 @@ void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND() {
 
   // Get RAM pointers for both buffers
   u8* dataPhysAddrPtr = mainMemory->GetPointerToAddress(sfcxState.dataPhysAddrReg);
-  u8* sparePhysAddrPtr = mainMemory->GetPointerToAddress(sfcxState.sparePhysAddrReg);
-
+  u8* sparePhysAddrPtr = nullptr;
+  if (physical) {
+    sparePhysAddrPtr = mainMemory->GetPointerToAddress(sfcxState.sparePhysAddrReg);
+  }
+  
 #ifdef SFCX_DEBUG
   LOG_DEBUG(SFCX, "DMA_PHY_TO_RAM: Reading 0x{:X} pages. Logical Address: 0x{:X}, Physical Address: 0x{:X}, Data DMA address: 0x{:X}, Spare DMA address: 0x{:X}",
     dmaPagesNum, sfcxState.addressReg, physAddr, sfcxState.dataPhysAddrReg, sfcxState.sparePhysAddrReg);
@@ -623,17 +629,21 @@ void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND() {
     // Write page and spare to RAM
     // On DMA, physical pages are split into Page data and Spare Data, and stored at different locations in memory
     memcpy(dataPhysAddrPtr, &sfcxState.pageBuffer, sfcxState.pageSize);
-    memcpy(sparePhysAddrPtr, &sfcxState.pageBuffer[sfcxState.pageSize], sfcxState.spareSize);
+    if (physical) {
+      memcpy(sparePhysAddrPtr, &sfcxState.pageBuffer[sfcxState.pageSize], sfcxState.spareSize);
+    }
 
     // Increase buffer pointers
     dataPhysAddrPtr += sfcxState.pageSize;   // Logical page size
-    sparePhysAddrPtr += sfcxState.spareSize; // Spare Size
+    if (physical) {
+      sparePhysAddrPtr += sfcxState.spareSize; // Spare Size
+    }
 
     if (cpi == 0 && XeMain::GetCPU())
       cpi = XeMain::GetCPU()->GetCPI();
 
     // Add a small delay to simulate the time it takes to read the page.
-    std::this_thread::sleep_for(std::chrono::nanoseconds(100 * cpi));
+    std::this_thread::sleep_for(std::chrono::nanoseconds(50 * cpi));
 
     // Increase read address
     physAddr += sfcxState.pageSizePhys;
