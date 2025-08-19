@@ -89,17 +89,29 @@ Xe::PCIDev::SMC::SMC(const std::string &deviceName, u64 size, PCIBridge *parentP
   pciDevSizes[0] = 0x100; // BAR0
 
   // Create UART handle
-  bool socket = smcCoreState.currentUARTSystem == "vcom"_j ? false : true;
-  if (socket) {
-    smcCoreState.uartHandle = std::make_unique<HW_UART_SOCK>();
+  switch (smcCoreState.currentUARTSystem) {
+  case "null"_j: {
+    smcCoreState.uartHandle = std::make_unique<HW_UART_NULL>();
+    break;
   }
-  else {
-#ifdef _WIN32
-    smcCoreState.uartHandle = std::make_unique<HW_UART_VCOM>();
-#else
-    LOG_CRITICAL(UART, "Invalid UART type! Defaulting to print");
+  case "print"_j: {
     smcCoreState.uartHandle = std::make_unique<HW_UART_SOCK>();
-#endif
+    break;
+  }
+  case "socket"_j: {
+    smcCoreState.uartHandle = std::make_unique<HW_UART_SOCK>();
+    break;
+  }
+#ifdef _WIN32
+  case "vcom"_j: {
+    smcCoreState.uartHandle = std::make_unique<HW_UART_VCOM>();
+    break;
+  }
+#endif // _WIN32
+  default: {
+    smcCoreState.uartHandle = std::make_unique<HW_UART_NULL>();
+    break;
+  }
   }
   smcCoreState.uartHandle->uartPresent = true;
 
@@ -336,27 +348,41 @@ void Xe::PCIDev::SMC::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
 // Setups the UART Communication at a given configuration.
 void Xe::PCIDev::SMC::setupUART(u32 uartConfig) {
   LOG_INFO(UART, "Initializing...");
-  bool socket = smcCoreState.currentUARTSystem == "vcom"_j ? false : true;
-  if (socket) {
-    HW_UART_SOCK_CONFIG *config = new HW_UART_SOCK_CONFIG();
-    strncpy(config->ip, smcCoreState.socketIp.c_str(), sizeof(config->ip));
-    config->port = smcCoreState.socketPort;
-    config->usePrint = smcCoreState.currentUARTSystem == "print"_j;
-    smcCoreState.uartHandle->Init(config);
-  } else {
-#ifdef _WIN32
-    HW_UART_VCOM_CONFIG *config = new HW_UART_VCOM_CONFIG();
-    strncpy(config->selectedComPort, smcCoreState.currentCOMPort.c_str(), sizeof(config->selectedComPort));
-    config->config = uartConfig;
-    smcCoreState.uartHandle->Init(config);
-#else
-    LOG_CRITICAL(UART, "Invalid UART type! Defaulting to print");
+  switch (smcCoreState.currentUARTSystem) {
+  case "null"_j: {
+    smcCoreState.uartHandle->Init(nullptr);
+    break;
+  }
+  case "print"_j: {
     HW_UART_SOCK_CONFIG *config = new HW_UART_SOCK_CONFIG();
     strncpy(config->ip, smcCoreState.socketIp.c_str(), sizeof(config->ip));
     config->port = smcCoreState.socketPort;
     config->usePrint = true;
     smcCoreState.uartHandle->Init(config);
-#endif
+    break;
+  }
+  case "socket"_j: {
+    HW_UART_SOCK_CONFIG *config = new HW_UART_SOCK_CONFIG();
+    strncpy(config->ip, smcCoreState.socketIp.c_str(), sizeof(config->ip));
+    config->port = smcCoreState.socketPort;
+    config->usePrint = false;
+    smcCoreState.uartHandle->Init(config);
+    break;
+  }
+#ifdef _WIN32
+  case "vcom"_j: {
+    HW_UART_VCOM_CONFIG *config = new HW_UART_VCOM_CONFIG();
+    strncpy(config->selectedComPort, smcCoreState.currentCOMPort.c_str(), sizeof(config->selectedComPort));
+    config->config = uartConfig;
+    smcCoreState.uartHandle->Init(config);
+    break;
+  }
+#endif // _WIN32
+  default: {
+    LOG_CRITICAL(UART, "Invalid UART type! Defaulting to null.");
+    smcCoreState.uartHandle->Init(nullptr);
+    break;
+  }
   }
 }
 
@@ -388,28 +414,28 @@ void Xe::PCIDev::SMC::smcMainThread() {
     break;
   }
   switch (Config::highlyExperimental.consoleRevison) {
-  case Config::eConsoleRevision::Xenon: {
+  case Config::eConsoleRevision::Xenon:
     reinterpret_cast<u8*>(hanaState)[0xFE] = 0x01;
-  } break;
-  case Config::eConsoleRevision::Zephyr: {
+    break;
+  case Config::eConsoleRevision::Zephyr:
     // reinterpret_cast<u8*>(hanaState)[0xFE] = ... ;
-  } break;
-  case Config::eConsoleRevision::Falcon: {
+    break;
+  case Config::eConsoleRevision::Falcon:
     reinterpret_cast<u8*>(hanaState)[0xFE] = 0x21;
-  } break;
-  case Config::eConsoleRevision::Jasper: {
+    break;
+  case Config::eConsoleRevision::Jasper:
     reinterpret_cast<u8*>(hanaState)[0xFE] = 0x21;
-  } break;
-  case Config::eConsoleRevision::Trinity: {
+    break;
+  case Config::eConsoleRevision::Trinity:
     reinterpret_cast<u8*>(hanaState)[0xFE] = 0x23;
-  } break;
+    break;
   case Config::eConsoleRevision::Corona4GB:
-  case Config::eConsoleRevision::Corona: {
+  case Config::eConsoleRevision::Corona:
     reinterpret_cast<u8*>(hanaState)[0xFE] = 0x23;
-  } break;
-  case Config::eConsoleRevision::Winchester: {
+    break;
+  case Config::eConsoleRevision::Winchester:
     reinterpret_cast<u8*>(hanaState)[0xFE] = 0x23;
-  } break;
+    break;
   }
   while (smcThreadRunning) {
     MICROPROFILE_SCOPEI("[Xe::PCI]", "SMC::Loop", MP_AUTO);

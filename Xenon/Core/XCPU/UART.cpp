@@ -299,6 +299,7 @@ u32 HW_UART_VCOM::ReadStatus() {
 }
 #else
 void HW_UART_VCOM::Init(void *uartConfig) {
+  (void)uartConfig;
   UNIMPLEMENTED_MSG("Override for HW_UART_VCOM::Init failed!");
 }
 
@@ -307,6 +308,7 @@ void HW_UART_VCOM::Shutdown() {
 }
 
 void HW_UART_VCOM::Write(const u8 data) {
+  (void)data;
   UNIMPLEMENTED_MSG("Override for HW_UART_VCOM::Write failed!");
 }
 
@@ -320,3 +322,24 @@ u32 HW_UART_VCOM::ReadStatus() {
   return UART_STATUS_EMPTY;
 }
 #endif // _WIN32
+
+void HW_UART_NULL::Init(void *uartConfig) {
+  (void)uartConfig;
+  uartPresent = false;
+  uartInitialized = false;
+}
+
+void HW_UART_NULL::Shutdown()
+{}
+
+void HW_UART_NULL::Write(const u8 data) {
+  (void)data;
+}
+
+u8 HW_UART_NULL::Read() {
+  return 0;
+}
+
+u32 HW_UART_NULL::ReadStatus() {
+  return UART_STATUS_EMPTY;
+}

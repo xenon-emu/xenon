@@ -235,14 +235,15 @@ void _smc::to_toml(toml::value &value) {
   value["UARTSystem"] = uartSystem;
   value["UARTSystem"].comments().push_back("# UART System");
   value["UARTSystem"].comments().push_back("# vcom is vCOM, only present on Windows");
-  value["UARTSystem"].comments().push_back("# socket is Socket, available via Netcat/Socat (netcat -lvnp 7000)");
+  value["UARTSystem"].comments().push_back("# socket is Socket, available via Netcat/Socat (ex, nc64 -Lp 7000)");
   value["UARTSystem"].comments().push_back("# print is Printf, directly to log");
+  value["UARTSystem"].comments().push_back("# null is no UART driver");
 #ifdef _WIN32
   value["COMPort"].comments().clear();
   value["COMPort"] = comPort;
   value["COMPort"].comments().push_back("# Virtual COM port or Loopback COM device used for UART");
   value["COMPort"].comments().push_back("# Do not modify if you do not have a Virtual COM driver");
-  value["COMPort"].comments().push_back("# Modify UARTSystem to use 'print' if you do not have netcat (a socket listener), otherwise use 'socket' (netcat -lvnp 7000)");
+  value["COMPort"].comments().push_back("# Modify UARTSystem to use 'socket', or use 'print' if you do not have a socket listener");
 #endif
   value["SocketIP"].comments().clear();
   value["SocketIP"] = socketIp;

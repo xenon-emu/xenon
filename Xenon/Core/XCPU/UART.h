@@ -135,3 +135,12 @@ public:
   ul32 currentBytesReadCount = 0;
 #endif // _WIN32
 };
+
+class HW_UART_NULL : public HW_UART {
+public:
+  void Init(void *uartConfig) override;
+  void Shutdown() override;
+  void Write(const u8 data) override;
+  u8 Read() override;
+  u32 ReadStatus() override;
+};

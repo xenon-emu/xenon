@@ -196,8 +196,14 @@ void Renderer::UpdateConstants(Xe::XGPU::XenosState *state) {
   XeShaderBoolConsts &boolConsts = state->boolConsts;
 
   // Vertex shader constants
-  f32 *ptr = reinterpret_cast<f32*>(state->GetRegisterPointer(XeRegister::SHADER_CONSTANT_000_X));
-  memcpy(floatConsts.values, ptr, sizeof(floatConsts.values));
+  constexpr u64 FLOAT_CONST_WORDS = sizeof(floatConsts.values) / sizeof(floatConsts.values[0]);
+  u32 *regPtr = reinterpret_cast<u32 *>(state->GetRegisterPointer(XeRegister::SHADER_CONSTANT_000_X));
+  for (u64 i = 0; i != FLOAT_CONST_WORDS; ++i) {
+    u32 word = regPtr[i];
+    f32 f;
+    ::memcpy(&f, &word, sizeof(word));
+    floatConsts.values[i] = f;
+  }
 
   // Boolean shader constants
   {
@@ -277,7 +283,7 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
         continue;
 
       u32 byteAddress = fetchData.BaseAddress << 2;
-      u32 byteSize = fetchData.Size << 2; // Size in DWORDS.
+      u32 byteSize = fetchData.Size << 2;
 
       u8 *data = ramPointer->GetPointerToAddress(byteAddress);
       if (!data) {
@@ -285,28 +291,28 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
         continue;
       }
 
-      std::vector<u32> floatVec{};
-      floatVec.resize(fetchData.Size);
-      memcpy(floatVec.data(), data, byteSize);
-      for (auto &f : floatVec) {
-        LOG_INFO(Xenos, "TEST: 0x{:X}, 0x{:X}", f, std::byteswap<u32>(f));
+      const u64 wordCount = fetchData.Size;
+      std::vector<u32> rawWords(wordCount);
+      memcpy(rawWords.data(), data, wordCount * sizeof(u32));
+
+      std::vector<u8> uploadBytes(wordCount * 4);
+      for (u64 i = 0; i != wordCount; ++i) {
+        u32 w = rawWords[i];
+        ::memcpy(&uploadBytes[i * 4], &w, 4);
       }
-      std::vector<u8> dataVec{};
-      dataVec.resize(byteSize);
-      memcpy(dataVec.data(), data, byteSize);
+
       Render::BufferLoadJob fetchBufferJob = {
         "VertexFetch",
-        std::move(dataVec),
+        std::move(uploadBytes),
         Render::eBufferType::Vertex,
         Render::eBufferUsage::StaticDraw
       };
-
       {
         std::lock_guard<std::mutex> lock(bufferQueueMutex);
         bufferLoadQueue.push(fetchBufferJob);
       }
-
       LOG_INFO(Xenos, "Uploaded vertex fetch buffer: slot={}, addr=0x{:X}, size={} bytes", fetchSlot, byteAddress, byteSize);
+
     }
   }
   // Clear
@@ -396,15 +402,16 @@ void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
               continue;
             }
 
-            // Prepare data for OpenGL: byteswap and copy to a float vector
-            std::vector<f32> dataVec(fetchSize / sizeof(f32)); // Resize based on number of floats
-            memcpy(dataVec.data(), data, fetchSize);
-            for (u32 i = 0; i < dataVec.size(); ++i) {
-              dataVec[i] = std::bit_cast<f32>(byteswap_be(std::bit_cast<u32>(dataVec[i])));
+            const size_t wordCount = fetchSize / 4;
+            std::vector<u32> rawWords(wordCount);
+
+            memcpy(rawWords.data(), data, wordCount * sizeof(u32));
+            std::vector<f32> dataVec;
+            dataVec.resize(wordCount);
+            for (u64 i = 0; i != wordCount; ++i) {
+              dataVec[i] = std::bit_cast<f32, u32>(rawWords[i]);
             }
 
-            // Use a unique key for the buffer based on its memory address and size.
-            // This allows for proper caching and updates of specific vertex buffers.
             u64 bufferKey = (static_cast<u64>(fetchAddress) << 32) | fetchSize;
 
             std::shared_ptr<Buffer> buffer = nullptr;
@@ -412,21 +419,18 @@ void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
             if (it != createdBuffers.end()) {
               buffer = it->second;
               if (buffer->GetSize() < fetchSize) {
-                  // Existing buffer is too small, destroy and recreate
                 buffer->DestroyBuffer();
                 buffer->CreateBuffer(static_cast<u32>(fetchSize), dataVec.data(), Render::eBufferUsage::StaticDraw, Render::eBufferType::Vertex);
               } else {
-                  // Existing buffer is large enough, just update its content
                 buffer->UpdateBuffer(0, static_cast<u32>(fetchSize), dataVec.data());
               }
             } else {
-              // Create a new buffer
               buffer = resourceFactory->CreateBuffer();
               buffer->CreateBuffer(static_cast<u32>(fetchSize), dataVec.data(), Render::eBufferUsage::StaticDraw, Render::eBufferType::Vertex);
               createdBuffers.insert({ bufferKey, buffer });
             }
 
-            // Bind the buffer to the current VAO for attribute setup
+            // Bind the buffer to the current VAO
             buffer->Bind();
 
             // Setup vertex attributes for this fetch.

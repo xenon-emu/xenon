@@ -192,6 +192,9 @@ Chunk ShaderCodeWriterSirit::GetTemporaryReg(u32 regIndex) {
   if (it == temp_regs.end()) {
     Sirit::Id ptr_type = module.TypePointer(spv::StorageClass::Function, vec4_type);
     Sirit::Id var = module.AddLocalVariable(ptr_type, spv::StorageClass::Function);
+    Sirit::Id float_zero = module.Constant(module.TypeFloat(32), 0.f);
+    Sirit::Id zero_vec4 = module.ConstantComposite(vec4_type, float_zero, float_zero, float_zero, float_zero);
+    module.OpStore(var, zero_vec4);
     module.Name(var, FMT("r{}", regIndex));
     temp_regs[regIndex] = var;
     it = temp_regs.find(regIndex);
@@ -204,12 +207,8 @@ Chunk ShaderCodeWriterSirit::GetConstantReg(u32 regIndex) {
   Sirit::Id uint_type = module.TypeInt(32, false);
   Sirit::Id float_type = module.TypeFloat(32);
   Sirit::Id vec4_type = module.TypeVector(float_type, 4);
-
-  // Constants for accessing the UBO
-  Sirit::Id zero_const = module.Constant(uint_type, 0); // Index for the array within the struct
+  Sirit::Id zero_const = module.Constant(uint_type, 0);
   Sirit::Id reg_index_const = module.Constant(uint_type, regIndex);
-
-  // Access the specific constant in the UBO
   Sirit::Id ptr_to_constant = module.OpAccessChain(module.TypePointer(spv::StorageClass::Uniform, vec4_type), ubo_var_v, zero_const, reg_index_const);
   Sirit::Id load_id = module.OpLoad(vec4_type, ptr_to_constant);
   module.Name(load_id, FMT("c{}", regIndex));
