@@ -4,7 +4,7 @@
 
 #include "Base/Logging/Log.h"
 
-#define HDD_DEBUG
+//#define HDD_DEBUG
 
 // Data was pulled off of an Hitachi 250Gb retail HDD.
 const u8 identifyDataBytes[] = {
@@ -150,7 +150,7 @@ Xe::PCIDev::HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentP
 
   // Set the SCR's at offset 0xC0 (SiS-like).
   // SStatus
-  data = 0x00000113;
+  data = ataState.imageAttached ? 0x00000113 : 0;
   ataState.regs.SStatus = data;
   memcpy(&pciConfigSpace.data[0xC0], &data, 4); // SSTATUS_DET_COM_ESTABLISHED.
                                                 // SSTATUS_SPD_GEN1_COM_SPEED.
