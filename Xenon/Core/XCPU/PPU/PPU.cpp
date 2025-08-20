@@ -656,8 +656,9 @@ bool PPU::PPUReadNextInstruction() {
   thread.instrFetch = true;
   // Fetch the instruction from memory
   _instr.opcode = PPCInterpreter::MMURead32(ppuState.get(), thread.CIA, thrId);
-  if (_instr.opcode == 0xFFFFFFFF) {
-    LOG_CRITICAL(Xenon, "PPU{} returned a invalid opcode! Halting...", ppuState->ppuID);
+  if (_instr.opcode == 0xFFFFFFFF || _instr.opcode == 0xCDCDCDCD) {
+    LOG_CRITICAL(Xenon, "PPU{} returned an invalid opcode found. Data = {:#x}, PIA [{:#x}] -> CIA [{:#x}]. Halting...", 
+      ppuState->ppuID, _instr.opcode, thread.PIA, thread.CIA);
     Halt();
     return false;
   }

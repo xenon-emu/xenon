@@ -215,8 +215,7 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
     for (auto &tlbEntry : ppuState->TLB.tlbSet0) {
       if (tlbEntry.V && ((tlbEntry.VPN & compareMask) == (rb & compareMask))) {
 #ifdef DEBUG_BUILD
-        if (Config::log.advanced)
-          LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: 0x{:X}", rpn);
+          LOG_TRACE(Xenon_MMU, "[TLB]: TLBIEL: Invalidating entry with VPN: {:#x}", tlbEntry.VPN);
 #endif
         tlbEntry.V = false;
         tlbEntry.VPN = 0;
@@ -227,8 +226,7 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
     for (auto &tlbEntry : ppuState->TLB.tlbSet1) {
       if (tlbEntry.V && ((tlbEntry.VPN & compareMask) == (rb & compareMask))) {
 #ifdef DEBUG_BUILD
-        if (Config::log.advanced)
-        LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: 0x{:X}", rpn);
+        LOG_TRACE(Xenon_MMU, "[TLB]: TLBIEL: Invalidating entry with VPN: {:#x}", tlbEntry.VPN);
 #endif
         tlbEntry.V = false;
         tlbEntry.VPN = 0;
@@ -239,8 +237,7 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
     for (auto &tlbEntry : ppuState->TLB.tlbSet2) {
       if (tlbEntry.V && ((tlbEntry.VPN & compareMask) == (rb & compareMask))) {
 #ifdef DEBUG_BUILD
-        if (Config::log.advanced)
-        LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: 0x{:X}", rpn);
+        LOG_TRACE(Xenon_MMU, "[TLB]: TLBIEL: Invalidating entry with VPN: {:#x}", tlbEntry.VPN);
 #endif
         tlbEntry.V = false;
         tlbEntry.VPN = 0;
@@ -251,8 +248,7 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
     for (auto &tlbEntry : ppuState->TLB.tlbSet3) {
       if (tlbEntry.V && ((tlbEntry.VPN & compareMask) == (rb & compareMask))) {
 #ifdef DEBUG_BUILD
-        if (Config::log.advanced)
-        LOG_TRACE(Xenon_MMU, "TLBIEL: Invalidating entry for RPN: 0x{:X}", rpn);
+        LOG_TRACE(Xenon_MMU, "[TLB]: TLBIEL: Invalidating entry with VPN: {:#x}", tlbEntry.VPN);
 #endif
         tlbEntry.V = false;
         tlbEntry.VPN = 0;
@@ -396,6 +392,9 @@ void PPCInterpreter::mmuAddTlbEntry(PPU_STATE *ppuState) {
     }
   }
 #endif
+
+  LOG_TRACE(Xenon_MMU, "[TLB]: Adding entry: TLB Set: {:#d}, TLB Index: {:#x}, VPN: {:#x}, PTE VPN: {:#x}, PTE RPN: {:#x}",
+    TS, TI, VPN, tlbVpn, tlbRpn);
 
   // TLB set to choose from
   // There are 4 sets of 256 entries each:
