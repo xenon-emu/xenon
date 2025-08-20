@@ -49,25 +49,34 @@ enum class eChunkType : u8 {
   Unknown
 };
 
-struct Chunk {
+class Chunk {
+public:
   eChunkType type = {};
+  // Register index
+  u32 regIndex = 0;
+  // Is it a constant register?
+  bool isConst = false;
 #ifndef NO_GFX
-  Sirit::Id id = {};   // SSA value (result of OpLoad, etc.)
-  Sirit::Id ptr = {};  // Pointer to value (from AddLocalVariable, OpAccessChain, etc.)
+  // SSA value
+  Sirit::Id id = {};
+  // Pointer to value
+  Sirit::Id ptr = {};
 
   Chunk() = default;
-  explicit Chunk(Sirit::Id v, eChunkType type = eChunkType::Unknown) : id(v), type(type) {}
-  Chunk(Sirit::Id id_, Sirit::Id ptr_, eChunkType type = eChunkType::Unknown) : id(id_), ptr(ptr_), type(type) {}
-  Chunk(const Chunk &c, eChunkType type = eChunkType::Unknown) : id(c.id), ptr(c.ptr), type(type) {}
+  explicit Chunk(Sirit::Id v, eChunkType type = eChunkType::Unknown, u32 regIndex = u32(-1), bool isConst = false) : id(v), type(type), regIndex(regIndex), isConst(isConst) {}
+  Chunk(Sirit::Id id_, Sirit::Id ptr_, u32 regIndex = u32(-1), eChunkType type = eChunkType::Unknown, bool isConst = false) : id(id_), ptr(ptr_), type(type), regIndex(regIndex), isConst(isConst) {}
+  Chunk(const Chunk &c, eChunkType type = eChunkType::Unknown) : regIndex(c.regIndex), id(c.id), ptr(c.ptr), type(type), isConst(c.isConst) {}
 #else
   struct Id {
     u32 value;
   };
+  // SSA value
   Id id = {};
+  // Pointer to value
   Id ptr = {};
-  Chunk() = default;
-  explicit Chunk(Id v) : id(v) {}
-  Chunk(Id id_, Id ptr_) : id(id_), ptr(ptr_) {}
+  explicit Chunk(Id v, u32 regIndex = u32(-1), eChunkType type = eChunkType::Unknown, bool isConst = false) : id(v), type(type), regIndex(regIndex), isConst(isConst) {}
+  Chunk(Id id_, Id ptr_, u32 regIndex = u32(-1), eChunkType type = eChunkType::Unknown, bool isConst = false) : id(id_), ptr(ptr_), type(type), regIndex(regIndex), isConst(isConst) {}
+  Chunk(const Chunk &c, eChunkType type = eChunkType::Unknown) : regIndex(c.regIndex), id(c.id), ptr(c.ptr), type(type), isConst(c.isConst) {}
 #endif
 
   operator u32() const { return id.value; }
@@ -78,7 +87,7 @@ struct Chunk {
 #endif
 
 #ifndef NO_GFX
-  Chunk& operator=(Sirit::Id v) {
+  Chunk &operator=(Sirit::Id v) {
 #else
   Chunk &operator=(Id v) {
 #endif

@@ -12,7 +12,6 @@ namespace Xe::Microcode::AST {
 ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType) :
   type(shaderType) {
   module.AddCapability(spv::Capability::Shader);
-  module.AddExtension("SPV_KHR_storage_buffer_storage_class");
   module.SetMemoryModel(spv::AddressingModel::Logical, spv::MemoryModel::GLSL450);
 
   std::string shaderTypeName = type == eShaderType::Pixel ? "Pixel" : "Vertex";
@@ -37,8 +36,8 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType) :
   module.Decorate(ubo_struct_v, spv::Decoration::Block);
   module.Name(ubo_struct_v, "ALUConsts");
   module.MemberName(ubo_struct_v, 0, "FloatConsts");
-  ubo_type_v = module.TypePointer(spv::StorageClass::StorageBuffer, ubo_struct_v);
-  ubo_var_v = module.AddGlobalVariable(ubo_type_v, spv::StorageClass::StorageBuffer);
+  ubo_type_v = module.TypePointer(spv::StorageClass::Uniform, ubo_struct_v);
+  ubo_var_v = module.AddGlobalVariable(ubo_type_v, spv::StorageClass::Uniform);
   // For vec4 array inside struct
   module.Decorate(vec4_array_512, spv::Decoration::ArrayStride, 16);
   module.MemberDecorate(ubo_struct_v, 0, spv::Decoration::Offset, 0);
@@ -50,8 +49,8 @@ ShaderCodeWriterSirit::ShaderCodeWriterSirit(eShaderType shaderType) :
   module.Decorate(ubo_struct_b, spv::Decoration::Block);
   module.Name(ubo_struct_b, "CommonBoolConsts");
   module.MemberName(ubo_struct_b, 0, "BoolConsts");
-  ubo_type_b = module.TypePointer(spv::StorageClass::StorageBuffer, ubo_struct_b);
-  ubo_var_b = module.AddGlobalVariable(ubo_type_b, spv::StorageClass::StorageBuffer);
+  ubo_type_b = module.TypePointer(spv::StorageClass::Uniform, ubo_struct_b);
+  ubo_var_b = module.AddGlobalVariable(ubo_type_b, spv::StorageClass::Uniform);
   module.Decorate(uint_array_32, spv::Decoration::ArrayStride, 4);
   module.MemberDecorate(ubo_struct_b, 0, spv::Decoration::Offset, 0);
 
@@ -175,7 +174,7 @@ Chunk ShaderCodeWriterSirit::GetExportDest(const eExportReg reg) {
     }
   }
 
-  return Chunk(loaded, var_id, chunkType);
+  return Chunk(loaded, var_id, (u32)reg, chunkType);
 }
 
 Chunk ShaderCodeWriterSirit::GetReg(u32 regIndex) {
@@ -200,20 +199,59 @@ Chunk ShaderCodeWriterSirit::GetTemporaryReg(u32 regIndex) {
     it = temp_regs.find(regIndex);
   }
   Sirit::Id load_id = module.OpLoad(vec4_type, it->second);
-  return Chunk(load_id, it->second, eChunkType::Vector);
+  return Chunk(load_id, it->second, regIndex, eChunkType::Vector);
 }
 
 Chunk ShaderCodeWriterSirit::GetConstantReg(u32 regIndex) {
-  Sirit::Id uint_type = module.TypeInt(32, false);
   Sirit::Id float_type = module.TypeFloat(32);
   Sirit::Id vec4_type = module.TypeVector(float_type, 4);
-  Sirit::Id zero_const = module.Constant(uint_type, 0);
-  Sirit::Id reg_index_const = module.Constant(uint_type, regIndex);
-  Sirit::Id ptr_to_constant = module.OpAccessChain(module.TypePointer(spv::StorageClass::Uniform, vec4_type), ubo_var_v, zero_const, reg_index_const);
-  Sirit::Id load_id = module.OpLoad(vec4_type, ptr_to_constant);
+  Sirit::Id vec4_ptr_type = module.TypePointer(spv::StorageClass::Uniform, vec4_type);
+
+  // If we already shadowed this const, load from shadow
+  auto it = c_shadow_vars.find(regIndex);
+  if (it != c_shadow_vars.end()) {
+    Sirit::Id load_id = module.OpLoad(vec4_type, it->second);
+    return Chunk(load_id, it->second, regIndex, eChunkType::Vector, true);
+  }
+
+  // Read from UBO
+  Sirit::Id uint_type = module.TypeInt(32, false);
+  Sirit::Id zero = module.Constant(uint_type, 0);
+  Sirit::Id idx = module.Constant(uint_type, regIndex);
+  Sirit::Id ptr = module.OpAccessChain(vec4_ptr_type, ubo_var_v, zero, idx);
+  Sirit::Id load_id = module.OpLoad(vec4_type, ptr);
   module.Name(load_id, FMT("c{}", regIndex));
-  return Chunk(load_id, ptr_to_constant, eChunkType::Vector);
+  return Chunk(load_id, ptr, regIndex, eChunkType::Vector, true);
 }
+
+Sirit::Id ShaderCodeWriterSirit::EnsureConstantShadow(u32 regIndex) {
+  auto it = c_shadow_vars.find(regIndex);
+  if (it != c_shadow_vars.end())
+    return it->second;
+
+
+  Sirit::Id float_type = module.TypeFloat(32);
+  Sirit::Id vec4_type = module.TypeVector(float_type, 4);
+  Sirit::Id ptr_type = module.TypePointer(spv::StorageClass::Private, vec4_type);
+
+  Sirit::Id local = module.AddGlobalVariable(ptr_type, spv::StorageClass::Private);
+
+  // Build an access-chain to the UBO element ALUConsts.FloatConsts[regIndex]
+  Sirit::Id uint_type = module.TypeInt(32, false);
+  Sirit::Id zero = module.Constant(uint_type, 0);
+  Sirit::Id idx = module.Constant(uint_type, regIndex);
+  Sirit::Id ubo_ptr_type = module.TypePointer(spv::StorageClass::Uniform, vec4_type);
+  Sirit::Id ubo_ptr = module.OpAccessChain(ubo_ptr_type, ubo_var_v, zero, idx);
+
+  // Load the current value from the UBO and store it into the local shadow
+  Sirit::Id ubo_val = module.OpLoad(vec4_type, ubo_ptr);
+  module.OpStore(local, ubo_val);
+
+  c_shadow_vars[regIndex] = local;
+  module.Name(local, FMT("c{}_shadow", regIndex));
+  return local;
+}
+
 
 Chunk ShaderCodeWriterSirit::GetVertexInputReg(u32 regIndex) {
   Sirit::Id vec4_type = module.TypeVector(module.TypeFloat(32), 4);
@@ -226,7 +264,7 @@ Chunk ShaderCodeWriterSirit::GetVertexInputReg(u32 regIndex) {
     it = vertex_input_vars.find(regIndex);
   }
   Sirit::Id load_id = module.OpLoad(vec4_type, it->second);
-  return Chunk(load_id, it->second, eChunkType::Vector);
+  return Chunk(load_id, it->second, regIndex, eChunkType::Vector);
 }
 
 Chunk ShaderCodeWriterSirit::GetPixelInputReg(u32 regIndex) {
@@ -240,7 +278,7 @@ Chunk ShaderCodeWriterSirit::GetPixelInputReg(u32 regIndex) {
     it = input_vars.find(regIndex);
   }
   Sirit::Id load_id = module.OpLoad(vec4_type, it->second);
-  return Chunk(load_id, it->second, eChunkType::Vector);
+  return Chunk(load_id, it->second, regIndex, eChunkType::Vector);
 }
 
 Chunk ShaderCodeWriterSirit::GetBoolVal(const u32 boolRegIndex) {
@@ -260,20 +298,20 @@ Chunk ShaderCodeWriterSirit::GetBoolVal(const u32 boolRegIndex) {
 
   Sirit::Id and_val = module.OpBitwiseAnd(uint_type, word_val, bit_mask);
   Sirit::Id result = module.OpINotEqual(bool_type, and_val, module.Constant(uint_type, 0));
-  return Chunk(result, word_ptr, eChunkType::Boolean);
+  return Chunk(result, {}, boolRegIndex, eChunkType::Boolean);
 }
 
 Chunk ShaderCodeWriterSirit::GetFloatVal(const u32 floatRegIndex) {
   LOG_DEBUG(Xenos, "[AST::Sirit] GetFloatVal({})", floatRegIndex);
   Chunk chunk = GetConstantReg(floatRegIndex);
-  return Chunk(chunk.id, chunk.ptr, chunk.type);
+  return Chunk(chunk.id, chunk.ptr, floatRegIndex, chunk.type);
 }
 
 Chunk ShaderCodeWriterSirit::GetFloatValRelative(const u32 floatRegOffset) {
   LOG_DEBUG(Xenos, "[AST::Sirit] GetFloatValRelative({})", floatRegOffset);
   Sirit::Id float_type = module.TypeFloat(32);
   Sirit::Id vec4_type = module.TypeVector(float_type, 4);
-  Sirit::Id vec4_ptr_type = module.TypePointer(spv::StorageClass::Function, vec4_type);
+  Sirit::Id vec4_ptr_type = module.TypePointer(spv::StorageClass::Uniform, vec4_type);
 
   Sirit::Id uint_type = module.TypeInt(32, false);
   Sirit::Id offset_id = module.Constant(uint_type, floatRegOffset);
@@ -285,7 +323,7 @@ Chunk ShaderCodeWriterSirit::GetFloatValRelative(const u32 floatRegOffset) {
 
   Sirit::Id x_value = module.OpCompositeExtract(float_type, reg_val, 0);
 
-  return Chunk(x_value, reg_ptr, eChunkType::Scalar);
+  return Chunk(x_value, reg_ptr, floatRegOffset, eChunkType::Scalar);
 }
 
 Chunk ShaderCodeWriterSirit::GetPredicate() {
@@ -383,7 +421,7 @@ Chunk ShaderCodeWriterSirit::FetchTexture(const Chunk &src, const TextureFetch &
   Sirit::Id vec4_type = module.TypeVector(float_type, 4);
   Sirit::Id sampled_image_val = module.OpLoad(sampled_type, var);
   Sirit::Id sampled_result = module.OpImageSampleImplicitLod(vec4_type, sampled_image_val, coord);
-  return Chunk(sampled_result, { 0 }, eChunkType::Fetch);
+  return Chunk(sampled_result, {}, src.regIndex, eChunkType::Fetch);
 }
 
 Chunk ShaderCodeWriterSirit::FetchVertex(const Chunk &src, const VertexFetch &instr, const Shader *shader) {
@@ -418,7 +456,7 @@ Chunk ShaderCodeWriterSirit::FetchVertex(const Chunk &src, const VertexFetch &in
   Sirit::Id var = vertex_input_vars[slot];
   Sirit::Id val = module.OpLoad(input_type, var);
 
-  return Chunk(val, var, componentCount == 1 ? eChunkType::Scalar : eChunkType::Fetch);
+  return Chunk(val, var, src.regIndex, componentCount == 1 ? eChunkType::Scalar : eChunkType::Fetch);
 }
 
 Chunk ShaderCodeWriterSirit::VectorFunc1(instr_vector_opc_t instr, const Chunk &a) {
@@ -811,14 +849,22 @@ void ShaderCodeWriterSirit::PopPredicate() {
   LOG_DEBUG(Xenos, "[AST::Sirit] PopPredicate()");
 }
 
-void ShaderCodeWriterSirit::Assign(const Chunk &dest, const Chunk &src) {
-  LOG_DEBUG(Xenos, "[AST::Sirit] Assign({}, {})", dest.id.value, src.id.value);
-  if (!dest.HasPointer()) {
-    LOG_ERROR(Xenos, "[AST::Sirit] Attempted to assign to a non-addressable Chunk!");
-    return;
+void ShaderCodeWriterSirit::Assign(const Chunk &dst, const Chunk &src) {
+  Sirit::Id value = src.id;
+  if (src.IsValid() && src.HasPointer()) {
+    // If src is a pointer-only chunk, load from it
+    Sirit::Id float_type = module.TypeFloat(32);
+    Sirit::Id vec4_type = module.TypeVector(float_type, 4);
+    value = module.OpLoad(vec4_type, src.ptr);
   }
 
-  module.OpStore(dest.ptr, src);
+  Sirit::Id dest = dst.ptr;
+  if (!dst.HasPointer()) {
+    // Destination is a constant (cN) -> write into shadow
+    dest = EnsureConstantShadow(dst.regIndex);
+  }
+  module.OpStore(dest, value);
+  LOG_DEBUG(Xenos, "[AST::Sirit] Assign({}, {})", dest.value, value.value);
 }
 
 void ShaderCodeWriterSirit::Emit(const Chunk &src) {
@@ -832,36 +878,30 @@ void ShaderCodeWriterSirit::AssignMasked(const Chunk &src, const Chunk &dst,
   LOG_DEBUG(Xenos, "[AST::Sirit] AssignMasked({}, {})", src.id.value, dst.id.value);
   Sirit::Id float_type = module.TypeFloat(32);
 
-  // Extract current dest components
-  std::array<Sirit::Id, 4> components = {};
-  for (u8 i = 0; i != 4; ++i) {
+  std::array<Sirit::Id, 4> components;
+  for (u8 i = 0; i != 4; ++i)
     components[i] = module.OpCompositeExtract(float_type, dst.id, i);
-  }
 
-  // Apply masked assignment from src
   for (u64 i = 0; i < dstSwizzle.size(); ++i) {
     u32 srcIndex = static_cast<u32>(srcSwizzle[i]);
     u32 dstIndex = static_cast<u32>(dstSwizzle[i]);
-    if (srcIndex >= 4 || dstIndex >= 4) {
-      LOG_ERROR(Xenos, "Invalid swizzle index: srcIndex={}, dstIndex={}", srcIndex, dstIndex);
-      continue;
-    }
-    
-    if (src.type == eChunkType::Vector || src.type == eChunkType::Fetch) {
-      // Extract src vector component
+    if (src.type == eChunkType::Vector || src.type == eChunkType::Fetch)
       components[dstIndex] = module.OpCompositeExtract(float_type, src.id, srcIndex);
-    } else if (src.type == eChunkType::Scalar) {
-      // Use scalar directly
+    else if (src.type == eChunkType::Scalar)
       components[dstIndex] = src.id;
-    } else {
-      // Default to 0 if something is off
+    else
       components[dstIndex] = module.Constant(float_type, 0.f);
-    }
   }
 
   Sirit::Id vec4_type = module.TypeVector(float_type, 4);
   Sirit::Id newVec = module.OpCompositeConstruct(vec4_type, components);
-  module.OpStore(dst.ptr, newVec);
+
+  if (!dst.HasPointer()) {
+    Sirit::Id shadowPtr = EnsureConstantShadow(dst.regIndex);
+    module.OpStore(shadowPtr, newVec);
+  } else {
+    module.OpStore(dst.ptr, newVec);
+  }
 }
 
 void ShaderCodeWriterSirit::AssignImmediate(const Chunk &dst,
@@ -871,29 +911,25 @@ void ShaderCodeWriterSirit::AssignImmediate(const Chunk &dst,
   Sirit::Id float_type = module.TypeFloat(32);
 
   std::array<Sirit::Id, 4> components = {};
-  for (u8 i = 0; i != 4; ++i) {
+  for (u8 i = 0; i != 4; ++i)
     components[i] = module.OpCompositeExtract(float_type, dst.id, i);
-  }
 
   for (u64 i = 0; i != dstSwizzle.size(); ++i) {
-    f32 value = 0.f;
-    switch (immediateValues[i]) {
-    case eSwizzle::One: value = 1.f; break;
-    case eSwizzle::Zero: value = 0.f; break;
-    case eSwizzle::Unused: value = 0.f; break;
-    default:
-      LOG_ERROR(Xenos, "[AST::Sirit] Invalid immediate swizzle");
-      continue;
-    }
-
-    Sirit::Id imm = module.Constant(float_type, value);
+    f32 f = (immediateValues[i] == eSwizzle::One)?1.f:0.f;
+    Sirit::Id imm = module.Constant(float_type, f);
     u32 dstIndex = static_cast<u32>(dstSwizzle[i]);
     components[dstIndex] = imm;
   }
 
   Sirit::Id vec4_type = module.TypeVector(float_type, 4);
   Sirit::Id newVec = module.OpCompositeConstruct(vec4_type, components);
-  module.OpStore(dst.ptr, newVec);
+
+  if (!dst.HasPointer()) {
+    Sirit::Id shadowPtr = EnsureConstantShadow(dst.regIndex);
+    module.OpStore(shadowPtr, newVec);
+  } else {
+    module.OpStore(dst.ptr, newVec);
+  }
 }
 
 } // namespace Xe::Microcode::AST

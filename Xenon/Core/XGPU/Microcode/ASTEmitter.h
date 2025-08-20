@@ -108,6 +108,7 @@ public:
   Chunk GetReg(u32 regIndex) override; // Deprecated, see comment in ShaderCodeWriterBase
   Chunk GetTemporaryReg(u32 regIndex) override;
   Chunk GetConstantReg(u32 regIndex) override;
+  Sirit::Id EnsureConstantShadow(u32 regIndex);
   Chunk GetVertexInputReg(u32 regIndex) override;
   Chunk GetPixelInputReg(u32 regIndex) override;
   Chunk GetBoolVal(const u32 boolRegIndex) override;
@@ -197,7 +198,7 @@ private:
 
   Sirit::Id entry_dispatch_func = { 0 };
 
-  std::stack<std::pair<Sirit::Id, Sirit::Id>> loop_stack{};
+  std::stack<std::pair<Sirit::Id, Sirit::Id>> loop_stack = {};
 
   Sirit::Id merge_label = { 0 };
   Sirit::Id true_label = { 0 };
@@ -208,6 +209,7 @@ private:
   Sirit::Id current_block_label = { 0 };
   Sirit::Id next_block_label = { 0 };
   std::unordered_map<u32, Sirit::Id> address_to_label = {};
+  std::unordered_map<u32, Sirit::Id> c_shadow_vars = {};
 
   // Helper to get export semantic index, typically from ASTNode.cpp
   // Copied here for completeness, but ideally should be part of a shared utility
