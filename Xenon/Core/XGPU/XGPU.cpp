@@ -115,14 +115,16 @@ Xe::Xenos::XGPU::XGPU(Render::Renderer *renderer, RAM *ram, PCIBridge *pciBridge
 }
 
 Xe::Xenos::XGPU::~XGPU() {
-  commandProcessor.reset();
-  xenosState.reset();
-  edram.reset();
   // Kill VSync Thread
   xeVsyncWorkerThreadRunning = false;
+  // Wait for things to finish
   if (xeVSyncWorkerThread.joinable()) {
     xeVSyncWorkerThread.join();
   }
+  // Reset other handles
+  commandProcessor.reset();
+  xenosState.reset();
+  edram.reset();
 }
 
 bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
