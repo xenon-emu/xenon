@@ -228,11 +228,11 @@ class TestRunner {
 public:
   TestRunner(PPU_STATE *ppuStatePtr) : ppuState(ppuStatePtr) {}
 
-  ~TestRunner() { ppuState.reset(); }
+  ~TestRunner() {}
 
   bool Setup(TestSuite &suite) {
     // Clear the RAM area at tests load address.
-    PPCInterpreter::MMUMemSet(ppuState.get(), START_ADDRESS, 0x00000000, 0x1000);
+    PPCInterpreter::MMUMemSet(ppuState, START_ADDRESS, 0x00000000, 0x1000);
 
     // Load the test binary into RAM.
     std::vector<u8> testBinData;
@@ -258,7 +258,7 @@ public:
       testBinData.resize(fileSize);
       file.read(reinterpret_cast<char*>(testBinData.data()), XE_SROM_SIZE);
       for (int idx = 0; idx < fileSize; ++idx) {
-        PPCInterpreter::MMUWrite8(ppuState.get(), START_ADDRESS + idx, testBinData[idx]);
+        PPCInterpreter::MMUWrite8(ppuState, START_ADDRESS + idx, testBinData[idx]);
       }
     }
     file.close();
@@ -276,7 +276,7 @@ public:
 
     bool testRunning = true;
     while (testRunning) {
-      PPU_THREAD_REGISTERS &thread = ppuState.get()->ppuThread[ppuState.get()->currentThread];
+      PPU_THREAD_REGISTERS &thread = ppuState->ppuThread[ppuState->currentThread];
       // Update previous instruction address
       thread.PIA = thread.CIA;
       // Update current instruction address
@@ -284,7 +284,7 @@ public:
       // Increase next instruction address
       thread.NIA += 4;
       // Fetch the instruction from memory
-      thread.CI.opcode = PPCInterpreter::MMURead32(ppuState.get(), thread.CIA, ppuState.get()->currentThread);
+      thread.CI.opcode = PPCInterpreter::MMURead32(ppuState, thread.CIA, ppuState->currentThread);
       if (thread.CI.opcode == 0xFFFFFFFF || thread.CI.opcode == 0xCDCDCDCD) {
         LOG_CRITICAL(Xenon, "[Testing]: Invalid opcode found.");
         return false;
@@ -296,7 +296,7 @@ public:
       if (thread.CI.opcode == BLR_OPCODE) {
         testRunning = false;
       } else {
-        PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
+        PPCInterpreter::ppcExecuteSingleInstruction(ppuState);
       }
     }
 
@@ -310,22 +310,27 @@ public:
   }
 
   bool SetupTestState(TestCase &testCase) {
-    PPU_THREAD_REGISTERS &thread = ppuState.get()->ppuThread[ppuState.get()->currentThread];
+    PPU_THREAD_REGISTERS &thread = ppuState->ppuThread[ppuState->currentThread];
     // Clear registers involved in tests.
     for (auto &reg : thread.GPR) { reg = 0; }
     for (auto &reg : thread.FPR) { reg.setValue(0.0); }
     for (auto &reg : thread.VR) { reg.x = 0; reg.y = 0; reg.z = 0; reg.w = 0; }
     thread.CR.CR_Hex = 0;
+    thread.SPR.XER.XER_Hex = 0;
 
     // Set NIA for this test case.
     thread.NIA = testCase.executionAddress;
+
+    // Set MSR to allow FPU and VXU execution.
+    thread.SPR.MSR.FP = 1;
+    thread.SPR.MSR.VXU = 1;
 
     for (auto &it : testCase.testAnnotations) {
       if (it.first == "REGISTER_IN") {
         size_t spacePosition = it.second.find(" ");
         auto regName = it.second.substr(0, spacePosition);
         auto regValue = it.second.substr(spacePosition + 1);
-        PPCInterpreter::SetRegFromString(ppuState.get(), regName.c_str(), regValue.c_str());
+        PPCInterpreter::SetRegFromString(ppuState, regName.c_str(), regValue.c_str());
       } else if (it.first == "MEMORY_IN") {
         /*
         size_t spacePos = it.second.find(" ");
@@ -359,7 +364,7 @@ public:
         auto regName = it.second.substr(0, spacePos);
         auto regValue = it.second.substr(spacePos + 1);
         std::string actualValue;
-        if (!PPCInterpreter::CompareRegWithString(ppuState.get(),
+        if (!PPCInterpreter::CompareRegWithString(ppuState,
           regName.c_str(), regValue.c_str(), actualValue)) {
           any_failed = true;
           LOG_ERROR(Xenon, "[Testing]: Register {} assert failed:\n", regName);
@@ -412,7 +417,7 @@ public:
     return !any_failed;
   }
 
-  std::unique_ptr<PPU_STATE> ppuState;
+  PPU_STATE *ppuState;
 };
 
 #ifdef _WIN32
@@ -502,6 +507,19 @@ bool PPCInterpreter::RunTests(PPU_STATE *ppuState) {
   LOG_INFO(Xenon, "[Testing]: Total tests executed: {}", failedTestsCount + passedTestsCount);
   LOG_INFO(Xenon, "[Testing]: Passed: {}", passedTestsCount);
   LOG_INFO(Xenon, "[Testing]: Failed: {}", failedTestsCount);
+
+  // Reset the state:
+  PPU_THREAD_REGISTERS &thread = ppuState->ppuThread[ppuState->currentThread];
+  // Clear registers involved in tests.
+  for (auto& reg : thread.GPR) { reg = 0; }
+  for (auto& reg : thread.FPR) { reg.setValue(0.0); }
+  for (auto& reg : thread.VR) { reg.x = 0; reg.y = 0; reg.z = 0; reg.w = 0; }
+  thread.CR.CR_Hex = 0;
+  thread.SPR.XER.XER_Hex = 0;
+  thread.SPR.MSR.FP = 0;
+  thread.SPR.MSR.VXU = 0;
+  // Set NIA back to default.
+  thread.NIA = 0x100;
 
   return failedTestsCount ? false : true;
 }
