@@ -282,6 +282,7 @@ void _xcpu::from_toml(const toml::value &value) {
   HW_INIT_SKIP_1 = toml::find_or<u64&>(value, "HW_INIT_SKIP1", HW_INIT_SKIP_1);
   HW_INIT_SKIP_2 = toml::find_or<u64&>(value, "HW_INIT_SKIP2", HW_INIT_SKIP_2);
   simulate1BL = toml::find_or<bool>(value, "Simulate1BL", simulate1BL);
+  runInstrTests = toml::find_or<bool>(value, "RunInstrTests", runInstrTests);
 }
 void _xcpu::to_toml(toml::value &value) {
   value["RAMSize"].comments().clear();
@@ -323,6 +324,11 @@ void _xcpu::to_toml(toml::value &value) {
   value["Simulate1BL"] = simulate1BL;
   value["Simulate1BL"].comments().push_back("# Simulates the behavior of the 1BL inside the XCPU. Allows for bootup without said binary being required.");
   value["Simulate1BL"].comments().push_back("# Currently WIP, do not use.");
+
+  value["RunInstrTests"].comments().clear();
+  value["RunInstrTests"] = runInstrTests;
+  value["RunInstrTests"].comments().push_back("# Runs a set of PPC instruction tests derived from the Xenia Project tests.");
+  value["RunInstrTests"].comments().push_back("# See their README on how to generate the tests. Not meant for end users.");
 }
 bool _xcpu::verify_toml(toml::value &value) {
   to_toml(value);
@@ -333,6 +339,7 @@ bool _xcpu::verify_toml(toml::value &value) {
   cache_value(HW_INIT_SKIP_1);
   cache_value(HW_INIT_SKIP_2);
   cache_value(simulate1BL);
+  cache_value(runInstrTests);
   from_toml(value);
   verify_value(ramSize);
   verify_value(elfLoader);
@@ -341,6 +348,7 @@ bool _xcpu::verify_toml(toml::value &value) {
   verify_value(HW_INIT_SKIP_1);
   verify_value(HW_INIT_SKIP_2);
   verify_value(simulate1BL);
+  verify_value(runInstrTests);
   return true;
 }
 
@@ -368,6 +376,8 @@ void _filepaths::from_toml(const toml::value &value) {
   oddImage = toml::find_or<std::string>(value, "ODDImage", oddImage);
   hddImage = toml::find_or<std::string>(value, "HDDImage", hddImage);
   elfBinary = toml::find_or<std::string>(value, "ElfBinary", elfBinary);
+  instrTestsPath = toml::find_or<std::string>(value, "InstrTestsPath", instrTestsPath);
+  instrTestsBinPath = toml::find_or<std::string>(value, "InstrTestsBinPath", instrTestsBinPath);
 }
 void _filepaths::to_toml(toml::value &value) {
   value.comments().clear();
@@ -375,12 +385,16 @@ void _filepaths::to_toml(toml::value &value) {
   value.comments().push_back("# ElfBinary is used in the elf loader");
   value.comments().push_back("# ODDImage is Optical Disc Drive Image, takes an ISO file for Linux");
   value.comments().push_back("# HDDImage is the Hard Drive Disc Image, takes an Xbox360 Formatted (FATX) HDD image for the Xbox System/Linux storage purposes");
+  value.comments().push_back("# InstrTestsPath is the base path for instruction test files (.s) for use in the test runner");
+  value.comments().push_back("# InstrTestsBinPath is the path for the generated binary instruction test files (.bin)");
   value["Fuses"] = fuses;
   value["OneBL"] = oneBl;
   value["Nand"] = nand;
   value["ODDImage"] = oddImage;
   value["HDDImage"] = hddImage;
   value["ElfBinary"] = elfBinary;
+  value["InstrTestsPath"] = instrTestsPath;
+  value["InstrTestsBinPath"] = instrTestsBinPath;
 }
 bool _filepaths::verify_toml(toml::value &value) {
   to_toml(value);
@@ -390,6 +404,8 @@ bool _filepaths::verify_toml(toml::value &value) {
   cache_value(oddImage);
   cache_value(hddImage);
   cache_value(elfBinary);
+  cache_value(instrTestsPath);
+  cache_value(instrTestsBinPath);
   from_toml(value);
   verify_value(fuses);
   verify_value(oneBl);
@@ -397,6 +413,8 @@ bool _filepaths::verify_toml(toml::value &value) {
   verify_value(oddImage);
   verify_value(hddImage);
   verify_value(elfBinary);
+  verify_value(instrTestsPath);
+  verify_value(instrTestsBinPath);
   return true;
 }
 

@@ -176,6 +176,8 @@ inline struct _xcpu {
   u64 HW_INIT_SKIP_2 = 0;
   // 1BL Simulation
   bool simulate1BL = false;
+  // Instruction tests execution
+  bool runInstrTests = false;
   // TOML Conversion
   void to_toml(toml::value &value);
   void from_toml(const toml::value &value);
@@ -211,6 +213,10 @@ inline struct _filepaths {
   std::string hddImage = "xenonHDD.img";
   // Elf binary path
   std::string elfBinary = "kernel.elf";
+  // Instruction tests base path.
+  std::string instrTestsPath = "tests";
+  // Instruction tests bin path.
+  std::string instrTestsBinPath = "bin";
 
   // Corrects the paths on first time creation
   void correct(const fs::path &basePath) {
@@ -226,6 +232,10 @@ inline struct _filepaths {
     hddImage = hddImagePath.string();
     auto elfBinaryPath = basePath / elfBinary;
     elfBinary = elfBinaryPath.string();
+    auto instrTestsBasePath = basePath / instrTestsPath;
+    instrTestsPath = instrTestsBasePath.string();
+    auto instrTestsBinaryPath = basePath / instrTestsBinPath;
+    instrTestsBinPath = instrTestsBinaryPath.string();
   }
 
   // TOML Conversion

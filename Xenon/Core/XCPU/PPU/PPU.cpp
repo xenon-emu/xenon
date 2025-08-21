@@ -190,6 +190,12 @@ void PPU::StartExecution(bool setHRMOR) {
   // TSCR[WEXT] = 1??
   ppuState->SPR.TSCR = 0x100000UL;
 
+  // Check for instruction tests.
+  if (Config::xcpu.runInstrTests) {
+    LOG_INFO(Xenon, "Starting PowerPC instruction tests.");
+    PPCInterpreter::RunTests(ppuState.get());
+  }
+
   // If we're PPU0,thread0 then enable THRD 0 and set Reset Vector.
   if (ppuState->ppuID == 0 && setHRMOR) {
     ppuState->SPR.CTRL = 0x800000UL; // CTRL[TE0] = 1;

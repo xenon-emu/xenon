@@ -952,6 +952,8 @@ void PathSettings(Render::GUI *gui) {
   Config::filepaths.nand = gui->InputText("NAND", Config::filepaths.nand);
   Config::filepaths.elfBinary = gui->InputText("ELF Binary", Config::filepaths.elfBinary);
   Config::filepaths.oddImage = gui->InputText("ODD Image File (iso)", Config::filepaths.oddImage);
+  Config::filepaths.instrTestsPath = gui->InputText("Instruction tests base path (.s)", Config::filepaths.instrTestsPath);
+  Config::filepaths.instrTestsBinPath = gui->InputText("Instruction tests binaries path (.bin)", Config::filepaths.instrTestsBinPath);
   if (gui->Button("Reload files")) {
     XeMain::ReloadFiles();
   }
