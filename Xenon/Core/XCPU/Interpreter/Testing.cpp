@@ -324,6 +324,7 @@ public:
     // Set MSR to allow FPU and VXU execution.
     thread.SPR.MSR.FP = 1;
     thread.SPR.MSR.VXU = 1;
+    thread.SPR.MSR.SF = 0; // Tests in xenia were designed for 32-bit mode of operation.
 
     for (auto &it : testCase.testAnnotations) {
       if (it.first == "REGISTER_IN") {
@@ -513,6 +514,7 @@ bool PPCInterpreter::RunTests(PPU_STATE *ppuState) {
   thread.SPR.XER.XER_Hex = 0;
   thread.SPR.MSR.FP = 0;
   thread.SPR.MSR.VXU = 0;
+  thread.SPR.MSR.SF = 1;
   // Set NIA back to default.
   thread.NIA = 0x100;
 
