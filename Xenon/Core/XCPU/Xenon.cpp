@@ -5,9 +5,10 @@
 #include "Base/Logging/Log.h"
 #include "Interpreter/PPCInterpreter.h"
 
-Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPath) {
+Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPath, RAM* ramPtr) {
   // First, Initialize system bus.
   mainBus = inBus;
+  ram = ramPtr;
 
   // Set SROM to 0.
   memset(xenonContext.SROM, 0, XE_SROM_SIZE);
@@ -82,6 +83,7 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPa
   // Asign Interpreter global variables
   PPCInterpreter::CPUContext = &xenonContext;
   PPCInterpreter::sysBus = mainBus;
+  PPCInterpreter::ramPtr = ram;
 
   // Setup SOC blocks.
   xenonContext.socPRVBlock.get()->PowerOnResetStatus.AsBITS.SecureMode = 1; // CB Checks this.

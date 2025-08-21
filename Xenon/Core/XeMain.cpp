@@ -32,7 +32,7 @@ void XeMain::Create() {
 #endif
   CreateHostBridge();
   CreateRootBus();
-  xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses);
+  xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses, ram.get());
   pciBridge->RegisterIIC(xenonCPU->GetIICPointer());
 }
 
@@ -124,7 +124,7 @@ void XeMain::ShutdownCPU() {
 #endif
   // Reset the CPU
   xenonCPU.reset();
-  xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses);
+  xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses, ram.get());
   // Ensure the IIC pointer in the PCI bridge is correct
   pciBridge->RegisterIIC(xenonCPU->GetIICPointer());
   // Set the CPU as inactive
@@ -160,7 +160,7 @@ void XeMain::ReloadFiles() {
   if (!CPUStarted) {
     // Reset the CPU again to reload 1bl and fuses
     xenonCPU.reset();
-    xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses);
+    xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses, ram.get());
     // Ensure the IIC pointer in the PCI bridge is correct
     pciBridge->RegisterIIC(xenonCPU->GetIICPointer());
   }

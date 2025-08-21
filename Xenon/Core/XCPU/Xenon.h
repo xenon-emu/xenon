@@ -20,7 +20,7 @@
 
 class Xenon {
 public:
-  Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPath);
+  Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPath, RAM* ramPtr);
   ~Xenon();
 
   void Start(u64 resetVector = 0x100);
@@ -52,6 +52,9 @@ public:
 private:
   // System Bus
   RootBus *mainBus = nullptr;
+
+  // System RAM
+  RAM* ram;
 
   // Global Xenon CPU Content (shared between PPUs)
   XENON_CONTEXT xenonContext = {};

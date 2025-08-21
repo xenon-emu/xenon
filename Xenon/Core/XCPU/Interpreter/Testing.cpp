@@ -332,12 +332,11 @@ public:
         auto regValue = it.second.substr(spacePosition + 1);
         PPCInterpreter::SetRegFromString(ppuState, regName.c_str(), regValue.c_str());
       } else if (it.first == "MEMORY_IN") {
-        /*
         size_t spacePos = it.second.find(" ");
         auto addressStr = it.second.substr(0, spacePos);
         auto bytesStr = it.second.substr(spacePos + 1);
         u32 address = std::strtoul(addressStr.c_str(), nullptr, 16);
-        auto p = memory_->TranslateVirtual(address);
+        auto p = PPCInterpreter::MMUGetPointerFromRAM(address);
         const char *c = bytesStr.c_str();
         while (*c) {
           while (*c == ' ') ++c;
@@ -347,10 +346,9 @@ public:
           char ccs[3] = { c[0], c[1], 0 };
           c += 2;
           u32 b = std::strtoul(ccs, nullptr, 16);
-          *p = static_cast<uint8_t>(b);
+          *p = static_cast<u8>(b);
           ++p;
         }
-        */
       }
     }
     return true;
@@ -372,18 +370,17 @@ public:
           LOG_ERROR(Xenon, "[Testing]:     Actual: {} == {}\n", regName, actualValue);
         }
       } else if (it.first == "MEMORY_OUT") {
-        /*
         size_t spacePos = it.second.find(" ");
         auto addressStr = it.second.substr(0, spacePos);
         auto bytesStr = it.second.substr(spacePos + 1);
         u32 address = std::strtoul(addressStr.c_str(), nullptr, 16);
-        auto baseAddress = memory_->TranslateVirtual(address);
+        auto baseAddress = PPCInterpreter::MMUGetPointerFromRAM(address);
         auto p = baseAddress;
         const char *c = bytesStr.c_str();
         bool failed = false;
         size_t count = 0;
-        StringBuffer expecteds;
-        StringBuffer actuals;
+        std::string expecteds;
+        std::string actuals;
         while (*c) {
           while (*c == ' ') ++c;
           if (!*c) {
@@ -392,13 +389,12 @@ public:
           char ccs[3] = { c[0], c[1], 0 };
           c += 2;
           count++;
-          u32 current_address =
-            address + static_cast<u32>(p - baseAddress);
+          u32 current_address = address + static_cast<u32>(p - baseAddress);
           u32 expected = std::strtoul(ccs, nullptr, 16);
           u8 actual = *p;
 
-          expecteds.AppendFormat(" {:02X}", expected);
-          actuals.AppendFormat(" {:02X}", actual);
+          expecteds.append(" {:02X}", expected);
+          actuals.append(" {:02X}", actual);
 
           if (expected != actual) {
             any_failed = true;
@@ -407,11 +403,10 @@ public:
           ++p;
         }
         if (failed) {
-          LOG_ERROR(Xenon, "Memory {} assert failed:\n", address_str);
-          LOG_ERROR(Xenon, "  Expected:{}\n", expecteds.to_string());
-          LOG_ERROR(Xenon, "    Actual:{}\n", actuals.to_string());
+          LOG_ERROR(Xenon, "Memory {} assert failed:\n", addressStr);
+          LOG_ERROR(Xenon, "  Expected:{}\n", expecteds);
+          LOG_ERROR(Xenon, "    Actual:{}\n", actuals);
         }
-        */
       }
     }
     return !any_failed;
@@ -454,7 +449,7 @@ void ProtectedRunTest(TestSuite &testSuite, TestRunner &runner,
     LOG_ERROR(Xenon, "[Testing]:     TEST FAILED (UNSUPPORTED INSTRUCTION)");
     ++failedCount;
   }
-#endif // XE_COMPILER_MSVC
+#endif
 }
 
 bool PPCInterpreter::RunTests(PPU_STATE *ppuState) {

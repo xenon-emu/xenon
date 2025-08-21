@@ -1258,6 +1258,10 @@ void PPCInterpreter::MMUMemSet(PPU_STATE *ppuState,
   sysBus->MemSet(EA, data, size);
 }
 
+u8* PPCInterpreter::MMUGetPointerFromRAM(u64 EA) {
+  return ramPtr->GetPointerToAddress(EA);
+}
+
 // Reads 1 byte of memory
 u8 PPCInterpreter::MMURead8(PPU_STATE *ppuState, u64 EA, ePPUThread thr) {
   u8 data = 0;

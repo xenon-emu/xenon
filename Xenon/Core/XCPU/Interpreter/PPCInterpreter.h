@@ -15,6 +15,7 @@ namespace PPCInterpreter {
 extern PPCInterpreter::PPCDecoder ppcDecoder;
 extern RootBus *sysBus;
 extern XENON_CONTEXT *CPUContext;
+extern RAM *ramPtr;
 
 //
 //  Helper macros for instructions
@@ -183,6 +184,8 @@ void MMUMemCpyFromHost(PPU_STATE *ppuState, u64 EA, const void *source, u64 size
 void MMUMemCpy(PPU_STATE *ppuState, u64 EA, u32 source, u64 size, ePPUThread thr = ePPUThread_None);
 
 void MMUMemSet(PPU_STATE *ppuState, u64 EA, s32 data, u64 size, ePPUThread thr = ePPUThread_None);
+
+u8 *MMUGetPointerFromRAM(u64 EA);
 
 // Helper Read Routines.
 u8 MMURead8(PPU_STATE *ppuState, u64 EA, ePPUThread thr = ePPUThread_None);

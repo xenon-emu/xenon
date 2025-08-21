@@ -13,6 +13,7 @@ using namespace PPCInterpreter;
 XENON_CONTEXT* PPCInterpreter::CPUContext = nullptr;
 RootBus* PPCInterpreter::sysBus = nullptr;
 PPCInterpreter::PPCDecoder PPCInterpreter::ppcDecoder{};
+RAM *PPCInterpreter::ramPtr = nullptr;
 
 // Interpreter Single Instruction Processing.
 void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
