@@ -447,7 +447,7 @@ void ProtectedRunTest(TestSuite &testSuite, TestRunner &runner,
 #ifdef _WIN32
   } __except (filter(GetExceptionCode())) {
     LOG_ERROR(Xenon, "[Testing]:     TEST FAILED (UNSUPPORTED INSTRUCTION)");
-    ++failed_count;
+    ++failedCount;
   }
 #endif // XE_COMPILER_MSVC
 }
