@@ -16,30 +16,26 @@ std::filesystem::path testsBinPath;
 typedef std::vector<std::pair<std::string, std::string>> AnnotationList;
 
 void PPCInterpreter::SetRegFromString(PPU_STATE *ppuState, const char *regName, const char *regValue) {
-  int value;
+  s32 value;
   if (sscanf(regName, "r%d", &value) == 1) {
     curThread.GPR[value] = Base::getFromString<u64>(regValue);
-  }
-  else if (sscanf(regName, "f%d", &value) == 1) {
+  } else if (sscanf(regName, "f%d", &value) == 1) {
     curThread.FPR[value].setValue(Base::getFromString<f64>(regValue));
-  }
-  else if (sscanf(regName, "v%d", &value) == 1) {
+  }  else if (sscanf(regName, "v%d", &value) == 1) {
     curThread.VR[value] = Base::getFromString<Base::Vector128>(regValue);
-  }
-  else if (std::strcmp(regName, "cr") == 0) {
+  } else if (std::strcmp(regName, "cr") == 0) {
     curThread.CR.CR_Hex = static_cast<u32>(Base::getFromString<u64>(regValue));
-  }
-  else {
+  } else {
     LOG_ERROR(Xenon, "[Testing] SetRegFromString: Unrecognized register name: {}", regName);
   }
 }
 
 bool PPCInterpreter::CompareRegWithString(PPU_STATE *ppuState, const char *regName, const char *regValue, std::string &outRegValue) {
-  int value;
+  s32 value = 0;
   if (sscanf(regName, "r%d", &value) == 1) {
     u64 expected = Base::getFromString<u64>(regValue);
     if (curThread.GPR[value] != expected) {
-      outRegValue = fmt::format("{:016X}", curThread.GPR[value]);
+      outRegValue = FMT("{:016X}", curThread.GPR[value]);
       return false;
     }
     return true;
@@ -48,13 +44,13 @@ bool PPCInterpreter::CompareRegWithString(PPU_STATE *ppuState, const char *regNa
       // Special case: Treat float as integer.
       u64 expected = Base::getFromString<u64>(regValue, true);
       if (curThread.FPR[value].asU64() != expected) {
-        outRegValue = fmt::format("{:016X}", curThread.FPR[value].asU64());
+        outRegValue = FMT("{:016X}", curThread.FPR[value].asU64());
         return false;
       }
     } else {
       f64 expected = Base::getFromString<f64>(regValue);
       if (curThread.FPR[value].asDouble() != expected) {
-        outRegValue = fmt::format("{:.17f}", curThread.FPR[value].asDouble());
+        outRegValue = FMT("{:.17f}", curThread.FPR[value].asDouble());
         return false;
       }
     }
@@ -62,8 +58,7 @@ bool PPCInterpreter::CompareRegWithString(PPU_STATE *ppuState, const char *regNa
   } else if (sscanf(regName, "v%d", &value) == 1) {
     Base::Vector128 expected = Base::getFromString<Base::Vector128>(regValue);
     if (curThread.VR[value] != expected) {
-      outRegValue =
-        fmt::format("[{:08X}, {:08X}, {:08X}, {:08X}]", curThread.VR[value].dsword[0],
+      outRegValue = FMT("[{:08X}, {:08X}, {:08X}, {:08X}]", curThread.VR[value].dsword[0],
           curThread.VR[value].dsword[1], curThread.VR[value].dsword[2], curThread.VR[value].dsword[3]);
       return false;
     }
@@ -72,7 +67,7 @@ bool PPCInterpreter::CompareRegWithString(PPU_STATE *ppuState, const char *regNa
     u64 actual = curThread.CR.CR_Hex;
     u64 expected = static_cast<u32>(Base::getFromString<u64>(regValue));
     if (actual != expected) {
-      outRegValue = fmt::format("{:016X}", actual);
+      outRegValue = FMT("{:016X}", actual);
       return false;
     }
     return true;
@@ -204,7 +199,7 @@ private:
             Base::FS::PathToUTF8String(sourceFilePath));
           return false;
         }
-      } else if (strlen(start) > 3 & &start[0] == '#' & &start[1] == '_') {
+      } else if (strlen(start) > 3 && start[0] == '#' && start[1] == '_') {
         // Annotation.
         // We don't actually verify anything here.
         char *nextSpace = strchr(start + 3, ' ');
@@ -431,7 +426,7 @@ int filter(unsigned int code) {
 
 
 void ProtectedRunTest(TestSuite &testSuite, TestRunner &runner,
-  TestCase &testCase, int &failedCount,
+  TestCase &testCase, s32 &failedCount,
   s32 &passedCount) {
 #ifdef _WIN32
   __try {
