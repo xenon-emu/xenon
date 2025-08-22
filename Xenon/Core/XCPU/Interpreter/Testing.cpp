@@ -431,7 +431,7 @@ void ProtectedRunTest(TestSuite &testSuite, TestRunner &runner,
   s32 &passedCount) {
 #ifdef _WIN32
   __try {
-#endif // XE_COMPILER_MSVC
+#endif // _WIN32
 
     if (!runner.Setup(testSuite)) {
       LOG_ERROR(Xenon, "[Testing]:     TEST FAILED SETUP");
@@ -450,7 +450,7 @@ void ProtectedRunTest(TestSuite &testSuite, TestRunner &runner,
     LOG_ERROR(Xenon, "[Testing]:     TEST FAILED (UNSUPPORTED INSTRUCTION)");
     ++failedCount;
   }
-#endif
+#endif // _WIN32
 }
 
 bool PPCInterpreter::RunTests(PPU_STATE *ppuState) {

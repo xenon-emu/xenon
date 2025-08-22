@@ -1702,7 +1702,7 @@ void PPCInterpreter::PPCInterpreter_lvewx(PPU_STATE* ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  VRi(vd).dword[3 - eb] = data;
+  VRi(vd).dword[eb] = data;
 }
 
 // Load Vector Indexed (x'7C00 00CE')

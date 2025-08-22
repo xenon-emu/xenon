@@ -191,7 +191,7 @@ void PPU::StartExecution(bool setHRMOR) {
   ppuState->SPR.TSCR = 0x100000UL;
 
   // Check for instruction tests.
-  if (Config::xcpu.runInstrTests) {
+  if (Config::xcpu.runInstrTests && ppuState->ppuID == 0) {
     LOG_INFO(Xenon, "Starting PowerPC instruction tests.");
     PPCInterpreter::RunTests(ppuState.get());
   }

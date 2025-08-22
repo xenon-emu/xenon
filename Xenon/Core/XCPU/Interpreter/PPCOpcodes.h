@@ -64,7 +64,6 @@ D_STUB(vmsumuhm)
 D_STUB(vmsumuhs)
 D_STUB(vmsumshm)
 D_STUB(vmsumshs)
-D_STUB(vadduhm)
 D_STUB(vmaxuh)
 D_STUB(vrlh)
 D_STUB(vcmpequh)
@@ -123,13 +122,11 @@ D_STUB(vcmpgtsb)
 D_STUB(vcmpgtsb_)
 D_STUB(vmulesb)
 D_STUB(vpkpx)
-D_STUB(vaddshs)
 D_STUB(vminsh)
 D_STUB(vsrah)
 D_STUB(vcmpgtsh)
 D_STUB(vcmpgtsh_)
 D_STUB(vmulesh)
-D_STUB(vcfsx)
 D_STUB(vupkhpx)
 D_STUB(vaddsws)
 D_STUB(vminsw)
@@ -137,8 +134,6 @@ D_STUB(vsraw)
 D_STUB(vcmpgtsw)
 D_STUB(vcmpgtsw_)
 D_STUB(vctuxs)
-D_STUB(vcmpbfp)
-D_STUB(vcmpbfp_)
 D_STUB(vctsxs)
 D_STUB(vupklpx)
 D_STUB(vsububm)
@@ -146,7 +141,6 @@ D_STUB(vavgub)
 D_STUB(vmaxfp)
 D_STUB(vslo)
 D_STUB(vsubuhm)
-D_STUB(vavguh)
 D_STUB(vminfp)
 D_STUB(vsro)
 D_STUB(vsubuwm)
@@ -166,13 +160,10 @@ D_STUB(vsum4sbs)
 D_STUB(vsubshs)
 D_STUB(vsubsws)
 D_STUB(vsumsws)
-D_STUB(vaddfp128)
 D_STUB(vmaddfp128)
 D_STUB(vmsum3fp128)
 D_STUB(vpkshss128)
-D_STUB(vand128)
 D_STUB(vpkshus128)
-D_STUB(vandc128)
 D_STUB(vpkswss128)
 D_STUB(vnor128)
 D_STUB(vpkswus128)
@@ -382,11 +373,19 @@ extern void PPCInterpreter_dstst(PPU_STATE *ppuState);
 extern void PPCInterpreter_mfvscr(PPU_STATE *ppuState);
 extern void PPCInterpreter_mtvscr(PPU_STATE *ppuState);
 extern void PPCInterpreter_vaddfp(PPU_STATE *ppuState);
+extern void PPCInterpreter_vaddfp128(PPU_STATE *ppuState);
 extern void PPCInterpreter_vaddubs(PPU_STATE *ppuState);
+extern void PPCInterpreter_vadduhm(PPU_STATE *ppuState);
 extern void PPCInterpreter_vadduws(PPU_STATE *ppuState);
+extern void PPCInterpreter_vaddshs(PPU_STATE *ppuState);
+extern void PPCInterpreter_vavguh(PPU_STATE *ppuState);
 extern void PPCInterpreter_vand(PPU_STATE *ppuState);
+extern void PPCInterpreter_vand128(PPU_STATE *ppuState);
 extern void PPCInterpreter_vandc(PPU_STATE *ppuState);
+extern void PPCInterpreter_vandc128(PPU_STATE *ppuState);
+extern void PPCInterpreter_vcfsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_vcfux(PPU_STATE *ppuState);
+extern void PPCInterpreter_vcmpbfp(PPU_STATE *ppuState);
 extern void PPCInterpreter_vcmpeqfp(PPU_STATE *ppuState);
 extern void PPCInterpreter_vcmpeqfp128(PPU_STATE *ppuState);
 extern void PPCInterpreter_vcmpequwx(PPU_STATE *ppuState);

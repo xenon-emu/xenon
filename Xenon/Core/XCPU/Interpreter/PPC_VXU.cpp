@@ -63,6 +63,24 @@ void PPCInterpreter::PPCInterpreter_vaddfp(PPU_STATE *ppuState) {
   VRi(vd).flt[3] = VRi(va).flt[3] + VRi(vb).flt[3];
 }
 
+// Vector128 Add Floating Point
+void PPCInterpreter::PPCInterpreter_vaddfp128(PPU_STATE* ppuState) {
+  /*
+    do i = 0,127,32
+      (vD)i:i+31 <- RndToNearFP32((vA)i:i+31 + fp (vB)i:i+31)
+    end
+  */
+
+  // TODO: Rounding and NJ mode check.
+
+  CHECK_VXU;
+
+  VR(VMX128_VD128).flt[0] = VR(VMX128_VA128).flt[0] + VR(VMX128_VB128).flt[0];
+  VR(VMX128_VD128).flt[1] = VR(VMX128_VA128).flt[1] + VR(VMX128_VB128).flt[1];
+  VR(VMX128_VD128).flt[2] = VR(VMX128_VA128).flt[2] + VR(VMX128_VB128).flt[2];
+  VR(VMX128_VD128).flt[3] = VR(VMX128_VA128).flt[3] + VR(VMX128_VB128).flt[3];
+}
+
 static inline u8 vecSaturateU8(PPU_STATE *ppuState, u32 inValue) {
   if (inValue > 255) {
     // Set SAT bit in VSCR and truncate to 255.
@@ -70,6 +88,28 @@ static inline u8 vecSaturateU8(PPU_STATE *ppuState, u32 inValue) {
     inValue = 255;
   }
   return static_cast<u8>(inValue);
+}
+
+static inline s16 vecSaturateS16(PPU_STATE* ppuState, s32 inValue) {
+  if (inValue > 32767) {
+    // Set SAT bit in VSCR and truncate to 32767.
+    curThread.VSCR.SAT = 1;
+    inValue = 32767;
+  } else if(inValue < -32768){
+    // Set SAT bit in VSCR and truncate to -32768.
+    curThread.VSCR.SAT = 1;
+    inValue = -32768;
+  }
+  return static_cast<s16>(inValue);
+}
+
+static inline u32 vecSaturateU32(PPU_STATE* ppuState, u64 inValue) {
+  if (inValue > UINT_MAX) {
+    // Set SAT bit in VSCR and truncate to 2^32 - 1.
+    curThread.VSCR.SAT = 1;
+    inValue = UINT_MAX;
+  }
+  return static_cast<u32>(inValue);
 }
 
 // Vector Add Unsigned Byte Saturate ('x1000 0200')
@@ -83,13 +123,13 @@ void PPCInterpreter::PPCInterpreter_vaddubs(PPU_STATE *ppuState) {
   }
 }
 
-static inline u32 vecSaturate32(PPU_STATE *ppuState, u64 inValue) {
-  if (inValue > UINT_MAX) {
-    // Set SAT bit in VSCR and truncate to 2^32 - 1.
-    curThread.VSCR.SAT = 1;
-    inValue = UINT_MAX;
+// Vector Add Unsigned Halfword Modulo (0x1000 0040)
+void PPCInterpreter::PPCInterpreter_vadduhm(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  for (u8 idx = 0; idx < 8; idx++) {
+    VRi(vd).word[idx] = VRi(va).word[idx] + VRi(vb).word[idx];
   }
-  return static_cast<u32>(inValue);
 }
 
 // Vector Add Unsigned Word Saturate (x'1000 0280')
@@ -98,10 +138,29 @@ void PPCInterpreter::PPCInterpreter_vadduws(PPU_STATE *ppuState) {
 
   CHECK_VXU;
 
-  VRi(vd).dword[0] = vecSaturate32(ppuState, static_cast<u64>(VRi(va).dword[0]) + static_cast<u64>(VRi(vb).dword[0]));
-  VRi(vd).dword[1] = vecSaturate32(ppuState, static_cast<u64>(VRi(va).dword[1]) + static_cast<u64>(VRi(vb).dword[1]));
-  VRi(vd).dword[2] = vecSaturate32(ppuState, static_cast<u64>(VRi(va).dword[2]) + static_cast<u64>(VRi(vb).dword[2]));
-  VRi(vd).dword[3] = vecSaturate32(ppuState, static_cast<u64>(VRi(va).dword[3]) + static_cast<u64>(VRi(vb).dword[3]));
+  VRi(vd).dword[0] = vecSaturateU32(ppuState, static_cast<u64>(VRi(va).dword[0]) + static_cast<u64>(VRi(vb).dword[0]));
+  VRi(vd).dword[1] = vecSaturateU32(ppuState, static_cast<u64>(VRi(va).dword[1]) + static_cast<u64>(VRi(vb).dword[1]));
+  VRi(vd).dword[2] = vecSaturateU32(ppuState, static_cast<u64>(VRi(va).dword[2]) + static_cast<u64>(VRi(vb).dword[2]));
+  VRi(vd).dword[3] = vecSaturateU32(ppuState, static_cast<u64>(VRi(va).dword[3]) + static_cast<u64>(VRi(vb).dword[3]));
+}
+
+// Vector Add Signed Halfword Saturate(0x1000 0340)
+void PPCInterpreter::PPCInterpreter_vaddshs(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  VRi(vd).sword[0] = vecSaturateS16(ppuState, static_cast<u32>(VRi(va).sword[0]) + static_cast<u32>(VRi(vb).sword[0]));
+  VRi(vd).sword[1] = vecSaturateS16(ppuState, static_cast<u32>(VRi(va).sword[1]) + static_cast<u32>(VRi(vb).sword[1]));
+  VRi(vd).sword[2] = vecSaturateS16(ppuState, static_cast<u32>(VRi(va).sword[2]) + static_cast<u32>(VRi(vb).sword[2]));
+  VRi(vd).sword[3] = vecSaturateS16(ppuState, static_cast<u32>(VRi(va).sword[3]) + static_cast<u32>(VRi(vb).sword[3]));
+}
+
+// Vector Average Unsigned Halfword (x'1000 0442')
+void PPCInterpreter::PPCInterpreter_vavguh(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  for (u8 idx = 0; idx < 8; idx++) {
+    VRi(vd).word[idx] = static_cast<u16>((static_cast<u32>(VRi(va).word[idx]) + static_cast<u32>(VRi(vb).word[idx]) + 1) >> 1);
+  }
 }
 
 // Vector Logical AND (x'1000 0404')
@@ -118,6 +177,20 @@ void PPCInterpreter::PPCInterpreter_vand(PPU_STATE *ppuState) {
   VRi(vd).dword[3] = VRi(va).dword[3] & VRi(vb).dword[3];
 }
 
+// Vector128 Logical AND
+void PPCInterpreter::PPCInterpreter_vand128(PPU_STATE* ppuState) {
+  /*
+  vD <- (vA) & (vB)
+  */
+
+  CHECK_VXU;
+
+  VR(VMX128_VD128).dword[0] = VR(VMX128_VA128).dword[0] & VR(VMX128_VB128).dword[0];
+  VR(VMX128_VD128).dword[1] = VR(VMX128_VA128).dword[1] & VR(VMX128_VB128).dword[1];
+  VR(VMX128_VD128).dword[2] = VR(VMX128_VA128).dword[2] & VR(VMX128_VB128).dword[2];
+  VR(VMX128_VD128).dword[3] = VR(VMX128_VA128).dword[3] & VR(VMX128_VB128).dword[3];
+}
+
 // Vector Logical AND with Complement (x'1000 0444')
 void PPCInterpreter::PPCInterpreter_vandc(PPU_STATE *ppuState) {
   /*
@@ -130,6 +203,31 @@ void PPCInterpreter::PPCInterpreter_vandc(PPU_STATE *ppuState) {
   VRi(vd).dword[1] = VRi(va).dword[1] & ~VRi(vb).dword[1];
   VRi(vd).dword[2] = VRi(va).dword[2] & ~VRi(vb).dword[2];
   VRi(vd).dword[3] = VRi(va).dword[3] & ~VRi(vb).dword[3];
+}
+
+// Vector128 Logical AND with Complement
+void PPCInterpreter::PPCInterpreter_vandc128(PPU_STATE* ppuState) {
+  /*
+  vD <- (vA) & ~(vB)
+  */
+
+  CHECK_VXU;
+
+  VR(VMX128_VD128).dword[0] = VR(VMX128_VA128).dword[0] & ~VR(VMX128_VB128).dword[0];
+  VR(VMX128_VD128).dword[1] = VR(VMX128_VA128).dword[1] & ~VR(VMX128_VB128).dword[1];
+  VR(VMX128_VD128).dword[2] = VR(VMX128_VA128).dword[2] & ~VR(VMX128_VB128).dword[2];
+  VR(VMX128_VD128).dword[3] = VR(VMX128_VA128).dword[3] & ~VR(VMX128_VB128).dword[3];
+}
+
+// Vector convert from Signed Fixed-Point Word (x'1000 034A')
+void PPCInterpreter::PPCInterpreter_vcfsx(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  float fltUimm = std::ldexp(1.0f, -int(_instr.vuimm));
+  VRi(vd).flt[0] = static_cast<f32>(VRi(vb).dsword[0]) * fltUimm;
+  VRi(vd).flt[1] = static_cast<f32>(VRi(vb).dsword[1]) * fltUimm;
+  VRi(vd).flt[2] = static_cast<f32>(VRi(vb).dsword[2]) * fltUimm;
+  VRi(vd).flt[3] = static_cast<f32>(VRi(vb).dsword[3]) * fltUimm;
 }
 
 // Vector Convert from Unsigned Fixed-Point Word (x'1000 030A')
@@ -150,6 +248,35 @@ void PPCInterpreter::PPCInterpreter_vcfux(PPU_STATE *ppuState) {
   VRi(vd).flt[1] = VRi(va).dword[1] / divisor;
   VRi(vd).flt[2] = VRi(va).dword[2] / divisor;
   VRi(vd).flt[3] = VRi(va).dword[3] / divisor;
+}
+
+static u32 vcmpbfpHelper(const f32 fra, const f32 frb)
+{
+  u32 returnValue = 0;
+  static const u32 retLE = 0x80000000;
+  static const u32 retGE = 0x40000000;
+  if (isnan<f32>(fra) || isnan<f32>(frb)) return retLE | retGE;
+  returnValue |= (fra <= frb ? 0 : retLE);
+  returnValue |= (fra >= -frb ? 0 : retGE);
+  
+  return returnValue;
+}
+
+// Vector Compare Bounds Floating Point (x'1000 03C6')
+void PPCInterpreter::PPCInterpreter_vcmpbfp(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  u32 regMask = 0;
+  regMask |= VRi(vd).dword[0] = vcmpbfpHelper(VRi(va).flt[0], VRi(vb).flt[0]);
+  regMask |= VRi(vd).dword[1] = vcmpbfpHelper(VRi(va).flt[1], VRi(vb).flt[1]);
+  regMask |= VRi(vd).dword[2] = vcmpbfpHelper(VRi(va).flt[2], VRi(vb).flt[2]);
+  regMask |= VRi(vd).dword[3] = vcmpbfpHelper(VRi(va).flt[3], VRi(vb).flt[3]);
+
+  if (_instr.vrc) {
+    u8 crValue = 0;
+    crValue = (regMask == 0) ? 0b0010 : 0b0000;
+    ppcUpdateCR(ppuState, 6, crValue);
+  }
 }
 
 // Vector Compare Equal-to-Floating Point (x'1000 00C6')
