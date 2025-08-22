@@ -279,6 +279,23 @@ void PPCInterpreter::PPCInterpreter_vcmpbfp(PPU_STATE* ppuState) {
   }
 }
 
+// Vector128 Compare Bounds Floating Point
+void PPCInterpreter::PPCInterpreter_vcmpbfp128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  u32 regMask = 0;
+  regMask |= VR(VMX128_R_VD128).dword[0] = vcmpbfpHelper(VR(VMX128_R_VA128).flt[0], VR(VMX128_R_VB128).flt[0]);
+  regMask |= VR(VMX128_R_VD128).dword[1] = vcmpbfpHelper(VR(VMX128_R_VA128).flt[1], VR(VMX128_R_VB128).flt[1]);
+  regMask |= VR(VMX128_R_VD128).dword[2] = vcmpbfpHelper(VR(VMX128_R_VA128).flt[2], VR(VMX128_R_VB128).flt[2]);
+  regMask |= VR(VMX128_R_VD128).dword[3] = vcmpbfpHelper(VR(VMX128_R_VA128).flt[3], VR(VMX128_R_VB128).flt[3]);
+
+  if (_instr.v128rc) {
+    u8 crValue = 0;
+    crValue = (regMask == 0) ? 0b0010 : 0b0000;
+    ppcUpdateCR(ppuState, 6, crValue);
+  }
+}
+
 // Vector Compare Equal-to-Floating Point (x'1000 00C6')
 void PPCInterpreter::PPCInterpreter_vcmpeqfp(PPU_STATE *ppuState) {
   CHECK_VXU;
@@ -313,12 +330,12 @@ void PPCInterpreter::PPCInterpreter_vcmpeqfp(PPU_STATE *ppuState) {
 void PPCInterpreter::PPCInterpreter_vcmpeqfp128(PPU_STATE *ppuState) {
   CHECK_VXU;
 
-  VR(VMX128_R_VD128).dword[0] = ((VR(VMX128_R_VB128).flt[0] == VR(VMX128_R_VB128).flt[0]) ? 0xFFFFFFFF : 0x00000000);
-  VR(VMX128_R_VD128).dword[1] = ((VR(VMX128_R_VB128).flt[1] == VR(VMX128_R_VB128).flt[1]) ? 0xFFFFFFFF : 0x00000000);
-  VR(VMX128_R_VD128).dword[2] = ((VR(VMX128_R_VB128).flt[2] == VR(VMX128_R_VB128).flt[2]) ? 0xFFFFFFFF : 0x00000000);
-  VR(VMX128_R_VD128).dword[3] = ((VR(VMX128_R_VB128).flt[3] == VR(VMX128_R_VB128).flt[3]) ? 0xFFFFFFFF : 0x00000000);
+  VR(VMX128_R_VD128).dword[0] = ((VR(VMX128_R_VA128).flt[0] == VR(VMX128_R_VB128).flt[0]) ? 0xFFFFFFFF : 0x00000000);
+  VR(VMX128_R_VD128).dword[1] = ((VR(VMX128_R_VA128).flt[1] == VR(VMX128_R_VB128).flt[1]) ? 0xFFFFFFFF : 0x00000000);
+  VR(VMX128_R_VD128).dword[2] = ((VR(VMX128_R_VA128).flt[2] == VR(VMX128_R_VB128).flt[2]) ? 0xFFFFFFFF : 0x00000000);
+  VR(VMX128_R_VD128).dword[3] = ((VR(VMX128_R_VA128).flt[3] == VR(VMX128_R_VB128).flt[3]) ? 0xFFFFFFFF : 0x00000000);
 
-  if (_instr.vrc) {
+  if (_instr.v128rc) {
     u8 crValue = 0;
     bool allEqual = false;
     bool allNotEqual = false;
@@ -380,7 +397,7 @@ void PPCInterpreter::PPCInterpreter_vcmpequw128(PPU_STATE *ppuState) {
   VR(VMX128_R_VD128).dword[2] = ((VR(VMX128_R_VA128).dword[2] == VR(VMX128_R_VB128).dword[2]) ? 0xFFFFFFFF : 0x00000000);
   VR(VMX128_R_VD128).dword[3] = ((VR(VMX128_R_VA128).dword[3] == VR(VMX128_R_VB128).dword[3]) ? 0xFFFFFFFF : 0x00000000);
 
-  if (_instr.vrc) {
+  if (_instr.v128rc) {
     u8 crValue = 0;
     bool allEqual = false;
     bool allNotEqual = false;

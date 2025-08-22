@@ -60,6 +60,7 @@ union PPCOpcode {
   PPCBitfield<u32, 11, 5> crba; // 11..15
   PPCBitfield<u32, 6, 5> crbd; // 6..10
   PPCBitfield<u32, 21, 1> vrc; // 31
+  PPCBitfield<u32, 25, 1> v128rc; // 25
   PPCBitfield<u32, 31, 1> rc; // 31
   PPCBitfield<u32, 26, 5> me32; // 26..30
   PPCBitfield<u32, 21, 5> mb32; // 21..25
