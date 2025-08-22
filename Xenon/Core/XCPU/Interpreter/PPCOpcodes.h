@@ -134,7 +134,6 @@ D_STUB(vsraw)
 D_STUB(vcmpgtsw)
 D_STUB(vcmpgtsw_)
 D_STUB(vctuxs)
-D_STUB(vctsxs)
 D_STUB(vupklpx)
 D_STUB(vsububm)
 D_STUB(vavgub)
@@ -382,6 +381,7 @@ extern void PPCInterpreter_vand(PPU_STATE *ppuState);
 extern void PPCInterpreter_vand128(PPU_STATE *ppuState);
 extern void PPCInterpreter_vandc(PPU_STATE *ppuState);
 extern void PPCInterpreter_vandc128(PPU_STATE *ppuState);
+extern void PPCInterpreter_vctsxs(PPU_STATE *ppuState);
 extern void PPCInterpreter_vcfsx(PPU_STATE *ppuState);
 extern void PPCInterpreter_vcfux(PPU_STATE *ppuState);
 extern void PPCInterpreter_vcmpbfp(PPU_STATE *ppuState);

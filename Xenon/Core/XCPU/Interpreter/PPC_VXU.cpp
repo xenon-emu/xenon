@@ -103,6 +103,17 @@ static inline s16 vecSaturateS16(PPU_STATE* ppuState, s32 inValue) {
   return static_cast<s16>(inValue);
 }
 
+static inline s32 vecSaturateS32(PPU_STATE* ppuState, s64 inValue) {
+  if (inValue < INT32_MIN) {
+    curThread.VSCR.SAT = 1;
+    inValue = INT32_MIN;
+  } else if (inValue > INT32_MAX) {
+    curThread.VSCR.SAT = 1;
+    inValue = INT32_MAX;
+  }
+  return static_cast<s32>(inValue);
+}
+
 static inline u32 vecSaturateU32(PPU_STATE* ppuState, u64 inValue) {
   if (inValue > UINT_MAX) {
     // Set SAT bit in VSCR and truncate to 2^32 - 1.
@@ -219,6 +230,17 @@ void PPCInterpreter::PPCInterpreter_vandc128(PPU_STATE* ppuState) {
   VR(VMX128_VD128).dword[3] = VR(VMX128_VA128).dword[3] & ~VR(VMX128_VB128).dword[3];
 }
 
+// Vector Convert to Signed Fixed-Point Word Saturate (x'1000 03CA')
+void PPCInterpreter::PPCInterpreter_vctsxs(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  f32 fuimm = static_cast<f32>(std::exp2(static_cast<u32>(_instr.vuimm)));
+  VRi(vd).dsword[0] = vecSaturateS32(ppuState, static_cast<s64>(static_cast<f64>(VRi(vb).flt[0]) * fuimm));
+  VRi(vd).dsword[1] = vecSaturateS32(ppuState, static_cast<s64>(static_cast<f64>(VRi(vb).flt[1]) * fuimm));
+  VRi(vd).dsword[2] = vecSaturateS32(ppuState, static_cast<s64>(static_cast<f64>(VRi(vb).flt[2]) * fuimm));
+  VRi(vd).dsword[3] = vecSaturateS32(ppuState, static_cast<s64>(static_cast<f64>(VRi(vb).flt[3]) * fuimm));
+}
+
 // Vector convert from Signed Fixed-Point Word (x'1000 034A')
 void PPCInterpreter::PPCInterpreter_vcfsx(PPU_STATE* ppuState) {
   CHECK_VXU;
@@ -255,7 +277,7 @@ static u32 vcmpbfpHelper(const f32 fra, const f32 frb)
   u32 returnValue = 0;
   static const u32 retLE = 0x80000000;
   static const u32 retGE = 0x40000000;
-  if (isnan<f32>(fra) || isnan<f32>(frb)) return retLE | retGE;
+  if (std::isnan<f32>(fra) || std::isnan<f32>(frb)) return retLE | retGE;
   returnValue |= (fra <= frb ? 0 : retLE);
   returnValue |= (fra >= -frb ? 0 : retGE);
   
