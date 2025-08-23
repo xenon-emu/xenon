@@ -1,4 +1,5 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
+#include <math.h>
 
 #include "PPCInterpreter.h"
 
@@ -277,7 +278,7 @@ static u32 vcmpbfpHelper(const f32 fra, const f32 frb)
   u32 returnValue = 0;
   static const u32 retLE = 0x80000000;
   static const u32 retGE = 0x40000000;
-  if (std::isnan<f32>(fra) || std::isnan<f32>(frb)) return retLE | retGE;
+  if (isnan<f32>(fra) || isnan<f32>(frb)) return retLE | retGE;
   returnValue |= (fra <= frb ? 0 : retLE);
   returnValue |= (fra >= -frb ? 0 : retGE);
   
