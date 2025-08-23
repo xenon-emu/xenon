@@ -206,5 +206,6 @@ private:
   bool ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packetData, u32 dataCount, u32 vizQueryCondition, const char *opCodeName);
   bool ExecutePacketType3_DRAW_INDX(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
   bool ExecutePacketType3_DRAW_INDX_2(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
+  bool ExecutePacketType3_LOAD_ALU_CONSTANT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
 };
 }

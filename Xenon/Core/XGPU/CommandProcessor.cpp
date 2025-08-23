@@ -335,6 +335,9 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
   case Xe::XGPU::PM4_IM_LOAD_IMMEDIATE:
     result = ExecutePacketType3_IM_LOAD_IMMEDIATE(ringBuffer, packetData, dataCount);
     break;
+  case Xe::XGPU::PM4_LOAD_ALU_CONSTANT:
+    result = ExecutePacketType3_LOAD_ALU_CONSTANT(ringBuffer, packetData, dataCount);
+    break;
   case Xe::XGPU::PM4_SET_CONSTANT:
     result = ExecutePacketType3_SET_CONSTANT(ringBuffer, packetData, dataCount);
     break;
@@ -1171,6 +1174,45 @@ bool CommandProcessor::ExecutePacketType3_DRAW_INDX_2(RingBuffer *ringBuffer, u3
   // No VIZ query token.
 
   return ExecutePacketType3_DRAW(ringBuffer, packetData, dataCount, 0, "PM4_DRAW_INDX_2");
+}
+
+bool CommandProcessor::ExecutePacketType3_LOAD_ALU_CONSTANT(RingBuffer* ringBuffer, u32 packetData, u32 dataCount) {
+  // Load Shader constants from memory.
+  u32 readAddress = ringBuffer->ReadAndSwap<u32>();
+  readAddress &= 0x3FFFFFFF;
+  u32 offsetType = ringBuffer->ReadAndSwap<u32>();
+  u32 index = offsetType & 0x7FF;
+  u32 sizeInDwords = ringBuffer->ReadAndSwap<u32>();
+  sizeInDwords &= 0xFFF;
+  u32 type = (offsetType >> 16) & 0xFF;
+  switch (type) {
+  case 0:  // ALU
+    index += 0x4000;
+    break;
+  case 1:  // FETCH
+    index += 0x4800;
+    break;
+  case 2:  // BOOL
+    index += 0x4900;
+    break;
+  case 3:  // LOOP
+    index += 0x4908;
+    break;
+  case 4:  // REGISTERS
+    index += 0x2000;
+    break;
+  default:
+    LOG_ERROR(Xenos, "[CP] [PT3:LOAD_ALU_CONSTANT]: Unrecognized Constant Type provided.");
+    return true;
+  }
+
+  for (u32 n = 0; n < sizeInDwords; n++, index++) {
+    u32 data = 0;
+    u8* dataPtr = ram->GetPointerToAddress(readAddress + n * 4);
+    memcpy(&data, dataPtr, sizeof(data));
+    state->WriteRegister(static_cast<XeRegister>(index), data);
+  }
+  return true;
 }
 
 } // namespace Xe::XGPU
