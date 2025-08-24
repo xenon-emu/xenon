@@ -163,9 +163,6 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
     static thread_local std::unordered_map<u32, u32> opcodeHashCache;
     u32 opName = opcodeHashCache.contains(opcode) ? opcodeHashCache[opcode] : opcodeHashCache[opcode] = Base::JoaatStringHash(PPCInterpreter::ppcDecoder.getNameTable()[decodedInstr]);
 
-    // Handle skips
-    bool skip = false;
-
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
     auto patchGPR = [&](s32 reg, u64 val) {
       x86::Gp temp = compiler.newGpq();
@@ -173,7 +170,6 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
       compiler.mov(jitBuilder->threadCtx->array(&PPU_THREAD_REGISTERS::GPR).Ptr(reg), temp);
     };
     switch (thread.CIA) {
-    case 0x80081830: skip = true; break;
     case 0x0200C870: patchGPR(5, 0); break;
     // RGH 2 17489 in a JRunner Corona XDKBuild
     case 0x0200C7F0: patchGPR(3, 0); break;
@@ -184,6 +180,12 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
     // Needed for FSB_FUNCTION_2
     case 0x1003598ULL: patchGPR(11, 0x0E); break;
     case 0x1003644ULL: patchGPR(11, 0x02); break;
+    // Bootanim load skip
+    case 0x80081EA4: patchGPR(3, 0x0); break;
+    // VdRetrainEDRAM return 0
+    case 0x800FC288: patchGPR(3, 0x0); break;
+    // VdIsHSIOTrainingSucceeded return 1
+    case 0x800F9130: patchGPR(3, 0x1); break;
     // Pretend ARGON hardware is present, to avoid the call
     case 0x800819E0:
     case 0x80081A60: {
@@ -204,14 +206,14 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
       readNextInstr = false;
 
     // Call JIT emitter
-    if (!skip && readNextInstr) {
+    if (readNextInstr) {
       bool invalidInstr = emitter == &PPCInterpreter::PPCInterpreterJIT_invalid;
       if (ppu->currentExecMode == eExecutorMode::Hybrid && invalidInstr) {
-        auto intEmitter = PPCInterpreter::ppcDecoder.getTable()[decodedInstr];
+        auto function = PPCInterpreter::ppcDecoder.decode(opcode);
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
         InvokeNode *out = nullptr;
-        compiler.invoke(&out, imm((void *)intEmitter), FuncSignature::build<void, void *>());
+        compiler.invoke(&out, imm((void *)function), FuncSignature::build<void, void *>());
         out->setArg(0, jitBuilder->ppuState->Base());
 #endif
       } else {
@@ -278,13 +280,11 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt) {
     // This *must* be done here simply because of how we handle JIT.
     // We run until the start of a block, which is a branch opcode (or until it's a invalid instruction),
     // but these are branch opcodes, designed to avoid calling them.
-    // So, these will break under BuildJITBlock, and tp avoid the issue, it's done here
+    // So, these will break under BuildJITBlock, and to avoid the issue, it's done here
     bool skipBlock = false;
     switch (thread.NIA) {
     // INIT_POWER_MODE bypass 2.0.17489.0
     case 0x80081764:
-    // XAudioRenderDriverInitialize bypass 2.0.17489.0
-    case 0x8018B0EC:
     // XDK 17.489.0 AudioChipCorder Device Detect bypass. This is not needed for
     // older console revisions
     case 0x801AF580:
