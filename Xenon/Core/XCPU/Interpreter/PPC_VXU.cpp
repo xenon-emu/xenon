@@ -1,5 +1,5 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
-#include <math.h>
+#include <cmath>
 
 #include "PPCInterpreter.h"
 
@@ -419,6 +419,36 @@ void PPCInterpreter::PPCInterpreter_vcmpequw128(PPU_STATE *ppuState) {
   VR(VMX128_R_VD128).dword[1] = ((VR(VMX128_R_VA128).dword[1] == VR(VMX128_R_VB128).dword[1]) ? 0xFFFFFFFF : 0x00000000);
   VR(VMX128_R_VD128).dword[2] = ((VR(VMX128_R_VA128).dword[2] == VR(VMX128_R_VB128).dword[2]) ? 0xFFFFFFFF : 0x00000000);
   VR(VMX128_R_VD128).dword[3] = ((VR(VMX128_R_VA128).dword[3] == VR(VMX128_R_VB128).dword[3]) ? 0xFFFFFFFF : 0x00000000);
+
+  if (_instr.v128rc) {
+    u8 crValue = 0;
+    bool allEqual = false;
+    bool allNotEqual = false;
+
+    if (VR(VMX128_R_VD128).dword[0] == 0xFFFFFFFF && VR(VMX128_R_VD128).dword[1] == 0xFFFFFFFF
+      && VR(VMX128_R_VD128).dword[2] == 0xFFFFFFFF && VR(VMX128_R_VD128).dword[3] == 0xFFFFFFFF) {
+      allEqual = true;
+    }
+
+    if (VR(VMX128_R_VD128).dword[0] == 0 && VR(VMX128_R_VD128).dword[1] == 0 && VR(VMX128_R_VD128).dword[2] == 0 && VR(VMX128_R_VD128).dword[3] == 0) {
+      allNotEqual = true;
+    }
+
+    crValue |= allEqual ? 0b1000 : 0;
+    crValue |= allNotEqual ? 0b0010 : 0;
+
+    ppcUpdateCR(ppuState, 6, crValue);
+  }
+}
+
+// Vector128 Compare Greater-Than-or-Equal-to Floating-Point
+void PPCInterpreter::PPCInterpreter_vcmpgefp128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  VR(VMX128_R_VD128).dword[0] = ((VR(VMX128_R_VA128).flt[0] >= VR(VMX128_R_VB128).flt[0]) ? 0xFFFFFFFF : 0x00000000);
+  VR(VMX128_R_VD128).dword[1] = ((VR(VMX128_R_VA128).flt[1] >= VR(VMX128_R_VB128).flt[1]) ? 0xFFFFFFFF : 0x00000000);
+  VR(VMX128_R_VD128).dword[2] = ((VR(VMX128_R_VA128).flt[2] >= VR(VMX128_R_VB128).flt[2]) ? 0xFFFFFFFF : 0x00000000);
+  VR(VMX128_R_VD128).dword[3] = ((VR(VMX128_R_VA128).flt[3] >= VR(VMX128_R_VB128).flt[3]) ? 0xFFFFFFFF : 0x00000000);
 
   if (_instr.v128rc) {
     u8 crValue = 0;
