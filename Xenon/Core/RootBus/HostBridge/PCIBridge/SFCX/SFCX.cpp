@@ -503,6 +503,11 @@ void Xe::PCIDev::SFCX::sfcxMainLoop() {
       case BLOCK_ERASE:
         sfcxEraseBlock();
         break;
+      case UNLOCK_CMD_0:
+        LOG_DEBUG(SFCX, "Performing unlock sequence for NAND write.");
+        break;
+      case UNLOCK_CMD_1:
+        break;
       default:
         LOG_ERROR(SFCX, "Unrecognized command was issued. 0x{:X}. Issuing interrupt if enabled.", sfcxState.commandReg);
         break;
@@ -560,10 +565,8 @@ void Xe::PCIDev::SFCX::sfcxReadPageFromNAND(bool physical) {
 
   if (cpi == 0 && XeMain::GetCPU())
     cpi = XeMain::GetCPU()->GetCPI();
-#ifndef SFCX_DEBUG
   // Simulate the time required to read
-  std::this_thread::sleep_for(2ms * cpi);
-#endif
+  std::this_thread::sleep_for(25ns * cpi);
 
   // Perform the read
   memcpy(sfcxState.pageBuffer, &rawImageData[nandOffset], physical ? sfcxState.pageSizePhys : sfcxState.pageSize);
@@ -584,10 +587,8 @@ void Xe::PCIDev::SFCX::sfcxEraseBlock() {
 
   if (cpi == 0 && XeMain::GetCPU())
     cpi = XeMain::GetCPU()->GetCPI();
-#ifndef SFCX_DEBUG
   // Simulate the time required to erase
-  std::this_thread::sleep_for(50ns * cpi);
-#endif
+  std::this_thread::sleep_for(25ns * cpi);
 
   // Perform the erase
   memset(&rawImageData[nandOffset], 0, sfcxState.blockSizePhys);
@@ -643,7 +644,7 @@ void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND(bool physical) {
       cpi = XeMain::GetCPU()->GetCPI();
 
     // Add a small delay to simulate the time it takes to read the page.
-    std::this_thread::sleep_for(std::chrono::nanoseconds(50 * cpi));
+    std::this_thread::sleep_for(25ns * cpi);
 
     // Increase read address
     physAddr += sfcxState.pageSizePhys;
@@ -689,7 +690,7 @@ void Xe::PCIDev::SFCX::sfcxDoDMAtoNAND() {
     if (cpi == 0 && XeMain::GetCPU())
       cpi = XeMain::GetCPU()->GetCPI();
     // Add a small delay to simulate the time it takes to read the page.
-    std::this_thread::sleep_for(std::chrono::nanoseconds(100 * cpi));
+    std::this_thread::sleep_for(25ns * cpi);
 
     // Increase read address
     physAddr += sfcxState.pageSizePhys;
