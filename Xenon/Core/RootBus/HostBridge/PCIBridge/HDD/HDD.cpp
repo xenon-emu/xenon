@@ -376,6 +376,7 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
       case ATA_COMMAND_SET_FEATURES:
         switch (ataState.regs.features) {
         case ATA_SF_SUBCOMMAND_SET_TRANSFER_MODE: {
+#ifdef HDD_DEBUG
           ATA_TRANSFER_MODE mode = static_cast<ATA_TRANSFER_MODE>(ataState.regs.sectorCount);
           switch (mode) {
           case ATA_TRANSFER_MODE::PIO:
@@ -427,6 +428,7 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
             LOG_DEBUG(HDD, "[CMD](SET_TRANSFER_MODE): Setting transfer mode to {:#x}", ataState.regs.sectorCount);
             break;
           }
+#endif // HDD_DEBUG
           ataState.regs.ataTransferMode = inData;
         }
         break;
@@ -459,9 +461,10 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
       memcpy(&ataState.regs.SControl, data, size);
       // Write also on PCI config space data.
       memcpy(&pciConfigSpace.data[0xC8], &data, 4);
-
+#ifdef HDD_DEBUG
       if (ataState.regs.SControl & 1)
         LOG_DEBUG(HDD, "[SCONTROL]: Resetting SATA link!");
+#endif // HDD_DEBUG
       break;
     case ATA_REG_SACTIVE:
       memcpy(&ataState.regs.SActive, data, size);
