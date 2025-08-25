@@ -1674,6 +1674,75 @@ void PPCInterpreter::PPCInterpreter_lfsu(PPU_STATE *ppuState) {
 // Load Vector
 //
 
+// Load Vector Element Byte Indexed (x'7C00 000E')
+void PPCInterpreter::PPCInterpreter_lvebx(PPU_STATE* ppuState) {
+  /*
+   if rA=0 then b <- 0
+   else         b <- (rA)
+   EA <- b + (rB)
+   eb <- EA60:63 
+   vD <- undefined
+   (vD)eb×8 :(eb×8)+7 <- MEM(EA,1)
+  */
+  
+  CHECK_VXU;
+
+  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
+
+  u8 eb = EA & 0xF;
+
+  Vector128 vector = {};
+
+  vector.dword[0] = MMURead32(ppuState, EA);
+  vector.dword[1] = MMURead32(ppuState, EA + (sizeof(u32) * 1));
+  vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
+  vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
+
+#ifdef VXU_LOAD_DEBUG
+  LOG_DEBUG(Xenon, "lvebx [EA = {:#x}, eb = {:#x} data = {:#x}]", (u32)EA, eb, data);
+#endif // VXU_LOAD_DEBUG
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  VRi(vd) = vector;
+}
+
+// Load Vector Element Halfword Indexed (x'7C00 004E')
+void PPCInterpreter::PPCInterpreter_lvehx(PPU_STATE* ppuState) {
+  /*
+   if rA=0 then b <- 0
+   else        
+   b <- (rA)
+   EA <- (b + (rB)) & 0xFFFF_FFFF_FFFF_FFFE 
+   eb <- EA60:63
+   vD <- undefined
+   (vD)(eb×8):(eb×8) + 15 <- MEM(EA,2)
+  */
+  
+  CHECK_VXU;
+
+  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
+
+  u8 eb = EA & 0xF;
+
+  Vector128 vector = {};
+
+  vector.dword[0] = MMURead32(ppuState, EA);
+  vector.dword[1] = MMURead32(ppuState, EA + (sizeof(u32) * 1));
+  vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
+  vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
+
+#ifdef VXU_LOAD_DEBUG
+  LOG_DEBUG(Xenon, "lvehx [EA = {:#x}, eb = {:#x} data = {:#x}]", (u32)EA, eb, data);
+#endif // VXU_LOAD_DEBUG
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  VRi(vd) = vector;
+}
+
 // Load Vector Element Word Indexed (x'7C00 008E')
 void PPCInterpreter::PPCInterpreter_lvewx(PPU_STATE* ppuState) {
   /*
@@ -1689,11 +1758,16 @@ void PPCInterpreter::PPCInterpreter_lvewx(PPU_STATE* ppuState) {
 
   CHECK_VXU;
 
-  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~3;
+  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
 
   u8 eb = (EA >> 2) & 0x3;
 
-  u32 data = MMURead32(ppuState, EA);
+  Vector128 vector = {};
+
+  vector.dword[0] = MMURead32(ppuState, EA);
+  vector.dword[1] = MMURead32(ppuState, EA + (sizeof(u32) * 1));
+  vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
+  vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   LOG_DEBUG(Xenon, "lvewx [EA = {:#x}, eb = {:#x} data = {:#x}]", (u32)EA, eb, data);
@@ -1702,7 +1776,7 @@ void PPCInterpreter::PPCInterpreter_lvewx(PPU_STATE* ppuState) {
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
 
-  VRi(vd).dword[eb] = data;
+  VRi(vd) = vector;
 }
 
 // Load Vector Indexed (x'7C00 00CE')
