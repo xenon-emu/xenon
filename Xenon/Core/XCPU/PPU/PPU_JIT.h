@@ -223,12 +223,11 @@ public:
   PPU_JIT(PPU *ppu);
   ~PPU_JIT();
 
-  void ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt = true);
+  void ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt = true, bool singleBlock = false);
   u64 ExecuteJITBlock(u64 addr, bool enableHalt); // returns step count
   std::shared_ptr<JITBlock> BuildJITBlock(u64 addr, u64 maxBlockSize);
   void setupContext(JITBlockBuilder *b);
   void setupProl(JITBlockBuilder *b, u32 instrData, u32 decoded);
-  void patchSkips(JITBlockBuilder *b, u32 addr);
 private:
   PPU *ppu = nullptr; // "Linked" PPU
   PPU_STATE *ppuState = nullptr; // For easier thread access

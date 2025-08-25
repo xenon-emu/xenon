@@ -198,16 +198,4 @@ void MMUWrite16(PPU_STATE *ppuState, u64 EA, u16 data, ePPUThread thr = ePPUThre
 void MMUWrite32(PPU_STATE *ppuState, u64 EA, u32 data, ePPUThread thr = ePPUThread_None);
 void MMUWrite64(PPU_STATE *ppuState, u64 EA, u64 data, ePPUThread thr = ePPUThread_None);
 
-//
-// Testing Utilities
-//
-
-// Sets a register value from a string.
-void SetRegFromString(PPU_STATE *ppuState, const char* regName, const char* regValue);
-// Compares a reg value with a given string. 
-bool CompareRegWithString(PPU_STATE* ppuState, const char* regName, const char* regValue, std::string& outReg);
-
-// Runs encountered tests in selected dirs.
-bool RunTests(PPU_STATE* ppuState);
-
 } // namespace PPCInterpreter

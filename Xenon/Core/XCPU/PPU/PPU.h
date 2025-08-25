@@ -26,6 +26,12 @@ enum class eThreadState : u8 {
   Resetting,   // Recreating handle, same as halted but will resume afterwards
   Quiting      // Currently in a shutdown
 };
+
+enum class ePPUTestingMode : u8 {
+ Interpreter, // Regular interpreter mode
+ JITx86,      // X86 JIT mode
+};
+
 class PPU {
 public:
   PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PIR);
@@ -159,4 +165,11 @@ private:
   u8 GetCurrentRunningThreads();
   // Simulates the behavior of the 1BL inside the Xenon Secure ROM.
   bool Simulate1Bl();
+
+  //
+  // Testing Utilities
+  //
+  
+  // Runs instruction tests on the desired backend.
+  bool RunInstructionTests(PPU_STATE* ppuState, PPU_JIT* ppuJITPtr, ePPUTestingMode testMode);
 };

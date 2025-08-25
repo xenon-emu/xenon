@@ -2,11 +2,14 @@
 #include <memory>
 #include "fmt/format.h"
 
-#include "PPCInterpreter.h"
 #include "Base/PathUtil.h"
 #include "Base/StringUtil.h"
+#include "Core/XCPU/PPU/PPU.h"
+#include "Core/XCPU/Interpreter/PPCInterpreter.h"
 
 #define BLR_OPCODE 0x4e800020
+#define curThreadId   ppuState->currentThread
+#define curThread     ppuState->ppuThread[curThreadId]
 
 const u32 START_ADDRESS = 0x10000000;
 
@@ -15,7 +18,7 @@ std::filesystem::path testsBinPath;
 
 typedef std::vector<std::pair<std::string, std::string>> AnnotationList;
 
-void PPCInterpreter::SetRegFromString(PPU_STATE *ppuState, const char *regName, const char *regValue) {
+void SetRegFromString(PPU_STATE *ppuState, const char *regName, const char *regValue) {
   s32 value;
   if (sscanf(regName, "r%d", &value) == 1) {
     curThread.GPR[value] = Base::getFromString<u64>(regValue);
@@ -30,7 +33,7 @@ void PPCInterpreter::SetRegFromString(PPU_STATE *ppuState, const char *regName, 
   }
 }
 
-bool PPCInterpreter::CompareRegWithString(PPU_STATE *ppuState, const char *regName, const char *regValue, std::string &outRegValue) {
+bool CompareRegWithString(PPU_STATE *ppuState, const char *regName, const char *regValue, std::string &outRegValue) {
   s32 value = 0;
   if (sscanf(regName, "r%d", &value) == 1) {
     u64 expected = Base::getFromString<u64>(regValue);
@@ -226,7 +229,9 @@ private:
 
 class TestRunner {
 public:
-  TestRunner(PPU_STATE *ppuStatePtr) : ppuState(ppuStatePtr) {}
+  TestRunner(PPU_STATE *ppuStatePtr, PPU_JIT* ppuJITPtr, ePPUTestingMode testMode)
+    : ppuState(ppuStatePtr), currentTestMode(testMode), ppuJIT(ppuJITPtr) {
+  }
 
   ~TestRunner() {}
 
@@ -273,32 +278,37 @@ public:
     }
 
     // Execute test.
+    if (currentTestMode == ePPUTestingMode::Interpreter) {
+      bool testRunning = true;
+      while (testRunning) {
+        PPU_THREAD_REGISTERS& thread = ppuState->ppuThread[ppuState->currentThread];
+        // Update previous instruction address
+        thread.PIA = thread.CIA;
+        // Update current instruction address
+        thread.CIA = thread.NIA;
+        // Increase next instruction address
+        thread.NIA += 4;
+        // Fetch the instruction from memory
+        thread.CI.opcode = PPCInterpreter::MMURead32(ppuState, thread.CIA, ppuState->currentThread);
+        if (thread.CI.opcode == 0xFFFFFFFF || thread.CI.opcode == 0xCDCDCDCD) {
+          LOG_CRITICAL(Xenon, "[Testing]: Invalid opcode found.");
+          return false;
+        }
+        if (_ex & PPU_EX_INSSTOR || _ex & PPU_EX_INSTSEGM) {
+          return false;
+        }
 
-    bool testRunning = true;
-    while (testRunning) {
-      PPU_THREAD_REGISTERS &thread = ppuState->ppuThread[ppuState->currentThread];
-      // Update previous instruction address
-      thread.PIA = thread.CIA;
-      // Update current instruction address
-      thread.CIA = thread.NIA;
-      // Increase next instruction address
-      thread.NIA += 4;
-      // Fetch the instruction from memory
-      thread.CI.opcode = PPCInterpreter::MMURead32(ppuState, thread.CIA, ppuState->currentThread);
-      if (thread.CI.opcode == 0xFFFFFFFF || thread.CI.opcode == 0xCDCDCDCD) {
-        LOG_CRITICAL(Xenon, "[Testing]: Invalid opcode found.");
-        return false;
+        if (thread.CI.opcode == BLR_OPCODE) {
+          testRunning = false;
+        }
+        else {
+          PPCInterpreter::ppcExecuteSingleInstruction(ppuState);
+        }
       }
-      if (_ex  &PPU_EX_INSSTOR || _ex  &PPU_EX_INSTSEGM) {
-        return false;
-      }
-
-      if (thread.CI.opcode == BLR_OPCODE) {
-        testRunning = false;
-      } else {
-        PPCInterpreter::ppcExecuteSingleInstruction(ppuState);
-      }
+    } else if (currentTestMode == ePPUTestingMode::JITx86) {
+      ppuJIT->ExecuteJITInstrs(0x100, true, false, true);
     }
+
 
     // Assert test state expectations.
     bool testResult = CheckTestResults(testCase);
@@ -331,7 +341,7 @@ public:
         size_t spacePosition = it.second.find(" ");
         auto regName = it.second.substr(0, spacePosition);
         auto regValue = it.second.substr(spacePosition + 1);
-        PPCInterpreter::SetRegFromString(ppuState, regName.c_str(), regValue.c_str());
+        SetRegFromString(ppuState, regName.c_str(), regValue.c_str());
       } else if (it.first == "MEMORY_IN") {
         size_t spacePos = it.second.find(" ");
         auto addressStr = it.second.substr(0, spacePos);
@@ -363,7 +373,7 @@ public:
         auto regName = it.second.substr(0, spacePos);
         auto regValue = it.second.substr(spacePos + 1);
         std::string actualValue;
-        if (!PPCInterpreter::CompareRegWithString(ppuState,
+        if (!CompareRegWithString(ppuState,
           regName.c_str(), regValue.c_str(), actualValue)) {
           any_failed = true;
           LOG_ERROR(Xenon, "[Testing]: Register {} assert failed:\n", regName);
@@ -414,6 +424,8 @@ public:
   }
 
   PPU_STATE *ppuState;
+  PPU_JIT *ppuJIT;
+  ePPUTestingMode currentTestMode;
 };
 
 #ifdef _WIN32
@@ -453,7 +465,7 @@ void ProtectedRunTest(TestSuite &testSuite, TestRunner &runner,
 #endif // _WIN32
 }
 
-bool PPCInterpreter::RunTests(PPU_STATE *ppuState) {
+bool PPU::RunInstructionTests(PPU_STATE *ppuState, PPU_JIT* ppuJITPtr, ePPUTestingMode testMode) {
   s32 result = 1, failedTestsCount = 0, passedTestsCount = 0;
 
   // Setup paths.
@@ -489,7 +501,7 @@ bool PPCInterpreter::RunTests(PPU_STATE *ppuState) {
   }
 
   LOG_INFO(Xenon, "[Testing]: {} tests loaded.", testSuites.size());
-  TestRunner runner(ppuState);
+  TestRunner runner(ppuState, ppuJITPtr, testMode);
   for (auto &testSuite : testSuites) {
     LOG_INFO(Xenon, "[Testing]: {}.s:", testSuite.name());
     for (auto &testCase : testSuite.getTestCases()) {

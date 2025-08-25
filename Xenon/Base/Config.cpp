@@ -283,6 +283,7 @@ void _xcpu::from_toml(const toml::value &value) {
   HW_INIT_SKIP_2 = toml::find_or<u64&>(value, "HW_INIT_SKIP2", HW_INIT_SKIP_2);
   simulate1BL = toml::find_or<bool>(value, "Simulate1BL", simulate1BL);
   runInstrTests = toml::find_or<bool>(value, "RunInstrTests", runInstrTests);
+  instrTestsMode = toml::find_or<u8&>(value, "InstrTestsMode", instrTestsMode);
 }
 void _xcpu::to_toml(toml::value &value) {
   value["RAMSize"].comments().clear();
@@ -329,6 +330,10 @@ void _xcpu::to_toml(toml::value &value) {
   value["RunInstrTests"] = runInstrTests;
   value["RunInstrTests"].comments().push_back("# Runs a set of PPC instruction tests derived from the Xenia Project tests.");
   value["RunInstrTests"].comments().push_back("# See their README on how to generate the tests. Not meant for end users.");
+  value["RunInstrTests"].comments().clear();
+  value["InstrTestsMode"] = instrTestsMode;
+  value["RunInstrTests"].comments().push_back("# Specifies the backend to test.");
+  value["RunInstrTests"].comments().push_back("# 0 = Interpreter, 1 = JITx86.");
 }
 bool _xcpu::verify_toml(toml::value &value) {
   to_toml(value);
@@ -340,6 +345,7 @@ bool _xcpu::verify_toml(toml::value &value) {
   cache_value(HW_INIT_SKIP_2);
   cache_value(simulate1BL);
   cache_value(runInstrTests);
+  cache_value(instrTestsMode);
   from_toml(value);
   verify_value(ramSize);
   verify_value(elfLoader);
@@ -349,6 +355,7 @@ bool _xcpu::verify_toml(toml::value &value) {
   verify_value(HW_INIT_SKIP_2);
   verify_value(simulate1BL);
   verify_value(runInstrTests);
+  verify_value(instrTestsMode);
   return true;
 }
 

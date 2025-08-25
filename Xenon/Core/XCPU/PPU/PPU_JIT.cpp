@@ -103,10 +103,6 @@ void PPU_JIT::setupProl(JITBlockBuilder *b, u32 instrData, u32 decoded) {
 #endif
 }
 
-void PPU_JIT::patchSkips(JITBlockBuilder *b, u32 addr) {
-
-}
-
 #undef GPR
 using namespace asmjit;
 std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
@@ -273,7 +269,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
 }
 #define GPR(x) curThread.GPR[x]
 
-void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt) {
+void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool singleBlock) {
   u32 instrsExecuted = 0;
   while (instrsExecuted < numInstrs && active && (XeRunning && !XePaused)) {
     auto &thread = curThread;
@@ -307,6 +303,7 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt) {
         break; // Failed to build block, abort
       block->codePtr(ppu, ppuState, enableHalt);
       instrsExecuted += block->size / 4;
+      if (singleBlock) { break; }
     } else {
       auto &block = it->second;
       u64 sum = 0;

@@ -178,6 +178,8 @@ inline struct _xcpu {
   bool simulate1BL = false;
   // Instruction tests execution
   bool runInstrTests = false;
+  // Instruction tests mode
+  u8 instrTestsMode = 0; // See ePPUTestingMode
   // TOML Conversion
   void to_toml(toml::value &value);
   void from_toml(const toml::value &value);

@@ -192,8 +192,9 @@ void PPU::StartExecution(bool setHRMOR) {
 
   // Check for instruction tests.
   if (Config::xcpu.runInstrTests && ppuState->ppuID == 0) {
-    LOG_INFO(Xenon, "Starting PowerPC instruction tests.");
-    PPCInterpreter::RunTests(ppuState.get());
+    LOG_INFO(Xenon, "Starting PowerPC instruction tests. Testing backend: {}",
+      Config::xcpu.instrTestsMode ? "JITx86" : "Interpreter");
+    RunInstructionTests(ppuState.get(), ppuJIT.get(), static_cast<ePPUTestingMode>(Config::xcpu.instrTestsMode));
   }
 
   // If we're PPU0,thread0 then enable THRD 0 and set Reset Vector.
