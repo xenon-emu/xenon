@@ -1674,6 +1674,8 @@ void PPCInterpreter::PPCInterpreter_lfsu(PPU_STATE *ppuState) {
 // Load Vector
 //
 
+// NOTE: lvexx Instructions effectively behave like lvx.
+
 // Load Vector Element Byte Indexed (x'7C00 000E')
 void PPCInterpreter::PPCInterpreter_lvebx(PPU_STATE* ppuState) {
   /*
@@ -1688,8 +1690,6 @@ void PPCInterpreter::PPCInterpreter_lvebx(PPU_STATE* ppuState) {
   CHECK_VXU;
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
-
-  u8 eb = EA & 0xF;
 
   Vector128 vector = {};
 
@@ -1723,8 +1723,6 @@ void PPCInterpreter::PPCInterpreter_lvehx(PPU_STATE* ppuState) {
   CHECK_VXU;
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
-
-  u8 eb = EA & 0xF;
 
   Vector128 vector = {};
 
@@ -1760,8 +1758,6 @@ void PPCInterpreter::PPCInterpreter_lvewx(PPU_STATE* ppuState) {
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
 
-  u8 eb = (EA >> 2) & 0x3;
-
   Vector128 vector = {};
 
   vector.dword[0] = MMURead32(ppuState, EA);
@@ -1777,6 +1773,29 @@ void PPCInterpreter::PPCInterpreter_lvewx(PPU_STATE* ppuState) {
     return;
 
   VRi(vd) = vector;
+}
+
+// Vector128 Load Vector Element Word Indexed
+void PPCInterpreter::PPCInterpreter_lvewx128(PPU_STATE* ppuState) {
+  CHECK_VXU;
+
+  u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
+
+  Vector128 vector = {};
+
+  vector.dword[0] = MMURead32(ppuState, EA);
+  vector.dword[1] = MMURead32(ppuState, EA + (sizeof(u32) * 1));
+  vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
+  vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
+
+#ifdef VXU_LOAD_DEBUG
+  LOG_DEBUG(Xenon, "lvewx128 [EA = {:#x}, eb = {:#x} data = {:#x}]", (u32)EA, eb, data);
+#endif // VXU_LOAD_DEBUG
+
+  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+    return;
+
+  VR(VMX128_1_VD128) = vector;
 }
 
 // Load Vector Indexed (x'7C00 00CE')
