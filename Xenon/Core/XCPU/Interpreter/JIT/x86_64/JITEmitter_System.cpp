@@ -121,4 +121,38 @@ void PPCInterpreter::PPCInterpreterJIT_mfspr(PPU_STATE *ppuState, JITBlockBuilde
 
   COMP->mov(GPRPtr(instr.rs), rSValue);
 }
+
+// Move from One Condition Register Field (x’7C20 0026’) 
+void PPCInterpreter::PPCInterpreterJIT_mfocrf(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  // Temp storage for the CR current value.
+  x86::Gp crValue = newGP32();
+  // Load CR value to temp storage.
+  COMP->mov(crValue, CRValPtr());
+  if (instr.l11) {
+    // MFOCRF
+    u32 crMask = 0;
+    u32 bit = 0x80;
+    u32 count = 0;
+
+    for (; bit; bit >>= 1) {
+      crMask <<= 4;
+      if (instr.crm & bit) {
+        crMask |= 0xF;
+        count++;
+      }
+    }
+
+    if (count == 1) {
+      COMP->and_(crValue, crMask);
+      COMP->mov(GPRPtr(instr.rd), crValue);
+    }
+    else { // Undefined behavior.
+      COMP->mov(GPRPtr(instr.rd), imm<u64>(0));
+    }
+  }
+  else {
+    // MFCR
+    COMP->mov(GPRPtr(instr.rd), crValue);
+  }
+}
 #endif

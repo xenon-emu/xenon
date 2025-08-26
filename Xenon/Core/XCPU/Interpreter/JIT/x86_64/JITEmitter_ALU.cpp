@@ -19,6 +19,44 @@ void PPCInterpreter::PPCInterpreterJIT_addx(PPU_STATE* ppuState, JITBlockBuilder
     J_ppuSetCR0(b, rATemp);
 }
 
+// Add Immediate Carrying (x'3000 0000')
+void PPCInterpreter::PPCInterpreterJIT_addic(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  // TODO: Overflow Enable.
+  Label end = COMP->newLabel(); // Self explanatory.
+
+  // Get rA value.
+  x86::Gp rATemp = newGP64();
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+
+  // XER[CA] Clear.
+  x86::Gp xer = newGP64();
+  COMP->mov(xer, SPRPtr(XER));
+#ifdef __LITTLE_ENDIAN__
+  COMP->btr(xer, 29); // Clear XER[CA] bit.
+#else
+  COMP->btr(xer, 2); // Clear XER[CA] bit.
+#endif // LITTLE_ENDIAN
+
+  // Perform the Add.
+  COMP->add(rATemp, imm<s64>(instr.simm16));
+  // Check for carry.
+  COMP->jnc(end);
+#ifdef __LITTLE_ENDIAN__
+  COMP->bts(xer, 29); // Set XER[CA] bit.
+#else
+  COMP->bts(xer, 2); // Set XER[CA] bit.
+#endif // LITTLE_ENDIAN
+
+  COMP->bind(end);
+  // Set XER[CA] value.
+  COMP->mov(SPRPtr(XER), xer);
+  // Set rD value.
+  COMP->mov(GPRPtr(instr.rd), rATemp);
+
+  if (instr.rc)
+    J_ppuSetCR0(b, rATemp);
+}
+
 // Add Carrying (x'7C00 0014')
 void PPCInterpreter::PPCInterpreterJIT_addcx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
   /*
@@ -113,6 +151,21 @@ void PPCInterpreter::PPCInterpreterJIT_addi(PPU_STATE *ppuState, JITBlockBuilder
   }
 }
 
+// Add Immediate Shifted (x'3C00 0000')
+void PPCInterpreter::PPCInterpreterJIT_addis(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  s64 shImm = (s64{ instr.simm16 } << 16);
+
+  x86::Gp rDTemp = newGP64();
+  COMP->mov(rDTemp, shImm);
+
+  if (instr.ra == 0) {
+    COMP->mov(GPRPtr(instr.rd), rDTemp);
+  } else {
+    COMP->add(rDTemp, GPRPtr(instr.ra)); // rDT += rA
+    COMP->mov(GPRPtr(instr.rd), rDTemp); // rD  = rDT
+  }
+}
+
 // And (x'7C00 0038')
 void PPCInterpreter::PPCInterpreterJIT_andx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
   /*
@@ -180,6 +233,64 @@ void PPCInterpreter::PPCInterpreterJIT_andis(PPU_STATE* ppuState, JITBlockBuilde
   COMP->mov(GPRPtr(instr.ra), rsTemp);
 
   J_ppuSetCR0(b, rsTemp);
+}
+
+// Compare 
+void PPCInterpreter::PPCInterpreterJIT_cmp(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  x86::Gp rA = newGP64();
+  x86::Gp rB = newGP64();
+  COMP->mov(rA, GPRPtr(instr.ra));
+  COMP->mov(rB, GPRPtr(instr.rb));
+
+  if (instr.l10) {
+    J_SetCRField(b, J_BuildCRS(b, rA, rB), instr.crfd);
+  } else {
+    J_SetCRField(b, J_BuildCRS(b, rA.r32(), rB.r32()), instr.crfd);
+  }
+}
+
+// Compare Immediate
+void PPCInterpreter::PPCInterpreterJIT_cmpi(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  x86::Gp rA = newGP64();
+  x86::Gp simm = newGP64();
+  COMP->mov(rA, GPRPtr(instr.ra));
+  COMP->mov(simm, imm<s16>(instr.simm16));
+
+  if (instr.l10) {
+    J_SetCRField(b, J_BuildCRS(b, rA, simm), instr.crfd);
+  } else {
+    J_SetCRField(b, J_BuildCRS(b, rA.r32(), simm.r32()), instr.crfd);
+  }
+}
+
+// Compare 
+void PPCInterpreter::PPCInterpreterJIT_cmpl(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  x86::Gp rA = newGP64();
+  x86::Gp rB = newGP64();
+  COMP->mov(rA, GPRPtr(instr.ra));
+  COMP->mov(rB, GPRPtr(instr.rb));
+
+  if (instr.l10) {
+    J_SetCRField(b, J_BuildCRU(b, rA, rB), instr.crfd);
+  }
+  else {
+    J_SetCRField(b, J_BuildCRU(b, rA.r32(), rB.r32()), instr.crfd);
+  }
+}
+
+// Compare Logical Immediate
+void PPCInterpreter::PPCInterpreterJIT_cmpli(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+  x86::Gp rA = newGP64();
+  x86::Gp uimm = newGP64();
+  COMP->mov(rA, GPRPtr(instr.ra));
+  COMP->mov(uimm, imm<u16>(instr.uimm16));
+
+  if (instr.l10) {
+    J_SetCRField(b, J_BuildCRU(b, rA, uimm), instr.crfd);
+  }
+  else {
+    J_SetCRField(b, J_BuildCRU(b, rA.r32(), uimm.r32()), instr.crfd);
+  }
 }
 
 // Multiply Low Doubleword (x'7C00 01D2')
