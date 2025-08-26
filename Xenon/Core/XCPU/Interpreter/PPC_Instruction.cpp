@@ -65,8 +65,8 @@ namespace PPCInterpreter {
     fillTable<instructionHandlerJIT>(jitTable, 0x00, 6, -1, {
       { 0x0A, GET(cmpli) },
       { 0x0B, GET(cmpi) },
-      { 0x0C, GET(addic) },
-      { 0x0D, GET(addic) },
+      //{ 0x0C, GET(addic) },
+      //{ 0x0D, GET(addic) },
       { 0x0E, GET(addi) },
       { 0x0F, GET(addis) },
       { 0x12, GET(b) },
@@ -96,7 +96,7 @@ namespace PPCInterpreter {
     // Group 0x1F opcodes (field 21..30)
     fillTable<instructionHandlerJIT>(jitTable, 0x1F, 10, 1, {
       { 0x000, GET(cmp) },
-      { 0x00A, GETRC(addc) },
+      //{ 0x00A, GETRC(addc) },
       { 0x013, GET(mfocrf) },
       { 0x018, GETRC(slw) },
       { 0x01B, GETRC(sld) },
