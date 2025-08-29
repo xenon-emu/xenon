@@ -157,7 +157,8 @@ private:
 
   std::unique_ptr<PPU_JIT> ppuJIT;
   friend class PPU_JIT;
-  friend bool callEpil(PPU *ppu, PPU_STATE *ppuState);
+  // Function call epilogue.
+  friend bool CallEpilogue(PPU *ppu, PPU_STATE *ppuState);
 
   //
   // Helpers

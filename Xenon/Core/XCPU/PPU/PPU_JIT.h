@@ -21,6 +21,8 @@
 #include "Core/XCPU/PPU/PowerPC.h"
 #include "Core/RootBus/RootBus.h"
 
+//#define JIT_DEBUG
+
 class PPU;
 using JITFunc = fptr<void(PPU*, PPU_STATE*, bool)>;
 
@@ -224,13 +226,14 @@ public:
   ~PPU_JIT();
 
   void ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt = true, bool singleBlock = false);
-  u64 ExecuteJITBlock(u64 addr, bool enableHalt); // returns step count
-  std::shared_ptr<JITBlock> BuildJITBlock(u64 addr, u64 maxBlockSize);
-  void setupContext(JITBlockBuilder *b);
-  void setupProl(JITBlockBuilder *b, u32 instrData, u32 decoded);
+  u64 ExecuteJITBlock(u64 blockStartAddress, bool enableHalt); // returns step count
+  std::shared_ptr<JITBlock> BuildJITBlock(u64 blockStartAddress, u64 maxBlockSize);
+  void SetupContext(JITBlockBuilder *b);
+  void SetupPrologue(JITBlockBuilder *b, u32 instrData, u32 decoded);
 private:
   PPU *ppu = nullptr; // "Linked" PPU
   PPU_STATE *ppuState = nullptr; // For easier thread access
   asmjit::JitRuntime jitRuntime;
-  std::unordered_map<u64, std::shared_ptr<JITBlock>> jitBlocks = {};
+  // Block Cache, contains all created and valid JIT'ed blocks.
+  std::unordered_map<u64, std::shared_ptr<JITBlock>> jitBlocksCache = {};
 };

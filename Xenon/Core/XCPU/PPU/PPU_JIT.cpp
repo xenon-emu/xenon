@@ -19,38 +19,20 @@ void callHalt() {
   return XeMain::GetCPU()->Halt();
 }
 
-bool callEpil(PPU *ppu, PPU_STATE *ppuState) {
-  // Check timebase
-  ppu->CheckTimeBaseStatus();
-
-  // Get current thread
-  auto &thread = ppuState->ppuThread[ppuState->currentThread];
-  // Check for external interrupts
-  if (thread.SPR.MSR.EE && ppu->xenonContext->xenonIIC.checkExtInterrupt(thread.SPR.PIR)) {
-    thread.exceptReg |= PPU_EX_EXT;
-  }
-
-  return ppu->PPUCheckExceptions();
-}
-
+// Constructor
 PPU_JIT::PPU_JIT(PPU *ppu) :
   ppu(ppu),
   ppuState(ppu->ppuState.get())
 {}
 
+// Destructor
 PPU_JIT::~PPU_JIT() {
-  for (auto &[hash, block] : jitBlocks)
+  for (auto &[hash, block] : jitBlocksCache)
     block.reset();
 }
 
-u64 PPU_JIT::ExecuteJITBlock(u64 addr, bool enableHalt) {
-  auto &block = jitBlocks.at(addr);
-  block->codePtr(ppu, ppuState, enableHalt);
-  return block->size / 4;
-}
-
-// get current PPU_THREAD_REGISTERS, use ppuState to get the current Thread
-void PPU_JIT::setupContext(JITBlockBuilder *b) {
+// Gets current PPU_THREAD_REGISTERS and uses ppuState to get the current Thread pointer.
+void PPU_JIT::SetupContext(JITBlockBuilder *b) {
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
   x86::Gp tempR = newGP32();
   COMP->movzx(tempR, b->ppuState->scalar(&PPU_STATE::currentThread).Ptr<u8>());
@@ -60,7 +42,8 @@ void PPU_JIT::setupContext(JITBlockBuilder *b) {
 #endif
 }
 
-void PPU_JIT::setupProl(JITBlockBuilder *b, u32 instrData, u32 decoded) {
+// Setups the Function Call Prologue.
+void PPU_JIT::SetupPrologue(JITBlockBuilder *b, u32 instrData, u32 decoded) {
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
   COMP->nop();
   COMP->nop();
@@ -89,12 +72,18 @@ void PPU_JIT::setupProl(JITBlockBuilder *b, u32 instrData, u32 decoded) {
 
   COMP->bind(continueLabel);
 
-  // Update CIA NIA _instr (CI)
+  // Update PIA, CIA, NIA and CI.
   auto emitter = PPCInterpreter::ppcDecoder.getJITTable()[decoded];
+  // PIA = CIA:
+  COMP->mov(temp, b->threadCtx->scalar(&PPU_THREAD_REGISTERS::CIA));
+  COMP->mov(b->threadCtx->scalar(&PPU_THREAD_REGISTERS::PIA), temp);
+  // CIA = NIA:
   COMP->mov(temp, b->threadCtx->scalar(&PPU_THREAD_REGISTERS::NIA));
   COMP->mov(b->threadCtx->scalar(&PPU_THREAD_REGISTERS::CIA), temp);
+  // NIA +=4:
   COMP->add(temp, 4);
   COMP->mov(b->threadCtx->scalar(&PPU_THREAD_REGISTERS::NIA), temp);
+  // CI data.
   COMP->mov(temp, instrData);
   COMP->mov(b->threadCtx->scalar(&PPU_THREAD_REGISTERS::CI).Ptr<u32>(), temp);
 
@@ -103,10 +92,27 @@ void PPU_JIT::setupProl(JITBlockBuilder *b, u32 instrData, u32 decoded) {
 #endif
 }
 
+// Function Call Epilogue.
+bool CallEpilogue(PPU* ppu, PPU_STATE* ppuState) {
+  // Check timebase and update if enabled.
+  ppu->CheckTimeBaseStatus();
+
+  // Get current thread.
+  auto& thread = ppuState->ppuThread[ppuState->currentThread];
+  // Check for external interrupts.
+  if (thread.SPR.MSR.EE && ppu->xenonContext->xenonIIC.checkExtInterrupt(thread.SPR.PIR)) {
+    thread.exceptReg |= PPU_EX_EXT;
+  }
+
+  // Check if exceptions are pending and process them in order.
+  return ppu->PPUCheckExceptions();
+}
+
 #undef GPR
 using namespace asmjit;
-std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
-  std::unique_ptr<JITBlockBuilder> jitBuilder = std::make_unique<STRIP_UNIQUE(jitBuilder)>(addr, &jitRuntime);
+// Builds a JIT block starting at the given address.
+std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxBlockSize) {
+  std::unique_ptr<JITBlockBuilder> jitBuilder = std::make_unique<STRIP_UNIQUE(jitBuilder)>(blockStartAddress, &jitRuntime);
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
   //
@@ -130,17 +136,16 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
 
   std::vector<u32> instrsTemp{};
 
-  setupContext(jitBuilder.get());
+  // Setup our block context.
+  SetupContext(jitBuilder.get());
 
   //
   // Instruction emitters
   //
   u64 instrCount = 0;
   while (XeRunning && !XePaused) {
-    u32 offset = instrCount * 4;
-    u64 pc = addr + offset;
-
-    // Fetch instruction
+    // Fetch next instruction, this is needed here to know wheter we can execute the instruction in JIT or Interpreter
+    // modes.
     auto &thread = curThread;
     thread.PIA = thread.CIA;
     thread.CIA = thread.NIA;
@@ -159,6 +164,8 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
     static thread_local std::unordered_map<u32, u32> opcodeHashCache;
     u32 opName = opcodeHashCache.contains(opcode) ? opcodeHashCache[opcode] : opcodeHashCache[opcode] = Base::JoaatStringHash(PPCInterpreter::ppcDecoder.getNameTable()[decodedInstr]);
 
+    // Perform patches for certain registers at runtime.
+    // Used for codeflow skips, and value patching.
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
     auto patchGPR = [&](s32 reg, u64 val) {
       x86::Gp temp = compiler.newGpq();
@@ -193,17 +200,23 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
     }
 #endif
 
+    // Should we read the next instruction?
     bool readNextInstr = true;
 
-    // Prol
-    setupProl(jitBuilder.get(), opcode, decodedInstr);
+    // Setup our call prologue (Updates instruction pointers and data)
+    SetupPrologue(jitBuilder.get(), opcode, decodedInstr);
 
-    if ((curThread.exceptReg & PPU_EX_INSSTOR || curThread.exceptReg & PPU_EX_INSTSEGM) || opcode == 0xFFFFFFFF)
+    // Check for Instruction storage/segment exceptions.
+    if ((curThread.exceptReg & PPU_EX_INSSTOR || curThread.exceptReg & PPU_EX_INSTSEGM)
+      || opcode == 0xFFFFFFFF || opcode == 0xCDCDCDCD) {
       readNextInstr = false;
-
-    // Call JIT emitter
+    }
+      
+    // Call JIT Emitter on fetched instruction.
     if (readNextInstr) {
       bool invalidInstr = emitter == &PPCInterpreter::PPCInterpreterJIT_invalid;
+
+      // If the instruction is invalid and we're in hybrid mode, call the interpreter decoder and function lookup.
       if (ppu->currentExecMode == eExecutorMode::Hybrid && invalidInstr) {
         auto function = PPCInterpreter::ppcDecoder.decode(opcode);
 
@@ -213,18 +226,24 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
         out->setArg(0, jitBuilder->ppuState->Base());
 #endif
       } else {
+        // Execute decoded instruction.
         emitter(ppuState, jitBuilder.get(), op);
       }
     }
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
-    // Epil (check for exc and interrupts)
-    InvokeNode *tbCheck = nullptr;
+    // Epilogue, update the time base and check/process pending exceptions.
+    // We should return execution if any exception is indeed found.
+    InvokeNode *returnCheck = nullptr;
     x86::Gp retVal = compiler.newGpb();
-    compiler.invoke(&tbCheck, imm((void*)callEpil), FuncSignature::build<bool, PPU*, PPU_STATE*>());
-    tbCheck->setArg(0, jitBuilder->ppu->Base());
-    tbCheck->setArg(1, jitBuilder->ppuState->Base());
-    tbCheck->setRet(0, retVal);
+
+    // Call our epilogue.
+    compiler.invoke(&returnCheck, imm((void*)CallEpilogue), FuncSignature::build<bool, PPU*, PPU_STATE*>());
+    returnCheck->setArg(0, jitBuilder->ppu->Base());
+    returnCheck->setArg(1, jitBuilder->ppuState->Base());
+    returnCheck->setRet(0, retVal);
+
+    // Test for ocurred exceptions and return if any.
     Label skipRet = compiler.newLabel();
     compiler.test(retVal, retVal);
     compiler.je(skipRet);
@@ -232,16 +251,16 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
     compiler.bind(skipRet);
 #endif
 
-    // If branch or block end
+    // If this was a branch instruction we must end the block.
     instrCount++;
     if (opName == "bclr"_j || opName == "bcctr"_j || opName == "bc"_j || opName == "b"_j || opName == "rfid"_j ||
         opName == "invalid"_j || instrCount >= maxBlockSize)
       break;
   }
 
-  // reset CIA NIA
-  curThread.CIA = addr - 4;
-  curThread.NIA = addr;
+  // Reset CIA and NIA.
+  curThread.CIA = blockStartAddress - 4;
+  curThread.NIA = blockStartAddress;
   jitBuilder->size = instrCount * 4;
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
@@ -251,28 +270,38 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 addr, u64 maxBlockSize) {
 #endif
 
   // Create the final JITBlock
-  std::shared_ptr<JITBlock> block = std::make_shared<STRIP_UNIQUE(block)>(&jitRuntime, addr, jitBuilder.get());
+  std::shared_ptr<JITBlock> block = std::make_shared<STRIP_UNIQUE(block)>(&jitRuntime, blockStartAddress, jitBuilder.get());
   if (!block->Build()) {
     block.reset();
     return nullptr;
   }
 
-  // Create block hash
+  // Create block hash. Needs improvement.
   block->hash = 0;
   for (auto &instr : instrsTemp) {
     block->hash += instr;
   }
   
-  // Insert block into cache
-  jitBlocks.emplace(addr, std::move(block));
-  return jitBlocks.at(addr);
+  // Insert block into the block cache.
+  jitBlocksCache.emplace(blockStartAddress, std::move(block));
+  return jitBlocksCache.at(blockStartAddress);
 }
 #define GPR(x) curThread.GPR[x]
 
+// Executes a given JIT block at a designated address.
+u64 PPU_JIT::ExecuteJITBlock(u64 blockStartAddress, bool enableHalt) {
+  auto& block = jitBlocksCache.at(blockStartAddress);
+  block->codePtr(ppu, ppuState, enableHalt);
+  return block->size / 4;
+}
+
+// Execute a given number of instructions using JIT.
 void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool singleBlock) {
   u32 instrsExecuted = 0;
   while (instrsExecuted < numInstrs && active && (XeRunning && !XePaused)) {
     auto &thread = curThread;
+
+    // Quick way of skiping function calls:
     // This *must* be done here simply because of how we handle JIT.
     // We run until the start of a block, which is a branch opcode (or until it's a invalid instruction),
     // but these are branch opcodes, designed to avoid calling them.
@@ -283,28 +312,32 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
     case 0x80081764:
     // XDK 17.489.0 AudioChipCorder Device Detect bypass. This is not needed for
     // older console revisions
-    case 0x801AF580:
+    case 0x801AF580: 
       skipBlock = true;
       break;
     default:
       break;
     }
-    if (skipBlock) {
-      instrsExecuted++;
-      thread.NIA += 4;
-    }
-    u64 blockStart = thread.NIA;
-    auto it = jitBlocks.find(blockStart);
-    if (it == jitBlocks.end()) {
-      if (it != jitBlocks.end())
-        jitBlocks.erase(blockStart);
-      auto block = BuildJITBlock(blockStart, numInstrs - instrsExecuted);
-      if (!block)
-        break; // Failed to build block, abort
+    // Skip to next block if needed.
+    if (skipBlock) { instrsExecuted++; thread.NIA += 4; }
+
+    // Get next block start address.
+    u64 blockStartAddress = thread.NIA;
+    // Attempt to find such block in the block cache.
+    auto it = jitBlocksCache.find(blockStartAddress);
+    if (it == jitBlocksCache.end()) {
+      // Block was not found. Attempt to create a new one.
+      auto block = BuildJITBlock(blockStartAddress, numInstrs - instrsExecuted);
+      if (!block) { break; } // Block build attempt failed.
+
+      // Execute our block and increse executed instructions.
       block->codePtr(ppu, ppuState, enableHalt);
       instrsExecuted += block->size / 4;
+
+      // For Testing and debugging purposes only.
       if (singleBlock) { break; }
     } else {
+      // We have a match, check for the block hash to see if it hasn't been modified.
       auto &block = it->second;
       u64 sum = 0;
       if (block->size % 8 == 0) {
@@ -325,12 +358,17 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
       }
 
       if (block->hash != sum) {
+#ifdef JIT_DEBUG
+        LOG_DEBUG(Xenon, "[JIT]: Block hash mismatch for block at address {:#x}", blockStartAddress);
+#endif // JIT_DEBUG
+        // Blocks do not match. Erase it and retry.
         block.reset();
-        jitBlocks.erase(blockStart);
+        jitBlocksCache.erase(blockStartAddress);
         continue;
       }
 
-      instrsExecuted += ExecuteJITBlock(blockStart, enableHalt);
+      // Run block as usual.
+      instrsExecuted += ExecuteJITBlock(blockStartAddress, enableHalt);
     }
   }
 }

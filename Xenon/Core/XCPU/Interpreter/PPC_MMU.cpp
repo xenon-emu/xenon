@@ -7,6 +7,8 @@
 
 #include "PPCInterpreter.h"
 
+//#define MMU_DEBUG
+
 //
 // Xbox 360 Memory map, info taken from various sources.
 //
@@ -203,6 +205,10 @@ void PPCInterpreter::PPCInterpreter_tlbiel(PPU_STATE *ppuState) {
     u64 rpn = 0;
 
     u64 compareMask = 0;
+
+#ifdef MMU_DEBUG
+    LOG_DEBUG(Xenon_MMU, "[TLBIEL]: Attempting to find entry for RB {:#x}", rb);
+#endif // MMU_DEBUG
 
     // TODO(bitsh1ft3r): Investigate this behavior. Why do 64kb and 16 mb behave the same?
     // and why doesn't is work as docs dictate.
