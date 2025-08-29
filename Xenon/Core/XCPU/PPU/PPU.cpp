@@ -720,16 +720,20 @@ bool PPU::PPUCheckExceptions() {
   // Check Exceptions pending and process them in order.
   u16 &exceptions = _ex;
   if (exceptions != PPU_EX_NONE) {
-    // Halt on any exception
+    // Halt on any exception if set in config.
     if (Config::debug.haltOnExceptions) {
+      LOG_DEBUG(Xenon, "[{}]: Halting on exceptions enabled, proceeding to halt.", ppuState->ppuName);
       Halt();
     }
+
+    // Exceptions are pending, check and process them in order.
+
     // Non Maskable:
     //
     // 1. System Reset
     //
     if (exceptions & PPU_EX_RESET) {
-      PPCInterpreter::ppcResetException(ppuState.get());
+      PPUSystemResetException(ppuState.get());
       exceptions &= ~PPU_EX_RESET;
       return true;
     }
@@ -738,7 +742,7 @@ bool PPU::PPUCheckExceptions() {
     //
     if (exceptions & PPU_EX_MC) {
       if (thread.SPR.MSR.ME) {
-        PPCInterpreter::ppcResetException(ppuState.get());
+        PPUSystemResetException(ppuState.get());
         exceptions &= ~PPU_EX_MC;
         return true;
       } else {
@@ -761,20 +765,20 @@ bool PPU::PPUCheckExceptions() {
     }
     // B. Floating-Point Unavailable
     if (exceptions & PPU_EX_FPU) {
-      PPCInterpreter::ppcFPUnavailableException(ppuState.get());
+      PPUFPUnavailableException(ppuState.get());
       exceptions &= ~PPU_EX_FPU;
       return true;
     }
     // C. Data Storage, Data Segment, or Alignment
     // Data Storage
     if (exceptions & PPU_EX_DATASTOR) {
-      PPCInterpreter::ppcDataStorageException(ppuState.get());
+      PPUDataStorageException(ppuState.get());
       exceptions &= ~PPU_EX_DATASTOR;
       return true;
     }
     // Data Segment
     if (exceptions & PPU_EX_DATASEGM) {
-      PPCInterpreter::ppcDataSegmentException(ppuState.get());
+      PPUDataSegmentException(ppuState.get());
       exceptions &= ~PPU_EX_DATASEGM;
       return true;
     }
@@ -793,13 +797,13 @@ bool PPU::PPUCheckExceptions() {
     // E. Program Trap, System Call, Program Priv Inst, Program Illegal Inst
     // Program Trap
     if (exceptions & PPU_EX_PROG && thread.progExceptionType == PROGRAM_EXCEPTION_TYPE_TRAP) {
-      PPCInterpreter::ppcProgramException(ppuState.get());
+      PPUProgramException(ppuState.get());
       exceptions &= ~PPU_EX_PROG;
       return true;
     }
     // System Call
     if (exceptions & PPU_EX_SC) {
-      PPCInterpreter::ppcSystemCallException(ppuState.get());
+      PPUSystemCallException(ppuState.get());
       exceptions &= ~PPU_EX_SC;
       return true;
     }
@@ -812,13 +816,13 @@ bool PPU::PPUCheckExceptions() {
     // F. Instruction Storage and Instruction Segment
     // Instruction Storage
     if (exceptions & PPU_EX_INSSTOR) {
-      PPCInterpreter::ppcInstStorageException(ppuState.get());
+      PPUInstStorageException(ppuState.get());
       exceptions &= ~PPU_EX_INSSTOR;
       return true;
     }
     // Instruction Segment
     if (exceptions & PPU_EX_INSTSEGM) {
-      PPCInterpreter::ppcInstSegmentException(ppuState.get());
+      PPUInstSegmentException(ppuState.get());
       exceptions &= ~PPU_EX_INSTSEGM;
       return true;
     }
@@ -835,14 +839,14 @@ bool PPU::PPUCheckExceptions() {
     //
     // External
     if (exceptions & PPU_EX_EXT && thread.SPR.MSR.EE) {
-      PPCInterpreter::ppcExternalException(ppuState.get());
+      PPUExternalException(ppuState.get());
       exceptions &= ~PPU_EX_EXT;
       return true;
     }
     // Decrementer. A dec exception may be present but will only be taken when
     // the EE bit of MSR is set.
     if (exceptions & PPU_EX_DEC && thread.SPR.MSR.EE) {
-      PPCInterpreter::ppcDecrementerException(ppuState.get());
+      PPUDecrementerException(ppuState.get());
       exceptions &= ~PPU_EX_DEC;
       return true;
     }
@@ -854,15 +858,16 @@ bool PPU::PPUCheckExceptions() {
     }
     // VX Unavailable.
     if (exceptions & PPU_EX_VXU) {
-      PPCInterpreter::ppcVXUnavailableException(ppuState.get());
+      PPUVXUnavailableException(ppuState.get());
       exceptions &= ~PPU_EX_VXU;
       return true;
     }
   }
-
+  // No exceptions have ocurred.
   return false;
 }
 
+// Checks if the Timebase Logic is enabled and does the corresponding updates if true.
 void PPU::CheckTimeBaseStatus() {
   // Start Profile
   MICROPROFILE_SCOPEI("[Xe::PPU]", "CheckTimeBaseStatus", MP_AUTO);
@@ -961,4 +966,133 @@ bool PPU::Simulate1Bl() {
 
   // All good.
   return true;
+}
+
+//
+// Exception definitions.
+//
+
+// Format: Exception name (Reset Vector)
+
+// System reset Exception (0x100)
+void PPU::PPUSystemResetException(PPU_STATE* ppuState) {
+  PPU_THREAD_REGISTERS& thread = curThread;
+  LOG_INFO(Xenon, "[{}](Thrd{:#d}): System Reset exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
+  thread.SPR.SRR0 = thread.NIA;
+  thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
+  thread.SPR.MSR.MSR_Hex &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+  thread.SPR.MSR.MSR_Hex |= 0x9000000000000000;
+  thread.NIA = 0x100;
+}
+
+// Data Storage Exception (0x300)
+void PPU::PPUDataStorageException(PPU_STATE* ppuState) {
+  PPU_THREAD_REGISTERS& thread = curThread;
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Data Storage exception. EA: 0x{:X}.", ppuState->ppuName, static_cast<s8>(curThreadId), thread.SPR.DAR);
+  thread.SPR.SRR0 = thread.CIA;
+  thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
+  thread.SPR.MSR.MSR_Hex &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+  thread.SPR.MSR.MSR_Hex |= 0x9000000000000000;
+  thread.NIA = 0x300;
+}
+
+// Data Segment Exception (0x380)
+void PPU::PPUDataSegmentException(PPU_STATE* ppuState) {
+  PPU_THREAD_REGISTERS& thread = curThread;
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Data Segment exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
+  thread.SPR.SRR0 = thread.CIA;
+  thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
+  thread.SPR.MSR.MSR_Hex &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+  thread.SPR.MSR.MSR_Hex |= 0x9000000000000000;
+  thread.NIA = 0x380;
+}
+
+// Instruction Storage Exception (0x400)
+void PPU::PPUInstStorageException(PPU_STATE* ppuState) {
+  PPU_THREAD_REGISTERS& thread = curThread;
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Instruction Storage exception. EA = 0x{:X}", ppuState->ppuName, static_cast<s8>(curThreadId), thread.CIA);
+  thread.SPR.SRR0 = thread.CIA;
+  thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
+  thread.SPR.SRR1 |= 0x40000000;
+  thread.SPR.MSR.MSR_Hex &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+  thread.SPR.MSR.MSR_Hex |= 0x9000000000000000;
+  thread.NIA = 0x400;
+}
+
+// Instruction Segment Exception (0x480)
+void PPU::PPUInstSegmentException(PPU_STATE* ppuState) {
+  PPU_THREAD_REGISTERS& thread = curThread;
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Instruction Segment exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
+  thread.SPR.SRR0 = thread.CIA;
+  thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
+  thread.SPR.MSR.MSR_Hex &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+  thread.SPR.MSR.MSR_Hex |= 0x9000000000000000;
+  thread.NIA = 0x480;
+}
+
+// External Exception (0x500)
+void PPU::PPUExternalException(PPU_STATE* ppuState) {
+  PPU_THREAD_REGISTERS& thread = curThread;
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): External exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
+  thread.SPR.SRR0 = thread.NIA;
+  thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
+  thread.SPR.MSR.MSR_Hex &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+  thread.SPR.MSR.MSR_Hex |= 0x9000000000000000;
+  thread.NIA = 0x500;
+}
+
+// Program Exception (0x700)
+void PPU::PPUProgramException(PPU_STATE* ppuState) {
+  PPU_THREAD_REGISTERS& thread = curThread;
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Program exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
+  thread.SPR.SRR0 = thread.CIA;
+  thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
+  thread.SPR.MSR.MSR_Hex &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+  thread.SPR.MSR.MSR_Hex |= 0x9000000000000000;
+  BSET(thread.SPR.SRR1, 64, thread.progExceptionType);
+  thread.NIA = 0x700;
+}
+
+// FP Unavailable Exception (0x800)
+void PPU::PPUFPUnavailableException(PPU_STATE* ppuState) {
+  PPU_THREAD_REGISTERS& thread = curThread;
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): FPU exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
+  thread.SPR.SRR0 = thread.CIA;
+  thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
+  thread.SPR.MSR.MSR_Hex &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+  thread.SPR.MSR.MSR_Hex |= 0x9000000000000000;
+  thread.NIA = 0x800;
+}
+
+// Decrementer Exception (0x900)
+void PPU::PPUDecrementerException(PPU_STATE* ppuState) {
+  PPU_THREAD_REGISTERS& thread = curThread;
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Decrementer exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
+  thread.SPR.SRR0 = thread.NIA;
+  thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
+  thread.SPR.MSR.MSR_Hex &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+  thread.SPR.MSR.MSR_Hex |= 0x9000000000000000;
+  thread.NIA = 0x900;
+}
+
+// System Call Exception (0xC00)
+void PPU::PPUSystemCallException(PPU_STATE* ppuState) {
+  PPU_THREAD_REGISTERS& thread = curThread;
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): System Call exception. Syscall ID: 0x{:X}", ppuState->ppuName, static_cast<s8>(curThreadId), GPR(0));
+  thread.SPR.SRR0 = thread.NIA;
+  thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
+  thread.SPR.MSR.MSR_Hex &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+  thread.SPR.MSR.MSR_Hex |= 0x9000000000000000;
+  thread.NIA = 0xC00;
+}
+
+// VX Unavailable Exception (0xF20)
+void PPU::PPUVXUnavailableException(PPU_STATE* ppuState) {
+  PPU_THREAD_REGISTERS& thread = curThread;
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): VXU exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
+  thread.SPR.SRR0 = thread.CIA; // See Cell Vector SIMD PEM, page 104, table 5.4.
+  thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
+  thread.SPR.MSR.MSR_Hex &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+  thread.SPR.MSR.MSR_Hex |= 0x9000000000000000;
+  thread.NIA = 0xF20;
 }

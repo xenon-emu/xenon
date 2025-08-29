@@ -136,6 +136,22 @@ private:
   u32 resetVector = 0;
   
   //
+  // Exceptions
+  //
+
+  void PPUSystemResetException(PPU_STATE* ppuState);
+  void PPUInstStorageException(PPU_STATE* ppuState);
+  void PPUDataStorageException(PPU_STATE* ppuState);
+  void PPUDataSegmentException(PPU_STATE* ppuState);
+  void PPUInstSegmentException(PPU_STATE* ppuState);
+  void PPUSystemCallException(PPU_STATE* ppuState);
+  void PPUDecrementerException(PPU_STATE* ppuState);
+  void PPUProgramException(PPU_STATE* ppuState);
+  void PPUExternalException(PPU_STATE* ppuState);
+  void PPUFPUnavailableException(PPU_STATE* ppuState);
+  void PPUVXUnavailableException(PPU_STATE* ppuState);
+
+  //
   // JIT
   //
 

@@ -142,22 +142,7 @@ u32 CRCompS(PPU_STATE *ppuState, u64 num1, u64 num2);
 // Single instruction execution
 void ppcExecuteSingleInstruction(PPU_STATE *ppuState);
 
-//
-// Exceptions
-//
-
-void ppcResetException(PPU_STATE *ppuState);
-void ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber);
-void ppcInstStorageException(PPU_STATE *ppuState);
-void ppcDataStorageException(PPU_STATE *ppuState);
-void ppcDataSegmentException(PPU_STATE *ppuState);
-void ppcInstSegmentException(PPU_STATE *ppuState);
-void ppcSystemCallException(PPU_STATE *ppuState);
-void ppcDecrementerException(PPU_STATE *ppuState);
-void ppcProgramException(PPU_STATE *ppuState);
-void ppcExternalException(PPU_STATE *ppuState);
-void ppcFPUnavailableException(PPU_STATE *ppuState);
-void ppcVXUnavailableException(PPU_STATE *ppuState);
+void ppcInterpreterTrap(PPU_STATE* ppuState, u32 trapNumber);
 
 //
 // MMU
