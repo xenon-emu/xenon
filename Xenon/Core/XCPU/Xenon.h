@@ -57,7 +57,7 @@ private:
   RAM* ram;
 
   // Global Xenon CPU Content (shared between PPUs)
-  XENON_CONTEXT xenonContext = {};
+  XenonContext xenonContext = {};
 
   // The CPI shared across all cores, useful for timing
   u32 sharedCPI = 0;

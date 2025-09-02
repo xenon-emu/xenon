@@ -14,7 +14,7 @@ namespace PPCInterpreter {
 
 extern PPCInterpreter::PPCDecoder ppcDecoder;
 extern RootBus *sysBus;
-extern XENON_CONTEXT *CPUContext;
+extern XenonContext *CPUContext;
 extern RAM *ramPtr;
 
 //
@@ -159,9 +159,9 @@ SECENG_ADDRESS_INFO mmuGetSecEngInfoFromAddress(u64 inputAddress);
 u64 mmuContructEndAddressFromSecEngAddr(u64 inputAddress, bool *socAccess);
 
 // Main R/W Routines.
-void MMURead(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
+void MMURead(XenonContext *cpuContext, PPU_STATE *ppuState,
             u64 EA, u64 byteCount, u8 *outData, ePPUThread thr = ePPUThread_None);
-void MMUWrite(XENON_CONTEXT* cpuContext, PPU_STATE *ppuState,
+void MMUWrite(XenonContext *cpuContext, PPU_STATE *ppuState,
               const u8* data, u64 EA, u64 byteCount, ePPUThread thr = ePPUThread_None);
 
 void MMUMemCpyFromHost(PPU_STATE *ppuState, u64 EA, const void *source, u64 size, ePPUThread thr = ePPUThread_None);

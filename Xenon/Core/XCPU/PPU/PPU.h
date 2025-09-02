@@ -10,12 +10,14 @@
 
 class PPU_JIT;
 
+// Describes the execution backends available for the PPU.
 enum class eExecutorMode : u8 {
   Interpreter,
   JIT,
   Hybrid
 };
 
+// Current PPU Thread State.
 enum class eThreadState : u8 {
   None,        // Not created
   Unused,      // Should we create a handle? (Only really used in elf loading and single-core testing)
@@ -27,14 +29,16 @@ enum class eThreadState : u8 {
   Quiting      // Currently in a shutdown
 };
 
+// Current 'testing' mode. Used for execution backend testing.
 enum class ePPUTestingMode : u8 {
  Interpreter, // Regular interpreter mode
  JITx86,      // X86 JIT mode
 };
 
+// Power Procesing Unit. Main execution unit inside the PPE's within the Xenon CPU.
 class PPU {
 public:
-  PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PIR);
+  PPU(XenonContext*inXenonContext, RootBus *mainBus, u64 resetVector, u32 PIR);
   ~PPU();
 
   // Start execution
@@ -127,7 +131,7 @@ private:
   std::unique_ptr<PPU_STATE> ppuState;
 
   // Main CPU Context.
-  XENON_CONTEXT *xenonContext = nullptr;
+  XenonContext *xenonContext = nullptr;
 
   // Amount of CPU clocls per instruction executed.
   u32 clocksPerInstruction = 0;

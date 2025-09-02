@@ -10,7 +10,7 @@
 using namespace PPCInterpreter;
 
 // Forward Declaration
-XENON_CONTEXT* PPCInterpreter::CPUContext = nullptr;
+XenonContext* PPCInterpreter::CPUContext = nullptr;
 RootBus* PPCInterpreter::sysBus = nullptr;
 PPCInterpreter::PPCDecoder PPCInterpreter::ppcDecoder{};
 RAM *PPCInterpreter::ramPtr = nullptr;

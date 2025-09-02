@@ -31,7 +31,7 @@ static constexpr u64 get_cpi_value(const u64 instrPerSecond) {
   return cpi == 0 ? 1 : cpi;
 }
 
-PPU::PPU(XENON_CONTEXT *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PIR) :
+PPU::PPU(XenonContext *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PIR) :
   resetVector(resetVector)
 {
   traceFile = nullptr;

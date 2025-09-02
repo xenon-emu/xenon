@@ -1072,7 +1072,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
 }
 
 // MMU Read Routine, used by the CPU
-void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE *ppuState,
+void PPCInterpreter::MMURead(XenonContext *cpuContext, PPU_STATE *ppuState,
                              u64 EA, u64 byteCount, u8 *outData, ePPUThread thr) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMURead", MP_AUTO);
   PPU_THREAD_REGISTERS &thread = ppuState->ppuThread[thr != ePPUThread_None ? thr : curThreadId];
@@ -1142,7 +1142,7 @@ void PPCInterpreter::MMURead(XENON_CONTEXT* cpuContext, PPU_STATE *ppuState,
 }
 
 // MMU Write Routine, used by the CPU
-void PPCInterpreter::MMUWrite(XENON_CONTEXT *cpuContext, PPU_STATE *ppuState,
+void PPCInterpreter::MMUWrite(XenonContext *cpuContext, PPU_STATE *ppuState,
                               const u8 *data, u64 EA, u64 byteCount, ePPUThread thr) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUWrite", MP_AUTO);
   const u64 oldEA = EA;
