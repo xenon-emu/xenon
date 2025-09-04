@@ -7,7 +7,7 @@
 #ifndef NO_GFX
 #include <SDL3/SDL.h>
 #define IMGUI_DEFINE_MATH_OPERATORS
-#include <backends/imgui_impl_vulkan.h>
+//#include <backends/imgui_impl_vulkan.h>
 
 #include "Base/Version.h"
 #include "Base/Hash.h"

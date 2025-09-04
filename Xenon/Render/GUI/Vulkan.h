@@ -10,7 +10,7 @@
 
 #ifndef NO_GFX
 #define IMGUI_DEFINE_MATH_OPERATORS
-#include <backends/imgui_impl_vulkan.h>
+//#include <backends/imgui_impl_vulkan.h>
 #include <backends/imgui_impl_sdl3.h>
 
 namespace Render {
