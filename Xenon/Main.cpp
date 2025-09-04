@@ -48,7 +48,9 @@ s32 main(s32 argc, char *argv[]) {
 #endif
     std::this_thread::sleep_for(100ms);
   }
-  Base::RemoveHangup();
+  if (Base::RemoveHangup() != 0) {
+    LOG_WARNING(System, "Failed to remove signal handler. Ign");
+  }
   // Shutdown
   XeMain::Shutdown();
   return 0;

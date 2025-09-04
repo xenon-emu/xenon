@@ -288,21 +288,21 @@ jobs:
       - name: Cache CMake Configuration
         uses: actions/cache@main
         env:
-          cache-name: ${{runner.os}}-cache-config
+          cache-name: xenon-${{runner.os}}-aarch64-clang-{{env.BUILD_TYPE}}-config-cache
         with:
           path: |
             ${{github.workspace}}/build
-          key: ${{ env.cache-name }}-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
+          key: xenon-${{runner.os}}-aarch64-clang-${{env.BUILD_TYPE}}-deps-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
           restore-keys: |
-            ${{ env.cache-name }}-
+            xenon-${{runner.os}}-aarch64-clang-${{env.BUILD_TYPE}}-deps-
 
       - name: Cache CMake Build
         uses: hendrikmuhs/ccache-action@v1.2.18
         env:
-          cache-name: xenon-arm64-clang-${{runner.os}}-${{env.BUILD_TYPE}}-cache
+          cache-name: xenon-${{runner.os}}-aarch64-clang-${{env.BUILD_TYPE}}-cache
         with:
           append-timestamp: false
-          key: xenon-arm64-clang-${{runner.os}}-${{env.BUILD_TYPE}}-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
+          key: xenon-${{runner.os}}-aarch64-clang-${{env.BUILD_TYPE}}-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
 
       - name: Configure CMake
         run: cmake -G Ninja -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_C_COMPILER=$(brew --prefix llvm)/bin/clang -DCMAKE_CXX_COMPILER=$(brew --prefix llvm)/bin/clang++ -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache

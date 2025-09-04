@@ -32,3 +32,12 @@
 	path = Deps/ThirdParty/cryptopp
 	url = https://github.com/weidai11/cryptopp.git
 	shallow = true
+[submodule "Deps/ThirdParty/volk"]
+	path = Deps/ThirdParty/volk
+	url = https://github.com/zeux/volk.git
+[submodule "Deps/ThirdParty/Vulkan-Headers"]
+	path = Deps/ThirdParty/Vulkan-Headers
+	url = https://github.com/KhronosGroup/Vulkan-Headers.git
+[submodule "Deps/ThirdParty/VulkanMemoryAllocator"]
+	path = Deps/ThirdParty/VulkanMemoryAllocator
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git

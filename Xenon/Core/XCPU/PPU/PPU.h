@@ -142,7 +142,7 @@ private:
 
   // Initial reset vector
   u32 resetVector = 0;
-  
+
   //
   // Exceptions
   //

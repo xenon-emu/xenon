@@ -150,6 +150,9 @@ if (GFX_ENABLED)
   xenon_dep(glad glad glad)
   xenon_dep(SDL3 SDL3::SDL3 SDL3)
   xenon_dep(sirit sirit Sirit)
+  xenon_dep(volk volk volk)
+  xenon_dep(VulkanMemoryAllocator VulkanMemoryAllocator VulkanMemoryAllocator)
+  find_package(Vulkan REQUIRED)
 endif()
 
 # Include Files
@@ -160,6 +163,9 @@ file(GLOB_RECURSE Core Xenon/Core/*.cpp Xenon/Core/*.h)
 
 if (GFX_ENABLED)
   set(ImGuiDir ${XENON_THIRDPARTY_DIR}/ImGui)
+  set(VolkDir ${XENON_THIRDPARTY_DIR}/volk)
+  set(VMADir ${XENON_THIRDPARTY_DIR}/VulkanMemoryAllocator)
+  set(VkHdrsDir ${XENON_THIRDPARTY_DIR}/Vulkan-Headers)
   set(ImGuiBackends
     ${ImGuiDir}/backends/imgui_impl_opengl3.cpp
     ${ImGuiDir}/backends/imgui_impl_opengl3.h
@@ -205,7 +211,7 @@ endif()
 # Link libraries
 target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11 asmjit::asmjit)
 if (GFX_ENABLED)
-  target_link_libraries(Xenon PRIVATE glad sirit SDL3::SDL3)
+  target_link_libraries(Xenon PRIVATE glad sirit SDL3::SDL3 Vulkan::Vulkan volk VulkanMemoryAllocator)
 endif()
 
 # Includes
@@ -217,6 +223,9 @@ target_include_directories(Xenon PRIVATE
 if (GFX_ENABLED)
   target_include_directories(Xenon SYSTEM PRIVATE
     ${ImGuiDir}
+    ${VolkDir}
+    ${VkHdrsDir}/include
+    ${VMADir}/include
     ${XENON_THIRDPARTY_DIR}/glad
     ${XENON_THIRDPARTY_DIR}/SDL3/include
     ${XENON_THIRDPARTY_DIR}/Sirit/include
@@ -245,4 +254,4 @@ endif()
 if (CMAKE_GENERATOR MATCHES "Visual Studio")
   set(CMAKE_GENERATOR_PLATFORM x64)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")
-endif() 
+endif()

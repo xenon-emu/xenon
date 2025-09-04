@@ -2,6 +2,8 @@
 
 #include "XeMain.h"
 
+#include "Render/Backends/Vulkan/VulkanRenderer.h"
+
 void XeMain::Create() {
   MICROPROFILE_SCOPEI("[Xe::Main]", "Create", MP_AUTO);
   Base::Log::Initialize();
@@ -16,6 +18,10 @@ void XeMain::Create() {
   switch (Base::JoaatStringHash(Config::rendering.backend)) {
   case "OpenGL"_jLower:
     renderer = std::make_unique<Render::OGLRenderer>(ram.get());
+    renderer->Start();
+    break;
+  case "Vulkan"_jLower:
+    renderer = std::make_unique<Render::VulkanRenderer>(ram.get());
     renderer->Start();
     break;
   case "Dummy"_jLower:

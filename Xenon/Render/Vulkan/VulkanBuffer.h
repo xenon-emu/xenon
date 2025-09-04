@@ -3,16 +3,23 @@
 #pragma once
 
 #include "Render/Abstractions/Buffer.h"
+#include "Render/Backends/Vulkan/VulkanRenderer.h"
 
 #include "Base/Types.h"
 #include "Base/Logging/Log.h"
 
 #ifndef NO_GFX
+
+#include <vk_mem_alloc.h>
+#include <volk.h>
+
 namespace Render {
+
+class VulkanRenderer;
 
 class VulkanBuffer : public Buffer {
 public:
-  VulkanBuffer() = default;
+  VulkanBuffer(VulkanRenderer *renderer) : renderer(renderer) {}
   ~VulkanBuffer() {
     DestroyBuffer();
   }
@@ -22,7 +29,16 @@ public:
   void Bind(u32 binding) override;
   void Unbind() override;
   void DestroyBuffer() override;
+private:
+  VkBufferUsageFlags ConvertBufferType(eBufferType type);
+  VkBufferUsageFlags ConvertUsage(eBufferUsage usage);
+
+  VulkanRenderer *renderer = nullptr;
+  VkBuffer buffer = nullptr;
+  VmaAllocation allocation = VK_NULL_HANDLE;
+  VmaAllocationInfo allocationInfo = {};
 };
 
 } // namespace Render
+
 #endif

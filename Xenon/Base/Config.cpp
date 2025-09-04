@@ -51,10 +51,10 @@ void _rendering::to_toml(toml::value &value) {
   value["PauseOnFocusLoss"].comments().push_back("# Pauses XeLL and GUI rendering on window focus loss");
   value["GPU"].comments().clear();
   value["GPU"] = gpuId;
-  value["GPU"].comments().push_back("# [!NOT SUPPORTED NOW!] Chooses which GPU to use if there are multiple (Vulkan/DirectX only)");
+  value["GPU"].comments().push_back("# Chooses which GPU to use if there are multiple (Vulkan/DirectX only)");
   value["Backend"].comments().clear();
   value["Backend"] = backend;
-  value["Backend"].comments().push_back("# Graphics API used for rendering (OpenGL/Dummy)");
+  value["Backend"].comments().push_back("# Graphics API used for rendering (OpenGL, Vulkan & Dummy)");
   value["DebugValidation"].comments().clear();
   value["DebugValidation"] = debugValidation;
   value["DebugValidation"].comments().push_back("# Graphics API Validation");

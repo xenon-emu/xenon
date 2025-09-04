@@ -97,7 +97,7 @@ void DummyRenderer::OnBind() {
   LOG_INFO(Render, "DummyRenderer::OnBind");
 }
 
-void DummyRenderer::OnSwap(SDL_Window* window) {
+void DummyRenderer::OnSwap(SDL_Window *window) {
   LOG_INFO(Render, "DummyRenderer::OnSwap");
 }
 

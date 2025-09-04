@@ -13,11 +13,23 @@
 #include "Base/Hash.h"
 #include "Core/RAM/RAM.h"
 #include "Core/RootBus/HostBridge/PCIe.h"
-#include "Render/Abstractions/Factory/ResourceFactory.h"
 #include "Render/Abstractions/Factory/ShaderFactory.h"
 #ifndef TOOL
 #include "Render/GUI/GUI.h"
 #endif
+
+#if defined(_WIN64)
+#define VK_USE_PLATFORM_WIN32_KHR
+#elif defined(__linux__)
+#define VK_USE_PLATFORM_XLIB_KHR
+#elif defined(__APPLE__)
+#define VK_USE_PLATFORM_METAL_EXT
+#endif
+
+#define VK_ENABLE_BETA_EXTENSIONS
+
+#include <volk.h>
+#include <vk_mem_alloc.h>
 
 namespace Render {
 
@@ -43,11 +55,27 @@ public:
 
   void OnCompute() override;
   void OnBind() override;
-  void OnSwap(SDL_Window* window) override;
+  void OnSwap(SDL_Window *window) override;
   s32 GetBackbufferFlags() override;
   s32 GetXenosFlags() override;
-  void* GetBackendContext() override;
+  void *GetBackendContext() override;
   u32 GetBackendID() override;
+
+  void CreateCommandBuffer();
+  void EndCommandBuffer();
+
+  void CheckActiveRenderPass();
+  void EndActiveRenderPass();
+
+  VmaAllocator allocator = VK_NULL_HANDLE;
+  VkInstance instance = VK_NULL_HANDLE;
+  VkDevice device = VK_NULL_HANDLE;
+  VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+
+  VkCommandPool commandPool = VK_NULL_HANDLE;
+  VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+  VkRenderPass renderPass = VK_NULL_HANDLE;
+  VkFramebuffer framebuffer = VK_NULL_HANDLE;
 };
 
 } // namespace Render

@@ -246,7 +246,7 @@ void PPU::Halt(u64 haltOn, bool requestedByGuest, s8 ppuId, ePPUThread threadId)
 #endif
   if (ppuThreadPreviousState == eThreadState::None) // If we were told to ignore it, then do so
     ppuThreadPreviousState.store(ppuThreadState.load());
-  ppuThreadState = eThreadState::Halted;
+  ppuThreadState.store(eThreadState::Halted);
 }
 void PPU::Continue() {
   if (ppuThreadState.load() == eThreadState::Running)
@@ -254,7 +254,7 @@ void PPU::Continue() {
   if (ppuThreadPreviousState == eThreadState::Running)
     LOG_DEBUG(Xenon, "Continuing execution on PPU{}", ppuState->ppuID);
   ppuThreadState.store(ppuThreadPreviousState.load());
-  ppuThreadPreviousState = eThreadState::None;
+  ppuThreadPreviousState.store(eThreadState::None);
   guestHalt = false;
 }
 void PPU::ContinueFromException() {
@@ -268,7 +268,7 @@ void PPU::ContinueFromException() {
     thread.progExceptionType = PROGRAM_EXCEPTION_TYPE_TRAP;
   }
   ppuThreadState.store(ppuThreadPreviousState.load());
-  ppuThreadPreviousState = eThreadState::None;
+  ppuThreadPreviousState.store(eThreadState::None);
   guestHalt = false;
 }
 void PPU::Step(int amount) {
