@@ -440,10 +440,9 @@ int filter(unsigned int code) {
 
 void ProtectedRunTest(TestSuite &testSuite, TestRunner &runner,
   TestCase &testCase, s32 &failedCount,
-  s32 &passedCount) {
-#ifdef _WIN32
-  __try {
-#endif // _WIN32
+  s32 &passedCount)
+{
+  try {
 
     if (!runner.Setup(testSuite)) {
       LOG_ERROR(Xenon, "[Testing]:     TEST FAILED SETUP");
@@ -456,13 +455,15 @@ void ProtectedRunTest(TestSuite &testSuite, TestRunner &runner,
       LOG_ERROR(Xenon, "[Testing]:     TEST FAILED");
       ++failedCount;
     }
-
-#ifdef _WIN32
-  } __except (filter(GetExceptionCode())) {
-    LOG_ERROR(Xenon, "[Testing]:     TEST FAILED (UNSUPPORTED INSTRUCTION)");
+  }
+  catch (const std::exception &e) {
+    LOG_ERROR(Xenon, "[Testing]:     TEST FAILED (exception: %s)", e.what());
     ++failedCount;
   }
-#endif // _WIN32
+  catch (...) {
+    LOG_ERROR(Xenon, "[Testing]:     TEST FAILED (unknown exception)");
+    ++failedCount;
+  }
 }
 
 bool PPU::RunInstructionTests(PPU_STATE *ppuState, PPU_JIT* ppuJITPtr, ePPUTestingMode testMode) {

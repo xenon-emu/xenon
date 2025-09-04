@@ -3,6 +3,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstdlib>
 
 #include "Logging/Log.h"
 #include "Types.h"
@@ -33,7 +34,7 @@ inline void SystemPause() {
 #endif
   s32 c = getchar();
   if (c == EOF && errno == EINTR) {
-    // Interrupted by signal — let main loop handle shutdown
+    // Interrupted by signal ï¿½ let main loop handle shutdown
     return;
   }
 }

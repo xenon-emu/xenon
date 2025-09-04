@@ -144,7 +144,7 @@ public:
   bool DebuggerActive();
 
   void SetDebuggerActive(s8 specificPPU = -1);
-  
+
   // Recompiled shaders
   std::mutex programLinkMutex{};
   std::unordered_map<u32, std::pair<Xe::Microcode::AST::Shader*, std::vector<u32>>> pendingVertexShaders{};
