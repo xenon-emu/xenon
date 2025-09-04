@@ -317,8 +317,8 @@ u8 PPCInterpreter::mmuGetPageSize(PPU_STATE *ppuState, bool L, u8 LP) {
 
   // HID6 16-17 bits select Large Page size 1.
   // HID6 18-19 bits select Large Page size 2.
-  const u8 LB_16_17 = static_cast<u8>(QGET(ppuState->SPR.HID6, 16, 17));
-  const u8 LB_18_19 = static_cast<u8>(QGET(ppuState->SPR.HID6, 18, 19));
+  const u8 LB_16_17 = (ppuState->SPR.HID6.lb & 0b1100) >> 2;
+  const u8 LB_18_19 = ppuState->SPR.HID6.lb & 0b11;
 
   // Final p size.
   u8 p = 0;
@@ -554,7 +554,7 @@ void PPCInterpreter::mmuReadString(PPU_STATE *ppuState, u64 stringAddress,
     maxLength = strLength + 1;
 
   stringBufferAddress = MMURead32(ppuState, stringAddress + 4);
-  MMURead(CPUContext, ppuState, stringBufferAddress, maxLength, reinterpret_cast<u8*>(string));
+  MMURead(xenonContext, ppuState, stringBufferAddress, maxLength, reinterpret_cast<u8*>(string));
   string[maxLength - 1] = 0;
 }
 
@@ -1135,7 +1135,7 @@ void PPCInterpreter::MMURead(XenonContext *cpuContext, PPU_STATE *ppuState,
   }
 
   // External read
-  if (!sysBus->Read(EA, outData, byteCount, socRead) && socRead) {
+  if (!xenonContext->GetRootBus()->Read(EA, outData, byteCount, socRead) && socRead) {
     if (Config::log.advanced)
       LOG_WARNING(Xenon_MMU, "Invalid SoC Read from 0x{:X}", EA);
   }
@@ -1195,7 +1195,7 @@ void PPCInterpreter::MMUWrite(XenonContext *cpuContext, PPU_STATE *ppuState,
   }
 
   // External write
-  if (!sysBus->Write(EA, data, byteCount, socWrite) && socWrite) {
+  if (!xenonContext->GetRootBus()->Write(EA, data, byteCount, socWrite) && socWrite) {
     u64 tmp = 0;
     memcpy(&tmp, data, byteCount);
     if (Config::log.advanced)
@@ -1205,14 +1205,14 @@ void PPCInterpreter::MMUWrite(XenonContext *cpuContext, PPU_STATE *ppuState,
 
 void PPCInterpreter::MMUMemCpyFromHost(PPU_STATE *ppuState,
                                        u64 EA, const void *source, u64 size, ePPUThread thr) {
-  MMUWrite(CPUContext, ppuState, reinterpret_cast<const u8*>(source), EA, size);
+  MMUWrite(xenonContext, ppuState, reinterpret_cast<const u8*>(source), EA, size);
 }
 
 void PPCInterpreter::MMUMemCpy(PPU_STATE *ppuState,
                                u64 EA, u32 source, u64 size, ePPUThread thr) {
   std::unique_ptr<u8[]> data = std::make_unique<STRIP_UNIQUE_ARR(data)>(size);
-  MMURead(CPUContext, ppuState, source, size, data.get(), thr);
-  MMUWrite(CPUContext, ppuState, data.get(), EA, size, thr);
+  MMURead(xenonContext, ppuState, source, size, data.get(), thr);
+  MMUWrite(xenonContext, ppuState, data.get(), EA, size, thr);
   data.reset();
 }
 
@@ -1223,11 +1223,11 @@ void PPCInterpreter::MMUMemSet(PPU_STATE *ppuState,
   if (MMUTranslateAddress(&EA, ppuState, true, thr) == false)
     return;
 
-  if (!CPUContext)
+  if (!xenonContext)
     return;
 
   // Check if it's reserved
-  CPUContext->xenonRes.Check(EA);
+  xenonContext->xenonRes.Check(EA);
 
   bool socWrite = false;
 
@@ -1247,13 +1247,13 @@ void PPCInterpreter::MMUMemSet(PPU_STATE *ppuState,
       // Check if writing to internal SRAM
       else if (EA >= XE_SRAM_ADDR && EA < XE_SRAM_ADDR + XE_SRAM_SIZE) {
         const u32 sramAddr = static_cast<u32>(EA - XE_SRAM_ADDR);
-        memset(&CPUContext->SRAM[sramAddr], data, size);
+        memset(&xenonContext->SRAM[sramAddr], data, size);
         return;
       }
       // Check if writing to Security Engine Config Block
       else if (EA >= XE_SOCSECENG_BLOCK_START && EA < XE_SOCSECENG_BLOCK_START + XE_SOCSECENG_BLOCK_SIZE) {
         const u32 secEngOffset = static_cast<u32>(EA - XE_SOCSECENG_BLOCK_START);
-        memset(reinterpret_cast<u8*>(CPUContext->socSecEngBlock.get()) + secEngOffset, 0, size);
+        memset(reinterpret_cast<u8*>(xenonContext->socSecEngBlock.get()) + secEngOffset, 0, size);
         return;
       }
     } break;
@@ -1261,53 +1261,53 @@ void PPCInterpreter::MMUMemSet(PPU_STATE *ppuState,
   }
 
   // External MemSet
-  sysBus->MemSet(EA, data, size);
+  xenonContext->GetRootBus()->MemSet(EA, data, size);
 }
 
 u8* PPCInterpreter::MMUGetPointerFromRAM(u64 EA) {
-  return ramPtr->GetPointerToAddress(EA);
+  return xenonContext->GetRAM()->GetPointerToAddress(EA);
 }
 
 // Reads 1 byte of memory
 u8 PPCInterpreter::MMURead8(PPU_STATE *ppuState, u64 EA, ePPUThread thr) {
   u8 data = 0;
-  MMURead(CPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data), thr);
+  MMURead(xenonContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data), thr);
   return data;
 }
 // Reads 2 bytes of memory
 u16 PPCInterpreter::MMURead16(PPU_STATE *ppuState, u64 EA, ePPUThread thr) {
   u16 data = 0;
-  MMURead(CPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data), thr);
+  MMURead(xenonContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data), thr);
   return byteswap_be<u16>(data);
 }
 // Reads 4 bytes of memory
 u32 PPCInterpreter::MMURead32(PPU_STATE *ppuState, u64 EA, ePPUThread thr) {
   u32 data = 0;
-  MMURead(CPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data), thr);
+  MMURead(xenonContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data), thr);
   return byteswap_be<u32>(data);
 }
 // Reads 8 bytes of memory
 u64 PPCInterpreter::MMURead64(PPU_STATE *ppuState, u64 EA, ePPUThread thr) {
   u64 data = 0;
-  MMURead(CPUContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data), thr);
+  MMURead(xenonContext, ppuState, EA, sizeof(data), reinterpret_cast<u8*>(&data), thr);
   return byteswap_be<u64>(data);
 }
 // Writes 1 byte to memory
 void PPCInterpreter::MMUWrite8(PPU_STATE *ppuState, u64 EA, u8 data, ePPUThread thr) {
-  MMUWrite(CPUContext, ppuState, reinterpret_cast<const u8*>(&data), EA, sizeof(data), thr);
+  MMUWrite(xenonContext, ppuState, reinterpret_cast<const u8*>(&data), EA, sizeof(data), thr);
 }
 // Writes 2 bytes to memory
 void PPCInterpreter::MMUWrite16(PPU_STATE *ppuState, u64 EA, u16 data, ePPUThread thr) {
   const u16 dataBS = byteswap_be<u16>(data);
-  MMUWrite(CPUContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data), thr);
+  MMUWrite(xenonContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data), thr);
 }
 // Writes 4 bytes to memory
 void PPCInterpreter::MMUWrite32(PPU_STATE *ppuState, u64 EA, u32 data, ePPUThread thr) {
   const u32 dataBS = byteswap_be<u32>(data);
-  MMUWrite(CPUContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data), thr);
+  MMUWrite(xenonContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data), thr);
 }
 // Writes 8 bytes to memory
 void PPCInterpreter::MMUWrite64(PPU_STATE *ppuState, u64 EA, u64 data, ePPUThread thr) {
   const u64 dataBS = byteswap_be<u64>(data);
-  MMUWrite(CPUContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data), thr);
+  MMUWrite(xenonContext, ppuState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data), thr);
 }

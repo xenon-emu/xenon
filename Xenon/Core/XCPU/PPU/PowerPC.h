@@ -9,10 +9,13 @@
 #include "Base/Bitfield.h"
 #include "Base/LRUCache.h"
 #include "Base/Vector128.h"
-#include "Core/XCPU/XenonSOC.h"
-#include "Core/XCPU/IIC/IIC.h"
-#include "Core/XCPU/XenonReservations.h"
+#include "Core/RAM/RAM.h"
 #include "Core/XCPU/eFuse.h"
+#include "Core/XCPU/IIC/IIC.h"
+#include "Core/XCPU/XenonSOC.h"
+#include "Core/RootBus/RootBus.h"
+#include "Core/XCPU/XenonReservations.h"
+
 
 // PowerPC Opcode definitions
 /*
@@ -472,6 +475,36 @@ union VSCRegister {
 #endif// __LITTLE_ENDIAN__
 };
 
+// Hardware Implementation Register 6 (HID6)
+union uHID6SPR {
+  u64 data;
+#ifdef __LITTLE_ENDIAN__
+  struct {
+    u64 : 34;
+    u64 RMSC : 4;
+    u64 : 6;
+    u64 lb : 4;
+    u64 tb_enable : 1;
+    u64 : 4;
+    u64 debug_enable : 1;
+    u64: 2;
+    u64 debug : 8;
+  };
+#else
+  struct {
+    u64 debug : 8;
+    u64 : 2;
+    u64 debug_enable : 1;
+    u64 : 4;
+    u64 tb_enable : 1;
+    u64 lb : 4;
+    u64 : 6;
+    u64 RMSC : 4;
+    u64 : 34;
+  };
+#endif
+};
+
 // Segment Lookaside Buffer Entry
 struct SLBEntry {
   u8 V;
@@ -596,7 +629,7 @@ struct PPU_STATE_SPRS {
   // Hardware Implementation Register 4
   u64 HID4;
   // Hardware Implementation Register 6
-  u64 HID6;
+  uHID6SPR HID6;
 };
 
 // Thread IDs for ease of handling
@@ -765,6 +798,12 @@ struct PPU_STATE {
 
 // Main Xenon CPU 'context'. Holds everything aside from the PPU cores and is shared for all threads.
 struct XenonContext {
+  XenonContext(RootBus* rootBusPtr, RAM* ramPtr) : rootBus(rootBusPtr), ram(ramPtr) {}
+  ~XenonContext() {
+    rootBus.reset();
+    ram.reset();
+  }
+
   // Xenon SecureROM
   // Contains the CPU's main startup code known as 1BL.
   u8 *SROM = new u8[XE_SROM_SIZE];
@@ -796,6 +835,10 @@ struct XenonContext {
   // value is set.
   bool timeBaseActive = false;
 
+  // RAM/RootBus getters.
+  RootBus *GetRootBus() { return rootBus.get(); }
+  RAM *GetRAM() { return ram.get(); }
+
   // Xenon SOC Blocks R/W methods.
   bool HandleSOCRead(u64 readAddr, u8* data, size_t byteCount);
   bool HandleSOCWrite(u64 writeAddr, const u8* data, size_t byteCount);
@@ -826,6 +869,12 @@ private:
 
   // Mutex for thread safety.
   std::recursive_mutex mutex;
+
+  // RootBus pointer.
+  std::shared_ptr<RootBus> rootBus;
+
+  // RAM pointer.
+  std::shared_ptr<RAM> ram;
 
   // SOC Blocks R/W.
 

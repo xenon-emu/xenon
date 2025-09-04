@@ -31,7 +31,7 @@ static constexpr u64 get_cpi_value(const u64 instrPerSecond) {
   return cpi == 0 ? 1 : cpi;
 }
 
-PPU::PPU(XenonContext *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PIR) :
+PPU::PPU(XenonContext *inXenonContext, u64 resetVector, u32 PIR) :
   resetVector(resetVector)
 {
   traceFile = nullptr;
@@ -91,6 +91,8 @@ PPU::PPU(XenonContext *inXenonContext, RootBus *mainBus, u64 resetVector, u32 PI
 
   // Asign global Xenon context
   xenonContext = inXenonContext;
+
+  xenonMMU = std::make_unique<STRIP_UNIQUE(xenonMMU)>(xenonContext);
 
   if (Config::xcpu.clocksPerInstruction) {
     clocksPerInstruction = Config::xcpu.clocksPerInstruction;
@@ -185,7 +187,7 @@ void PPU::StartExecution(bool setHRMOR) {
   ppuState->SPR.LPCR = 0x402ULL;
 
   // HID6?
-  ppuState->SPR.HID6 = 0x1803800000000ULL;
+  ppuState->SPR.HID6.data = 0x1803800000000ULL;
 
   // TSCR[WEXT] = 1??
   ppuState->SPR.TSCR = 0x100000UL;
@@ -877,7 +879,7 @@ void PPU::CheckTimeBaseStatus() {
     // 0 -> TBU, TBL, DEC, HDEC, and the hang-detection logic do not
     // update. 1 -> TBU, TBL, DEC, HDEC, and the hang-detection logic
     // are enabled to update
-    if (ppuState->SPR.HID6 & 0x1000000000000) {
+    if (ppuState->SPR.HID6.tb_enable) {
       UpdateTimeBase();
     }
   }

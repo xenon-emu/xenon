@@ -10,10 +10,8 @@
 using namespace PPCInterpreter;
 
 // Forward Declaration
-XenonContext* PPCInterpreter::CPUContext = nullptr;
-RootBus* PPCInterpreter::sysBus = nullptr;
+XenonContext* PPCInterpreter::xenonContext = nullptr;
 PPCInterpreter::PPCDecoder PPCInterpreter::ppcDecoder{};
-RAM *PPCInterpreter::ramPtr = nullptr;
 
 // Interpreter Single Instruction Processing.
 void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
@@ -144,7 +142,7 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
     u32 strAddr = GPR(3);
     u64 strSize = static_cast<u64>(GPR(4));
     std::unique_ptr<u8[]> buffer = std::make_unique<STRIP_UNIQUE_ARR(buffer)>(strSize+1);
-    MMURead(CPUContext, ppuState, strAddr, strSize, buffer.get());
+    MMURead(xenonContext, ppuState, strAddr, strSize, buffer.get());
     char *dbgString = reinterpret_cast<char*>(buffer.get());
     dbgString[strSize] = '\0'; // nul-term
     Base::Log::NoFmtMessage(Base::Log::Class::DebugPrint, Base::Log::Level::Guest, dbgString);

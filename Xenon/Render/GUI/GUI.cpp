@@ -701,7 +701,15 @@ void PPURegisters(Render::GUI *gui, PPU_STATE *state) {
       Hex(gui, SPR, HID0);
       Hex(gui, SPR, HID1);
       Hex(gui, SPR, HID4);
-      Hex(gui, SPR, HID6);
+      if (gui->BeginNode("HID6", ImGuiTreeNodeFlags_DefaultOpen)) {
+        uHID6SPR& HID6 = SPR.HID6;
+        U8Hex(gui, HID6, debug);
+        U8Hex(gui, HID6, debug_enable);
+        U8Hex(gui, HID6, tb_enable);
+        U8Hex(gui, HID6, lb);
+        U8Hex(gui, HID6, RMSC);
+        gui->EndNode();
+      }
       gui->EndNode();
     }
     if (gui->BeginNode("TLB")) {

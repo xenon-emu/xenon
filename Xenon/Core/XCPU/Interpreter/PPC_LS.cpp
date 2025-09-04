@@ -397,13 +397,13 @@ void PPCInterpreter::PPCInterpreter_stwcx(PPU_STATE *ppuState) {
     return;
 
   if (curThread.ppuRes->valid) {
-    CPUContext->xenonRes.LockGuard([&] {
+    xenonContext->xenonRes.LockGuard([&] {
       if (curThread.ppuRes->valid) {
         if (curThread.ppuRes->reservedAddr == RA) {
           MMUWrite32(ppuState, EA, static_cast<u32>(GPRi(rs)));
           BSET(CR, 4, CR_BIT_EQ);
         } else {
-          CPUContext->xenonRes.Decrement();
+          xenonContext->xenonRes.Decrement();
           curThread.ppuRes->valid = false;
         }
       }
@@ -506,13 +506,13 @@ void PPCInterpreter::PPCInterpreter_stdcx(PPU_STATE *ppuState) {
     return;
 
   if (curThread.ppuRes->valid) {
-    CPUContext->xenonRes.LockGuard([&] {
+    xenonContext->xenonRes.LockGuard([&] {
       if (curThread.ppuRes->valid) {
         if (curThread.ppuRes->reservedAddr == RA) {
           MMUWrite64(ppuState, EA, GPRi(rd));
           BSET(CR, 4, CR_BIT_EQ);
         } else {
-          CPUContext->xenonRes.Decrement();
+          xenonContext->xenonRes.Decrement();
           curThread.ppuRes->valid = false;
         }
       }
@@ -1256,7 +1256,7 @@ void PPCInterpreter::PPCInterpreter_lwarx(PPU_STATE *ppuState) {
 
   curThread.ppuRes->valid = true;
   curThread.ppuRes->reservedAddr = RA;
-  CPUContext->xenonRes.Increment();
+  xenonContext->xenonRes.Increment();
 
   u32 data = MMURead32(ppuState, EA);
 
@@ -1441,7 +1441,7 @@ void PPCInterpreter::PPCInterpreter_ldarx(PPU_STATE *ppuState) {
 
   curThread.ppuRes->reservedAddr = RA;
   curThread.ppuRes->valid = true;
-  CPUContext->xenonRes.Increment();
+  xenonContext->xenonRes.Increment();
 
   const u64 data = MMURead64(ppuState, EA);
 

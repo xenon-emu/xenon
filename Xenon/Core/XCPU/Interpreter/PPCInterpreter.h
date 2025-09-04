@@ -13,9 +13,7 @@
 namespace PPCInterpreter {
 
 extern PPCInterpreter::PPCDecoder ppcDecoder;
-extern RootBus *sysBus;
-extern XenonContext *CPUContext;
-extern RAM *ramPtr;
+extern XenonContext *xenonContext;
 
 //
 //  Helper macros for instructions

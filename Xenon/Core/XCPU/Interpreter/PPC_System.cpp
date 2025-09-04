@@ -305,7 +305,7 @@ void PPCInterpreter::PPCInterpreter_mfspr(PPU_STATE *ppuState) {
     GPRi(rs) = curThread.SPR.DABR;
     break;
   case SPR_HID6:
-    GPRi(rs) = ppuState->SPR.HID6;
+    GPRi(rs) = ppuState->SPR.HID6.data;
     break;
   case SPR_PIR:
     GPRi(rs) = curThread.SPR.PIR;
@@ -429,7 +429,7 @@ void PPCInterpreter::PPCInterpreter_mtspr(PPU_STATE *ppuState) {
     ppuState->SPR.HID4 = GPRi(rd);
     break;
   case SPR_HID6:
-    ppuState->SPR.HID6 = GPRi(rd);
+    ppuState->SPR.HID6.data = GPRi(rd);
     break;
   case SPR_DABR:
     curThread.SPR.DABR = GPRi(rd);

@@ -6,18 +6,17 @@
 #include "Interpreter/PPCInterpreter.h"
 
 Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPath, RAM* ramPtr) {
-  // First, Initialize system bus.
-  mainBus = inBus;
-  ram = ramPtr;
+  // Initilize Xenon Context
+  xenonContext = std::make_unique<STRIP_UNIQUE(xenonContext)>(inBus, ramPtr); // Threads 0-1
 
   // Set SROM to 0.
-  memset(xenonContext.SROM, 0, XE_SROM_SIZE);
+  memset(xenonContext->SROM, 0, XE_SROM_SIZE);
 
   // Populate FuseSet
   {
     std::ifstream file(fusesPath);
     if (!file.is_open()) {
-      xenonContext.socSecOTPBlock.get()->sec->AsULONGLONG = { 0x9999999999999999 };
+      xenonContext->socSecOTPBlock.get()->sec->AsULONGLONG = { 0x9999999999999999 };
     } else {
       std::vector<std::string> fusesets;
       std::string fuseset;
@@ -34,18 +33,18 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPa
         LOG_INFO(System, " * FuseSet {:02}: 0x{}", i, fuseset.c_str());
       }
 
-      xenonContext.socSecOTPBlock.get()->sec[0].AsULONGLONG = strtoull(fusesets[0].c_str(), nullptr, 16);
-      xenonContext.socSecOTPBlock.get()->ConsoleType[0] = strtoull(fusesets[1].c_str(), nullptr, 16);
-      xenonContext.socSecOTPBlock.get()->ConsoleSequence[0] = strtoull(fusesets[2].c_str(), nullptr, 16);
-      xenonContext.socSecOTPBlock.get()->UniqueId1[0] = strtoull(fusesets[3].c_str(), nullptr, 16);
-      xenonContext.socSecOTPBlock.get()->UniqueId2[0] = strtoull(fusesets[4].c_str(), nullptr, 16);
-      xenonContext.socSecOTPBlock.get()->UniqueId3[0] = strtoull(fusesets[5].c_str(), nullptr, 16);
-      xenonContext.socSecOTPBlock.get()->UniqueId4[0] = strtoull(fusesets[6].c_str(), nullptr, 16);
-      xenonContext.socSecOTPBlock.get()->UpdateSequence[0] = strtoull(fusesets[7].c_str(), nullptr, 16);
-      xenonContext.socSecOTPBlock.get()->EepromKey1[0] = strtoull(fusesets[8].c_str(), nullptr, 16);
-      xenonContext.socSecOTPBlock.get()->EepromKey2[0] = strtoull(fusesets[9].c_str(), nullptr, 16);
-      xenonContext.socSecOTPBlock.get()->EepromHash1[0] = strtoull(fusesets[10].c_str(), nullptr, 16);
-      xenonContext.socSecOTPBlock.get()->EepromHash2[0] = strtoull(fusesets[11].c_str(), nullptr, 16);
+      xenonContext->socSecOTPBlock.get()->sec[0].AsULONGLONG = strtoull(fusesets[0].c_str(), nullptr, 16);
+      xenonContext->socSecOTPBlock.get()->ConsoleType[0] = strtoull(fusesets[1].c_str(), nullptr, 16);
+      xenonContext->socSecOTPBlock.get()->ConsoleSequence[0] = strtoull(fusesets[2].c_str(), nullptr, 16);
+      xenonContext->socSecOTPBlock.get()->UniqueId1[0] = strtoull(fusesets[3].c_str(), nullptr, 16);
+      xenonContext->socSecOTPBlock.get()->UniqueId2[0] = strtoull(fusesets[4].c_str(), nullptr, 16);
+      xenonContext->socSecOTPBlock.get()->UniqueId3[0] = strtoull(fusesets[5].c_str(), nullptr, 16);
+      xenonContext->socSecOTPBlock.get()->UniqueId4[0] = strtoull(fusesets[6].c_str(), nullptr, 16);
+      xenonContext->socSecOTPBlock.get()->UpdateSequence[0] = strtoull(fusesets[7].c_str(), nullptr, 16);
+      xenonContext->socSecOTPBlock.get()->EepromKey1[0] = strtoull(fusesets[8].c_str(), nullptr, 16);
+      xenonContext->socSecOTPBlock.get()->EepromKey2[0] = strtoull(fusesets[9].c_str(), nullptr, 16);
+      xenonContext->socSecOTPBlock.get()->EepromHash1[0] = strtoull(fusesets[10].c_str(), nullptr, 16);
+      xenonContext->socSecOTPBlock.get()->EepromHash2[0] = strtoull(fusesets[11].c_str(), nullptr, 16);
     }
   }
 
@@ -73,21 +72,19 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPa
         return;
       }
       if (fileSize == XE_SROM_SIZE) {
-        file.read(reinterpret_cast<char*>(xenonContext.SROM), XE_SROM_SIZE);
+        file.read(reinterpret_cast<char*>(xenonContext->SROM), XE_SROM_SIZE);
         LOG_INFO(Xenon, "1BL Loaded.");
       }
     }
     file.close();
   }
 
-  // Asign Interpreter global variables
-  PPCInterpreter::CPUContext = &xenonContext;
-  PPCInterpreter::sysBus = mainBus;
-  PPCInterpreter::ramPtr = ram;
+  // Asign Interpreter global CPU context
+  PPCInterpreter::xenonContext = xenonContext.get();
 
   // Setup SOC blocks.
-  xenonContext.socPRVBlock.get()->PowerOnResetStatus.AsBITS.SecureMode = 1; // CB Checks this.
-  xenonContext.socPRVBlock.get()->PowerManagementControl.AsULONGLONG = 0x382C00000000B001ULL; // Power Management Control.
+  xenonContext->socPRVBlock.get()->PowerOnResetStatus.AsBITS.SecureMode = 1; // CB Checks this.
+  xenonContext->socPRVBlock.get()->PowerManagementControl.AsULONGLONG = 0x382C00000000B001ULL; // Power Management Control.
 }
 
 Xenon::~Xenon() {
@@ -95,8 +92,8 @@ Xenon::~Xenon() {
   ppu0.reset();
   ppu1.reset();
   ppu2.reset();
-  delete[] xenonContext.SRAM;
-  delete[] xenonContext.SROM;
+  delete[] xenonContext->SRAM;
+  delete[] xenonContext->SROM;
 }
 
 void Xenon::Start(u64 resetVector) {
@@ -108,9 +105,9 @@ void Xenon::Start(u64 resetVector) {
     ppu2.reset();
   }
   // Create PPU elements
-  ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(&xenonContext, mainBus, resetVector, 0); // Threads 0-1
-  ppu1 = std::make_unique<STRIP_UNIQUE(ppu1)>(&xenonContext, mainBus, resetVector, 2); // Threads 2-3
-  ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(&xenonContext, mainBus, resetVector, 4); // Threads 4-5
+  ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(xenonContext.get(), resetVector, 0); // Threads 0-1
+  ppu1 = std::make_unique<STRIP_UNIQUE(ppu1)>(xenonContext.get(), resetVector, 2); // Threads 2-3
+  ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(xenonContext.get(), resetVector, 4); // Threads 4-5
   // Start execution on the main thread
   ppu0->StartExecution();
   sharedCPI = ppu0->GetCPI();
@@ -125,7 +122,7 @@ void Xenon::Start(u64 resetVector) {
 u32 Xenon::RunCPITests(u64 resetVector) {
   // Create PPU element
   ppu0.reset();
-  ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(&xenonContext, mainBus, resetVector, 0); // Threads 0-1
+  ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(xenonContext.get(), resetVector, 0); // Threads 0-1
   // Start execution on the main thread
   ppu0->StartExecution();
   // Get CPU and reset PPU
@@ -138,9 +135,9 @@ void Xenon::LoadElf(const std::string path) {
   ppu0.reset();
   ppu1.reset();
   ppu2.reset();
-  ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(&xenonContext, mainBus, 0, 0); // Threads 0-1
-  ppu1 = std::make_unique<STRIP_UNIQUE(ppu1)>(&xenonContext, mainBus, 0, 2); // Threads 2-3
-  ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(&xenonContext, mainBus, 0, 4); // Threads 4-5
+  ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(xenonContext.get(), 0, 0); // Threads 0-1
+  ppu1 = std::make_unique<STRIP_UNIQUE(ppu1)>(xenonContext.get(), 0, 2); // Threads 2-3
+  ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(xenonContext.get(), 0, 4); // Threads 4-5
   std::filesystem::path filePath{ path };
   std::ifstream file{ filePath, std::ios_base::in | std::ios_base::binary };
   u64 fileSize = 0;

@@ -43,21 +43,15 @@ public:
 
   bool IsHaltedByGuest();
 
-  Xe::XCPU::IIC::XenonIIC *GetIICPointer() { return &xenonContext.xenonIIC; }
+  Xe::XCPU::IIC::XenonIIC *GetIICPointer() { return &xenonContext->xenonIIC; }
 
   PPU *GetPPU(u8 ppuID);
 
   u32 GetCPI() { return sharedCPI; }
 
 private:
-  // System Bus
-  RootBus *mainBus = nullptr;
-
-  // System RAM
-  RAM* ram;
-
   // Global Xenon CPU Content (shared between PPUs)
-  XenonContext xenonContext = {};
+  std::unique_ptr<XenonContext> xenonContext;
 
   // The CPI shared across all cores, useful for timing
   u32 sharedCPI = 0;
