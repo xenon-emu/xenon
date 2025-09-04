@@ -252,15 +252,16 @@ void PPCInterpreter::PPCInterpreter_vcfux(PPU_STATE *ppuState) {
   VRi(vd).flt[3] = VRi(va).dword[3] / divisor;
 }
 
-static u32 vcmpbfpHelper(const f32 fra, const f32 frb)
-{
+static u32 vcmpbfpHelper(const f32 fra, const f32 frb) {
   u32 returnValue = 0;
   static const u32 retLE = 0x80000000;
   static const u32 retGE = 0x40000000;
-  if (isnan<f32>(fra) || isnan<f32>(frb)) return retLE | retGE;
+  if (std::isnan(fra) || std::isnan(frb))
+    return retLE | retGE;
+
   returnValue |= (fra <= frb ? 0 : retLE);
   returnValue |= (fra >= -frb ? 0 : retGE);
-  
+
   return returnValue;
 }
 
