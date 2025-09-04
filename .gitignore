@@ -436,6 +436,7 @@ Tools/AST/Deps/ThirdParty/SDL3
 Tools/AST/Deps/ThirdParty/Sirit
 result
 files
+output.txt
 # Specific to Xenon tooling
 Tools/AST/Deps/ThirdParty/Sirit/*
 .direnv/*
