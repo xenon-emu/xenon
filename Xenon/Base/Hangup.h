@@ -5,7 +5,7 @@
 #ifdef __linux__
 #include <signal.h>
 #elif defined(_WIN32)
-
+#include <Windows.h>
 #endif
 
 namespace Base {
