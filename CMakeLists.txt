@@ -257,6 +257,10 @@ target_include_directories(Xenon SYSTEM PRIVATE
   ${XENON_THIRDPARTY_DIR}/asmjit/src
 )
 
+if (APPLE)
+  target_link_libraries(Xenon PRIVATE c++ c++abi)
+endif()
+
 # Add defines specific to Windows
 if (WIN32)
   target_link_libraries(Xenon PRIVATE ws2_32)

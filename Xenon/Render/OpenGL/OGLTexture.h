@@ -20,7 +20,7 @@ struct TextureParamFlag {
   const GLint param;
 };
 
-enum eCreationFlags : const s32 {
+enum eCreationFlags : s32 {
   glTextureWrapS_GL_CLAMP_TO_EDGE = (1 << 0),
   glTextureWrapT_GL_CLAMP_TO_EDGE = (1 << 1),
   glTextureMinFilter_GL_NEAREST = (1 << 2),
@@ -31,7 +31,7 @@ enum eCreationFlags : const s32 {
   glTextureSwizzleA_GL_BLUE = (1 << 7),
 };
 
-enum eTextureDepth : const s32 {
+enum eTextureDepth : s32 {
   RG = (1 << 4),
   RGI = (1 << 5),
   R8 = (1 << 6),
