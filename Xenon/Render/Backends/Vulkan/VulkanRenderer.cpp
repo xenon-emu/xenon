@@ -38,7 +38,7 @@ void VulkanRenderer::BackendStart() {
 #if defined(VK_USE_PLATFORM_XCB_KHR)
   instanceExtensions.push_back(VK_KHR_XCB_SURFACE_EXTENSION_NAME);
 #elif defined(VK_USE_PLATFORM_XLIB_KHR)
-  //instanceExtensions.push_back(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
+  instanceExtensions.push_back(VK_KHR_XLIB_SURFACE_EXTENSION_NAME);
 #elif defined(__APPLE__)
   instanceExtensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
 #endif
