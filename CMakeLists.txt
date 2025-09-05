@@ -29,9 +29,14 @@ endif()
 # Optimizations
 if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
-  if (MSVC)
+  if (msvc)
     add_compile_options($<$<CONFIG:Release>:/Oi> $<$<CONFIG:Release>:/Ot>)
   endif()
+endif()
+
+# Silences clang-cl: warning: argument unused during compilation: '/Zc:preprocessor' [-Wunused-command-line-argument]
+if (MSVC AND Clang)
+  add_compile_options(-Wno-unused-command-line-argument)
 endif()
 
 # Options

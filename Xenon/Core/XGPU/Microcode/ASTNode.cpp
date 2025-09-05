@@ -19,8 +19,9 @@ Chunk ReadRegister::EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *s
     return writer.GetVertexInputReg(regIndex);
   case eRegisterType::PixelInput:
     return writer.GetPixelInputReg(regIndex);
+  default:
+    return writer.GetTemporaryReg(regIndex);
   }
-  return writer.GetTemporaryReg(regIndex);
 }
 
 Chunk WriteRegister::EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) {
@@ -33,8 +34,9 @@ Chunk WriteRegister::EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *
     return writer.GetVertexInputReg(regIndex);
   case eRegisterType::PixelInput:
     return writer.GetPixelInputReg(regIndex);
+  default:
+    return writer.GetTemporaryReg(regIndex);
   }
-  return writer.GetTemporaryReg(regIndex);
 }
 
 Chunk WriteExportRegister::EmitShaderCode(ShaderCodeWriterBase &writer, const Shader *shader) {

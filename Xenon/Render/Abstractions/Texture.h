@@ -6,7 +6,7 @@
 namespace Render {
 
 // TODO(Vali0004): Expand formats
-enum eDataFormat : const u8 {
+enum eDataFormat : u8 {
   RGB,
   RGBA,
   BGR,
