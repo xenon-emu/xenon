@@ -2,10 +2,10 @@
 
 #pragma once
 
-#ifdef __linux__
-#include <unistd.h>
-#elif defined(_WIN32)
+#ifdef _WIN32
 #include <processthreadsapi.h>
+#else
+#include <unistd.h>
 #endif
 
 namespace Base {
