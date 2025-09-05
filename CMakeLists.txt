@@ -150,8 +150,9 @@ if (GFX_ENABLED)
   xenon_dep(glad glad glad)
   xenon_dep(SDL3 SDL3::SDL3 SDL3)
   xenon_dep(sirit sirit Sirit)
-  xenon_dep(volk volk::volk volk)
+  xenon_dep(VulkanHeaders Vulkan::Headers Vulkan-Headers)
   xenon_dep(VulkanMemoryAllocator VulkanMemoryAllocator VulkanMemoryAllocator)
+  xenon_dep(volk volk::volk volk)
 endif()
 
 # Include Files
@@ -225,9 +226,9 @@ if (GFX_ENABLED)
     ${XENON_THIRDPARTY_DIR}/glad
     ${XENON_THIRDPARTY_DIR}/SDL3/include
     ${XENON_THIRDPARTY_DIR}/Sirit/include
-    ${XENON_THIRDPARTY_DIR}/volk/include
     ${XENON_THIRDPARTY_DIR}/Vulkan-Headers/include
     ${XENON_THIRDPARTY_DIR}/VulkanMemoryAllocator/include
+    ${XENON_THIRDPARTY_DIR}/volk/include
   )
 endif()
 target_include_directories(Xenon SYSTEM PRIVATE
