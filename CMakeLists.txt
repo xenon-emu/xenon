@@ -112,7 +112,7 @@ macro(xenon_dep pkg target subdir)
         message(STATUS "Using system ${pkg} (header-only)")
         set(found_system ON)
       else()
-        message(WARNING "System ${pkg} found but unusable — falling back to bundled")
+        message(WARNING "System ${pkg} found but unusable - falling back to bundled")
       endif()
     endif()
   endif()
@@ -135,6 +135,16 @@ macro(xenon_dep pkg target subdir)
       elseif (${pkg} STREQUAL "asmjit")
         set(ASMJIT_NO_CUSTOM_FLAGS TRUE CACHE BOOL "" FORCE)
         set(ASMJIT_STATIC TRUE CACHE BOOL "" FORCE)
+      elseif (${pkg} STREQUAL "Vulkan-Headers")
+        # Vulkan-Headers is header-only, need to expose the include directory
+        set(VULKAN_HEADERS_INSTALL OFF CACHE BOOL "" FORCE)
+        add_subdirectory(${subdir})
+        # Ensure include dir is propagated
+        set_target_properties(Vulkan::Headers PROPERTIES
+          INTERFACE_INCLUDE_DIRECTORIES
+          ${CMAKE_CURRENT_SOURCE_DIR}/Deps/ThirdParty/Vulkan-Headers/include
+        )
+        set(found_system ON)
       endif()
 
       message(STATUS "Using bundled ${pkg}")
@@ -152,7 +162,6 @@ if (GFX_ENABLED)
   xenon_dep(sirit sirit Sirit)
   xenon_dep(VulkanHeaders Vulkan::Headers Vulkan-Headers)
   xenon_dep(VulkanMemoryAllocator VulkanMemoryAllocator VulkanMemoryAllocator)
-  xenon_dep(volk volk::volk volk)
 endif()
 
 # Include Files
@@ -162,18 +171,24 @@ file(GLOB_RECURSE Base Xenon/Base/*.cpp Xenon/Base/*.h)
 file(GLOB_RECURSE Core Xenon/Core/*.cpp Xenon/Core/*.h)
 
 if (GFX_ENABLED)
+  add_compile_definitions(VK_NO_PROTOTYPES)
   set(ImGuiDir ${XENON_THIRDPARTY_DIR}/ImGui)
+  set(VolkDir ${XENON_THIRDPARTY_DIR}/volk)
   set(ImGuiBackends
     ${ImGuiDir}/backends/imgui_impl_opengl3.cpp
     ${ImGuiDir}/backends/imgui_impl_opengl3.h
+    ${ImGuiDir}/backends/imgui_impl_vulkan.cpp
+    ${ImGuiDir}/backends/imgui_impl_vulkan.h
     ${ImGuiDir}/backends/imgui_impl_sdl3.cpp
     ${ImGuiDir}/backends/imgui_impl_sdl3.h
   )
   file(GLOB ImGui ${ImGuiDir}/*.cpp ${ImGuiDir}/*.h)
+  file(GLOB Volk ${VolkDir}/*.c ${VolkDir}/*.h)
   file(GLOB_RECURSE XenonRender Xenon/Render/*.cpp Xenon/Render/*.h)
   set(Render
     ${ImGuiBackends}
     ${ImGui}
+    ${volk}
     ${XenonRender}
   )
 endif()
@@ -208,7 +223,7 @@ endif()
 # Link libraries
 target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11 asmjit::asmjit)
 if (GFX_ENABLED)
-  target_link_libraries(Xenon PRIVATE glad sirit SDL3::SDL3 volk::volk VulkanMemoryAllocator)
+  target_link_libraries(Xenon PRIVATE glad sirit SDL3::SDL3 VulkanMemoryAllocator)
 endif()
 
 # Includes

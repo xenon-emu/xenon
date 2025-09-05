@@ -11,7 +11,6 @@
 , toml11
 , vulkan-headers
 , vulkan-loader
-, vulkan-volk
 , withGraphics ? true
 }:
 
@@ -45,6 +44,14 @@ let
       hash = "sha256-/nPJ4gJ48gWtpxJ2Tlz4Az07mdBLrL4w/gdb0Xjq47o= ";
     }
     else {};
+  volk = if withGraphics
+    then fetchFromGitHub {
+      owner = "zeux";
+      repo = "volk";
+      rev = "7dc4d8c060d2f2fee1be75d893f1c017be12fc99";
+      hash = "sha256-nzLnfRx1oSAEbROICqBEATv8oyS9U3vuFOkmziCXoE4=";
+    }
+    else {};
   vulkan-memory-allocator = if withGraphics
     then fetchFromGitHub {
       owner = "GPUOpen-LibrariesAndSDKs";
@@ -72,7 +79,6 @@ stdenv.mkDerivation {
   ] ++ lib.optionals withGraphics [
     sdl3
     vulkan-headers
-    vulkan-volk
   ];
 
   cmakeFlags = if withGraphics
@@ -84,9 +90,11 @@ stdenv.mkDerivation {
       echo graphics present
       rm -rf $sourceRoot/Deps/ThirdParty/ImGui
       rm -rf $sourceRoot/Deps/ThirdParty/Sirit
+      rm -rf $sourceRoot/Deps/ThirdParty/volk
       rm -rf $sourceRoot/Deps/ThirdParty/VulkanMemoryAllocator
       cp -r ${imgui} $sourceRoot/Deps/ThirdParty/ImGui
       cp -r ${sirit} $sourceRoot/Deps/ThirdParty/Sirit
+      cp -r ${volk} $sourceRoot/Deps/ThirdParty/volk
       cp -r ${vulkan-memory-allocator} $sourceRoot/Deps/ThirdParty/VulkanMemoryAllocator
     ''}
     rm -rf $sourceRoot/Deps/ThirdParty/asmjit
