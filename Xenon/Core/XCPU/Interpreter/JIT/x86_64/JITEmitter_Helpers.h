@@ -25,14 +25,14 @@ using namespace asmjit;
 // Pointer Helpers
 //
 
-#define GPRPtr(x) b->threadCtx->array(&PPU_THREAD_REGISTERS::GPR).Ptr(x)
-#define SPRStruct(x) b->threadCtx->substruct(&PPU_THREAD_REGISTERS::SPR).substruct(&PPU_THREAD_SPRS::x)
-#define SPRPtr(x) b->threadCtx->substruct(&PPU_THREAD_REGISTERS::SPR).scalar(&PPU_THREAD_SPRS::x)
-#define SharedSPRStruct(x) b->ppuState->substruct(&PPU_STATE::SPR).substruct(&PPU_STATE_SPRS::x)
-#define SharedSPRPtr(x) b->ppuState->substruct(&PPU_STATE::SPR).scalar(&PPU_STATE_SPRS::x)
-#define CRValPtr() b->threadCtx->scalar(&PPU_THREAD_REGISTERS::CR)
-#define CIAPtr() b->threadCtx->scalar(&PPU_THREAD_REGISTERS::CIA)
-#define NIAPtr() b->threadCtx->scalar(&PPU_THREAD_REGISTERS::NIA)
+#define GPRPtr(x) b->threadCtx->array(&sPPUThread::GPR).Ptr(x)
+#define SPRStruct(x) b->threadCtx->substruct(&sPPUThread::SPR).substruct(&sPPUThreadSPRs::x)
+#define SPRPtr(x) b->threadCtx->substruct(&sPPUThread::SPR).scalar(&sPPUThreadSPRs::x)
+#define SharedSPRStruct(x) b->ppeState->substruct(&sPPEState::SPR).substruct(&sPPESPRs::x)
+#define SharedSPRPtr(x) b->ppeState->substruct(&sPPEState::SPR).scalar(&sPPESPRs::x)
+#define CRValPtr() b->threadCtx->scalar(&sPPUThread::CR)
+#define CIAPtr() b->threadCtx->scalar(&sPPUThread::CIA)
+#define NIAPtr() b->threadCtx->scalar(&sPPUThread::NIA)
 #define LRPtr() SPRPtr(LR)
 
 inline x86::Gp Jrotl32(JITBlockBuilder *b, x86::Mem x, u32 n) {

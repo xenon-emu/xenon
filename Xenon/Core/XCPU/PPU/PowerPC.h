@@ -26,7 +26,8 @@
 */
 template<typename T, u32 I, u32 N>
 using PPCBitfield = bitfield<T, sizeof(T) * 8 - N - I, N>;
-union PPCOpcode {
+// PowerPC Instruction bitfields. Includes VMX128 bitfields.
+union uPPCInstr {
   u32 opcode;
   PPCBitfield<u32, 0, 6> main; // 0..5
   ControlField<PPCBitfield<u32, 30, 1>, PPCBitfield<u32, 16, 5>> sh64; // 30 + 16..20
@@ -216,7 +217,7 @@ can be the implicit result of an integer instruction. * CR1 can be the implicit
 result of a floating-point instruction. * A specified CR field can indicate the
 result of either an integer or floating-point compare instruction
 */
-union CRegister {
+union uCRegister {
   u32 CR_Hex;
   // Individual Bit access.
   u8 bits[32];
@@ -248,7 +249,7 @@ enum eFPRoundMode : u32 {
 /*
 Floating-Point Status and Control Register (FPSCR)
 */
-union FPSCRegister {
+union uFPSCRegister {
   // Rounding mode (towards: nearest, zero, +inf, -inf)
   PPCBitfield<eFPRoundMode, 30, 2> RN;
   // Non-IEEE mode enable (aka flush-to-zero)
@@ -318,18 +319,18 @@ union FPSCRegister {
   // are ignored by hardware, we set a mask in order to mimic this.
   static constexpr u32 fpscrMask = 0xFFFFF7FF;
 
-  FPSCRegister() = default;
-  explicit FPSCRegister(u32 hexValue) : FPSCR_Hex{ hexValue & fpscrMask } {}
+  uFPSCRegister() = default;
+  explicit uFPSCRegister(u32 hexValue) : FPSCR_Hex{ hexValue & fpscrMask } {}
 
   u8& operator[](u8 bitIdx) { return bits[bitIdx]; }
 
-  FPSCRegister& operator=(u32 inValue) { FPSCR_Hex = inValue & fpscrMask; return *this; }
+  uFPSCRegister& operator=(u32 inValue) { FPSCR_Hex = inValue & fpscrMask; return *this; }
 
-  FPSCRegister& operator|=(u32 inValue) { FPSCR_Hex |= inValue & fpscrMask; return *this; }
+  uFPSCRegister& operator|=(u32 inValue) { FPSCR_Hex |= inValue & fpscrMask; return *this; }
 
-  FPSCRegister& operator&=(u32 inValue) { FPSCR_Hex &= inValue; return *this; }
+  uFPSCRegister& operator&=(u32 inValue) { FPSCR_Hex &= inValue; return *this; }
 
-  FPSCRegister& operator^=(u32 inValue) { FPSCR_Hex ^= inValue & fpscrMask; return *this; }
+  uFPSCRegister& operator^=(u32 inValue) { FPSCR_Hex ^= inValue & fpscrMask; return *this; }
 
   // Clears both Fraction Inexact and Fraction Rounded bits.
   void clearFIFR() { FI = 0; FR = 0; }
@@ -456,7 +457,7 @@ union PVRegister {
 };
 
 // Vector Status and Control Register
-union VSCRegister {
+union uVSCRegister {
   u32 hexValue;
 #ifdef __LITTLE_ENDIAN__
   struct {
@@ -506,7 +507,7 @@ union uHID6SPR {
 };
 
 // Segment Lookaside Buffer Entry
-struct SLBEntry {
+struct sSLBEntry {
   u8 V;
   u8 LP; // Large Page selector
   u8 C;
@@ -536,8 +537,8 @@ struct TLB_Reg {
   TLBEntry tlbSet3[256];
 };
 
-// This SPR's are duplicated for every thread.
-struct PPU_THREAD_SPRS {
+// PPU Specific SPR's. They are duplicated by thread.
+struct sPPUThreadSPRs {
   // Fixed Point Exception Register (XER)
   XERegister XER;
   // Link Register
@@ -589,8 +590,9 @@ struct PPU_THREAD_SPRS {
   // Processor Identification Register
   u32 PIR;
 };
-// This contains SPR's that are shared by both threads.
-struct PPU_STATE_SPRS {
+
+// This contains SPR's belonging to the PPE, this means that they are shared by both threads.
+struct sPPESPRs {
   // Storage Description Register 1
   u64 SDR1;
   // Control Register
@@ -633,7 +635,7 @@ struct PPU_STATE_SPRS {
 };
 
 // Thread IDs for ease of handling
-enum ePPUThread : u8 {
+enum ePPUThreadID : u8 {
   ePPUThread_Zero = 0,
   ePPUThread_One,
   ePPUThread_None
@@ -720,17 +722,17 @@ public:
 //
 
 // This contains all registers that are duplicated per thread.
-struct PPU_THREAD_REGISTERS {
+struct sPPUThread {
   // Special purpose registers
-  PPU_THREAD_SPRS SPR;
+  sPPUThreadSPRs SPR;
   // Current Instruction Address
   u64 CIA;
   // Next Instruction Address
   u64 NIA;
   // Previous Instruction Address (Useful for debugging purposes)
   u64 PIA;
-  // Current instruction data
-  PPCOpcode CI;
+  // Current instruction data and bitfields.
+  uPPCInstr CI;
   // Instruction fetch flag
   bool instrFetch = false;
   // General-Purpose Registers (32)
@@ -740,16 +742,15 @@ struct PPU_THREAD_REGISTERS {
   // Vector Registers (128)
   Base::Vector128 VR[128]{};
   // Condition Register
-  CRegister CR;
+  uCRegister CR;
   // Floating-Point Status Control Register
-  FPSCRegister FPSCR;
+  uFPSCRegister FPSCR;
   // Segment Lookaside Buffer
-  SLBEntry SLB[64]{};
+  sSLBEntry SLB[64]{};
   // Vector Status and Control Register
-  VSCRegister VSCR;
+  uVSCRegister VSCR;
 
   // ERAT's
-
   LRUCache iERAT{}; // Instruction effective to real address cache.
   LRUCache dERAT{}; // Data effective to real address cache.
 
@@ -757,10 +758,6 @@ struct PPU_THREAD_REGISTERS {
   u16 exceptReg = 0;
   // Program Exception Type
   u16 progExceptionType = 0;
-  // Tells wheter we're currently processing an exception.
-  bool exceptionTaken = false;
-  // For use with Data/Instruction Storage/Segment exceptions.
-  u64 exceptEA = 0;
   // SystemCall Type
   bool exceptHVSysCall = false;
 
@@ -771,25 +768,38 @@ struct PPU_THREAD_REGISTERS {
   u64 lastWriteAddress = 0;
   u64 lastRegValue = 0;
 
+  // PPU reservations for PPC atomic load/store operations.
   std::unique_ptr<PPU_RES> ppuRes{};
 };
 
-struct PPU_STATE {
-  ~PPU_STATE() {
+// The structure of the Xenon CPU differs from that on the CELL/BE in that instead of having one PPE and 8 SPE's
+// it contains 3 parallel PPE's each managing two threads (one physical and one logical).
+// Should be depicted as follows:
+/*
+* Xenon XCPU --->PPE 0 --- PPU Thread 0
+*             |            PPU Thread 1
+*             |->PPE 1 --- PPU Thread 2
+*             |            PPU Thread 3
+*             |->PPE 2 --- PPU Thread 4
+*                          PPU Thread 5
+*/
+
+// Power Processor Element (PPE)
+struct sPPEState {
+  ~sPPEState() {
     for (u8 i = 0; i < 2; ++i) {
+      // Clear reservations.
       ppuThread[i].ppuRes.reset();
     }
   }
-  // Thread Specific State.
-  PPU_THREAD_REGISTERS ppuThread[2] = {};
-  // Current executing thread.
-  ePPUThread currentThread = ePPUThread_Zero;
+  // Power Processing Unit Threads
+  sPPUThread ppuThread[2] = {};
+  // Current executing thread ID.
+  ePPUThreadID currentThread = ePPUThread_Zero;
   // Shared Special Purpose Registers.
-  PPU_STATE_SPRS SPR{};
+  sPPESPRs SPR{};
   // Translation Lookaside Buffer
   TLB_Reg TLB{};
-  // Address Translation Flag
-  bool translationInProgress = false;
   // Current PPU Name, for ease of debugging.
   std::string ppuName{};
   // PPU ID

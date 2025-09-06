@@ -31,7 +31,7 @@ public:
 
   void Reset();
 
-  void Halt(u64 haltOn = 0, bool requestedByGuest = false, u8 ppuId = 0, ePPUThread threadId = ePPUThread_Zero);
+  void Halt(u64 haltOn = 0, bool requestedByGuest = false, u8 ppuId = 0, ePPUThreadID threadId = ePPUThread_Zero);
 
   void Continue();
 

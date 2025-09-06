@@ -5,7 +5,7 @@
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
 
 // Add (x'7C00 0214')
-void PPCInterpreter::PPCInterpreterJIT_addx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr){
+void PPCInterpreter::PPCInterpreterJIT_addx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr){
   /*
   rD <- (rA) + (rB)
   */
@@ -20,7 +20,7 @@ void PPCInterpreter::PPCInterpreterJIT_addx(PPU_STATE* ppuState, JITBlockBuilder
 }
 
 // Add Immediate Carrying (x'3000 0000')
-void PPCInterpreter::PPCInterpreterJIT_addic(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_addic(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   // TODO: Overflow Enable.
   Label end = COMP->newLabel(); // Self explanatory.
 
@@ -58,7 +58,7 @@ void PPCInterpreter::PPCInterpreterJIT_addic(PPU_STATE* ppuState, JITBlockBuilde
 }
 
 // Add Carrying (x'7C00 0014')
-void PPCInterpreter::PPCInterpreterJIT_addcx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_addcx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
   rD <- (rA) + (rB)
   */
@@ -100,7 +100,7 @@ void PPCInterpreter::PPCInterpreterJIT_addcx(PPU_STATE* ppuState, JITBlockBuilde
 }
 
 // Add Extended (x'7C00 0114')
-void PPCInterpreter::PPCInterpreterJIT_addex(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_addex(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
     rD <- (rA) + (rB) + XER[CA]
   */
@@ -132,7 +132,7 @@ void PPCInterpreter::PPCInterpreterJIT_addex(PPU_STATE* ppuState, JITBlockBuilde
 }
 
 // Add Immediate (x'3800 0000')
-void PPCInterpreter::PPCInterpreterJIT_addi(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_addi(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   /*
     if rA = 0 then rD <- EXTS(SIMM)
     else rD <- (rA) + EXTS(SIMM)
@@ -152,7 +152,7 @@ void PPCInterpreter::PPCInterpreterJIT_addi(PPU_STATE *ppuState, JITBlockBuilder
 }
 
 // Add Immediate Shifted (x'3C00 0000')
-void PPCInterpreter::PPCInterpreterJIT_addis(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_addis(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   s64 shImm = (s64{ instr.simm16 } << 16);
 
   x86::Gp rDTemp = newGP64();
@@ -167,7 +167,7 @@ void PPCInterpreter::PPCInterpreterJIT_addis(PPU_STATE* ppuState, JITBlockBuilde
 }
 
 // And (x'7C00 0038')
-void PPCInterpreter::PPCInterpreterJIT_andx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_andx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   /*
     rA <- (rS) & (rB)
   */
@@ -187,7 +187,7 @@ void PPCInterpreter::PPCInterpreterJIT_andx(PPU_STATE *ppuState, JITBlockBuilder
 }
 
 // AND with Complement (x'7C00 0078')
-void PPCInterpreter::PPCInterpreterJIT_andcx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_andcx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
   rA <- (rS) + ~(rB)
   */
@@ -206,7 +206,7 @@ void PPCInterpreter::PPCInterpreterJIT_andcx(PPU_STATE* ppuState, JITBlockBuilde
 }
 
 // And Immediate (x'7000 0000')
-void PPCInterpreter::PPCInterpreterJIT_andi(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_andi(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
     rA <- (rS) & ((48)0 || UIMM)
   */
@@ -219,7 +219,7 @@ void PPCInterpreter::PPCInterpreterJIT_andi(PPU_STATE* ppuState, JITBlockBuilder
 }
 
 // And Immediate Shifted (x'7400 0000')
-void PPCInterpreter::PPCInterpreterJIT_andis(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_andis(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
   rA <- (rS) + ((32)0 || UIMM || (16)0)
   */
@@ -236,7 +236,7 @@ void PPCInterpreter::PPCInterpreterJIT_andis(PPU_STATE* ppuState, JITBlockBuilde
 }
 
 // Compare 
-void PPCInterpreter::PPCInterpreterJIT_cmp(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_cmp(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   x86::Gp rA = newGP64();
   x86::Gp rB = newGP64();
   COMP->mov(rA, GPRPtr(instr.ra));
@@ -250,7 +250,7 @@ void PPCInterpreter::PPCInterpreterJIT_cmp(PPU_STATE* ppuState, JITBlockBuilder*
 }
 
 // Compare Immediate
-void PPCInterpreter::PPCInterpreterJIT_cmpi(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_cmpi(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   x86::Gp rA = newGP64();
   x86::Gp simm = newGP64();
   COMP->mov(rA, GPRPtr(instr.ra));
@@ -264,7 +264,7 @@ void PPCInterpreter::PPCInterpreterJIT_cmpi(PPU_STATE* ppuState, JITBlockBuilder
 }
 
 // Compare 
-void PPCInterpreter::PPCInterpreterJIT_cmpl(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_cmpl(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   x86::Gp rA = newGP64();
   x86::Gp rB = newGP64();
   COMP->mov(rA, GPRPtr(instr.ra));
@@ -279,7 +279,7 @@ void PPCInterpreter::PPCInterpreterJIT_cmpl(PPU_STATE* ppuState, JITBlockBuilder
 }
 
 // Compare Logical Immediate
-void PPCInterpreter::PPCInterpreterJIT_cmpli(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_cmpli(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   x86::Gp rA = newGP64();
   x86::Gp uimm = newGP64();
   COMP->mov(rA, GPRPtr(instr.ra));
@@ -294,7 +294,7 @@ void PPCInterpreter::PPCInterpreterJIT_cmpli(PPU_STATE* ppuState, JITBlockBuilde
 }
 
 // Multiply Low Doubleword (x'7C00 01D2')
-void PPCInterpreter::PPCInterpreterJIT_mulldx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_mulldx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   /*
     prod[0-127] <- (rA) * (rB)
     rD <- prod[64-127]
@@ -317,7 +317,7 @@ void PPCInterpreter::PPCInterpreterJIT_mulldx(PPU_STATE *ppuState, JITBlockBuild
 }
 
 // NAND
-void PPCInterpreter::PPCInterpreterJIT_nandx(PPU_STATE *ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_nandx(sPPEState *ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
     rA <- ~((rS) & (rB))
   */
@@ -343,7 +343,7 @@ void PPCInterpreter::PPCInterpreterJIT_nandx(PPU_STATE *ppuState, JITBlockBuilde
 }
 
 // NOR (x'7C00 00F8')
-void PPCInterpreter::PPCInterpreterJIT_norx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_norx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
     rA <- ~((rS) | (rB))
   */
@@ -369,7 +369,7 @@ void PPCInterpreter::PPCInterpreterJIT_norx(PPU_STATE* ppuState, JITBlockBuilder
 }
 
 // Rotate Left Word Immediate then AND with Mask (x'5400 0000')
-void PPCInterpreter::PPCInterpreterJIT_rlwinmx(PPU_STATE *ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_rlwinmx(sPPEState *ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
     n <- SH
     r <- ROTL[32](rS[32-63], n)
@@ -394,7 +394,7 @@ void PPCInterpreter::PPCInterpreterJIT_rlwinmx(PPU_STATE *ppuState, JITBlockBuil
 }
 
 // Shift Left Double Word (x'7C00 0036') STUB
-void PPCInterpreter::PPCInterpreterJIT_sldx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_sldx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
   n <- rB[58-63]
   r <- ROTL[64](rS, n)
@@ -428,7 +428,7 @@ void PPCInterpreter::PPCInterpreterJIT_sldx(PPU_STATE* ppuState, JITBlockBuilder
 }
 
 // Shift Left Word (x'7C00 0030')
-void PPCInterpreter::PPCInterpreterJIT_slwx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_slwx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
     n <- rB[59-63]
     r <- ROTL[32](rS[32-63], n)
@@ -461,7 +461,7 @@ void PPCInterpreter::PPCInterpreterJIT_slwx(PPU_STATE* ppuState, JITBlockBuilder
 }
 
 // Shift Right Double Word (x'7C00 0436')
-void PPCInterpreter::PPCInterpreterJIT_srdx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_srdx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
     n <- rB[59-63]
     r <- ROTL[32](rS[32-63], n)
@@ -494,7 +494,7 @@ void PPCInterpreter::PPCInterpreterJIT_srdx(PPU_STATE* ppuState, JITBlockBuilder
 }
 
 // Shift Right Word (x'7C00 0430')
-void PPCInterpreter::PPCInterpreterJIT_srwx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_srwx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
     n <- rB[58-63]
     r <- ROTL[64](rS, 64 - n)
@@ -527,7 +527,7 @@ void PPCInterpreter::PPCInterpreterJIT_srwx(PPU_STATE* ppuState, JITBlockBuilder
 }
 
 // Shift Right Algebraic Double Word Immediate (x'7C00 0674')
-void PPCInterpreter::PPCInterpreterJIT_sradix(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_sradix(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
     n <- sh[5] || sh[0-4]
     r <- ROTL[64](rS, 64 - n)
@@ -570,7 +570,7 @@ void PPCInterpreter::PPCInterpreterJIT_sradix(PPU_STATE* ppuState, JITBlockBuild
 }
 
 // Rotate Left Word then AND with Mask (x'5C00 0000')
-void PPCInterpreter::PPCInterpreterJIT_rlwnmx(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_rlwnmx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   /*
     n <- rB[59-63]27-31
     r <- ROTL[32](rS[32-63], n)
@@ -596,7 +596,7 @@ void PPCInterpreter::PPCInterpreterJIT_rlwnmx(PPU_STATE *ppuState, JITBlockBuild
 }
 
 // XOR (x'7C00 0278')
-void PPCInterpreter::PPCInterpreterJIT_xorx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_xorx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
     rA <- (rS) ^ (rB)
   */
@@ -616,7 +616,7 @@ void PPCInterpreter::PPCInterpreterJIT_xorx(PPU_STATE* ppuState, JITBlockBuilder
 }
 
 // XOR Immediate (x'6800 0000')
-void PPCInterpreter::PPCInterpreterJIT_xori(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_xori(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
     rA <- (rS) ^ ((4816)0 || UIMM)
   */
@@ -627,7 +627,7 @@ void PPCInterpreter::PPCInterpreterJIT_xori(PPU_STATE* ppuState, JITBlockBuilder
 }
 
 // XOR Immediate Shifted (x'6C00 0000')
-void PPCInterpreter::PPCInterpreterJIT_xoris(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_xoris(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
     rA <- (rS) | ((32)0 || UIMM || (16)0)
   */
@@ -641,7 +641,7 @@ void PPCInterpreter::PPCInterpreterJIT_xoris(PPU_STATE* ppuState, JITBlockBuilde
 }
 
 // OR (x'7C00 0378')
-void PPCInterpreter::PPCInterpreterJIT_orx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_orx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
     rA <- (rS) | (rB)
   */
@@ -664,7 +664,7 @@ void PPCInterpreter::PPCInterpreterJIT_orx(PPU_STATE* ppuState, JITBlockBuilder*
 }
 
 // OR with Complement (x'7C00 0338')
-void PPCInterpreter::PPCInterpreterJIT_orcx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_orcx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
   rA <- (rS) | ~(rB)
   */
@@ -688,7 +688,7 @@ void PPCInterpreter::PPCInterpreterJIT_orcx(PPU_STATE* ppuState, JITBlockBuilder
 }
 
 // OR Immediate (x'6000 0000')
-void PPCInterpreter::PPCInterpreterJIT_ori(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_ori(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
     rA <- (rS) | ((4816)0 || UIMM)
   */
@@ -699,7 +699,7 @@ void PPCInterpreter::PPCInterpreterJIT_ori(PPU_STATE* ppuState, JITBlockBuilder*
 }
 
 // OR Immediate Shifted (x'6400 0000')
-void PPCInterpreter::PPCInterpreterJIT_oris(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_oris(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   /*
     rA <- (rS) | ((32)0 || UIMM || (16)0)
   */
@@ -713,7 +713,7 @@ void PPCInterpreter::PPCInterpreterJIT_oris(PPU_STATE *ppuState, JITBlockBuilder
 }
 
 // Rotate Left Double Word then Clear Left (x'7800 0010')
-void PPCInterpreter::PPCInterpreterJIT_rldclx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_rldclx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
     n <- rB[58-63]
     r <- ROTL[64](rS, n)
@@ -740,7 +740,7 @@ void PPCInterpreter::PPCInterpreterJIT_rldclx(PPU_STATE* ppuState, JITBlockBuild
 }
 
 // Rotate Left Double Word then Clear Right (x'7800 0012')
-void PPCInterpreter::PPCInterpreterJIT_rldcrx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_rldcrx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
     n <- rB[58-63]
     r <- ROTL[64](rS, n)
@@ -767,7 +767,7 @@ void PPCInterpreter::PPCInterpreterJIT_rldcrx(PPU_STATE* ppuState, JITBlockBuild
 }
 
 // Rotate Left Double Word Immediate then Clear (x'7800 0008')
-void PPCInterpreter::PPCInterpreterJIT_rldicx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_rldicx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
     n <- sh[5] || sh[0-4]
     r <- ROTL[64](rS, n)
@@ -794,7 +794,7 @@ void PPCInterpreter::PPCInterpreterJIT_rldicx(PPU_STATE* ppuState, JITBlockBuild
 }
 
 // Rotate Left Double Word Immediate then Clear Left (x'7800 0000')
-void PPCInterpreter::PPCInterpreterJIT_rldiclx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_rldiclx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
     n <- sh[5] || sh[0-4]
     r <- ROTL[64](rS, n)
@@ -821,7 +821,7 @@ void PPCInterpreter::PPCInterpreterJIT_rldiclx(PPU_STATE* ppuState, JITBlockBuil
 }
 
 // Rotate Left Double Word Immediate then Clear Right (x'7800 0004')
-void PPCInterpreter::PPCInterpreterJIT_rldicrx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_rldicrx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
     n <- sh[5] || sh[0-4]
     r <- ROTL[64](rS, n)
@@ -848,7 +848,7 @@ void PPCInterpreter::PPCInterpreterJIT_rldicrx(PPU_STATE* ppuState, JITBlockBuil
 }
 
 // Rotate Left Double Word Immediate then Mask Insert (x'7800 000C')
-void PPCInterpreter::PPCInterpreterJIT_rldimix(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_rldimix(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
     n <- sh[5] || sh[0-4]
     r <- ROTL[64](rS, n)
@@ -880,7 +880,7 @@ void PPCInterpreter::PPCInterpreterJIT_rldimix(PPU_STATE* ppuState, JITBlockBuil
 }
 
 // Rotate Left Word Immediate then Mask Insert (x'5000 0000')
-void PPCInterpreter::PPCInterpreterJIT_rlwimix(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_rlwimix(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
     n <- SH
     r <- ROTL[32](rS[32-63], n)
@@ -912,7 +912,7 @@ void PPCInterpreter::PPCInterpreterJIT_rlwimix(PPU_STATE* ppuState, JITBlockBuil
 }
 
 // Count Leading Zeros Double Word (x'7C00 0074')
-void PPCInterpreter::PPCInterpreterJIT_cntlzdx(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_cntlzdx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
   n <- 0
   do while n < 64

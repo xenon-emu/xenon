@@ -8,8 +8,8 @@
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
 
 #define BLR_OPCODE 0x4e800020
-#define curThreadId   ppuState->currentThread
-#define curThread     ppuState->ppuThread[curThreadId]
+#define curThreadId   ppeState->currentThread
+#define curThread     ppeState->ppuThread[curThreadId]
 
 const u32 START_ADDRESS = 0x10000000;
 
@@ -18,7 +18,7 @@ std::filesystem::path testsBinPath;
 
 typedef std::vector<std::pair<std::string, std::string>> AnnotationList;
 
-void SetRegFromString(PPU_STATE *ppuState, const char *regName, const char *regValue) {
+void SetRegFromString(sPPEState *ppeState, const char *regName, const char *regValue) {
   s32 value;
   if (sscanf(regName, "r%d", &value) == 1) {
     curThread.GPR[value] = Base::getFromString<u64>(regValue);
@@ -33,7 +33,7 @@ void SetRegFromString(PPU_STATE *ppuState, const char *regName, const char *regV
   }
 }
 
-bool CompareRegWithString(PPU_STATE *ppuState, const char *regName, const char *regValue, std::string &outRegValue) {
+bool CompareRegWithString(sPPEState *ppeState, const char *regName, const char *regValue, std::string &outRegValue) {
   s32 value = 0;
   if (sscanf(regName, "r%d", &value) == 1) {
     u64 expected = Base::getFromString<u64>(regValue);
@@ -229,15 +229,15 @@ private:
 
 class TestRunner {
 public:
-  TestRunner(PPU_STATE *ppuStatePtr, PPU_JIT* ppuJITPtr, ePPUTestingMode testMode)
-    : ppuState(ppuStatePtr), currentTestMode(testMode), ppuJIT(ppuJITPtr) {
+  TestRunner(sPPEState *ppeStatePtr, PPU_JIT* ppuJITPtr, ePPUTestingMode testMode)
+    : ppeState(ppeStatePtr), currentTestMode(testMode), ppuJIT(ppuJITPtr) {
   }
 
   ~TestRunner() {}
 
   bool Setup(TestSuite &suite) {
     // Clear the RAM area at tests load address.
-    PPCInterpreter::MMUMemSet(ppuState, START_ADDRESS, 0x00000000, 0x1000);
+    PPCInterpreter::MMUMemSet(ppeState, START_ADDRESS, 0x00000000, 0x1000);
 
     // Load the test binary into RAM.
     std::vector<u8> testBinData;
@@ -263,7 +263,7 @@ public:
       testBinData.resize(fileSize);
       file.read(reinterpret_cast<char*>(testBinData.data()), XE_SROM_SIZE);
       for (int idx = 0; idx < fileSize; ++idx) {
-        PPCInterpreter::MMUWrite8(ppuState, START_ADDRESS + idx, testBinData[idx]);
+        PPCInterpreter::MMUWrite8(ppeState, START_ADDRESS + idx, testBinData[idx]);
       }
     }
     file.close();
@@ -281,7 +281,7 @@ public:
     if (currentTestMode == ePPUTestingMode::Interpreter) {
       bool testRunning = true;
       while (testRunning) {
-        PPU_THREAD_REGISTERS& thread = ppuState->ppuThread[ppuState->currentThread];
+        sPPUThread& thread = ppeState->ppuThread[ppeState->currentThread];
         // Update previous instruction address
         thread.PIA = thread.CIA;
         // Update current instruction address
@@ -289,7 +289,7 @@ public:
         // Increase next instruction address
         thread.NIA += 4;
         // Fetch the instruction from memory
-        thread.CI.opcode = PPCInterpreter::MMURead32(ppuState, thread.CIA, ppuState->currentThread);
+        thread.CI.opcode = PPCInterpreter::MMURead32(ppeState, thread.CIA, ppeState->currentThread);
         if (thread.CI.opcode == 0xFFFFFFFF || thread.CI.opcode == 0xCDCDCDCD) {
           LOG_CRITICAL(Xenon, "[Testing]: Invalid opcode found.");
           return false;
@@ -302,7 +302,7 @@ public:
           testRunning = false;
         }
         else {
-          PPCInterpreter::ppcExecuteSingleInstruction(ppuState);
+          PPCInterpreter::ppcExecuteSingleInstruction(ppeState);
         }
       }
     } else if (currentTestMode == ePPUTestingMode::JITx86) {
@@ -320,7 +320,7 @@ public:
   }
 
   bool SetupTestState(TestCase &testCase) {
-    PPU_THREAD_REGISTERS &thread = ppuState->ppuThread[ppuState->currentThread];
+    sPPUThread &thread = ppeState->ppuThread[ppeState->currentThread];
     // Clear registers involved in tests.
     for (auto &reg : thread.GPR) { reg = 0; }
     for (auto &reg : thread.FPR) { reg.setValue(0.0); }
@@ -341,7 +341,7 @@ public:
         size_t spacePosition = it.second.find(" ");
         auto regName = it.second.substr(0, spacePosition);
         auto regValue = it.second.substr(spacePosition + 1);
-        SetRegFromString(ppuState, regName.c_str(), regValue.c_str());
+        SetRegFromString(ppeState, regName.c_str(), regValue.c_str());
       } else if (it.first == "MEMORY_IN") {
         size_t spacePos = it.second.find(" ");
         auto addressStr = it.second.substr(0, spacePos);
@@ -373,7 +373,7 @@ public:
         auto regName = it.second.substr(0, spacePos);
         auto regValue = it.second.substr(spacePos + 1);
         std::string actualValue;
-        if (!CompareRegWithString(ppuState,
+        if (!CompareRegWithString(ppeState,
           regName.c_str(), regValue.c_str(), actualValue)) {
           any_failed = true;
           LOG_ERROR(Xenon, "[Testing]: Register {} assert failed:\n", regName);
@@ -423,7 +423,7 @@ public:
     return !any_failed;
   }
 
-  PPU_STATE *ppuState;
+  sPPEState *ppeState;
   PPU_JIT *ppuJIT;
   ePPUTestingMode currentTestMode;
 };
@@ -466,7 +466,7 @@ void ProtectedRunTest(TestSuite &testSuite, TestRunner &runner,
   }
 }
 
-bool PPU::RunInstructionTests(PPU_STATE *ppuState, PPU_JIT* ppuJITPtr, ePPUTestingMode testMode) {
+bool PPU::RunInstructionTests(sPPEState *ppeState, PPU_JIT* ppuJITPtr, ePPUTestingMode testMode) {
   s32 result = 1, failedTestsCount = 0, passedTestsCount = 0;
 
   // Setup paths.
@@ -502,7 +502,7 @@ bool PPU::RunInstructionTests(PPU_STATE *ppuState, PPU_JIT* ppuJITPtr, ePPUTesti
   }
 
   LOG_INFO(Xenon, "[Testing]: {} tests loaded.", testSuites.size());
-  TestRunner runner(ppuState, ppuJITPtr, testMode);
+  TestRunner runner(ppeState, ppuJITPtr, testMode);
   for (auto &testSuite : testSuites) {
     LOG_INFO(Xenon, "[Testing]: {}.s:", testSuite.name());
     for (auto &testCase : testSuite.getTestCases()) {
@@ -518,7 +518,7 @@ bool PPU::RunInstructionTests(PPU_STATE *ppuState, PPU_JIT* ppuJITPtr, ePPUTesti
   LOG_INFO(Xenon, "[Testing]: Failed: {}", failedTestsCount);
 
   // Reset the state:
-  PPU_THREAD_REGISTERS &thread = ppuState->ppuThread[ppuState->currentThread];
+  sPPUThread &thread = ppeState->ppuThread[ppeState->currentThread];
   // Clear registers involved in tests.
   for (auto& reg : thread.GPR) { reg = 0; }
   for (auto& reg : thread.FPR) { reg.setValue(0.0); }

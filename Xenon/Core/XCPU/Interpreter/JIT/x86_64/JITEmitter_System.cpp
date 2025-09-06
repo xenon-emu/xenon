@@ -3,7 +3,7 @@
 #include "JITEmitter_Helpers.h"
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
-void PPCInterpreter::PPCInterpreterJIT_mfspr(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_mfspr(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   u32 sprNum = instr.spr;
   sprNum = ((sprNum & 0x1F) << 5) | ((sprNum >> 5) & 0x1F);
   u64 value = 0;
@@ -115,7 +115,7 @@ void PPCInterpreter::PPCInterpreterJIT_mfspr(PPU_STATE *ppuState, JITBlockBuilde
     COMP->mov(rSValue, SPRPtr(PIR));
     break;
   default:
-    LOG_ERROR(Xenon, "{}(Thrd{:#d}) mfspr: Unknown SPR: {:#x}", ppuState->ppuName, static_cast<u8>(curThreadId), sprNum);
+    LOG_ERROR(Xenon, "{}(Thrd{:#d}) mfspr: Unknown SPR: {:#x}", ppeState->ppuName, static_cast<u8>(curThreadId), sprNum);
     break;
   }
 
@@ -123,7 +123,7 @@ void PPCInterpreter::PPCInterpreterJIT_mfspr(PPU_STATE *ppuState, JITBlockBuilde
 }
 
 // Move from One Condition Register Field (x’7C20 0026’) 
-void PPCInterpreter::PPCInterpreterJIT_mfocrf(PPU_STATE* ppuState, JITBlockBuilder* b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_mfocrf(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   // Temp storage for the CR current value.
   x86::Gp crValue = newGP32();
   // Load CR value to temp storage.

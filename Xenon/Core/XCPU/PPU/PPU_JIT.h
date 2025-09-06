@@ -24,7 +24,7 @@
 //#define JIT_DEBUG
 
 class PPU;
-using JITFunc = fptr<void(PPU*, PPU_STATE*, bool)>;
+using JITFunc = fptr<void(PPU*, sPPEState*, bool)>;
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
 template <typename T, typename fT>
@@ -148,7 +148,7 @@ public:
   ~JITBlockBuilder() {
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
     delete ppu;
-    delete ppuState;
+    delete ppeState;
     delete threadCtx;
 #endif
     ppuAddr = 0;
@@ -166,9 +166,9 @@ public:
   // Current PPU
   ASMJitPtr<PPU> *ppu = nullptr;
   // Context pointer
-  ASMJitPtr<PPU_STATE> *ppuState = nullptr;
+  ASMJitPtr<sPPEState> *ppeState = nullptr;
   // Current thread context
-  ASMJitPtr<PPU_THREAD_REGISTERS> *threadCtx = nullptr;
+  ASMJitPtr<sPPUThread> *threadCtx = nullptr;
   // EnableHalt flag
   x86::Gp haltBool{};
   // asmjit Compiler
@@ -232,7 +232,7 @@ public:
   void SetupPrologue(JITBlockBuilder *b, u32 instrData, u32 decoded);
 private:
   PPU *ppu = nullptr; // "Linked" PPU
-  PPU_STATE *ppuState = nullptr; // For easier thread access
+  sPPEState *ppeState = nullptr; // For easier thread access
   asmjit::JitRuntime jitRuntime;
   // Block Cache, contains all created and valid JIT'ed blocks.
   std::unordered_map<u64, std::shared_ptr<JITBlock>> jitBlocksCache = {};

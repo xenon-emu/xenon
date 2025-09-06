@@ -32,7 +32,7 @@ namespace XCPU {
 			std::shared_ptr<XenonContext> xenonContext;
 
 			// Calculates and returns the page size (p in the PPC arch).
-			ePageSize GetCurrentPageSize(PPU_STATE* ppuState, bool L, u8 LP);
+			ePageSize GetCurrentPageSize(sPPEState* ppeState, bool L, u8 LP);
 		};
 	}
 }

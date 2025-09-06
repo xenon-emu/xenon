@@ -14,8 +14,8 @@ XenonContext* PPCInterpreter::xenonContext = nullptr;
 PPCInterpreter::PPCDecoder PPCInterpreter::ppcDecoder{};
 
 // Interpreter Single Instruction Processing.
-void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
-  PPU_THREAD_REGISTERS &thread = curThread;
+void PPCInterpreter::ppcExecuteSingleInstruction(sPPEState *ppeState) {
+  sPPUThread &thread = curThread;
 
   // RGH 2 for CB_A 9188 in a JRunner XDKBuild.
   if (thread.CIA == 0x0200C870) {
@@ -126,11 +126,11 @@ void PPCInterpreter::ppcExecuteSingleInstruction(PPU_STATE *ppuState) {
   instructionHandler function =
     ppcDecoder.decode(thread.CI.opcode);
 
-  function(ppuState);
+  function(ppeState);
 }
 
-void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
-  PPU_THREAD_REGISTERS &thread = curThread;
+void PPCInterpreter::ppcInterpreterTrap(sPPEState *ppeState, u32 trapNumber) {
+  sPPUThread &thread = curThread;
   // Hacky optimization
   #undef curThread
   #define curThread thread
@@ -142,7 +142,7 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
     u32 strAddr = GPR(3);
     u64 strSize = static_cast<u64>(GPR(4));
     std::unique_ptr<u8[]> buffer = std::make_unique<STRIP_UNIQUE_ARR(buffer)>(strSize+1);
-    MMURead(xenonContext, ppuState, strAddr, strSize, buffer.get());
+    MMURead(xenonContext, ppeState, strAddr, strSize, buffer.get());
     char *dbgString = reinterpret_cast<char*>(buffer.get());
     dbgString[strSize] = '\0'; // nul-term
     Base::Log::NoFmtMessage(Base::Log::Class::DebugPrint, Base::Log::Level::Guest, dbgString);
@@ -151,25 +151,25 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
   case 0x16: {
     if (Config::debug.haltOnGuestAssertion && XeMain::GetCPU()) {
       LOG_XBOX(Xenon, "FATAL ERROR! Halting CPU...");
-      PPU *PPU = XeMain::GetCPU()->GetPPU(ppuState->ppuID);
+      PPU *PPU = XeMain::GetCPU()->GetPPU(ppeState->ppuID);
       if (PPU)
-        PPU->Halt(0, true, ppuState->ppuID, curThreadId);
+        PPU->Halt(0, true, ppeState->ppuID, curThreadId);
     }
   } break;
   case 0x17:
     // DebugLoadImageSymbols, type signature:
     // PUBLIC VOID DebugLoadImageSymbols(IN PSTRING ModuleName == $r3,
     //                   IN PKD_SYMBOLS_INFO Info == $r4)
-    ppcDebugLoadImageSymbols(ppuState, GPR(3), GPR(4));
+    ppcDebugLoadImageSymbols(ppeState, GPR(3), GPR(4));
     break;
   case 0x19: {
     if (Config::debug.haltOnGuestAssertion) {
 #ifndef NO_GFX
       if (XeMain::GetCPU()) {
         LOG_XBOX(Xenon, "Assertion! Halting CPU... (Continuing will cause execution to resume as normal)");
-        PPU *PPU = XeMain::GetCPU()->GetPPU(ppuState->ppuID);
+        PPU *PPU = XeMain::GetCPU()->GetPPU(ppeState->ppuID);
         if (PPU)
-          PPU->Halt(0, true, ppuState->ppuID, curThreadId);
+          PPU->Halt(0, true, ppeState->ppuID, curThreadId);
       }
 #else
       LOG_XBOX(Xenon, "Assertion! Continuing...");
@@ -189,7 +189,7 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
     // DebugUnloadImageSymbols, type signature:
     // PUBLIC VOID DebugUnloadImageSymbols(IN PSTRING ModuleName == $r3,
     //                   IN PKD_SYMBOLS_INFO Info == $r4)
-    ppcDebugUnloadImageSymbols(ppuState, GPR(3), GPR(4));
+    ppcDebugUnloadImageSymbols(ppeState, GPR(3), GPR(4));
     break;
   default:
     LOG_WARNING(Xenon, "Unimplemented trap! trapNumber = '0x{:X}'", trapNumber);
@@ -200,5 +200,5 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
   thread.progExceptionType = PROGRAM_EXCEPTION_TYPE_TRAP;
   // Hacky optimization
   #undef curThread
-  #define curThread ppuState->ppuThread[curThreadId]
+  #define curThread ppeState->ppuThread[curThreadId]
 }

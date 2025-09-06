@@ -52,7 +52,7 @@ public:
   void Reset();
 
   // Debug tools
-  void Halt(u64 haltOn = 0, bool requestedByGuest = false, s8 ppuId = 0, ePPUThread threadId = ePPUThread_None);
+  void Halt(u64 haltOn = 0, bool requestedByGuest = false, s8 ppuId = 0, ePPUThreadID threadId = ePPUThread_None);
   void Continue();
   void ContinueFromException();
   void Step(int amount = 1);
@@ -64,7 +64,7 @@ public:
   void ThreadLoop();
 
   // Returns a pointer to a thread
-  PPU_THREAD_REGISTERS *GetPPUThread(u8 thrdID);
+  sPPUThread *GetPPUThread(u8 thrdID);
 
   // Runs a specified number of instructions
   void PPURunInstructions(u64 numInstrs, bool enableHalt = true);
@@ -93,8 +93,8 @@ public:
   // Returns the thread state
   eThreadState ThreadState() { return ppuThreadState; }
 
-  // Get ppuState
-  PPU_STATE *GetPPUState() { return ppuState.get(); }
+  // Get ppeState
+  sPPEState *GetPPUState() { return ppeState.get(); }
 
   // Load a elf image from host memory. Copies into RAM
   // Returns entrypoint
@@ -129,7 +129,7 @@ private:
   u64 ppuStepAmount = 0;
 
   // Execution threads inside this PPU.
-  std::unique_ptr<PPU_STATE> ppuState;
+  std::unique_ptr<sPPEState> ppeState;
 
   // Main CPU Context.
   XenonContext *xenonContext = nullptr;
@@ -147,17 +147,17 @@ private:
   // Exceptions
   //
 
-  void PPUSystemResetException(PPU_STATE* ppuState);
-  void PPUInstStorageException(PPU_STATE* ppuState);
-  void PPUDataStorageException(PPU_STATE* ppuState);
-  void PPUDataSegmentException(PPU_STATE* ppuState);
-  void PPUInstSegmentException(PPU_STATE* ppuState);
-  void PPUSystemCallException(PPU_STATE* ppuState);
-  void PPUDecrementerException(PPU_STATE* ppuState);
-  void PPUProgramException(PPU_STATE* ppuState);
-  void PPUExternalException(PPU_STATE* ppuState);
-  void PPUFPUnavailableException(PPU_STATE* ppuState);
-  void PPUVXUnavailableException(PPU_STATE* ppuState);
+  void PPUSystemResetException(sPPEState* ppeState);
+  void PPUInstStorageException(sPPEState* ppeState);
+  void PPUDataStorageException(sPPEState* ppeState);
+  void PPUDataSegmentException(sPPEState* ppeState);
+  void PPUInstSegmentException(sPPEState* ppeState);
+  void PPUSystemCallException(sPPEState* ppeState);
+  void PPUDecrementerException(sPPEState* ppeState);
+  void PPUProgramException(sPPEState* ppeState);
+  void PPUExternalException(sPPEState* ppeState);
+  void PPUFPUnavailableException(sPPEState* ppeState);
+  void PPUVXUnavailableException(sPPEState* ppeState);
 
   //
   // JIT
@@ -166,7 +166,7 @@ private:
   std::unique_ptr<PPU_JIT> ppuJIT;
   friend class PPU_JIT;
   // Function call epilogue.
-  friend bool CallEpilogue(PPU *ppu, PPU_STATE *ppuState);
+  friend bool CallEpilogue(PPU *ppu, sPPEState *ppeState);
 
   //
   // Helpers
@@ -196,5 +196,5 @@ private:
   //
   
   // Runs instruction tests on the desired backend.
-  bool RunInstructionTests(PPU_STATE* ppuState, PPU_JIT* ppuJITPtr, ePPUTestingMode testMode);
+  bool RunInstructionTests(sPPEState* ppeState, PPU_JIT* ppuJITPtr, ePPUTestingMode testMode);
 };

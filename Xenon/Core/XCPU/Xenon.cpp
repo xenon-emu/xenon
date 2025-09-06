@@ -181,7 +181,7 @@ void Xenon::Reset() {
   std::this_thread::sleep_for(200ms);
 }
 
-void Xenon::Halt(u64 haltOn, bool requestedByGuest, u8 ppuId, ePPUThread threadId) {
+void Xenon::Halt(u64 haltOn, bool requestedByGuest, u8 ppuId, ePPUThreadID threadId) {
   if (ppu0.get())
     ppu0->Halt(haltOn, requestedByGuest, ppuId, threadId);
   if (ppu1.get())

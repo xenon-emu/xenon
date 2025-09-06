@@ -3,7 +3,7 @@
 #include "JITEmitter_Helpers.h"
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
-void PPCInterpreter::PPCInterpreterJIT_b(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
+void PPCInterpreter::PPCInterpreterJIT_b(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   x86::Gp CIA = newGP64();  // current instruction address
   x86::Gp target = newGP64();
 

@@ -67,25 +67,25 @@ PPU::PPU(XenonContext *inXenonContext, u64 resetVector, u32 PIR) :
     return;
   }
 
-  // Allocate memory for our PPU state
-  ppuState = std::make_unique<STRIP_UNIQUE(ppuState)>();
+  // Allocate memory for our PPE state
+  ppeState = std::make_unique<STRIP_UNIQUE(ppeState)>();
 
-  // Set PPU ID (PIR, as 0 indexed. So 0-6)
-  ppuState->ppuID = PIR / 2;
+  // Set PPU Thread ID (PIR, as 0 indexed. So 0-5)
+  ppeState->ppuID = PIR / 2;
 
-  // Set PPU Name
-  ppuState->ppuName = fmt::format("PPU{}", ppuState->ppuID);
+  // Set PPU Thread Name
+  ppeState->ppuName = fmt::format("PPU{}", ppeState->ppuID);
 
   // Initialize Both threads as in a Reset
   for (u8 thrdNum = 0; thrdNum < 2; thrdNum++) {
     // Set Reset vector for both threads
-    ppuState->ppuThread[static_cast<ePPUThread>(thrdNum)].NIA = XE_RESET_VECTOR;
+    ppeState->ppuThread[static_cast<ePPUThreadID>(thrdNum)].NIA = XE_RESET_VECTOR;
     // Set MSR for both Threads
-    ppuState->ppuThread[static_cast<ePPUThread>(thrdNum)].SPR.MSR.MSR_Hex = 0x9000000000000000;
+    ppeState->ppuThread[static_cast<ePPUThreadID>(thrdNum)].SPR.MSR.MSR_Hex = 0x9000000000000000;
   }
 
   // Set Thread Timeout Register
-  ppuState->SPR.TTR = 0x1000; // Execute 4096 instructions
+  ppeState->SPR.TTR = 0x4000; // Docs say that the recommended value is 16K instructions.
 
   ppuJIT = std::make_unique<PPU_JIT>(this);
 
@@ -96,18 +96,18 @@ PPU::PPU(XenonContext *inXenonContext, u64 resetVector, u32 PIR) :
 
   if (Config::xcpu.clocksPerInstruction) {
     clocksPerInstruction = Config::xcpu.clocksPerInstruction;
-    LOG_INFO(Xenon, "{}: Using cached CPI from Config, got {}", ppuState->ppuName, clocksPerInstruction);
+    LOG_INFO(Xenon, "{}: Using cached CPI from Config, got {}", ppeState->ppuName, clocksPerInstruction);
   } else {
     CalculateCPI();
-    if (ppuState->ppuID == 0) {
+    if (ppeState->ppuID == 0) {
       Config::xcpu.clocksPerInstruction = clocksPerInstruction;
     }
   } 
   if (!Config::highlyExperimental.clocksPerInstructionBypass) {
-    LOG_INFO(Xenon, "{}: {} clocks per instruction", ppuState->ppuName, clocksPerInstruction);
+    LOG_INFO(Xenon, "{}: {} clocks per instruction", ppeState->ppuName, clocksPerInstruction);
   }
   else {
-    LOG_INFO(Xenon, "{}: {} clocks per instruction (Overwritten! Actual CPI: {})", ppuState->ppuName, Config::highlyExperimental.clocksPerInstructionBypass, clocksPerInstruction);
+    LOG_INFO(Xenon, "{}: {} clocks per instruction (Overwritten! Actual CPI: {})", ppeState->ppuName, Config::highlyExperimental.clocksPerInstructionBypass, clocksPerInstruction);
     clocksPerInstruction = Config::highlyExperimental.clocksPerInstructionBypass;
   }
 
@@ -115,8 +115,8 @@ PPU::PPU(XenonContext *inXenonContext, u64 resetVector, u32 PIR) :
   ppuHaltOn = Config::debug.haltOnAddress;
 
   for (u8 thrdID = 0; thrdID < 2; thrdID++) {
-    PPU_THREAD_REGISTERS &thread = ppuState->ppuThread[static_cast<ePPUThread>(thrdID)];
-    thread.ppuRes = std::make_unique<STRIP_UNIQUE(PPU_THREAD_REGISTERS::ppuRes)>();
+    sPPUThread &thread = ppeState->ppuThread[static_cast<ePPUThreadID>(thrdID)];
+    thread.ppuRes = std::make_unique<STRIP_UNIQUE(sPPUThread::ppuRes)>();
     memset(thread.ppuRes.get(), 0, sizeof(PPU_RES));
     xenonContext->xenonRes.Register(thread.ppuRes.get());
 
@@ -131,30 +131,30 @@ PPU::PPU(XenonContext *inXenonContext, u64 resetVector, u32 PIR) :
   // Set PVR and PIR
   switch (Config::highlyExperimental.consoleRevison) {
   case Config::eConsoleRevision::Xenon: {
-    ppuState->SPR.PVR.PVR_Hex = 0x00710200;
+    ppeState->SPR.PVR.PVR_Hex = 0x00710200;
   } break;
   case Config::eConsoleRevision::Zephyr: {
-    ppuState->SPR.PVR.PVR_Hex = 0x00710300;
+    ppeState->SPR.PVR.PVR_Hex = 0x00710300;
   } break;
   case Config::eConsoleRevision::Falcon: {
-    ppuState->SPR.PVR.PVR_Hex = 0x00710500;
+    ppeState->SPR.PVR.PVR_Hex = 0x00710500;
   } break;
   case Config::eConsoleRevision::Jasper: {
-    ppuState->SPR.PVR.PVR_Hex = 0x00710500;
+    ppeState->SPR.PVR.PVR_Hex = 0x00710500;
   } break;
   case Config::eConsoleRevision::Trinity: {
-    ppuState->SPR.PVR.PVR_Hex = 0x00710800;
+    ppeState->SPR.PVR.PVR_Hex = 0x00710800;
   } break;
   case Config::eConsoleRevision::Corona4GB:
   case Config::eConsoleRevision::Corona: {
-    ppuState->SPR.PVR.PVR_Hex = 0x00710800;
+    ppeState->SPR.PVR.PVR_Hex = 0x00710800;
   } break;
   case Config::eConsoleRevision::Winchester: {
-    ppuState->SPR.PVR.PVR_Hex = 0x00710900;
+    ppeState->SPR.PVR.PVR_Hex = 0x00710900;
   } break;
   }
-  ppuState->ppuThread[ePPUThread_Zero].SPR.PIR = PIR;
-  ppuState->ppuThread[ePPUThread_One].SPR.PIR = PIR + 1;
+  ppeState->ppuThread[ePPUThread_Zero].SPR.PIR = PIR;
+  ppeState->ppuThread[ePPUThread_One].SPR.PIR = PIR + 1;
 }
 PPU::~PPU() {
   // Signal we're quitting
@@ -164,7 +164,7 @@ PPU::~PPU() {
   if (ppuThread.joinable())
     ppuThread.join();
   ppuJIT.reset();
-  ppuState.reset();
+  ppeState.reset();
 }
 
 void PPU::StartExecution(bool setHRMOR) {
@@ -174,36 +174,36 @@ void PPU::StartExecution(bool setHRMOR) {
     // If we were told to halt on startup, ensure we are able to continue, otherwise it'll deadlock
     // We have it like this to safeguard against sleeping threads waking themselves after continuing,
     // thus destroying the stack
-    ppuThreadPreviousState.store(ppuState->ppuID == 0 ? eThreadState::Running : eThreadState::Sleeping);
-    LOG_DEBUG(Xenon, "{} was set to be halted, setting previous state to {}", ppuState->ppuName, ppuState->ppuID == 0 ? "Running" : "Sleeping");
+    ppuThreadPreviousState.store(ppeState->ppuID == 0 ? eThreadState::Running : eThreadState::Sleeping);
+    LOG_DEBUG(Xenon, "{} was set to be halted, setting previous state to {}", ppeState->ppuName, ppeState->ppuID == 0 ? "Running" : "Sleeping");
   }
   else {
-    LOG_DEBUG(Xenon, "{} setting to {}", ppuState->ppuName, ppuState->ppuID == 0 ? "Running" : "Sleeping");
-    ppuThreadState.store(ppuState->ppuID == 0 ? eThreadState::Running : eThreadState::Sleeping);
+    LOG_DEBUG(Xenon, "{} setting to {}", ppeState->ppuName, ppeState->ppuID == 0 ? "Running" : "Sleeping");
+    ppuThreadState.store(ppeState->ppuID == 0 ? eThreadState::Running : eThreadState::Sleeping);
     ppuThreadPreviousState.store(ppuThreadState);
   }
 
   // TLB Software reload Mode?
-  ppuState->SPR.LPCR = 0x402ULL;
+  ppeState->SPR.LPCR = 0x402ULL;
 
   // HID6?
-  ppuState->SPR.HID6.data = 0x1803800000000ULL;
+  ppeState->SPR.HID6.data = 0x1803800000000ULL;
 
   // TSCR[WEXT] = 1??
-  ppuState->SPR.TSCR = 0x100000UL;
+  ppeState->SPR.TSCR = 0x100000UL;
 
   // Check for instruction tests.
-  if (Config::xcpu.runInstrTests && ppuState->ppuID == 0) {
+  if (Config::xcpu.runInstrTests && ppeState->ppuID == 0) {
     LOG_INFO(Xenon, "Starting PowerPC instruction tests. Testing backend: {}",
       Config::xcpu.instrTestsMode ? "JITx86" : "Interpreter");
-    RunInstructionTests(ppuState.get(), ppuJIT.get(), static_cast<ePPUTestingMode>(Config::xcpu.instrTestsMode));
+    RunInstructionTests(ppeState.get(), ppuJIT.get(), static_cast<ePPUTestingMode>(Config::xcpu.instrTestsMode));
   }
 
   // If we're PPU0,thread0 then enable THRD 0 and set Reset Vector.
-  if (ppuState->ppuID == 0 && setHRMOR) {
-    ppuState->SPR.CTRL = 0x800000UL; // CTRL[TE0] = 1;
-    ppuState->SPR.HRMOR = 0x20000000000ULL;
-    ppuState->ppuThread[ePPUThread_Zero].NIA = resetVector;
+  if (ppeState->ppuID == 0 && setHRMOR) {
+    ppeState->SPR.CTRL = 0x800000UL; // CTRL[TE0] = 1;
+    ppeState->SPR.HRMOR = 0x20000000000ULL;
+    ppeState->ppuThread[ePPUThread_Zero].NIA = resetVector;
     // Also simulate 1BL if we're told to.
     if (Config::xcpu.simulate1BL) { Simulate1Bl(); }
   }
@@ -218,7 +218,7 @@ void PPU::CalculateCPI() {
   // Get our CPI
   u64 cpi = get_cpi_value(instrPerSecond);
 
-  LOG_INFO(Xenon, "{} Speed: {:#d} instructions per second.", ppuState->ppuName, instrPerSecond);
+  LOG_INFO(Xenon, "{} Speed: {:#d} instructions per second.", ppeState->ppuName, instrPerSecond);
 
   // Find a way to calculate the right ticks/IPS ratio.
   clocksPerInstruction = cpi;
@@ -233,9 +233,9 @@ void PPU::Reset() {
   ppuThreadResetting = true;
 }
 
-void PPU::Halt(u64 haltOn, bool requestedByGuest, s8 ppuId, ePPUThread threadId) {
+void PPU::Halt(u64 haltOn, bool requestedByGuest, s8 ppuId, ePPUThreadID threadId) {
   if (haltOn && !guestHalt) {
-    LOG_DEBUG(Xenon, "Halting PPU{} on address 0x{:X}", ppuState->ppuID, haltOn);
+    LOG_DEBUG(Xenon, "Halting PPU{} on address 0x{:X}", ppeState->ppuID, haltOn);
     ppuHaltOn = haltOn;
   }
   guestHalt = requestedByGuest;
@@ -252,7 +252,7 @@ void PPU::Continue() {
   if (ppuThreadState.load() == eThreadState::Running)
     return;
   if (ppuThreadPreviousState == eThreadState::Running)
-    LOG_DEBUG(Xenon, "Continuing execution on PPU{}", ppuState->ppuID);
+    LOG_DEBUG(Xenon, "Continuing execution on PPU{}", ppeState->ppuID);
   ppuThreadState.store(ppuThreadPreviousState.load());
   ppuThreadPreviousState.store(eThreadState::None);
   guestHalt = false;
@@ -263,7 +263,7 @@ void PPU::ContinueFromException() {
   if (ppuThreadPreviousState == eThreadState::Running)
     LOG_DEBUG(Xenon, "Jumping to exception handler");
   if (guestHalt) {
-    PPU_THREAD_REGISTERS &thread = ppuState->ppuThread[curThreadId];
+    sPPUThread &thread = ppeState->ppuThread[curThreadId];
     thread.exceptReg |= PPU_EX_PROG;
     thread.progExceptionType = PROGRAM_EXCEPTION_TYPE_TRAP;
   }
@@ -275,7 +275,7 @@ void PPU::Step(int amount) {
   if (ppuThreadState.load() == eThreadState::Running)
     return;
   if (ppuThreadPreviousState == eThreadState::Running)
-    LOG_DEBUG(Xenon, "Continuing PPU{} for {} Instructions", ppuState->ppuID, amount);
+    LOG_DEBUG(Xenon, "Continuing PPU{} for {} Instructions", ppeState->ppuID, amount);
   ppuStepAmount = amount;
 }
 
@@ -306,7 +306,7 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
       // Start Profile
       MICROPROFILE_SCOPEI("[Xe::PPU]", "ExecuteSingleInstruction", MP_AUTO);
       // Execute instruction
-      PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
+      PPCInterpreter::ppcExecuteSingleInstruction(ppeState.get());
     }
 
     // Increase Time Base Counter if enabled
@@ -345,23 +345,23 @@ void PPU::ThreadStateMachine() {
       if (!ppuThreadResetting && (state & ePPUThreadBit_Zero)) {
         // Thread 0 is running, process instructions until we reach TTR timeout.
         curThreadId = ePPUThread_Zero;
-        PPURunInstructions(ppuState->SPR.TTR, ppuHaltOn != 0);
+        PPURunInstructions(ppeState->SPR.TTR, ppuHaltOn != 0);
       }
       if (!ppuThreadResetting && (state & ePPUThreadBit_One)) {
         // Thread 1 is running, process instructions until we reach TTR timeout.
         curThreadId = ePPUThread_One;
-        PPURunInstructions(ppuState->SPR.TTR, ppuHaltOn != 0);
+        PPURunInstructions(ppeState->SPR.TTR, ppuHaltOn != 0);
       }
     } else {
       if (!ppuThreadResetting && (state & ePPUThreadBit_Zero)) {
         // Thread 1 is running, process instructions until we reach TTR timeout.
         curThreadId = ePPUThread_Zero;
-        ppuJIT->ExecuteJITInstrs(ppuState->SPR.TTR, ppuThreadActive, ppuHaltOn != 0);
+        ppuJIT->ExecuteJITInstrs(ppeState->SPR.TTR, ppuThreadActive, ppuHaltOn != 0);
       }
       if (!ppuThreadResetting && (state & ePPUThreadBit_One)) {
         // Thread 1 is running, process instructions until we reach TTR timeout.
         curThreadId = ePPUThread_One;
-        ppuJIT->ExecuteJITInstrs(ppuState->SPR.TTR, ppuThreadActive, ppuHaltOn != 0);
+        ppuJIT->ExecuteJITInstrs(ppeState->SPR.TTR, ppuThreadActive, ppuHaltOn != 0);
       }
     }
   } break;
@@ -410,8 +410,8 @@ void PPU::ThreadStateMachine() {
     ppuThreadState.store(eThreadState::None);
   } break;
   case eThreadState::Resetting: {
-    if (ppuState.get())
-      LOG_INFO(Xenon, "PPU{} is resetting!", ppuState->ppuID);
+    if (ppeState.get())
+      LOG_INFO(Xenon, "PPU{} is resetting!", ppeState->ppuID);
     else
       LOG_INFO(Xenon, "A PPU is in the middle of resetting!");
     ppuThreadState.store(eThreadState::None);
@@ -426,8 +426,8 @@ void PPU::ThreadStateMachine() {
 }
 void PPU::ThreadLoop() {
   // Set thread name
-  if (ppuState.get())
-    Base::SetCurrentThreadName("[Xe] " + ppuState->ppuName);
+  if (ppeState.get())
+    Base::SetCurrentThreadName("[Xe] " + ppeState->ppuName);
   while (ppuThreadActive) {
     // Start Profile
     MICROPROFILE_SCOPEI("[Xe::PPU]", "ThreadLoop", MP_AUTO);
@@ -447,8 +447,8 @@ void PPU::ThreadLoop() {
 }
 
 // Returns a pointer to the specified thread.
-PPU_THREAD_REGISTERS *PPU::GetPPUThread(u8 thrdID) {
-  return &ppuState->ppuThread[static_cast<ePPUThread>(thrdID)];
+sPPUThread *PPU::GetPPUThread(u8 thrdID) {
+  return &ppeState->ppuThread[static_cast<ePPUThreadID>(thrdID)];
 }
 
 // This is the calibration code for the GetIPS() function. It branches to the
@@ -467,7 +467,7 @@ u32 PPU::GetIPS() {
 
   // Write the calibration code to main memory
   for (s32 i = 0; i < 4; i++) {
-    PPCInterpreter::MMUWrite32(ppuState.get(), 4 + (i * 4), ipsCalibrationCode[i]);
+    PPCInterpreter::MMUWrite32(ppeState.get(), 4 + (i * 4), ipsCalibrationCode[i]);
   }
 
   // Set our NIP to our calibration code address
@@ -487,14 +487,14 @@ u32 PPU::GetIPS() {
       continue;
     } else {
       PPUReadNextInstruction();
-      PPCInterpreter::ppcExecuteSingleInstruction(ppuState.get());
+      PPCInterpreter::ppcExecuteSingleInstruction(ppeState.get());
     }
     instrCount++;
   }
 
   // Zero out the memory after execution
   for (s32 i = 0; i < 4; i++) {
-    PPCInterpreter::MMUWrite32(ppuState.get(), 4 + (i * 4), 0x00000000);
+    PPCInterpreter::MMUWrite32(ppeState.get(), 4 + (i * 4), 0x00000000);
   }
 
   // Set the NIP back to default
@@ -520,8 +520,8 @@ void bswap_elf(T &value) {
 #define READ(header, entry) elf32 ? header entry : header##64 entry
 u64 PPU::loadElfImage(u8* data, u64 size) {
   // Setup HRMOR for elf binaries
-  ppuState->SPR.CTRL = 0x800000; // CTRL[TE0] = 1;
-  ppuState->SPR.HRMOR = 0x0000000000000000;
+  ppeState->SPR.CTRL = 0x800000; // CTRL[TE0] = 1;
+  ppeState->SPR.HRMOR = 0x0000000000000000;
 
   // Loaded ELF Header type (elf32/elf64)
   bool elf32 = true; // Assume little endian file
@@ -638,10 +638,10 @@ u64 PPU::loadElfImage(u8* data, u64 size) {
       u64 target_addr = physical_load ? paddr : vaddr;
       LOG_INFO(Xenon, "Loading 0x{:X} bytes from offset 0x{:X} in the ELF to address 0x{:X}",
         filesize, file_offset, target_addr);
-      PPCInterpreter::MMUMemCpyFromHost(ppuState.get(), target_addr, data + file_offset, filesize);
+      PPCInterpreter::MMUMemCpyFromHost(ppeState.get(), target_addr, data + file_offset, filesize);
       if (memsize > filesize) { // Memory size greater than file, zero out remainder
         u64 remainder = memsize - filesize;
-        PPCInterpreter::MMUMemSet(ppuState.get(), target_addr + filesize, 0, remainder);
+        PPCInterpreter::MMUMemSet(ppeState.get(), target_addr + filesize, 0, remainder);
       }
     }
   }
@@ -654,8 +654,8 @@ u64 PPU::loadElfImage(u8* data, u64 size) {
 
 // Reads the next instruction from memory and advances the NIP accordingly.
 bool PPU::PPUReadNextInstruction() {
-  ePPUThread thrId = curThreadId;
-  PPU_THREAD_REGISTERS &thread = ppuState->ppuThread[thrId];
+  ePPUThreadID thrId = curThreadId;
+  sPPUThread &thread = ppeState->ppuThread[thrId];
   // Update previous instruction address
   thread.PIA = thread.CIA;
   // Update current instruction address
@@ -664,10 +664,10 @@ bool PPU::PPUReadNextInstruction() {
   thread.NIA += 4;
   thread.instrFetch = true;
   // Fetch the instruction from memory
-  _instr.opcode = PPCInterpreter::MMURead32(ppuState.get(), thread.CIA, thrId);
+  _instr.opcode = PPCInterpreter::MMURead32(ppeState.get(), thread.CIA, thrId);
   if (_instr.opcode == 0xFFFFFFFF || _instr.opcode == 0xCDCDCDCD) {
     LOG_CRITICAL(Xenon, "PPU{} returned an invalid opcode found. Data = {:#x}, PIA [{:#x}] -> CIA [{:#x}]. Halting...", 
-      ppuState->ppuID, _instr.opcode, thread.PIA, thread.CIA);
+      ppeState->ppuID, _instr.opcode, thread.PIA, thread.CIA);
     Halt();
     return false;
   }
@@ -681,7 +681,7 @@ bool PPU::PPUReadNextInstruction() {
 // Checks for CPU bringup interrupts
 bool PPU::PPUCheckInterrupts() {
   // Check if we are allowed to enable thread zero if the thread is sleeping...
-  bool WEXT = (ppuState->SPR.TSCR & 0x100000) >> 20;
+  bool WEXT = (ppeState->SPR.TSCR & 0x100000) >> 20;
 
   // Check for external interrupts that enable execution
   if (ppuThreadActive && !ppuThreadResetting && (ppuThreadState.load() == eThreadState::Halted || ppuThreadState.load() == eThreadState::Sleeping) && WEXT) {
@@ -691,16 +691,16 @@ bool PPU::PPUCheckInterrupts() {
     }
 
     // Proceed.
-    LOG_DEBUG(Xenon, "{} was previously halted or sleeping, bringing online", ppuState->ppuName);
+    LOG_DEBUG(Xenon, "{} was previously halted or sleeping, bringing online", ppeState->ppuName);
     ppuThreadState.store(eThreadState::Running);
     // Enable thread 0 execution
-    ppuState->SPR.CTRL = 0x800000;
+    ppeState->SPR.CTRL = 0x800000;
 
     // Issue reset
-    ppuState->ppuThread[ePPUThread_Zero].exceptReg |= PPU_EX_RESET;
-    ppuState->ppuThread[ePPUThread_One].exceptReg |= PPU_EX_RESET;
+    ppeState->ppuThread[ePPUThread_Zero].exceptReg |= PPU_EX_RESET;
+    ppeState->ppuThread[ePPUThread_One].exceptReg |= PPU_EX_RESET;
 
-    PPU_THREAD_REGISTERS &thread = curThread;
+    sPPUThread &thread = curThread;
 
     thread.SPR.SRR1 = 0x200000; // Set SRR1[42:44] = 100
 
@@ -716,7 +716,7 @@ bool PPU::PPUCheckInterrupts() {
 
 // Checks for exceptions and process them in the correct order.
 bool PPU::PPUCheckExceptions() {
-  PPU_THREAD_REGISTERS &thread = curThread;
+  sPPUThread &thread = curThread;
   // Start Profile
   MICROPROFILE_SCOPEI("[Xe::PPU]", "CheckExceptions", MP_AUTO);
   // Check Exceptions pending and process them in order.
@@ -724,7 +724,7 @@ bool PPU::PPUCheckExceptions() {
   if (exceptions != PPU_EX_NONE) {
     // Halt on any exception if set in config.
     if (Config::debug.haltOnExceptions) {
-      LOG_DEBUG(Xenon, "[{}]: Halting on exceptions enabled, proceeding to halt.", ppuState->ppuName);
+      LOG_DEBUG(Xenon, "[{}]: Halting on exceptions enabled, proceeding to halt.", ppeState->ppuName);
       Halt();
     }
 
@@ -735,7 +735,7 @@ bool PPU::PPUCheckExceptions() {
     // 1. System Reset
     //
     if (exceptions & PPU_EX_RESET) {
-      PPUSystemResetException(ppuState.get());
+      PPUSystemResetException(ppeState.get());
       exceptions &= ~PPU_EX_RESET;
       return true;
     }
@@ -744,12 +744,12 @@ bool PPU::PPUCheckExceptions() {
     //
     if (exceptions & PPU_EX_MC) {
       if (thread.SPR.MSR.ME) {
-        PPUSystemResetException(ppuState.get());
+        PPUSystemResetException(ppeState.get());
         exceptions &= ~PPU_EX_MC;
         return true;
       } else {
         // Checkstop Mode. Hard Fault.
-        LOG_CRITICAL(Xenon, "{}: CHECKSTOP!", ppuState->ppuName);
+        LOG_CRITICAL(Xenon, "{}: CHECKSTOP!", ppeState->ppuName);
         // A checkstop is a full - stop of the processor that requires a System
         // Reset to recover.
         XeMain::ShutdownCPU();
@@ -761,70 +761,70 @@ bool PPU::PPUCheckExceptions() {
     //
     // A. Program - Illegal Instruction
     if (exceptions & PPU_EX_PROG && thread.progExceptionType == PROGRAM_EXCEPTION_TYPE_ILL) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Illegal Instruction.", ppuState->ppuName, static_cast<u8>(curThreadId));
+      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Illegal Instruction.", ppeState->ppuName, static_cast<u8>(curThreadId));
       exceptions &= ~PPU_EX_PROG;
       return true;
     }
     // B. Floating-Point Unavailable
     if (exceptions & PPU_EX_FPU) {
-      PPUFPUnavailableException(ppuState.get());
+      PPUFPUnavailableException(ppeState.get());
       exceptions &= ~PPU_EX_FPU;
       return true;
     }
     // C. Data Storage, Data Segment, or Alignment
     // Data Storage
     if (exceptions & PPU_EX_DATASTOR) {
-      PPUDataStorageException(ppuState.get());
+      PPUDataStorageException(ppeState.get());
       exceptions &= ~PPU_EX_DATASTOR;
       return true;
     }
     // Data Segment
     if (exceptions & PPU_EX_DATASEGM) {
-      PPUDataSegmentException(ppuState.get());
+      PPUDataSegmentException(ppeState.get());
       exceptions &= ~PPU_EX_DATASEGM;
       return true;
     }
     // Alignment
     if (exceptions & PPU_EX_ALIGNM) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Alignment.", ppuState->ppuName, static_cast<u8>(curThreadId));
+      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Alignment.", ppeState->ppuName, static_cast<u8>(curThreadId));
       exceptions &= ~PPU_EX_ALIGNM;
       return true;
     }
     // D. Trace
     if (exceptions & PPU_EX_TRACE) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Trace.", ppuState->ppuName, static_cast<u8>(curThreadId));
+      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Trace.", ppeState->ppuName, static_cast<u8>(curThreadId));
       exceptions &= ~PPU_EX_TRACE;
       return true;
     }
     // E. Program Trap, System Call, Program Priv Inst, Program Illegal Inst
     // Program Trap
     if (exceptions & PPU_EX_PROG && thread.progExceptionType == PROGRAM_EXCEPTION_TYPE_TRAP) {
-      PPUProgramException(ppuState.get());
+      PPUProgramException(ppeState.get());
       exceptions &= ~PPU_EX_PROG;
       return true;
     }
     // System Call
     if (exceptions & PPU_EX_SC) {
-      PPUSystemCallException(ppuState.get());
+      PPUSystemCallException(ppeState.get());
       exceptions &= ~PPU_EX_SC;
       return true;
     }
     // Program - Privileged Instruction
     if (exceptions & PPU_EX_PROG && thread.progExceptionType == PROGRAM_EXCEPTION_TYPE_PRIV) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Privileged Instruction.", ppuState->ppuName, static_cast<u8>(curThreadId));
+      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Privileged Instruction.", ppeState->ppuName, static_cast<u8>(curThreadId));
       exceptions &= ~PPU_EX_PROG;
       return true;
     }
     // F. Instruction Storage and Instruction Segment
     // Instruction Storage
     if (exceptions & PPU_EX_INSSTOR) {
-      PPUInstStorageException(ppuState.get());
+      PPUInstStorageException(ppeState.get());
       exceptions &= ~PPU_EX_INSSTOR;
       return true;
     }
     // Instruction Segment
     if (exceptions & PPU_EX_INSTSEGM) {
-      PPUInstSegmentException(ppuState.get());
+      PPUInstSegmentException(ppeState.get());
       exceptions &= ~PPU_EX_INSTSEGM;
       return true;
     }
@@ -832,7 +832,7 @@ bool PPU::PPUCheckExceptions() {
     // 4. Program - Imprecise Mode Floating-Point Enabled Exception
     //
     if (exceptions & PPU_EX_PROG) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Imprecise Mode Floating-Point Enabled Exception.", ppuState->ppuName, static_cast<u8>(curThreadId));
+      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Imprecise Mode Floating-Point Enabled Exception.", ppeState->ppuName, static_cast<u8>(curThreadId));
       exceptions &= ~PPU_EX_PROG;
       return true;
     }
@@ -841,26 +841,26 @@ bool PPU::PPUCheckExceptions() {
     //
     // External
     if (exceptions & PPU_EX_EXT && thread.SPR.MSR.EE) {
-      PPUExternalException(ppuState.get());
+      PPUExternalException(ppeState.get());
       exceptions &= ~PPU_EX_EXT;
       return true;
     }
     // Decrementer. A dec exception may be present but will only be taken when
     // the EE bit of MSR is set.
     if (exceptions & PPU_EX_DEC && thread.SPR.MSR.EE) {
-      PPUDecrementerException(ppuState.get());
+      PPUDecrementerException(ppeState.get());
       exceptions &= ~PPU_EX_DEC;
       return true;
     }
     // Hypervisor Decrementer
     if (exceptions & PPU_EX_HDEC) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Hypervisor Decrementer.", ppuState->ppuName, static_cast<u8>(curThreadId));
+      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Hypervisor Decrementer.", ppeState->ppuName, static_cast<u8>(curThreadId));
       exceptions &= ~PPU_EX_HDEC;
       return true;
     }
     // VX Unavailable.
     if (exceptions & PPU_EX_VXU) {
-      PPUVXUnavailableException(ppuState.get());
+      PPUVXUnavailableException(ppeState.get());
       exceptions &= ~PPU_EX_VXU;
       return true;
     }
@@ -879,7 +879,7 @@ void PPU::CheckTimeBaseStatus() {
     // 0 -> TBU, TBL, DEC, HDEC, and the hang-detection logic do not
     // update. 1 -> TBU, TBL, DEC, HDEC, and the hang-detection logic
     // are enabled to update
-    if (ppuState->SPR.HID6.tb_enable) {
+    if (ppeState->SPR.HID6.tb_enable) {
       UpdateTimeBase();
     }
   }
@@ -892,7 +892,7 @@ void PPU::UpdateTimeBase() {
   u32 newDec = 0;
   u32 dec = 0;
   // Update the Time Base.
-  ppuState->SPR.TB += clocksPerInstruction;
+  ppeState->SPR.TB += clocksPerInstruction;
   // Get the decrementer value.
   dec = curThread.SPR.DEC;
   newDec = dec - clocksPerInstruction;
@@ -908,11 +908,11 @@ void PPU::UpdateTimeBase() {
 
 // Returns current executing thread by reading CTRL register
 u8 PPU::GetCurrentRunningThreads() {
-  if (!ppuState)
+  if (!ppeState)
     return ePPUThreadBit_None;
 
   // Extract bits 22-23 in one step and directly map them to thread states
-  u8 ctrlTE = (ppuState->SPR.CTRL >> 22) & 0b11;
+  u8 ctrlTE = (ppeState->SPR.CTRL >> 22) & 0b11;
 
   // Directly map ctrlTE to thread states using bit shifting
   return (ctrlTE & 0b01) * ePPUThreadBit_One | (ctrlTE & 0b10) / 2 * ePPUThreadBit_Zero;
@@ -934,11 +934,11 @@ bool PPU::Simulate1Bl() {
   
   // Zero out Secure RAM:
   LOG_INFO(Xenon, " * Zeroing SRAM.");
-  PPCInterpreter::MMUMemSet(ppuState.get(), 0x10000, 0, 0x10000);
+  PPCInterpreter::MMUMemSet(ppeState.get(), 0x10000, 0, 0x10000);
 
   // Verify CB's offset in NAND and fetch its header contents.
   // CB's offset should be stored in the NAND header at location 0x8.
-  u32 cbOffset = PPCInterpreter::MMURead32(ppuState.get(), NAND_MEMORY_MAPPED_ADDR + 8);
+  u32 cbOffset = PPCInterpreter::MMURead32(ppeState.get(), NAND_MEMORY_MAPPED_ADDR + 8);
   
   // Verification is nothing but a mere address alignment and a not zero check.
   if (cbOffset == 0) {
@@ -948,7 +948,7 @@ bool PPU::Simulate1Bl() {
 
   // Read CB header, we don't print anything as SFCX code should have already done this.
   Xe::PCIDev::BL_HEADER cbHeader = {};
-  PPCInterpreter::MMURead(xenonContext, ppuState.get(), NAND_MEMORY_MAPPED_ADDR + cbOffset, 16, reinterpret_cast<u8*>(&cbHeader));
+  PPCInterpreter::MMURead(xenonContext, ppeState.get(), NAND_MEMORY_MAPPED_ADDR + cbOffset, 16, reinterpret_cast<u8*>(&cbHeader));
 
   // Byteswap header data.
   cbHeader.entryPoint = byteswap_be(cbHeader.entryPoint);
@@ -961,7 +961,7 @@ bool PPU::Simulate1Bl() {
   LOG_INFO(Xenon, " * Fetching CB data.");
   std::vector<u8> cbData;
   for (size_t idx = 0; idx < cbHeader.lenght; idx++) {
-    cbData.push_back(PPCInterpreter::MMURead8(ppuState.get(), NAND_MEMORY_MAPPED_ADDR + cbOffset + idx));
+    cbData.push_back(PPCInterpreter::MMURead8(ppeState.get(), NAND_MEMORY_MAPPED_ADDR + cbOffset + idx));
   }
 
   // Initialize HMAC key.
@@ -977,9 +977,9 @@ bool PPU::Simulate1Bl() {
 // Format: Exception name (Reset Vector)
 
 // System reset Exception (0x100)
-void PPU::PPUSystemResetException(PPU_STATE* ppuState) {
-  PPU_THREAD_REGISTERS& thread = curThread;
-  LOG_INFO(Xenon, "[{}](Thrd{:#d}): System Reset exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
+void PPU::PPUSystemResetException(sPPEState* ppeState) {
+  sPPUThread& thread = curThread;
+  LOG_INFO(Xenon, "[{}](Thrd{:#d}): System Reset exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.NIA;
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
   thread.SPR.MSR.MSR_Hex &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
@@ -988,9 +988,9 @@ void PPU::PPUSystemResetException(PPU_STATE* ppuState) {
 }
 
 // Data Storage Exception (0x300)
-void PPU::PPUDataStorageException(PPU_STATE* ppuState) {
-  PPU_THREAD_REGISTERS& thread = curThread;
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Data Storage exception. EA: 0x{:X}.", ppuState->ppuName, static_cast<s8>(curThreadId), thread.SPR.DAR);
+void PPU::PPUDataStorageException(sPPEState* ppeState) {
+  sPPUThread& thread = curThread;
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Data Storage exception. EA: 0x{:X}.", ppeState->ppuName, static_cast<s8>(curThreadId), thread.SPR.DAR);
   thread.SPR.SRR0 = thread.CIA;
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
   thread.SPR.MSR.MSR_Hex &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
@@ -999,9 +999,9 @@ void PPU::PPUDataStorageException(PPU_STATE* ppuState) {
 }
 
 // Data Segment Exception (0x380)
-void PPU::PPUDataSegmentException(PPU_STATE* ppuState) {
-  PPU_THREAD_REGISTERS& thread = curThread;
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Data Segment exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
+void PPU::PPUDataSegmentException(sPPEState* ppeState) {
+  sPPUThread& thread = curThread;
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Data Segment exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA;
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
   thread.SPR.MSR.MSR_Hex &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
@@ -1010,9 +1010,9 @@ void PPU::PPUDataSegmentException(PPU_STATE* ppuState) {
 }
 
 // Instruction Storage Exception (0x400)
-void PPU::PPUInstStorageException(PPU_STATE* ppuState) {
-  PPU_THREAD_REGISTERS& thread = curThread;
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Instruction Storage exception. EA = 0x{:X}", ppuState->ppuName, static_cast<s8>(curThreadId), thread.CIA);
+void PPU::PPUInstStorageException(sPPEState* ppeState) {
+  sPPUThread& thread = curThread;
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Instruction Storage exception. EA = 0x{:X}", ppeState->ppuName, static_cast<s8>(curThreadId), thread.CIA);
   thread.SPR.SRR0 = thread.CIA;
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
   thread.SPR.SRR1 |= 0x40000000;
@@ -1022,9 +1022,9 @@ void PPU::PPUInstStorageException(PPU_STATE* ppuState) {
 }
 
 // Instruction Segment Exception (0x480)
-void PPU::PPUInstSegmentException(PPU_STATE* ppuState) {
-  PPU_THREAD_REGISTERS& thread = curThread;
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Instruction Segment exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
+void PPU::PPUInstSegmentException(sPPEState* ppeState) {
+  sPPUThread& thread = curThread;
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Instruction Segment exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA;
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
   thread.SPR.MSR.MSR_Hex &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
@@ -1033,9 +1033,9 @@ void PPU::PPUInstSegmentException(PPU_STATE* ppuState) {
 }
 
 // External Exception (0x500)
-void PPU::PPUExternalException(PPU_STATE* ppuState) {
-  PPU_THREAD_REGISTERS& thread = curThread;
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): External exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
+void PPU::PPUExternalException(sPPEState* ppeState) {
+  sPPUThread& thread = curThread;
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): External exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.NIA;
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
   thread.SPR.MSR.MSR_Hex &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
@@ -1044,9 +1044,9 @@ void PPU::PPUExternalException(PPU_STATE* ppuState) {
 }
 
 // Program Exception (0x700)
-void PPU::PPUProgramException(PPU_STATE* ppuState) {
-  PPU_THREAD_REGISTERS& thread = curThread;
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Program exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
+void PPU::PPUProgramException(sPPEState* ppeState) {
+  sPPUThread& thread = curThread;
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Program exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA;
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
   thread.SPR.MSR.MSR_Hex &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
@@ -1056,9 +1056,9 @@ void PPU::PPUProgramException(PPU_STATE* ppuState) {
 }
 
 // FP Unavailable Exception (0x800)
-void PPU::PPUFPUnavailableException(PPU_STATE* ppuState) {
-  PPU_THREAD_REGISTERS& thread = curThread;
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): FPU exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
+void PPU::PPUFPUnavailableException(sPPEState* ppeState) {
+  sPPUThread& thread = curThread;
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): FPU exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA;
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
   thread.SPR.MSR.MSR_Hex &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
@@ -1067,9 +1067,9 @@ void PPU::PPUFPUnavailableException(PPU_STATE* ppuState) {
 }
 
 // Decrementer Exception (0x900)
-void PPU::PPUDecrementerException(PPU_STATE* ppuState) {
-  PPU_THREAD_REGISTERS& thread = curThread;
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Decrementer exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
+void PPU::PPUDecrementerException(sPPEState* ppeState) {
+  sPPUThread& thread = curThread;
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Decrementer exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.NIA;
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
   thread.SPR.MSR.MSR_Hex &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
@@ -1078,9 +1078,9 @@ void PPU::PPUDecrementerException(PPU_STATE* ppuState) {
 }
 
 // System Call Exception (0xC00)
-void PPU::PPUSystemCallException(PPU_STATE* ppuState) {
-  PPU_THREAD_REGISTERS& thread = curThread;
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): System Call exception. Syscall ID: 0x{:X}", ppuState->ppuName, static_cast<s8>(curThreadId), GPR(0));
+void PPU::PPUSystemCallException(sPPEState* ppeState) {
+  sPPUThread& thread = curThread;
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): System Call exception. Syscall ID: 0x{:X}", ppeState->ppuName, static_cast<s8>(curThreadId), GPR(0));
   thread.SPR.SRR0 = thread.NIA;
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
   thread.SPR.MSR.MSR_Hex &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
@@ -1089,9 +1089,9 @@ void PPU::PPUSystemCallException(PPU_STATE* ppuState) {
 }
 
 // VX Unavailable Exception (0xF20)
-void PPU::PPUVXUnavailableException(PPU_STATE* ppuState) {
-  PPU_THREAD_REGISTERS& thread = curThread;
-  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): VXU exception.", ppuState->ppuName, static_cast<s8>(curThreadId));
+void PPU::PPUVXUnavailableException(sPPEState* ppeState) {
+  sPPUThread& thread = curThread;
+  LOG_TRACE(Xenon, "[{}](Thrd{:#d}): VXU exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA; // See Cell Vector SIMD PEM, page 104, table 5.4.
   thread.SPR.SRR1 = thread.SPR.MSR.MSR_Hex & 0xFFFFFFFF87C0FFFF;
   thread.SPR.MSR.MSR_Hex &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.

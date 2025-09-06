@@ -7,7 +7,7 @@
 namespace XCPU {
   namespace MMU {
 
-    ePageSize XenonMMU::GetCurrentPageSize(PPU_STATE* ppuState, bool L, u8 LP) {
+    ePageSize XenonMMU::GetCurrentPageSize(sPPEState* ppeState, bool L, u8 LP) {
       MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUGetPageSize", MP_AUTO);
 
       // Large page selection works the following way:
@@ -18,8 +18,8 @@ namespace XCPU {
 
       // HID6 16-17 bits select Large Page size 1.
       // HID6 18-19 bits select Large Page size 2.
-      const u8 lb16to17 = (ppuState->SPR.HID6.lb & 0b1100) >> 2;
-      const u8 lb18to19 = ppuState->SPR.HID6.lb & 0b11;
+      const u8 lb16to17 = (ppeState->SPR.HID6.lb & 0b1100) >> 2;
+      const u8 lb18to19 = ppeState->SPR.HID6.lb & 0b11;
 
       // Page size.
       ePageSize pSize = pSize4Kb; // We always default to a 4Kb page size.
