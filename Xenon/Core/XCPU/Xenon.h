@@ -51,7 +51,7 @@ public:
 
 private:
   // Global Xenon CPU Content (shared between PPUs)
-  std::unique_ptr<XenonContext> xenonContext;
+  std::unique_ptr<Xe::XCPU::XenonContext> xenonContext;
 
   // The CPI shared across all cores, useful for timing
   u32 sharedCPI = 0;

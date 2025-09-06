@@ -10,7 +10,7 @@
 using namespace PPCInterpreter;
 
 // Forward Declaration
-XenonContext* PPCInterpreter::xenonContext = nullptr;
+Xe::XCPU::XenonContext* PPCInterpreter::xenonContext = nullptr;
 PPCInterpreter::PPCDecoder PPCInterpreter::ppcDecoder{};
 
 // Interpreter Single Instruction Processing.

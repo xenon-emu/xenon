@@ -7,13 +7,14 @@
 #include "PPC_Instruction.h"
 #include "PPCOpcodes.h"
 
+#include "Core/XCPU/XenonContext.h"
 #include "Core/RootBus/RootBus.h"
 #include "Core/XCPU/PPU/PowerPC.h"
 
 namespace PPCInterpreter {
 
 extern PPCInterpreter::PPCDecoder ppcDecoder;
-extern XenonContext *xenonContext;
+extern Xe::XCPU::XenonContext *xenonContext;
 
 //
 //  Helper macros for instructions
@@ -157,9 +158,9 @@ SECENG_ADDRESS_INFO mmuGetSecEngInfoFromAddress(u64 inputAddress);
 u64 mmuContructEndAddressFromSecEngAddr(u64 inputAddress, bool *socAccess);
 
 // Main R/W Routines.
-void MMURead(XenonContext *cpuContext, sPPEState *ppeState,
+void MMURead(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppeState,
             u64 EA, u64 byteCount, u8 *outData, ePPUThreadID thr = ePPUThread_None);
-void MMUWrite(XenonContext *cpuContext, sPPEState *ppeState,
+void MMUWrite(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppeState,
               const u8* data, u64 EA, u64 byteCount, ePPUThreadID thr = ePPUThread_None);
 
 void MMUMemCpyFromHost(sPPEState *ppeState, u64 EA, const void *source, u64 size, ePPUThreadID thr = ePPUThread_None);

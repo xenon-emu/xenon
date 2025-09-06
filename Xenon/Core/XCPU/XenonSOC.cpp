@@ -3,8 +3,10 @@
 #include <random>
 
 #include "Base/Logging/Log.h"
-#include "Core/XCPU/PPU/PowerPC.h"
+#include "Core/XCPU/XenonContext.h"
 #include "Core/XCPU/PostBus/PostBus.h"
+
+namespace Xe::XCPU {
 
 bool XenonContext::HandleSOCRead(u64 readAddr, u8* data, size_t byteCount) {
   // Get target block
@@ -222,4 +224,5 @@ bool XenonContext::HandlePRVWrite(u64 writeAddr, const u8* data, size_t byteCoun
 
   LOG_TRACE(Xenon, "SoC PRV Write at address 0x{:X}, data 0x{:X}.", writeAddr, dataIn);
   return true;
+}
 }

@@ -5,7 +5,7 @@
 #include <memory>
 
 #include "PowerPC.h"
-
+#include "Core/XCPU/XenonContext.h"
 #include "Core/RootBus/RootBus.h"
 #include "Core/XCPU/XenonMMU/XenonMMU.h"
 
@@ -39,7 +39,7 @@ enum class ePPUTestingMode : u8 {
 // Power Procesing Unit. Main execution unit inside the PPE's within the Xenon CPU.
 class PPU {
 public:
-  PPU(XenonContext*inXenonContext, u64 resetVector, u32 PIR);
+  PPU(Xe::XCPU::XenonContext * inXenonContext, u64 resetVector, u32 PIR);
   ~PPU();
 
   // Start execution
@@ -132,10 +132,10 @@ private:
   std::unique_ptr<sPPEState> ppeState;
 
   // Main CPU Context.
-  XenonContext *xenonContext = nullptr;
+  Xe::XCPU::XenonContext *xenonContext = nullptr;
 
   // Xenon Memory Management Unit
-  std::unique_ptr<XCPU::MMU::XenonMMU> xenonMMU;
+  std::unique_ptr<Xe::XCPU::MMU::XenonMMU> xenonMMU;
 
   // Amount of CPU clocls per instruction executed.
   u32 clocksPerInstruction = 0;
