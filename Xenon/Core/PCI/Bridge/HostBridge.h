@@ -2,9 +2,9 @@
 
 #pragma once
 
-#include "PCIe.h"
+#include "Core/PCI/PCIe.h"
 
-#include "Core/RootBus/HostBridge/PCIBridge/PCIBridge.h"
+#include "Core/PCI/Bridge/PCIBridge.h"
 
 #include "Core/XGPU/XGPU.h"
 

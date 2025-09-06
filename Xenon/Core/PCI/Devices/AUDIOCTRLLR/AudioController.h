@@ -2,7 +2,7 @@
 
 #pragma once
 
-#include "Core/RootBus/HostBridge/PCIBridge/PCIDevice.h"
+#include "Core/PCI/PCIDevice.h"
 
 #define AUDIO_CTRLR_DEV_SIZE 0x40
 

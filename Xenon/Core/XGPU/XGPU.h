@@ -9,12 +9,12 @@
 #include <thread>
 #include <vector>
 
-#include "Core/RAM/RAM.h"
+#include "Core/PCI/Devices/RAM/RAM.h"
 #include "Core/XGPU/EDRAM.h"
 #include "Core/XGPU/XGPUConfig.h"
 #include "Core/XGPU/XenosRegisters.h"
 #include "Core/XGPU/CommandProcessor.h"
-#include "Core/RootBus/HostBridge/PCIe.h"
+#include "Core/PCI/PCIe.h"
 
 /*
  *	XGPU.h Basic Xenos implementation.

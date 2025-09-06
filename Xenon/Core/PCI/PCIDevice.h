@@ -5,7 +5,7 @@
 #include <cstring>
 #include <string>
 
-#include "Core/RootBus/HostBridge/PCIe.h"
+#include "Core/PCI/PCIe.h"
 
 struct PCIDeviceInfo {
   std::string deviceName{};

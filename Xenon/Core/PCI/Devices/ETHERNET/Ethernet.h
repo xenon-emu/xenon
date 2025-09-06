@@ -13,9 +13,9 @@
 #include <thread>
 #include <unordered_map>
 
-#include "Core/RAM/RAM.h"
-#include "Core/RootBus/HostBridge/PCIBridge/PCIBridge.h"
-#include "Core/RootBus/HostBridge/PCIBridge/PCIDevice.h"
+#include "Core/PCI/Devices/RAM/RAM.h"
+#include "Core/PCI/Bridge/PCIBridge.h"
+#include "Core/PCI/PCIDevice.h"
 
 #define ETHERNET_DEV_SIZE 0x80
 

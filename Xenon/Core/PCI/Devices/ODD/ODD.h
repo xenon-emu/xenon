@@ -15,10 +15,10 @@
 #include <string>
 #include <thread>
 
-#include "Core/RAM/RAM.h"
-#include "Core/RootBus/HostBridge/PCIBridge/SATA.h"
-#include "Core/RootBus/HostBridge/PCIBridge/PCIBridge.h"
-#include "Core/RootBus/HostBridge/PCIBridge/PCIDevice.h"
+#include "Core/PCI/Devices/RAM/RAM.h"
+#include "Core/PCI/SATA.h"
+#include "Core/PCI/Bridge/PCIBridge.h"
+#include "Core/PCI/PCIDevice.h"
 #include "Core/XCPU/Interpreter/PPCInternal.h"
 
 #define ODD_DEV_SIZE 0x30

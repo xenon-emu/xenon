@@ -2,8 +2,8 @@
 
 #pragma once
 
-#include "Core/RootBus/HostBridge/PCIBridge/PCIDevice.h"
-#include "Core/RootBus/HostBridge/PCIBridge/OHCI/OHCI.h"
+#include "Core/PCI/PCIDevice.h"
+#include "Core/PCI/Devices/OHCI/OHCI.h"
 
 namespace Xe {
 namespace PCIDev {

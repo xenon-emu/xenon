@@ -5,9 +5,9 @@
 #include <cstring>
 #include <unordered_map>
 
-#include "PCIDevice.h"
+#include "Core/PCI/PCIDevice.h"
 
-#include "Core/RootBus/HostBridge/PCIe.h"
+#include "Core/PCI/PCIe.h"
 #include "Core/XCPU/IIC/IIC.h"
 
 /*  Dev type          Config Address    BAR

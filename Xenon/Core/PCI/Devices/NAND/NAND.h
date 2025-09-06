@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "Base/SystemDevice.h"
-#include "Core/RootBus/HostBridge/PCIBridge/SFCX/SFCX.h"
+#include "Core/PCI/Devices/SFCX/SFCX.h"
 
 class NAND : public SystemDevice {
 public:

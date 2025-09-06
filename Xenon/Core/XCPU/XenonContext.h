@@ -6,7 +6,7 @@
 
 #include <memory>
 
-#include "Core/RAM/RAM.h"
+#include "Core/PCI/Devices/RAM/RAM.h"
 #include "Core/XCPU/eFuse.h"
 #include "Core/XCPU/IIC/IIC.h"
 #include "Core/XCPU/XenonSOC.h"

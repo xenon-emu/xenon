@@ -1,7 +1,7 @@
 // Copyright 2025 Xenon Emulator Project. All rights reserved.
 
 #include "Base/Global.h"
-#include "Core/NAND/NAND.h"
+#include "Core/PCI/Devices/NAND/NAND.h"
 #include "Core/XCPU/PostBus/PostBus.h"
 #include "Core/XCPU/Xenon.h"
 

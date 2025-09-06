@@ -6,9 +6,9 @@
 #include <fstream>
 #include <filesystem>
 
-#include "Core/RAM/RAM.h"
-#include "Core/RootBus/HostBridge/PCIBridge/PCIBridge.h"
-#include "Core/RootBus/HostBridge/PCIBridge/PCIDevice.h"
+#include "Core/PCI/Devices/RAM/RAM.h"
+#include "Core/PCI/Bridge/PCIBridge.h"
+#include "Core/PCI/PCIDevice.h"
 
 // Device Size (at address 0xEA00C000)
 #define SFCX_DEV_SIZE 0x400

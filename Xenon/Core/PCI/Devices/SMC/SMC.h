@@ -10,8 +10,8 @@
 
 #include "Base/Global.h"
 
-#include "Core/RootBus/HostBridge/PCIBridge/PCIBridge.h"
-#include "Core/RootBus/HostBridge/PCIBridge/PCIDevice.h"
+#include "Core/PCI/Bridge/PCIBridge.h"
+#include "Core/PCI/PCIDevice.h"
 
 #include "Core/XCPU/UART.h"
 
