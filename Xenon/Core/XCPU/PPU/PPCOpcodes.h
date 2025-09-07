@@ -4,7 +4,7 @@
 
 #include "PPCInternal.h"
 #include "Core/XCPU/PPU/PowerPC.h"
-#include "Core/XCPU/PPU/PPU_JIT.h"
+#include "Core/XCPU/JIT/PPU_JIT.h"
 
 namespace PPCInterpreter {
 //

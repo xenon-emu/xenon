@@ -5,7 +5,7 @@
 #include "Base/Logging/Log.h"
 
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
-#include "Core/XCPU/PPU/PPU_JIT.h"
+#include "Core/XCPU/JIT/PPU_JIT.h"
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
 using namespace asmjit;

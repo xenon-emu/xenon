@@ -19,7 +19,7 @@
 #include "Core/PCI/SATA.h"
 #include "Core/PCI/Bridge/PCIBridge.h"
 #include "Core/PCI/PCIDevice.h"
-#include "Core/XCPU/Interpreter/PPCInternal.h"
+#include "Core/XCPU/PPU/PPCInternal.h"
 
 #define ODD_DEV_SIZE 0x30
 

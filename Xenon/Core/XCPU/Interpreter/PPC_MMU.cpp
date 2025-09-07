@@ -2,7 +2,7 @@
 
 #include "Base/Global.h"
 #include "Core/PCI/Devices/NAND/NAND.h"
-#include "Core/XCPU/PostBus/PostBus.h"
+#include "Core/PCI/Devices/PostBus/PostBus.h"
 #include "Core/XCPU/Xenon.h"
 
 #include "PPCInterpreter.h"

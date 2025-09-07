@@ -11,8 +11,8 @@
 #include "Base/Thread.h"
 #include "Base/Logging/Log.h"
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
-#include "Core/XCPU/elf_abi.h"
-#include "PPU_JIT.h"
+#include "Core/XCPU/ElfABI.h"
+#include "Core/XCPU/JIT/PPU_JIT.h"
 
 // Clocks per instruction / Ticks per instruction
 static constexpr f64 cpi_a = -5.8868;

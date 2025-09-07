@@ -5,7 +5,6 @@
 #include "XenonMMU.h"
 
 namespace Xe::XCPU::MMU {
-
   ePageSize XenonMMU::GetCurrentPageSize(sPPEState* ppeState, bool L, u8 LP) {
     MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUGetPageSize", MP_AUTO);
 

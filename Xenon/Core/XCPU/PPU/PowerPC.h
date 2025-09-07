@@ -9,7 +9,7 @@
 #include "Base/Bitfield.h"
 #include "Base/LRUCache.h"
 #include "Base/Vector128.h"
-#include "Core/XCPU/XenonReservations.h"
+#include "Core/XCPU/Context/Reservations/XenonReservations.h"
 
 
 // PowerPC Opcode definitions

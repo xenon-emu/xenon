@@ -13,7 +13,7 @@
 #include "Core/PCI/Bridge/PCIBridge.h"
 #include "Core/PCI/PCIDevice.h"
 
-#include "Core/XCPU/UART.h"
+#include "Core/XCPU/UART/UART.h"
 
 /*
   Xenon System Management Controller (SMC) Emulation:

@@ -2,12 +2,12 @@
 
 #pragma once
 
-#include "PPCInternal.h"
-
 #include "PPC_Instruction.h"
-#include "PPCOpcodes.h"
 
-#include "Core/XCPU/XenonContext.h"
+#include "Core/XCPU/PPU/PPCInternal.h"
+#include "Core/XCPU/PPU/PPCOpcodes.h"
+
+#include "Core/XCPU/Context/XenonContext.h"
 #include "Core/RootBus/RootBus.h"
 #include "Core/XCPU/PPU/PowerPC.h"
 

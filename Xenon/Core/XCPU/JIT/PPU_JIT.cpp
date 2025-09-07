@@ -4,12 +4,12 @@
 #include "Base/Global.h"
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
-#include "Core/XCPU/Interpreter/JIT/x86_64/JITEmitter_Helpers.h"
+#include "Core/XCPU/JIT/x86_64/JITEmitter_Helpers.h"
 #endif
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
-#include "Core/XCPU/Interpreter/PPCInternal.h"
+#include "Core/XCPU/PPU/PPCInternal.h"
 #include "Core/XCPU/Xenon.h"
-#include "PPU.h"
+#include "Core/XCPU/PPU/PPU.h"
 #include "PPU_JIT.h"
 
 //
@@ -93,7 +93,7 @@ void PPU_JIT::SetupPrologue(JITBlockBuilder *b, u32 instrData, u32 decoded) {
 }
 
 // Function Call Epilogue.
-bool CallEpilogue(PPU* ppu, sPPEState* ppeState) {
+bool CallEpilogue(PPU *ppu, sPPEState *ppeState) {
   // Check timebase and update if enabled.
   ppu->CheckTimeBaseStatus();
 
@@ -261,7 +261,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
   // Reset CIA and NIA.
   curThread.CIA = blockStartAddress - 4;
   curThread.NIA = blockStartAddress;
-  jitBuilder->size = instrCount * 4;
+  jitBuilder->size = instrCount  *4;
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
   compiler.ret();
@@ -302,7 +302,7 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
     auto &thread = curThread;
 
     // Quick way of skiping function calls:
-    // This *must* be done here simply because of how we handle JIT.
+    // This *must *be done here simply because of how we handle JIT.
     // We run until the start of a block, which is a branch opcode (or until it's a invalid instruction),
     // but these are branch opcodes, designed to avoid calling them.
     // So, these will break under BuildJITBlock, and to avoid the issue, it's done here
@@ -343,7 +343,7 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
       if (block->size % 8 == 0) {
         for (u64 i = 0; i < block->size / 8; i++) {
           thread.instrFetch = true;
-          u64 val = PPCInterpreter::MMURead64(ppeState, block->ppuAddress + i * 8);
+          u64 val = PPCInterpreter::MMURead64(ppeState, block->ppuAddress + i  *8);
           thread.instrFetch = false;
           u64 top = val >> 32;
           u64 bottom = val & 0xFFFFFFFF;
@@ -352,7 +352,7 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
       } else {
         for (u64 i = 0; i != block->size / 4; i++) {
           thread.instrFetch = true;
-          sum += PPCInterpreter::MMURead32(ppeState, block->ppuAddress + i * 4);
+          sum += PPCInterpreter::MMURead32(ppeState, block->ppuAddress + i  *4);
           thread.instrFetch = false;
         }
       }

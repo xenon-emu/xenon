@@ -15,8 +15,8 @@
 #include "Base/Hash.h"
 #include "Base/Logging/Log.h"
 #include "Core/XCPU/PPU/PowerPC.h"
-#include "Core/XCPU/Interpreter/PPCOpcodes.h"
-#include "Core/XCPU/PPU/PPU_JIT.h"
+#include "Core/XCPU/PPU/PPCOpcodes.h"
+#include "Core/XCPU/JIT/PPU_JIT.h"
 
 constexpr u64 PPCRotateMask(u32 mb, u32 me) {
   const u64 mask = ~0ULL << (~(me - mb) & 63);

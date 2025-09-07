@@ -3,7 +3,7 @@
 #pragma once
 
 #include "Core/XCPU/PPU/PowerPC.h"
-#include "Core/XCPU/XenonContext.h"
+#include "Core/XCPU/Context/XenonContext.h"
 
 namespace Xe::XCPU::MMU {
   // The CELL B/E manual states that any CELL arch based PPE's (like the ones inside the Xenon CPU) can have the

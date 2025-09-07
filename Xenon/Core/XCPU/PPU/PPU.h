@@ -5,9 +5,9 @@
 #include <memory>
 
 #include "PowerPC.h"
-#include "Core/XCPU/XenonContext.h"
+#include "Core/XCPU/Context/XenonContext.h"
 #include "Core/RootBus/RootBus.h"
-#include "Core/XCPU/XenonMMU/XenonMMU.h"
+#include "Core/XCPU/MMU/XenonMMU.h"
 
 class PPU_JIT;
 

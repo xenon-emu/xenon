@@ -10,7 +10,7 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPa
   xenonContext = std::make_unique<STRIP_UNIQUE(xenonContext)>(inBus, ramPtr); // Threads 0-1
 
   // Set SROM to 0.
-  memset(xenonContext->SROM, 0, XE_SROM_SIZE);
+  memset(xenonContext->SROM.get(), 0, XE_SROM_SIZE);
 
   // Populate FuseSet
   {
@@ -55,8 +55,7 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPa
     if (!file.is_open()) {
       LOG_CRITICAL(Xenon, "Unable to open file: {} for reading. Check your file path. System Stopped!", blPath);
       Base::SystemPause();
-    }
-    else {
+    } else {
       u64 fileSize = 0;
       // fs::file_size can cause a exception if it is not a valid file
       try {
@@ -66,13 +65,12 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPa
           fileSize = 0;
           LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of {} (Error: {})", blPath, ec.message());
         }
-      }
-      catch (const std::exception& ex) {
+      } catch (const std::exception &ex) {
         LOG_ERROR(Base_Filesystem, "Exception trying to get file size. Reason: {}", ex.what());
         return;
       }
       if (fileSize == XE_SROM_SIZE) {
-        file.read(reinterpret_cast<char*>(xenonContext->SROM), XE_SROM_SIZE);
+        file.read(reinterpret_cast<char*>(xenonContext->SROM.get()), XE_SROM_SIZE);
         LOG_INFO(Xenon, "1BL Loaded.");
       }
     }
@@ -92,8 +90,7 @@ Xenon::~Xenon() {
   ppu0.reset();
   ppu1.reset();
   ppu2.reset();
-  delete[] xenonContext->SRAM;
-  delete[] xenonContext->SROM;
+  xenonContext.reset();
 }
 
 void Xenon::Start(u64 resetVector) {
@@ -149,8 +146,7 @@ void Xenon::LoadElf(const std::string path) {
       fileSize = 0;
       LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of {} (Error: {})", filePath.string(), ec.message());
     }
-  }
-  catch (const std::exception& ex) {
+  } catch (const std::exception &ex) {
     LOG_ERROR(Base_Filesystem, "Exception trying to get file size. Exception: {}",
       ex.what());
     return;
