@@ -15,7 +15,7 @@
 
 // Global running state
 inline volatile bool XeRunning{ true };
-inline std::atomic<bool> XeShutdonSignaled{ false };
+inline std::atomic<bool> XeShutdownSignaled{ false };
 // Global paused state
 inline std::atomic<bool> XePaused{ false };
 

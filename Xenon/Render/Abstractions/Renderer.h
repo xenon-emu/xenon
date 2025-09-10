@@ -54,7 +54,7 @@ struct BufferLoadJob {
 
 class Renderer {
 public:
-  Renderer(RAM *ram);
+  Renderer();
   virtual ~Renderer() = default;
   virtual void BackendSDLProperties(SDL_PropertiesID properties) = 0;
   virtual void BackendStart() = 0;
@@ -82,7 +82,7 @@ public:
   virtual u32 GetBackendID() = 0;
   void SDLInit();
 
-  void Start();
+  void Start(RAM *ram);
   void CreateHandles();
   void Shutdown();
   void Resize(u32 x, u32 y);
@@ -163,8 +163,6 @@ public:
   std::atomic<u32> waitTime = 0;
   // Internal swap counter
   std::atomic<u32> swapCount;
-  std::mutex frameReadyMutex;
-  std::condition_variable frameReadyCondVar;
   bool frameReady = false;
 
   // Shaders

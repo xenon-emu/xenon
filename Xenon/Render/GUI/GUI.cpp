@@ -905,9 +905,7 @@ void LogSettings(Render::GUI *gui) {
 
 void GraphicsSettings(Render::GUI *gui) {
   gui->Toggle("Enable", &Config::rendering.enable);
-  gui->Tooltip("Enable GPU Rendering thread (Disabling this will kill rendering on next startup)");
-  gui->Toggle("Enable GUI", &Config::rendering.enableGui);
-  gui->Tooltip("Whether to create the GUI handle");
+  gui->Tooltip("Enable GPU Rendering thread (Disabling this will kill rendering)");
   if (gui->Toggle("Fullscreen", &Config::rendering.isFullscreen)) {
     XeMain::renderer->fullscreen = Config::rendering.isFullscreen;
     SDL_SetWindowFullscreen(gui->mainWindow, XeMain::renderer->fullscreen);

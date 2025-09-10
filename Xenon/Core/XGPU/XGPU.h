@@ -43,7 +43,7 @@ public:
   bool IsAddressMappedInBAR(u32 address);
 
   // Dump framebuffer from RAM
-  void DumpFB(const std::filesystem::path &path, int pitch);
+  void DumpFB(const std::filesystem::path &path, s32 pitch);
 
   u32 GetSurface() {
     return xenosState->fbSurfaceAddress;

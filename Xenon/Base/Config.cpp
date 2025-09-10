@@ -17,7 +17,6 @@ namespace Config {
 #define verify_value(x) if (prev_##x != x) { LOG_INFO(Config, "Value '{}' didn't match!", #x); return false; }
 void _rendering::from_toml(const toml::value &value) {
   enable = toml::find_or<bool>(value, "Enable", enable);
-  enableGui = toml::find_or<bool>(value, "EnableGUI", enableGui);
   window.from_toml("Resolution", value);
   isFullscreen = toml::find_or<bool>(value, "Fullscreen", isFullscreen);
   vsync = toml::find_or<bool>(value, "VSync", vsync);
@@ -31,9 +30,6 @@ void _rendering::to_toml(toml::value &value) {
   value["Enable"].comments().clear();
   value["Enable"] = enable;
   value["Enable"].comments().push_back("# Enables/disables rendering entirely");
-  value["EnableGUI"].comments().clear();
-  value["EnableGUI"] = enableGui;
-  value["EnableGUI"].comments().push_back("# Enables/disables GUI creation");
   value["Resolution"].comments().clear();
   window.to_toml(value["Resolution"]);
   value["Resolution"].comments().push_back("# Window Resolution");
@@ -62,7 +58,6 @@ void _rendering::to_toml(toml::value &value) {
 bool _rendering::verify_toml(toml::value &value) {
   to_toml(value);
   cache_value(enable);
-  cache_value(enableGui);
   cache_value(window);
   cache_value(isFullscreen);
   cache_value(vsync);
@@ -73,7 +68,6 @@ bool _rendering::verify_toml(toml::value &value) {
   cache_value(debugValidation);
   from_toml(value);
   verify_value(enable);
-  verify_value(enableGui);
   verify_value(window.width);
   verify_value(window.height);
   verify_value(isFullscreen);
@@ -121,12 +115,8 @@ void _debug::from_toml(const toml::value &value) {
   haltOnReadAddress = toml::find_or<u64&>(value, "HaltOnRead", haltOnReadAddress);
   haltOnWriteAddress = toml::find_or<u64&>(value, "HaltOnWrite", haltOnWriteAddress);
   haltOnAddress = toml::find_or<u64&>(value, "HaltOnAddress", haltOnAddress);
-  haltOnSlbMiss = toml::find_or<bool>(value, "HaltOnSLBMiss", haltOnSlbMiss);
-  haltOnExceptions = toml::find_or<bool>(value, "HaltOnExceptions", haltOnExceptions);
   startHalted = toml::find_or<bool>(value, "StartHalted", startHalted);
   softHaltOnAssertions = toml::find_or<bool>(value, "SoftHaltOnAssertions", softHaltOnAssertions);
-  haltOnInvalidInstructions = toml::find_or<bool>(value, "HaltOnInvalidInstructions", haltOnInvalidInstructions);
-  haltOnGuestAssertion = toml::find_or<bool>(value, "HaltOnGuestAssertion", haltOnGuestAssertion);
   autoContinueOnGuestAssertion = toml::find_or<bool>(value, "AutoContinueOnGuestAssertion", autoContinueOnGuestAssertion);
 #ifdef DEBUG_BUILD
   createTraceFile = toml::find_or<bool>(value, "CreateTraceFile", createTraceFile);
@@ -145,12 +135,6 @@ void _debug::to_toml(toml::value &value) {
   value["HaltOnAddress"] = haltOnAddress;
   value["HaltOnAddress"].as_integer_fmt().fmt = toml::integer_format::hex;
   value["HaltOnAddress"].comments().push_back("# Address to halt on when the CPU executes this address");
-  value["HaltOnSLBMiss"].comments().clear();
-  value["HaltOnSLBMiss"] = haltOnSlbMiss;
-  value["HaltOnSLBMiss"].comments().push_back("# Halts when a SLB cache misses");
-  value["HaltOnExceptions"].comments().clear();
-  value["HaltOnExceptions"] = haltOnExceptions;
-  value["HaltOnExceptions"].comments().push_back("# Halts on every exception (TODO: Separate toggles)");
   value["StartHalted"].comments().clear();
   value["StartHalted"] = startHalted;
   value["StartHalted"].comments().push_back("# Starts with the CPU halted");
@@ -158,12 +142,6 @@ void _debug::to_toml(toml::value &value) {
   value["SoftHaltOnAssertions"] = softHaltOnAssertions;
   value["SoftHaltOnAssertions"].comments().push_back("# Soft-halts on asserts, in cases like implemented instructions");
   value["SoftHaltOnAssertions"].comments().push_back("# Disabling this causes assertions to do nothing");
-  value["HaltOnInvalidInstructions"].comments().clear();
-  value["HaltOnInvalidInstructions"] = haltOnInvalidInstructions;
-  value["HaltOnInvalidInstructions"].comments().push_back("# Halts the PPU core on invalid instructions");
-  value["HaltOnGuestAssertion"].comments().clear();
-  value["HaltOnGuestAssertion"] = haltOnGuestAssertion;
-  value["HaltOnGuestAssertion"].comments().push_back("# Halts whenever a guest causes a TRAP opcode for asserting");
   value["AutoContinueOnGuestAssertion"].comments().clear();
   value["AutoContinueOnGuestAssertion"] = autoContinueOnGuestAssertion;
   value["AutoContinueOnGuestAssertion"].comments().push_back("# Automatically continues on guest assertion");
@@ -179,12 +157,8 @@ bool _debug::verify_toml(toml::value &value) {
   cache_value(haltOnReadAddress);
   cache_value(haltOnWriteAddress);
   cache_value(haltOnAddress);
-  cache_value(haltOnSlbMiss);
-  cache_value(haltOnExceptions);
   cache_value(startHalted);
   cache_value(softHaltOnAssertions);
-  cache_value(haltOnInvalidInstructions);
-  cache_value(haltOnGuestAssertion);
   cache_value(autoContinueOnGuestAssertion);
 #ifdef DEBUG_BUILD
   cache_value(createTraceFile);
@@ -193,12 +167,8 @@ bool _debug::verify_toml(toml::value &value) {
   verify_value(haltOnReadAddress);
   verify_value(haltOnWriteAddress);
   verify_value(haltOnAddress);
-  verify_value(haltOnSlbMiss);
-  verify_value(haltOnExceptions);
   verify_value(startHalted);
   verify_value(softHaltOnAssertions);
-  verify_value(haltOnInvalidInstructions);
-  verify_value(haltOnGuestAssertion);
   verify_value(autoContinueOnGuestAssertion);
 #ifdef DEBUG_BUILD
   verify_value(createTraceFile);

@@ -18,8 +18,7 @@
 
 namespace Render {
 
-Renderer::Renderer(RAM *ram) :
-  ramPointer(ram),
+Renderer::Renderer() :
   width(TILE(Config::rendering.window.width)),
   height(TILE(Config::rendering.window.height)),
   VSYNC(Config::rendering.vsync),
@@ -27,7 +26,6 @@ Renderer::Renderer(RAM *ram) :
 {}
 
 void Renderer::SDLInit() {
-  MICROPROFILE_SCOPEI("[Xe::Render]", "SDLInit", MP_AUTO);
   // Init SDL Events, Video, Joystick, and Gamepad
   if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
     LOG_ERROR(Xenon, "Failed to initialize SDL: {}", SDL_GetError());
@@ -67,16 +65,18 @@ void Renderer::SDLInit() {
   windowID = SDL_GetWindowID(mainWindow);
 }
 
-void Renderer::Start() {
-  MICROPROFILE_SCOPEI("[Xe::Render]", "Start", MP_AUTO);
-  // Create thread and SDL
-  SDLInit();
-  thread = std::thread(&Renderer::Thread, this);
-  thread.detach();
+void Renderer::Start(RAM *ram) {
+  ramPointer = ram;
+  // Should we render?
+  threadRunning = Config::rendering.enable && XeRunning;
+  if (threadRunning) {
+    SDLInit();
+    thread = std::thread(&Renderer::Thread, this);
+    thread.detach();
+  }
 }
 
 void Renderer::CreateHandles() {
-  MICROPROFILE_SCOPEI("[Xe::Render]", "Create", MP_AUTO);
   // Create factories
   BackendStart();
 
@@ -93,17 +93,14 @@ void Renderer::CreateHandles() {
   pixelSSBO->Bind();
 
   // Create our GUI
-  if (Config::rendering.enableGui) {
-    gui = resourceFactory->CreateGUI();
-    gui->Init(mainWindow, reinterpret_cast<void*>(GetBackendContext()));
-    imguiCreated = true;
-  }
+  gui = resourceFactory->CreateGUI();
+  gui->Init(mainWindow, reinterpret_cast<void*>(GetBackendContext()));
+  imguiCreated = true;
 }
 
 void Renderer::Shutdown() {
-  if (Config::rendering.enableGui) {
+  if (gui)
     gui->Shutdown();
-  }
   threadRunning = false;
   backbuffer->DestroyTexture();
   pixelSSBO->DestroyBuffer();
@@ -162,8 +159,8 @@ void Renderer::HandleEvents() {
     focusLost = flag & SDL_WINDOW_INPUT_FOCUS ? false : true;
   }
   // Process events.
-  while (XeRunning && SDL_PollEvent(&windowEvent)) {
-    if (Config::rendering.enableGui && imguiCreated) {
+  while (threadRunning && SDL_PollEvent(&windowEvent)) {
+    if (imguiCreated) {
       ImGui_ImplSDL3_ProcessEvent(&windowEvent);
     }
     switch (windowEvent.type) {
@@ -453,11 +450,6 @@ void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
 void Renderer::Thread() {
   // Set thread name
   Base::SetCurrentThreadName("[Xe] Render");
-  // Should we render?
-  threadRunning = Config::rendering.enable;
-  if (!threadRunning) {
-    return;
-  }
 
   // Setup SDL handles (thread-specific)
   BackendSDLInit();
@@ -466,180 +458,150 @@ void Renderer::Thread() {
   CreateHandles();
 
   // Main loop
-  while (threadRunning && XeRunning) {
-    // Start Profile
-    MICROPROFILE_SCOPEI("[Xe::Render]", "Loop", MP_AUTO);
-
+  while (threadRunning) {
+    threadRunning = Config::rendering.enable && XeRunning;
     // Exit early if needed
-    if (!threadRunning || !XeRunning)
+    if (!threadRunning)
       break;
 
-    // Buffer load
-    {
-      std::lock_guard<std::mutex> lock(bufferQueueMutex);
-      while (!bufferLoadQueue.empty()) {
-        BufferLoadJob job = bufferLoadQueue.front();
-        bufferLoadQueue.pop();
+//    // Buffer load
+//    {
+//      std::lock_guard<std::mutex> lock(bufferQueueMutex);
+//      while (!bufferLoadQueue.empty()) {
+//        BufferLoadJob job = bufferLoadQueue.front();
+//        bufferLoadQueue.pop();
+//
+//        auto &bufferEntry = createdBuffers[job.hash];
+//        if (bufferEntry) {
+//          bufferEntry->UpdateBuffer(0, static_cast<u32>(job.data.size()), job.data.data());
+//#ifdef XE_DEBUG
+//          LOG_DEBUG(Xenos, "Updated buffer '{}', size: {}", job.name, job.data.size());
+//#endif
+//        } else {
+//          bufferEntry = resourceFactory->CreateBuffer();
+//          bufferEntry->CreateBuffer(static_cast<u32>(job.data.size()), job.data.data(), job.usage, job.type);
+//#ifdef XE_DEBUG
+//          LOG_DEBUG(Xenos, "Created buffer '{}', size: {}", job.name, job.data.size());
+//#endif
+//        }
+//      }
+//    }
+//
+//    if (readyToLink.load()) {
+//      const bool hasVS = pendingVertexShaders.contains(pendingVertexShader);
+//      const bool hasPS = pendingPixelShaders.contains(pendingPixelShader);
+//
+//      if (hasVS && hasPS) {
+//        u64 combined = (static_cast<u64>(pendingVertexShader) << 32) | pendingPixelShader;
+//#ifdef XE_DEBUG
+//        LOG_DEBUG(Xenos, "Linking VS: 0x{:08X}, PS: 0x{:08X}", pendingVertexShader, pendingPixelShader);
+//#endif
+//        TryLinkShaderPair(pendingVertexShader, pendingPixelShader);
+//        readyToLink.store(false);
+//      }
+//    }
 
-        auto &bufferEntry = createdBuffers[job.hash];
-        if (bufferEntry) {
-          bufferEntry->UpdateBuffer(0, static_cast<u32>(job.data.size()), job.data.data());
-#ifdef XE_DEBUG
-          LOG_DEBUG(Xenos, "Updated buffer '{}', size: {}", job.name, job.data.size());
-#endif
-        } else {
-          bufferEntry = resourceFactory->CreateBuffer();
-          bufferEntry->CreateBuffer(static_cast<u32>(job.data.size()), job.data.data(), job.usage, job.type);
-#ifdef XE_DEBUG
-          LOG_DEBUG(Xenos, "Created buffer '{}', size: {}", job.name, job.data.size());
-#endif
-        }
-      }
-    }
-
-    if (readyToLink.load()) {
-      const bool hasVS = pendingVertexShaders.contains(pendingVertexShader);
-      const bool hasPS = pendingPixelShaders.contains(pendingPixelShader);
-
-      if (hasVS && hasPS) {
-        u64 combined = (static_cast<u64>(pendingVertexShader) << 32) | pendingPixelShader;
-#ifdef XE_DEBUG
-        LOG_DEBUG(Xenos, "Linking VS: 0x{:08X}, PS: 0x{:08X}", pendingVertexShader, pendingPixelShader);
-#endif
-        TryLinkShaderPair(pendingVertexShader, pendingPixelShader);
-        readyToLink.store(false);
-      }
-    }
-
-    // Copy job
-    {
-      std::lock_guard<std::mutex> lock(copyQueueMutex);
-      if (!copyQueue.empty()) {
-        IssueCopy(copyQueue.front());
-        copyQueue.pop();
-      }
-    }
+    //// Copy job
+    //{
+    //  std::lock_guard<std::mutex> lock(copyQueueMutex);
+    //  if (!copyQueue.empty()) {
+    //    IssueCopy(copyQueue.front());
+    //    copyQueue.pop();
+    //  }
+    //}
 
     // Clear the display
     if (XeMain::xenos)
       Clear();
 
-    if (XeMain::xenos && XeMain::xenos->RenderingTo2DFramebuffer() && !focusLost) {
-      fbPointer = ramPointer->GetPointerToAddress(XeMain::xenos->GetSurface());
+    //if (XeMain::xenos && XeMain::xenos->RenderingTo2DFramebuffer()) {
+    //  if (ramPointer) {
+    //    fbPointer = ramPointer->GetPointerToAddress(XeMain::xenos->GetSurface());
+    //    const u32 *ui_fbPointer = reinterpret_cast<const u32 *>(fbPointer);
+    //    pixelSSBO->UpdateBuffer(0, pitch, ui_fbPointer);
+    //
+    //    computeShaderProgram->Bind();
+    //    pixelSSBO->Bind();
+    //
+    //    if (XeMain::xenos) {
+    //      computeShaderProgram->SetUniformInt("internalWidth", XeMain::xenos->GetWidth());
+    //      computeShaderProgram->SetUniformInt("internalHeight", XeMain::xenos->GetHeight());
+    //    }
+    //    computeShaderProgram->SetUniformInt("resWidth", width);
+    //    computeShaderProgram->SetUniformInt("resHeight", height);
+    //    OnCompute();
+    //    renderShaderPrograms->Bind();
+    //    backbuffer->Bind();
+    //    OnBind();
+    //    backbuffer->Unbind();
+    //    renderShaderPrograms->Unbind();
+    //  }
+    //
+    //  // Frame sync
+    //  std::vector<DrawJob> currentFrameJobs;
+    //  {
+    //    std::lock_guard<std::mutex> lock(drawQueueMutex);
+    //    while (!drawQueue.empty()) {
+    //      currentFrameJobs.push_back(std::move(drawQueue.front()));
+    //      drawQueue.pop();
+    //    }
+    //  }
+    //
+    //  if (!currentFrameJobs.empty()) {
+    //    previousJobs = std::move(currentFrameJobs);
+    //  }
+    //
+    //  for (const auto &drawJob : previousJobs) {
+    //    u64 combinedHash = (static_cast<u64>(drawJob.shaderVS) << 32) | drawJob.shaderPS;
+    //    auto shaderIt = linkedShaderPrograms.find(combinedHash);
+    //    if (shaderIt != linkedShaderPrograms.end() && shaderIt->second.program) {
+    //      shaderIt->second.program->Bind();
+    //      if (drawJob.indexed) {
+    //        DrawIndexed(shaderIt->second, drawJob.params, drawJob.params.indexBufferInfo);
+    //      } else {
+    //        Draw(shaderIt->second, drawJob.params);
+    //      }
+    //    }frameReadyV
+    //  }
+    //}
 
-      {
-        MICROPROFILE_SCOPEI("[Xe::Render]", "Deswizle", MP_AUTO);
-        const u32 *ui_fbPointer = reinterpret_cast<const u32*>(fbPointer);
-        pixelSSBO->UpdateBuffer(0, pitch, ui_fbPointer);
-      }
-
-      computeShaderProgram->Bind();
-      pixelSSBO->Bind();
-
-      if (XeMain::xenos) {
-        computeShaderProgram->SetUniformInt("internalWidth", XeMain::xenos->GetWidth());
-        computeShaderProgram->SetUniformInt("internalHeight", XeMain::xenos->GetHeight());
-      }
-      computeShaderProgram->SetUniformInt("resWidth", width);
-      computeShaderProgram->SetUniformInt("resHeight", height);
-      OnCompute();
-
-      {
-        MICROPROFILE_SCOPEI("[Xe::Render]", "BindTexture", MP_AUTO);
-        renderShaderPrograms->Bind();
-        backbuffer->Bind();
-        OnBind();
-        backbuffer->Unbind();
-        renderShaderPrograms->Unbind();
-      }
-    }
-
-    // Frame sync
-    if (XeMain::xenos && !XeMain::xenos->RenderingTo2DFramebuffer()) {
-      std::vector<DrawJob> currentFrameJobs;
-      {
-        std::lock_guard<std::mutex> lock(drawQueueMutex);
-        while (!drawQueue.empty()) {
-          currentFrameJobs.push_back(std::move(drawQueue.front()));
-          drawQueue.pop();
-        }
-      }
-
-      static int emptyDrawCount = 0;
-      if (!currentFrameJobs.empty()) {
-        emptyDrawCount = 0;
-        previousJobs = std::move(currentFrameJobs);
-      } else if (previousJobs.empty()) {
-        if (++emptyDrawCount > 5) {
-          LOG_WARNING(Xenos, "Draw queue was empty too many frames in a row");
-        }
-        if (XeMain::xenos && !XeMain::xenos->RenderingTo2DFramebuffer()) {
-          // If there's no previous frame to reuse, skip rendering
-          continue;
-        }
-      }
-      std::unique_lock<std::mutex> lock(frameReadyMutex);
-      frameReadyCondVar.wait_for(lock, 10s, [this] { return frameReady || !XeRunning; });
-      frameReady = false;
-
-      for (const auto &drawJob : previousJobs) {
-        u64 combinedHash = (static_cast<u64>(drawJob.shaderVS) << 32) | drawJob.shaderPS;
-        auto shaderIt = linkedShaderPrograms.find(combinedHash);
-        if (shaderIt != linkedShaderPrograms.end() && shaderIt->second.program) {
-          shaderIt->second.program->Bind();
-          if (drawJob.indexed) {
-            DrawIndexed(shaderIt->second, drawJob.params, drawJob.params.indexBufferInfo);
-          } else {
-            Draw(shaderIt->second, drawJob.params);
-          }
-        }
-      }
-    }
-
-    if (waiting) {
-      waiting = false;
-      if (waitTime >= 0x100) {
-        // Wait
-        std::this_thread::sleep_for(std::chrono::milliseconds(waitTime / 0x100));
-      } else {
-        // Yield
-        std::this_thread::yield();
-      }
-    }
+    //if (waiting) {
+    //  waiting = false;
+    //  if (waitTime >= 0x100) {
+    //    std::this_thread::sleep_for(std::chrono::milliseconds(waitTime / 0x100));
+    //  } else {
+    //    std::this_thread::yield();
+    //  }
+    //}
 
     // Render the GUI
-    if (Config::rendering.enableGui && gui.get() && !focusLost) {
-      MICROPROFILE_SCOPEI("[Xe::Render::GUI]", "Render", MP_AUTO);
+    if (gui.get() && !focusLost) {
       gui->Render(backbuffer.get());
     }
 
     // Swap
-    MICROPROFILE_SCOPEI("[Xe::Render]", "Swap", MP_AUTO);
-    swapCount.fetch_add(1);
+    //swapCount.fetch_add(1);
     OnSwap(mainWindow);
   }
 }
 
 bool Renderer::DebuggerActive() {
-  if (!gui.get())
-    return false;
-  for (bool &a : gui.get()->ppcDebuggerActive) {
-    if (a) {
+  for (s32 i = gui.get() ? 2 : 0; i; --i) {
+    if (gui->ppcDebuggerActive[i])
       return true;
-    }
   }
   return false;
 }
 
 void Renderer::SetDebuggerActive(s8 specificPPU) {
-  if (gui.get()) {
-    if (specificPPU != -1) {
-      for (bool &a : gui.get()->ppcDebuggerActive) {
-        a = true;
-      }
-    } else if (specificPPU <= 3 && specificPPU > 0) {
-      gui.get()->ppcDebuggerActive[specificPPU - 1] = true;
+  if (specificPPU != -1) {
+    for (s32 i = gui.get() ? 2 : 0; i; --i) {
+      gui->ppcDebuggerActive[i] = true;
     }
+  }
+
+  if (gui && (specificPPU <= 3 && specificPPU > 0)) {
+    gui->ppcDebuggerActive[specificPPU - 1] = true;
   }
 }
 

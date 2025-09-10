@@ -18,40 +18,41 @@ s32 main(s32 argc, char *argv[]) {
     ::Base::Param::Help();
     return 0;
   }
+#if MICROPROFILE_ENABLED
   // Enable profiling
   MicroProfileSetEnableAllGroups(true);
   MicroProfileSetForceMetaCounters(true);
 #if AUTO_FLIP
   MicroProfileStartAutoFlip(30);
-#endif
+#endif // AUTO_FLIP
+#endif // MICROPROFILE_ENABLED
   // Set thread name
   Base::SetCurrentThreadName("[Xe] Main");
-  // Define profiler
-  {
-    // Create all handles
-    XeMain::Create();
-    // Setup hangup
-    if (Base::InstallHangup() != 0) {
-      LOG_CRITICAL(System, "Failed to install signal handler. Clean shutdown is not possible through console");
-    }
-    // Start execution of the emulator
-    XeMain::StartCPU();
+  // Setup hangup
+  if (Base::InstallHangup() != 0) {
+    printf("Failed to install signal handler. Clean shutdown is not possible through console\n");
   }
+  // Create all handles
+  XeMain::Create();
+  // Give errors a second to catch up, incase of the async backend
+  std::this_thread::sleep_for(100ms);
+  // Start execution of the emulator
+  XeMain::StartCPU();
   // Inf wait until told otherwise
   while (XeRunning) {
-#if MICROPROFILE_ENABLED == 1 && AUTO_FLIP == 0
+#if MICROPROFILE_ENABLED && !AUTO_FLIP
     MicroProfileFlip(nullptr);
-#endif
+#endif // MICROPROFILE_ENABLED && !AUTO_FLIP
 #ifndef NO_GFX
     if (XeMain::renderer.get())
       XeMain::renderer->HandleEvents();
-#endif
-    std::this_thread::sleep_for(100ms);
-  }
-  if (Base::RemoveHangup() != 0) {
-    LOG_WARNING(System, "Failed to remove signal handler. Ign");
+#endif // !NO_GFX
   }
   // Shutdown
   XeMain::Shutdown();
+  // Remove hangup
+  if (Base::RemoveHangup() != 0) {
+    printf("Failed to remove signal handler. (this is more of a warning, than an issue)\n");
+  }
   return 0;
 }

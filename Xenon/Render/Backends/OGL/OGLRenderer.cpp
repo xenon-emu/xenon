@@ -13,10 +13,6 @@
 #ifndef NO_GFX
 namespace Render {
 
-OGLRenderer::OGLRenderer(RAM *ram) :
-  Renderer(ram)
-{}
-
 std::string OGLRenderer::GLVersion() const {
   return reinterpret_cast<const char *>(glGetString(GL_VERSION));
 }

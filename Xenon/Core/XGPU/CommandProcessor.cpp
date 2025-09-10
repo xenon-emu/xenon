@@ -688,13 +688,6 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
     LOG_WARNING(Xenos, "[CP::IM_LOAD] Unknown shader type '{}'", static_cast<u32>(shaderType));
   } break;
   }
-#ifndef NO_GFX
-  {
-    std::lock_guard<std::mutex> lock(render->frameReadyMutex);
-    render->frameReady = true;
-  }
-  render->frameReadyCondVar.notify_one();
-#endif
 
   return true;
 }
@@ -746,13 +739,6 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuff
     LOG_WARNING(Xenos, "[CP::IM_LOAD_IMMEDIATE] Unknown shader type '{}'", static_cast<u32>(shaderType));
   } break;
   }
-#ifndef NO_GFX
-  {
-    std::lock_guard<std::mutex> lock(render->frameReadyMutex);
-    render->frameReady = true;
-  }
-  render->frameReadyCondVar.notify_one();
-#endif
 
   return true;
 }
@@ -844,13 +830,6 @@ bool CommandProcessor::ExecutePacketType3_EVENT_WRITE_SHD(RingBuffer *ringBuffer
   // Writeback
   state->vgtDrawInitiator.hexValue = initiator & 0x3F;
 
-#ifndef NO_GFX
-  {
-    std::lock_guard<std::mutex> lock(render->frameReadyMutex);
-    render->frameReady = true;
-  }
-  render->frameReadyCondVar.notify_one();
-#endif
   u32 writeValue = 0;
   if ((initiator >> 31) & 0x1) {
 #ifndef NO_GFX
@@ -1088,11 +1067,6 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
         std::lock_guard<std::mutex> lock(render->copyQueueMutex);
         render->copyQueue.push(state);
       }
-      {
-        std::lock_guard<std::mutex> lock(render->frameReadyMutex);
-        render->frameReady = true;
-      }
-      render->frameReadyCondVar.notify_one(); // Wake up the renderer
 #endif
       return true;
     }
@@ -1133,13 +1107,6 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
       isIndexedDraw ? "Indexed" : "Auto",
       (u32)state->vgtDrawInitiator.primitiveType,
       state->vgtDrawInitiator.numIndices);
-#endif
-#ifndef NO_GFX
-    {
-      std::lock_guard<std::mutex> lock(render->frameReadyMutex);
-      render->frameReady = true;
-    }
-    render->frameReadyCondVar.notify_one();
 #endif
     state->ClearDirtyState();
   } else {
@@ -1208,7 +1175,7 @@ bool CommandProcessor::ExecutePacketType3_LOAD_ALU_CONSTANT(RingBuffer* ringBuff
 
   for (u32 n = 0; n < sizeInDwords; n++, index++) {
     u32 data = 0;
-    u8* dataPtr = ram->GetPointerToAddress(readAddress + n * 4);
+    u8 *dataPtr = ram->GetPointerToAddress(readAddress + n * 4);
     memcpy(&data, dataPtr, sizeof(data));
     state->WriteRegister(static_cast<XeRegister>(index), data);
   }

@@ -149,7 +149,7 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
     break;
   }
   case 0x16: {
-    if (Config::debug.haltOnGuestAssertion && XeMain::GetCPU()) {
+    if (Config::debug.softHaltOnAssertions && XeMain::GetCPU()) {
       LOG_XBOX(Xenon, "FATAL ERROR! Halting CPU...");
       PPU *PPU = XeMain::GetCPU()->GetPPU(ppuState->ppuID);
       if (PPU)
@@ -163,7 +163,7 @@ void PPCInterpreter::ppcInterpreterTrap(PPU_STATE *ppuState, u32 trapNumber) {
     ppcDebugLoadImageSymbols(ppuState, GPR(3), GPR(4));
     break;
   case 0x19: {
-    if (Config::debug.haltOnGuestAssertion) {
+    if (Config::debug.softHaltOnAssertions) {
 #ifndef NO_GFX
       if (XeMain::GetCPU()) {
         LOG_XBOX(Xenon, "Assertion! Halting CPU... (Continuing will cause execution to resume as normal)");

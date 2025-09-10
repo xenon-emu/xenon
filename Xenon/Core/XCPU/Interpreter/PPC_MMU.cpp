@@ -1036,10 +1036,6 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, PPU_STATE *ppuState,
         }
       }
     } else {
-      // Debug tools
-      if (Config::debug.haltOnSlbMiss && XeMain::GetCPU()) {
-        XeMain::GetCPU()->Halt();
-      }
       // SLB Miss
       // Data or Inst Segment Exception
       if (thread.instrFetch) {

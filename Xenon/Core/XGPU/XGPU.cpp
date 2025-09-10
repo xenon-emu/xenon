@@ -109,8 +109,6 @@ Xe::Xenos::XGPU::XGPU(Render::Renderer *renderer, RAM *ram, PCIBridge *pciBridge
   commandProcessor = std::make_unique<STRIP_UNIQUE(commandProcessor)>(ramPtr, xenosState.get(), render, parentBus);
   xenosState->commandProcessor = commandProcessor.get(); // CP expects xenosState, xenosState expects CP, this fixes it.
 
-  // VSync Worker thread.
-  xeVsyncWorkerThreadRunning = true;
   xeVSyncWorkerThread = std::thread(&XGPU::xeVSyncWorkerThreadLoop, this);
 }
 
@@ -241,13 +239,12 @@ bool Xe::Xenos::XGPU::IsAddressMappedInBAR(u32 address) {
   return false;
 }
 
-void Xe::Xenos::XGPU::DumpFB(const std::filesystem::path &path, int pitch) {
+void Xe::Xenos::XGPU::DumpFB(const std::filesystem::path &path, s32 pitch) {
   std::ofstream f(path, std::ios::out | std::ios::binary | std::ios::trunc);
   if (!f) {
     LOG_ERROR(Xenos, "Failed to open {} for writing", path.filename().string());
-  }
-  else {
-    f.write(reinterpret_cast<const char*>(ramPtr->GetPointerToAddress(xenosState->fbSurfaceAddress)), pitch);
+  } else {
+    f.write(reinterpret_cast<const char *>(ramPtr->GetPointerToAddress(xenosState->fbSurfaceAddress)), pitch);
     LOG_INFO(Xenos, "Framebuffer dumped to '{}'", path.string());
   }
   f.close();
@@ -261,6 +258,10 @@ void Xe::Xenos::XGPU::xeVSyncWorkerThreadLoop() {
     std::chrono::steady_clock::now();
 
   while (xeVsyncWorkerThreadRunning) {
+    // Ensure we haven't shutdown elsewhere
+    xeVsyncWorkerThreadRunning = XeRunning;
+    if (!xeVsyncWorkerThreadRunning)
+      break;
     // Measure elapsed time since last check.
     std::chrono::steady_clock::time_point timerNow =
       std::chrono::steady_clock::now();

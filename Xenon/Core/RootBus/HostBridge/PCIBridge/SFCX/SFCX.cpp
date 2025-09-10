@@ -63,8 +63,7 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
       imageSize = 0;
       LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of {} (Error: {})", nandLoadPath, ec.message());
     }
-  }
-  catch (const std::exception& ex) {
+  } catch (const std::exception& ex) {
     LOG_ERROR(Base_Filesystem, "Exception trying to get file size. Exception: {}",
       ex.what());
     return;
@@ -74,14 +73,12 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
 
   if (!nandFile.is_open()) {
     LOG_CRITICAL(SFCX, "Fatal error! Please make sure your NAND (or NAND path) is valid!");
-    Base::SystemPause();
     return;
   }
 
   // Check file magic
   if (!checkMagic()) {
     LOG_CRITICAL(SFCX, "Fatal error! The loaded 'nand.bin' doesn't correspond to a Xbox 360 NAND.");
-    Base::SystemPause();
     return;
   }
 
@@ -149,6 +146,8 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
 
   sfcxState.nandHeader.smcBootAddr = byteswap_be<u32>(sfcxState.nandHeader.smcBootAddr);
   LOG_INFO(SFCX, " * SMC Boot Addr: 0x{:X}", sfcxState.nandHeader.smcBootAddr);
+
+  hasInitialised = true;
 
   // Get CB_A and CB_B headers
   BL_HEADER cbaHeader;
@@ -253,7 +252,6 @@ Xe::PCIDev::SFCX::~SFCX() {
 
 void Xe::PCIDev::SFCX::Start() {
   // Enter SFCX Thread
-  sfcxThreadRunning = true;
   sfcxThread = std::thread(&Xe::PCIDev::SFCX::sfcxMainLoop, this);
 }
 
@@ -478,8 +476,14 @@ void Xe::PCIDev::SFCX::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
 
 void Xe::PCIDev::SFCX::sfcxMainLoop() {
   Base::SetCurrentThreadName("[Xe] SFCX");
+  sfcxThreadRunning = XeRunning;
   // Config register should be initialized by now
-  while (XeRunning && sfcxThreadRunning) {
+  while (sfcxThreadRunning) {
+    // Ensure we haven't shutdown elsewhere.
+    sfcxThreadRunning = XeRunning;
+    if (!sfcxThreadRunning)
+      break;
+
     // Did we got a command?
     if (sfcxState.commandReg != NO_CMD) {
       // Check the command reg to see what command was issued

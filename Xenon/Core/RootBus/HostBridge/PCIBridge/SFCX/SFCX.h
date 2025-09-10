@@ -194,6 +194,8 @@ public:
   void ConfigRead(u64 readAddress, u8* data, u64 size) override;
   void ConfigWrite(u64 writeAddress, const u8* data, u64 size) override;
 
+  bool hasInitialised = false;
+  // Init skips
   u64 initSkip1 = 0, initSkip2 = 0;
 private:
   // Secure Flash Controller for Xbox main loop.

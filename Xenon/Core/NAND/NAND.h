@@ -11,7 +11,7 @@
 
 class NAND : public SystemDevice {
 public:
-  NAND(const std::string &deviceName, Xe::PCIDev::SFCX *sfcx, bool isSOCDevice);
+  NAND(const std::string &deviceName, Xe::PCIDev::SFCX *sfcx);
   ~NAND();
 
   void Read(u64 readAddress, u8 *data, u64 size) override;

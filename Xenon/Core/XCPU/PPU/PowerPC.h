@@ -798,10 +798,10 @@ struct PPU_STATE {
 
 // Main Xenon CPU 'context'. Holds everything aside from the PPU cores and is shared for all threads.
 struct XenonContext {
-  XenonContext(RootBus* rootBusPtr, RAM* ramPtr) : rootBus(rootBusPtr), ram(ramPtr) {}
+  XenonContext(RootBus *rootBusPtr, RAM *ramPtr) : rootBus(rootBusPtr), ram(ramPtr) {}
   ~XenonContext() {
-    rootBus.reset();
-    ram.reset();
+    delete[] SROM;
+    delete[] SRAM;
   }
 
   // Xenon SecureROM
@@ -836,8 +836,8 @@ struct XenonContext {
   bool timeBaseActive = false;
 
   // RAM/RootBus getters.
-  RootBus *GetRootBus() { return rootBus.get(); }
-  RAM *GetRAM() { return ram.get(); }
+  RootBus *GetRootBus() { return rootBus; }
+  RAM *GetRAM() { return ram; }
 
   // Xenon SOC Blocks R/W methods.
   bool HandleSOCRead(u64 readAddr, u8* data, size_t byteCount);
@@ -866,15 +866,14 @@ struct XenonContext {
   std::unique_ptr<Xe::XCPU::SOC::SOCPRV_BLOCK> socPRVBlock = std::make_unique<Xe::XCPU::SOC::SOCPRV_BLOCK>();
 
 private:
-
   // Mutex for thread safety.
-  std::recursive_mutex mutex;
+  std::recursive_mutex mutex{};
 
   // RootBus pointer.
-  std::shared_ptr<RootBus> rootBus;
+  RootBus *rootBus{};
 
   // RAM pointer.
-  std::shared_ptr<RAM> ram;
+  RAM *ram{};
 
   // SOC Blocks R/W.
 

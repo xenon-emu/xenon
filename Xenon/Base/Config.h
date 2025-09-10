@@ -46,8 +46,6 @@ struct _resolution {
 inline struct _rendering {
   // Enable GPU Render thread
   bool enable = true;
-  // Whether to create the GUI handle
-  bool enableGui = true;
   // Window Resolution
   _resolution window{ 1280, 720 };
   // Render in fullscreen
@@ -98,18 +96,10 @@ inline struct _debug {
   u64 haltOnWriteAddress = 0;
   // Halt on execution of this address
   u64 haltOnAddress = 0;
-  // Halt on a SLB Miss
-  bool haltOnSlbMiss = false;
-  // Halt on an exception
-  bool haltOnExceptions = false;
   // Start the CPU halted
   bool startHalted = false;
   // Soft halts on assertions, otherwise, ignores them
   bool softHaltOnAssertions = true;
-  // Halts on invalid instructions
-  bool haltOnInvalidInstructions = true;
-  // Halt on guest assertion
-  bool haltOnGuestAssertion = true;
   // Automatically continue on guest assertion
   bool autoContinueOnGuestAssertion = false;
 #ifdef DEBUG_BUILD

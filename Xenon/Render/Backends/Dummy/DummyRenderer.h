@@ -12,7 +12,6 @@ namespace Render {
 
 class DummyRenderer : public Renderer {
 public:
-  DummyRenderer(RAM *ram);
   void BackendSDLProperties(SDL_PropertiesID properties) override;
   void BackendStart() override;
   void BackendShutdown() override;

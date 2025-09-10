@@ -466,7 +466,7 @@ u32 PPU::GetIPS() {
   // Instr Count: The amount of instructions to execute in order to test
 
   // Write the calibration code to main memory
-  for (s32 i = 0; i < 4; i++) {
+  for (s32 i = 4; i; --i) {
     PPCInterpreter::MMUWrite32(ppuState.get(), 4 + (i * 4), ipsCalibrationCode[i]);
   }
 
@@ -723,7 +723,7 @@ bool PPU::PPUCheckExceptions() {
   u16 &exceptions = _ex;
   if (exceptions != PPU_EX_NONE) {
     // Halt on any exception if set in config.
-    if (Config::debug.haltOnExceptions) {
+    if (Config::debug.softHaltOnAssertions) {
       LOG_DEBUG(Xenon, "[{}]: Halting on exceptions enabled, proceeding to halt.", ppuState->ppuName);
       Halt();
     }

@@ -23,7 +23,6 @@ namespace Render {
 
 class OGLRenderer : public Renderer {
 public:
-  OGLRenderer(RAM *ram);
   void BackendSDLProperties(SDL_PropertiesID properties) override;
   void BackendStart() override;
   void BackendShutdown() override;

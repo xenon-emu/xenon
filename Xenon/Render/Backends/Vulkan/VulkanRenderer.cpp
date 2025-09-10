@@ -12,10 +12,6 @@
 #ifndef NO_GFX
 namespace Render {
 
-VulkanRenderer::VulkanRenderer(RAM *ram) :
-  Renderer(ram)
-{}
-
 void VulkanRenderer::BackendStart() {
   VkResult res = volkInitialize();
   if (res != VK_SUCCESS) {

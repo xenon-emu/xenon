@@ -46,8 +46,8 @@ extern void ReloadFiles();
 extern void SaveConfig();
 extern void LoadConfig();
 
-extern void CreateHostBridge();
-extern void CreatePCIDevices();
+extern void CreateBridges();
+extern void CreatePCIDevices(RAM *ram);
 extern void CreateRootBus();
 
 extern Xenon *GetCPU();

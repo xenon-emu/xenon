@@ -73,7 +73,7 @@ s32 globalShutdownHandler() {
   XeRunning = false;
   // Give everything a while to shut down. If it still hasn't shutdown, then something hung
   std::this_thread::sleep_for(15s);
-  if (XeShutdonSignaled) {
+  if (XeShutdownSignaled) {
     printf("This was called because after 15s, and a shutdown call, it still hasn't shutdown.\n");
     printf("Something likely hung. If you have issues, please make a GitHub Issue report with this message in it\n");
     // We should force exit. We only should call shutdown once, and if we don't, then it hung

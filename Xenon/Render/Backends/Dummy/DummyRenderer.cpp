@@ -7,11 +7,6 @@
 #ifndef NO_GFX
 namespace Render {
 
-DummyRenderer::DummyRenderer(RAM *ram) :
-  Renderer(ram) {
-  LOG_WARNING(Render, "DummyRenderer::DummyRenderer: Using dummy renderer!");
-}
-
 void DummyRenderer::BackendStart() {
   LOG_INFO(Render, "DummyRenderer::BackendStart");
   resourceFactory = std::make_unique<DummyResourceFactory>();

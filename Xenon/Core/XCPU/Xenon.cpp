@@ -16,35 +16,32 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPa
   {
     std::ifstream file(fusesPath);
     if (!file.is_open()) {
-      xenonContext->socSecOTPBlock.get()->sec->AsULONGLONG = { 0x9999999999999999 };
+      xenonContext->socSecOTPBlock->sec->AsULONGLONG = { 0x9999999999999999 };
     } else {
-      std::vector<std::string> fusesets;
+      LOG_INFO(System, "Current FuseSet:");
+      std::vector<std::pair<std::string, u64>> fusesets{};
       std::string fuseset;
       while (std::getline(file, fuseset)) {
         if (size_t pos = fuseset.find(": "); pos != std::string::npos) {
           fuseset = fuseset.substr(pos + 2);
         }
-        fusesets.push_back(fuseset);
-      }
-      // Got some fuses, let's print them!
-      LOG_INFO(System, "Current FuseSet:");
-      for (int i = 0; i < 12; i++) {
-        fuseset = fusesets[i];
-        LOG_INFO(System, " * FuseSet {:02}: 0x{}", i, fuseset.c_str());
+        u64 fuse = strtoull(fuseset.c_str(), nullptr, 16);
+        LOG_INFO(System, " * FuseSet {:02}: 0x{:X}", fusesets.size(), fuse);
+        fusesets.push_back(std::make_pair(fuseset, fuse));
       }
 
-      xenonContext->socSecOTPBlock.get()->sec[0].AsULONGLONG = strtoull(fusesets[0].c_str(), nullptr, 16);
-      xenonContext->socSecOTPBlock.get()->ConsoleType[0] = strtoull(fusesets[1].c_str(), nullptr, 16);
-      xenonContext->socSecOTPBlock.get()->ConsoleSequence[0] = strtoull(fusesets[2].c_str(), nullptr, 16);
-      xenonContext->socSecOTPBlock.get()->UniqueId1[0] = strtoull(fusesets[3].c_str(), nullptr, 16);
-      xenonContext->socSecOTPBlock.get()->UniqueId2[0] = strtoull(fusesets[4].c_str(), nullptr, 16);
-      xenonContext->socSecOTPBlock.get()->UniqueId3[0] = strtoull(fusesets[5].c_str(), nullptr, 16);
-      xenonContext->socSecOTPBlock.get()->UniqueId4[0] = strtoull(fusesets[6].c_str(), nullptr, 16);
-      xenonContext->socSecOTPBlock.get()->UpdateSequence[0] = strtoull(fusesets[7].c_str(), nullptr, 16);
-      xenonContext->socSecOTPBlock.get()->EepromKey1[0] = strtoull(fusesets[8].c_str(), nullptr, 16);
-      xenonContext->socSecOTPBlock.get()->EepromKey2[0] = strtoull(fusesets[9].c_str(), nullptr, 16);
-      xenonContext->socSecOTPBlock.get()->EepromHash1[0] = strtoull(fusesets[10].c_str(), nullptr, 16);
-      xenonContext->socSecOTPBlock.get()->EepromHash2[0] = strtoull(fusesets[11].c_str(), nullptr, 16);
+      xenonContext->socSecOTPBlock->sec[0].AsULONGLONG = fusesets[0].second;
+      xenonContext->socSecOTPBlock->ConsoleType[0] = fusesets[1].second;
+      xenonContext->socSecOTPBlock->ConsoleSequence[0] = fusesets[2].second;
+      xenonContext->socSecOTPBlock->UniqueId1[0] = fusesets[3].second;
+      xenonContext->socSecOTPBlock->UniqueId2[0] = fusesets[4].second;
+      xenonContext->socSecOTPBlock->UniqueId3[0] = fusesets[5].second;
+      xenonContext->socSecOTPBlock->UniqueId4[0] = fusesets[6].second;
+      xenonContext->socSecOTPBlock->UpdateSequence[0] = fusesets[7].second;
+      xenonContext->socSecOTPBlock->EepromKey1[0] = fusesets[8].second;
+      xenonContext->socSecOTPBlock->EepromKey2[0] = fusesets[9].second;
+      xenonContext->socSecOTPBlock->EepromHash1[0] = fusesets[10].second;
+      xenonContext->socSecOTPBlock->EepromHash2[0] = fusesets[11].second;
     }
   }
 
@@ -55,8 +52,7 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPa
     if (!file.is_open()) {
       LOG_CRITICAL(Xenon, "Unable to open file: {} for reading. Check your file path. System Stopped!", blPath);
       Base::SystemPause();
-    }
-    else {
+    } else {
       u64 fileSize = 0;
       // fs::file_size can cause a exception if it is not a valid file
       try {
@@ -66,13 +62,13 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPa
           fileSize = 0;
           LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of {} (Error: {})", blPath, ec.message());
         }
-      }
-      catch (const std::exception& ex) {
+      } catch (const std::exception &ex) {
         LOG_ERROR(Base_Filesystem, "Exception trying to get file size. Reason: {}", ex.what());
         return;
       }
+
       if (fileSize == XE_SROM_SIZE) {
-        file.read(reinterpret_cast<char*>(xenonContext->SROM), XE_SROM_SIZE);
+        file.read(reinterpret_cast<char *>(xenonContext->SROM), XE_SROM_SIZE);
         LOG_INFO(Xenon, "1BL Loaded.");
       }
     }
@@ -92,8 +88,7 @@ Xenon::~Xenon() {
   ppu0.reset();
   ppu1.reset();
   ppu2.reset();
-  delete[] xenonContext->SRAM;
-  delete[] xenonContext->SROM;
+  xenonContext.reset();
 }
 
 void Xenon::Start(u64 resetVector) {

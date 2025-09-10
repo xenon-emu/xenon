@@ -35,7 +35,6 @@ namespace Render {
 
 class VulkanRenderer : public Renderer {
 public:
-  VulkanRenderer(RAM *ram);
   void BackendSDLProperties(SDL_PropertiesID properties) override;
   void BackendStart() override;
   void BackendShutdown() override;

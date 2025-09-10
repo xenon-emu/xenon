@@ -3,8 +3,8 @@
 #include "NAND.h"
 #include "Base/Logging/Log.h"
 
-NAND::NAND(const std::string &deviceName, Xe::PCIDev::SFCX *sfcx, bool isSOCDevice) :
-  SystemDevice(deviceName, NAND_MEMORY_MAPPED_ADDR, NAND_MEMORY_MAPPED_ADDR + NAND_MEMORY_MAPPED_SIZE, isSOCDevice),
+NAND::NAND(const std::string &deviceName, Xe::PCIDev::SFCX *sfcx) :
+  SystemDevice(deviceName, NAND_MEMORY_MAPPED_ADDR, NAND_MEMORY_MAPPED_ADDR + NAND_MEMORY_MAPPED_SIZE, true),
   sfcxDevice(sfcx)
 {}
 
