@@ -283,7 +283,7 @@ jobs:
 
       - name: Install Dependencies (macOS)
         run: |
-          brew install llvm
+          brew install llvm@20
 
       - name: Cache CMake Configuration
         uses: actions/cache@main

@@ -19,8 +19,8 @@ namespace Xe::XCPU::MMU {
   // Xenon Memory Management Unit
   class XenonMMU {
   public:
-    XenonMMU(XenonContext *inXenonContext) :
-      xenonContext(inXenonContext)
+    XenonMMU(std::shared_ptr<XenonContext> inXenonContext) :
+      xenonContext(std::move(inXenonContext))
     {}
     ~XenonMMU() {
       xenonContext.reset();

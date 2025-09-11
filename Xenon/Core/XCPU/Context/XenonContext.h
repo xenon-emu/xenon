@@ -41,12 +41,10 @@ namespace Xe::XCPU {
       socCBIBlock.reset();
       socPMWBlock.reset();
       socPRVBlock.reset();
-      rootBus.reset();
-      ram.reset();
     }
 
-    RootBus *GetRootBus() { return rootBus.get(); }
-    RAM *GetRAM() { return ram.get(); }
+    RootBus *GetRootBus() { return rootBus; }
+    RAM *GetRAM() { return ram; }
     bool HandleSOCRead(u64 readAddr, u8 *data, size_t byteCount);
     bool HandleSOCWrite(u64 writeAddr, const u8 *data, size_t byteCount);
 
@@ -94,9 +92,9 @@ namespace Xe::XCPU {
     // Mutex for thread safety
     std::recursive_mutex mutex{};
     // RootBus pointer
-    std::shared_ptr<RootBus> rootBus{};
+    RootBus *rootBus{};
     // RAM pointer
-    std::shared_ptr<RAM> ram{};
+    RAM *ram{};
 
     // SOC Blocks R/W.
 
