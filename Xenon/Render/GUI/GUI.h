@@ -86,7 +86,6 @@ public:
   ImFont *robotRegular16 = nullptr;
   ImFont *robotRegular18 = nullptr;
   SDL_Window *mainWindow = nullptr;
-  bool styleEditor = false;
   bool demoWindow = false;
   u32 stepAmount = 1;
   bool ppcDebuggerActive[3]{};

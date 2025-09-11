@@ -917,27 +917,6 @@ void GraphicsSettings(Render::GUI *gui) {
   gui->Toggle("Exit on window close", &Config::rendering.quitOnWindowClosure);
 }
 
-void XCPUSettings(Render::GUI *gui) {
-  if (XeMain::CPUStarted) {
-    if (gui->Button("Shutdown")) {
-      XeMain::ShutdownCPU();
-    }
-  } else {
-    if (gui->Button("Start")) {
-      XeMain::StartCPU();
-    }
-  }
-  if (gui->Button("Reboot")) {
-    XeMain::Reboot(static_cast<u32>(XeMain::smcCore->GetPowerOnReason()));
-  }
-  Config::xcpu.ramSize = gui->InputText("RAM Size", Config::xcpu.ramSize);
-  gui->Tooltip("Requires an restart of the CPU for things to take effect");
-  gui->Toggle("Load Elf", &Config::xcpu.elfLoader);
-  gui->Toggle("Override Init Skips", &Config::xcpu.overrideInitSkip);
-  gui->InputInt("Init Skip 1", &Config::xcpu.HW_INIT_SKIP_1);
-  gui->InputInt("Init Skip 2", &Config::xcpu.HW_INIT_SKIP_2);
-}
-
 void SMCSettings(Render::GUI *gui) {
   Config::smc.uartSystem = gui->InputText("UART System", Config::smc.uartSystem);
 #ifdef _WIN32
@@ -952,9 +931,37 @@ void SMCSettings(Render::GUI *gui) {
   gui->Tooltip("17 is Power Button, 18 is Eject Button");
 }
 
+void XCPUSettings(Render::GUI *gui) {
+  gui->Toggle("Debug", &Config::imgui.debugWindow);
+  if (XeMain::CPUStarted) {
+    if (gui->Button("Shutdown")) {
+      XeMain::ShutdownCPU();
+    }
+  } else {
+    if (gui->Button("Start")) {
+      XeMain::StartCPU();
+    }
+  }
+  gui->SameLine();
+  if (gui->Button("Reboot")) {
+    XeMain::Reboot(static_cast<u32>(XeMain::smcCore->GetPowerOnReason()));
+  }
+  Config::xcpu.ramSize = gui->InputText("RAM Size", Config::xcpu.ramSize);
+  gui->Tooltip("Requires an restart of the CPU for things to take effect");
+  gui->Toggle("Load Elf", &Config::xcpu.elfLoader);
+  gui->Text("SMC");
+  gui->Separator();
+  SMCSettings(gui);
+  gui->Text("Init");
+  gui->Separator();
+  gui->Toggle("Override Init Skips", &Config::xcpu.overrideInitSkip);
+  gui->InputInt("Init Skip 1", &Config::xcpu.HW_INIT_SKIP_1);
+  gui->InputInt("Init Skip 2", &Config::xcpu.HW_INIT_SKIP_2);
+}
+
 void PathSettings(Render::GUI *gui) {
   Config::filepaths.fuses = gui->InputText("Fuses", Config::filepaths.fuses);
-  Config::filepaths.oneBl = gui->InputText("1bl", Config::filepaths.oneBl);
+  Config::filepaths.oneBl = gui->InputText("1BL", Config::filepaths.oneBl);
   Config::filepaths.nand = gui->InputText("NAND", Config::filepaths.nand);
   Config::filepaths.elfBinary = gui->InputText("ELF Binary", Config::filepaths.elfBinary);
   Config::filepaths.oddImage = gui->InputText("ODD Image File (iso)", Config::filepaths.oddImage);
@@ -967,7 +974,6 @@ void PathSettings(Render::GUI *gui) {
 }
 
 void ImGuiSettings(Render::GUI *gui) {
-  gui->Toggle("Style Editor", &gui->styleEditor);
   gui->Toggle("Demo", &gui->demoWindow);
   if (gui->Toggle("Viewports", &Config::imgui.viewports)) {
     ImGuiIO &io = ImGui::GetIO();
@@ -985,15 +991,16 @@ void ConfigSettings(Render::GUI *gui) {
   if (gui->Button("Save")) {
     XeMain::SaveConfig();
   }
+  gui->SameLine();
   if (gui->Button("Load")) {
     XeMain::LoadConfig();
   }
 }
 
 void Render::GUI::OnSwap(Texture *texture) {
-  if (ppcDebuggerDetached) {
-    if (BeginWindow("PPC Debugger", { 1200.f, 700.f }, ImGuiWindowFlags_None, &ppcDebuggerDetached, { 500.f, 100.f })) {
-      if (BeginTabBar("##debugger")) {
+  if (Config::imgui.debugWindow) {
+    if (BeginWindow("PPC Debugger", { 1200.f, 700.f }, ImGuiWindowFlags_None, &Config::imgui.debugWindow, { 1000.f, 400.f })) {
+      if (BeginTabBar("##debug")) {
         if (!ppcDebuggerDetached) {
           DebuggerDockSpace(this);
         }
@@ -1002,149 +1009,21 @@ void Render::GUI::OnSwap(Texture *texture) {
             rebuildDock = true;
             ppcDebuggerActive[i] ^= true;
           }
-          ImGui::SameLine();
         }
         if (TabItemButton("All")) {
           rebuildDock = true;
-          for (bool& a : ppcDebuggerActive)
+          for (bool &a : ppcDebuggerActive)
             a ^= true;
         }
         Xenon *CPU = XeMain::GetCPU();
-        bool halted = CPU->IsHalted();
-        if (TabItemButton(halted ? "Continue" : "Pause")) {
-          if (halted)
-            CPU->Continue();
-          else
-            CPU->Halt();
-        }
-        EndTabBar();
-      }
-    }
-    EndWindow();
-  }
-  if (Config::imgui.debugWindow) {
-    if (BeginWindow("Debug", { 1200.f, 700.f }, ImGuiWindowFlags_None, &Config::imgui.debugWindow, { 1000.f, 400.f })) {
-      if (BeginTabBar("##main")) {
-        if (BeginTabItem("Debug")) {
-          if (BeginTabBar("##debug")) {
-            if (!ppcDebuggerDetached) {
-              DebuggerDockSpace(this);
-            }
-            for (u8 i = 0; i != 3; ++i) {
-              if (TabItemButton("PPU" + std::to_string(i))) {
-                rebuildDock = true;
-                ppcDebuggerActive[i] ^= true;
-              }
-              ImGui::SameLine();
-            }
-            if (TabItemButton("All")) {
-              rebuildDock = true;
-              for (bool& a : ppcDebuggerActive)
-                a ^= true;
-            }
-            Xenon *CPU = XeMain::GetCPU();
-            if (CPU) {
-              bool halted = CPU->IsHalted();
-              if (TabItemButton(halted ? "Continue" : "Pause")) {
-                if (halted)
-                  CPU->Continue();
-                else
-                  CPU->Halt();
-              }
-            }
-            EndTabBar();
+        if (CPU) {
+          bool halted = CPU->IsHalted();
+          if (TabItemButton(halted ? "Continue" : "Pause")) {
+            if (halted)
+              CPU->Continue();
+            else
+              CPU->Halt();
           }
-          EndTabItem();
-        }
-#if defined(MICROPROFILE_ENABLED) && MICROPROFILE_ENABLED
-        if (BeginTabItem("Profiler")) {
-#ifdef MICROPROFILE_WEBSERVER
-          if (Button("Open")) {
-            std::string url = fmt::format("http://127.0.0.1:{}/", MicroProfileWebServerPort());
-#ifdef _WIN32
-            ShellExecuteA(nullptr, "open", url.data(), nullptr, nullptr, SW_SHOWNORMAL);
-#elif defined(__linux__)
-            std::string command = "xdg-open " + url;
-            s32 result = std::system(command.c_str());
-#endif
-          }
-#else
-          //TODO: Implement some system to display it in ImGui
-#endif
-          EndTabItem();
-        }
-#endif
-        if (BeginTabItem("Dump")) {
-          if (Button("Dump FB")) {
-            const auto UserDir = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
-            XeMain::xenos->DumpFB(UserDir / "fbmem.bin", XeMain::renderer->pitch);
-          }
-          if (Button("Dump Memory")) {
-            const auto UserDir = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
-            const auto& path = UserDir / "memory.bin";
-            std::ofstream f(path, std::ios::out | std::ios::binary | std::ios::trunc);
-            if (!f) {
-              LOG_ERROR(Xenon, "Failed to open {} for writing", path.filename().string());
-            }
-            else {
-              RAM *ramPtr = XeMain::ram.get();
-              f.write(reinterpret_cast<const char*>(ramPtr->GetPointerToAddress(0)), ramPtr->GetSize());
-              LOG_INFO(Xenon, "RAM dumped to '{}' (size: 0x{:08X})", path.string(), ramPtr->GetSize());
-            }
-            f.close();
-          }
-          EndTabItem();
-        }
-        if (BeginTabItem("Settings")) {
-          if (BeginTabBar("##settings")) {
-            if (BeginTabItem("CPU")) {
-              XCPUSettings(this);
-              EndTabItem();
-            }
-            if (BeginTabItem("SMC")) {
-              SMCSettings(this);
-              EndTabItem();
-            }
-            if (BeginTabItem("General")) {
-              if (Button("Exit")) {
-                XeRunning = false;
-              }
-              Tooltip("Cleanly exits the process");
-              if (Button("Soft exit")) {
-                s32 exitCode = Base::exit(0);
-                LOG_INFO(Xenon, "Exited with code '{}'", exitCode);
-              }
-              Tooltip("Uses 'exit(0);' instead of properly shutting down");
-              if (Button("Force exit")) {
-                s32 exitCode = Base::fexit(0);
-                LOG_INFO(Xenon, "Exited with code '{}'", exitCode);
-              }
-              Tooltip("Forcefully closes the process using TerminateProcess and _exit");
-              EndTabItem();
-            }
-            if (BeginTabItem("Log")) {
-              LogSettings(this);
-              EndTabItem();
-            }
-            if (BeginTabItem("Paths")) {
-              PathSettings(this);
-              EndTabItem();
-            }
-            if (BeginTabItem("Graphics")) {
-              GraphicsSettings(this);
-              EndTabItem();
-            }
-            if (BeginTabItem("ImGui")) {
-              ImGuiSettings(this);
-              EndTabItem();
-            }
-            if (BeginTabItem("Config")) {
-              ConfigSettings(this);
-              EndTabItem();
-            }
-            EndTabBar();
-          }
-          EndTabItem();
         }
         EndTabBar();
       }
@@ -1153,15 +1032,81 @@ void Render::GUI::OnSwap(Texture *texture) {
   }
 }
 
-void Render::GUI::Render(Texture* texture) {
+void Render::GUI::Render(Texture *texture) {
   BeginSwap();
   ImGui::NewFrame();
   ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
-  if (styleEditor) {
-    if (BeginWindow("Style Editor", { 1000.f, 900.f }, ImGuiWindowFlags_NoCollapse, &styleEditor, { 600.f, 60.f })) {
+  if (ImGui::BeginMainMenuBar()) {
+    if (ImGui::BeginMenu("Style")) {
       ImGui::ShowStyleEditor();
+      ImGui::EndMenu();
     }
-    EndWindow();
+#if defined(MICROPROFILE_ENABLED) && MICROPROFILE_ENABLED
+    if (ImGui::BeginMenu("Dump")) {
+#ifdef MICROPROFILE_WEBSERVER
+      if (Button("Open")) {
+        std::string url = fmt::format("http://127.0.0.1:{}/", MicroProfileWebServerPort());
+#ifdef _WIN32
+        ShellExecuteA(nullptr, "open", url.data(), nullptr, nullptr, SW_SHOWNORMAL);
+#elif defined(__linux__)
+        std::string command = "xdg-open " + url;
+        s32 result = std::system(command.c_str());
+#endif
+      }
+#else
+      //TODO: Implement some system to display it in ImGui
+#endif
+      ImGui::EndMenu();
+    }
+#endif
+    if (ImGui::BeginMenu("CPU")) {
+      XCPUSettings(this);
+      if (Button("Dump FB")) {
+        const auto UserDir = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
+        XeMain::xenos->DumpFB(UserDir / "fbmem.bin", XeMain::renderer->pitch);
+      }
+      if (Button("Dump Memory")) {
+        const auto UserDir = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
+        const auto &path = UserDir / "memory.bin";
+        std::ofstream f(path, std::ios::out | std::ios::binary | std::ios::trunc);
+        if (!f) {
+          LOG_ERROR(Xenon, "Failed to open {} for writing", path.filename().string());
+        } else {
+          RAM *ramPtr = XeMain::ram.get();
+          f.write(reinterpret_cast<const char *>(ramPtr->GetPointerToAddress(0)), ramPtr->GetSize());
+          LOG_INFO(Xenon, "RAM dumped to '{}' (size: 0x{:08X})", path.string(), ramPtr->GetSize());
+        }
+        f.close();
+      }
+      ImGui::EndMenu();
+    }
+    if (ImGui::BeginMenu("Settings")) {
+      Text("Log");
+      Separator();
+      LogSettings(this);
+      Text("GUI");
+      Separator();
+      ImGuiSettings(this);
+      Text("Config");
+      Separator();
+      ConfigSettings(this);
+      PathSettings(this);
+      Text("Graphics");
+      Separator();
+      GraphicsSettings(this);
+      Separator();
+      if (Button("Exit")) {
+        XeRunning = false;
+      }
+      Tooltip("Cleanly exits the process");
+      if (Button("Force Exit")) {
+        s32 exitCode = Base::fexit(0);
+        LOG_INFO(Xenon, "Exited with code '{}'", exitCode);
+      }
+      Tooltip("Forcefully closes the process using TerminateProcess");
+      ImGui::EndMenu();
+    }
+    ImGui::EndMainMenuBar();
   }
   if (demoWindow) {
     ImGui::ShowDemoWindow(&demoWindow);
@@ -1197,7 +1142,7 @@ void Render::GUI::SetStyle() {
   colors[ImGuiCol_CheckMark] = ImColor(255, 255, 255, 255);
   colors[ImGuiCol_SliderGrab] = ImColor(87, 87, 87, 255);
   colors[ImGuiCol_SliderGrabActive] = ImColor(99, 97, 97, 255);
-  colors[ImGuiCol_Button] = ImColor(108, 232, 0, 255);
+  colors[ImGuiCol_Button] = ImColor(108, 202, 0, 255);
   colors[ImGuiCol_ButtonHovered] = ImColor(110, 210, 50, 208);
   colors[ImGuiCol_ButtonActive] = ImColor(110, 210, 50, 240);
   colors[ImGuiCol_Header] = ImColor(110, 210, 50, 79);
@@ -1236,7 +1181,6 @@ void Render::GUI::SetStyle() {
   style.WindowPadding = { 10.f, 10.f };
   style.WindowRounding = 5.f;
   style.WindowBorderSize = 1.f;
-  style.WindowMinSize = { 200.f, 200.f };
   style.WindowTitleAlign = { 0.f, 0.5f };
   style.WindowMenuButtonPosition = ImGuiDir_Left;
   style.ChildRounding = 6.f;
@@ -1246,25 +1190,25 @@ void Render::GUI::SetStyle() {
   style.FramePadding = { 8.f, 4.f };
   style.FrameRounding = 4.f;
   style.FrameBorderSize = 1.f;
-  style.ItemSpacing = { 10.f, 8.f };
-  style.ItemInnerSpacing = { 6.f, 6.f };
+  style.ItemSpacing = { 4.f, 4.f };
+  style.ItemInnerSpacing = { 2.f, 2.f };
   style.TouchExtraPadding = { 0.f, 0.f };
   style.IndentSpacing = 21.f;
   style.ScrollbarSize = 15.f;
   style.ScrollbarRounding = 0.f;
   style.GrabMinSize = 8.f;
-  style.GrabRounding = 3.f;
+  style.GrabRounding = 8.f;
   style.TabRounding = 4.f;
   style.TabBorderSize = 1.f;
-  style.TabBarBorderSize = 0.5f;
+  style.TabBarBorderSize = 0.f;
   style.TabBarOverlineSize = 0.f;
   style.ButtonTextAlign = { 0.5f, 0.5f };
-  style.DisplaySafeAreaPadding = { 3.f, 22.f };
-  style.MouseCursorScale = 0.7f;
+  style.DisplaySafeAreaPadding = { 0.f, 0.f };
+  style.MouseCursorScale = 1.f;
   // Change some style vars for Viewports
-  if (io.ConfigFlags  &ImGuiConfigFlags_ViewportsEnable) {
-    style.WindowRounding = 0.0f;
-    style.Colors[ImGuiCol_WindowBg].w = 1.0f;
+  if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+    style.WindowRounding = 0.f;
+    style.Colors[ImGuiCol_WindowBg].w = 1.f;
   }
 }
 #endif

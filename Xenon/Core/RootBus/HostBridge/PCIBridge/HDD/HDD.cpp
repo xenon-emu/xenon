@@ -148,6 +148,8 @@ Xe::PCIDev::HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentP
     LOG_INFO(HDD, "No HDD image found - disabling device.");
   }
 
+  hddThreadRunning = ataState.imageAttached;
+
   // Set the SCR's at offset 0xC0 (SiS-like).
   // SStatus
   data = ataState.imageAttached ? 0x00000113 : 0;
@@ -172,7 +174,6 @@ Xe::PCIDev::HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentP
   ataState.regs.status = ATA_STATUS_DRDY;
 
   // Enter HDD Worker Thread
-  hddThreadRunning = true;
   hddWorkerThread = std::thread(&Xe::PCIDev::HDD::hddThreadLoop, this);
 }
 
@@ -661,9 +662,15 @@ const std::string Xe::PCIDev::HDD::getATACommandName(u32 commandID) {
 
 // Worker thread for DMA.
 void Xe::PCIDev::HDD::hddThreadLoop() {
+  // Check if we should be running
+  if (!hddThreadRunning)
+    return;
   LOG_INFO(HDD, "Entered HDD worker thread.");
-
   while (hddThreadRunning) {
+    // Check if we should exit early
+    hddThreadRunning = XeRunning;
+    if (hddThreadRunning)
+      break;
     // Check for the DMA active command.
     if (ataState.regs.dmaCommand & XE_ATA_DMA_ACTIVE) {
       // Start our DMA operation

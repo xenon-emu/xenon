@@ -35,7 +35,7 @@ s32 main(s32 argc, char *argv[]) {
   // Create all handles
   XeMain::Create();
   // Give errors a second to catch up, incase of the async backend
-  std::this_thread::sleep_for(100ms);
+  std::this_thread::sleep_for(200ms);
   // Start execution of the emulator
   XeMain::StartCPU();
   // Inf wait until told otherwise
@@ -46,6 +46,8 @@ s32 main(s32 argc, char *argv[]) {
 #ifndef NO_GFX
     if (XeMain::renderer.get())
       XeMain::renderer->HandleEvents();
+#else
+    std::this_thread::sleep_for(100ms);
 #endif // !NO_GFX
   }
   // Shutdown

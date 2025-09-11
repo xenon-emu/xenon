@@ -105,9 +105,6 @@ public:
   u32 width = 1280;
   u32 height = 720;
 
-  // ImGui Created
-  bool imguiCreated = false;
-
   // Render Lost Lost
   bool focusLost = false;
   // Vertical SYNC

@@ -94,14 +94,12 @@ void Renderer::CreateHandles() {
 
   // Create our GUI
   gui = resourceFactory->CreateGUI();
-  gui->Init(mainWindow, reinterpret_cast<void*>(GetBackendContext()));
-  imguiCreated = true;
+  gui->Init(mainWindow, reinterpret_cast<void *>(GetBackendContext()));
 }
 
 void Renderer::Shutdown() {
   if (gui)
     gui->Shutdown();
-  threadRunning = false;
   backbuffer->DestroyTexture();
   pixelSSBO->DestroyBuffer();
   shaderFactory->Destroy();
@@ -160,9 +158,7 @@ void Renderer::HandleEvents() {
   }
   // Process events.
   while (threadRunning && SDL_PollEvent(&windowEvent)) {
-    if (imguiCreated) {
-      ImGui_ImplSDL3_ProcessEvent(&windowEvent);
-    }
+    ImGui_ImplSDL3_ProcessEvent(&windowEvent);
     switch (windowEvent.type) {
     case SDL_EVENT_WINDOW_RESIZED:
       if (windowEvent.window.windowID == windowID) {
