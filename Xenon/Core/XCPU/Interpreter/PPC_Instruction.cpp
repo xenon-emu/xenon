@@ -14,24 +14,24 @@
 #include "PPCInterpreter.h"
 
 namespace PPCInterpreter {
-  void PPCInterpreter_nop(PPU_STATE *ppuState) {
+  void PPCInterpreter_nop(sPPEState *ppeState) {
     // Do nothing
   }
 
-  void PPCInterpreter_invalid(PPU_STATE *ppuState) {
+  void PPCInterpreter_invalid(sPPEState *ppeState) {
     LOG_CRITICAL(Xenon, "PPC Interpreter: Invalid instruction found! Data: 0x{:X} (opcode, value[s]), address: 0x{:X}",
       _instr.opcode,
       curThread.CIA);
   }
 
-  void PPCInterpreter_known_unimplemented(const char *name, PPU_STATE *ppuState) {
+  void PPCInterpreter_known_unimplemented(const char *name, sPPEState *ppeState) {
     LOG_CRITICAL(Xenon, "PPC Interpreter: {} is not implemented! Data: 0x{:X}, address: 0x{:X}",
       name,
       _instr.opcode,
       curThread.CIA);
   }
 
-  void PPCInterpreterJIT_invalid(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr) {
+  void PPCInterpreterJIT_invalid(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
     u32 opcodeEntry = PPCDecode(instr.opcode);
     std::string opName = ppcDecoder.getNameTable()[opcodeEntry];
     LOG_DEBUG(Xenon, "JIT: No emitter found for opcode '{}' (0x{:08X}) at addr 0x{:X}", opName, instr.opcode, curThread.CIA);
@@ -491,7 +491,7 @@ namespace PPCInterpreter {
       return "nop";
     }
 
-    PPCOpcode op;
+    uPPCInstr op;
     op.opcode = instr;
     u32 decodedInstr = PPCDecode(instr);
     std::string baseName = ppcDecoder.getNameTable()[decodedInstr];

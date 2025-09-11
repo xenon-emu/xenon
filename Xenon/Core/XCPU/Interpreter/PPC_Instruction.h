@@ -15,8 +15,8 @@
 #include "Base/Hash.h"
 #include "Base/Logging/Log.h"
 #include "Core/XCPU/PPU/PowerPC.h"
-#include "Core/XCPU/Interpreter/PPCOpcodes.h"
-#include "Core/XCPU/PPU/PPU_JIT.h"
+#include "Core/XCPU/PPU/PPCOpcodes.h"
+#include "Core/XCPU/JIT/PPU_JIT.h"
 
 constexpr u64 PPCRotateMask(u32 mb, u32 me) {
   const u64 mask = ~0ULL << (~(me - mb) & 63);
@@ -29,13 +29,13 @@ constexpr u32 PPCDecode(u32 instr) {
 
 namespace PPCInterpreter {
   // Define a type alias for function pointers
-  using instructionHandler = fptr<void(PPU_STATE *ppuState)>;
-  using instructionHandlerJIT = fptr<void(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr)>;
-  extern void PPCInterpreter_nop(PPU_STATE *ppuState);
-  extern void PPCInterpreter_invalid(PPU_STATE *ppuState);
-  extern void PPCInterpreter_known_unimplemented(const char *name, PPU_STATE *ppuState);
+  using instructionHandler = fptr<void(sPPEState *ppeState)>;
+  using instructionHandlerJIT = fptr<void(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr)>;
+  extern void PPCInterpreter_nop(sPPEState *ppeState);
+  extern void PPCInterpreter_invalid(sPPEState *ppeState);
+  extern void PPCInterpreter_known_unimplemented(const char *name, sPPEState *ppeState);
   extern const std::string PPCInterpreter_getFullName(u32 instr);
-  extern void PPCInterpreterJIT_invalid(PPU_STATE *ppuState, JITBlockBuilder *b, PPCOpcode instr);
+  extern void PPCInterpreterJIT_invalid(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
   class PPCDecoder {
     template <typename T>
     class InstrInfo {

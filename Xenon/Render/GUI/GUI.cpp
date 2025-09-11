@@ -359,10 +359,10 @@ void Render::GUI::Tooltip(const std::string &contents, ImGuiHoveredFlags delay) 
   }
 }
 
-void RenderInstructions(Render::GUI *gui, PPU_STATE *state, ePPUThread thr, u64 numInstructions) {
+void RenderInstructions(Render::GUI *gui, sPPEState *state, ePPUThreadID thr, u64 numInstructions) {
   if (!gui || !state)
     return;
-  PPU_THREAD_REGISTERS &thread = state->ppuThread[thr];
+  sPPUThread &thread = state->ppuThread[thr];
   f32 maxLineWidth = ImGui::GetContentRegionAvail().x;
   for (u64 i = 0; i != (numInstructions * 2) + 1; ++i) {
     u32 instr = 0;
@@ -396,18 +396,18 @@ void RenderInstructions(Render::GUI *gui, PPU_STATE *state, ePPUThread thr, u64 
   }
 }
 
-void PPUThreadDiassembly(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
+void PPUThreadDiassembly(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
   if (gui->BeginSimpleWindow(fmt::format("Diassembly [{}:{}]", state->ppuName, static_cast<u8>(thr)))) {
     RenderInstructions(gui, state, thr, 16);
   }
   gui->EndWindow();
 }
 
-void PPUThreadRegisters(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
+void PPUThreadRegisters(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
   if (!state)
     return;
   if (gui->BeginSimpleWindow(fmt::format("Registers [{}:{}]", state->ppuName, static_cast<u8>(thr)))) {
-    PPU_THREAD_REGISTERS &ppuRegisters = state->ppuThread[thr];
+    sPPUThread &ppuRegisters = state->ppuThread[thr];
     if (gui->BeginNode("GPRs")) {
       for (u64 i = 0; i < 32; ++i) {
         HexArr(gui, ppuRegisters.GPR, i);
@@ -426,7 +426,7 @@ void PPUThreadRegisters(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
       gui->EndNode();
     }
     if (gui->BeginNode("SPRs")) {
-      PPU_THREAD_SPRS &SPR = ppuRegisters.SPR;
+      sPPUThreadSPRs &SPR = ppuRegisters.SPR;
       if (gui->BeginNode("MSRs", ImGuiTreeNodeFlags_DefaultOpen)) {
         MSRegister &MSR = SPR.MSR;
         BFHex(gui, MSR, LE);
@@ -487,7 +487,7 @@ void PPUThreadRegisters(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
     }
     if (gui->BeginNode("SLBs")) {
       for (u64 i = 0; i < 64; ++i) {
-        SLBEntry &SLB = ppuRegisters.SLB[i];
+        sSLBEntry &SLB = ppuRegisters.SLB[i];
         if (gui->BeginNode(fmt::format("[{}]", i))) {
           U8Hex(gui, SLB, V);
           U8Hex(gui, SLB, LP);
@@ -505,7 +505,7 @@ void PPUThreadRegisters(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
       }
     }
     if (gui->BeginNode("GPR:CR")) {
-      CRegister &CR = ppuRegisters.CR;
+      uCRegister &CR = ppuRegisters.CR;
       Hex(gui, CR, CR_Hex);
       BFHex(gui, CR, CR0);
       BFHex(gui, CR, CR1);
@@ -518,7 +518,7 @@ void PPUThreadRegisters(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
       gui->EndNode();
     }
     if (gui->BeginNode("Op:CI")) {
-      PPCOpcode &CI = ppuRegisters.CI;
+      uPPCInstr &CI = ppuRegisters.CI;
       Hex(gui, CI, opcode);
       BFHex(gui, CI, main);
       BFHex(gui, CI, sh64);
@@ -574,7 +574,7 @@ void PPUThreadRegisters(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
       gui->EndNode();
     }
     if (gui->BeginNode("FPSCR")) {
-      FPSCRegister& FPSCR = ppuRegisters.FPSCR;
+      uFPSCRegister& FPSCR = ppuRegisters.FPSCR;
       Hex(gui, FPSCR, FPSCR_Hex);
       BFHex(gui, FPSCR, RN);
       BFHex(gui, FPSCR, NI);
@@ -620,8 +620,6 @@ void PPUThreadRegisters(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
     Hex(gui, ppuRegisters, NIA);
     Bool(gui, ppuRegisters, instrFetch);
     Hex(gui, ppuRegisters, exceptReg);
-    Bool(gui, ppuRegisters, exceptionTaken);
-    Hex(gui, ppuRegisters, exceptEA);
     Hex(gui, ppuRegisters, progExceptionType);
     Bool(gui, ppuRegisters, exceptHVSysCall);
     Hex(gui, ppuRegisters, intEA);
@@ -633,12 +631,12 @@ void PPUThreadRegisters(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
 
 bool rebuildThreadDS[6]{};
 bool builtWithDisassembly[6]{};
-void PPUThreadDockSpace(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
+void PPUThreadDockSpace(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
   if (!state)
     return;
   if (gui->BeginSimpleWindow(fmt::format("{} [{}]", static_cast<u8>(thr), state->ppuName))) {
     std::string id = fmt::format("{}:{}_DS", state->ppuName, static_cast<u8>(thr));
-    PPU_THREAD_REGISTERS &thread = state->ppuThread[thr];
+    sPPUThread &thread = state->ppuThread[thr];
     ImGuiID dsId = ImGui::GetID(id.c_str());
     if (!ImGui::DockBuilderGetNode(dsId) || (rebuildThreadDS[thread.SPR.PIR] && !builtWithDisassembly[thread.SPR.PIR])) {
       ImGui::DockBuilderRemoveNode(dsId);
@@ -670,13 +668,13 @@ void PPUThreadDockSpace(Render::GUI *gui, PPU_STATE *state, ePPUThread thr) {
   gui->EndWindow();
 }
 
-void PPURegisters(Render::GUI *gui, PPU_STATE *state) {
+void PPURegisters(Render::GUI *gui, sPPEState *state) {
   if (gui->BeginSimpleWindow(fmt::format("Registers [{}]", state->ppuID))) {
     Xenon *CPU = XeMain::GetCPU();
     if (!CPU)
       return;
     if (gui->BeginNode("SPR")) {
-      PPU_STATE_SPRS &SPR = state->SPR;
+      sPPESPRs &SPR = state->SPR;
       Hex(gui, SPR, SDR1);
       Hex(gui, SPR, CTRL);
       Hex(gui, SPR, TB);
@@ -766,7 +764,6 @@ void PPURegisters(Render::GUI *gui, PPU_STATE *state) {
     }
     Custom(gui, ppuName, "{}", state->ppuName);
     U8DecPtr(gui, state, currentThread);
-    BoolPtr(gui, state, translationInProgress);
   }
   gui->EndWindow();
 }
@@ -775,7 +772,7 @@ void PPUDockSpace(Render::GUI *gui, PPU *PPU) {
   if (!PPU)
     return;
 
-  PPU_STATE *state = PPU->GetPPUState();
+  sPPEState *state = PPU->GetPPUState();
   if (!state)
     return;
 
@@ -820,7 +817,7 @@ void PPUDockSpace(Render::GUI *gui, PPU *PPU) {
 
     PPURegisters(gui, state);
     for (u8 i = 0; i != 2; ++i) {
-      PPUThreadDockSpace(gui, state, static_cast<ePPUThread>(i));
+      PPUThreadDockSpace(gui, state, static_cast<ePPUThreadID>(i));
     }
   }
   gui->EndWindow();

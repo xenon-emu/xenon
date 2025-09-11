@@ -5,7 +5,7 @@
 #include <unordered_map>
 
 #include "Base/SystemDevice.h"
-#include "Core/RootBus/HostBridge/HostBridge.h"
+#include "Core/PCI/Bridge/HostBridge.h"
 
 // PCI Configuration region
 #define PCI_CONFIG_REGION_ADDRESS 0xD0000000

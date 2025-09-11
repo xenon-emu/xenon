@@ -10,7 +10,7 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPa
   xenonContext = std::make_unique<STRIP_UNIQUE(xenonContext)>(inBus, ramPtr); // Threads 0-1
 
   // Set SROM to 0.
-  memset(xenonContext->SROM, 0, XE_SROM_SIZE);
+  memset(xenonContext->SROM.get(), 0, XE_SROM_SIZE);
 
   // Populate FuseSet
   {
@@ -68,7 +68,7 @@ Xenon::Xenon(RootBus *inBus, const std::string blPath, const std::string fusesPa
       }
 
       if (fileSize == XE_SROM_SIZE) {
-        file.read(reinterpret_cast<char *>(xenonContext->SROM), XE_SROM_SIZE);
+        file.read(reinterpret_cast<char*>(xenonContext->SROM.get()), XE_SROM_SIZE);
         LOG_INFO(Xenon, "1BL Loaded.");
       }
     }
@@ -144,8 +144,7 @@ void Xenon::LoadElf(const std::string path) {
       fileSize = 0;
       LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of {} (Error: {})", filePath.string(), ec.message());
     }
-  }
-  catch (const std::exception& ex) {
+  } catch (const std::exception &ex) {
     LOG_ERROR(Base_Filesystem, "Exception trying to get file size. Exception: {}",
       ex.what());
     return;
@@ -176,7 +175,7 @@ void Xenon::Reset() {
   std::this_thread::sleep_for(200ms);
 }
 
-void Xenon::Halt(u64 haltOn, bool requestedByGuest, u8 ppuId, ePPUThread threadId) {
+void Xenon::Halt(u64 haltOn, bool requestedByGuest, u8 ppuId, ePPUThreadID threadId) {
   if (ppu0.get())
     ppu0->Halt(haltOn, requestedByGuest, ppuId, threadId);
   if (ppu1.get())

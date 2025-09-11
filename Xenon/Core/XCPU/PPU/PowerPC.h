@@ -9,12 +9,7 @@
 #include "Base/Bitfield.h"
 #include "Base/LRUCache.h"
 #include "Base/Vector128.h"
-#include "Core/RAM/RAM.h"
-#include "Core/XCPU/eFuse.h"
-#include "Core/XCPU/IIC/IIC.h"
-#include "Core/XCPU/XenonSOC.h"
-#include "Core/RootBus/RootBus.h"
-#include "Core/XCPU/XenonReservations.h"
+#include "Core/XCPU/Context/Reservations/XenonReservations.h"
 
 
 // PowerPC Opcode definitions
@@ -26,7 +21,8 @@
 */
 template<typename T, u32 I, u32 N>
 using PPCBitfield = bitfield<T, sizeof(T) * 8 - N - I, N>;
-union PPCOpcode {
+// PowerPC Instruction bitfields. Includes VMX128 bitfields.
+union uPPCInstr {
   u32 opcode;
   PPCBitfield<u32, 0, 6> main; // 0..5
   ControlField<PPCBitfield<u32, 30, 1>, PPCBitfield<u32, 16, 5>> sh64; // 30 + 16..20
@@ -216,7 +212,7 @@ can be the implicit result of an integer instruction. * CR1 can be the implicit
 result of a floating-point instruction. * A specified CR field can indicate the
 result of either an integer or floating-point compare instruction
 */
-union CRegister {
+union uCRegister {
   u32 CR_Hex;
   // Individual Bit access.
   u8 bits[32];
@@ -248,7 +244,7 @@ enum eFPRoundMode : u32 {
 /*
 Floating-Point Status and Control Register (FPSCR)
 */
-union FPSCRegister {
+union uFPSCRegister {
   // Rounding mode (towards: nearest, zero, +inf, -inf)
   PPCBitfield<eFPRoundMode, 30, 2> RN;
   // Non-IEEE mode enable (aka flush-to-zero)
@@ -318,18 +314,18 @@ union FPSCRegister {
   // are ignored by hardware, we set a mask in order to mimic this.
   static constexpr u32 fpscrMask = 0xFFFFF7FF;
 
-  FPSCRegister() = default;
-  explicit FPSCRegister(u32 hexValue) : FPSCR_Hex{ hexValue & fpscrMask } {}
+  uFPSCRegister() = default;
+  explicit uFPSCRegister(u32 hexValue) : FPSCR_Hex{ hexValue & fpscrMask } {}
 
   u8& operator[](u8 bitIdx) { return bits[bitIdx]; }
 
-  FPSCRegister& operator=(u32 inValue) { FPSCR_Hex = inValue & fpscrMask; return *this; }
+  uFPSCRegister& operator=(u32 inValue) { FPSCR_Hex = inValue & fpscrMask; return *this; }
 
-  FPSCRegister& operator|=(u32 inValue) { FPSCR_Hex |= inValue & fpscrMask; return *this; }
+  uFPSCRegister& operator|=(u32 inValue) { FPSCR_Hex |= inValue & fpscrMask; return *this; }
 
-  FPSCRegister& operator&=(u32 inValue) { FPSCR_Hex &= inValue; return *this; }
+  uFPSCRegister& operator&=(u32 inValue) { FPSCR_Hex &= inValue; return *this; }
 
-  FPSCRegister& operator^=(u32 inValue) { FPSCR_Hex ^= inValue & fpscrMask; return *this; }
+  uFPSCRegister& operator^=(u32 inValue) { FPSCR_Hex ^= inValue & fpscrMask; return *this; }
 
   // Clears both Fraction Inexact and Fraction Rounded bits.
   void clearFIFR() { FI = 0; FR = 0; }
@@ -456,7 +452,7 @@ union PVRegister {
 };
 
 // Vector Status and Control Register
-union VSCRegister {
+union uVSCRegister {
   u32 hexValue;
 #ifdef __LITTLE_ENDIAN__
   struct {
@@ -506,7 +502,7 @@ union uHID6SPR {
 };
 
 // Segment Lookaside Buffer Entry
-struct SLBEntry {
+struct sSLBEntry {
   u8 V;
   u8 LP; // Large Page selector
   u8 C;
@@ -536,8 +532,8 @@ struct TLB_Reg {
   TLBEntry tlbSet3[256];
 };
 
-// This SPR's are duplicated for every thread.
-struct PPU_THREAD_SPRS {
+// PPU Specific SPR's. They are duplicated by thread.
+struct sPPUThreadSPRs {
   // Fixed Point Exception Register (XER)
   XERegister XER;
   // Link Register
@@ -589,8 +585,9 @@ struct PPU_THREAD_SPRS {
   // Processor Identification Register
   u32 PIR;
 };
-// This contains SPR's that are shared by both threads.
-struct PPU_STATE_SPRS {
+
+// This contains SPR's belonging to the PPE, this means that they are shared by both threads.
+struct sPPESPRs {
   // Storage Description Register 1
   u64 SDR1;
   // Control Register
@@ -633,7 +630,7 @@ struct PPU_STATE_SPRS {
 };
 
 // Thread IDs for ease of handling
-enum ePPUThread : u8 {
+enum ePPUThreadID : u8 {
   ePPUThread_Zero = 0,
   ePPUThread_One,
   ePPUThread_None
@@ -720,17 +717,17 @@ public:
 //
 
 // This contains all registers that are duplicated per thread.
-struct PPU_THREAD_REGISTERS {
+struct sPPUThread {
   // Special purpose registers
-  PPU_THREAD_SPRS SPR;
+  sPPUThreadSPRs SPR;
   // Current Instruction Address
   u64 CIA;
   // Next Instruction Address
   u64 NIA;
   // Previous Instruction Address (Useful for debugging purposes)
   u64 PIA;
-  // Current instruction data
-  PPCOpcode CI;
+  // Current instruction data and bitfields.
+  uPPCInstr CI;
   // Instruction fetch flag
   bool instrFetch = false;
   // General-Purpose Registers (32)
@@ -740,16 +737,15 @@ struct PPU_THREAD_REGISTERS {
   // Vector Registers (128)
   Base::Vector128 VR[128]{};
   // Condition Register
-  CRegister CR;
+  uCRegister CR;
   // Floating-Point Status Control Register
-  FPSCRegister FPSCR;
+  uFPSCRegister FPSCR;
   // Segment Lookaside Buffer
-  SLBEntry SLB[64]{};
+  sSLBEntry SLB[64]{};
   // Vector Status and Control Register
-  VSCRegister VSCR;
+  uVSCRegister VSCR;
 
   // ERAT's
-
   LRUCache iERAT{}; // Instruction effective to real address cache.
   LRUCache dERAT{}; // Data effective to real address cache.
 
@@ -757,10 +753,6 @@ struct PPU_THREAD_REGISTERS {
   u16 exceptReg = 0;
   // Program Exception Type
   u16 progExceptionType = 0;
-  // Tells wheter we're currently processing an exception.
-  bool exceptionTaken = false;
-  // For use with Data/Instruction Storage/Segment exceptions.
-  u64 exceptEA = 0;
   // SystemCall Type
   bool exceptHVSysCall = false;
 
@@ -771,135 +763,42 @@ struct PPU_THREAD_REGISTERS {
   u64 lastWriteAddress = 0;
   u64 lastRegValue = 0;
 
+  // PPU reservations for PPC atomic load/store operations.
   std::unique_ptr<PPU_RES> ppuRes{};
 };
 
-struct PPU_STATE {
-  ~PPU_STATE() {
+// The structure of the Xenon CPU differs from that on the CELL/BE in that instead of having one PPE and 8 SPE's
+// it contains 3 parallel PPE's each managing two threads (one physical and one logical).
+// Should be depicted as follows:
+/*
+* Xenon XCPU --->PPE 0 --- PPU Thread 0
+*             |            PPU Thread 1
+*             |->PPE 1 --- PPU Thread 2
+*             |            PPU Thread 3
+*             |->PPE 2 --- PPU Thread 4
+*                          PPU Thread 5
+*/
+
+// Power Processor Element (PPE)
+struct sPPEState {
+  ~sPPEState() {
     for (u8 i = 0; i < 2; ++i) {
+      // Clear reservations.
       ppuThread[i].ppuRes.reset();
     }
   }
-  // Thread Specific State.
-  PPU_THREAD_REGISTERS ppuThread[2] = {};
-  // Current executing thread.
-  ePPUThread currentThread = ePPUThread_Zero;
+  // Power Processing Unit Threads
+  sPPUThread ppuThread[2] = {};
+  // Current executing thread ID.
+  ePPUThreadID currentThread = ePPUThread_Zero;
   // Shared Special Purpose Registers.
-  PPU_STATE_SPRS SPR{};
+  sPPESPRs SPR{};
   // Translation Lookaside Buffer
   TLB_Reg TLB{};
-  // Address Translation Flag
-  bool translationInProgress = false;
   // Current PPU Name, for ease of debugging.
   std::string ppuName{};
   // PPU ID
   u8 ppuID = 0;
-};
-
-// Main Xenon CPU 'context'. Holds everything aside from the PPU cores and is shared for all threads.
-struct XenonContext {
-  XenonContext(RootBus *rootBusPtr, RAM *ramPtr) : rootBus(rootBusPtr), ram(ramPtr) {}
-  ~XenonContext() {
-    delete[] SROM;
-    delete[] SRAM;
-  }
-
-  // Xenon SecureROM
-  // Contains the CPU's main startup code known as 1BL.
-  u8 *SROM = new u8[XE_SROM_SIZE];
-
-  // Xenon SecureRAM
-  // The SRAM is used during the early boot process for the CPU to decrypt the second stage booloader on the system.
-  // It is also used in conjuction with the Xenon's 'Security Engine' for cryptographic purposes (Holds the keyset 
-  // generated by it).
-  u8 *SRAM = new u8[XE_SRAM_SIZE];
-
-  // Xenon eFuses
-  // Each Xenon CPU has a built-in One-Time-Programmable storage (768 bits) that contains per-cpu data and security
-  // flags, these include:
-  // * Console type (Devkit/Retail)
-  // * SB/CB (Second stage bootloaders (Devkit/Retail respectively)) 'lockdown value'.
-  // * CPU 'Key'. A 16 byte string that it's used during the boot process for cryptographic and security purposes.
-  // * SD/CD (Kernel) 'lockdown value'. 
-  eFuses fuseSet = {};
-
-  // Xenon Integrated Interrupt Controller
-  // This is a built-in interrupt controller that holds and coordinates interrupts betweeen the PPU's and the 
-  // external system peripherals.
-  Xe::XCPU::IIC::XenonIIC xenonIIC = {};
-
-  // Used for conditional load/store instructions regarding PowerPC atomic operations.
-  XenonReservations xenonRes = {};
-
-  // Time Base switch, possibly RTC register, the TB counter only runs if this
-  // value is set.
-  bool timeBaseActive = false;
-
-  // RAM/RootBus getters.
-  RootBus *GetRootBus() { return rootBus; }
-  RAM *GetRAM() { return ram; }
-
-  // Xenon SOC Blocks R/W methods.
-  bool HandleSOCRead(u64 readAddr, u8* data, size_t byteCount);
-  bool HandleSOCWrite(u64 writeAddr, const u8* data, size_t byteCount);
-
-  //
-  // SOC Blocks.
-  // 
-
-  // Secure OTP Block.
-  std::unique_ptr<Xe::XCPU::SOC::SOCSECOTP_ARRAY> socSecOTPBlock = std::make_unique<Xe::XCPU::SOC::SOCSECOTP_ARRAY>();
-
-  // Security Engine Block.
-  std::unique_ptr<Xe::XCPU::SOC::SOCSECENG_BLOCK> socSecEngBlock = std::make_unique<Xe::XCPU::SOC::SOCSECENG_BLOCK>();
-
-  // Secure RNG Block.
-  std::unique_ptr<Xe::XCPU::SOC::SOCSECRNG_BLOCK> socSecRNGBlock = std::make_unique<Xe::XCPU::SOC::SOCSECRNG_BLOCK>();
-
-  // CBI Block.
-  std::unique_ptr<Xe::XCPU::SOC::SOCCBI_BLOCK> socCBIBlock = std::make_unique<Xe::XCPU::SOC::SOCCBI_BLOCK>();
-
-  // PMW Block.
-  std::unique_ptr<Xe::XCPU::SOC::SOCPMW_BLOCK> socPMWBlock = std::make_unique<Xe::XCPU::SOC::SOCPMW_BLOCK>();
-
-  // Pervasive Block.
-  std::unique_ptr<Xe::XCPU::SOC::SOCPRV_BLOCK> socPRVBlock = std::make_unique<Xe::XCPU::SOC::SOCPRV_BLOCK>();
-
-private:
-  // Mutex for thread safety.
-  std::recursive_mutex mutex{};
-
-  // RootBus pointer.
-  RootBus *rootBus{};
-
-  // RAM pointer.
-  RAM *ram{};
-
-  // SOC Blocks R/W.
-
-  // Security Engine Block.
-  bool HandleSecEngRead(u64 readAddr, u8* data, size_t byteCount);
-  bool HandleSecEngWrite(u64 writeAddr, const u8* data, size_t byteCount);
-
-  // Secure OTP Block.
-  bool HandleSecOTPRead(u64 readAddr, u8* data, size_t byteCount);
-  bool HandleSecOTPWrite(u64 writeAddr, const u8* data, size_t byteCount);
-
-  // Secure RNG Block.
-  bool HandleSecRNGRead(u64 readAddr, u8* data, size_t byteCount);
-  bool HandleSecRNGWrite(u64 writeAddr, const u8* data, size_t byteCount);
-
-  // CBI Block.
-  bool HandleCBIRead(u64 readAddr, u8* data, size_t byteCount);
-  bool HandleCBIWrite(u64 writeAddr, const u8* data, size_t byteCount);
-
-  // PMW Block.
-  bool HandlePMWRead(u64 readAddr, u8* data, size_t byteCount);
-  bool HandlePMWWrite(u64 writeAddr, const u8* data, size_t byteCount);
-
-  // Pervasive logic Block.
-  bool HandlePRVRead(u64 readAddr, u8* data, size_t byteCount);
-  bool HandlePRVWrite(u64 writeAddr, const u8* data, size_t byteCount);
 };
 
 //

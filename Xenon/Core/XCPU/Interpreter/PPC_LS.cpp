@@ -122,19 +122,19 @@ inline u32 ConvertToSingle(u64 inValue) {
 //
 
 // Data Cache Block Store
-void PPCInterpreter::PPCInterpreter_dcbst(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_dcbst(sPPEState *ppeState) {
   // Temporarily disable caching
   return;
 }
 
 // Data Cache Block set to Zero
-void PPCInterpreter::PPCInterpreter_dcbz(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_dcbz(sPPEState *ppeState) {
   u64 EA = (_instr.ra ? GPRi(ra) : 0) + GPRi(rb);
   EA = EA & ~(128 - 1); // Cache line size
 
   // Temporarily disable caching
   for (u8 n = 0; n < 128; n += sizeof(u64))
-    MMUWrite64(ppuState, EA + n, 0);
+    MMUWrite64(ppeState, EA + n, 0);
   return;
 
   // As far as I can tell, XCPU does all the crypto, scrambling of
@@ -143,12 +143,12 @@ void PPCInterpreter::PPCInterpreter_dcbz(PPU_STATE *ppuState) {
 }
 
 // Instruction Cache Block Invalidate
-void PPCInterpreter::PPCInterpreter_icbi(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_icbi(sPPEState *ppeState) {
   // Do nothing
 }
 
 // Store Byte (x'9800 0000')
-void PPCInterpreter::PPCInterpreter_stb(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stb(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -157,18 +157,18 @@ void PPCInterpreter::PPCInterpreter_stb(PPU_STATE *ppuState) {
   */
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  MMUWrite8(ppuState, EA, static_cast<u8>(GPRi(rs)));
+  MMUWrite8(ppeState, EA, static_cast<u8>(GPRi(rs)));
 }
 
 // Store Byte with Update (x'9C00 0000')
-void PPCInterpreter::PPCInterpreter_stbu(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stbu(sPPEState *ppeState) {
   /*
   EA <- (rA) + EXTS(d)
   MEM(EA, 1) <- rS[56-63]
   rA <- EA
   */
   const u64 EA = GPRi(ra) + _instr.simm16;
-  MMUWrite8(ppuState, EA, static_cast<u8>(GPRi(rs)));
+  MMUWrite8(ppeState, EA, static_cast<u8>(GPRi(rs)));
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -177,14 +177,14 @@ void PPCInterpreter::PPCInterpreter_stbu(PPU_STATE *ppuState) {
 }
 
 // Store Byte with Update Indexed (x'7C00 01EE')
-void PPCInterpreter::PPCInterpreter_stbux(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stbux(sPPEState *ppeState) {
   /*
   EA <- (rA) + (rB)
   MEM(EA, 1) <- rS[56-63]
   rA <- EA
   */
   const u64 EA = GPRi(ra) + GPRi(rb);
-  MMUWrite8(ppuState, EA, static_cast<u8>(GPRi(rs)));
+  MMUWrite8(ppeState, EA, static_cast<u8>(GPRi(rs)));
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -193,7 +193,7 @@ void PPCInterpreter::PPCInterpreter_stbux(PPU_STATE *ppuState) {
 }
 
 // Store Byte Indexed (x'7C00 01AE')
-void PPCInterpreter::PPCInterpreter_stbx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stbx(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -201,7 +201,7 @@ void PPCInterpreter::PPCInterpreter_stbx(PPU_STATE *ppuState) {
   MEM(EA, 1) <- rS[56-63]
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite8(ppuState, EA, static_cast<u8>(GPRi(rs)));
+  MMUWrite8(ppeState, EA, static_cast<u8>(GPRi(rs)));
 }
 
 //
@@ -209,7 +209,7 @@ void PPCInterpreter::PPCInterpreter_stbx(PPU_STATE *ppuState) {
 //
 
 // Store Half Word (x'B000 0000')
-void PPCInterpreter::PPCInterpreter_sth(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_sth(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -217,11 +217,11 @@ void PPCInterpreter::PPCInterpreter_sth(PPU_STATE *ppuState) {
   MEM(EA, 2) <- rS[48-6316-31]
   */
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  MMUWrite16(ppuState, EA, static_cast<u16>(GPRi(rs)));
+  MMUWrite16(ppeState, EA, static_cast<u16>(GPRi(rs)));
 }
 
 // Store Half Word Byte-Reverse Indexed (x'7C00 072C')
-void PPCInterpreter::PPCInterpreter_sthbrx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_sthbrx(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -229,18 +229,18 @@ void PPCInterpreter::PPCInterpreter_sthbrx(PPU_STATE *ppuState) {
   MEM(EA, 2) <- rS[56-63] || rS[48-55]
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite16(ppuState, EA, byteswap_be<u16>(static_cast<u16>(GPRi(rs))));
+  MMUWrite16(ppeState, EA, byteswap_be<u16>(static_cast<u16>(GPRi(rs))));
 }
 
 // Store Half Word with Update (x'B400 0000')
-void PPCInterpreter::PPCInterpreter_sthu(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_sthu(sPPEState *ppeState) {
   /*
   EA <- (rA) + EXTS(d)
   MEM(EA, 2) <- rS[48-63]
   rA <- EA
   */
   const u64 EA = GPRi(ra) + _instr.simm16;
-  MMUWrite16(ppuState, EA, static_cast<u16>(GPRi(rs)));
+  MMUWrite16(ppeState, EA, static_cast<u16>(GPRi(rs)));
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -249,14 +249,14 @@ void PPCInterpreter::PPCInterpreter_sthu(PPU_STATE *ppuState) {
 }
 
 // Store Half Word with Update Indexed (x'7C00 036E')
-void PPCInterpreter::PPCInterpreter_sthux(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_sthux(sPPEState *ppeState) {
   /*
   EA <- (rA) + (rB)
   MEM(EA, 2) <- rS[48-63]
   rA <- EA
   */
   const u64 EA = GPRi(ra) + GPRi(rb);
-  MMUWrite16(ppuState, EA, static_cast<u16>(GPRi(rs)));
+  MMUWrite16(ppeState, EA, static_cast<u16>(GPRi(rs)));
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -265,7 +265,7 @@ void PPCInterpreter::PPCInterpreter_sthux(PPU_STATE *ppuState) {
 }
 
 // Store Half Word Indexed (x'7C00 032E')
-void PPCInterpreter::PPCInterpreter_sthx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_sthx(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -273,11 +273,11 @@ void PPCInterpreter::PPCInterpreter_sthx(PPU_STATE *ppuState) {
   MEM(EA, 2) <- rS[48-63]
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite16(ppuState, EA, static_cast<u16>(GPRi(rs)));
+  MMUWrite16(ppeState, EA, static_cast<u16>(GPRi(rs)));
 }
 
 // Store Multiple Word (x'BC00 0000')
-void PPCInterpreter::PPCInterpreter_stmw(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stmw(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -291,12 +291,12 @@ void PPCInterpreter::PPCInterpreter_stmw(PPU_STATE *ppuState) {
 
   u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
   for (u32 idx = _instr.rs; idx < 32; ++idx, EA += 4) {
-    MMUWrite32(ppuState, EA, static_cast<u32>(GPR(idx)));
+    MMUWrite32(ppeState, EA, static_cast<u32>(GPR(idx)));
   }
 }
 
 // Store String Word Immediate (x'7C00 05AA')
-void PPCInterpreter::PPCInterpreter_stswi(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stswi(sPPEState *ppeState) {
   /*
   if rA = 0 then EA <- 0
   else EA <- (rA)
@@ -319,14 +319,14 @@ void PPCInterpreter::PPCInterpreter_stswi(PPU_STATE *ppuState) {
 
   while (N > 0) {
     if (N > 3) {
-      MMUWrite32(ppuState, EA, static_cast<u32>(GPR(reg)));
+      MMUWrite32(ppeState, EA, static_cast<u32>(GPR(reg)));
       EA += 4;
       N -= 4;
     } else {
       u32 buf = static_cast<u32>(GPR(reg));
       while (N > 0) {
         N = N - 1;
-        MMUWrite8(ppuState, EA, (0xFF000000 & buf) >> 24);
+        MMUWrite8(ppeState, EA, (0xFF000000 & buf) >> 24);
         buf <<= 8;
         EA++;
       }
@@ -340,7 +340,7 @@ void PPCInterpreter::PPCInterpreter_stswi(PPU_STATE *ppuState) {
 //
 
 // Store Word (x'9000 0000')
-void PPCInterpreter::PPCInterpreter_stw(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stw(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -348,11 +348,11 @@ void PPCInterpreter::PPCInterpreter_stw(PPU_STATE *ppuState) {
   MEM(EA, 4) <- rS[32-63]
   */
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  MMUWrite32(ppuState, EA, static_cast<u32>(GPRi(rs)));
+  MMUWrite32(ppeState, EA, static_cast<u32>(GPRi(rs)));
 }
 
 // Store Word Byte-Reverse Indexed (x'7C00 052C')
-void PPCInterpreter::PPCInterpreter_stwbrx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stwbrx(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -360,11 +360,11 @@ void PPCInterpreter::PPCInterpreter_stwbrx(PPU_STATE *ppuState) {
   MEM(EA, 4) <- rS[56-63] || rS[48-55] || rS[40-47] || rS[32-39]
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite32(ppuState, EA, byteswap_be<u32>(static_cast<u32>(GPRi(rs))));
+  MMUWrite32(ppeState, EA, byteswap_be<u32>(static_cast<u32>(GPRi(rs))));
 }
 
 // Store Word Conditional Indexed (x'7C00 012D')
-void PPCInterpreter::PPCInterpreter_stwcx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stwcx(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -391,7 +391,7 @@ void PPCInterpreter::PPCInterpreter_stwcx(PPU_STATE *ppuState) {
     BSET(CR, 4, CR_BIT_SO);
 
   // Translate address
-  MMUTranslateAddress(&RA, ppuState, true);
+  MMUTranslateAddress(&RA, ppeState, true);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -400,7 +400,7 @@ void PPCInterpreter::PPCInterpreter_stwcx(PPU_STATE *ppuState) {
     xenonContext->xenonRes.LockGuard([&] {
       if (curThread.ppuRes->valid) {
         if (curThread.ppuRes->reservedAddr == RA) {
-          MMUWrite32(ppuState, EA, static_cast<u32>(GPRi(rs)));
+          MMUWrite32(ppeState, EA, static_cast<u32>(GPRi(rs)));
           BSET(CR, 4, CR_BIT_EQ);
         } else {
           xenonContext->xenonRes.Decrement();
@@ -410,18 +410,18 @@ void PPCInterpreter::PPCInterpreter_stwcx(PPU_STATE *ppuState) {
     });
   }
 
-  ppcUpdateCR(ppuState, 0, CR);
+  ppcUpdateCR(ppeState, 0, CR);
 }
 
 // Store Word with Update (x'9400 0000')
-void PPCInterpreter::PPCInterpreter_stwu(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stwu(sPPEState *ppeState) {
   /*
   EA <- (rA) + EXTS(d)
   MEM(EA, 4) <- rS[32-63]
   rA <- EA
   */
   const u64 EA = GPRi(ra) + _instr.simm16;
-  MMUWrite32(ppuState, EA, static_cast<u32>(GPRi(rs)));
+  MMUWrite32(ppeState, EA, static_cast<u32>(GPRi(rs)));
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -430,14 +430,14 @@ void PPCInterpreter::PPCInterpreter_stwu(PPU_STATE *ppuState) {
 }
 
 // Store Word with Update Indexed (x'7C00 016E')
-void PPCInterpreter::PPCInterpreter_stwux(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stwux(sPPEState *ppeState) {
   /*
   EA <- (rA) + (rB)
   MEM(EA, 4) <- rS[32-63]
   rA <- EA
   */
   const u64 EA = GPRi(ra) + GPRi(rb);
-  MMUWrite32(ppuState, EA, static_cast<u32>(GPRi(rs)));
+  MMUWrite32(ppeState, EA, static_cast<u32>(GPRi(rs)));
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -446,7 +446,7 @@ void PPCInterpreter::PPCInterpreter_stwux(PPU_STATE *ppuState) {
 }
 
 // Store Word Indexed (x'7C00 012E')
-void PPCInterpreter::PPCInterpreter_stwx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stwx(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -454,7 +454,7 @@ void PPCInterpreter::PPCInterpreter_stwx(PPU_STATE *ppuState) {
   MEM(EA, 4) <- rS[32-63]
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite32(ppuState, EA, static_cast<u32>(GPRi(rs)));
+  MMUWrite32(ppeState, EA, static_cast<u32>(GPRi(rs)));
 }
 
 //
@@ -462,7 +462,7 @@ void PPCInterpreter::PPCInterpreter_stwx(PPU_STATE *ppuState) {
 //
 
 // Store Double Word (x'F800 0000')
-void PPCInterpreter::PPCInterpreter_std(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_std(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -470,11 +470,11 @@ void PPCInterpreter::PPCInterpreter_std(PPU_STATE *ppuState) {
   (MEM(EA, 8)) <- (rS)
   */
   const u64 EA = (_instr.simm16 & ~3) + (_instr.ra ? GPRi(ra) : 0);
-  MMUWrite64(ppuState, EA, GPRi(rs));
+  MMUWrite64(ppeState, EA, GPRi(rs));
 }
 
 // Store Double Word Conditional Indexed (x'7C00 01AD')
-void PPCInterpreter::PPCInterpreter_stdcx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stdcx(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -500,7 +500,7 @@ void PPCInterpreter::PPCInterpreter_stdcx(PPU_STATE *ppuState) {
 
   // TODO: If the address is not aligned by 4, then we must issue a trap.
 
-  MMUTranslateAddress(&RA, ppuState, true);
+  MMUTranslateAddress(&RA, ppeState, true);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -509,7 +509,7 @@ void PPCInterpreter::PPCInterpreter_stdcx(PPU_STATE *ppuState) {
     xenonContext->xenonRes.LockGuard([&] {
       if (curThread.ppuRes->valid) {
         if (curThread.ppuRes->reservedAddr == RA) {
-          MMUWrite64(ppuState, EA, GPRi(rd));
+          MMUWrite64(ppeState, EA, GPRi(rd));
           BSET(CR, 4, CR_BIT_EQ);
         } else {
           xenonContext->xenonRes.Decrement();
@@ -519,18 +519,18 @@ void PPCInterpreter::PPCInterpreter_stdcx(PPU_STATE *ppuState) {
     });
   }
 
-  ppcUpdateCR(ppuState, 0, CR);
+  ppcUpdateCR(ppeState, 0, CR);
 }
 
 // Store Double Word with Update (x'F800 0001')
-void PPCInterpreter::PPCInterpreter_stdu(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stdu(sPPEState *ppeState) {
   /*
   EA <- (rA) + EXTS(ds || 0b00)
   (MEM(EA, 8)) <- (rS)
   rA <- EA
   */
   const u64 EA = GPRi(ra) + (_instr.simm16 & ~3);
-  MMUWrite64(ppuState, EA, GPRi(rs));
+  MMUWrite64(ppeState, EA, GPRi(rs));
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -539,14 +539,14 @@ void PPCInterpreter::PPCInterpreter_stdu(PPU_STATE *ppuState) {
 }
 
 // Store Double Word with Update Indexed (x'7C00 016A')
-void PPCInterpreter::PPCInterpreter_stdux(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stdux(sPPEState *ppeState) {
   /*
   EA <- (rA) + (rB)
   MEM(EA, 8) <- (rS)
   rA <- EA
   */
   const u64 EA = GPRi(ra) + GPRi(rb);
-  MMUWrite64(ppuState, EA, GPRi(rs));
+  MMUWrite64(ppeState, EA, GPRi(rs));
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -555,7 +555,7 @@ void PPCInterpreter::PPCInterpreter_stdux(PPU_STATE *ppuState) {
 }
 
 // Store Double Word Indexed (x'7C00 012A')
-void PPCInterpreter::PPCInterpreter_stdx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stdx(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -563,7 +563,7 @@ void PPCInterpreter::PPCInterpreter_stdx(PPU_STATE *ppuState) {
   (MEM(EA, 8)) <- (rS)
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite64(ppuState, EA, GPRi(rs));
+  MMUWrite64(ppeState, EA, GPRi(rs));
 }
 
 //
@@ -571,7 +571,7 @@ void PPCInterpreter::PPCInterpreter_stdx(PPU_STATE *ppuState) {
 //
 
 // Store Floating-Point Single (x'D000 0000')
-void PPCInterpreter::PPCInterpreter_stfs(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stfs(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -582,11 +582,11 @@ void PPCInterpreter::PPCInterpreter_stfs(PPU_STATE *ppuState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  MMUWrite32(ppuState, EA, ConvertToSingle(FPRi(frs).asU64()));
+  MMUWrite32(ppeState, EA, ConvertToSingle(FPRi(frs).asU64()));
 }
 
 // Store Floating-Point Single with Update (x'D400 0000')
-void PPCInterpreter::PPCInterpreter_stfsu(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_stfsu(sPPEState* ppeState) {
   /*
   EA <- (rA) + EXTS(d)
   MEM(EA, 4) <-  SINGLE(frS)
@@ -596,7 +596,7 @@ void PPCInterpreter::PPCInterpreter_stfsu(PPU_STATE* ppuState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  MMUWrite32(ppuState, EA, ConvertToSingle(FPRi(frs).asU64()));
+  MMUWrite32(ppeState, EA, ConvertToSingle(FPRi(frs).asU64()));
   
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -605,7 +605,7 @@ void PPCInterpreter::PPCInterpreter_stfsu(PPU_STATE* ppuState) {
 }
 
 // Store Floating-Point Single with Update Indexed
-void PPCInterpreter::PPCInterpreter_stfsux(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_stfsux(sPPEState* ppeState) {
   /*
   EA <- (rA) + (rB)
   MEM(EA, 4) <-  SINGLE(frS)
@@ -615,7 +615,7 @@ void PPCInterpreter::PPCInterpreter_stfsux(PPU_STATE* ppuState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite32(ppuState, EA, ConvertToSingle(FPRi(frs).asU64()));
+  MMUWrite32(ppeState, EA, ConvertToSingle(FPRi(frs).asU64()));
   
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -624,7 +624,7 @@ void PPCInterpreter::PPCInterpreter_stfsux(PPU_STATE* ppuState) {
 }
 
 // Store Floating-Point Single Indexed (x'7C00 052E')
-void PPCInterpreter::PPCInterpreter_stfsx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stfsx(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -635,11 +635,11 @@ void PPCInterpreter::PPCInterpreter_stfsx(PPU_STATE *ppuState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite32(ppuState, EA, ConvertToSingle(FPRi(frs).asU64()));
+  MMUWrite32(ppeState, EA, ConvertToSingle(FPRi(frs).asU64()));
 }
 
 // Store Floating-Point Double (x'D800 0000')
-void PPCInterpreter::PPCInterpreter_stfd(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stfd(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -650,11 +650,11 @@ void PPCInterpreter::PPCInterpreter_stfd(PPU_STATE *ppuState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra || 1 ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  MMUWrite64(ppuState, EA, FPRi(frs).asU64());
+  MMUWrite64(ppeState, EA, FPRi(frs).asU64());
 }
 
 // Store Floating-Point Double Indexed
-void PPCInterpreter::PPCInterpreter_stfdx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stfdx(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -665,11 +665,11 @@ void PPCInterpreter::PPCInterpreter_stfdx(PPU_STATE *ppuState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra || 1 ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite64(ppuState, EA, FPRi(frs).asU64());
+  MMUWrite64(ppeState, EA, FPRi(frs).asU64());
 }
 
 // Store Floating-Point Double with Update
-void PPCInterpreter::PPCInterpreter_stfdu(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stfdu(sPPEState *ppeState) {
   /*
   EA <- (rA) + EXTS(d)
   MEM(EA, 8) <- (frS)
@@ -679,7 +679,7 @@ void PPCInterpreter::PPCInterpreter_stfdu(PPU_STATE *ppuState) {
   CHECK_FPU;
 
   const u64 EA = GPRi(ra) + _instr.simm16;
-  MMUWrite64(ppuState, EA, FPRi(frs).asU64());
+  MMUWrite64(ppeState, EA, FPRi(frs).asU64());
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -688,7 +688,7 @@ void PPCInterpreter::PPCInterpreter_stfdu(PPU_STATE *ppuState) {
 }
 
 // Store Floating-Point Double with Update Indexed
-void PPCInterpreter::PPCInterpreter_stfdux(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stfdux(sPPEState *ppeState) {
   /*
   EA <- (rA) + (rB)
   MEM(EA, 8) <- (frS)
@@ -698,7 +698,7 @@ void PPCInterpreter::PPCInterpreter_stfdux(PPU_STATE *ppuState) {
   CHECK_FPU;
 
   const u64 EA = GPRi(ra) + GPRi(rb);
-  MMUWrite64(ppuState, EA, FPRi(frs).asU64());
+  MMUWrite64(ppeState, EA, FPRi(frs).asU64());
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -707,7 +707,7 @@ void PPCInterpreter::PPCInterpreter_stfdux(PPU_STATE *ppuState) {
 }
 
 // Store Floating-Point as Integer Word Indexed (x'7C00 07AE')
-void PPCInterpreter::PPCInterpreter_stfiwx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stfiwx(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -718,7 +718,7 @@ void PPCInterpreter::PPCInterpreter_stfiwx(PPU_STATE *ppuState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite32(ppuState, EA, FPRi(frs).asU32());
+  MMUWrite32(ppeState, EA, FPRi(frs).asU32());
 }
 
 //
@@ -726,7 +726,7 @@ void PPCInterpreter::PPCInterpreter_stfiwx(PPU_STATE *ppuState) {
 //
 
 // Store Vector Indexed
-void PPCInterpreter::PPCInterpreter_stvx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stvx(sPPEState *ppeState) {
   /*
   if rA=0 then b <- 0
   else b <- (rA)
@@ -740,26 +740,26 @@ void PPCInterpreter::PPCInterpreter_stvx(PPU_STATE *ppuState) {
 
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
 
-  MMUWrite32(ppuState, EA, VRi(vs).dword[0]);
-  MMUWrite32(ppuState, EA + (sizeof(u32) * 1), VRi(vs).dword[1]);
-  MMUWrite32(ppuState, EA + (sizeof(u32) * 2), VRi(vs).dword[2]);
-  MMUWrite32(ppuState, EA + (sizeof(u32) * 3), VRi(vs).dword[3]);
+  MMUWrite32(ppeState, EA, VRi(vs).dword[0]);
+  MMUWrite32(ppeState, EA + (sizeof(u32) * 1), VRi(vs).dword[1]);
+  MMUWrite32(ppeState, EA + (sizeof(u32) * 2), VRi(vs).dword[2]);
+  MMUWrite32(ppeState, EA + (sizeof(u32) * 3), VRi(vs).dword[3]);
 }
 
 // Store Vector Indexed 128
-void PPCInterpreter::PPCInterpreter_stvx128(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_stvx128(sPPEState* ppeState) {
   CHECK_VXU;
 
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
 
-  MMUWrite32(ppuState, EA, VR(VMX128_1_VD128).dword[0]);
-  MMUWrite32(ppuState, EA + (sizeof(u32) * 1), VR(VMX128_1_VD128).dword[1]);
-  MMUWrite32(ppuState, EA + (sizeof(u32) * 2), VR(VMX128_1_VD128).dword[2]);
-  MMUWrite32(ppuState, EA + (sizeof(u32) * 3), VR(VMX128_1_VD128).dword[3]);
+  MMUWrite32(ppeState, EA, VR(VMX128_1_VD128).dword[0]);
+  MMUWrite32(ppeState, EA + (sizeof(u32) * 1), VR(VMX128_1_VD128).dword[1]);
+  MMUWrite32(ppeState, EA + (sizeof(u32) * 2), VR(VMX128_1_VD128).dword[2]);
+  MMUWrite32(ppeState, EA + (sizeof(u32) * 3), VR(VMX128_1_VD128).dword[3]);
 }
 
 // Store Vector Element Word Indexed (x'7C00 018E')
-void PPCInterpreter::PPCInterpreter_stvewx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_stvewx(sPPEState* ppeState) {
   /*
     if rA=0 then b <- 0
     else b <- (rA)
@@ -775,21 +775,21 @@ void PPCInterpreter::PPCInterpreter_stvewx(PPU_STATE* ppuState) {
   u64 EA = ((_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~3);
   const u8 eb = EA & 0xF;
 
-  MMUWrite32(ppuState, EA, VRi(vd).dword[eb / 4]);
+  MMUWrite32(ppeState, EA, VRi(vd).dword[eb / 4]);
 }
 
 // Store Vector Element Word Indexed 128
-void PPCInterpreter::PPCInterpreter_stvewx128(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_stvewx128(sPPEState* ppeState) {
   CHECK_VXU;
 
   u64 EA = ((_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~3);
   const u8 eb = EA & 0xF;
 
-  MMUWrite32(ppuState, EA, VR(VMX128_1_VD128).dword[eb / 4]);
+  MMUWrite32(ppeState, EA, VR(VMX128_1_VD128).dword[eb / 4]);
 }
 
 // Store Vector Right Indexed
-void PPCInterpreter::PPCInterpreter_stvrx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_stvrx(sPPEState* ppeState) {
   CHECK_VXU;
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
@@ -810,12 +810,12 @@ void PPCInterpreter::PPCInterpreter_stvrx(PPU_STATE* ppuState) {
 
   auto bytes = vec.bytes;
   for (u32 i = 0; i < eb; ++i) {
-    MMUWrite8(ppuState, EA + i, bytes[(16 - eb) + i]);
+    MMUWrite8(ppeState, EA + i, bytes[(16 - eb) + i]);
   }
 }
 
 // Store Vector Right Indexed 128
-void PPCInterpreter::PPCInterpreter_stvrx128(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_stvrx128(sPPEState* ppeState) {
   CHECK_VXU;
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
@@ -836,12 +836,12 @@ void PPCInterpreter::PPCInterpreter_stvrx128(PPU_STATE* ppuState) {
 
   auto bytes = vec.bytes;
   for (u32 i = 0; i < eb; ++i) {
-    MMUWrite8(ppuState, EA + i, bytes[(16 - eb) + i]);
+    MMUWrite8(ppeState, EA + i, bytes[(16 - eb) + i]);
   }
 }
 
 // Store Vector Left Indexed
-void PPCInterpreter::PPCInterpreter_stvlx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_stvlx(sPPEState* ppeState) {
   CHECK_VXU;
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
@@ -856,12 +856,12 @@ void PPCInterpreter::PPCInterpreter_stvlx(PPU_STATE* ppuState) {
 
   auto bytes = vec.bytes;
   for (int i = 0; i < 16 - eb; ++i) {
-    MMUWrite8(ppuState, EA + i, bytes[i]);
+    MMUWrite8(ppeState, EA + i, bytes[i]);
   }
 }
 
 // Store Vector Left Indexed 128
-void PPCInterpreter::PPCInterpreter_stvlx128(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_stvlx128(sPPEState* ppeState) {
   CHECK_VXU;
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
@@ -875,12 +875,12 @@ void PPCInterpreter::PPCInterpreter_stvlx128(PPU_STATE* ppuState) {
 
   auto bytes = vec.bytes;
   for (int i = 0; i < 16 - eb; ++i) {
-    MMUWrite8(ppuState, EA + i, bytes[i]);
+    MMUWrite8(ppeState, EA + i, bytes[i]);
   }
 }
 
 // Store Vector Left Indexed LRU 128
-void PPCInterpreter::PPCInterpreter_stvlxl128(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_stvlxl128(sPPEState* ppeState) {
   CHECK_VXU;
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
@@ -894,12 +894,12 @@ void PPCInterpreter::PPCInterpreter_stvlxl128(PPU_STATE* ppuState) {
 
   auto bytes = vec.bytes;
   for (int i = 0; i < 16 - eb; ++i) {
-    MMUWrite8(ppuState, EA + i, bytes[i]);
+    MMUWrite8(ppeState, EA + i, bytes[i]);
   }
 }
 
 // Store Vector Indexed LRU (x'7C00 03CE')
-void PPCInterpreter::PPCInterpreter_stvxl(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_stvxl(sPPEState *ppeState) {
   /*
   if rA=0 then b <- 0
   else b <- (rA)
@@ -913,10 +913,10 @@ void PPCInterpreter::PPCInterpreter_stvxl(PPU_STATE *ppuState) {
 
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
 
-  MMUWrite32(ppuState, EA, VRi(vs).dword[0]);
-  MMUWrite32(ppuState, EA + (sizeof(u32) * 1), VRi(vs).dword[1]);
-  MMUWrite32(ppuState, EA + (sizeof(u32) * 2), VRi(vs).dword[2]);
-  MMUWrite32(ppuState, EA + (sizeof(u32) * 3), VRi(vs).dword[3]);
+  MMUWrite32(ppeState, EA, VRi(vs).dword[0]);
+  MMUWrite32(ppeState, EA + (sizeof(u32) * 1), VRi(vs).dword[1]);
+  MMUWrite32(ppeState, EA + (sizeof(u32) * 2), VRi(vs).dword[2]);
+  MMUWrite32(ppeState, EA + (sizeof(u32) * 3), VRi(vs).dword[3]);
 }
 
 //
@@ -924,7 +924,7 @@ void PPCInterpreter::PPCInterpreter_stvxl(PPU_STATE *ppuState) {
 //
 
 // Load Byte and Zero (x'8800 0000')
-void PPCInterpreter::PPCInterpreter_lbz(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lbz(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -932,7 +932,7 @@ void PPCInterpreter::PPCInterpreter_lbz(PPU_STATE *ppuState) {
   rD <- (56)0 || MEM(EA, 1)
   */
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  const u8 data = MMURead8(ppuState, EA);
+  const u8 data = MMURead8(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -941,14 +941,14 @@ void PPCInterpreter::PPCInterpreter_lbz(PPU_STATE *ppuState) {
 }
 
 // Load Byte and Zero with Update (x'8C00 0000')
-void PPCInterpreter::PPCInterpreter_lbzu(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lbzu(sPPEState *ppeState) {
   /*
   EA <- (rA) + EXTS(d)
   rD <- (56)0 || MEM(EA, 1)
   rA <- EA
   */
   const u64 EA = GPRi(ra) + _instr.simm16;
-  const u8 data = MMURead8(ppuState, EA);
+  const u8 data = MMURead8(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -958,14 +958,14 @@ void PPCInterpreter::PPCInterpreter_lbzu(PPU_STATE *ppuState) {
 }
 
 // Load Byte and Zero with Update Indexed (x'7C00 00EE')
-void PPCInterpreter::PPCInterpreter_lbzux(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lbzux(sPPEState *ppeState) {
   /*
   EA <- (rA) + (rB)
   rD <- (56)0 || MEM(EA, 1)
   rA <- EA
   */
   const u64 EA = GPRi(ra) + GPRi(rb);
-  const u8 data = MMURead8(ppuState, EA);
+  const u8 data = MMURead8(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -975,7 +975,7 @@ void PPCInterpreter::PPCInterpreter_lbzux(PPU_STATE *ppuState) {
 }
 
 // Load Byte and Zero Indexed (x'7C00 00AE')
-void PPCInterpreter::PPCInterpreter_lbzx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lbzx(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -983,7 +983,7 @@ void PPCInterpreter::PPCInterpreter_lbzx(PPU_STATE *ppuState) {
   rD <- (56)0 || MEM(EA, 1)
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u8 data = MMURead8(ppuState, EA);
+  const u8 data = MMURead8(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -996,7 +996,7 @@ void PPCInterpreter::PPCInterpreter_lbzx(PPU_STATE *ppuState) {
 //
 
 // Load Half Word Algebraic (x'A800 0000')
-void PPCInterpreter::PPCInterpreter_lha(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lha(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1004,7 +1004,7 @@ void PPCInterpreter::PPCInterpreter_lha(PPU_STATE *ppuState) {
   rD <- EXTS(MEM(EA, 2))
   */
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  const u16 unsignedWord = MMURead16(ppuState, EA);
+  const u16 unsignedWord = MMURead16(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1013,14 +1013,14 @@ void PPCInterpreter::PPCInterpreter_lha(PPU_STATE *ppuState) {
 }
 
 // Load Half Word Algebraic with Update (x'AC00 0000')
-void PPCInterpreter::PPCInterpreter_lhau(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lhau(sPPEState *ppeState) {
   /*
   EA <- (rA) + EXTS(d)
   rD <- EXTS(MEM(EA, 2))
   rA <- EA
   */
   const u64 EA = GPRi(ra) + _instr.simm16;
-  const u16 unsignedWord = MMURead16(ppuState, EA);
+  const u16 unsignedWord = MMURead16(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1030,14 +1030,14 @@ void PPCInterpreter::PPCInterpreter_lhau(PPU_STATE *ppuState) {
 }
 
 // Load Half Word Algebraic with Update
-void PPCInterpreter::PPCInterpreter_lhaux(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lhaux(sPPEState *ppeState) {
   /*
   EA <- (rA) + (rB)
   rD <- EXTS(MEM(EA, 2))
   rA <- EA
   */
   const u64 EA = GPRi(ra) + GPRi(rb);
-  const u16 unsignedWord = MMURead16(ppuState, EA);
+  const u16 unsignedWord = MMURead16(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1047,7 +1047,7 @@ void PPCInterpreter::PPCInterpreter_lhaux(PPU_STATE *ppuState) {
 }
 
 // Load Half Word Algebraic Indexed (x'7C00 02AE')
-void PPCInterpreter::PPCInterpreter_lhax(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lhax(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1055,7 +1055,7 @@ void PPCInterpreter::PPCInterpreter_lhax(PPU_STATE *ppuState) {
   rD <- EXTS(MEM(EA, 2))
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u16 unsignedWord = MMURead16(ppuState, EA);
+  const u16 unsignedWord = MMURead16(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1064,7 +1064,7 @@ void PPCInterpreter::PPCInterpreter_lhax(PPU_STATE *ppuState) {
 }
 
 // Load Half Word Byte-Reverse Indexed (x'7C00 062C')
-void PPCInterpreter::PPCInterpreter_lhbrx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lhbrx(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1072,7 +1072,7 @@ void PPCInterpreter::PPCInterpreter_lhbrx(PPU_STATE *ppuState) {
   rD <- (48)0 || MEM(EA + 1, 1) || MEM(EA, 1)
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u16 data = MMURead16(ppuState, EA);
+  const u16 data = MMURead16(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1081,7 +1081,7 @@ void PPCInterpreter::PPCInterpreter_lhbrx(PPU_STATE *ppuState) {
 }
 
 // Load Half Word and Zero (x'A000 0000')
-void PPCInterpreter::PPCInterpreter_lhz(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lhz(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1089,7 +1089,7 @@ void PPCInterpreter::PPCInterpreter_lhz(PPU_STATE *ppuState) {
   rD <- (48)0 || MEM(EA, 2)
   */
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  const u16 data = MMURead16(ppuState, EA);
+  const u16 data = MMURead16(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1098,14 +1098,14 @@ void PPCInterpreter::PPCInterpreter_lhz(PPU_STATE *ppuState) {
 }
 
 // Load Half Word and Zero with Update (x'A400 0000')
-void PPCInterpreter::PPCInterpreter_lhzu(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lhzu(sPPEState *ppeState) {
   /*
   EA <- rA + EXTS(d)
   rD <- (48)0 || MEM(EA, 2)
   rA <- EA
   */
   const u64 EA = GPRi(ra) + _instr.simm16;
-  const u16 data = MMURead16(ppuState, EA);
+  const u16 data = MMURead16(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1115,14 +1115,14 @@ void PPCInterpreter::PPCInterpreter_lhzu(PPU_STATE *ppuState) {
 }
 
 // Load Half Word and Zero with Update Indexed (x'7C00 026E')
-void PPCInterpreter::PPCInterpreter_lhzux(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lhzux(sPPEState *ppeState) {
   /*
   EA <- (rA) + (rB)
   rD <- (48)0 || MEM(EA, 2)
   rA <- EA
   */
   const u64 EA = GPRi(ra) + GPRi(rb);
-  const u16 data = MMURead16(ppuState, EA);
+  const u16 data = MMURead16(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1132,7 +1132,7 @@ void PPCInterpreter::PPCInterpreter_lhzux(PPU_STATE *ppuState) {
 }
 
 // Load Half Word and Zero Indexed (x'7C00 022E')
-void PPCInterpreter::PPCInterpreter_lhzx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lhzx(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1140,7 +1140,7 @@ void PPCInterpreter::PPCInterpreter_lhzx(PPU_STATE *ppuState) {
   rD <- (48)0 || MEM(EA, 2)
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u16 data = MMURead16(ppuState, EA);
+  const u16 data = MMURead16(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1153,7 +1153,7 @@ void PPCInterpreter::PPCInterpreter_lhzx(PPU_STATE *ppuState) {
 //
 
 // Load Multiple Word (x'B800 0000')
-void PPCInterpreter::PPCInterpreter_lmw(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lmw(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1166,12 +1166,12 @@ void PPCInterpreter::PPCInterpreter_lmw(PPU_STATE *ppuState) {
   */
   u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
   for (u32 idx = _instr.rd; idx < 32; ++idx, EA += 4) {
-    GPR(idx) = MMURead32(ppuState, EA);
+    GPR(idx) = MMURead32(ppeState, EA);
   }
 }
 
 // Load String Word Immediate (x'7C00 04AA')
-void PPCInterpreter::PPCInterpreter_lswi(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lswi(sPPEState *ppeState) {
   /*
   if rA = 0 then EA <- 0
   else EA <- (rA)
@@ -1195,7 +1195,7 @@ void PPCInterpreter::PPCInterpreter_lswi(PPU_STATE *ppuState) {
 
   while (N > 0) {
     if (N > 3) {
-      GPR(reg) = MMURead32(ppuState, EA);
+      GPR(reg) = MMURead32(ppeState, EA);
       EA += 4;
       N -= 4;
     } else {
@@ -1203,7 +1203,7 @@ void PPCInterpreter::PPCInterpreter_lswi(PPU_STATE *ppuState) {
       u32 i = 3;
       while (N > 0) {
         N = N - 1;
-        buf |= MMURead8(ppuState, EA) << (i * 8);
+        buf |= MMURead8(ppeState, EA) << (i * 8);
         EA++;
         i--;
       }
@@ -1218,7 +1218,7 @@ void PPCInterpreter::PPCInterpreter_lswi(PPU_STATE *ppuState) {
 //
 
 // Load Word Algebraic (x'E800 0002')
-void PPCInterpreter::PPCInterpreter_lwa(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lwa(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1226,7 +1226,7 @@ void PPCInterpreter::PPCInterpreter_lwa(PPU_STATE *ppuState) {
   rD <- EXTS(MEM(EA, 4))
   */
   const u64 EA = (_instr.simm16 & ~3) + (_instr.ra ? GPRi(ra) : 0);
-  const u32 unsignedWord = MMURead32(ppuState, EA);
+  const u32 unsignedWord = MMURead32(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1235,7 +1235,7 @@ void PPCInterpreter::PPCInterpreter_lwa(PPU_STATE *ppuState) {
 }
 
 // Load Word and Reserve Indexed (x'7C00 0028')
-void PPCInterpreter::PPCInterpreter_lwarx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lwarx(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1249,7 +1249,7 @@ void PPCInterpreter::PPCInterpreter_lwarx(PPU_STATE *ppuState) {
 
   // TODO: If address is not aligned by 4, then we must issue a trap.
 
-  MMUTranslateAddress(&RA, ppuState, false);
+  MMUTranslateAddress(&RA, ppeState, false);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1258,7 +1258,7 @@ void PPCInterpreter::PPCInterpreter_lwarx(PPU_STATE *ppuState) {
   curThread.ppuRes->reservedAddr = RA;
   xenonContext->xenonRes.Increment();
 
-  u32 data = MMURead32(ppuState, EA);
+  u32 data = MMURead32(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1267,7 +1267,7 @@ void PPCInterpreter::PPCInterpreter_lwarx(PPU_STATE *ppuState) {
 }
 
 // Load Word Algebraic Indexed (x'7C00 02AA')
-void PPCInterpreter::PPCInterpreter_lwax(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lwax(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1275,7 +1275,7 @@ void PPCInterpreter::PPCInterpreter_lwax(PPU_STATE *ppuState) {
   rD <- EXTS(MEM(EA, 4))
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u32 unsignedWord = MMURead32(ppuState, EA);
+  const u32 unsignedWord = MMURead32(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1284,14 +1284,14 @@ void PPCInterpreter::PPCInterpreter_lwax(PPU_STATE *ppuState) {
 }
 
 // Load Word Algebraic with Update Indexed
-void PPCInterpreter::PPCInterpreter_lwaux(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lwaux(sPPEState *ppeState) {
   /*
   EA <- (rA) + (rB)
   rD <- EXTS(MEM(EA, 4))
   rA <- EA
   */
   const u64 EA = GPRi(ra) + GPRi(rb);
-  const u32 unsignedWord = MMURead32(ppuState, EA);
+  const u32 unsignedWord = MMURead32(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1301,7 +1301,7 @@ void PPCInterpreter::PPCInterpreter_lwaux(PPU_STATE *ppuState) {
 }
 
 // Load Word Byte-Reverse Indexed (x'7C00 042C')
-void PPCInterpreter::PPCInterpreter_lwbrx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lwbrx(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1309,7 +1309,7 @@ void PPCInterpreter::PPCInterpreter_lwbrx(PPU_STATE *ppuState) {
   rD <- (32)0 || MEM(EA + 3, 1) || MEM(EA + 2, 1) || MEM(EA + 1, 1) || MEM(EA, 1)
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u32 data = MMURead32(ppuState, EA);
+  const u32 data = MMURead32(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1318,7 +1318,7 @@ void PPCInterpreter::PPCInterpreter_lwbrx(PPU_STATE *ppuState) {
 }
 
 // Load Word and Zero (x'8000 0000')
-void PPCInterpreter::PPCInterpreter_lwz(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lwz(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1326,7 +1326,7 @@ void PPCInterpreter::PPCInterpreter_lwz(PPU_STATE *ppuState) {
   rD <- (32)0 || MEM(EA, 4)
   */
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  const u32 data = MMURead32(ppuState, EA);
+  const u32 data = MMURead32(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1335,14 +1335,14 @@ void PPCInterpreter::PPCInterpreter_lwz(PPU_STATE *ppuState) {
 }
 
 // Load Word and Zero with Update (x'8400 0000')
-void PPCInterpreter::PPCInterpreter_lwzu(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lwzu(sPPEState *ppeState) {
   /*
   EA <- rA + EXTS(d)
   rD <- (32)0 || MEM(EA, 4)
   rA <- EA
   */
   const u64 EA = GPRi(ra) + _instr.simm16;
-  const u32 data = MMURead32(ppuState, EA);
+  const u32 data = MMURead32(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1352,14 +1352,14 @@ void PPCInterpreter::PPCInterpreter_lwzu(PPU_STATE *ppuState) {
 }
 
 // Load Word and Zero with Update Indexed (x'7C00 006E')
-void PPCInterpreter::PPCInterpreter_lwzux(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lwzux(sPPEState *ppeState) {
   /*
   EA <- (rA) + (rB)
   rD <- (32)0 || MEM(EA, 4)
   rA <- EA
   */
   const u64 EA = GPRi(ra) + GPRi(rb);
-  const u32 data = MMURead32(ppuState, EA);
+  const u32 data = MMURead32(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1369,7 +1369,7 @@ void PPCInterpreter::PPCInterpreter_lwzux(PPU_STATE *ppuState) {
 }
 
 // Load Word and Zero Indexed (x'7C00 002E')
-void PPCInterpreter::PPCInterpreter_lwzx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lwzx(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1377,7 +1377,7 @@ void PPCInterpreter::PPCInterpreter_lwzx(PPU_STATE *ppuState) {
   rD <- (32)0 || MEM(EA, 4)
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u32 data = MMURead32(ppuState, EA);
+  const u32 data = MMURead32(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1390,7 +1390,7 @@ void PPCInterpreter::PPCInterpreter_lwzx(PPU_STATE *ppuState) {
 //
 
 // Load Double Word (x'E800 0000')
-void PPCInterpreter::PPCInterpreter_ld(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_ld(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1398,7 +1398,7 @@ void PPCInterpreter::PPCInterpreter_ld(PPU_STATE *ppuState) {
   rD <- MEM(EA, 8)
   */
   const u64 EA = (_instr.simm16 & ~3) + (_instr.ra ? GPRi(ra) : 0);
-  const u64 data = MMURead64(ppuState, EA);
+  const u64 data = MMURead64(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1407,11 +1407,11 @@ void PPCInterpreter::PPCInterpreter_ld(PPU_STATE *ppuState) {
 }
 
 // Load Double Word Byte Reversed Indexed
-void PPCInterpreter::PPCInterpreter_ldbrx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_ldbrx(sPPEState *ppeState) {
   // TODO(bitsh1ft3r): Add instruction def and check for that ~7 to be correct
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   const u64 RA = EA & ~7;
-  const u64 data = MMURead64(ppuState, EA);
+  const u64 data = MMURead64(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1420,7 +1420,7 @@ void PPCInterpreter::PPCInterpreter_ldbrx(PPU_STATE *ppuState) {
 }
 
 // Load Double Word and Reserve Indexed (x'7C00 00A8')
-void PPCInterpreter::PPCInterpreter_ldarx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_ldarx(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1434,7 +1434,7 @@ void PPCInterpreter::PPCInterpreter_ldarx(PPU_STATE *ppuState) {
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   u64 RA = EA & ~7;
 
-  MMUTranslateAddress(&RA, ppuState, false);
+  MMUTranslateAddress(&RA, ppeState, false);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1443,7 +1443,7 @@ void PPCInterpreter::PPCInterpreter_ldarx(PPU_STATE *ppuState) {
   curThread.ppuRes->valid = true;
   xenonContext->xenonRes.Increment();
 
-  const u64 data = MMURead64(ppuState, EA);
+  const u64 data = MMURead64(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1452,14 +1452,14 @@ void PPCInterpreter::PPCInterpreter_ldarx(PPU_STATE *ppuState) {
 }
 
 // Load Double Word with Update (x'E800 0001')
-void PPCInterpreter::PPCInterpreter_ldu(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_ldu(sPPEState *ppeState) {
   /*
   EA <- (rA) + EXTS(ds || 0b00)
   rD <- MEM(EA, 8)
   rA <- EA
   */
   const u64 EA = GPRi(ra) + (_instr.simm16 & ~3);
-  const u64 data = MMURead64(ppuState, EA);
+  const u64 data = MMURead64(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1469,14 +1469,14 @@ void PPCInterpreter::PPCInterpreter_ldu(PPU_STATE *ppuState) {
 }
 
 // Load Double Word with Update Indexed (x'7C00 006A')
-void PPCInterpreter::PPCInterpreter_ldux(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_ldux(sPPEState *ppeState) {
   /*
   EA <- (rA) + (rB)
   rD <- MEM(EA, 8)
   rA <- EA
   */
   const u64 EA = GPRi(ra) + GPRi(rb);
-  const u64 data = MMURead64(ppuState, EA);
+  const u64 data = MMURead64(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1486,7 +1486,7 @@ void PPCInterpreter::PPCInterpreter_ldux(PPU_STATE *ppuState) {
 }
 
 // Load Double Word Indexed (x'7C00 002A')
-void PPCInterpreter::PPCInterpreter_ldx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_ldx(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1494,7 +1494,7 @@ void PPCInterpreter::PPCInterpreter_ldx(PPU_STATE *ppuState) {
   rD <- MEM(EA, 8)
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u64 data = MMURead64(ppuState, EA);
+  const u64 data = MMURead64(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1503,7 +1503,7 @@ void PPCInterpreter::PPCInterpreter_ldx(PPU_STATE *ppuState) {
 }
 
 // Load Floating-Point Single Indexed (x'7C00 042E')
-void PPCInterpreter::PPCInterpreter_lfsx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lfsx(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1514,7 +1514,7 @@ void PPCInterpreter::PPCInterpreter_lfsx(PPU_STATE *ppuState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u32 data = MMURead32(ppuState, EA);
+  const u32 data = MMURead32(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1523,7 +1523,7 @@ void PPCInterpreter::PPCInterpreter_lfsx(PPU_STATE *ppuState) {
 }
 
 // Load Floating-Point Single with Update Indexed
-void PPCInterpreter::PPCInterpreter_lfsux(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lfsux(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1535,7 +1535,7 @@ void PPCInterpreter::PPCInterpreter_lfsux(PPU_STATE *ppuState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u32 data = MMURead32(ppuState, EA);
+  const u32 data = MMURead32(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1546,7 +1546,7 @@ void PPCInterpreter::PPCInterpreter_lfsux(PPU_STATE *ppuState) {
 }
 
 // Load Floating-Point Double (x'C800 0000')
-void PPCInterpreter::PPCInterpreter_lfd(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lfd(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1557,7 +1557,7 @@ void PPCInterpreter::PPCInterpreter_lfd(PPU_STATE *ppuState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  const u64 data = MMURead64(ppuState, EA);
+  const u64 data = MMURead64(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1566,7 +1566,7 @@ void PPCInterpreter::PPCInterpreter_lfd(PPU_STATE *ppuState) {
 }
 
 // Load Floating-Point Double-Indexed (x'C800 0000')
-void PPCInterpreter::PPCInterpreter_lfdx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lfdx(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1577,7 +1577,7 @@ void PPCInterpreter::PPCInterpreter_lfdx(PPU_STATE *ppuState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u64 data = MMURead64(ppuState, EA);
+  const u64 data = MMURead64(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1586,7 +1586,7 @@ void PPCInterpreter::PPCInterpreter_lfdx(PPU_STATE *ppuState) {
 }
 
 // Load Floating-Point Double with Update
-void PPCInterpreter::PPCInterpreter_lfdu(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lfdu(sPPEState *ppeState) {
   /*
   EA <- (rA) + EXTS(d)
   frD <- MEM(EA, 8)
@@ -1596,7 +1596,7 @@ void PPCInterpreter::PPCInterpreter_lfdu(PPU_STATE *ppuState) {
   CHECK_FPU;
 
   const u64 EA = GPRi(ra) + _instr.simm16;
-  const u64 data = MMURead64(ppuState, EA);
+  const u64 data = MMURead64(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1606,7 +1606,7 @@ void PPCInterpreter::PPCInterpreter_lfdu(PPU_STATE *ppuState) {
 }
 
 // Load Floating-Point Double with Update Indexed
-void PPCInterpreter::PPCInterpreter_lfdux(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lfdux(sPPEState *ppeState) {
   /*
   EA <- (rA) + (rB)
   frD <- MEM(EA, 8)
@@ -1616,7 +1616,7 @@ void PPCInterpreter::PPCInterpreter_lfdux(PPU_STATE *ppuState) {
   CHECK_FPU;
 
   const u64 EA = GPRi(ra) + GPRi(rb);
-  const u64 data = MMURead64(ppuState, EA);
+  const u64 data = MMURead64(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1626,7 +1626,7 @@ void PPCInterpreter::PPCInterpreter_lfdux(PPU_STATE *ppuState) {
 }
 
 // Load Floating-Point Single (x'C000 0000')
-void PPCInterpreter::PPCInterpreter_lfs(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lfs(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1638,7 +1638,7 @@ void PPCInterpreter::PPCInterpreter_lfs(PPU_STATE *ppuState) {
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
 
-  u32 data = MMURead32(ppuState, EA);
+  u32 data = MMURead32(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1647,7 +1647,7 @@ void PPCInterpreter::PPCInterpreter_lfs(PPU_STATE *ppuState) {
 }
 
 // Load Floating-Point Single with Update
-void PPCInterpreter::PPCInterpreter_lfsu(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lfsu(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -1660,7 +1660,7 @@ void PPCInterpreter::PPCInterpreter_lfsu(PPU_STATE *ppuState) {
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
   
-  u32 data = MMURead32(ppuState, EA);
+  u32 data = MMURead32(ppeState, EA);
 
   if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
     return;
@@ -1677,7 +1677,7 @@ void PPCInterpreter::PPCInterpreter_lfsu(PPU_STATE *ppuState) {
 // NOTE: lvexx Instructions effectively behave like lvx.
 
 // Load Vector Element Byte Indexed (x'7C00 000E')
-void PPCInterpreter::PPCInterpreter_lvebx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_lvebx(sPPEState* ppeState) {
   /*
    if rA=0 then b <- 0
    else         b <- (rA)
@@ -1693,10 +1693,10 @@ void PPCInterpreter::PPCInterpreter_lvebx(PPU_STATE* ppuState) {
 
   Vector128 vector = {};
 
-  vector.dword[0] = MMURead32(ppuState, EA);
-  vector.dword[1] = MMURead32(ppuState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = MMURead32(ppeState, EA);
+  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
+  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
+  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   LOG_DEBUG(Xenon, "lvebx [EA = {:#x}, eb = {:#x} data = {:#x}]", (u32)EA, eb, data);
@@ -1709,7 +1709,7 @@ void PPCInterpreter::PPCInterpreter_lvebx(PPU_STATE* ppuState) {
 }
 
 // Load Vector Element Halfword Indexed (x'7C00 004E')
-void PPCInterpreter::PPCInterpreter_lvehx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_lvehx(sPPEState* ppeState) {
   /*
    if rA=0 then b <- 0
    else        
@@ -1726,10 +1726,10 @@ void PPCInterpreter::PPCInterpreter_lvehx(PPU_STATE* ppuState) {
 
   Vector128 vector = {};
 
-  vector.dword[0] = MMURead32(ppuState, EA);
-  vector.dword[1] = MMURead32(ppuState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = MMURead32(ppeState, EA);
+  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
+  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
+  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   LOG_DEBUG(Xenon, "lvehx [EA = {:#x}, eb = {:#x} data = {:#x}]", (u32)EA, eb, data);
@@ -1742,7 +1742,7 @@ void PPCInterpreter::PPCInterpreter_lvehx(PPU_STATE* ppuState) {
 }
 
 // Load Vector Element Word Indexed (x'7C00 008E')
-void PPCInterpreter::PPCInterpreter_lvewx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_lvewx(sPPEState* ppeState) {
   /*
   if rA=0 then b <- 0
   else b <- (rA)
@@ -1760,10 +1760,10 @@ void PPCInterpreter::PPCInterpreter_lvewx(PPU_STATE* ppuState) {
 
   Vector128 vector = {};
 
-  vector.dword[0] = MMURead32(ppuState, EA);
-  vector.dword[1] = MMURead32(ppuState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = MMURead32(ppeState, EA);
+  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
+  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
+  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   LOG_DEBUG(Xenon, "lvewx [EA = {:#x}, eb = {:#x} data = {:#x}]", (u32)EA, eb, data);
@@ -1776,17 +1776,17 @@ void PPCInterpreter::PPCInterpreter_lvewx(PPU_STATE* ppuState) {
 }
 
 // Vector128 Load Vector Element Word Indexed
-void PPCInterpreter::PPCInterpreter_lvewx128(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_lvewx128(sPPEState* ppeState) {
   CHECK_VXU;
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
 
   Vector128 vector = {};
 
-  vector.dword[0] = MMURead32(ppuState, EA);
-  vector.dword[1] = MMURead32(ppuState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = MMURead32(ppeState, EA);
+  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
+  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
+  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   LOG_DEBUG(Xenon, "lvewx128 [EA = {:#x}, eb = {:#x} data = {:#x}]", (u32)EA, eb, data);
@@ -1799,7 +1799,7 @@ void PPCInterpreter::PPCInterpreter_lvewx128(PPU_STATE* ppuState) {
 }
 
 // Load Vector Indexed (x'7C00 00CE')
-void PPCInterpreter::PPCInterpreter_lvx(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_lvx(sPPEState* ppeState) {
   /*
   if rA=0 then b <- 0
   else b <- (rA)
@@ -1814,10 +1814,10 @@ void PPCInterpreter::PPCInterpreter_lvx(PPU_STATE* ppuState) {
   Vector128 vector{};
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
 
-  vector.dword[0] = MMURead32(ppuState, EA);
-  vector.dword[1] = MMURead32(ppuState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = MMURead32(ppeState, EA);
+  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
+  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
+  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   u8 vrd = _instr.vd;
@@ -1833,17 +1833,17 @@ void PPCInterpreter::PPCInterpreter_lvx(PPU_STATE* ppuState) {
 }
 
 // Load Vector Indexed 128
-void PPCInterpreter::PPCInterpreter_lvx128(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lvx128(sPPEState *ppeState) {
 
   CHECK_VXU;
 
   Vector128 vector {};
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
 
-  vector.dword[0] = MMURead32(ppuState, EA);
-  vector.dword[1] = MMURead32(ppuState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = MMURead32(ppeState, EA);
+  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
+  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
+  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   u8 vrd = VMX128_1_VD128;
@@ -1858,16 +1858,16 @@ void PPCInterpreter::PPCInterpreter_lvx128(PPU_STATE *ppuState) {
 }
 
 // // Load Vector Indexed LRU 128
-void PPCInterpreter::PPCInterpreter_lvxl128(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_lvxl128(sPPEState* ppeState) {
   CHECK_VXU;
 
   Vector128 vector{};
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
 
-  vector.dword[0] = MMURead32(ppuState, EA);
-  vector.dword[1] = MMURead32(ppuState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = MMURead32(ppeState, EA);
+  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
+  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
+  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   u8 vrd = VMX128_1_VD128;
@@ -1882,7 +1882,7 @@ void PPCInterpreter::PPCInterpreter_lvxl128(PPU_STATE* ppuState) {
 }
 
 // Load Vector Indexed LRU (x'7C00 02CE')
-void PPCInterpreter::PPCInterpreter_lvxl(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lvxl(sPPEState *ppeState) {
   /*
   if rA=0 then b <- 0
   else b <- (rA)
@@ -1897,10 +1897,10 @@ void PPCInterpreter::PPCInterpreter_lvxl(PPU_STATE *ppuState) {
   Vector128 vector{};
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
 
-  vector.dword[0] = MMURead32(ppuState, EA);
-  vector.dword[1] = MMURead32(ppuState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = MMURead32(ppeState, EA);
+  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
+  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
+  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   u8 vrd = _instr.vd;
@@ -1915,7 +1915,7 @@ void PPCInterpreter::PPCInterpreter_lvxl(PPU_STATE *ppuState) {
 }
 
 // Load Vector Left Indexed (x'7C00 040E')
-void PPCInterpreter::PPCInterpreter_lvlx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lvlx(sPPEState *ppeState) {
   /*
   if rA=0 then base <- 0
   else base <- (rA)
@@ -1932,10 +1932,10 @@ void PPCInterpreter::PPCInterpreter_lvlx(PPU_STATE *ppuState) {
   const u8 eb = EA & 0xF;
   EA &= ~0xF;
 
-  vector.dword[0] = MMURead32(ppuState, EA);
-  vector.dword[1] = MMURead32(ppuState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = MMURead32(ppeState, EA);
+  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
+  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
+  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   LOG_DEBUG(Xenon, "lvlx [EA {:#x}] Temp VR = [{:#x}, {:#x}, {:#x}, {:#x}]",
@@ -1970,7 +1970,7 @@ void PPCInterpreter::PPCInterpreter_lvlx(PPU_STATE *ppuState) {
 }
 
 // Load Vector Left Indexed 128
-void PPCInterpreter::PPCInterpreter_lvlx128(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_lvlx128(sPPEState* ppeState) {
   CHECK_VXU;
 
   Vector128 vector{};
@@ -1979,10 +1979,10 @@ void PPCInterpreter::PPCInterpreter_lvlx128(PPU_STATE* ppuState) {
   const u8 eb = EA & 0xF;
   EA &= ~0xF;
 
-  vector.dword[0] = MMURead32(ppuState, EA);
-  vector.dword[1] = MMURead32(ppuState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = MMURead32(ppeState, EA);
+  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
+  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
+  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   LOG_DEBUG(Xenon, "lvlx128 [EA {:#x}] Temp VR = [{:#x}, {:#x}, {:#x}, {:#x}]",
@@ -2018,7 +2018,7 @@ void PPCInterpreter::PPCInterpreter_lvlx128(PPU_STATE* ppuState) {
 
 
 // Load Vector Right Indexed (x'7C00 044E')
-void PPCInterpreter::PPCInterpreter_lvrx(PPU_STATE *ppuState) {
+void PPCInterpreter::PPCInterpreter_lvrx(sPPEState *ppeState) {
   /*
   if rA=0 then base <- 0
   else base <- (rA)
@@ -2035,10 +2035,10 @@ void PPCInterpreter::PPCInterpreter_lvrx(PPU_STATE *ppuState) {
   const u8 eb = EA & 0xF;
   EA &= ~0xF;
 
-  vector.dword[0] = MMURead32(ppuState, EA);
-  vector.dword[1] = MMURead32(ppuState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = MMURead32(ppeState, EA);
+  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
+  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
+  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   LOG_DEBUG(Xenon, "lvrx [EA {:#x}] Temp VR = [{:#x}, {:#x}, {:#x}, {:#x}]",
@@ -2078,7 +2078,7 @@ void PPCInterpreter::PPCInterpreter_lvrx(PPU_STATE *ppuState) {
 }
 
 // Load Vector Right Indexed 128
-void PPCInterpreter::PPCInterpreter_lvrx128(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_lvrx128(sPPEState* ppeState) {
   CHECK_VXU;
 
   Vector128 vector{};
@@ -2087,10 +2087,10 @@ void PPCInterpreter::PPCInterpreter_lvrx128(PPU_STATE* ppuState) {
   const u8 eb = EA & 0xF;
   EA &= ~0xF;
 
-  vector.dword[0] = MMURead32(ppuState, EA);
-  vector.dword[1] = MMURead32(ppuState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppuState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppuState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = MMURead32(ppeState, EA);
+  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
+  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
+  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   LOG_DEBUG(Xenon, "lvrx128 [EA {:#x}] Temp VR = [{:#x}, {:#x}, {:#x}, {:#x}]",
@@ -2130,7 +2130,7 @@ void PPCInterpreter::PPCInterpreter_lvrx128(PPU_STATE* ppuState) {
 }
 
 // Load Vector for Shift Left (x'7C00 000C')
-void PPCInterpreter::PPCInterpreter_lvsl(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_lvsl(sPPEState* ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -2201,7 +2201,7 @@ void PPCInterpreter::PPCInterpreter_lvsl(PPU_STATE* ppuState) {
 }
 
 // Load Vector for Shift Right (x'7C00 004C')
-void PPCInterpreter::PPCInterpreter_lvsr(PPU_STATE* ppuState) {
+void PPCInterpreter::PPCInterpreter_lvsr(sPPEState* ppeState) {
   /*
    if rA = 0 then  b <- 0
    else            b <- (rA)

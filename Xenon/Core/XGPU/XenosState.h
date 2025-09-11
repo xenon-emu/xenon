@@ -6,7 +6,7 @@
 #include <mutex>
 #include <string>
 
-#include "Core/RAM/RAM.h"
+#include "Core/PCI/Devices/RAM/RAM.h"
 
 #include "EDRAM.h"
 #include "ShaderConstants.h"

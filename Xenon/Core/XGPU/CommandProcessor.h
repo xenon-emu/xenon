@@ -24,8 +24,8 @@
 #include "Base/Logging/Log.h"
 #include "Base/Types.h"
 
-#include "Core/RAM/RAM.h"
-#include "Core/RootBus/HostBridge/PCIBridge/PCIBridge.h"
+#include "Core/PCI/Devices/RAM/RAM.h"
+#include "Core/PCI/Bridge/PCIBridge.h"
 #include "Core/XGPU/Microcode/ASTBlock.h"
 #include "Core/XGPU/PM4Opcodes.h"
 #include "Core/XGPU/RingBuffer.h"
