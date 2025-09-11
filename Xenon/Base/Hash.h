@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "Types.h"
+
 #include <string_view>
 
 namespace Base {

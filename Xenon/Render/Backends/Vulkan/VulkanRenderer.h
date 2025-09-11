@@ -5,18 +5,6 @@
 #include "Render/Abstractions/Renderer.h"
 
 #ifndef NO_GFX
-#include <SDL3/SDL.h>
-#define IMGUI_DEFINE_MATH_OPERATORS
-//#include <backends/imgui_impl_vulkan.h>
-
-#include "Base/Version.h"
-#include "Base/Hash.h"
-#include "Core/PCI/Devices/RAM/RAM.h"
-#include "Core/PCI/PCIe.h"
-#include "Render/Abstractions/Factory/ShaderFactory.h"
-#ifndef TOOL
-#include "Render/GUI/GUI.h"
-#endif
 
 #if defined(_WIN64)
 #define VK_USE_PLATFORM_WIN32_KHR
@@ -27,6 +15,21 @@
 #endif
 
 #define VK_ENABLE_BETA_EXTENSIONS
+
+#include <SDL3/SDL.h>
+#include <SDL3/SDL_vulkan.h>
+#define IMGUI_IMPL_VULKAN_USE_VOLK
+#define IMGUI_DEFINE_MATH_OPERATORS
+#include <backends/imgui_impl_vulkan.h>
+
+#include "Base/Version.h"
+#include "Base/Hash.h"
+#include "Core/PCI/Devices/RAM/RAM.h"
+#include "Core/PCI/PCIe.h"
+#include "Render/Abstractions/Factory/ShaderFactory.h"
+#ifndef TOOL
+#include "Render/GUI/GUI.h"
+#endif
 
 #include <volk.h>
 #include <vk_mem_alloc.h>
@@ -61,19 +64,46 @@ public:
   u32 GetBackendID() override;
 
   void CreateCommandBuffer();
+  void BeginCommandBuffer();
   void EndCommandBuffer();
+
+  void RecreateSwapchain();
 
   void CheckActiveRenderPass();
   void EndActiveRenderPass();
 
+  // Core
+  s32 graphicsQueueFamily = 0;
   VmaAllocator allocator = VK_NULL_HANDLE;
   VkInstance instance = VK_NULL_HANDLE;
   VkDevice device = VK_NULL_HANDLE;
   VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+  VkQueue graphicsQueue = VK_NULL_HANDLE;
 
+  // Swapchain
+  VkSurfaceKHR surface = VK_NULL_HANDLE;
+  VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+  VkSurfaceFormatKHR chosenFormat{ VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
+  VkPresentModeKHR chosenPresentMode{};
+  u32 swapchainImageCount = 2;
+  std::vector<VkImage> swapchainImages;
+  std::vector<VkImageView> swapchainImageViews;
+  std::vector<VkFramebuffer> swapchainFramebuffers;
+  VkExtent2D swapchainExtent{ 0, 0 };
+
+  // Command buffers
   VkCommandPool commandPool = VK_NULL_HANDLE;
   VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+
+  // Synchronization
+  VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
+  VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
+  VkFence inFlightFence = VK_NULL_HANDLE;
+
+  // Render pass
   VkRenderPass renderPass = VK_NULL_HANDLE;
+
+  // Framebuffers
   VkFramebuffer framebuffer = VK_NULL_HANDLE;
 };
 

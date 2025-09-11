@@ -586,7 +586,7 @@ void PPCInterpreter::PPCInterpreter_stfs(sPPEState *ppeState) {
 }
 
 // Store Floating-Point Single with Update (x'D400 0000')
-void PPCInterpreter::PPCInterpreter_stfsu(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_stfsu(sPPEState *ppeState) {
   /*
   EA <- (rA) + EXTS(d)
   MEM(EA, 4) <-  SINGLE(frS)
@@ -605,7 +605,7 @@ void PPCInterpreter::PPCInterpreter_stfsu(sPPEState* ppeState) {
 }
 
 // Store Floating-Point Single with Update Indexed
-void PPCInterpreter::PPCInterpreter_stfsux(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_stfsux(sPPEState *ppeState) {
   /*
   EA <- (rA) + (rB)
   MEM(EA, 4) <-  SINGLE(frS)
@@ -747,7 +747,7 @@ void PPCInterpreter::PPCInterpreter_stvx(sPPEState *ppeState) {
 }
 
 // Store Vector Indexed 128
-void PPCInterpreter::PPCInterpreter_stvx128(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_stvx128(sPPEState *ppeState) {
   CHECK_VXU;
 
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
@@ -759,7 +759,7 @@ void PPCInterpreter::PPCInterpreter_stvx128(sPPEState* ppeState) {
 }
 
 // Store Vector Element Word Indexed (x'7C00 018E')
-void PPCInterpreter::PPCInterpreter_stvewx(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_stvewx(sPPEState *ppeState) {
   /*
     if rA=0 then b <- 0
     else b <- (rA)
@@ -779,7 +779,7 @@ void PPCInterpreter::PPCInterpreter_stvewx(sPPEState* ppeState) {
 }
 
 // Store Vector Element Word Indexed 128
-void PPCInterpreter::PPCInterpreter_stvewx128(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_stvewx128(sPPEState *ppeState) {
   CHECK_VXU;
 
   u64 EA = ((_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~3);
@@ -789,7 +789,7 @@ void PPCInterpreter::PPCInterpreter_stvewx128(sPPEState* ppeState) {
 }
 
 // Store Vector Right Indexed
-void PPCInterpreter::PPCInterpreter_stvrx(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_stvrx(sPPEState *ppeState) {
   CHECK_VXU;
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
@@ -815,7 +815,7 @@ void PPCInterpreter::PPCInterpreter_stvrx(sPPEState* ppeState) {
 }
 
 // Store Vector Right Indexed 128
-void PPCInterpreter::PPCInterpreter_stvrx128(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_stvrx128(sPPEState *ppeState) {
   CHECK_VXU;
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
@@ -841,7 +841,7 @@ void PPCInterpreter::PPCInterpreter_stvrx128(sPPEState* ppeState) {
 }
 
 // Store Vector Left Indexed
-void PPCInterpreter::PPCInterpreter_stvlx(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_stvlx(sPPEState *ppeState) {
   CHECK_VXU;
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
@@ -861,7 +861,7 @@ void PPCInterpreter::PPCInterpreter_stvlx(sPPEState* ppeState) {
 }
 
 // Store Vector Left Indexed 128
-void PPCInterpreter::PPCInterpreter_stvlx128(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_stvlx128(sPPEState *ppeState) {
   CHECK_VXU;
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
@@ -880,7 +880,7 @@ void PPCInterpreter::PPCInterpreter_stvlx128(sPPEState* ppeState) {
 }
 
 // Store Vector Left Indexed LRU 128
-void PPCInterpreter::PPCInterpreter_stvlxl128(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_stvlxl128(sPPEState *ppeState) {
   CHECK_VXU;
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb));
@@ -1677,16 +1677,16 @@ void PPCInterpreter::PPCInterpreter_lfsu(sPPEState *ppeState) {
 // NOTE: lvexx Instructions effectively behave like lvx.
 
 // Load Vector Element Byte Indexed (x'7C00 000E')
-void PPCInterpreter::PPCInterpreter_lvebx(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_lvebx(sPPEState *ppeState) {
   /*
    if rA=0 then b <- 0
    else         b <- (rA)
    EA <- b + (rB)
-   eb <- EA60:63 
+   eb <- EA60:63
    vD <- undefined
-   (vD)eb×8 :(eb×8)+7 <- MEM(EA,1)
+   (vD)eb*8 :(eb*8)+7 <- MEM(EA,1)
   */
-  
+
   CHECK_VXU;
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
@@ -1709,17 +1709,17 @@ void PPCInterpreter::PPCInterpreter_lvebx(sPPEState* ppeState) {
 }
 
 // Load Vector Element Halfword Indexed (x'7C00 004E')
-void PPCInterpreter::PPCInterpreter_lvehx(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_lvehx(sPPEState *ppeState) {
   /*
    if rA=0 then b <- 0
-   else        
+   else
    b <- (rA)
-   EA <- (b + (rB)) & 0xFFFF_FFFF_FFFF_FFFE 
+   EA <- (b + (rB)) & 0xFFFF_FFFF_FFFF_FFFE
    eb <- EA60:63
    vD <- undefined
-   (vD)(eb×8):(eb×8) + 15 <- MEM(EA,2)
+   (vD)(eb*8):(eb*8) + 15 <- MEM(EA,2)
   */
-  
+
   CHECK_VXU;
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
@@ -1742,7 +1742,7 @@ void PPCInterpreter::PPCInterpreter_lvehx(sPPEState* ppeState) {
 }
 
 // Load Vector Element Word Indexed (x'7C00 008E')
-void PPCInterpreter::PPCInterpreter_lvewx(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_lvewx(sPPEState *ppeState) {
   /*
   if rA=0 then b <- 0
   else b <- (rA)
@@ -1776,7 +1776,7 @@ void PPCInterpreter::PPCInterpreter_lvewx(sPPEState* ppeState) {
 }
 
 // Vector128 Load Vector Element Word Indexed
-void PPCInterpreter::PPCInterpreter_lvewx128(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_lvewx128(sPPEState *ppeState) {
   CHECK_VXU;
 
   u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
@@ -1799,7 +1799,7 @@ void PPCInterpreter::PPCInterpreter_lvewx128(sPPEState* ppeState) {
 }
 
 // Load Vector Indexed (x'7C00 00CE')
-void PPCInterpreter::PPCInterpreter_lvx(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_lvx(sPPEState *ppeState) {
   /*
   if rA=0 then b <- 0
   else b <- (rA)
@@ -1808,7 +1808,7 @@ void PPCInterpreter::PPCInterpreter_lvx(sPPEState* ppeState) {
    then vD <- MEM(EA,16)
    else vD <- MEM(EA+8,8) || MEM(EA,8)
   */
-  
+
   CHECK_VXU;
 
   Vector128 vector{};
@@ -1858,7 +1858,7 @@ void PPCInterpreter::PPCInterpreter_lvx128(sPPEState *ppeState) {
 }
 
 // // Load Vector Indexed LRU 128
-void PPCInterpreter::PPCInterpreter_lvxl128(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_lvxl128(sPPEState *ppeState) {
   CHECK_VXU;
 
   Vector128 vector{};
@@ -1956,7 +1956,7 @@ void PPCInterpreter::PPCInterpreter_lvlx(sPPEState *ppeState) {
 
   while (i < 16)
     VRi(vd).bytes[i++] = 0;
- 
+
   VRi(vd).dword[0] = byteswap_be<u32>(VRi(vd).dword[0]);
   VRi(vd).dword[1] = byteswap_be<u32>(VRi(vd).dword[1]);
   VRi(vd).dword[2] = byteswap_be<u32>(VRi(vd).dword[2]);
@@ -1970,7 +1970,7 @@ void PPCInterpreter::PPCInterpreter_lvlx(sPPEState *ppeState) {
 }
 
 // Load Vector Left Indexed 128
-void PPCInterpreter::PPCInterpreter_lvlx128(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_lvlx128(sPPEState *ppeState) {
   CHECK_VXU;
 
   Vector128 vector{};
@@ -2078,7 +2078,7 @@ void PPCInterpreter::PPCInterpreter_lvrx(sPPEState *ppeState) {
 }
 
 // Load Vector Right Indexed 128
-void PPCInterpreter::PPCInterpreter_lvrx128(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_lvrx128(sPPEState *ppeState) {
   CHECK_VXU;
 
   Vector128 vector{};
@@ -2130,7 +2130,7 @@ void PPCInterpreter::PPCInterpreter_lvrx128(sPPEState* ppeState) {
 }
 
 // Load Vector for Shift Left (x'7C00 000C')
-void PPCInterpreter::PPCInterpreter_lvsl(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_lvsl(sPPEState *ppeState) {
   /*
   if rA = 0 then b <- 0
   else b <- (rA)
@@ -2165,7 +2165,7 @@ void PPCInterpreter::PPCInterpreter_lvsl(sPPEState* ppeState) {
 
 #ifdef VXU_LOAD_DEBUG
   u8 vrd = _instr.vd;
-  LOG_DEBUG(Xenon, "lvsl: EA {:#x}, sh {:#x}, VrD {:#d} = [{:#x},{:#x},{:#x},{:#x}]", EA, sh, vrd, VRi(vd).dword[0], 
+  LOG_DEBUG(Xenon, "lvsl: EA {:#x}, sh {:#x}, VrD {:#d} = [{:#x},{:#x},{:#x},{:#x}]", EA, sh, vrd, VRi(vd).dword[0],z
     VRi(vd).dword[1], VRi(vd).dword[2], VRi(vd).dword[3]);
 #endif // VXU_LOAD_DEBUG
 
@@ -2201,7 +2201,7 @@ void PPCInterpreter::PPCInterpreter_lvsl(sPPEState* ppeState) {
 }
 
 // Load Vector for Shift Right (x'7C00 004C')
-void PPCInterpreter::PPCInterpreter_lvsr(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_lvsr(sPPEState *ppeState) {
   /*
    if rA = 0 then  b <- 0
    else            b <- (rA)

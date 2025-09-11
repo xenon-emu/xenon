@@ -122,7 +122,7 @@ void PPCInterpreter::PPCInterpreterJIT_mfspr(sPPEState *ppeState, JITBlockBuilde
   COMP->mov(GPRPtr(instr.rs), rSValue);
 }
 
-// Move from One Condition Register Field (x’7C20 0026’) 
+// Move from One Condition Register Field (x'7C20 0026') 
 void PPCInterpreter::PPCInterpreterJIT_mfocrf(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   // Temp storage for the CR current value.
   x86::Gp crValue = newGP32();
@@ -145,12 +145,11 @@ void PPCInterpreter::PPCInterpreterJIT_mfocrf(sPPEState* ppeState, JITBlockBuild
     if (count == 1) {
       COMP->and_(crValue, crMask);
       COMP->mov(GPRPtr(instr.rd), crValue);
-    }
-    else { // Undefined behavior.
+    } else {
+      // Undefined behavior.
       COMP->mov(GPRPtr(instr.rd), imm<u64>(0));
     }
-  }
-  else {
+  } else {
     // MFCR
     COMP->mov(GPRPtr(instr.rd), crValue);
   }

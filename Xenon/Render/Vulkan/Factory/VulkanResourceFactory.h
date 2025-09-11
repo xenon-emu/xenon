@@ -21,7 +21,7 @@ public:
   {}
 
   std::unique_ptr<ShaderFactory> CreateShaderFactory() override {
-    return std::make_unique<VulkanShaderFactory>();
+    return std::make_unique<VulkanShaderFactory>(renderer);
   }
   std::unique_ptr<Buffer> CreateBuffer() override {
     return std::make_unique<VulkanBuffer>(renderer);

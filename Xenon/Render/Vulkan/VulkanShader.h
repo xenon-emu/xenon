@@ -3,6 +3,7 @@
 #pragma once
 
 #include "Render/Abstractions/Shader.h"
+#include "Render/Backends/Vulkan/VulkanRenderer.h"
 
 #include "Base/Types.h"
 #include "Base/Logging/Log.h"
@@ -12,6 +13,7 @@ namespace Render {
 
 class VulkanShader : public Shader {
 public:
+  explicit VulkanShader(VkDevice device) : device(device) {}
   ~VulkanShader() override { Destroy(); }
 
   void CompileFromSource(eShaderType type, const char *source) override;
@@ -26,6 +28,10 @@ public:
   void Bind() override;
   void Unbind() override;
   void Destroy() override;
+private:
+  VkDevice device{};
+  VkShaderModule vertexShader = VK_NULL_HANDLE;
+  VkShaderModule fragmentShader = VK_NULL_HANDLE;
 };
 
 } // namespace Render

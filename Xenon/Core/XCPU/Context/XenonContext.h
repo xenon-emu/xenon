@@ -35,6 +35,8 @@ namespace Xe::XCPU {
       socPRVBlock = std::make_unique<STRIP_UNIQUE(socPRVBlock)>();
     }
     ~XenonContext() {
+      SROM.reset();
+      SRAM.reset();
       socSecOTPBlock.reset();
       socSecEngBlock.reset();
       socSecRNGBlock.reset();

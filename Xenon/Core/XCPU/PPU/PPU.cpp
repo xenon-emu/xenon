@@ -466,7 +466,7 @@ u32 PPU::GetIPS() {
   // Instr Count: The amount of instructions to execute in order to test
 
   // Write the calibration code to main memory
-  for (s32 i = 4; i; --i) {
+  for (u8 i = 0; i != 4; ++i) {
     PPCInterpreter::MMUWrite32(ppeState.get(), 4 + (i * 4), ipsCalibrationCode[i]);
   }
 

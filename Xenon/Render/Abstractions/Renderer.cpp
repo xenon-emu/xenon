@@ -45,8 +45,7 @@ void Renderer::SDLInit() {
   SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, true);
   // Enable HiDPI
   SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_HIGH_PIXEL_DENSITY_BOOLEAN, true);
-  SDL_SetNumberProperty(props, "flags", SDL_WINDOW_OPENGL);
-  SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true);
+  BackendSDLProperties(props);
   // Create window
   mainWindow = SDL_CreateWindowWithProperties(props);
 
@@ -57,7 +56,7 @@ void Renderer::SDLInit() {
     LOG_ERROR(Render, "Failed to create window: {}", SDL_GetError());
   }
 
-  // Destroy (no longer used) properties
+  // Destroy (no longer used) properties  
   SDL_DestroyProperties(props);
   // Set if we are in fullscreen mode or not
   SDL_SetWindowFullscreen(mainWindow, fullscreen);
@@ -460,115 +459,119 @@ void Renderer::Thread() {
     if (!threadRunning)
       break;
 
-//    // Buffer load
-//    {
-//      std::lock_guard<std::mutex> lock(bufferQueueMutex);
-//      while (!bufferLoadQueue.empty()) {
-//        BufferLoadJob job = bufferLoadQueue.front();
-//        bufferLoadQueue.pop();
-//
-//        auto &bufferEntry = createdBuffers[job.hash];
-//        if (bufferEntry) {
-//          bufferEntry->UpdateBuffer(0, static_cast<u32>(job.data.size()), job.data.data());
-//#ifdef XE_DEBUG
-//          LOG_DEBUG(Xenos, "Updated buffer '{}', size: {}", job.name, job.data.size());
-//#endif
-//        } else {
-//          bufferEntry = resourceFactory->CreateBuffer();
-//          bufferEntry->CreateBuffer(static_cast<u32>(job.data.size()), job.data.data(), job.usage, job.type);
-//#ifdef XE_DEBUG
-//          LOG_DEBUG(Xenos, "Created buffer '{}', size: {}", job.name, job.data.size());
-//#endif
-//        }
-//      }
-//    }
-//
-//    if (readyToLink.load()) {
-//      const bool hasVS = pendingVertexShaders.contains(pendingVertexShader);
-//      const bool hasPS = pendingPixelShaders.contains(pendingPixelShader);
-//
-//      if (hasVS && hasPS) {
-//        u64 combined = (static_cast<u64>(pendingVertexShader) << 32) | pendingPixelShader;
-//#ifdef XE_DEBUG
-//        LOG_DEBUG(Xenos, "Linking VS: 0x{:08X}, PS: 0x{:08X}", pendingVertexShader, pendingPixelShader);
-//#endif
-//        TryLinkShaderPair(pendingVertexShader, pendingPixelShader);
-//        readyToLink.store(false);
-//      }
-//    }
+    // Buffer load
+    {
+      std::lock_guard<std::mutex> lock(bufferQueueMutex);
+      while (!bufferLoadQueue.empty()) {
+        BufferLoadJob job = bufferLoadQueue.front();
+        bufferLoadQueue.pop();
 
-    //// Copy job
-    //{
-    //  std::lock_guard<std::mutex> lock(copyQueueMutex);
-    //  if (!copyQueue.empty()) {
-    //    IssueCopy(copyQueue.front());
-    //    copyQueue.pop();
-    //  }
-    //}
+        auto &bufferEntry = createdBuffers[job.hash];
+        if (bufferEntry) {
+          bufferEntry->UpdateBuffer(0, static_cast<u32>(job.data.size()), job.data.data());
+#ifdef XE_DEBUG
+          LOG_DEBUG(Xenos, "Updated buffer '{}', size: {}", job.name, job.data.size());
+#endif
+        } else {
+          bufferEntry = resourceFactory->CreateBuffer();
+          bufferEntry->CreateBuffer(static_cast<u32>(job.data.size()), job.data.data(), job.usage, job.type);
+#ifdef XE_DEBUG
+          LOG_DEBUG(Xenos, "Created buffer '{}', size: {}", job.name, job.data.size());
+#endif
+        }
+      }
+    }
+
+    if (readyToLink.load()) {
+      const bool hasVS = pendingVertexShaders.contains(pendingVertexShader);
+      const bool hasPS = pendingPixelShaders.contains(pendingPixelShader);
+
+      if (hasVS && hasPS) {
+        u64 combined = (static_cast<u64>(pendingVertexShader) << 32) | pendingPixelShader;
+#ifdef XE_DEBUG
+        LOG_DEBUG(Xenos, "Linking VS: 0x{:08X}, PS: 0x{:08X}", pendingVertexShader, pendingPixelShader);
+#endif
+        TryLinkShaderPair(pendingVertexShader, pendingPixelShader);
+        readyToLink.store(false);
+      }
+    }
+
+    // Copy job
+    {
+      std::lock_guard<std::mutex> lock(copyQueueMutex);
+      if (!copyQueue.empty()) {
+        IssueCopy(copyQueue.front());
+        copyQueue.pop();
+      }
+    }
 
     // Clear the display
     if (XeMain::xenos)
       Clear();
 
-    //if (XeMain::xenos && XeMain::xenos->RenderingTo2DFramebuffer()) {
-    //  if (ramPointer) {
-    //    fbPointer = ramPointer->GetPointerToAddress(XeMain::xenos->GetSurface());
-    //    const u32 *ui_fbPointer = reinterpret_cast<const u32 *>(fbPointer);
-    //    pixelSSBO->UpdateBuffer(0, pitch, ui_fbPointer);
-    //
-    //    computeShaderProgram->Bind();
-    //    pixelSSBO->Bind();
-    //
-    //    if (XeMain::xenos) {
-    //      computeShaderProgram->SetUniformInt("internalWidth", XeMain::xenos->GetWidth());
-    //      computeShaderProgram->SetUniformInt("internalHeight", XeMain::xenos->GetHeight());
-    //    }
-    //    computeShaderProgram->SetUniformInt("resWidth", width);
-    //    computeShaderProgram->SetUniformInt("resHeight", height);
-    //    OnCompute();
-    //    renderShaderPrograms->Bind();
-    //    backbuffer->Bind();
-    //    OnBind();
-    //    backbuffer->Unbind();
-    //    renderShaderPrograms->Unbind();
-    //  }
-    //
-    //  // Frame sync
-    //  std::vector<DrawJob> currentFrameJobs;
-    //  {
-    //    std::lock_guard<std::mutex> lock(drawQueueMutex);
-    //    while (!drawQueue.empty()) {
-    //      currentFrameJobs.push_back(std::move(drawQueue.front()));
-    //      drawQueue.pop();
-    //    }
-    //  }
-    //
-    //  if (!currentFrameJobs.empty()) {
-    //    previousJobs = std::move(currentFrameJobs);
-    //  }
-    //
-    //  for (const auto &drawJob : previousJobs) {
-    //    u64 combinedHash = (static_cast<u64>(drawJob.shaderVS) << 32) | drawJob.shaderPS;
-    //    auto shaderIt = linkedShaderPrograms.find(combinedHash);
-    //    if (shaderIt != linkedShaderPrograms.end() && shaderIt->second.program) {
-    //      shaderIt->second.program->Bind();
-    //      if (drawJob.indexed) {
-    //        DrawIndexed(shaderIt->second, drawJob.params, drawJob.params.indexBufferInfo);
-    //      } else {
-    //        Draw(shaderIt->second, drawJob.params);
-    //      }
-    //    }frameReadyV
-    //  }
-    //}
+    if (XeMain::xenos && XeMain::xenos->RenderingTo2DFramebuffer()) {
+      if (ramPointer) {
+        fbPointer = ramPointer->GetPointerToAddress(XeMain::xenos->GetSurface());
+        const u32 *ui_fbPointer = reinterpret_cast<const u32 *>(fbPointer);
+        pixelSSBO->UpdateBuffer(0, pitch, ui_fbPointer);
+    
+        if (computeShaderProgram.get()) {
+          computeShaderProgram->Bind();
+          pixelSSBO->Bind();
 
-    //if (waiting) {
-    //  waiting = false;
-    //  if (waitTime >= 0x100) {
-    //    std::this_thread::sleep_for(std::chrono::milliseconds(waitTime / 0x100));
-    //  } else {
-    //    std::this_thread::yield();
-    //  }
-    //}
+          if (XeMain::xenos) {
+            computeShaderProgram->SetUniformInt("internalWidth", XeMain::xenos->GetWidth());
+            computeShaderProgram->SetUniformInt("internalHeight", XeMain::xenos->GetHeight());
+          }
+          computeShaderProgram->SetUniformInt("resWidth", width);
+          computeShaderProgram->SetUniformInt("resHeight", height);
+          OnCompute();
+        }
+        if (renderShaderPrograms.get()) {
+          renderShaderPrograms->Bind();
+          backbuffer->Bind();
+          OnBind();
+          backbuffer->Unbind();
+          renderShaderPrograms->Unbind();
+        }
+      }
+    
+      // Frame sync
+      std::vector<DrawJob> currentFrameJobs;
+      {
+        std::lock_guard<std::mutex> lock(drawQueueMutex);
+        while (!drawQueue.empty()) {
+          currentFrameJobs.push_back(std::move(drawQueue.front()));
+          drawQueue.pop();
+        }
+      }
+    
+      if (!currentFrameJobs.empty()) {
+        previousJobs = std::move(currentFrameJobs);
+      }
+    
+      for (const auto &drawJob : previousJobs) {
+        u64 combinedHash = (static_cast<u64>(drawJob.shaderVS) << 32) | drawJob.shaderPS;
+        auto shaderIt = linkedShaderPrograms.find(combinedHash);
+        if (shaderIt != linkedShaderPrograms.end() && shaderIt->second.program) {
+          shaderIt->second.program->Bind();
+          if (drawJob.indexed) {
+            DrawIndexed(shaderIt->second, drawJob.params, drawJob.params.indexBufferInfo);
+          } else {
+            Draw(shaderIt->second, drawJob.params);
+          }
+        }
+      }
+    }
+
+    if (waiting) {
+      waiting = false;
+      if (waitTime >= 0x100) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(waitTime / 0x100));
+      } else {
+        std::this_thread::yield();
+      }
+    }
 
     // Render the GUI
     if (gui.get() && !focusLost) {
@@ -576,7 +579,7 @@ void Renderer::Thread() {
     }
 
     // Swap
-    //swapCount.fetch_add(1);
+    swapCount.fetch_add(1);
     OnSwap(mainWindow);
   }
 }

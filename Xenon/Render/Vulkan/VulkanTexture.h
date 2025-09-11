@@ -5,8 +5,9 @@
 #include "Render/Abstractions/Texture.h"
 #include "Render/Backends/Vulkan/VulkanRenderer.h"
 
-#include "Base/Types.h"
 #include "Base/Logging/Log.h"
+#include "Base/Assert.h"
+#include "Base/Types.h"
 
 #ifndef NO_GFX
 
@@ -26,7 +27,16 @@ public:
   void Bind() override;
   void Unbind() override;
   void DestroyTexture() override;
+
+  VkCommandBuffer BeginSingleTimeCommands();
+  void EndSingleTimeCommands(VkCommandBuffer cmd);
 private:
+  void TransitionImageLayout(VkCommandBuffer cmd, VkImage image,
+    VkFormat format, VkImageLayout oldLayout,
+    VkImageLayout newLayout, u32 mipLevels, u32 layerCount = 1);
+  void CopyBufferToImage(VkCommandBuffer cmd, VkBuffer buffer, VkImage image, u32 width, u32 height, u32 x = 0, u32 y = 0, u32 w = 0, u32 h = 0);
+  bool CreateBufferWithData(void *srcData, VkDeviceSize size, VkBufferUsageFlags usage,
+    VkBuffer &outBuffer, VmaAllocation &outAlloc);
   VkFormat GetVulkanFormat(eDataFormat format);
   u32 GetBytesPerPixel(eDataFormat format);
   void CreateImageView(VkFormat format);

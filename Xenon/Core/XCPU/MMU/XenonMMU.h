@@ -22,15 +22,11 @@ namespace Xe::XCPU::MMU {
     XenonMMU(XenonContext *inXenonContext) :
       xenonContext(inXenonContext)
     {}
-    ~XenonMMU() {
-      xenonContext.reset();
-    }
 
     // Read/Write routines
-
   private:
     // Xenon CPU Context
-    std::shared_ptr<XenonContext> xenonContext = {};
+    XenonContext *xenonContext = nullptr;
 
     // Calculates and returns the page size (p in the PPC arch).
     ePageSize GetCurrentPageSize(sPPEState *ppeState, bool L, u8 LP);
