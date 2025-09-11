@@ -78,7 +78,7 @@ inline struct _imgui {
   // Viewports
   bool viewports = false;
   // Debug Window
-  bool debugWindow = true;
+  bool debugWindow = false;
 
   // TOML Conversion
   void to_toml(toml::value &value);
