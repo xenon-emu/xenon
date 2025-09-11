@@ -305,10 +305,18 @@ jobs:
           key: xenon-${{runner.os}}-aarch64-clang-${{env.BUILD_TYPE}}-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
 
       - name: Configure CMake
-        run: cmake -G Ninja -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_C_COMPILER=$(brew --prefix llvm)/bin/clang -DCMAKE_CXX_COMPILER=$(brew --prefix llvm)/bin/clang++ -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+        run: |
+          export PATH="/opt/homebrew/opt/llvm@20/bin:$PATH"
+          export CPPFLAGS="-I/opt/homebrew/opt/llvm@20/include"
+          export LDFLAGS="-L/opt/homebrew/opt/llvm@20/lib"
+          cmake -G Ninja -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_C_COMPILER=$(brew --prefix llvm)/bin/clang -DCMAKE_CXX_COMPILER=$(brew --prefix llvm)/bin/clang++ -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
       - name: Build
-        run: cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --parallel $(nproc)
+        run: |
+          export PATH="/opt/homebrew/opt/llvm@20/bin:$PATH"
+          export CPPFLAGS="-I/opt/homebrew/opt/llvm@20/include"
+          export LDFLAGS="-L/opt/homebrew/opt/llvm@20/lib"
+          cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --parallel $(nproc)
 
       - name: Prepare Artifact Folder
         run: |
