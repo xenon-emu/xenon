@@ -30,9 +30,7 @@
 #ifndef TOOL
 #include "Render/GUI/GUI.h"
 #endif
-
-#include <volk.h>
-#include <vk_mem_alloc.h>
+#include "Render/GUI/Vulkan.h"
 
 namespace Render {
 

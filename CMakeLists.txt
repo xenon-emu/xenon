@@ -257,12 +257,12 @@ target_include_directories(Xenon SYSTEM PRIVATE
   ${XENON_THIRDPARTY_DIR}/asmjit/src
 )
 
+# Add defines specific to Apple
 if (APPLE)
   target_link_libraries(Xenon PRIVATE c++ c++abi)
-endif()
-
+  add_definitions(-U None -U Always)
 # Add defines specific to Windows
-if (WIN32)
+elseif (WIN32)
   target_link_libraries(Xenon PRIVATE ws2_32)
   add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
 
@@ -271,6 +271,9 @@ if (WIN32)
 
   # Add .rc file, for the app icon and executable properties
   target_sources(Xenon PRIVATE Xenon/Xenon.rc)
+# Add defines specific to Linux
+else()
+  add_definitions(-U None -U Always)
 endif()
 
 # Specific to MSVC, forces system version so the autodetected 8.1 SDK isn't used

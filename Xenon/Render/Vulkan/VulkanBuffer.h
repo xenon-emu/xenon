@@ -10,9 +10,6 @@
 
 #ifndef NO_GFX
 
-#include <vk_mem_alloc.h>
-#include <volk.h>
-
 namespace Render {
 
 class VulkanRenderer;

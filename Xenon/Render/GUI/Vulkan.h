@@ -13,15 +13,26 @@
 #if defined(_WIN64)
 #define VK_USE_PLATFORM_WIN32_KHR
 #elif defined(__linux__)
-#define VK_USE_PLATFORM_XLIB_KHR
+#define VK_USE_PLATFORM_XCB_KHR
 #elif defined(__APPLE__)
 #define VK_USE_PLATFORM_METAL_EXT
 #endif
 
 #define VK_ENABLE_BETA_EXTENSIONS
 
+#pragma push_macro("Bool")
+#pragma push_macro("None")
+#pragma push_macro("Always")
+#undef Bool
+#undef None
+#undef Always
+
 #include <volk.h>
 #include <vk_mem_alloc.h>
+
+#pragma pop_macro("Always")
+#pragma pop_macro("None")
+#pragma pop_macro("Bool")
 
 #define IMGUI_DEFINE_MATH_OPERATORS
 #define IMGUI_IMPL_VULKAN_USE_VOLK

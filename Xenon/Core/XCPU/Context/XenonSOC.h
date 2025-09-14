@@ -345,7 +345,7 @@ typedef union _SECRNG_CONFIGURATION {
 } SECRNG_CONFIGURATION, * PSECRNG_CONFIGURATION; // size 8
 
 typedef struct _SOCSECRNG_BLOCK {
-  SECRNG_STATUS Status; // 0x0 sz:0x8
+  SECRNG_STATUS SecRngStatus; // 0x0 sz:0x8
   u64 Fifo; // 0x8 sz:0x8
   SECRNG_CONFIGURATION Configuration; // 0x10 sz:0x8
   u64 TraceLogicArrayControl; // 0x18 sz:0x8
