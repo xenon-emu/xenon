@@ -2,7 +2,7 @@
 
 #include "Base/Logging/Log.h"
 #include "Base/Global.h"
-#include "Core/XCPU/Xenon.h"
+#include "Core/XCPU/XenonCPU.h"
 
 #include "RootBus.h"
 

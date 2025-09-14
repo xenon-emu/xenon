@@ -8,7 +8,7 @@
 #endif
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
 #include "Core/XCPU/PPU/PPCInternal.h"
-#include "Core/XCPU/Xenon.h"
+#include "Core/XCPU/XenonCPU.h"
 #include "Core/XCPU/PPU/PPU.h"
 #include "PPU_JIT.h"
 

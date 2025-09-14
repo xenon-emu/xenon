@@ -1,4 +1,6 @@
-// Copyright 2025 Xenon Emulator Project. All rights reserved.
+/***************************************************************/
+/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/***************************************************************/
 
 #include "GUI.h"
 #include "Roboto-Regular.h"
@@ -670,7 +672,7 @@ void PPUThreadDockSpace(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
 
 void PPURegisters(Render::GUI *gui, sPPEState *state) {
   if (gui->BeginSimpleWindow(fmt::format("Registers [{}]", state->ppuID))) {
-    Xenon *CPU = XeMain::GetCPU();
+    Xe::XCPU::XenonCPU *CPU = XeMain::GetCPU();
     if (!CPU)
       return;
     if (gui->BeginNode("SPR")) {
@@ -881,7 +883,7 @@ void DebuggerDockSpace(Render::GUI *gui) {
   }
   ImGui::DockSpace(dsId);
 
-  Xenon *CPU = XeMain::GetCPU();
+  Xe::XCPU::XenonCPU *CPU = XeMain::GetCPU();
   for (u8 ppuID = 0; ppuID != 3; ++ppuID) {
     if (CPU && gui->ppcDebuggerActive[ppuID]) {
       PPU *PPU = CPU->GetPPU(ppuID);
@@ -1012,7 +1014,7 @@ void Render::GUI::OnSwap(Texture *texture) {
           for (bool &a : ppcDebuggerActive)
             a ^= true;
         }
-        Xenon *CPU = XeMain::GetCPU();
+        Xe::XCPU::XenonCPU *CPU = XeMain::GetCPU();
         if (CPU) {
           bool halted = CPU->IsHalted();
           if (TabItemButton(halted ? "Continue" : "Pause")) {

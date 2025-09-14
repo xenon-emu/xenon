@@ -1,4 +1,6 @@
-// Copyright 2025 Xenon Emulator Project. All rights reserved.
+/***************************************************************/
+/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/***************************************************************/
 
 #include "XeMain.h"
 
@@ -268,6 +270,6 @@ void XeMain::CreatePCIDevices(RAM *ram) {
   sfcx->Start();
 }
 
-Xenon *XeMain::GetCPU() {
+Xe::XCPU::XenonCPU *XeMain::GetCPU() {
   return xenonCPU.get();
 }

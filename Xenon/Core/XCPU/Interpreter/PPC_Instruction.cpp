@@ -8,7 +8,7 @@
 */
 
 #include "Base/Global.h"
-#include "Core/XCPU/Xenon.h"
+#include "Core/XCPU/XenonCPU.h"
 
 #include "PPC_Instruction.h"
 #include "PPCInterpreter.h"

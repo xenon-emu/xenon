@@ -1,4 +1,6 @@
-// Copyright 2025 Xenon Emulator Project. All rights reserved.
+/***************************************************************/
+/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/***************************************************************/
 
 #pragma once
 
@@ -23,7 +25,7 @@
 #include "Core/PCI/Devices/SMC/SMC.h"
 #include "Core/PCI/Devices/XMA/XMA.h"
 #include "Core/RootBus/RootBus.h"
-#include "Core/XCPU/Xenon.h"
+#include "Core/XCPU/XenonCPU.h"
 #include "Core/XGPU/XGPU.h"
 
 #include "Render/Backends/OGL/OGLRenderer.h"
@@ -50,7 +52,7 @@ extern void CreateBridges();
 extern void CreatePCIDevices(RAM *ram);
 extern void CreateRootBus();
 
-extern Xenon *GetCPU();
+extern Xe::XCPU::XenonCPU *GetCPU();
 
 // Main objects
 //  Base path
@@ -96,7 +98,7 @@ inline std::shared_ptr<RAM> ram{};
 
 // Console Handles
 //  Xenon CPU
-inline std::unique_ptr<Xenon> xenonCPU{};
+inline std::unique_ptr<Xe::XCPU::XenonCPU> xenonCPU{};
 //  Xenos GPU
 inline std::shared_ptr<Xe::Xenos::XGPU> xenos{};
 

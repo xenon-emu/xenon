@@ -1,10 +1,12 @@
-// Copyright 2025 Xenon Emulator Project. All rights reserved.
+/***************************************************************/
+/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/***************************************************************/
 
 #include "Base/Logging/Log.h"
 #include "Base/Global.h"
 #include "Base/Config.h"
 #include "Base/Thread.h"
-#include "Core/XCPU/Xenon.h"
+#include "Core/XCPU/XenonCPU.h"
 
 #include "SFCX.h"
 

@@ -1,4 +1,6 @@
-// Copyright 2025 Xenon Emulator Project. All rights reserved.
+/***************************************************************/
+/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/***************************************************************/
 
 #include <stdio.h>
 
@@ -7,7 +9,7 @@
 #include "Arch.h"
 #include "Global.h"
 
-#include "Core/XCPU/Xenon.h"
+#include "Core/XCPU/XenonCPU.h"
 
 #ifdef  _MSC_VER
 #define Crash() __debugbreak()

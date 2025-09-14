@@ -1,4 +1,6 @@
-// Copyright 2025 Xenon Emulator Project. All rights reserved.
+/***************************************************************/
+/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/***************************************************************/
 
 #pragma once
 
@@ -19,7 +21,7 @@ inline std::atomic<bool> XeShutdownSignaled{ false };
 // Global paused state
 inline std::atomic<bool> XePaused{ false };
 
-class Xenon;
+namespace Xe::XCPU { class XenonCPU; }
 
 // Handles system pause
 namespace Base {
@@ -52,7 +54,7 @@ extern void ShutdownCPU();
 
 extern void Reboot(u32 type);
 
-extern Xenon *GetCPU();
+extern Xe::XCPU::XenonCPU *GetCPU();
 
 } // namespace XeMain
 
