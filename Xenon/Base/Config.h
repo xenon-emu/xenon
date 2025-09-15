@@ -101,7 +101,7 @@ inline struct _debug {
   // Start the CPU halted
   bool startHalted = false;
   // Soft halts on assertions, otherwise, ignores them
-  bool softHaltOnAssertions = true;
+  bool softHaltOnAssertions = false;
   // Automatically continue on guest assertion
   bool autoContinueOnGuestAssertion = false;
 #ifdef DEBUG_BUILD
