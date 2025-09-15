@@ -167,6 +167,7 @@ if (GFX_ENABLED)
   xenon_dep(sirit sirit Sirit)
   xenon_dep(VulkanHeaders Vulkan::Headers Vulkan-Headers)
   xenon_dep(VulkanMemoryAllocator VulkanMemoryAllocator VulkanMemoryAllocator)
+  xenon_dep(vk-bootstrap vk-bootstrap::vk-bootstrap vk-bootstrap)
 endif()
 
 # Include Files
@@ -228,7 +229,7 @@ endif()
 # Link libraries
 target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11 asmjit::asmjit)
 if (GFX_ENABLED)
-  target_link_libraries(Xenon PRIVATE glad sirit SDL3::SDL3 VulkanMemoryAllocator)
+  target_link_libraries(Xenon PRIVATE glad sirit SDL3::SDL3 VulkanMemoryAllocator vk-bootstrap::vk-bootstrap)
 endif()
 
 # Includes
@@ -246,6 +247,7 @@ if (GFX_ENABLED)
     ${XENON_THIRDPARTY_DIR}/glad
     ${XENON_THIRDPARTY_DIR}/SDL3/include
     ${XENON_THIRDPARTY_DIR}/Sirit/include
+    ${XENON_THIRDPARTY_DIR}/vk-bootstrap/src
     ${XENON_THIRDPARTY_DIR}/Vulkan-Headers/include
     ${XENON_THIRDPARTY_DIR}/VulkanMemoryAllocator/include
     ${XENON_THIRDPARTY_DIR}/volk/include

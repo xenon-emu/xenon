@@ -41,3 +41,6 @@
 [submodule "Deps/ThirdParty/VulkanMemoryAllocator"]
 	path = Deps/ThirdParty/VulkanMemoryAllocator
 	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+[submodule "Deps/ThirdParty/vk-bootstrap"]
+	path = Deps/ThirdParty/vk-bootstrap
+	url = https://github.com/charles-lunarg/vk-bootstrap.git

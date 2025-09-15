@@ -25,6 +25,7 @@
 
 #include <volk.h>
 #include <vk_mem_alloc.h>
+#include <VkBootstrap.h>
 
 #pragma pop_macro("Always")
 #pragma pop_macro("None")
@@ -81,13 +82,13 @@ public:
 
   void RecreateSwapchain();
 
-  void CheckActiveRenderPass();
-  void EndActiveRenderPass();
-
   // Core
   s32 graphicsQueueFamily = 0;
   VmaAllocator allocator = VK_NULL_HANDLE;
   VkInstance instance = VK_NULL_HANDLE;
+  vkb::DispatchTable dispatchTable{};
+  vkb::Instance vkbInstance{};
+  vkb::PhysicalDevice vkbPhys{};
   VkDevice device = VK_NULL_HANDLE;
   VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
   VkQueue graphicsQueue = VK_NULL_HANDLE;
@@ -95,12 +96,15 @@ public:
   // Swapchain
   VkSurfaceKHR surface = VK_NULL_HANDLE;
   VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+  vkb::Swapchain vkbSwapchain{};
+  vkb::Device vkbDevice{};
   VkSurfaceFormatKHR chosenFormat{ VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
   VkPresentModeKHR chosenPresentMode{};
   u32 swapchainImageCount = 2;
-  std::vector<VkImage> swapchainImages;
-  std::vector<VkImageView> swapchainImageViews;
-  std::vector<VkFramebuffer> swapchainFramebuffers;
+  std::vector<VkImage> swapchainImages{};
+  std::vector<VkImageView> swapchainImageViews{};
+  std::vector<VkFence> imagesInFlight{};
+  std::vector<VkFramebuffer> swapchainFramebuffers{};
   VkExtent2D swapchainExtent{ 0, 0 };
 
   // Command buffers
@@ -116,7 +120,7 @@ public:
   VkRenderPass renderPass = VK_NULL_HANDLE;
 
   // Framebuffers
-  VkFramebuffer framebuffer = VK_NULL_HANDLE;
+  std::vector<VkFramebuffer> framebuffers{};
 };
 
 } // namespace Render

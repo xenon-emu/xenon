@@ -44,6 +44,14 @@ let
       hash = "sha256-/nPJ4gJ48gWtpxJ2Tlz4Az07mdBLrL4w/gdb0Xjq47o= ";
     }
     else {};
+  vk-bootstrap = if withGraphics
+    then fetchFromGitHub {
+      owner = "charles-lunarg";
+      repo = "vk-bootstrap";
+      rev = "fe2cf07474bff6d7b7285e7af20b21656789dc07";
+      hash = "sha256-DgDfYNGIdemyLaedJk25EWAt1aFccb8rhCtw25RSGm4=";
+    }
+    else {};
   volk = if withGraphics
     then fetchFromGitHub {
       owner = "zeux";
@@ -90,10 +98,12 @@ stdenv.mkDerivation {
       echo graphics present
       rm -rf $sourceRoot/Deps/ThirdParty/ImGui
       rm -rf $sourceRoot/Deps/ThirdParty/Sirit
+      rm -rf $sourceRoot/Deps/ThirdParty/vk-bootstrap
       rm -rf $sourceRoot/Deps/ThirdParty/volk
       rm -rf $sourceRoot/Deps/ThirdParty/VulkanMemoryAllocator
       cp -r ${imgui} $sourceRoot/Deps/ThirdParty/ImGui
       cp -r ${sirit} $sourceRoot/Deps/ThirdParty/Sirit
+      cp -r ${vk-bootstrap} $sourceRoot/Deps/ThirdParty/vk-bootstrap
       cp -r ${volk} $sourceRoot/Deps/ThirdParty/volk
       cp -r ${vulkan-memory-allocator} $sourceRoot/Deps/ThirdParty/VulkanMemoryAllocator
     ''}
