@@ -720,12 +720,6 @@ bool PPU::PPUCheckExceptions() {
   // Check Exceptions pending and process them in order.
   u16 &exceptions = _ex;
   if (exceptions != PPU_EX_NONE) {
-    // Halt on any exception if set in config.
-    if (Config::debug.softHaltOnAssertions) {
-      LOG_DEBUG(Xenon, "[{}]: Halting on exceptions enabled, proceeding to halt.", ppeState->ppuName);
-      Halt();
-    }
-
     // Exceptions are pending, check and process them in order.
 
     // Non Maskable:
