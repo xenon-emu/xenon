@@ -1,3 +1,7 @@
+/***************************************************************/
+/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/***************************************************************/
+
 #include <stdio.h>
 #include <memory>
 #include "fmt/format.h"

@@ -1,4 +1,6 @@
-// Copyright 2025 Xenon Emulator Project. All rights reserved.
+/***************************************************************/
+/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/***************************************************************/
 
 #define VMA_IMPLEMENTATION
 #define VOLK_IMPLEMENTATION

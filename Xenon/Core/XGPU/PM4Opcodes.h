@@ -1,6 +1,8 @@
+/***************************************************************/
+/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/***************************************************************/
+
 /*
-* Copyright 2025 Xenon Emulator Project. All rights reserved.
-*
 * Most of the information in this file was gathered from
 * various sources across the internet.
 *

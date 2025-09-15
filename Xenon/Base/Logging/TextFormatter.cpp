@@ -1,5 +1,6 @@
-// Copyright 2025 Xenon Emulator Project. All rights reserved.
-
+/***************************************************************/
+/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/***************************************************************/
 #include "Base/Assert.h"
 #include "Base/Config.h"
 
