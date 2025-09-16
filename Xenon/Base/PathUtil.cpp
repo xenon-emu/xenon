@@ -71,7 +71,7 @@ static auto UserPaths = [] {
 
   configDir /= "Xenon";
   insert_path(PathType::BinaryDir, binaryDir, false);
-  insert_path(PathType::RootDir, currentDir, false);
+  insert_path(PathType::RootDir, configDir);
   insert_path(PathType::ConsoleDir, configDir / CONSOLE_DIR);
   insert_path(PathType::LogDir, configDir / LOG_DIR);
   insert_path(PathType::ShaderDir, configDir / SHADER_DIR);

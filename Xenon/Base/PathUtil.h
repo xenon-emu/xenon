@@ -14,7 +14,7 @@ namespace FS {
 
 enum class PathType {
   BinaryDir,  // Binary Path
-  RootDir,    // Execution Path
+  RootDir,    // Config Path
   ConsoleDir, // Where Xenon gets the console files
   LogDir,     // Where log files are stored
   ShaderDir   // Where shaders are stored
