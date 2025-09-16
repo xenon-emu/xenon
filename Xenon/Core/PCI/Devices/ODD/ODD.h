@@ -252,7 +252,7 @@ struct XE_ATAPI_INQUIRY_DATA {
   inquiryDataByte1 byte1;
   u8 version;
   inquiryDataByte3 byte3;
-  u8 additionalLenght;
+  u8 additionalLength;
   inquiryDataByte5 byte5;
   inquiryDataByte6 byte6;
   inquiryDataByte7 byte7;

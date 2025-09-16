@@ -944,15 +944,15 @@ bool PPU::Simulate1Bl() {
 
   // Byteswap header data.
   cbHeader.entryPoint = byteswap_be(cbHeader.entryPoint);
-  cbHeader.lenght = byteswap_be(cbHeader.lenght);
+  cbHeader.length = byteswap_be(cbHeader.length);
 
   LOG_INFO(Xenon, " * Found CB Header at offset {:#x}, entry point {:#x}, size {:#x}.", cbOffset, cbHeader.entryPoint,
-    cbHeader.lenght);
+    cbHeader.length);
 
   // Copy CB data from NAND.
   LOG_INFO(Xenon, " * Fetching CB data.");
   std::vector<u8> cbData;
-  for (size_t idx = 0; idx < cbHeader.lenght; idx++) {
+  for (size_t idx = 0; idx < cbHeader.length; idx++) {
     cbData.push_back(PPCInterpreter::MMURead8(ppeState.get(), NAND_MEMORY_MAPPED_ADDR + cbOffset + idx));
   }
 

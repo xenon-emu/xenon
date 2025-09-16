@@ -141,7 +141,7 @@ struct BL_HEADER {
   u16 pairingData;
   u16 flags;
   u32 entryPoint;
-  u32 lenght;
+  u32 length;
 };
 
 struct SFCX_STATE {

@@ -163,32 +163,32 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
 
   // Byteswap CB_A info from header
   cbaHeader.buildNumber = byteswap_be<u16>(cbaHeader.buildNumber);
-  cbaHeader.lenght = byteswap_be<u32>(cbaHeader.lenght);
+  cbaHeader.length = byteswap_be<u32>(cbaHeader.length);
   cbaHeader.entryPoint = byteswap_be<u32>(cbaHeader.entryPoint);
 
   // Get CB_B header data from image data
-  u32 cbbOffset = sfcxState.nandHeader.entry + cbaHeader.lenght;
+  u32 cbbOffset = sfcxState.nandHeader.entry + cbaHeader.length;
   cbbOffset = 1 ? ((cbbOffset / 0x200) * 0x210) + cbbOffset % 0x200 : cbbOffset;
   memcpy(&cbbHeader, reinterpret_cast<char*>(rawImageData.data() + cbbOffset),
     sizeof(cbbHeader));
 
   // Byteswap CB_B info from header
   cbbHeader.buildNumber = byteswap_be<u16>(cbbHeader.buildNumber);
-  cbbHeader.lenght = byteswap_be<u32>(cbbHeader.lenght);
+  cbbHeader.length = byteswap_be<u32>(cbbHeader.length);
   cbbHeader.entryPoint = byteswap_be<u32>(cbbHeader.entryPoint);
 
   // Check for CB(_A) Magic
   if (cbaHeader.name[0] == 'C' && cbaHeader.name[1] == 'B') {
     LOG_INFO(SFCX, "Found CB(_A) Header: Physical: 0x{:X}, LBA: 0x{:X}", sfcxState.nandHeader.entry, cbaOffset);
     LOG_INFO(SFCX, " * CB Entry: 0x{:X}", cbaHeader.entryPoint);
-    LOG_INFO(SFCX, " * CB Lenght: 0x{:X}", cbaHeader.lenght);
+    LOG_INFO(SFCX, " * CB Length: 0x{:X}", cbaHeader.length);
   }
 
   // Check for CB(_B) Magic
   if (cbbHeader.name[0] == 'C' && cbbHeader.name[1] == 'B') {
-    LOG_INFO(SFCX, "Found CB(_B) Header: Physical: 0x{:X}, LBA: 0x{:X}", sfcxState.nandHeader.entry + cbaHeader.lenght, cbbOffset);
+    LOG_INFO(SFCX, "Found CB(_B) Header: Physical: 0x{:X}, LBA: 0x{:X}", sfcxState.nandHeader.entry + cbaHeader.length, cbbOffset);
     LOG_INFO(SFCX, " * CB Entry: 0x{:X}", cbbHeader.entryPoint);
-    LOG_INFO(SFCX, " * CB Lenght: 0x{:X}", cbbHeader.lenght);
+    LOG_INFO(SFCX, " * CB Length: 0x{:X}", cbbHeader.length);
   }
 
   u32 cbVersion = (cbaHeader.buildNumber == cbbHeader.buildNumber) ? cbaHeader.buildNumber : cbbHeader.buildNumber;
@@ -196,8 +196,7 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
   if (cbaHeader.buildNumber == cbbHeader.buildNumber) {
     LOG_INFO(SFCX, "Detected Unified CB: ");
     LOG_INFO(SFCX, "   * CB Version: {:#d}", cbVersion);
-  }
-  else {
+  } else {
     LOG_INFO(SFCX, "Detected Split CB:");
     LOG_INFO(SFCX, " * CB_A Version: {:#d}", cbaHeader.buildNumber);
     LOG_INFO(SFCX, " * CB_B Version: {:#d}", cbbHeader.buildNumber);
@@ -209,8 +208,7 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
     LOG_INFO(SFCX, "Manual Hardware Init stage skip addresses set:");
     LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, initSkip1);
     LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: 0x{:X}", cbVersion, initSkip2);
-  }
-  else {
+  } else {
     LOG_INFO(SFCX, "Auto-detecting Hardware Init stage skip addresses:");
     switch (cbVersion) {
     // CB_B 6723

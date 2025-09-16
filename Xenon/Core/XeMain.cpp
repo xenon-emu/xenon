@@ -153,7 +153,7 @@ void XeMain::ShutdownCPU() {
   }
   // Set the CPU to 'Resetting' mode before killing the handle
   xenonCPU->Reset();
-  if (!ram) {
+  if (ram) {
     // Reset RAM
     ram->Reset();
 #ifndef NO_GFX

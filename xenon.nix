@@ -2,12 +2,12 @@
 , cmake
 , fetchFromGitHub
 , makeWrapper
-, fmt
 , lib
 , ninja
 , pkg-config
 , roboto
 , sdl3
+, fmt_11
 , toml11
 , python3
 , vulkan-headers
@@ -84,10 +84,10 @@ stdenv.mkDerivation {
   nativeBuildInputs = [ makeWrapper cmake pkg-config ninja ];
 
   buildInputs = [
-    fmt toml11
+    fmt_11 toml11
   ] ++ lib.optionals withGraphics [
     sdl3
-    python3 # Needed for shaderc
+    python3 # Needed for glslang
     vulkan-headers
   ];
 
