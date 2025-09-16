@@ -205,8 +205,16 @@ bool XenonContext::HandlePRVWrite(u64 writeAddr, const u8 *data, size_t byteCoun
   // Apply operations on know registers
   switch (writeAddr) {
   case 0x61010ULL:
+    u64 postCode = byteswap_be<u64>(dataIn);
+#ifdef DEBUG_BUILD
+    std::string poseCodeStr = Xe::XCPU::POSTBUS::GET_POST(postCode);
+    PPU *PPU = XeMain::GetCPU()->GetPPU(ppeState->ppuID);
+    if (PPU->traceFile) {
+      fprintf(PPU->traceFile, "POST,0x%llx,%s\n", postCode, poseCodeStr.c_str());
+    }
+#endif
     // POST Output
-    Xe::XCPU::POSTBUS::POST(byteswap_be<u64>(dataIn));
+    Xe::XCPU::POSTBUS::POST(postCode);
     break;
   case 0x611A0ULL:
     if (socPRVBlock.get()->TimebaseControl.AsBITS.TimebaseEnable) {
