@@ -14,6 +14,7 @@ namespace Xe {
 namespace XCPU {
 namespace POSTBUS {
 void POST(u64 postCode);
+std::string GET_POST(u64 postCode);
 }
 } // namespace XCPU
 } // namespace Xe

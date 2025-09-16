@@ -612,3 +612,417 @@ void Xe::XCPU::POSTBUS::POST(u64 postCode) {
     LOG_ERROR(Xenon_PostBus, "POST: Unrecognized post code: 0x{:X}", postCode);
   }
 }
+
+std::string Xe::XCPU::POSTBUS::GET_POST(u64 postCode) {
+  /* 1BL */
+  if (postCode >= 0x10 && postCode <= 0x1E) {
+    switch (postCode) {
+    case 0x10:
+      return "1BL started.";
+    case 0x11:
+      return "FSB_CONFIG_PHY_CONTROL";
+    case 0x12:
+      return "FSB_CONFIG_RX_STATE";
+    case 0x13:
+      return "FSB_CONFIG_TX_STATE";
+    case 0x14:
+      return "FSB_CONFIG_TX_CREDITS";
+    case 0x15:
+      return "FETCH_OFFSET";
+    case 0x16:
+      return "FETCH_HEADER";
+    case 0x17:
+      return "VERIFY_HEADER";
+    case 0x18:
+      return "FETCH_CONTENTS";
+    case 0x19:
+      return "HMACSHA_COMPUTE";
+    case 0x1A:
+      return "RC4_INITIALIZE";
+    case 0x1B:
+      return "RC4_DECRYPT";
+    case 0x1C:
+      return "SHA_COMPUTE";
+    case 0x1D:
+      return "SIG_VERIFY";
+    case 0x1E:
+      return "BRANCH";
+    }
+  }
+  /* 1BL PANICS */
+  else if (postCode >= 0x81 && postCode <= 0x98) {
+    switch (postCode) {
+    /* 1BL PANIC*/
+    case 0x81:
+      return "MACHINE_CHECK-FAIL";
+    case 0x82:
+      return "DATA_STORAGE-FAIL";
+    case 0x83:
+      return "DATA_SEGMENT-FAIL";
+    case 0x84:
+      return "INSTRUCTION_STORAGE-FAIL";
+    case 0x85:
+      return "INSTRUCTION_SEGMENT-FAIL";
+    case 0x86:
+      return "EXTERNAL-FAIL";
+    case 0x87:
+      return "ALIGNMENT-FAIL";
+    case 0x88:
+      return "PROGRAM-FAIL";
+    case 0x89:
+      return "FPU_UNAVAILABLE-FAIL";
+    case 0x8a:
+      return "DECREMENTER-FAIL";
+    case 0x8b:
+      return "HYPERVISOR_DECREMENTER-FAIL";
+    case 0x8c:
+      return "SYSTEM_CALL-FAIL";
+    case 0x8d:
+      return "TRACE-FAIL";
+    case 0x8e:
+      return "VPU_UNAVAILABLE-FAIL";
+    case 0x8f:
+      return "MAINTENANCE-FAIL";
+    case 0x90:
+      return "VMX_ASSIST-FAIL";
+    case 0x91:
+      return "THERMAL_MANAGEMENT-FAIL";
+    case 0x92:
+      return "INVALID_THREAD-FAIL";
+    case 0x93:
+      return "TOO_MANY_CORES-FAIL";
+    case 0x94:
+      return "VERIFY_OFFSET-FAIL";
+    case 0x95:
+      return "VERIFY_HEADER-FAIL";
+    case 0x96:
+      return "SIG_VERIFY-FAIL";
+    case 0x97:
+      return "NONHOST_RESUME_STATUS-FAIL";
+    case 0x98:
+      return "NEXT_STAGE_SIZE-FAIL";
+    }
+  }
+  /* CB */
+  else if (postCode >= 0x20 && postCode <= 0x3B) {
+    switch (postCode) {
+    case 0x20:
+      return "CB_ENTRY";
+    case 0x21:
+      return "CB_INIT_SECOTP";
+    case 0x22:
+      return "CB_INIT_SECENG";
+    case 0x23:
+      return "CB_INIT_SYSRAM";
+    case 0x24:
+      return "CB_VERIFY_OFFSET_3BL_CC";
+    case 0x25:
+      return "CB_LOCATE_3BL_CC";
+    case 0x26:
+      return "CB_FETCH_HEADER_3BL_CC";
+    case 0x27:
+      return "CB_VERIFY_HEADER_3BL_CC";
+    case 0x28:
+      return "CB_FETCH_CONTENTS_3BL_CC";
+    case 0x29:
+      return "CB_HMACSHA_COMPUTE_3BL_CC";
+    case 0x2A:
+      return "CB_RC4_INITIALIZE_3BL_CC";
+    case 0x2B:
+      return "CB_RC4_DECRYPT_3BL_CC";
+    case 0x2C:
+      return "CB_SHA_COMPUTE_3BL_CC";
+    case 0x2D:
+      return "CB_SIG_VERIFY_3BL_CC";
+    case 0x2E:
+      return "CB_HWINIT";
+    case 0x2F:
+      return "CB_RELOCATE";
+    case 0x30:
+      return "CB_VERIFY_OFFSET_4BL_CD";
+    case 0x31:
+      return "CB_FETCH_HEADER_4BL_CD";
+    case 0x32:
+      return "CB_VERIFY_HEADER_4BL_CD";
+    case 0x33:
+      return "CB_FETCH_CONTENTS_4BL_CD";
+    case 0x34:
+      return "CB_HMACSHA_COMPUTE_4BL_CD";
+    case 0x35:
+      return "CB_RC4_INITIALIZE_4BL_CD";
+    case 0x36:
+      return "CB_RC4_DECRYPT_4BL_CD";
+    case 0x37:
+      return "CB_SHA_COMPUTE_4BL_CD";
+    case 0x38:
+      return "CB_SIG_VERIFY_4BL_CD";
+    case 0x39:
+      return "CB_SHA_VERIFY_4BL_CD";
+    case 0x3A:
+      return "CB_BRANCH";
+    case 0x3B:
+      return "CB_PCI_INIT";
+    }
+  }
+  /* CB PANICS */
+  else if (postCode >= 0x9B && postCode <= 0xB0) {
+    switch (postCode) {
+    case 0x9B:
+      return "VERIFY_SECOTP_1-FAIL";
+    case 0x9C:
+      return "VERIFY_SECOTP_2-FAIL";
+    case 0x9D:
+      return "VERIFY_SECOTP_3-FAIL";
+    case 0x9E:
+      return "VERIFY_SECOTP_4-FAIL";
+    case 0x9F:
+      return "VERIFY_SECOTP_5-FAIL";
+    case 0xA0:
+      return "VERIFY_SECOTP_6-FAIL";
+    case 0xA1:
+      return "VERIFY_SECOTP_7-FAIL";
+    case 0xA2:
+      return "VERIFY_SECOTP_8-FAIL";
+    case 0xA3:
+      return "VERIFY_SECOTP_9-FAIL";
+    case 0xA4:
+      return "VERIFY_SECOTP_10-FAIL";
+    case 0xA5:
+      return "VERIFY_OFFSET_3BL_CC-FAIL";
+    case 0xA6:
+      return "LOCATE_3BL_CC-FAIL";
+    case 0xA7:
+      return "VERIFY_HEADER_3BL_CC-FAIL";
+    case 0xA8:
+      return "SIG_VERIFY_3BL_CC-FAIL";
+    case 0xA9:
+      return "HWINIT_FAIL-FAIL";
+    case 0xAA:
+      return "VERIFY_OFFSET_4BL_CC-FAIL";
+    case 0xAB:
+      return "VERIFY_HEADER_4BL_CC-FAIL";
+    case 0xAC:
+      return "SIG_VERIFY_4BL_CC-FAIL";
+    case 0xAD:
+      return "SHA_VERIFY_4BL_CC-FAIL";
+    case 0xAE:
+      return "UNEXPECTED_INTERRUPT-FAIL";
+    case 0xAF:
+      return "UNSUPPORTED_RAM_SIZE-FAIL";
+    default:
+      return FMT("CB_UNREC_PANIC_0x{:X}", postCode);
+    }
+  }
+  /* CB_A */
+  else if (postCode >= 0xD0 && postCode <= 0xDB) {
+    switch (postCode) {
+    case 0xD0:
+      return "CB_A_ENTRY";
+    case 0xD1:
+      return "READ_FUSES";
+    case 0xD2:
+      return "VERIFY_OFFSET_CB_B";
+    case 0xD3:
+      return "FETCH_HEADER_CB_B";
+    case 0xD4:
+      return "VERIFY_HEADER_CB_B";
+    case 0xD5:
+      return "FETCH_CONTENTS_CB_B";
+    case 0xD6:
+      return "HMACSHA_COMPUTE_CB_B";
+    case 0xD7:
+      return "RC4_INITIALIZE_CB_B";
+    case 0xD8:
+      return "RC4_DECRYPT_CB_B";
+    case 0xD9:
+      return "SHA_COMPUTE_CB_B";
+    case 0xDA:
+      return "SHA_VERIFY_CB_B_EXPECTED-RGH";
+    case 0xDB:
+      return "BRANCH_CB_B";
+    }
+  }
+  /* CB_A PANICS */
+  else if (postCode >= 0xF0 && postCode <= 0xF3) {
+    switch (postCode) {
+    case 0xF0:
+      return "VERIFY_OFFSET_CB_B";
+    case 0xF1:
+      return "VERIFY_HEADER_CB_B";
+    case 0xF2:
+      return "SHA_VERIFY_CB_B";
+    case 0xF3:
+      return "ENTRY_SIZE_INVALID_CB_B";
+    }
+  }
+  /* CD */
+  else if (postCode >= 0x40 && postCode <= 0x53) {
+    switch (postCode) {
+    case 0x40:
+      return "CD_ENTRY";
+    case 0x41:
+      return "VERIFY_OFFSET_CE";
+    case 0x42:
+      return "FETCH_HEADER_CE";
+    case 0x43:
+      return "VERIFY_HEADER_CE";
+    case 0x44:
+      return "FETCH_CONTENTS_CE";
+    case 0x45:
+      return "HMACSHA_COMPUTE_CE";
+    case 0x46:
+      return "RC4_INITIALIZE_CE";
+    case 0x47:
+      return "RC4_DECRYPT_CE";
+    case 0x48:
+      return "SHA_COMPUTE_CE";
+    case 0x49:
+      return "SHA_VERIFY-RGH";
+    case 0x4A:
+      return "LOAD_6BL_CF";
+    case 0x4B:
+      return "LZX_EXPAND_CE";
+    case 0x4C:
+      return "SWEEP_CACHES";
+    case 0x4D:
+      return "DECODE_FUSES";
+    case 0x4E:
+      return "FETCH_OFFSET_6BL_CF";
+    case 0x4F:
+      return "VERIFY_OFFSET_6BL_CF";
+    case 0x50:
+      return "LOAD_UPDATE_1";
+    case 0x51:
+      return "LOAD_UPDATE_2";
+    case 0x52:
+      return "BRANCH";
+    case 0x53:
+      return "DECRYPT_VERIFY_HV_CERT";
+    }
+  }
+  /* CD PANICS */
+  else if (postCode >= 0xB1 && postCode <= 0xB8) {
+    switch (postCode) {
+    case 0xB1:
+      return "VERIFY_OFFSET_CE-FAIL";
+    case 0xB2:
+      return "VERIFY_HEADER_CE-FAIL";
+    case 0xB3:
+      return "SHA_VERIFY_CE-FAIL";
+    case 0xB4:
+      return "LZX_EXPAND_CE-FAIL";
+    case 0xB5:
+      return "VERIFY_OFFSET_6BL-FAIL";
+    case 0xB6:
+      return "DECODE_FUSES-FAIL";
+    case 0xB7:
+      return "UPDATE_MISSING-FAIL";
+    case 0xB8:
+      return "CF_HASH_AUTH-FAIL";
+    }
+  }
+  /* CE/CF PANICS */
+  else if (postCode >= 0xC1 && postCode <= 0xC8) {
+    switch (postCode) {
+    case 0xC1:
+      return "LZX_EXPAND_1";
+    case 0xC2:
+      return "LZX_EXPAND_2";
+    case 0xC3:
+      return "LZX_EXPAND_3";
+    case 0xC4:
+      return "LZX_EXPAND_4";
+    case 0xC5:
+      return "LZX_EXPAND_5";
+    case 0xC6:
+      return "LZX_EXPAND_6";
+    case 0xC7:
+      return "LZX_EXPAND_7";
+    case 0xC8:
+      return "SHA_VERIFY";
+    }
+  }
+  /* HYPERVISOR */
+  else if (postCode >= 0x58 && postCode <= 0x5F) {
+    switch (postCode) {
+    case 0x58:
+      return "INIT_HYPERVISOR";
+    case 0x59:
+      return "INIT_SOC_MMIO";
+    case 0x5A:
+      return "INIT_XEX_TRAINING";
+    case 0x5B:
+      return "INIT_KEYRING";
+    case 0x5C:
+      return "INIT_KEYS";
+    case 0x5D:
+      return "INIT_SOC_INT";
+    case 0x5E:
+      return "INIT_SOC_INT_COMPLETE";
+    case 0x5F:
+      return "INIT_HYPERVISOR_COMPLETE";
+    }
+  }
+  /* HYPERVISOR PANICS */
+  else if (postCode == 0xFF) {
+    return "FATAL";
+  }
+  /* KERNEL */
+  else if (postCode >= 0x60 && postCode <= 0x79) {
+    switch (postCode) {
+    case 0x60:
+      return "INIT_KERNEL";
+    case 0x61:
+      return "INITIAL_HAL_PHASE_0";
+    case 0x62:
+      return "INIT_PROCESS_OBJECTS";
+    case 0x63:
+      return "INIT_KERNEL_DEBUGGER";
+    case 0x64:
+      return "INIT_MEMORY_MANAGER";
+    case 0x65:
+      return "INIT_STACKS";
+    case 0x66:
+      return "INIT_OBJECT_SYSTEM";
+    case 0x67:
+      return "INIT_PHASE1_THREAD";
+    case 0x68:
+      return "INIT_PROCESSORS";
+    case 0x69:
+      return "INIT_KEYVAULT";
+    case 0x6A:
+      return "INIT_HAL_PHASE_1";
+    case 0x6B:
+      return "INIT_SFC_DRIVER";
+    case 0x6C:
+      return "INIT_SECURITY";
+    case 0x6D:
+      return "INIT_KEY_EX_VAULT";
+    case 0x6E:
+      return "INIT_SETTINGS";
+    case 0x6F:
+      return "INIT_POWER_MODE";
+    case 0x70:
+      return "INIT_VIDEO_DRIVER";
+    case 0x71:
+      return "INIT_AUDIO_DRIVER";
+    case 0x72:
+      return "INIT_BOOT_ANIMATION";
+    case 0x73:
+      return "INIT_SATA_DRIVER";
+    case 0x74:
+      return "INIT_SHADOWBOOT";
+    case 0x75:
+      return "INIT_DUMP_SYSTEM";
+    case 0x76:
+      return "INIT_SYSTEM_ROOT";
+    case 0x77:
+      return "INIT_OTHER_DRIVERS";
+    case 0x78:
+      return "INIT_STFS_DRIVER";
+    case 0x79:
+      return "LOAD_XAM";
+    }
+  }
+  return FMT("UNREC_POST_0x{:X}", postCode);
+}

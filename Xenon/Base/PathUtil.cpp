@@ -47,8 +47,20 @@ static auto UserPaths = [] {
   auto currentDir = fs::current_path();
   auto binaryDir = GetBinaryDirectory();
   bool nixos = false;
+#ifdef _WIN32
+  const char *appdata = std::getenv("APPDATA");
+  if (!appdata) {
+    throw std::runtime_error("APPDATA not set");
+  }
+#else
+  const char *home = std::getenv("HOME");
+  if (!home) {
+    throw std::runtime_error("HOME not set");
+  }
+  fs::path configDir(fs::path(home) / ".local" / "share");
+#endif
 
-  std::unordered_map<PathType, fs::path> paths;
+  std::unordered_map<PathType, fs::path> paths{};
 
   const auto insert_path = [&](PathType xenon_path, const fs::path &new_path, bool create = true) {
     if (create && !fs::exists(new_path))
@@ -57,31 +69,16 @@ static auto UserPaths = [] {
     paths.insert_or_assign(xenon_path, new_path);
   };
 
+  configDir /= "Xenon";
   insert_path(PathType::BinaryDir, binaryDir, false);
-  // If we are in the nix store, it's read-only. Change to currentDir if needed
-  if (binaryDir.string().find("/nix/store/") != std::string::npos) {
-    nixos = true;
-  }
-  if (nixos) {
-    currentDir /= "files";
-    insert_path(PathType::RootDir, currentDir);
-    insert_path(PathType::ConsoleDir, currentDir / CONSOLE_DIR);
-    insert_path(PathType::LogDir, currentDir / LOG_DIR);
-    insert_path(PathType::ShaderDir, currentDir / SHADER_DIR);
-    fs::create_directory(currentDir / SHADER_DIR / "cache");
-    fs::create_directory(currentDir / SHADER_DIR / "spirv");
-    fs::create_directory(currentDir / SHADER_DIR / "opengl");
-    fs::create_directory(currentDir / SHADER_DIR / "vulkan");
-  } else {
-    insert_path(PathType::RootDir, currentDir, false);
-    insert_path(PathType::ConsoleDir, binaryDir / CONSOLE_DIR);
-    insert_path(PathType::LogDir, binaryDir / LOG_DIR);
-    insert_path(PathType::ShaderDir, binaryDir / SHADER_DIR);
-    fs::create_directory(binaryDir / SHADER_DIR / "cache");
-    fs::create_directory(binaryDir / SHADER_DIR / "spirv");
-    fs::create_directory(binaryDir / SHADER_DIR / "opengl");
-    fs::create_directory(binaryDir / SHADER_DIR / "vulkan");
-  }
+  insert_path(PathType::RootDir, currentDir, false);
+  insert_path(PathType::ConsoleDir, configDir / CONSOLE_DIR);
+  insert_path(PathType::LogDir, configDir / LOG_DIR);
+  insert_path(PathType::ShaderDir, configDir / SHADER_DIR);
+  fs::create_directory(configDir / SHADER_DIR / "cache");
+  fs::create_directory(configDir / SHADER_DIR / "spirv");
+  fs::create_directory(configDir / SHADER_DIR / "opengl");
+  fs::create_directory(configDir / SHADER_DIR / "vulkan");
   return paths;
 }();
 
