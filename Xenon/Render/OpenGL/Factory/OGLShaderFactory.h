@@ -10,7 +10,7 @@
 
 #ifndef NO_GFX
 namespace Render {
-  
+
 class OGLShaderFactory : public ShaderFactory {
 public:
   void Destroy() override;

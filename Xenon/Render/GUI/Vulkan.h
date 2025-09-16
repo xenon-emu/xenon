@@ -15,7 +15,6 @@
 #include "Render/Backends/Vulkan/VulkanRenderer.h"
 
 #define IMGUI_DEFINE_MATH_OPERATORS
-#define IMGUI_IMPL_VULKAN_USE_VOLK
 #include <backends/imgui_impl_vulkan.h>
 #include <backends/imgui_impl_sdl3.h>
 

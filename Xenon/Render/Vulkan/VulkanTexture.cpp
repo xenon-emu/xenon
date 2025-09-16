@@ -12,25 +12,25 @@ VkCommandBuffer Render::VulkanTexture::BeginSingleTimeCommands() {
   allocInfo.commandPool = renderer->commandPool;
   allocInfo.commandBufferCount = 1;
 
-  VkCommandBuffer cmd;
-  vkAllocateCommandBuffers(renderer->device, &allocInfo, &cmd);
+  VkCommandBuffer cmd{};
+  renderer->dispatch.allocateCommandBuffers(&allocInfo, &cmd);
 
   VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
   beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  vkBeginCommandBuffer(cmd, &beginInfo);
+  renderer->dispatch.beginCommandBuffer(cmd, &beginInfo);
   return cmd;
 }
 
 void Render::VulkanTexture::EndSingleTimeCommands(VkCommandBuffer cmd) {
-  vkEndCommandBuffer(cmd);
+  renderer->dispatch.endCommandBuffer(cmd);
   VkSubmitInfo submit{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
   submit.commandBufferCount = 1;
   submit.pCommandBuffers = &cmd;
 
-  vkQueueSubmit(renderer->graphicsQueue, 1, &submit, VK_NULL_HANDLE);
-  vkQueueWaitIdle(renderer->graphicsQueue);
+  renderer->dispatch.queueSubmit(renderer->graphicsQueue, 1, &submit, VK_NULL_HANDLE);
+  renderer->dispatch.queueWaitIdle(renderer->graphicsQueue);
 
-  vkFreeCommandBuffers(renderer->device, renderer->commandPool, 1, &cmd);
+  renderer->dispatch.freeCommandBuffers(renderer->commandPool, 1, &cmd);
 }
 
 void Render::VulkanTexture::TransitionImageLayout(VkCommandBuffer cmd, VkImage image,
@@ -74,7 +74,7 @@ void Render::VulkanTexture::TransitionImageLayout(VkCommandBuffer cmd, VkImage i
     dstStage = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
   }
 
-  vkCmdPipelineBarrier(cmd, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+  renderer->dispatch.cmdPipelineBarrier(cmd, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
 void Render::VulkanTexture::CopyBufferToImage(VkCommandBuffer cmd, VkBuffer buffer, VkImage image, u32 width, u32 height, u32 x, u32 y, u32 w, u32 h) {
@@ -94,7 +94,7 @@ void Render::VulkanTexture::CopyBufferToImage(VkCommandBuffer cmd, VkBuffer buff
   region.imageOffset = { (s32)x, (s32)y, 0 };
   region.imageExtent = { w, h, 1 };
 
-  vkCmdCopyBufferToImage(cmd, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+  renderer->dispatch.cmdCopyBufferToImage(cmd, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 }
 
 bool Render::VulkanTexture::CreateBufferWithData(void *srcData, VkDeviceSize size, VkBufferUsageFlags usage,
@@ -135,6 +135,7 @@ void Render::VulkanTexture::CreateTextureHandle(u32 width, u32 height, s32 flags
   VkImageCreateInfo imageInfo = {};
   imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
   imageInfo.imageType = VK_IMAGE_TYPE_2D;
+  SetDepth(1); // Hard-code for now
   imageInfo.extent = { width, height, GetDepth() };
   imageInfo.mipLevels = 1;
   imageInfo.arrayLayers = 1;
@@ -217,7 +218,7 @@ void Render::VulkanTexture::Unbind() {
 
 void Render::VulkanTexture::DestroyTexture() {
   if (imageView != VK_NULL_HANDLE) {
-    vkDestroyImageView(renderer->device, imageView, nullptr);
+    renderer->dispatch.destroyImageView(imageView, nullptr);
     imageView = VK_NULL_HANDLE;
   }
   if (image != VK_NULL_HANDLE) {
@@ -255,7 +256,7 @@ void Render::VulkanTexture::CreateImageView(VkFormat format) {
   viewInfo.subresourceRange.baseArrayLayer = 0;
   viewInfo.subresourceRange.layerCount = 1;
 
-  VkResult res = vkCreateImageView(renderer->device, &viewInfo, nullptr, &imageView);
+  VkResult res = renderer->dispatch.createImageView(&viewInfo, nullptr, &imageView);
   if (res != VK_SUCCESS) {
     LOG_ERROR(System, "vkCreateImageView failed with error code {:x}", static_cast<u32>(res));
   }

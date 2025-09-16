@@ -18,24 +18,11 @@
 
 #define VK_ENABLE_BETA_EXTENSIONS
 
-#pragma push_macro("Bool")
-#pragma push_macro("None")
-#pragma push_macro("Always")
-#undef Bool
-#undef None
-#undef Always
-
-#include <volk.h>
 #include <vk_mem_alloc.h>
 #include <VkBootstrap.h>
 
-#pragma pop_macro("Always")
-#pragma pop_macro("None")
-#pragma pop_macro("Bool")
-
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_vulkan.h>
-#define IMGUI_IMPL_VULKAN_USE_VOLK
 #define IMGUI_DEFINE_MATH_OPERATORS
 #include <backends/imgui_impl_vulkan.h>
 
@@ -84,28 +71,28 @@ public:
 
   void RecreateSwapchain();
 
+  // vk-bootstrap
+  vkb::Instance vkbInstance{};
+  vkb::InstanceDispatchTable instanceDispatch{};
+  vkb::DispatchTable dispatch{};
+  vkb::PhysicalDevice vkbPhys{};
+  vkb::Swapchain vkbSwapchain{};
+  vkb::Device vkbDevice{};
+
   // Core
+  u64 currentFrame = 0;
   s32 graphicsQueueFamily = 0;
   VmaAllocator allocator = VK_NULL_HANDLE;
-  VkInstance instance = VK_NULL_HANDLE;
-  vkb::DispatchTable dispatchTable{};
-  vkb::Instance vkbInstance{};
-  vkb::PhysicalDevice vkbPhys{};
-  VkDevice device = VK_NULL_HANDLE;
-  VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
   VkQueue graphicsQueue = VK_NULL_HANDLE;
 
   // Swapchain
   VkSurfaceKHR surface = VK_NULL_HANDLE;
   VkSwapchainKHR swapchain = VK_NULL_HANDLE;
-  vkb::Swapchain vkbSwapchain{};
-  vkb::Device vkbDevice{};
   VkSurfaceFormatKHR chosenFormat{ VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
   VkPresentModeKHR chosenPresentMode{};
   u32 swapchainImageCount = 2;
   std::vector<VkImage> swapchainImages{};
   std::vector<VkImageView> swapchainImageViews{};
-  std::vector<VkFence> imagesInFlight{};
   std::vector<VkFramebuffer> swapchainFramebuffers{};
   VkExtent2D swapchainExtent{ 0, 0 };
 
@@ -114,9 +101,10 @@ public:
   VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
 
   // Synchronization
-  VkSemaphore imageAvailableSemaphore = VK_NULL_HANDLE;
-  VkSemaphore renderFinishedSemaphore = VK_NULL_HANDLE;
-  VkFence inFlightFence = VK_NULL_HANDLE;
+  std::vector<VkSemaphore> availableSemaphores{};
+  std::vector<VkSemaphore> finishedSemaphores{};
+  std::vector<VkFence> inFlightFences{};
+  std::vector<VkFence> imagesInFlight{};
 
   // Render pass
   VkRenderPass renderPass = VK_NULL_HANDLE;

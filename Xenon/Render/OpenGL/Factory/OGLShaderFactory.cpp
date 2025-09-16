@@ -75,10 +75,10 @@ std::shared_ptr<Shader> OGLShaderFactory::LoadFromFile(const std::string &name, 
     return nullptr;
   }
 
-  std::unordered_map<eShaderType, std::string> shaderSources;
-  std::stringstream buffer;
-  std::string line;
-  eShaderType currentType;
+  std::unordered_map<eShaderType, std::string> shaderSources{};
+  std::stringstream buffer{};
+  std::string line{};
+  eShaderType currentType{};
   bool insideShader = false;
 
   while (std::getline(file, line)) {

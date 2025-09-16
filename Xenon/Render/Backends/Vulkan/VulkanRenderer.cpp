@@ -8,6 +8,7 @@
 #include "Base/Config.h"
 
 #include "Render/Backends/Vulkan/VulkanRenderer.h"
+#include "Render/Backends/Vulkan/VulkanShaders.h"
 
 #include "Render/Vulkan/Factory/VulkanResourceFactory.h"
 
@@ -15,13 +16,19 @@
 namespace Render {
 
 void VulkanRenderer::BackendStart() {
-  VkResult res = volkInitialize();
-  if (res != VK_SUCCESS) {
-    LOG_ERROR(Render, "volkInitialize failed with error code 0x{:x}", static_cast<u32>(res));
-    return;
-  }
-
   vkb::InstanceBuilder builder{};
+
+  builder.set_debug_callback([](VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+    VkDebugUtilsMessageTypeFlagsEXT messageType,
+    const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+    void *pUserData) -> VkBool32
+  {
+		auto severity = vkb::to_string_message_severity(messageSeverity);
+		auto type = vkb::to_string_message_type(messageType);
+    LOG_INFO(Render, "[{}: {}]", severity, type, pCallbackData->pMessage);
+		return VK_FALSE;
+	});
+
   auto instRet = builder
     .set_app_name("Xenon")
     .require_api_version(1, 2, 0)
@@ -35,10 +42,10 @@ void VulkanRenderer::BackendStart() {
   }
 
   vkbInstance = instRet.value();
-  instance = vkbInstance.instance;
-  volkLoadInstance(instance);
 
-  if (!SDL_Vulkan_CreateSurface(mainWindow, instance, nullptr, &surface)) {
+  instanceDispatch = vkbInstance.make_table();
+
+  if (!SDL_Vulkan_CreateSurface(mainWindow, vkbInstance.instance, nullptr, &surface)) {
     LOG_ERROR(Render, "SDL_Vulkan_CreateSurface failed: {}", SDL_GetError());
     return;
   }
@@ -55,10 +62,8 @@ void VulkanRenderer::BackendStart() {
     return;
   }
 
-  vkbPhys = physRet.value();
-  physicalDevice = vkbPhys.physical_device;
-
   // Create device
+  vkbPhys = physRet.value();
   VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamicRendering{};
   dynamicRendering.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
   dynamicRendering.dynamicRendering = VK_TRUE;
@@ -72,56 +77,48 @@ void VulkanRenderer::BackendStart() {
   }
 
   vkbDevice = devRet.value();
-  dispatchTable = vkbDevice.make_table();
-  device = vkbDevice.device;
+  dispatch = vkbDevice.make_table();
   graphicsQueue = vkbDevice.get_queue(vkb::QueueType::graphics).value();
   graphicsQueueFamily = vkbDevice.get_queue_index(vkb::QueueType::graphics).value();
 
-  volkLoadDevice(device);
-
   // Initialize VMA
   VmaVulkanFunctions vmaFunctions = {};
-  vmaFunctions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
-  vmaFunctions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
-  vmaFunctions.vkAllocateMemory = vkAllocateMemory;
-  vmaFunctions.vkBindBufferMemory = vkBindBufferMemory;
-  vmaFunctions.vkBindImageMemory = vkBindImageMemory;
-  vmaFunctions.vkCreateBuffer = vkCreateBuffer;
-  vmaFunctions.vkCreateImage = vkCreateImage;
-  vmaFunctions.vkDestroyBuffer = vkDestroyBuffer;
-  vmaFunctions.vkDestroyImage = vkDestroyImage;
-  vmaFunctions.vkFlushMappedMemoryRanges = vkFlushMappedMemoryRanges;
-  vmaFunctions.vkFreeMemory = vkFreeMemory;
-  vmaFunctions.vkGetBufferMemoryRequirements = vkGetBufferMemoryRequirements;
-  vmaFunctions.vkGetImageMemoryRequirements = vkGetImageMemoryRequirements;
-  vmaFunctions.vkGetPhysicalDeviceMemoryProperties = vkGetPhysicalDeviceMemoryProperties;
-  vmaFunctions.vkGetPhysicalDeviceProperties = vkGetPhysicalDeviceProperties;
-  vmaFunctions.vkInvalidateMappedMemoryRanges = vkInvalidateMappedMemoryRanges;
-  vmaFunctions.vkMapMemory = vkMapMemory;
-  vmaFunctions.vkUnmapMemory = vkUnmapMemory;
-  vmaFunctions.vkCmdCopyBuffer = vkCmdCopyBuffer;
+  vmaFunctions.vkGetInstanceProcAddr = instanceDispatch.fp_vkGetInstanceProcAddr;
+  vmaFunctions.vkGetDeviceProcAddr = vkbDevice.fp_vkGetDeviceProcAddr;
+  vmaFunctions.vkGetPhysicalDeviceMemoryProperties = instanceDispatch.fp_vkGetPhysicalDeviceMemoryProperties;
+  vmaFunctions.vkGetPhysicalDeviceProperties = instanceDispatch.fp_vkGetPhysicalDeviceProperties;
+  vmaFunctions.vkAllocateMemory = dispatch.fp_vkAllocateMemory;
+  vmaFunctions.vkBindBufferMemory = dispatch.fp_vkBindBufferMemory;
+  vmaFunctions.vkBindImageMemory = dispatch.fp_vkBindImageMemory;
+  vmaFunctions.vkCreateBuffer = dispatch.fp_vkCreateBuffer;
+  vmaFunctions.vkCreateImage = dispatch.fp_vkCreateImage;
+  vmaFunctions.vkDestroyBuffer = dispatch.fp_vkDestroyBuffer;
+  vmaFunctions.vkDestroyImage = dispatch.fp_vkDestroyImage;
+  vmaFunctions.vkFlushMappedMemoryRanges = dispatch.fp_vkFlushMappedMemoryRanges;
+
+  vmaFunctions.vkGetBufferMemoryRequirements = dispatch.fp_vkGetBufferMemoryRequirements;
+  vmaFunctions.vkGetImageMemoryRequirements = dispatch.fp_vkGetImageMemoryRequirements;
+  vmaFunctions.vkInvalidateMappedMemoryRanges = dispatch.fp_vkInvalidateMappedMemoryRanges;
+  vmaFunctions.vkFreeMemory = dispatch.fp_vkFreeMemory;
+  vmaFunctions.vkMapMemory = dispatch.fp_vkMapMemory;
+  vmaFunctions.vkUnmapMemory = dispatch.fp_vkUnmapMemory;
+  vmaFunctions.vkCmdCopyBuffer = dispatch.fp_vkCmdCopyBuffer;
 
   VmaAllocatorCreateInfo allocatorInfo = {};
-  allocatorInfo.physicalDevice = physicalDevice;
-  allocatorInfo.device = device;
+  allocatorInfo.physicalDevice = vkbPhys.physical_device;
+  allocatorInfo.device = vkbDevice.device;
   allocatorInfo.pVulkanFunctions = &vmaFunctions;
-  allocatorInfo.instance = instance;
+  allocatorInfo.instance = vkbInstance.instance;
   allocatorInfo.vulkanApiVersion = VK_API_VERSION_1_2;
 
-  res = vmaCreateAllocator(&allocatorInfo, &allocator);
+  VkResult res = vmaCreateAllocator(&allocatorInfo, &allocator);
   if (res != VK_SUCCESS) {
     LOG_ERROR(Render, "vmaCreateAllocator failed with error code 0x{:x}", static_cast<u32>(res));
     return;
   }
 
-  // Load KHR swapchain functions (volk does this automatically after vkDevice creation)
-  if (!vkCreateSwapchainKHR || !vkAcquireNextImageKHR || !vkQueuePresentKHR) {
-    LOG_ERROR(Render, "Vulkan swapchain functions not loaded!");
-    return;
-  }
-
   // Swapchain setup
-  auto swapchainRet = vkb::SwapchainBuilder{ vkbPhys, device, surface }
+  auto swapchainRet = vkb::SwapchainBuilder{ vkbPhys, vkbDevice, surface }
     .use_default_format_selection()
     .set_desired_present_mode(Config::rendering.vsync ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_MAILBOX_KHR)
     .set_desired_extent(width, height)
@@ -155,13 +152,10 @@ void VulkanRenderer::BackendStart() {
   //  framebufferInfo.width = width;
   //  framebufferInfo.height = height;
   //  framebufferInfo.layers = 1;
-  //  if (dispatchTable.createFramebuffer(&framebufferInfo, nullptr, &framebuffers[i]) != VK_SUCCESS) {
+  //  if (dispatch.createFramebuffer(&framebufferInfo, nullptr, &framebuffers[i]) != VK_SUCCESS) {
   //      return -1;
   //  }
   //}
-
-  // Initialize imagesInFlight
-  imagesInFlight.resize(swapchainImageViews.size(), VK_NULL_HANDLE);
 
   chosenFormat.format = vkbSwapchain.image_format;
   chosenFormat.colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR;
@@ -170,19 +164,76 @@ void VulkanRenderer::BackendStart() {
   width = extent.width;
   height = extent.height;
 
+  // Initialize syncros
+  availableSemaphores.resize(swapchainImageViews.size(), VK_NULL_HANDLE);
+  finishedSemaphores.resize(swapchainImageViews.size(), VK_NULL_HANDLE);
+  inFlightFences.resize(swapchainImageViews.size(), VK_NULL_HANDLE);
+  imagesInFlight.resize(swapchainImageViews.size(), VK_NULL_HANDLE);
+
+  // Create semaphores/fences
+  VkSemaphoreCreateInfo semaphoreInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+
+  VkFenceCreateInfo fenceInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+  fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+  for (u64 i = 0; i != swapchainImageViews.size(); ++i) {
+    VkResult result = dispatch.createSemaphore(&semaphoreInfo, nullptr, &availableSemaphores[i]);
+    if (result != VK_SUCCESS) {
+      LOG_ERROR(Render, "vkCreateSemaphore[i] failed with error code 0x{:x}", i, static_cast<u32>(result));
+      return;
+    }
+    result = dispatch.createFence(&fenceInfo, nullptr, &inFlightFences[i]);
+    if (result != VK_SUCCESS) {
+      LOG_ERROR(Render, "createFence[i] failed with error code 0x{:x}", i, static_cast<u32>(result));
+      return;
+    }
+  }
+
+  for (u64 i = 0; i != vkbSwapchain.image_count; ++i) {
+    VkResult result = dispatch.createSemaphore(&semaphoreInfo, nullptr, &finishedSemaphores[i]);
+    if (result != VK_SUCCESS) {
+      LOG_ERROR(Render, "vkCreateSemaphore[i] failed with error code 0x{:x}", i, static_cast<u32>(result));
+      return;
+    }
+  }
+
   CreateCommandBuffer();
 
   resourceFactory = std::make_unique<VulkanResourceFactory>(this);
   shaderFactory = resourceFactory->CreateShaderFactory();
   fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) };
+  std::string versionString = "#version 450 core";
   shaderPath /= "vulkan";
   computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
     { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
   });
+  if (!computeShaderProgram) {
+    std::ofstream f{ shaderPath / "fb_deswizzle.comp" };
+    f.write(versionString.data(), versionString.size());
+    f.write(computeShaderSource, sizeof(computeShaderSource));
+    f.close();
+    computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
+      { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
+    });
+  }
   renderShaderPrograms = shaderFactory->LoadFromFiles("Render", {
     { eShaderType::Vertex, shaderPath / "framebuffer.vert" },
     { eShaderType::Fragment, shaderPath / "framebuffer.frag" }
   });
+  if (!renderShaderPrograms) {
+    std::ofstream vert{ shaderPath / "framebuffer.vert" };
+    vert.write(versionString.data(), versionString.size());
+    vert.write(vertexShaderSource, sizeof(vertexShaderSource));
+    vert.close();
+    std::ofstream frag{ shaderPath / "framebuffer.frag" };
+    frag.write(versionString.data(), versionString.size());
+    frag.write(fragmentShaderSource, sizeof(fragmentShaderSource));
+    frag.close();
+    renderShaderPrograms = shaderFactory->LoadFromFiles("Render", {
+      { eShaderType::Vertex, shaderPath / "framebuffer.vert" },
+      { eShaderType::Fragment, shaderPath / "framebuffer.frag" }
+    });
+  }
 }
 
 void VulkanRenderer::CreateCommandBuffer() {
@@ -191,7 +242,7 @@ void VulkanRenderer::CreateCommandBuffer() {
   poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
   poolInfo.queueFamilyIndex = static_cast<u32>(graphicsQueueFamily);
 
-  VkResult res = vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool);
+  VkResult res = dispatch.createCommandPool(&poolInfo, nullptr, &commandPool);
   if (res != VK_SUCCESS) {
     LOG_ERROR(Render, "vkCreateCommandPool failed: 0x{:x}", static_cast<u32>(res));
     return;
@@ -203,7 +254,7 @@ void VulkanRenderer::CreateCommandBuffer() {
   allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
   allocInfo.commandBufferCount = 1;
 
-  res = vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer);
+  res = dispatch.allocateCommandBuffers(&allocInfo, &commandBuffer);
   if (res != VK_SUCCESS) {
     LOG_ERROR(Render, "vkAllocateCommandBuffers failed with error 0x{:x}", static_cast<u32>(res));
     return;
@@ -213,11 +264,11 @@ void VulkanRenderer::CreateCommandBuffer() {
 void VulkanRenderer::BeginCommandBuffer() {
   VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
   beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-  dispatchTable.beginCommandBuffer(commandBuffer, &beginInfo);
+  dispatch.beginCommandBuffer(commandBuffer, &beginInfo);
 }
 
 void VulkanRenderer::EndCommandBuffer() {
-  dispatchTable.endCommandBuffer(commandBuffer);
+  dispatch.endCommandBuffer(commandBuffer);
 }
 
 void VulkanRenderer::BackendSDLProperties(SDL_PropertiesID properties) {
@@ -232,11 +283,11 @@ void VulkanRenderer::BackendSDLInit() {
 
 void VulkanRenderer::BackendShutdown() {
   for (auto &fence : imagesInFlight) {
-    dispatchTable.destroyFence(fence, nullptr);
+    dispatch.destroyFence(fence, nullptr);
   }
-  dispatchTable.destroyCommandPool(commandPool, nullptr);
+  dispatch.destroyCommandPool(commandPool, nullptr);
   for (auto &framebuffer : framebuffers) {
-    dispatchTable.destroyFramebuffer(framebuffer, nullptr);
+    dispatch.destroyFramebuffer(framebuffer, nullptr);
   }
   vkbSwapchain.destroy_image_views(swapchainImageViews);
   vkb::destroy_device(vkbDevice);
@@ -300,20 +351,9 @@ void VulkanRenderer::OnSwap(SDL_Window* window) {
   if (swapchain == VK_NULL_HANDLE)
     return;
 
-  // Create semaphores/fences if not already
-  if (imageAvailableSemaphore == VK_NULL_HANDLE) {
-    VkSemaphoreCreateInfo semInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-    vkCreateSemaphore(device, &semInfo, nullptr, &imageAvailableSemaphore);
-    vkCreateSemaphore(device, &semInfo, nullptr, &renderFinishedSemaphore);
-
-    VkFenceCreateInfo fenceInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    vkCreateFence(device, &fenceInfo, nullptr, &inFlightFence);
-  }
-
   // Acquire next image
-  uint32_t imageIndex = 0;
-  VkResult result = dispatchTable.acquireNextImageKHR(swapchain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIndex);
+  u32 imageIndex{};
+  VkResult result = dispatch.acquireNextImageKHR(swapchain, UINT64_MAX, availableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex);
 
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
     RecreateSwapchain();
@@ -324,9 +364,9 @@ void VulkanRenderer::OnSwap(SDL_Window* window) {
   }
 
   if (imagesInFlight[imageIndex] != VK_NULL_HANDLE) {
-    vkWaitForFences(device, 1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
+    dispatch.waitForFences(1, &imagesInFlight[imageIndex], VK_TRUE, UINT64_MAX);
   }
-  imagesInFlight[imageIndex] = inFlightFence;
+  imagesInFlight[imageIndex] = inFlightFences[currentFrame];
 
   BeginCommandBuffer();
 
@@ -337,16 +377,16 @@ void VulkanRenderer::OnSwap(SDL_Window* window) {
   VkPipelineStageFlags waitStages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
   VkSubmitInfo submitInfo{ VK_STRUCTURE_TYPE_SUBMIT_INFO };
   submitInfo.waitSemaphoreCount = 1;
-  submitInfo.pWaitSemaphores = &imageAvailableSemaphore;
+  submitInfo.pWaitSemaphores = &availableSemaphores[currentFrame];
   submitInfo.pWaitDstStageMask = waitStages;
   submitInfo.commandBufferCount = 1;
   submitInfo.pCommandBuffers = &commandBuffer;
   submitInfo.signalSemaphoreCount = 1;
-  submitInfo.pSignalSemaphores = &renderFinishedSemaphore;
+  submitInfo.pSignalSemaphores = &finishedSemaphores[imageIndex];
 
-  dispatchTable.resetFences(1, &inFlightFence);
+  dispatch.resetFences(1, &inFlightFences[currentFrame]);
 
-  if (dispatchTable.queueSubmit(graphicsQueue, 1, &submitInfo, inFlightFence) != VK_SUCCESS) {
+  if (dispatch.queueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS) {
     LOG_ERROR(Render, "Failed to submit command buffer!");
     return;
   }
@@ -354,26 +394,27 @@ void VulkanRenderer::OnSwap(SDL_Window* window) {
   // Present swapchain image
   VkPresentInfoKHR presentInfo{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
   presentInfo.waitSemaphoreCount = 1;
-  presentInfo.pWaitSemaphores = &renderFinishedSemaphore;
+  presentInfo.pWaitSemaphores = &finishedSemaphores[imageIndex];
   VkSwapchainKHR swapchains[] = { swapchain };
   presentInfo.swapchainCount = 1;
   presentInfo.pSwapchains = swapchains;
   presentInfo.pImageIndices = &imageIndex;
 
-  result = dispatchTable.queuePresentKHR(graphicsQueue, &presentInfo);
+  result = dispatch.queuePresentKHR(graphicsQueue, &presentInfo);
   if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) {
     RecreateSwapchain();
     return;
   } else if (result != VK_SUCCESS) {
     LOG_ERROR(Render, "Failed to present swapchain image! Error: {}", (u32)result);
   }
+  currentFrame = (currentFrame + 1) % swapchainImageCount;
 }
 
 void VulkanRenderer::RecreateSwapchain() {
-  vkDeviceWaitIdle(device);
+  dispatch.deviceWaitIdle();
 
   // Rebuild swapchain using vk-bootstrap
-  vkb::SwapchainBuilder swapchainBuilder{ vkbPhys, device, surface };
+  vkb::SwapchainBuilder swapchainBuilder{ vkbPhys, vkbDevice, surface };
   auto swapchainRet = swapchainBuilder
     .use_default_format_selection()
     .set_desired_present_mode(Config::rendering.vsync ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_MAILBOX_KHR)

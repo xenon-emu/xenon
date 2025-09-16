@@ -11,7 +11,7 @@
 #include <glad/glad.h>
 
 namespace Render {
-  
+
 struct DepthFormatMapping {
   const s32 flag;
   const u32 glFormat;

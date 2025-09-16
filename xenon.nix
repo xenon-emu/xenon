@@ -9,6 +9,7 @@
 , roboto
 , sdl3
 , toml11
+, python3
 , vulkan-headers
 , vulkan-loader
 , withGraphics ? true
@@ -27,6 +28,14 @@ let
     rev = "60f81a77e0c9a0e7ffc1ca1bc438ddfa2e43b78e";
     hash = "sha256-I94xGY0XVQu/RAtccf3dPbIuo1vtgVWvu56G7CaSth0=";
   };
+  glslang = if withGraphics
+    then fetchFromGitHub {
+      owner = "KhronosGroup";
+      repo = "glslang";
+      rev = "9d764997360b202d2ba7aaad9a401e57d8df56b3";
+      hash = "sha256-mRpwvzW3YPjaFvWLOLQHUqrsAJoHEkM+v2fXY3IUxyc=";
+    }
+    else {};
   imgui = if withGraphics
     then fetchFromGitHub {
       owner = "ocornut";
@@ -50,14 +59,6 @@ let
       repo = "vk-bootstrap";
       rev = "fe2cf07474bff6d7b7285e7af20b21656789dc07";
       hash = "sha256-DgDfYNGIdemyLaedJk25EWAt1aFccb8rhCtw25RSGm4=";
-    }
-    else {};
-  volk = if withGraphics
-    then fetchFromGitHub {
-      owner = "zeux";
-      repo = "volk";
-      rev = "7dc4d8c060d2f2fee1be75d893f1c017be12fc99";
-      hash = "sha256-nzLnfRx1oSAEbROICqBEATv8oyS9U3vuFOkmziCXoE4=";
     }
     else {};
   vulkan-memory-allocator = if withGraphics
@@ -86,6 +87,7 @@ stdenv.mkDerivation {
     fmt toml11
   ] ++ lib.optionals withGraphics [
     sdl3
+    python3 # Needed for shaderc
     vulkan-headers
   ];
 
@@ -96,15 +98,15 @@ stdenv.mkDerivation {
   postUnpack = ''
     ${lib.optionalString withGraphics ''
       echo graphics present
+      rm -rf $sourceRoot/Deps/ThirdParty/glslang
       rm -rf $sourceRoot/Deps/ThirdParty/ImGui
       rm -rf $sourceRoot/Deps/ThirdParty/Sirit
       rm -rf $sourceRoot/Deps/ThirdParty/vk-bootstrap
-      rm -rf $sourceRoot/Deps/ThirdParty/volk
       rm -rf $sourceRoot/Deps/ThirdParty/VulkanMemoryAllocator
+      cp -r ${glslang} $sourceRoot/Deps/ThirdParty/glslang
       cp -r ${imgui} $sourceRoot/Deps/ThirdParty/ImGui
       cp -r ${sirit} $sourceRoot/Deps/ThirdParty/Sirit
       cp -r ${vk-bootstrap} $sourceRoot/Deps/ThirdParty/vk-bootstrap
-      cp -r ${volk} $sourceRoot/Deps/ThirdParty/volk
       cp -r ${vulkan-memory-allocator} $sourceRoot/Deps/ThirdParty/VulkanMemoryAllocator
     ''}
     rm -rf $sourceRoot/Deps/ThirdParty/asmjit

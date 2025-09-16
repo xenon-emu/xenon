@@ -24,7 +24,7 @@ public:
   std::shared_ptr<Shader> LoadFromBinary(const std::string &name, const std::unordered_map<eShaderType, std::vector<u32>> &sources) override;
   std::shared_ptr<Shader> GetShader(const std::string &name) override;
 private:
-  VkDevice device{};
+  VulkanRenderer *renderer = nullptr;
 };
 
 } // namespace Render

@@ -71,8 +71,8 @@ static auto UserPaths = [] {
     fs::create_directory(currentDir / SHADER_DIR / "cache");
     fs::create_directory(currentDir / SHADER_DIR / "spirv");
     fs::create_directory(currentDir / SHADER_DIR / "opengl");
-  }
-  else {
+    fs::create_directory(currentDir / SHADER_DIR / "vulkan");
+  } else {
     insert_path(PathType::RootDir, currentDir, false);
     insert_path(PathType::ConsoleDir, binaryDir / CONSOLE_DIR);
     insert_path(PathType::LogDir, binaryDir / LOG_DIR);
@@ -80,6 +80,7 @@ static auto UserPaths = [] {
     fs::create_directory(binaryDir / SHADER_DIR / "cache");
     fs::create_directory(binaryDir / SHADER_DIR / "spirv");
     fs::create_directory(binaryDir / SHADER_DIR / "opengl");
+    fs::create_directory(binaryDir / SHADER_DIR / "vulkan");
   }
   return paths;
 }();

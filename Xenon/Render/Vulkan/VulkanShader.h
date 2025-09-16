@@ -11,11 +11,15 @@
 #include "Base/Logging/Log.h"
 
 #ifndef NO_GFX
+
+#include <glslang/Public/ShaderLang.h>
+#include <SPIRV/GlslangToSpv.h>
+
 namespace Render {
 
 class VulkanShader : public Shader {
 public:
-  explicit VulkanShader(VkDevice device) : device(device) {}
+  explicit VulkanShader(VulkanRenderer *renderer) : renderer(renderer) {}
   ~VulkanShader() override { Destroy(); }
 
   void CompileFromSource(eShaderType type, const char *source) override;
@@ -31,7 +35,7 @@ public:
   void Unbind() override;
   void Destroy() override;
 private:
-  VkDevice device{};
+  VulkanRenderer *renderer = nullptr;
   VkShaderModule vertexShader = VK_NULL_HANDLE;
   VkShaderModule fragmentShader = VK_NULL_HANDLE;
 };

@@ -152,6 +152,8 @@ macro(xenon_dep pkg target subdir)
           ${CMAKE_CURRENT_SOURCE_DIR}/Deps/ThirdParty/Vulkan-Headers/include
         )
         set(found_system ON)
+      elseif (${pkg} STREQUAL "glslang")
+        set(ENABLE_OPT OFF CACHE BOOL "" FORCE)
       endif()
 
       message(STATUS "Using bundled ${pkg}")
@@ -170,6 +172,7 @@ if (GFX_ENABLED)
   xenon_dep(VulkanHeaders Vulkan::Headers Vulkan-Headers)
   xenon_dep(VulkanMemoryAllocator VulkanMemoryAllocator VulkanMemoryAllocator)
   xenon_dep(vk-bootstrap vk-bootstrap::vk-bootstrap vk-bootstrap)
+  xenon_dep(glslang glslang glslang)
 endif()
 
 # Include Files
@@ -181,7 +184,6 @@ file(GLOB_RECURSE Core Xenon/Core/*.cpp Xenon/Core/*.h)
 if (GFX_ENABLED)
   add_compile_definitions(VK_NO_PROTOTYPES)
   set(ImGuiDir ${XENON_THIRDPARTY_DIR}/ImGui)
-  set(VolkDir ${XENON_THIRDPARTY_DIR}/volk)
   set(ImGuiBackends
     ${ImGuiDir}/backends/imgui_impl_opengl3.cpp
     ${ImGuiDir}/backends/imgui_impl_opengl3.h
@@ -191,12 +193,10 @@ if (GFX_ENABLED)
     ${ImGuiDir}/backends/imgui_impl_sdl3.h
   )
   file(GLOB ImGui ${ImGuiDir}/*.cpp ${ImGuiDir}/*.h)
-  file(GLOB Volk ${VolkDir}/*.c ${VolkDir}/*.h)
   file(GLOB_RECURSE XenonRender Xenon/Render/*.cpp Xenon/Render/*.h)
   set(Render
     ${ImGuiBackends}
     ${ImGui}
-    ${volk}
     ${XenonRender}
   )
 endif()
@@ -231,7 +231,7 @@ endif()
 # Link libraries
 target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11 asmjit::asmjit)
 if (GFX_ENABLED)
-  target_link_libraries(Xenon PRIVATE glad sirit SDL3::SDL3 VulkanMemoryAllocator vk-bootstrap::vk-bootstrap)
+  target_link_libraries(Xenon PRIVATE glad glslang sirit SDL3::SDL3 VulkanMemoryAllocator vk-bootstrap::vk-bootstrap)
 endif()
 
 # Includes
@@ -248,11 +248,11 @@ if (GFX_ENABLED)
     ${VMADir}/include
     ${XENON_THIRDPARTY_DIR}/glad
     ${XENON_THIRDPARTY_DIR}/SDL3/include
+    ${XENON_THIRDPARTY_DIR}/glslang/include
     ${XENON_THIRDPARTY_DIR}/Sirit/include
     ${XENON_THIRDPARTY_DIR}/vk-bootstrap/src
     ${XENON_THIRDPARTY_DIR}/Vulkan-Headers/include
     ${XENON_THIRDPARTY_DIR}/VulkanMemoryAllocator/include
-    ${XENON_THIRDPARTY_DIR}/volk/include
   )
 endif()
 target_include_directories(Xenon SYSTEM PRIVATE
@@ -264,7 +264,6 @@ target_include_directories(Xenon SYSTEM PRIVATE
 # Add defines specific to Apple
 if (APPLE)
   target_link_libraries(Xenon PRIVATE c++ c++abi)
-  add_definitions(-U None -U Always)
 # Add defines specific to Windows
 elseif (WIN32)
   target_link_libraries(Xenon PRIVATE ws2_32)
@@ -275,9 +274,6 @@ elseif (WIN32)
 
   # Add .rc file, for the app icon and executable properties
   target_sources(Xenon PRIVATE Xenon/Xenon.rc)
-# Add defines specific to Linux
-else()
-  add_definitions(-U None -U Always)
 endif()
 
 # Specific to MSVC, forces system version so the autodetected 8.1 SDK isn't used

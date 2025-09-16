@@ -44,3 +44,6 @@
 [submodule "Deps/ThirdParty/vk-bootstrap"]
 	path = Deps/ThirdParty/vk-bootstrap
 	url = https://github.com/charles-lunarg/vk-bootstrap.git
+[submodule "Deps/ThirdParty/glslang"]
+	path = Deps/ThirdParty/glslang
+	url = https://github.com/KhronosGroup/glslang.git
