@@ -671,7 +671,7 @@ void Xe::PCIDev::HDD::hddThreadLoop() {
   while (hddThreadRunning) {
     // Check if we should exit early
     hddThreadRunning = XeRunning;
-    if (hddThreadRunning)
+    if (!hddThreadRunning)
       break;
     // Check for the DMA active command.
     if (ataState.regs.dmaCommand & XE_ATA_DMA_ACTIVE) {
