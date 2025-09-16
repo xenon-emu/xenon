@@ -19,8 +19,8 @@ let
   asmjit = fetchFromGitHub {
     owner = "asmjit";
     repo = "asmjit";
-    rev = "356dddbc5508dd65f466098da26a2e47584eafdb";
-    hash = "sha256-j/Ft9hVU1bXPM70jOC5uyirvs7aWZF2yUtyYK9kQZ/8=";
+    rev = "32b5f78700e68684066feb99d583d6fb2a4e3b22";
+    hash = "sha256-00000000000000000000000000000000000000000000";
   };
   cryptopp = fetchFromGitHub {
     owner = "weidai11";
