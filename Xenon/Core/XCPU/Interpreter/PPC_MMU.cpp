@@ -1169,7 +1169,7 @@ void PPCInterpreter::MMUWrite(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppe
   if (socWrite) {
 #ifdef DEBUG_BUILD
     if (EA == 0x61010ULL) {
-      u64 postCode = byteswap_be<u64>(*reinterpret_cast<const u64 *>(data));
+      u64 postCode = *reinterpret_cast<const u64 *>(data);
       std::string poseCodeStr = Xe::XCPU::POSTBUS::GET_POST(postCode);
       PPU *PPU = XeMain::GetCPU()->GetPPU(ppeState->ppuID);
       if (PPU->traceFile) {
