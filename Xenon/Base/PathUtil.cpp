@@ -52,6 +52,7 @@ static auto UserPaths = [] {
   if (!appdata) {
     throw std::runtime_error("APPDATA not set");
   }
+  fs::path configDir(fs::path(appdata));
 #else
   const char *home = std::getenv("HOME");
   if (!home) {
