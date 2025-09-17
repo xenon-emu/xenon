@@ -15,9 +15,8 @@
   <img src="https://img.shields.io/github/stars/xenon-emu/Xenon" width="118" height="24">
 </h1>
 
-**Xenon** is an **Xbox 360 emulator** written in **C++** available for **Windows** and **Linux**.\
+[**Xenon**](https://xenonemu.dev) is an **Xbox 360 emulator** written in **C++** available for **Windows** and **Linux**.\
 Experimental, currently only small programs work.\
-Our website: https://xenonemu.dev/
 For the latest news on **Xenon**, watch our [**YouTube channel**](https://www.youtube.com/@Xenon.emulator).\
 For those who want to **support** the project, a [**Kofi page**](https://ko-fi.com/bitsh1ft3r) is available for donations!
 
