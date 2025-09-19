@@ -57,12 +57,12 @@ jobs:
           Deps
         key: xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-deps-${{ hashFiles('build/x64-clang-${env.BUILD_TYPE}/Deps/ThirdParty/**/CMakeLists.txt', 'build/x64-clang-${env.BUILD_TYPE}/Deps/ThirdParty/**cmake/**') }}
         restore-keys: |
-          xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-deps-
+          xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-deps-ccache-
 
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.18
       env:
-        cache-name: xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-cache
+        cache-name: xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-ccache
       with:
         append-timestamp: false
         key: xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
@@ -112,12 +112,12 @@ jobs:
           Deps
         key: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-deps-${{ hashFiles('build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**/CMakeLists.txt', 'build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**cmake/**') }}
         restore-keys: |
-          xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-deps-
+          xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-deps-ccache-
 
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.18
       env:
-        cache-name: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-cache
+        cache-name: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-ccache
       with:
         append-timestamp: false
         key: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
@@ -161,12 +161,12 @@ jobs:
 
         key: xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-deps-${{ hashFiles('build/x64-clang-${env.BUILD_TYPE}/Deps/ThirdParty/**/CMakeLists.txt', 'build/x64-clang-${env.BUILD_TYPE}/Deps/ThirdParty/**cmake/**') }}
         restore-keys: |
-          xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-deps-
+          xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-deps-ccache-
 
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.18
       env:
-        cache-name: xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-cache
+        cache-name: xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-ccache
       with:
         append-timestamp: false
         key: xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
@@ -224,12 +224,12 @@ jobs:
 
         key: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-deps-${{ hashFiles('build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**/CMakeLists.txt', 'build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**cmake/**') }}
         restore-keys: |
-          xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-deps-
+          xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-deps-ccache-
 
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.18
       env:
-        cache-name: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-cache
+        cache-name: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-ccache
       with:
         append-timestamp: false
         key: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
@@ -294,12 +294,12 @@ jobs:
             ${{github.workspace}}/build
           key: xenon-${{runner.os}}-aarch64-clang-${{env.BUILD_TYPE}}-deps-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
           restore-keys: |
-            xenon-${{runner.os}}-aarch64-clang-${{env.BUILD_TYPE}}-deps-
+            xenon-${{runner.os}}-aarch64-clang-${{env.BUILD_TYPE}}-deps-ccache-
 
       - name: Cache CMake Build
         uses: hendrikmuhs/ccache-action@v1.2.18
         env:
-          cache-name: xenon-${{runner.os}}-aarch64-clang-${{env.BUILD_TYPE}}-cache
+          cache-name: xenon-${{runner.os}}-aarch64-clang-${{env.BUILD_TYPE}}-ccache
         with:
           append-timestamp: false
           key: xenon-${{runner.os}}-aarch64-clang-${{env.BUILD_TYPE}}-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
