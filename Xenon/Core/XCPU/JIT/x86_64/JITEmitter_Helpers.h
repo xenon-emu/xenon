@@ -17,11 +17,11 @@ using namespace asmjit;
 //
 // Allocates a new general purpose x86 register
 //
-#define newGP64()  b->compiler->newGpq()
-#define newGP32()  b->compiler->newGpd()
-#define newGP16()  b->compiler->newGpw()
-#define newGP8()   b->compiler->newGpb()
-#define newGPptr() b->compiler->newGpz()
+#define newGP64()  b->compiler->new_gpq()
+#define newGP32()  b->compiler->new_gpd()
+#define newGP16()  b->compiler->new_gpw()
+#define newGP8()   b->compiler->new_gpb()
+#define newGPptr() b->compiler->new_gpz()
 
 //
 // Pointer Helpers
@@ -62,9 +62,9 @@ inline x86::Gp J_BuildCRU(JITBlockBuilder *b, x86::Gp lhs, x86::Gp rhs) {
   COMP->xor_(crValue, crValue);
 
   // Declare labels:
-  Label gt = COMP->newLabel(); // Self explanatory.
-  Label lt = COMP->newLabel(); // Self explanatory.
-  Label end = COMP->newLabel(); // Self explanatory.
+  Label gt = COMP->new_label(); // Self explanatory.
+  Label lt = COMP->new_label(); // Self explanatory.
+  Label end = COMP->new_label(); // Self explanatory.
 
   COMP->cmp(lhs, rhs); // Compare lhs and rhs
   // Check Greater Than.
@@ -112,9 +112,9 @@ inline x86::Gp J_BuildCRS(JITBlockBuilder* b, x86::Gp lhs, x86::Gp rhs) {
   COMP->xor_(crValue, crValue);
 
   // Declare labels:
-  Label gt = COMP->newLabel(); // Self explanatory.
-  Label lt = COMP->newLabel(); // Self explanatory.
-  Label end = COMP->newLabel(); // Self explanatory.
+  Label gt = COMP->new_label(); // Self explanatory.
+  Label lt = COMP->new_label(); // Self explanatory.
+  Label end = COMP->new_label(); // Self explanatory.
 
   COMP->cmp(lhs, rhs); // Compare lhs and rhs
   // Check Greater Than.
@@ -179,8 +179,8 @@ inline void J_SetCRField(JITBlockBuilder *b, x86::Gp field, u32 index) {
 // * Takes into account the current computation mode (MSR[SF]).
 inline void J_ppuSetCR0(JITBlockBuilder* b, x86::Gp inValue) {
   // Declare labels:
-  Label sfBitMode = COMP->newLabel(); // Determines if the compare is done using 64 bit mode.
-  Label end = COMP->newLabel(); // Self explanatory.
+  Label sfBitMode = COMP->new_label(); // Determines if the compare is done using 64 bit mode.
+  Label end = COMP->new_label(); // Self explanatory.
 
   // Check for MSR[SF]:
   x86::Gp tempMSR = newGP64(); // MSR is 64 bits wide.
@@ -215,8 +215,8 @@ inline void J_ppuSetCR0(JITBlockBuilder* b, x86::Gp inValue) {
 }
 
 inline void J_ppuSetCR(JITBlockBuilder *b, x86::Gp value, u32 index) {
-  Label use64 = COMP->newLabel();
-  Label done = COMP->newLabel();
+  Label use64 = COMP->new_label();
+  Label done = COMP->new_label();
 
   x86::Gp tempMSR = newGP64();
   x86::Gp tempCR = newGP32();
@@ -249,10 +249,10 @@ inline void J_ppuSetCR(JITBlockBuilder *b, x86::Gp value, u32 index) {
 
 // Check if carry took place according to computation modes and set XER[CA] depending on the result.
 inline void J_AddDidCarrySetCarry(JITBlockBuilder* b, x86::Gp a, x86::Gp result) {
-  Label use64 = COMP->newLabel();
-  Label resultCheck = COMP->newLabel();
-  Label setTrue = COMP->newLabel();
-  Label done = COMP->newLabel();
+  Label use64 = COMP->new_label();
+  Label resultCheck = COMP->new_label();
+  Label setTrue = COMP->new_label();
+  Label done = COMP->new_label();
 
   // Get XER
   x86::Gp xer = newGP32();
