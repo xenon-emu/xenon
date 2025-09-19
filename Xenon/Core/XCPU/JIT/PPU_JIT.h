@@ -182,7 +182,7 @@ private:
 };
 
 class JITBlock {
-public:  
+public:
   JITBlock(asmjit::JitRuntime *rt, u64 ppuAddr, JITBlockBuilder *builder) :
     runtime(rt), ppuAddress(ppuAddr), builder(builder), size(builder->size)
   {

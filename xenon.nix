@@ -20,7 +20,7 @@ let
     owner = "asmjit";
     repo = "asmjit";
     rev = "32b5f78700e68684066feb99d583d6fb2a4e3b22";
-    hash = "sha256-00000000000000000000000000000000000000000000";
+    hash = "sha256-7Ng6GzxK7i4lI1cNFiUmNlCIcXj9FyNrTkDr23TBJLg=";
   };
   cryptopp = fetchFromGitHub {
     owner = "weidai11";
