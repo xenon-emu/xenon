@@ -51,7 +51,7 @@ void PPU_JIT::SetupPrologue(JITBlockBuilder *b, u32 instrData, u32 decoded) {
   COMP->nop();
 
   x86::Gp temp = newGP64();
-  Label continueLabel = COMP->new_label();
+  Label continueLabel = COMP->newLabel();
 
   // enableHalt
   COMP->test(b->haltBool, b->haltBool);
@@ -70,7 +70,7 @@ void PPU_JIT::SetupPrologue(JITBlockBuilder *b, u32 instrData, u32 decoded) {
 
   // Call HALT
   InvokeNode *out = nullptr;
-  COMP->invoke(Out(out), imm((void*)callHalt), FuncSignature::build<void>());
+  COMP->invoke(&out, imm((void*)callHalt), FuncSignature::build<void>());
 
   COMP->bind(continueLabel);
 
@@ -124,16 +124,16 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
   jitBuilder->compiler = &compiler;
 
   // Setup function and, state / thread context
-  jitBuilder->ppu = new ASMJitPtr<PPU>(compiler.new_gpz("ppu"));
-  jitBuilder->ppeState = new ASMJitPtr<sPPEState>(compiler.new_gpz("ppeState"));
-  jitBuilder->threadCtx = new ASMJitPtr<sPPUThread>(compiler.new_gpz("thread"));
-  jitBuilder->haltBool = compiler.new_gpb("enableHalt"); // bool
+  jitBuilder->ppu = new ASMJitPtr<PPU>(compiler.newGpz("ppu"));
+  jitBuilder->ppeState = new ASMJitPtr<sPPEState>(compiler.newGpz("ppeState"));
+  jitBuilder->threadCtx = new ASMJitPtr<sPPUThread>(compiler.newGpz("thread"));
+  jitBuilder->haltBool = compiler.newGpb("enableHalt"); // bool
 
   FuncNode *signature = nullptr;
-  compiler.add_func_node(Out(signature), FuncSignature::build<void, PPU*, sPPEState*, bool>());
-  signature->set_arg(0, jitBuilder->ppu->Base());
-  signature->set_arg(1, jitBuilder->ppeState->Base());
-  signature->set_arg(2, jitBuilder->haltBool);
+  compiler.addFuncNode(&signature, FuncSignature::build<void, PPU*, sPPEState*, bool>());
+  signature->setArg(0, jitBuilder->ppu->Base());
+  signature->setArg(1, jitBuilder->ppeState->Base());
+  signature->setArg(2, jitBuilder->haltBool);
 #endif
 
   std::vector<u32> instrsTemp{};
@@ -170,7 +170,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
     // Used for codeflow skips, and value patching.
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
     auto patchGPR = [&](s32 reg, u64 val) {
-      x86::Gp temp = compiler.new_gpq();
+      x86::Gp temp = compiler.newGpq();
       compiler.mov(temp, val);
       compiler.mov(jitBuilder->threadCtx->array(&sPPUThread::GPR).Ptr(reg), temp);
     };
@@ -194,7 +194,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
     // Pretend ARGON hardware is present, to avoid the call
     case 0x800819E0:
     case 0x80081A60: {
-      x86::Gp temp = compiler.new_gpq();
+      x86::Gp temp = compiler.newGpq();
       compiler.mov(temp, jitBuilder->threadCtx->array(&sPPUThread::GPR).Ptr(11));
       compiler.or_(temp, 0x08);
       compiler.mov(jitBuilder->threadCtx->array(&sPPUThread::GPR).Ptr(11), temp);
@@ -213,7 +213,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
       || opcode == 0xFFFFFFFF || opcode == 0xCDCDCDCD) {
       readNextInstr = false;
     }
-      
+
     // Call JIT Emitter on fetched instruction.
     if (readNextInstr) {
       bool invalidInstr = emitter == &PPCInterpreter::PPCInterpreterJIT_invalid;
@@ -224,8 +224,8 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
         InvokeNode *out = nullptr;
-        compiler.invoke(Out(out), imm((void *)function), FuncSignature::build<void, void *>());
-        out->set_arg(0, jitBuilder->ppeState->Base());
+        compiler.invoke(&out, imm((void *)function), FuncSignature::build<void, void *>());
+        out->setArg(0, jitBuilder->ppeState->Base());
 #endif
       } else {
         // Execute decoded instruction.
@@ -237,16 +237,16 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
     // Epilogue, update the time base and check/process pending exceptions.
     // We should return execution if any exception is indeed found.
     InvokeNode *returnCheck = nullptr;
-    x86::Gp retVal = compiler.new_gpb();
+    x86::Gp retVal = compiler.newGpb();
 
     // Call our epilogue.
-    compiler.invoke(Out(returnCheck), imm((void*)CallEpilogue), FuncSignature::build<bool, PPU*, sPPEState*>());
-    returnCheck->set_arg(0, jitBuilder->ppu->Base());
-    returnCheck->set_arg(1, jitBuilder->ppeState->Base());
-    returnCheck->set_ret(0, retVal);
+    compiler.invoke(&returnCheck, imm((void*)CallEpilogue), FuncSignature::build<bool, PPU*, sPPEState*>());
+    returnCheck->setArg(0, jitBuilder->ppu->Base());
+    returnCheck->setArg(1, jitBuilder->ppeState->Base());
+    returnCheck->setRet(0, retVal);
 
     // Test for ocurred exceptions and return if any.
-    Label skipRet = compiler.new_label();
+    Label skipRet = compiler.newLabel();
     compiler.test(retVal, retVal);
     compiler.je(skipRet);
     compiler.ret();
@@ -267,7 +267,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
   compiler.ret();
-  compiler.end_func();
+  compiler.endFunc();
   compiler.finalize();
 #endif
 

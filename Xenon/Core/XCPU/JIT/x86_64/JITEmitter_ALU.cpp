@@ -24,7 +24,7 @@ void PPCInterpreter::PPCInterpreterJIT_addx(sPPEState* ppeState, JITBlockBuilder
 // Add Immediate Carrying (x'3000 0000')
 void PPCInterpreter::PPCInterpreterJIT_addic(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   // TODO: Overflow Enable.
-  Label end = COMP->new_label(); // Self explanatory.
+  Label end = COMP->newLabel(); // Self explanatory.
 
   // Get rA value.
   x86::Gp rATemp = newGP64();
@@ -66,7 +66,7 @@ void PPCInterpreter::PPCInterpreterJIT_addcx(sPPEState* ppeState, JITBlockBuilde
   */
 
   // TODO: Overflow Enable.
-  Label end = COMP->new_label(); // Self explanatory.
+  Label end = COMP->newLabel(); // Self explanatory.
 
   // Get rA value.
   x86::Gp rATemp = newGP64();
@@ -108,7 +108,7 @@ void PPCInterpreter::PPCInterpreterJIT_addex(sPPEState* ppeState, JITBlockBuilde
   */
 
   // TODO: Overflow Enable.
-  Label end = COMP->new_label(); // Self explanatory.
+  Label end = COMP->newLabel(); // Self explanatory.
   x86::Gp rATemp = newGP64();
   COMP->mov(rATemp, GPRPtr(instr.ra));
   x86::Gp xer = newGP32();
@@ -406,7 +406,7 @@ void PPCInterpreter::PPCInterpreterJIT_sldx(sPPEState* ppeState, JITBlockBuilder
   rA <- r & m
   */
 
-  Label end = COMP->new_label();
+  Label end = COMP->newLabel();
   x86::Gp rsTemp = newGP64();
   COMP->xor_(rsTemp, rsTemp);
   x86::Gp n = newGP64();
@@ -439,7 +439,7 @@ void PPCInterpreter::PPCInterpreterJIT_slwx(sPPEState* ppeState, JITBlockBuilder
     rA <- r & m
   */
 
-  Label end = COMP->new_label();
+  Label end = COMP->newLabel();
   x86::Gp rsTemp = newGP64();
   COMP->xor_(rsTemp, rsTemp);
   x86::Gp n = newGP64();
@@ -472,7 +472,7 @@ void PPCInterpreter::PPCInterpreterJIT_srdx(sPPEState* ppeState, JITBlockBuilder
     rA <- r & m
   */
 
-  Label end = COMP->new_label();
+  Label end = COMP->newLabel();
   x86::Gp rsTemp = newGP64();
   COMP->xor_(rsTemp, rsTemp);
   x86::Gp n = newGP64();
@@ -505,7 +505,7 @@ void PPCInterpreter::PPCInterpreterJIT_srwx(sPPEState* ppeState, JITBlockBuilder
     else m <- (64)0
     rA <- r & m
   */
-  Label end = COMP->new_label();
+  Label end = COMP->newLabel();
   x86::Gp rsTemp = newGP64();
   COMP->xor_(rsTemp, rsTemp);
   x86::Gp n = newGP64();
@@ -538,7 +538,7 @@ void PPCInterpreter::PPCInterpreterJIT_sradix(sPPEState* ppeState, JITBlockBuild
     rA <- (r & m) | (((64)S) & ~m)
     XER[CA] <- S & ((r & ~m) != 0)
   */
-  Label end = COMP->new_label();
+  Label end = COMP->newLabel();
   x86::Gp sh = newGP64();
   COMP->mov(sh, u64(instr.sh64));
   x86::Gp rsTemp = newGP64();

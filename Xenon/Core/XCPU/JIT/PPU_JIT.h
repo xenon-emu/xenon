@@ -145,7 +145,7 @@ public:
   JITBlockBuilder(u64 addr, asmjit::JitRuntime *rt) :
     ppuAddr(addr), runtime(rt)
   {
-    code.init(runtime->environment(), runtime->cpu_features());
+    code.init(runtime->environment(), runtime->cpuFeatures());
   }
   ~JITBlockBuilder() {
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
@@ -200,7 +200,7 @@ public:
     asmjit::CodeHolder *code = builder->Code();
     runtime->add(&fnPtr, code);
     codePtr = reinterpret_cast<decltype(codePtr)>(fnPtr);
-    codeSize = code->code_size();
+    codeSize = code->codeSize();
     return true;
   }
 
