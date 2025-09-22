@@ -140,11 +140,11 @@ void XeMain::StartCPU() {
     LOG_CRITICAL(Xenon, "No NAND, unable to start execution.");
     Base::SystemPause();
     return;
+  } else {
+    // CPU Start routine and entry point.
+    xenonCPU->Start(0x20000000100);
   }
   CPUStarted = true;
-
-  // CPU Start routine and entry point.
-  xenonCPU->Start(0x20000000100);
 }
 
 void XeMain::ShutdownCPU() {
