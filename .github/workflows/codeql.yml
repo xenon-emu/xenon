@@ -2,6 +2,14 @@ name: CodeQL
 
 on: [push, pull_request]
 
+concurrency:
+  group: ci-${{github.event_name}}-${{github.ref}}
+  cancel-in-progress: ${{github.event_name == 'push'}}
+
+env:
+  BUILD_TYPE: Release
+  BUILD_DIR: ${{github.workspace}}/build
+
 jobs:
   analyze:
     name: Analyze (${{ matrix.language }})
@@ -22,6 +30,15 @@ jobs:
       uses: actions/checkout@v4
       with:
         submodules: recursive
+        fetch-depth: 0
+
+    - name: Install Dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y ninja-build clang lld cmake \
+                           libx11-dev libxext-dev libxrandr-dev libxcursor-dev \
+                           libxi-dev libxinerama-dev libwayland-dev libxkbcommon-dev \
+                           wayland-protocols git
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
@@ -29,8 +46,16 @@ jobs:
         config-file: .github/codeql-${{ matrix.language }}.yml
         languages: ${{ matrix.language }}
 
-    - name: Autobuild
-      uses: github/codeql-action/autobuild@v3
+    - name: Configure CMake
+      run: cmake -G Ninja -B ${{ env.BUILD_DIR }} \
+                 -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+                 -DCMAKE_C_COMPILER=clang \
+                 -DCMAKE_CXX_COMPILER=clang++
+
+    - name: Build
+      run: cmake --build ${{ env.BUILD_DIR }} \
+                 --config ${{ env.BUILD_TYPE }} \
+                 --parallel $(nproc)
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
