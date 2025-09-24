@@ -1,0 +1,4 @@
+name: xenon-cpp-queries
+version: 0.0.0
+libraryPathDependencies: codeql-cpp
+suites: xenon-cpp-suite

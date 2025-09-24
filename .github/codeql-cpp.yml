@@ -1,0 +1,8 @@
+name: "Custom CodeQL Analysis"
+
+queries:
+  - uses: ./.github/codeql/custom-queries/cpp/msvcSpecific.ql
+
+paths-ignore:
+  - Tools
+  - Xenon/include
