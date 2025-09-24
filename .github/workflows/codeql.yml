@@ -53,9 +53,7 @@ jobs:
                  -DCMAKE_CXX_COMPILER=clang++
 
     - name: Build
-      run: cmake --build ${{ env.BUILD_DIR }} \
-                 --config ${{ env.BUILD_TYPE }} \
-                 --parallel $(nproc)
+      run: cmake --build ${{ env.BUILD_DIR }} --parallel $(nproc)
 
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
