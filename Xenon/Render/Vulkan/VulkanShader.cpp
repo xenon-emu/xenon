@@ -18,6 +18,7 @@ inline EShLanguage ToStage(Render::eShaderType type) {
   switch (type) {
   case Render::eShaderType::Vertex: return EShLangVertex;
   case Render::eShaderType::Fragment: return EShLangFragment;
+  case Render::eShaderType::Compute:  return EShLangCompute;
   default: return EShLangCount;
   }
 }
@@ -186,6 +187,9 @@ void Render::VulkanShader::CompileFromBinary(eShaderType type, const u8 *data, u
   case eShaderType::Fragment:
     fragmentShader = shaderModule;
     break;
+  case eShaderType::Compute:
+    computeShader = shaderModule;
+    break;
   default:
     LOG_ERROR(Render, "Unsupported shader type.");
     renderer->dispatch.destroyShaderModule(shaderModule, nullptr);
@@ -238,6 +242,10 @@ void Render::VulkanShader::Destroy() {
   if (fragmentShader) {
     renderer->dispatch.destroyShaderModule(fragmentShader, nullptr);
     fragmentShader = VK_NULL_HANDLE;
+  }
+  if (computeShader) {
+    renderer->dispatch.destroyShaderModule(computeShader, nullptr);
+    computeShader = VK_NULL_HANDLE;
   }
 }
 
