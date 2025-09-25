@@ -265,7 +265,7 @@ void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
     switch (ataControlReg) {
     case ATA_REG_DMA_COMMAND:
       memcpy(data, &ataState.regs.dmaCommand, size);
-        break;
+      break;
     case ATA_REG_DMA_STATUS:
       memcpy(data, &ataState.regs.dmaStatus, size);
       break;
@@ -483,6 +483,9 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
     switch (regOffset) {
     case ATA_REG_DMA_COMMAND:
       memcpy(&ataState.regs.dmaCommand, data, size);
+      if (ataState.regs.dmaCommand & XE_ATAPI_DMA_ACTIVE) {
+        ataState.regs.dmaStatus = XE_ATA_DMA_ACTIVE; // Signal DMA active status.
+      }
       break;
     case ATA_REG_DMA_STATUS:
       memcpy(&ataState.regs.dmaStatus, data, size);
