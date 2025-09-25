@@ -1,6 +1,6 @@
 name: CodeQL
 
-on: [push, pull_request]
+on: [ ]
 
 concurrency:
   group: ci-${{github.event_name}}-${{github.ref}}
