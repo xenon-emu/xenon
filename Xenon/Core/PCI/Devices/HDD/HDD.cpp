@@ -225,13 +225,31 @@ void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
       memcpy(data, &ataState.regs.sectorCount, size);
       break;
     case ATA_REG_LBA_LOW:
-      memcpy(data, &ataState.regs.lbaLow, size);
+      if (ataState.regs.deviceControl & ATA_DEVICE_CONTROL_HOB) {
+        // Reading is performed from the 'previous content' register.
+        memcpy(data, &ataState.regs.prevLBALow, size);
+      } else {
+        // Reading is performed from the 'last content' register.
+        memcpy(data, &ataState.regs.lbaLow, size);
+      }
       break;
     case ATA_REG_LBA_MED:
-      memcpy(data, &ataState.regs.lbaMiddle, size);
+      if (ataState.regs.deviceControl & ATA_DEVICE_CONTROL_HOB) {
+        // Reading is performed from the 'previous content' register.
+        memcpy(data, &ataState.regs.prevLBAMiddle, size);
+      } else {
+        // Reading is performed from the 'last content' register.
+        memcpy(data, &ataState.regs.lbaMiddle, size);
+      }
       break;
     case ATA_REG_LBA_HI:
-      memcpy(data, &ataState.regs.lbaHigh, size);
+      if (ataState.regs.deviceControl & ATA_DEVICE_CONTROL_HOB) {
+        // Reading is performed from the 'previous content' register.
+        memcpy(data, &ataState.regs.prevLBAHigh, size);
+      } else {
+        // Reading is performed from the 'last content' register.
+        memcpy(data, &ataState.regs.lbaHigh, size);
+      }
       break;
     case ATA_REG_DEV_SEL:
       memcpy(data, &ataState.regs.deviceSelect, size);
