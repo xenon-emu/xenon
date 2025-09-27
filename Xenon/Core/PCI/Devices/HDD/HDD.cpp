@@ -764,5 +764,7 @@ void Xe::PCIDev::HDD::doDMA() {
 
 // Issues an interrupt to the XCPU.
 void Xe::PCIDev::HDD::ataIssueInterrupt() {
-  parentBus->RouteInterrupt(PRIO_SATA_HDD);
+  if ((ataState.regs.deviceControl & ATA_DEVICE_CONTROL_NIEN) == 0) {
+    parentBus->RouteInterrupt(PRIO_SATA_HDD);
+  }
 }
