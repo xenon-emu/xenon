@@ -386,6 +386,11 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
         ataReadDMAExtCommand();
         break;
       }
+      case ATA_COMMAND_READ_NATIVE_MAX_ADDRESS_EXT:
+        ataReadNativeMaxAddressExtCommand();
+        // Request interrupt
+        ataIssueInterrupt();
+        break;
       case ATA_COMMAND_WRITE_DMA:
         ataWriteDMACommand();
         break;
@@ -597,6 +602,22 @@ void Xe::PCIDev::HDD::ataReadDMACommand() {
   ataState.mountedHDDImage->Read(offset, ataState.dataOutBuffer.get(), sectorCount);
 }
 
+// ATA READ NATIVE MAX ADDRESS EXT (LBA 48 Bit)
+void Xe::PCIDev::HDD::ataReadNativeMaxAddressExtCommand() {
+  // This command returns the native maximum LBA address of the disk drive.
+  u64 lbaMaxAddress = ataState.ataIdentifyData.userAddressableSectors48Bit[0] |
+    static_cast<u64>(ataState.ataIdentifyData.userAddressableSectors48Bit[1]) << 32;
+
+  ataState.regs.lbaLow = lbaMaxAddress & 0xFF;
+  ataState.regs.prevLBALow = (lbaMaxAddress >> 24) & 0xFF;
+  ataState.regs.lbaMiddle = (lbaMaxAddress >> 8) & 0xFF;
+  ataState.regs.prevLBAMiddle = (lbaMaxAddress >> 32) & 0xFF;
+  ataState.regs.lbaHigh = (lbaMaxAddress >> 16) & 0xFF;
+  ataState.regs.prevLBAHigh = (lbaMaxAddress >> 40) & 0xFF;
+
+  ataState.regs.status = ATA_STATUS_DRDY;
+}
+
 // ATA READ DMA EXT (LBA 48 Bit)
 void Xe::PCIDev::HDD::ataReadDMAExtCommand() {
   u64 offset = (static_cast<u64>(ataState.regs.prevLBAHigh) << 40) |
@@ -650,6 +671,7 @@ static const std::unordered_map<u32, const std::string> ataCommandNameMap = {
   { 0x08, "DEVICE_RESET" },
   { 0x20, "READ_SECTORS" },
   { 0x25, "READ_DMA_EXT" },
+  { 0x27, "READ_NATIVE_MAX_ADDRESS_EXT" },
   { 0x30, "WRITE_SECTORS" },
   { 0x35, "WRITE_DMA_EXT" },
   { 0x40, "READ_VERIFY_SECTORS" },

@@ -422,6 +422,7 @@ private:
 
   // ATA Commands.
   void ataReadDMACommand();
+  void ataReadNativeMaxAddressExtCommand();
   void ataReadDMAExtCommand();
   void ataWriteDMACommand();
   void ataIdentifyDeviceCommand();
