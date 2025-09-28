@@ -180,7 +180,7 @@ bool XenonContext::HandleINTWrite(u64 writeAddr, const u8 *data, size_t byteCoun
   dataIn = byteswap_be<u64>(dataIn);
   u16 offset = writeAddr - XE_SOCINTS_BLOCK_START;
 
-  memcpy(reinterpret_cast<u8 *>(socINTBlock.get()) + offset, &dataIn, byteCount);
+  memcpy(reinterpret_cast<u8*>(socINTBlock.get()) + offset, &dataIn, byteCount);
 
   LOG_TRACE(Xenon, "SoC INT Write at address 0x{:X}, data 0x{:X}.", writeAddr, dataIn);
   return true;
