@@ -4,7 +4,7 @@
 
 #include "Base/Global.h"
 #include "Core/PCI/Devices/NAND/NAND.h"
-#include "Core/PCI/Devices/PostBus/PostBus.h"
+#include "Core/XCPU/Context/PostBus/PostBus.h"
 #include "Core/XCPU/XenonCPU.h"
 
 #include "PPCInterpreter.h"

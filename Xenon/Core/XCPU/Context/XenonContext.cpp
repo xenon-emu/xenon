@@ -6,7 +6,7 @@
 
 #include "Base/Logging/Log.h"
 #include "Core/XCPU/Context/XenonContext.h"
-#include "Core/PCI/Devices/PostBus/PostBus.h"
+#include "Core/XCPU/Context/PostBus/PostBus.h"
 
 namespace Xe::XCPU {
 
