@@ -33,6 +33,7 @@ namespace Xe::XCPU {
       socSecEngBlock = std::make_unique<STRIP_UNIQUE(socSecEngBlock)>();
       socSecRNGBlock = std::make_unique<STRIP_UNIQUE(socSecRNGBlock)>();
       socCBIBlock = std::make_unique<STRIP_UNIQUE(socCBIBlock)>();
+      socINTBlock = std::make_unique<STRIP_UNIQUE(socINTBlock)>();
       socPMWBlock = std::make_unique<STRIP_UNIQUE(socPMWBlock)>();
       socPRVBlock = std::make_unique<STRIP_UNIQUE(socPRVBlock)>();
     }
@@ -43,6 +44,7 @@ namespace Xe::XCPU {
       socSecEngBlock.reset();
       socSecRNGBlock.reset();
       socCBIBlock.reset();
+      socINTBlock.reset();
       socPMWBlock.reset();
       socPRVBlock.reset();
     }
@@ -88,6 +90,8 @@ namespace Xe::XCPU {
     std::unique_ptr<SOC::SOCSECRNG_BLOCK> socSecRNGBlock{};
     // CBI Block
     std::unique_ptr<SOC::SOCCBI_BLOCK> socCBIBlock{};
+    // INT Block
+    std::unique_ptr<SOC::SOCINTS_BLOCK> socINTBlock{};
     // PMW Block
     std::unique_ptr<SOC::SOCPMW_BLOCK> socPMWBlock{};
     // Pervasive Block
@@ -117,6 +121,10 @@ namespace Xe::XCPU {
     // CBI Block.
     bool HandleCBIRead(u64 readAddr, u8 *data, size_t byteCount);
     bool HandleCBIWrite(u64 writeAddr, const u8 *data, size_t byteCount);
+
+    // INT Block.
+    bool HandleINTRead(u64 readAddr, u8 *data, size_t byteCount);
+    bool HandleINTWrite(u64 writeAddr, const u8 *data, size_t byteCount);
 
     // PMW Block.
     bool HandlePMWRead(u64 readAddr, u8 *data, size_t byteCount);

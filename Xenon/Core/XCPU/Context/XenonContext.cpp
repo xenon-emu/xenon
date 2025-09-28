@@ -6,7 +6,7 @@
 
 #include "Base/Logging/Log.h"
 #include "Core/XCPU/Context/XenonContext.h"
-#include "Core/PCI/Devices/PostBus/PostBus.h"
+#include "Core/XCPU/Context/PostBus/PostBus.h"
 
 namespace Xe::XCPU {
 
@@ -24,6 +24,9 @@ bool XenonContext::HandleSOCRead(u64 readAddr, u8 *data, size_t byteCount) {
   } else if (readAddr >= XE_SOCCBI_BLOCK_START && readAddr < XE_SOCCBI_BLOCK_START + XE_SOCCBI_BLOCK_SIZE) {
     // CBI
     return HandleCBIRead(readAddr, data, byteCount);
+  } else if (readAddr >= XE_SOCINTS_BLOCK_START && readAddr < XE_SOCINTS_BLOCK_START + XE_SOCINTS_BLOCK_SIZE) {
+    // INT
+    return HandleINTRead(readAddr, data, byteCount);
   } else if (readAddr >= XE_SOCPMW_BLOCK_START && readAddr < XE_SOCPMW_BLOCK_START + XE_SOCPMW_BLOCK_SIZE) {
     // PMW
     return HandlePMWRead(readAddr, data, byteCount);
@@ -48,6 +51,9 @@ bool XenonContext::HandleSOCWrite(u64 writeAddr, const u8 *data, size_t byteCoun
   } else if (writeAddr >= XE_SOCCBI_BLOCK_START && writeAddr < XE_SOCCBI_BLOCK_START + XE_SOCCBI_BLOCK_SIZE) {
     // CBI
     return HandleCBIWrite(writeAddr, data, byteCount);
+  } else if (writeAddr >= XE_SOCINTS_BLOCK_START && writeAddr < XE_SOCINTS_BLOCK_START + XE_SOCINTS_BLOCK_SIZE) {
+    // INT
+    return HandleINTWrite(writeAddr, data, byteCount);
   } else if (writeAddr >= XE_SOCPMW_BLOCK_START && writeAddr < XE_SOCPMW_BLOCK_START + XE_SOCPMW_BLOCK_SIZE) {
     // PMW
     return HandlePMWWrite(writeAddr, data, byteCount);
@@ -157,6 +163,27 @@ bool XenonContext::HandleCBIWrite(u64 writeAddr, const u8 *data, size_t byteCoun
   std::lock_guard lock(mutex);
   LOG_ERROR(Xenon, "SoC CBI Write at address 0x{:X}.", writeAddr);
   return false;
+}
+
+// INT Read
+bool XenonContext::HandleINTRead(u64 readAddr, u8 *data, size_t byteCount) {
+  std::lock_guard lock(mutex);
+  LOG_ERROR(Xenon, "SoC INT Read at address 0x{:X}.", readAddr);
+  return false;
+}
+
+// INT Write
+bool XenonContext::HandleINTWrite(u64 writeAddr, const u8 *data, size_t byteCount) {
+  std::lock_guard lock(mutex);
+  u64 dataIn = 0;
+  memcpy(&dataIn, data, byteCount);
+  dataIn = byteswap_be<u64>(dataIn);
+  u16 offset = writeAddr - XE_SOCINTS_BLOCK_START;
+
+  memcpy(reinterpret_cast<u8*>(socINTBlock.get()) + offset, &dataIn, byteCount);
+
+  LOG_TRACE(Xenon, "SoC INT Write at address 0x{:X}, data 0x{:X}.", writeAddr, dataIn);
+  return true;
 }
 
 // PMW Read

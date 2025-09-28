@@ -633,7 +633,7 @@ typedef struct _SOCINTS_BLOCK {
   u64 Reserved11[9]; // 28728
   u64 EndOfInterruptGeneration; // 28800
   u64 Reserved12[495]; // 28808
-} XE_SOCINTS_BLOCK, *PXE_SOCINTS_BLOCK;
+} SOCINTS_BLOCK, *PSOCINTS_BLOCK;
 
 //
 // System On Chip Power Management/Bus interface Unit Block

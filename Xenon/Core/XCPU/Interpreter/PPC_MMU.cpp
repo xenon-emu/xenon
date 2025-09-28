@@ -4,7 +4,7 @@
 
 #include "Base/Global.h"
 #include "Core/PCI/Devices/NAND/NAND.h"
-#include "Core/PCI/Devices/PostBus/PostBus.h"
+#include "Core/XCPU/Context/PostBus/PostBus.h"
 #include "Core/XCPU/XenonCPU.h"
 
 #include "PPCInterpreter.h"
@@ -1194,6 +1194,7 @@ void PPCInterpreter::MMUWrite(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppe
       (EA & ~0xF000) < XE_IIC_BASE + XE_IIC_SIZE &&
       (EA & 0xFFFFF) < 0x560FF) {
       cpuContext->xenonIIC.writeInterrupt(EA, data, byteCount);
+      cpuContext->HandleSOCWrite(EA, data, byteCount);
       return;
     }
     // Try to handle the SoC write, may belong to one of the CPU SoC blocks.
