@@ -125,9 +125,9 @@ inline constexpr u64 duplicate32(u32 x) { return x | static_cast<u64>(x) << 32; 
 
 // Set XER[OV] bit. Overflow enable
 inline void ppuSetXerOv(sPPEState *ppeState, bool inbit) {
-  XERegister xer = curThread.SPR.XER;
+  uXER xer = curThread.SPR.XER;
   // Set register as intended
-  curThread.SPR.XER.XER_Hex = 0;
+  curThread.SPR.XER.hexValue = 0;
   // Maintain ByteCount
   curThread.SPR.XER.ByteCount = xer.ByteCount;
   // Should maintain SO and CA bits
@@ -847,11 +847,11 @@ void PPCInterpreter::PPCInterpreter_mftb(sPPEState *ppeState) {
   const u32 spr = (_instr.spr >> 5) | ((_instr.spr & 0x1f) << 5);
 
   switch (spr) {
-  case 268:
-    GPRi(rd) = ppeState->SPR.TB;
+  case TBLRO:
+    GPRi(rd) = ppeState->SPR.TB.TBL;
     break;
-  case 269:
-    GPRi(rd) = HIDW(ppeState->SPR.TB);
+  case TBURO:
+    GPRi(rd) = ppeState->SPR.TB.TBU;
     break;
 
   default:

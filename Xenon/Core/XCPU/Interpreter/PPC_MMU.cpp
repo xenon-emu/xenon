@@ -319,8 +319,8 @@ u8 PPCInterpreter::mmuGetPageSize(sPPEState *ppeState, bool L, u8 LP) {
 
   // HID6 16-17 bits select Large Page size 1.
   // HID6 18-19 bits select Large Page size 2.
-  const u8 LB_16_17 = (ppeState->SPR.HID6.lb & 0b1100) >> 2;
-  const u8 LB_18_19 = ppeState->SPR.HID6.lb & 0b11;
+  const u8 LB_16_17 = (ppeState->SPR.HID6.LB & 0b1100) >> 2;
+  const u8 LB_18_19 = ppeState->SPR.HID6.LB & 0b11;
 
   // Final p size.
   u8 p = 0;
@@ -375,9 +375,9 @@ void PPCInterpreter::mmuAddTlbEntry(sPPEState *ppeState) {
 #define MMU_GET_TLB_INDEX_TS(x)   (static_cast<u16>(x & 0xF))
 #define MMU_GET_TLB_INDEX_LVPN(x) (static_cast<u64>((x & 0xE00000000000) >> 25))
 
-  const u64 tlbIndex = ppeState->SPR.PPE_TLB_Index;
-  const u64 tlbVpn = ppeState->SPR.PPE_TLB_VPN;
-  const u64 tlbRpn = ppeState->SPR.PPE_TLB_RPN;
+  const u64 tlbIndex = ppeState->SPR.PPE_TLB_Index.hexValue;
+  const u64 tlbVpn = ppeState->SPR.PPE_TLB_VPN.hexValue;
+  const u64 tlbRpn = ppeState->SPR.PPE_TLB_RPN.hexValue;
 
   // TLB Index (0 - 255) of current tlb set.
   const u16 TI = MMU_GET_TLB_INDEX_TI(tlbIndex);
@@ -517,11 +517,11 @@ bool PPCInterpreter::mmuSearchTlbEntry(sPPEState *ppeState, u64 *RPN, u64 VA, u8
   // On normal conditions this is done for the LRU index of the TLB.
 
   // Software management of the TLB. 0 = Hardware, 1 = Software.
-  bool tlbSoftwareManaged = ((ppeState->SPR.LPCR & 0x400) >> 10);
+  bool tlbSoftwareManaged = ((ppeState->SPR.LPCR.hexValue & 0x400) >> 10);
 
   if (tlbSoftwareManaged) {
     u64 tlbIndexHint =
-      curThread.SPR.PPE_TLB_Index_Hint;
+      curThread.SPR.PPE_TLB_Index_Hint.hexValue;
     u8 currentTlbSet = tlbIndexHint & 0xF;
     u8 currentTlbIndex = static_cast<u8>(tlbIndexHint & 0xFF0) >> 4;
     currentTlbSet = tlbSet;
@@ -539,7 +539,7 @@ bool PPCInterpreter::mmuSearchTlbEntry(sPPEState *ppeState, u64 *RPN, u64 VA, u8
 
     tlbIndex = tlbIndex << 4;
     tlbIndexHint = tlbIndex |= currentTlbSet;
-    curThread.SPR.PPE_TLB_Index_Hint = tlbIndexHint;
+    curThread.SPR.PPE_TLB_Index_Hint.hexValue = tlbIndexHint;
   }
   return false;
 }
@@ -655,13 +655,13 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, sPPEState *ppeState,
   sPPUThread &thread = ppeState->ppuThread[thr != ePPUThread_None ? thr : curThreadId];
 
   // Machine State Register.
-  const MSRegister _msr = thread.SPR.MSR;
+  const uMSR _msr = thread.SPR.MSR;
   // Logical Partition Control Register.
-  const u64 LPCR = ppeState->SPR.LPCR;
+  const u64 LPCR = ppeState->SPR.LPCR.hexValue;
   // Hypervisor Real Mode Offset Register.
-  const u64 HRMOR = ppeState->SPR.HRMOR;
+  const u64 HRMOR = ppeState->SPR.HRMOR.hexValue;
   // Real Mode Offset Register.
-  const u64 RMOR = ppeState->SPR.RMOR;
+  const u64 RMOR = ppeState->SPR.RMOR.hexValue;
   // Upper 32 bits of EA, used when getting the VPN.
   const u64 upperEA = (*EA & 0xFFFFFFFF00000000);
 
@@ -833,9 +833,9 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, sPPEState *ppeState,
         // interrupt, else do page table search
         if (tlbSoftwareManaged) {
           if (thread.instrFetch) {
-            _ex |= PPU_EX_INSSTOR;
+            _ex |= ppuInstrStorageEx;
           } else {
-            _ex |= PPU_EX_DATASTOR;
+            _ex |= ppuDataStorageEx;
             thread.SPR.DAR = *EA;
             thread.SPR.DSISR = DSISR_NOPTE;
           }
@@ -860,8 +860,8 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, sPPEState *ppeState,
           u64 hash1 = ~hash0;
 
           // Get hash table origin and hash table mask
-          const u64 htabOrg = ppeState->SPR.SDR1 & PPC_SPR_SDR_64_HTABORG;
-          const u64 htabSize = ppeState->SPR.SDR1 & PPC_SPR_SDR_64_HTABSIZE;
+          const u64 htabOrg = ppeState->SPR.SDR1.hexValue & PPC_SPR_SDR_64_HTABORG;
+          const u64 htabSize = ppeState->SPR.SDR1.hexValue & PPC_SPR_SDR_64_HTABSIZE;
 
           // Create the mask
           u64 htabMask = QMASK(64 - (11 + htabSize), 63);
@@ -1021,16 +1021,16 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, sPPEState *ppeState,
 
           // Instruction read
           if (thread.instrFetch) {
-            _ex |= PPU_EX_INSSTOR;
+            _ex |= ppuInstrStorageEx;
 
           } else if (memWrite) {
             // Data write
-            _ex |= PPU_EX_DATASTOR;
+            _ex |= ppuDataStorageEx;
             thread.SPR.DAR = *EA;
             thread.SPR.DSISR = DSISR_NOPTE | DSISR_ISSTORE;
           } else {
             // Data read
-            _ex |= PPU_EX_DATASTOR;
+            _ex |= ppuDataStorageEx;
             thread.SPR.DAR = *EA;
             thread.SPR.DSISR = DSISR_NOPTE;
           }
@@ -1041,9 +1041,9 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, sPPEState *ppeState,
       // SLB Miss
       // Data or Inst Segment Exception
       if (thread.instrFetch) {
-        _ex |= PPU_EX_INSTSEGM;
+        _ex |= ppuInstrSegmentEx;
       } else {
-        _ex |= PPU_EX_DATASEGM;
+        _ex |= ppuDataSegmentEx;
         thread.SPR.DAR = *EA;
       }
       return false;

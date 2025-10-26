@@ -57,7 +57,7 @@ void FPCompareUnordered(sPPEState* ppeState, double fra, double frb);
 
 static inline bool checkFpuAvailable(sPPEState *ppeState) {
   if (curThread.SPR.MSR.FP != 1) {
-    _ex |= PPU_EX_FPU;
+    _ex |= ppuFPUnavailableEx;
     return false;
   }
   return true;
@@ -65,7 +65,7 @@ static inline bool checkFpuAvailable(sPPEState *ppeState) {
 
 static inline bool checkVxuAvailable(sPPEState *ppeState) {
   if (curThread.SPR.MSR.VXU != 1) {
-    _ex |= PPU_EX_VXU;
+    _ex |= ppuVXUnavailableEx;
     return false;
   }
   return true;

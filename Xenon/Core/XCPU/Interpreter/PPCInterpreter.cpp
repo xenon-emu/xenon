@@ -122,7 +122,7 @@ void PPCInterpreter::ppcExecuteSingleInstruction(sPPEState *ppeState) {
 
   // This is to set a PPU0[Thread0] breakpoint.
   if (thread.SPR.PIR == 0) {
-    thread.lastRegValue = GPR(11);
+    u8 a = 0;
   }
 
   instructionHandler function =
@@ -176,11 +176,11 @@ void PPCInterpreter::ppcInterpreterTrap(sPPEState *ppeState, u32 trapNumber) {
 #else
       LOG_XBOX(Xenon, "Assertion! Continuing...");
 #endif
-      thread.progExceptionType = PROGRAM_EXCEPTION_TYPE_TRAP;
+      thread.progExceptionType = ppuProgExTypeTRAP;
       return;
     } else if (Config::debug.autoContinueOnGuestAssertion) {
       LOG_XBOX(Xenon, "Assertion! Automatically continuing execution...");
-      thread.progExceptionType = PROGRAM_EXCEPTION_TYPE_TRAP;
+      thread.progExceptionType = ppuProgExTypeTRAP;
       return;
     } else {
       LOG_XBOX(Xenon, "Assertion!");
@@ -198,8 +198,8 @@ void PPCInterpreter::ppcInterpreterTrap(sPPEState *ppeState, u32 trapNumber) {
     break;
   }
 
-  _ex |= PPU_EX_PROG;
-  thread.progExceptionType = PROGRAM_EXCEPTION_TYPE_TRAP;
+  _ex |= ppuProgramEx;
+  thread.progExceptionType = ppuProgExTypeTRAP;
   // Hacky optimization
   #undef curThread
   #define curThread ppeState->ppuThread[curThreadId]

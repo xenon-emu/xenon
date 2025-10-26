@@ -371,7 +371,7 @@ void RenderInstructions(Render::GUI *gui, sPPEState *state, ePPUThreadID thr, u6
     u64 addr = (thread.CIA - (4 * numInstructions + 1)) + (4 * i);
     thread.instrFetch = true;
     instr = PPCInterpreter::MMURead32(state, addr, thr);
-    if (thread.exceptReg & PPU_EX_INSSTOR || thread.exceptReg & PPU_EX_INSTSEGM) {
+    if (thread.exceptReg & ppuInstrStorageEx || thread.exceptReg & ppuInstrSegmentEx) {
       break;
     }
     thread.instrFetch = false;
@@ -418,7 +418,7 @@ void PPUThreadRegisters(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
     }
     if (gui->BeginNode("FPRs")) {
       for (u64 i = 0; i < 32; ++i) {
-        FPRegister &FPR = ppuRegisters.FPR[i];
+        sFPR &FPR = ppuRegisters.FPR[i];
         gui->IDGroup(i, [&] {
           TextFmt(gui, "FPR[{}]", i);
           Custom(gui, valueAsDouble, "{}", FPR.asDouble());
@@ -430,7 +430,7 @@ void PPUThreadRegisters(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
     if (gui->BeginNode("SPRs")) {
       sPPUThreadSPRs &SPR = ppuRegisters.SPR;
       if (gui->BeginNode("MSRs", ImGuiTreeNodeFlags_DefaultOpen)) {
-        MSRegister &MSR = SPR.MSR;
+        uMSR &MSR = SPR.MSR;
         BFHex(gui, MSR, LE);
         BFHex(gui, MSR, RI);
         BFHex(gui, MSR, PMM);
@@ -452,8 +452,8 @@ void PPUThreadRegisters(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
         gui->EndNode();
       }
       if (gui->BeginNode("XER")) {
-        XERegister& XER = SPR.XER;
-        Hex(gui, XER, XER_Hex);
+        uXER& XER = SPR.XER;
+        Hex(gui, XER, hexValue);
         BFHex(gui, XER, ByteCount);
         BFHex(gui, XER, R0);
         BFHex(gui, XER, CA);
@@ -470,7 +470,7 @@ void PPUThreadRegisters(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
       Dec(gui, SPR, DEC);
       Hex(gui, SPR, SRR0);
       Hex(gui, SPR, SRR1);
-      Hex(gui, SPR, ACCR);
+      Hex(gui, SPR, ACCR.hexValue);
       Hex(gui, SPR, SPRG0);
       Hex(gui, SPR, SPRG1);
       Hex(gui, SPR, SPRG2);
@@ -479,11 +479,11 @@ void PPUThreadRegisters(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
       Hex(gui, SPR, HSPRG1);
       Hex(gui, SPR, HSRR0);
       Hex(gui, SPR, HSRR1);
-      Hex(gui, SPR, TSRL);
-      Hex(gui, SPR, TSSR);
-      Hex(gui, SPR, PPE_TLB_Index_Hint);
-      Hex(gui, SPR, DABR);
-      Hex(gui, SPR, DABRX);
+      Hex(gui, SPR, TSRL.hexValue);
+      Hex(gui, SPR, TSRR.hexValue);
+      Hex(gui, SPR, PPE_TLB_Index_Hint.hexValue);
+      Hex(gui, SPR, DABR.hexValue);
+      Hex(gui, SPR, DABRX.hexValue);
       Hex(gui, SPR, PIR);
       gui->EndNode();
     }
@@ -507,7 +507,7 @@ void PPUThreadRegisters(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
       }
     }
     if (gui->BeginNode("GPR:CR")) {
-      uCRegister &CR = ppuRegisters.CR;
+      uCR &CR = ppuRegisters.CR;
       Hex(gui, CR, CR_Hex);
       BFHex(gui, CR, CR0);
       BFHex(gui, CR, CR1);
@@ -576,7 +576,7 @@ void PPUThreadRegisters(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
       gui->EndNode();
     }
     if (gui->BeginNode("FPSCR")) {
-      uFPSCRegister& FPSCR = ppuRegisters.FPSCR;
+      uFPSCR& FPSCR = ppuRegisters.FPSCR;
       Hex(gui, FPSCR, FPSCR_Hex);
       BFHex(gui, FPSCR, RN);
       BFHex(gui, FPSCR, NI);
@@ -623,10 +623,7 @@ void PPUThreadRegisters(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
     Bool(gui, ppuRegisters, instrFetch);
     Hex(gui, ppuRegisters, exceptReg);
     Hex(gui, ppuRegisters, progExceptionType);
-    Bool(gui, ppuRegisters, exceptHVSysCall);
-    Hex(gui, ppuRegisters, intEA);
-    Hex(gui, ppuRegisters, lastWriteAddress);
-    Hex(gui, ppuRegisters, lastRegValue);
+    Bool(gui, ppuRegisters, exHVSysCall);
   }
   gui->EndWindow();
 }
@@ -676,37 +673,37 @@ void PPURegisters(Render::GUI *gui, sPPEState *state) {
     if (!CPU)
       return;
     if (gui->BeginNode("SPR")) {
-      sPPESPRs &SPR = state->SPR;
-      Hex(gui, SPR, SDR1);
-      Hex(gui, SPR, CTRL);
-      Hex(gui, SPR, TB);
+      sPPUGlobalSPRs &SPR = state->SPR;
+      Hex(gui, SPR, SDR1.hexValue);
+      Hex(gui, SPR, CTRL.hexValue);
+      Hex(gui, SPR, TB.hexValue);
       if (gui->BeginNode("PVR", ImGuiTreeNodeFlags_DefaultOpen)) {
-        PVRegister &PVR = SPR.PVR;
-        Hex(gui, PVR, PVR_Hex);
+        uPVR &PVR = SPR.PVR;
+        Hex(gui, PVR, hexValue);
         U8Hex(gui, PVR, Revision);
         U8Hex(gui, PVR, Version);
         gui->EndNode();
       }
       Hex(gui, SPR, HDEC);
-      Hex(gui, SPR, RMOR);
-      Hex(gui, SPR, HRMOR);
-      Hex(gui, SPR, LPCR);
-      Hex(gui, SPR, LPIDR);
-      Hex(gui, SPR, TSCR);
-      Hex(gui, SPR, TTR);
-      Hex(gui, SPR, PPE_TLB_Index);
-      Hex(gui, SPR, PPE_TLB_VPN);
-      Hex(gui, SPR, PPE_TLB_RPN);
-      Hex(gui, SPR, PPE_TLB_RMT);
-      Hex(gui, SPR, HID0);
-      Hex(gui, SPR, HID1);
-      Hex(gui, SPR, HID4);
+      Hex(gui, SPR, RMOR.hexValue);
+      Hex(gui, SPR, HRMOR.hexValue);
+      Hex(gui, SPR, LPCR.hexValue);
+      Hex(gui, SPR, LPIDR.hexValue);
+      Hex(gui, SPR, TSCR.hexValue);
+      Hex(gui, SPR, TTR.hexValue);
+      Hex(gui, SPR, PPE_TLB_Index.hexValue);
+      Hex(gui, SPR, PPE_TLB_VPN.hexValue);
+      Hex(gui, SPR, PPE_TLB_RPN.hexValue);
+      Hex(gui, SPR, PPE_TLB_RMT.hexValue);
+      Hex(gui, SPR, HID0.hexValue);
+      Hex(gui, SPR, HID1.hexValue);
+      Hex(gui, SPR, HID4.hexValue);
       if (gui->BeginNode("HID6", ImGuiTreeNodeFlags_DefaultOpen)) {
-        uHID6SPR& HID6 = SPR.HID6;
+        uHID6& HID6 = SPR.HID6;
         U8Hex(gui, HID6, debug);
         U8Hex(gui, HID6, debug_enable);
         U8Hex(gui, HID6, tb_enable);
-        U8Hex(gui, HID6, lb);
+        U8Hex(gui, HID6, LB);
         U8Hex(gui, HID6, RMSC);
         gui->EndNode();
       }

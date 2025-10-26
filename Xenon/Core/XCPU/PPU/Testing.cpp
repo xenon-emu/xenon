@@ -298,7 +298,7 @@ public:
           LOG_CRITICAL(Xenon, "[Testing]: Invalid opcode found.");
           return false;
         }
-        if (_ex & PPU_EX_INSSTOR || _ex & PPU_EX_INSTSEGM) {
+        if (_ex & ppuInstrStorageEx || _ex & ppuInstrSegmentEx) {
           return false;
         }
 
@@ -330,7 +330,7 @@ public:
     for (auto &reg : thread.FPR) { reg.setValue(0.0); }
     for (auto &reg : thread.VR) { reg.x = 0; reg.y = 0; reg.z = 0; reg.w = 0; }
     thread.CR.CR_Hex = 0;
-    thread.SPR.XER.XER_Hex = 0;
+    thread.SPR.XER.hexValue = 0;
 
     // Set NIA for this test case.
     thread.NIA = testCase.executionAddress;
@@ -528,7 +528,7 @@ bool PPU::RunInstructionTests(sPPEState *ppeState, PPU_JIT* ppuJITPtr, ePPUTesti
   for (auto& reg : thread.FPR) { reg.setValue(0.0); }
   for (auto& reg : thread.VR) { reg.x = 0; reg.y = 0; reg.z = 0; reg.w = 0; }
   thread.CR.CR_Hex = 0;
-  thread.SPR.XER.XER_Hex = 0;
+  thread.SPR.XER.hexValue = 0;
   thread.SPR.MSR.FP = 0;
   thread.SPR.MSR.VXU = 0;
   thread.SPR.MSR.SF = 1;

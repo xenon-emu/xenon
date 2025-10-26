@@ -19,8 +19,8 @@ void PPCInterpreter::PPCInterpreter_eieio(sPPEState *ppeState) {
 // System Call
 void PPCInterpreter::PPCInterpreter_sc(sPPEState *ppeState) {
   // Raise the exception.
-  _ex |= PPU_EX_SC;
-  curThread.exceptHVSysCall = _instr.lev & 1;
+  _ex |= ppuSystemCallEx;
+  curThread.exHVSysCall = _instr.lev & 1;
 }
 
 // SLB Move To Entry
@@ -94,10 +94,10 @@ void PPCInterpreter::PPCInterpreter_rfid(sPPEState *ppeState) {
     BSET(new_msr, 64, 0);
   }
 
-  const u32 b3 = BGET(curThread.SPR.MSR.MSR_Hex, 64, 3);
+  const u32 b3 = BGET(curThread.SPR.MSR.hexValue, 64, 3);
 
   // MSR.51 = (MSR.3 & SRR1.51) | ((~MSR.3) & MSR.51)
-  if ((b3 && BGET(srr1, 64, 51)) || (!b3 && BGET(curThread.SPR.MSR.MSR_Hex, 64, 51))) {
+  if ((b3 && BGET(srr1, 64, 51)) || (!b3 && BGET(curThread.SPR.MSR.hexValue, 64, 51))) {
     BSET(new_msr, 64, 51);
   }
 
@@ -127,7 +127,7 @@ void PPCInterpreter::PPCInterpreter_rfid(sPPEState *ppeState) {
 
   // See what changed and take actions
   // NB: we ignore a bunch of bits..
-  const u64 diff_msr = curThread.SPR.MSR.MSR_Hex ^ new_msr;
+  const u64 diff_msr = curThread.SPR.MSR.hexValue ^ new_msr;
 
   // NB: we dont do half-modes
   if (diff_msr & QMASK(58, 59)) {
@@ -135,7 +135,7 @@ void PPCInterpreter::PPCInterpreter_rfid(sPPEState *ppeState) {
     curThread.SPR.MSR.DR = usr != 0 || (new_msr & QMASK(58, 59)) != 0;
   }
 
-  curThread.SPR.MSR.MSR_Hex = new_msr;
+  curThread.SPR.MSR.hexValue = new_msr;
   curThread.NIA = curThread.SPR.SRR0 & ~3;
 
   // Check for 32-bit mode of operation.
@@ -206,7 +206,7 @@ void PPCInterpreter::PPCInterpreter_mfspr(sPPEState *ppeState) {
 
   switch (static_cast<eXenonSPR>(spr)) {
   case eXenonSPR::XER:
-    GPRi(rs) = curThread.SPR.XER.XER_Hex;
+    GPRi(rs) = curThread.SPR.XER.hexValue;
     break;
   case eXenonSPR::LR:
     GPRi(rs) = curThread.SPR.LR;
@@ -224,7 +224,7 @@ void PPCInterpreter::PPCInterpreter_mfspr(sPPEState *ppeState) {
     GPRi(rs) = curThread.SPR.DEC;
     break;
   case eXenonSPR::SDR1:
-    GPRi(rs) = ppeState->SPR.SDR1;
+    GPRi(rs) = ppeState->SPR.SDR1.hexValue;
     break;
   case eXenonSPR::SRR0:
     GPRi(rs) = curThread.SPR.SRR0;
@@ -236,16 +236,16 @@ void PPCInterpreter::PPCInterpreter_mfspr(sPPEState *ppeState) {
     GPRi(rs) = curThread.SPR.CFAR;
     break;
   case eXenonSPR::CTRLRD:
-    GPRi(rs) = ppeState->SPR.CTRL;
+    GPRi(rs) = ppeState->SPR.CTRL.hexValue;
     break;
   case eXenonSPR::VRSAVE:
     GPRi(rs) = curThread.SPR.VRSAVE;
     break;
   case eXenonSPR::TBLRO:
-    GPRi(rs) = (ppeState->SPR.TB & 0x00000000FFFFFFFF);
+    GPRi(rs) = ppeState->SPR.TB.TBL;
     break;
   case eXenonSPR::TBURO:
-    GPRi(rs) = (ppeState->SPR.TB & 0xFFFFFFFF00000000);
+    GPRi(rs) = ppeState->SPR.TB.TBU;
     break;
   case eXenonSPR::SPRG0:
     GPRi(rs) = curThread.SPR.SPRG0;
@@ -261,7 +261,7 @@ void PPCInterpreter::PPCInterpreter_mfspr(sPPEState *ppeState) {
     GPRi(rs) = curThread.SPR.SPRG3;
     break;
   case eXenonSPR::PVR:
-    GPRi(rs) = ppeState->SPR.PVR.PVR_Hex;
+    GPRi(rs) = ppeState->SPR.PVR.hexValue;
     break;
   case eXenonSPR::HSPRG0:
     GPRi(rs) = curThread.SPR.HSPRG0;
@@ -270,37 +270,37 @@ void PPCInterpreter::PPCInterpreter_mfspr(sPPEState *ppeState) {
     GPRi(rs) = curThread.SPR.HSPRG1;
     break;
   case eXenonSPR::RMOR:
-    GPRi(rs) = ppeState->SPR.RMOR;
+    GPRi(rs) = ppeState->SPR.RMOR.hexValue;
     break;
   case eXenonSPR::HRMOR:
-    GPRi(rs) = ppeState->SPR.HRMOR;
+    GPRi(rs) = ppeState->SPR.HRMOR.hexValue;
     break;
   case eXenonSPR::LPCR:
-    GPRi(rs) = ppeState->SPR.LPCR;
+    GPRi(rs) = ppeState->SPR.LPCR.hexValue;
     break;
   case eXenonSPR::TSCR:
-    GPRi(rs) = ppeState->SPR.TSCR;
+    GPRi(rs) = ppeState->SPR.TSCR.hexValue;
     break;
   case eXenonSPR::TTR:
-    GPRi(rs) = ppeState->SPR.TTR;
+    GPRi(rs) = ppeState->SPR.TTR.hexValue;
     break;
   case eXenonSPR::PPE_TLB_Index_Hint:
-    GPRi(rs) = curThread.SPR.PPE_TLB_Index_Hint;
+    GPRi(rs) = curThread.SPR.PPE_TLB_Index_Hint.hexValue;
     break;
   case eXenonSPR::HID0:
-    GPRi(rs) = ppeState->SPR.HID0;
+    GPRi(rs) = ppeState->SPR.HID0.hexValue;
     break;
   case eXenonSPR::HID1:
-    GPRi(rs) = ppeState->SPR.HID1;
+    GPRi(rs) = ppeState->SPR.HID1.hexValue;
     break;
   case eXenonSPR::HID4:
-    GPRi(rs) = ppeState->SPR.HID4;
+    GPRi(rs) = ppeState->SPR.HID4.hexValue;
     break;
   case eXenonSPR::HID6:
-    GPRi(rs) = ppeState->SPR.HID6.data;
+    GPRi(rs) = ppeState->SPR.HID6.hexValue;
     break;
   case eXenonSPR::DABR:
-    GPRi(rs) = curThread.SPR.DABR;
+    GPRi(rs) = curThread.SPR.DABR.hexValue;
     break;
   case eXenonSPR::PIR:
     GPRi(rs) = curThread.SPR.PIR;
@@ -318,9 +318,9 @@ void PPCInterpreter::PPCInterpreter_mtspr(sPPEState *ppeState) {
 
   switch (static_cast<eXenonSPR>(spr)) {
   case eXenonSPR::XER:
-    curThread.SPR.XER.XER_Hex = static_cast<u32>(GPRi(rd));
+    curThread.SPR.XER.hexValue = static_cast<u32>(GPRi(rd));
     // Clear the unused bits in XER (35:56)
-    curThread.SPR.XER.XER_Hex &= 0xE000007F;
+    curThread.SPR.XER.hexValue &= 0xE000007F;
     break;
   case eXenonSPR::LR:
     curThread.SPR.LR = GPRi(rd);
@@ -338,7 +338,7 @@ void PPCInterpreter::PPCInterpreter_mtspr(sPPEState *ppeState) {
     curThread.SPR.DEC = static_cast<u32>(GPRi(rd));
     break;
   case eXenonSPR::SDR1:
-    ppeState->SPR.SDR1 = GPRi(rd);
+    ppeState->SPR.SDR1.hexValue = GPRi(rd);
     break;
   case eXenonSPR::SRR0:
     curThread.SPR.SRR0 = GPRi(rd);
@@ -350,7 +350,7 @@ void PPCInterpreter::PPCInterpreter_mtspr(sPPEState *ppeState) {
     curThread.SPR.CFAR = GPRi(rd);
     break;
   case eXenonSPR::CTRLWR:
-    ppeState->SPR.CTRL = static_cast<u32>(GPRi(rd));
+    ppeState->SPR.CTRL.hexValue = static_cast<u32>(GPRi(rd));
     break;
   case eXenonSPR::VRSAVE:
     curThread.SPR.VRSAVE = static_cast<u32>(GPRi(rd));
@@ -368,10 +368,10 @@ void PPCInterpreter::PPCInterpreter_mtspr(sPPEState *ppeState) {
     curThread.SPR.SPRG3 = GPRi(rd);
     break;
   case eXenonSPR::TBLWO:
-    ppeState->SPR.TB |= (GPRi(rd) & 0xFFFFFFFF);
+    ppeState->SPR.TB.TBL = (GPRi(rd) & 0xFFFFFFFF);
     break;
   case eXenonSPR::TBUWO:
-    ppeState->SPR.TB |= (GPRi(rd) << 32);
+    ppeState->SPR.TB.TBU = (GPRi(rd) & 0xFFFFFFFF);
     break;
   case eXenonSPR::HSPRG0:
     curThread.SPR.HSPRG0 = GPRi(rd);
@@ -383,53 +383,53 @@ void PPCInterpreter::PPCInterpreter_mtspr(sPPEState *ppeState) {
     ppeState->SPR.HDEC = static_cast<u32>(GPRi(rd));
     break;
   case eXenonSPR::RMOR:
-    ppeState->SPR.RMOR = GPRi(rd);
+    ppeState->SPR.RMOR.hexValue = GPRi(rd);
     break;
   case eXenonSPR::HRMOR:
-    ppeState->SPR.HRMOR = GPRi(rd);
+    ppeState->SPR.HRMOR.hexValue = GPRi(rd);
     break;
   case eXenonSPR::LPCR:
-    ppeState->SPR.LPCR = GPRi(rd);
+    ppeState->SPR.LPCR.hexValue = GPRi(rd);
     break;
   case eXenonSPR::LPIDR:
-    ppeState->SPR.LPIDR = static_cast<u32>(GPRi(rd));
+    ppeState->SPR.LPIDR.hexValue = static_cast<u32>(GPRi(rd));
     break;
   case eXenonSPR::TSCR:
-    ppeState->SPR.TSCR = static_cast<u32>(GPRi(rd));
+    ppeState->SPR.TSCR.hexValue = static_cast<u32>(GPRi(rd));
     break;
   case eXenonSPR::TTR:
-    ppeState->SPR.TTR = GPRi(rd);
+    ppeState->SPR.TTR.hexValue = GPRi(rd);
     break;
   case eXenonSPR::PPE_TLB_Index:
-    ppeState->SPR.PPE_TLB_Index = GPRi(rd);
+    ppeState->SPR.PPE_TLB_Index.hexValue = GPRi(rd);
     break;
   case eXenonSPR::PPE_TLB_Index_Hint:
-    curThread.SPR.PPE_TLB_Index_Hint = GPRi(rd);
+    curThread.SPR.PPE_TLB_Index_Hint.hexValue = GPRi(rd);
     break;
   case eXenonSPR::PPE_TLB_VPN:
-    ppeState->SPR.PPE_TLB_VPN = GPRi(rd);
+    ppeState->SPR.PPE_TLB_VPN.hexValue = GPRi(rd);
     mmuAddTlbEntry(ppeState);
     break;
   case eXenonSPR::PPE_TLB_RPN:
-    ppeState->SPR.PPE_TLB_RPN = GPRi(rd);
+    ppeState->SPR.PPE_TLB_RPN.hexValue = GPRi(rd);
     break;
   case eXenonSPR::HID0:
-    ppeState->SPR.HID0 = GPRi(rd);
+    ppeState->SPR.HID0.hexValue = GPRi(rd);
     break;
   case eXenonSPR::HID1:
-    ppeState->SPR.HID1 = GPRi(rd);
+    ppeState->SPR.HID1.hexValue = GPRi(rd);
     break;
   case eXenonSPR::HID4:
-    ppeState->SPR.HID4 = GPRi(rd);
+    ppeState->SPR.HID4.hexValue = GPRi(rd);
     break;
   case eXenonSPR::HID6:
-    ppeState->SPR.HID6.data = GPRi(rd);
+    ppeState->SPR.HID6.hexValue = GPRi(rd);
     break;
   case eXenonSPR::DABR:
-    curThread.SPR.DABR = GPRi(rd);
+    curThread.SPR.DABR.hexValue = GPRi(rd);
     break;
   case eXenonSPR::DABRX:
-    curThread.SPR.DABRX = GPRi(rd);
+    curThread.SPR.DABRX.hexValue = GPRi(rd);
     break;
   default:
     LOG_ERROR(Xenon, "{}(Thrd{:#d}) SPR 0x{:X} =0x{:X}", ppeState->ppuName, static_cast<u8>(curThreadId), spr, GPRi(rd));
@@ -439,12 +439,12 @@ void PPCInterpreter::PPCInterpreter_mtspr(sPPEState *ppeState) {
 
 // Move From Machine State Register
 void PPCInterpreter::PPCInterpreter_mfmsr(sPPEState *ppeState) {
-  GPRi(rd) = curThread.SPR.MSR.MSR_Hex;
+  GPRi(rd) = curThread.SPR.MSR.hexValue;
 }
 
 // Move To Machine State Register
 void PPCInterpreter::PPCInterpreter_mtmsr(sPPEState *ppeState) {
-  curThread.SPR.MSR.MSR_Hex = GPRi(rs);
+  curThread.SPR.MSR.hexValue = GPRi(rs);
 
   // Check for 32-bit mode of operation
   if (!curThread.SPR.MSR.SF)
@@ -473,7 +473,7 @@ void PPCInterpreter::PPCInterpreter_mtmsrd(sPPEState *ppeState) {
        the corresponding bits of the MSR
     */
     const u64 regRS = GPRi(rs);
-    curThread.SPR.MSR.MSR_Hex = regRS;
+    curThread.SPR.MSR.hexValue = regRS;
 
     // MSR0 = (RS)0 | (RS)1
     curThread.SPR.MSR.SF = (regRS & 0x8000000000000000) || (regRS & 0x4000000000000000) ? 1 : 0;
