@@ -12,108 +12,106 @@ void PPCInterpreter::PPCInterpreterJIT_mfspr(sPPEState *ppeState, JITBlockBuilde
 
   x86::Gp rSValue = newGP64();
 
-  switch (sprNum) {
-  case SPR_XER:
+  switch (static_cast<eXenonSPR>(sprNum)) {
+  case eXenonSPR::XER:
     COMP->mov(rSValue, SPRPtr(XER));
     break;
-  case SPR_LR:
+  case eXenonSPR::LR:
     COMP->mov(rSValue, SPRPtr(LR));
     break;
-  case SPR_CTR:
+  case eXenonSPR::CTR:
     COMP->mov(rSValue, SPRPtr(CTR));
     break;
-  case SPR_DSISR:
+  case eXenonSPR::DSISR:
     COMP->mov(rSValue, SPRPtr(DSISR));
     break;
-  case SPR_DAR:
+  case eXenonSPR::DAR:
     COMP->mov(rSValue, SPRPtr(DAR));
     break;
-  case SPR_DEC:
+  case eXenonSPR::DEC:
     COMP->mov(rSValue, SPRPtr(DEC));
     break;
-  case SPR_SDR1:
+  case eXenonSPR::SDR1:
     COMP->mov(rSValue, SharedSPRPtr(SDR1));
     break;
-  case SPR_SRR0:
+  case eXenonSPR::SRR0:
     COMP->mov(rSValue, SPRPtr(SRR0));
     break;
-  case SPR_SRR1:
+  case eXenonSPR::SRR1:
     COMP->mov(rSValue, SPRPtr(SRR1));
     break;
-  case SPR_CFAR:
+  case eXenonSPR::CFAR:
     COMP->mov(rSValue, SPRPtr(CFAR));
     break;
-  case SPR_CTRLRD:
+  case eXenonSPR::CTRLRD:
     COMP->mov(rSValue, SharedSPRPtr(CTRL));
     break;
-  case SPR_VRSAVE:
+  case eXenonSPR::VRSAVE:
     COMP->mov(rSValue, SPRPtr(VRSAVE));
     break;
-  case SPR_TBL_RO:
-    COMP->mov(rSValue, SharedSPRPtr(TB));
+  case eXenonSPR::TBLRO:
+    COMP->mov(rSValue, 0x00000000FFFFFFFF);
+    COMP->and_(rSValue, SharedSPRPtr(TB));
     break;
-  case SPR_TBU_RO:
+  case eXenonSPR::TBURO:
     COMP->mov(rSValue, 0xFFFFFFFF00000000);
     COMP->and_(rSValue, SharedSPRPtr(TB));
     break;
-  case SPR_SPRG0:
+  case eXenonSPR::SPRG0:
     COMP->mov(rSValue, SPRPtr(SPRG0));
     break;
-  case SPR_SPRG1:
+  case eXenonSPR::SPRG1:
     COMP->mov(rSValue, SPRPtr(SPRG1));
     break;
-  case SPR_SPRG2:
+  case eXenonSPR::SPRG2:
     COMP->mov(rSValue, SPRPtr(SPRG2));
     break;
-  case SPR_SPRG3:
+  case eXenonSPR::SPRG3:
     COMP->mov(rSValue, SPRPtr(SPRG3));
     break;
-  case SPR_TB:
-    COMP->mov(rSValue, SharedSPRPtr(TB));
-    break;
-  case SPR_PVR:
+  case eXenonSPR::PVR:
     COMP->mov(rSValue, SharedSPRPtr(PVR));
     break;
-  case SPR_HSPRG0:
+  case eXenonSPR::HSPRG0:
     COMP->mov(rSValue, SPRPtr(HSPRG0));
     break;
-  case SPR_HSPRG1:
+  case eXenonSPR::HSPRG1:
     COMP->mov(rSValue, SPRPtr(HSPRG1));
     break;
-  case SPR_RMOR:
+  case eXenonSPR::RMOR:
     COMP->mov(rSValue, SharedSPRPtr(RMOR));
     break;
-  case SPR_HRMOR:
+  case eXenonSPR::HRMOR:
     COMP->mov(rSValue, SharedSPRPtr(HRMOR));
     break;
-  case SPR_LPCR:
+  case eXenonSPR::LPCR:
     COMP->mov(rSValue, SharedSPRPtr(LPCR));
     break;
-  case SPR_TSCR:
+  case eXenonSPR::TSCR:
     COMP->mov(rSValue, SharedSPRPtr(TSCR));
     break;
-  case SPR_TTR:
+  case eXenonSPR::TTR:
     COMP->mov(rSValue, SharedSPRPtr(TTR));
     break;
-  case SPR_PpeTlbIndexHint:
+  case eXenonSPR::PPE_TLB_Index_Hint:
     COMP->mov(rSValue, SPRPtr(PPE_TLB_Index_Hint));
     break;
-  case SPR_HID0:
+  case eXenonSPR::HID0:
     COMP->mov(rSValue, SharedSPRPtr(HID0));
     break;
-  case SPR_HID1:
+  case eXenonSPR::HID1:
     COMP->mov(rSValue, SharedSPRPtr(HID1));
     break;
-  case SPR_HID4:
+  case eXenonSPR::HID4:
     COMP->mov(rSValue, SharedSPRPtr(HID4));
     break;
-  case SPR_DABR:
+  case eXenonSPR::DABR:
     COMP->mov(rSValue, SPRPtr(DABR));
     break;
-  case SPR_HID6:
+  case eXenonSPR::HID6:
     COMP->mov(rSValue, SharedSPRPtr(HID6));
     break;
-  case SPR_PIR:
+  case eXenonSPR::PIR:
     COMP->mov(rSValue, SPRPtr(PIR));
     break;
   default:

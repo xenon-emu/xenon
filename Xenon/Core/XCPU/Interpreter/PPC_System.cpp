@@ -204,107 +204,105 @@ void PPCInterpreter::PPCInterpreter_mfspr(sPPEState *ppeState) {
   u32 spr = _instr.spr;
   spr = ((spr & 0x1F) << 5) | ((spr >> 5) & 0x1F);
 
-  switch (spr) {
-  case SPR_XER:
+  switch (static_cast<eXenonSPR>(spr)) {
+  case eXenonSPR::XER:
     GPRi(rs) = curThread.SPR.XER.XER_Hex;
     break;
-  case SPR_LR:
+  case eXenonSPR::LR:
     GPRi(rs) = curThread.SPR.LR;
     break;
-  case SPR_CTR:
+  case eXenonSPR::CTR:
     GPRi(rs) = curThread.SPR.CTR;
     break;
-  case SPR_DSISR:
+  case eXenonSPR::DSISR:
     GPRi(rs) = curThread.SPR.DSISR;
     break;
-  case SPR_DAR:
+  case eXenonSPR::DAR:
     GPRi(rs) = curThread.SPR.DAR;
     break;
-  case SPR_DEC:
+  case eXenonSPR::DEC:
     GPRi(rs) = curThread.SPR.DEC;
     break;
-  case SPR_SDR1:
+  case eXenonSPR::SDR1:
     GPRi(rs) = ppeState->SPR.SDR1;
     break;
-  case SPR_SRR0:
+  case eXenonSPR::SRR0:
     GPRi(rs) = curThread.SPR.SRR0;
     break;
-  case SPR_SRR1:
+  case eXenonSPR::SRR1:
     GPRi(rs) = curThread.SPR.SRR1;
     break;
-  case SPR_CFAR:
+  case eXenonSPR::CFAR:
     GPRi(rs) = curThread.SPR.CFAR;
     break;
-  case SPR_CTRLRD:
+  case eXenonSPR::CTRLRD:
     GPRi(rs) = ppeState->SPR.CTRL;
     break;
-  case SPR_VRSAVE:
+  case eXenonSPR::VRSAVE:
     GPRi(rs) = curThread.SPR.VRSAVE;
     break;
-  case SPR_TBL_RO:
-    GPRi(rs) = ppeState->SPR.TB;
+  case eXenonSPR::TBLRO:
+    GPRi(rs) = (ppeState->SPR.TB & 0x00000000FFFFFFFF);
     break;
-  case SPR_TBU_RO:
+  case eXenonSPR::TBURO:
     GPRi(rs) = (ppeState->SPR.TB & 0xFFFFFFFF00000000);
     break;
-  case SPR_SPRG0:
+  case eXenonSPR::SPRG0:
     GPRi(rs) = curThread.SPR.SPRG0;
     break;
-  case SPR_SPRG1:
+  case eXenonSPR::SPRG1:
     GPRi(rs) = curThread.SPR.SPRG1;
     break;
-  case SPR_SPRG2:
+  case eXenonSPR::SPRG2:
     GPRi(rs) = curThread.SPR.SPRG2;
     break;
-  case SPR_SPRG3:
+  case eXenonSPR::SPRG3RD:
+  case eXenonSPR::SPRG3:
     GPRi(rs) = curThread.SPR.SPRG3;
     break;
-  case SPR_TB:
-    GPRi(rs) = ppeState->SPR.TB;
-    break;
-  case SPR_PVR:
+  case eXenonSPR::PVR:
     GPRi(rs) = ppeState->SPR.PVR.PVR_Hex;
     break;
-  case SPR_HSPRG0:
+  case eXenonSPR::HSPRG0:
     GPRi(rs) = curThread.SPR.HSPRG0;
     break;
-  case SPR_HSPRG1:
+  case eXenonSPR::HSPRG1:
     GPRi(rs) = curThread.SPR.HSPRG1;
     break;
-  case SPR_RMOR:
+  case eXenonSPR::RMOR:
     GPRi(rs) = ppeState->SPR.RMOR;
     break;
-  case SPR_HRMOR:
+  case eXenonSPR::HRMOR:
     GPRi(rs) = ppeState->SPR.HRMOR;
     break;
-  case SPR_LPCR:
+  case eXenonSPR::LPCR:
     GPRi(rs) = ppeState->SPR.LPCR;
     break;
-  case SPR_TSCR:
+  case eXenonSPR::TSCR:
     GPRi(rs) = ppeState->SPR.TSCR;
     break;
-  case SPR_TTR:
+  case eXenonSPR::TTR:
     GPRi(rs) = ppeState->SPR.TTR;
     break;
-  case SPR_PpeTlbIndexHint:
+  case eXenonSPR::PPE_TLB_Index_Hint:
     GPRi(rs) = curThread.SPR.PPE_TLB_Index_Hint;
     break;
-  case SPR_HID0:
+  case eXenonSPR::HID0:
     GPRi(rs) = ppeState->SPR.HID0;
     break;
-  case SPR_HID1:
+  case eXenonSPR::HID1:
     GPRi(rs) = ppeState->SPR.HID1;
     break;
-  case SPR_HID4:
+  case eXenonSPR::HID4:
     GPRi(rs) = ppeState->SPR.HID4;
     break;
-  case SPR_DABR:
-    GPRi(rs) = curThread.SPR.DABR;
-    break;
-  case SPR_HID6:
+  case eXenonSPR::HID6:
     GPRi(rs) = ppeState->SPR.HID6.data;
     break;
-  case SPR_PIR:
+  case eXenonSPR::DABR:
+    GPRi(rs) = curThread.SPR.DABR;
+    break;
+  case eXenonSPR::PIR:
     GPRi(rs) = curThread.SPR.PIR;
     break;
   default:
@@ -318,120 +316,119 @@ void PPCInterpreter::PPCInterpreter_mtspr(sPPEState *ppeState) {
   u32 spr = _instr.spr;
   spr = ((spr & 0x1F) << 5) | ((spr >> 5) & 0x1F);
 
-  switch (spr) {
-  case SPR_XER:
+  switch (static_cast<eXenonSPR>(spr)) {
+  case eXenonSPR::XER:
     curThread.SPR.XER.XER_Hex = static_cast<u32>(GPRi(rd));
     // Clear the unused bits in XER (35:56)
     curThread.SPR.XER.XER_Hex &= 0xE000007F;
     break;
-  case SPR_LR:
+  case eXenonSPR::LR:
     curThread.SPR.LR = GPRi(rd);
     break;
-  case SPR_CTR:
+  case eXenonSPR::CTR:
     curThread.SPR.CTR = GPRi(rd);
     break;
-  case SPR_DSISR:
+  case eXenonSPR::DSISR:
     curThread.SPR.DSISR = GPRi(rd);
     break;
-  case SPR_DAR:
+  case eXenonSPR::DAR:
     curThread.SPR.DAR = GPRi(rd);
     break;
-  case SPR_DEC:
+  case eXenonSPR::DEC:
     curThread.SPR.DEC = static_cast<u32>(GPRi(rd));
     break;
-  case SPR_SDR1:
+  case eXenonSPR::SDR1:
     ppeState->SPR.SDR1 = GPRi(rd);
     break;
-  case SPR_SRR0:
+  case eXenonSPR::SRR0:
     curThread.SPR.SRR0 = GPRi(rd);
     break;
-  case SPR_SRR1:
+  case eXenonSPR::SRR1:
     curThread.SPR.SRR1 = GPRi(rd);
     break;
-  case SPR_CFAR:
+  case eXenonSPR::CFAR:
     curThread.SPR.CFAR = GPRi(rd);
     break;
-  case SPR_CTRLRD:
-  case SPR_CTRLWR:
+  case eXenonSPR::CTRLWR:
     ppeState->SPR.CTRL = static_cast<u32>(GPRi(rd));
     break;
-  case SPR_VRSAVE:
+  case eXenonSPR::VRSAVE:
     curThread.SPR.VRSAVE = static_cast<u32>(GPRi(rd));
     break;
-  case SPR_SPRG0:
+  case eXenonSPR::SPRG0:
     curThread.SPR.SPRG0 = GPRi(rd);
     break;
-  case SPR_SPRG1:
+  case eXenonSPR::SPRG1:
     curThread.SPR.SPRG1 = GPRi(rd);
     break;
-  case SPR_SPRG2:
+  case eXenonSPR::SPRG2:
     curThread.SPR.SPRG2 = GPRi(rd);
     break;
-  case SPR_SPRG3:
+  case eXenonSPR::SPRG3:
     curThread.SPR.SPRG3 = GPRi(rd);
     break;
-  case SPR_TBL_WO:
-    ppeState->SPR.TB = GPRi(rd);
+  case eXenonSPR::TBLWO:
+    ppeState->SPR.TB |= (GPRi(rd) & 0xFFFFFFFF);
     break;
-  case SPR_TBU_WO:
-    ppeState->SPR.TB = ppeState->SPR.TB |= (GPRi(rd) << 32);
+  case eXenonSPR::TBUWO:
+    ppeState->SPR.TB |= (GPRi(rd) << 32);
     break;
-  case SPR_HSPRG0:
+  case eXenonSPR::HSPRG0:
     curThread.SPR.HSPRG0 = GPRi(rd);
     break;
-  case SPR_HSPRG1:
+  case eXenonSPR::HSPRG1:
     curThread.SPR.HSPRG1 = GPRi(rd);
     break;
-  case SPR_HDEC:
+  case eXenonSPR::HDEC:
     ppeState->SPR.HDEC = static_cast<u32>(GPRi(rd));
     break;
-  case SPR_RMOR:
+  case eXenonSPR::RMOR:
     ppeState->SPR.RMOR = GPRi(rd);
     break;
-  case SPR_HRMOR:
+  case eXenonSPR::HRMOR:
     ppeState->SPR.HRMOR = GPRi(rd);
     break;
-  case SPR_LPCR:
+  case eXenonSPR::LPCR:
     ppeState->SPR.LPCR = GPRi(rd);
     break;
-  case SPR_LPIDR:
+  case eXenonSPR::LPIDR:
     ppeState->SPR.LPIDR = static_cast<u32>(GPRi(rd));
     break;
-  case SPR_TSCR:
+  case eXenonSPR::TSCR:
     ppeState->SPR.TSCR = static_cast<u32>(GPRi(rd));
     break;
-  case SPR_TTR:
+  case eXenonSPR::TTR:
     ppeState->SPR.TTR = GPRi(rd);
     break;
-  case SPR_PpeTlbIndex:
+  case eXenonSPR::PPE_TLB_Index:
     ppeState->SPR.PPE_TLB_Index = GPRi(rd);
     break;
-  case SPR_PpeTlbIndexHint:
+  case eXenonSPR::PPE_TLB_Index_Hint:
     curThread.SPR.PPE_TLB_Index_Hint = GPRi(rd);
     break;
-  case SPR_PpeTlbVpn:
+  case eXenonSPR::PPE_TLB_VPN:
     ppeState->SPR.PPE_TLB_VPN = GPRi(rd);
     mmuAddTlbEntry(ppeState);
     break;
-  case SPR_PpeTlbRpn:
+  case eXenonSPR::PPE_TLB_RPN:
     ppeState->SPR.PPE_TLB_RPN = GPRi(rd);
     break;
-  case SPR_HID0:
+  case eXenonSPR::HID0:
     ppeState->SPR.HID0 = GPRi(rd);
     break;
-  case SPR_HID1:
+  case eXenonSPR::HID1:
     ppeState->SPR.HID1 = GPRi(rd);
     break;
-  case SPR_HID4:
+  case eXenonSPR::HID4:
     ppeState->SPR.HID4 = GPRi(rd);
     break;
-  case SPR_HID6:
+  case eXenonSPR::HID6:
     ppeState->SPR.HID6.data = GPRi(rd);
     break;
-  case SPR_DABR:
+  case eXenonSPR::DABR:
     curThread.SPR.DABR = GPRi(rd);
     break;
-  case SPR_DABRX:
+  case eXenonSPR::DABRX:
     curThread.SPR.DABRX = GPRi(rd);
     break;
   default:

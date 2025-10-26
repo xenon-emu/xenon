@@ -803,86 +803,71 @@ struct sPPEState {
   u8 ppuID = 0;
 };
 
-//
 // Xenon Special Purpose Registers
-//
-
-#define SPR_XER 1
-#define SPR_LR 8
-#define SPR_CTR 9
-#define SPR_DSISR 18
-#define SPR_DAR 19
-#define SPR_DEC 22
-#define SPR_SDR1 25
-#define SPR_SRR0 26
-#define SPR_SRR1 27
-#define SPR_CFAR 28
-#define SPR_PID 48
-#define SPR_ESR 62
-#define SPR_IVPR 63
-#define SPR_CTRLRD 136
-#define SPR_CTRLWR 152
-#define SPR_VRSAVE 256
-#define SPR_TBL_RO 268
-#define SPR_TBU_RO 269
-#define SPR_SPRG0 272
-#define SPR_SPRG1 273
-#define SPR_SPRG2 274
-#define SPR_SPRG3 275
-#define SPR_TBL_WO 284
-#define SPR_TBU_WO 285
-#define SPR_TB 286
-#define SPR_PVR 287
-#define SPR_HSPRG0 304
-#define SPR_HSPRG1 305
-#define SPR_HDSISR 306
-#define SPR_HDAR 307
-#define SPR_DBCR0 308
-#define SPR_DBCR1 309
-#define SPR_HDEC 310
-#define SPR_HIOR 311
-#define SPR_RMOR 312
-#define SPR_HRMOR 313
-#define SPR_HSRR0 314
-#define SPR_HSRR1 315
-#define SPR_DAC1 316
-#define SPR_DAC2 317
-#define SPR_LPCR 318
-#define SPR_LPIDR 319
-#define SPR_TSR 336
-#define SPR_TCR 340
-#define SPR_SIAR 780
-#define SPR_SDAR 781
-#define SPR_TSRL 896
-#define SPR_TSRR 897
-#define SPR_TSCR 921
-#define SPR_TTR 922
-#define SPR_PpeTlbIndexHint 946
-#define SPR_PpeTlbIndex 947
-#define SPR_PpeTlbVpn 948
-#define SPR_PpeTlbRpn 949
-#define SPR_PpeTlbRmt 951
-#define SPR_DSR0 952
-#define SPR_DRMR0 953
-#define SPR_DCIDR0 954
-#define SPR_DRSR1 955
-#define SPR_DRMR1 956
-#define SPR_DCIDR1 957
-#define SPR_ISSR0 976
-#define SPR_IRMR0 977
-#define SPR_ICIDR0 978
-#define SPR_IRSR1 979
-#define SPR_IRMR1 980
-#define SPR_ICIDR1 981
-#define SPR_HID0 1008
-#define SPR_HID1 1009
-#define SPR_IABR 1010
-#define SPR_HID4 1012
-#define SPR_DABR 1013
-#define SPR_HID5 1014
-#define SPR_DABRX 1015
-#define SPR_BUSCSR 1016
-#define SPR_HID6 1017
-#define SPR_L2SR 1018
-#define SPR_BPVR 1022
-#define SPR_PIR 1023
+// This is mainly taken from CBE_Public_Registers.v1_5.02APR2007.pdf
+// All registers are R/W unless specified otherwise.
+enum eXenonSPR : u16 {
+  // SPR Name | Decimal ID | Description
+  XER = 1,      // Fixed-Point Exception Register
+  LR = 8,       // Link Register
+  CTR = 9,      // Count Register
+  DSISR = 18,   // Data Storage Interrupt Status Register
+  DAR = 19,     // Data Address Register
+  DEC = 22,     // Decrementer Register
+  SDR1 = 25,    // Storage Description Register 1 
+  SRR0 = 26,    // Machine Status Save/Restore Register 0 
+  SRR1 = 27,    // Machine Status Save/Restore Register 1
+  CFAR = 28,    // Not described in the manual but used in Linux
+  ACCR = 29,    // Address Compare Control Register
+  CTRLRD = 136, // Control Register - Read Only
+  CTRLWR = 152, // Control Register - Write Only
+  VRSAVE = 256, // VXU Register Save
+  SPRG3RD = 259,  // Software Use Special Purpose Register 3 - Read Only
+  TBLRO = 268,  // Time Base Register (Lower 32 bits) - Read Only
+  TBURO = 269,  // Time Base Register (Upper 32 bits) - Read Only
+  SPRG0 = 272,  // Software Use Special Purpose Register 0 
+  SPRG1 = 273,  // Software Use Special Purpose Register 1 
+  SPRG2 = 274,  // Software Use Special Purpose Register 2 
+  SPRG3 = 275,  // Software Use Special Purpose Register 3 
+  TBLWO = 284,  // Time Base Register (Lower 32 bits) - Write Only
+  TBUWO = 285,  // Time Base Register (Upper 32 bits) - Write Only
+  PVR = 287,    // PPE Processor Version Register
+  HSPRG0 = 304, // Hypervisor Software Use Special Purpose Register 0 
+  HSPRG1 = 305, // Hypervisor Software Use Special Purpose Register 1
+  HDEC = 310,   // Hypervisor Decrementer Register
+  RMOR = 312,   // Real Mode Offset Register
+  HRMOR = 313,  // Hypervisor Real Mode Offset Register
+  HSRR0 = 314,  // Hypervisor Machine Status Save / Restore Register 0
+  HSRR1 = 315,  // Hypervisor Machine Status Save / Restore Register 1
+  LPCR = 318,   // Logical Partition Control Register
+  LPIDR = 319,  // Logical Partition Identity Register
+  TSRL = 896,   // Thread Status Register Local
+  TSRR = 897,   // Thread Status Register Remote - Read Only
+  TSCR = 921,   // Thread Switch Control Register
+  TTR = 922,    // Thread Switch Timeout Register
+  PPE_TLB_Index_Hint = 946, // PPE Translation Lookaside Buffer Index Hint Register - Read Only
+  PPE_TLB_Index = 947,      // PPE Translation Lookaside Buffer Index Register
+  PPE_TLB_VPN = 948,        // PPE Translation Lookaside Buffer Virtual-Page Number Register
+  PPE_TLB_RPN = 949,        // PPE Translation Lookaside Buffer Real-Page Number Register
+  PPE_TLB_RMT = 951,        // PPE Translation Lookaside Buffer RMT Register
+  DRSR0 = 952,  // Data Range Start Register 0
+  DRMR0 = 953,  // Data Range Mask Register 0
+  DCIDR0 = 954, // Data Class ID Register 0
+  DRSR1 = 955,  // Data Range Start Register 1
+  DRMR1 = 956,  // Data Range Mask Register 1
+  DCIDR1 = 957, // Data Class ID Register 1
+  IRSR0 = 976,  // Instruction Range Start Register 0
+  IRMR0 = 977,  // Instruction Range Mask Register 0
+  ICIDR0 = 978, // Instruction Class ID Register 0
+  IRSR1 = 979,  // Instruction Range Start Register 1
+  IRMR1 = 980,  // Instruction Range Mask Register 1
+  ICIDR1 = 981, // Instruction Class ID Register 1
+  HID0 = 1008,  // Hardware Implementation Register 0
+  HID1 = 1009,  // Hardware Implementation Register 1
+  HID4 = 1012,  // Hardware Implementation Register 4
+  DABR = 1013,  // Data Address Breakpoint Register
+  DABRX = 1015, // Data Address Breakpoint Register Extension
+  HID6 = 1017,  // Hardware Implementation Register 6
+  BP_VR = 1022, // CBEA-Compliant Processor Version Register - Read Only
+  PIR = 1023    // Processor Identification Register - Read Only
+};
