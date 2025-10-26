@@ -172,7 +172,7 @@ void PPCInterpreter::PPCInterpreter_stbu(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + _instr.simm16;
   MMUWrite8(ppeState, EA, static_cast<u8>(GPRi(rs)));
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(ra) = EA;
@@ -188,7 +188,7 @@ void PPCInterpreter::PPCInterpreter_stbux(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + GPRi(rb);
   MMUWrite8(ppeState, EA, static_cast<u8>(GPRi(rs)));
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(ra) = EA;
@@ -244,7 +244,7 @@ void PPCInterpreter::PPCInterpreter_sthu(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + _instr.simm16;
   MMUWrite16(ppeState, EA, static_cast<u16>(GPRi(rs)));
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(ra) = EA;
@@ -260,7 +260,7 @@ void PPCInterpreter::PPCInterpreter_sthux(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + GPRi(rb);
   MMUWrite16(ppeState, EA, static_cast<u16>(GPRi(rs)));
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(ra) = EA;
@@ -395,7 +395,7 @@ void PPCInterpreter::PPCInterpreter_stwcx(sPPEState *ppeState) {
   // Translate address
   MMUTranslateAddress(&RA, ppeState, true);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   if (curThread.ppuRes->valid) {
@@ -425,7 +425,7 @@ void PPCInterpreter::PPCInterpreter_stwu(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + _instr.simm16;
   MMUWrite32(ppeState, EA, static_cast<u32>(GPRi(rs)));
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(ra) = EA;
@@ -441,7 +441,7 @@ void PPCInterpreter::PPCInterpreter_stwux(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + GPRi(rb);
   MMUWrite32(ppeState, EA, static_cast<u32>(GPRi(rs)));
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(ra) = EA;
@@ -504,7 +504,7 @@ void PPCInterpreter::PPCInterpreter_stdcx(sPPEState *ppeState) {
 
   MMUTranslateAddress(&RA, ppeState, true);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   if (curThread.ppuRes->valid) {
@@ -534,7 +534,7 @@ void PPCInterpreter::PPCInterpreter_stdu(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + (_instr.simm16 & ~3);
   MMUWrite64(ppeState, EA, GPRi(rs));
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(ra) = EA;
@@ -550,7 +550,7 @@ void PPCInterpreter::PPCInterpreter_stdux(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + GPRi(rb);
   MMUWrite64(ppeState, EA, GPRi(rs));
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(ra) = EA;
@@ -600,7 +600,7 @@ void PPCInterpreter::PPCInterpreter_stfsu(sPPEState *ppeState) {
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
   MMUWrite32(ppeState, EA, ConvertToSingle(FPRi(frs).asU64()));
   
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(ra) = EA;
@@ -619,7 +619,7 @@ void PPCInterpreter::PPCInterpreter_stfsux(sPPEState *ppeState) {
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   MMUWrite32(ppeState, EA, ConvertToSingle(FPRi(frs).asU64()));
   
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(ra) = EA;
@@ -683,7 +683,7 @@ void PPCInterpreter::PPCInterpreter_stfdu(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + _instr.simm16;
   MMUWrite64(ppeState, EA, FPRi(frs).asU64());
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(ra) = EA;
@@ -702,7 +702,7 @@ void PPCInterpreter::PPCInterpreter_stfdux(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + GPRi(rb);
   MMUWrite64(ppeState, EA, FPRi(frs).asU64());
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(ra) = EA;
@@ -936,7 +936,7 @@ void PPCInterpreter::PPCInterpreter_lbz(sPPEState *ppeState) {
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
   const u8 data = MMURead8(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = data;
@@ -952,7 +952,7 @@ void PPCInterpreter::PPCInterpreter_lbzu(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + _instr.simm16;
   const u8 data = MMURead8(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = data;
@@ -969,7 +969,7 @@ void PPCInterpreter::PPCInterpreter_lbzux(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + GPRi(rb);
   const u8 data = MMURead8(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = data;
@@ -987,7 +987,7 @@ void PPCInterpreter::PPCInterpreter_lbzx(sPPEState *ppeState) {
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   const u8 data = MMURead8(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = data;
@@ -1008,7 +1008,7 @@ void PPCInterpreter::PPCInterpreter_lha(sPPEState *ppeState) {
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
   const u16 unsignedWord = MMURead16(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = EXTS(unsignedWord, 16);
@@ -1024,7 +1024,7 @@ void PPCInterpreter::PPCInterpreter_lhau(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + _instr.simm16;
   const u16 unsignedWord = MMURead16(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = EXTS(unsignedWord, 16);
@@ -1041,7 +1041,7 @@ void PPCInterpreter::PPCInterpreter_lhaux(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + GPRi(rb);
   const u16 unsignedWord = MMURead16(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = EXTS(unsignedWord, 16);
@@ -1059,7 +1059,7 @@ void PPCInterpreter::PPCInterpreter_lhax(sPPEState *ppeState) {
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   const u16 unsignedWord = MMURead16(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = EXTS(unsignedWord, 16);
@@ -1076,7 +1076,7 @@ void PPCInterpreter::PPCInterpreter_lhbrx(sPPEState *ppeState) {
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   const u16 data = MMURead16(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = byteswap_be<u16>(data);
@@ -1093,7 +1093,7 @@ void PPCInterpreter::PPCInterpreter_lhz(sPPEState *ppeState) {
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
   const u16 data = MMURead16(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = data;
@@ -1109,7 +1109,7 @@ void PPCInterpreter::PPCInterpreter_lhzu(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + _instr.simm16;
   const u16 data = MMURead16(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = data;
@@ -1126,7 +1126,7 @@ void PPCInterpreter::PPCInterpreter_lhzux(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + GPRi(rb);
   const u16 data = MMURead16(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = data;
@@ -1144,7 +1144,7 @@ void PPCInterpreter::PPCInterpreter_lhzx(sPPEState *ppeState) {
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   const u16 data = MMURead16(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = data;
@@ -1230,7 +1230,7 @@ void PPCInterpreter::PPCInterpreter_lwa(sPPEState *ppeState) {
   const u64 EA = (_instr.simm16 & ~3) + (_instr.ra ? GPRi(ra) : 0);
   const u32 unsignedWord = MMURead32(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = EXTS(unsignedWord, 32);
@@ -1253,7 +1253,7 @@ void PPCInterpreter::PPCInterpreter_lwarx(sPPEState *ppeState) {
 
   MMUTranslateAddress(&RA, ppeState, false);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   curThread.ppuRes->valid = true;
@@ -1262,7 +1262,7 @@ void PPCInterpreter::PPCInterpreter_lwarx(sPPEState *ppeState) {
 
   u32 data = MMURead32(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
     GPRi(rd) = data;
@@ -1279,7 +1279,7 @@ void PPCInterpreter::PPCInterpreter_lwax(sPPEState *ppeState) {
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   const u32 unsignedWord = MMURead32(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = EXTS(unsignedWord, 32);
@@ -1295,7 +1295,7 @@ void PPCInterpreter::PPCInterpreter_lwaux(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + GPRi(rb);
   const u32 unsignedWord = MMURead32(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = EXTS(unsignedWord, 32);
@@ -1313,7 +1313,7 @@ void PPCInterpreter::PPCInterpreter_lwbrx(sPPEState *ppeState) {
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   const u32 data = MMURead32(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = byteswap_be<u32>(data);
@@ -1330,7 +1330,7 @@ void PPCInterpreter::PPCInterpreter_lwz(sPPEState *ppeState) {
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
   const u32 data = MMURead32(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = data;
@@ -1346,7 +1346,7 @@ void PPCInterpreter::PPCInterpreter_lwzu(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + _instr.simm16;
   const u32 data = MMURead32(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = data;
@@ -1363,7 +1363,7 @@ void PPCInterpreter::PPCInterpreter_lwzux(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + GPRi(rb);
   const u32 data = MMURead32(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = data;
@@ -1381,7 +1381,7 @@ void PPCInterpreter::PPCInterpreter_lwzx(sPPEState *ppeState) {
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   const u32 data = MMURead32(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = data;
@@ -1402,7 +1402,7 @@ void PPCInterpreter::PPCInterpreter_ld(sPPEState *ppeState) {
   const u64 EA = (_instr.simm16 & ~3) + (_instr.ra ? GPRi(ra) : 0);
   const u64 data = MMURead64(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = data;
@@ -1415,7 +1415,7 @@ void PPCInterpreter::PPCInterpreter_ldbrx(sPPEState *ppeState) {
   const u64 RA = EA & ~7;
   const u64 data = MMURead64(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = data;
@@ -1438,7 +1438,7 @@ void PPCInterpreter::PPCInterpreter_ldarx(sPPEState *ppeState) {
 
   MMUTranslateAddress(&RA, ppeState, false);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   curThread.ppuRes->reservedAddr = RA;
@@ -1447,7 +1447,7 @@ void PPCInterpreter::PPCInterpreter_ldarx(sPPEState *ppeState) {
 
   const u64 data = MMURead64(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = data;
@@ -1463,7 +1463,7 @@ void PPCInterpreter::PPCInterpreter_ldu(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + (_instr.simm16 & ~3);
   const u64 data = MMURead64(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = data;
@@ -1480,7 +1480,7 @@ void PPCInterpreter::PPCInterpreter_ldux(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + GPRi(rb);
   const u64 data = MMURead64(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = data;
@@ -1498,7 +1498,7 @@ void PPCInterpreter::PPCInterpreter_ldx(sPPEState *ppeState) {
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   const u64 data = MMURead64(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   GPRi(rd) = data;
@@ -1518,7 +1518,7 @@ void PPCInterpreter::PPCInterpreter_lfsx(sPPEState *ppeState) {
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   const u32 data = MMURead32(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   FPRi(frd).setValue(ConvertToDouble(data));
@@ -1539,7 +1539,7 @@ void PPCInterpreter::PPCInterpreter_lfsux(sPPEState *ppeState) {
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   const u32 data = MMURead32(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   FPRi(frd).setValue(ConvertToDouble(data));
@@ -1561,7 +1561,7 @@ void PPCInterpreter::PPCInterpreter_lfd(sPPEState *ppeState) {
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
   const u64 data = MMURead64(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   FPRi(frd).setValue(data);
@@ -1581,7 +1581,7 @@ void PPCInterpreter::PPCInterpreter_lfdx(sPPEState *ppeState) {
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   const u64 data = MMURead64(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   FPRi(frd).setValue(data);
@@ -1600,7 +1600,7 @@ void PPCInterpreter::PPCInterpreter_lfdu(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + _instr.simm16;
   const u64 data = MMURead64(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   FPRi(frd).setValue(data);
@@ -1620,7 +1620,7 @@ void PPCInterpreter::PPCInterpreter_lfdux(sPPEState *ppeState) {
   const u64 EA = GPRi(ra) + GPRi(rb);
   const u64 data = MMURead64(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   FPRi(frd).setValue(data);
@@ -1642,7 +1642,7 @@ void PPCInterpreter::PPCInterpreter_lfs(sPPEState *ppeState) {
 
   u32 data = MMURead32(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   FPRi(frd).setValue(ConvertToDouble(data));
@@ -1664,7 +1664,7 @@ void PPCInterpreter::PPCInterpreter_lfsu(sPPEState *ppeState) {
   
   u32 data = MMURead32(ppeState, EA);
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   FPRi(frd).setValue(ConvertToDouble(data));
@@ -1704,7 +1704,7 @@ void PPCInterpreter::PPCInterpreter_lvebx(sPPEState *ppeState) {
   LOG_DEBUG(Xenon, "lvebx [EA = {:#x}, eb = {:#x} data = {:#x}]", (u32)EA, eb, data);
 #endif // VXU_LOAD_DEBUG
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   VRi(vd) = vector;
@@ -1737,7 +1737,7 @@ void PPCInterpreter::PPCInterpreter_lvehx(sPPEState *ppeState) {
   LOG_DEBUG(Xenon, "lvehx [EA = {:#x}, eb = {:#x} data = {:#x}]", (u32)EA, eb, data);
 #endif // VXU_LOAD_DEBUG
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   VRi(vd) = vector;
@@ -1771,7 +1771,7 @@ void PPCInterpreter::PPCInterpreter_lvewx(sPPEState *ppeState) {
   LOG_DEBUG(Xenon, "lvewx [EA = {:#x}, eb = {:#x} data = {:#x}]", (u32)EA, eb, data);
 #endif // VXU_LOAD_DEBUG
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   VRi(vd) = vector;
@@ -1794,7 +1794,7 @@ void PPCInterpreter::PPCInterpreter_lvewx128(sPPEState *ppeState) {
   LOG_DEBUG(Xenon, "lvewx128 [EA = {:#x}, eb = {:#x} data = {:#x}]", (u32)EA, eb, data);
 #endif // VXU_LOAD_DEBUG
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   VR(VMX128_1_VD128) = vector;
@@ -1828,7 +1828,7 @@ void PPCInterpreter::PPCInterpreter_lvx(sPPEState *ppeState) {
 #endif // VXU_LOAD_DEBUG
 
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   VRi(vd) = vector;
@@ -1853,7 +1853,7 @@ void PPCInterpreter::PPCInterpreter_lvx128(sPPEState *ppeState) {
     (u32)EA, vrd, vector.dword[0], vector.dword[1], vector.dword[2], vector.dword[3]);
 #endif // VXU_LOAD_DEBUG
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   VR(VMX128_1_VD128) = vector;
@@ -1877,7 +1877,7 @@ void PPCInterpreter::PPCInterpreter_lvxl128(sPPEState *ppeState) {
     (u32)EA, vrd, vector.dword[0], vector.dword[1], vector.dword[2], vector.dword[3]);
 #endif // VXU_LOAD_DEBUG
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   VR(VMX128_1_VD128) = vector;
@@ -1910,7 +1910,7 @@ void PPCInterpreter::PPCInterpreter_lvxl(sPPEState *ppeState) {
     (u32)EA, vrd, vector.dword[0], vector.dword[1], vector.dword[2], vector.dword[3]);
 #endif // VXU_LOAD_DEBUG
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   VRi(vd) = vector;
@@ -1944,7 +1944,7 @@ void PPCInterpreter::PPCInterpreter_lvlx(sPPEState *ppeState) {
     (u32)EA, vector.dword[0], vector.dword[1], vector.dword[2], vector.dword[3]);
 #endif // VXU_LOAD_DEBUG
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   vector.dword[0] = byteswap_be<u32>(vector.dword[0]);
@@ -1991,7 +1991,7 @@ void PPCInterpreter::PPCInterpreter_lvlx128(sPPEState *ppeState) {
     (u32)EA, vector.dword[0], vector.dword[1], vector.dword[2], vector.dword[3]);
 #endif // VXU_LOAD_DEBUG
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   vector.dword[0] = byteswap_be<u32>(vector.dword[0]);
@@ -2047,7 +2047,7 @@ void PPCInterpreter::PPCInterpreter_lvrx(sPPEState *ppeState) {
     (u32)EA, vector.dword[0], vector.dword[1], vector.dword[2], vector.dword[3]);
 #endif // VXU_LOAD_DEBUG
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   vector.dword[0] = byteswap_be<u32>(vector.dword[0]);
@@ -2099,7 +2099,7 @@ void PPCInterpreter::PPCInterpreter_lvrx128(sPPEState *ppeState) {
     (u32)EA, vector.dword[0], vector.dword[1], vector.dword[2], vector.dword[3]);
 #endif // VXU_LOAD_DEBUG
 
-  if (_ex & PPU_EX_DATASEGM || _ex & PPU_EX_DATASTOR)
+  if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
   vector.dword[0] = byteswap_be<u32>(vector.dword[0]);

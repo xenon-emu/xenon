@@ -18,8 +18,8 @@ namespace Xe::XCPU::MMU {
 
     // HID6 16-17 bits select Large Page size 1.
     // HID6 18-19 bits select Large Page size 2.
-    const u8 lb16to17 = (ppeState->SPR.HID6.lb & 0b1100) >> 2;
-    const u8 lb18to19 = ppeState->SPR.HID6.lb & 0b11;
+    const u8 lb16to17 = (ppeState->SPR.HID6.LB & 0b1100) >> 2;
+    const u8 lb18to19 = ppeState->SPR.HID6.LB & 0b11;
 
     // Page size.
     ePageSize pSize = pSize4Kb; // We always default to a 4Kb page size.

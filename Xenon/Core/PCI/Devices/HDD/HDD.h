@@ -17,7 +17,7 @@
 #include <string>
 #include <thread>
 
-#include "Core/PCI/Devices/RAM/RAM.h"
+#include "Core/RAM/RAM.h"
 #include "Core/XCPU/PPU/PPCInternal.h"
 #include "Core/PCI/SATA.h"
 #include "Core/PCI/Bridge/PCIBridge.h"

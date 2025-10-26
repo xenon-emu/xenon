@@ -11,7 +11,7 @@
 #include <thread>
 #include <vector>
 
-#include "Core/PCI/Devices/RAM/RAM.h"
+#include "Core/RAM/RAM.h"
 #include "Core/XGPU/EDRAM.h"
 #include "Core/XGPU/XGPUConfig.h"
 #include "Core/XGPU/XenosRegisters.h"

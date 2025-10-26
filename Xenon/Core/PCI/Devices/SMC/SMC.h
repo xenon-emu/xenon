@@ -15,7 +15,7 @@
 #include "Core/PCI/Bridge/PCIBridge.h"
 #include "Core/PCI/PCIDevice.h"
 
-#include "Core/XCPU/UART/UART.h"
+#include "Core/PCI/Devices/SMC/UART/UART.h"
 
 /*
   Xenon System Management Controller (SMC) Emulation:
@@ -25,7 +25,7 @@
    Clock, DVD tray state, Tilt Status, IR Receiver, Temps, etc...
 
    Since emulating an 8051 core is just adding overhead to the emulator as
-   of now I'm chosing just to do HLE for this.
+   of now I'm choosing just to do HLE for this.
 */
 
 #define SMC_DEV_SIZE 0x100
@@ -92,11 +92,11 @@ enum SMC_PWR_REASON {
   SMC_PWR_REASON_KIOSK =          0x41,  // XSS 7 console powered on by kiosk pin
   SMC_PWR_REASON_WIRELESS =       0x55,  // XSS 8 wireless controller middle button/start button pushed to power on controller and console
   SMC_PWR_REASON_WIRED_F1 =       0x56,  // XSS 9 wired guide button; fat front top USB port, slim front left USB port
-  SMC_PWR_REASON_WIRED_F2 =       0x57,  // XSS A wired guide button; fat front botton USB port, slim front right USB port
+  SMC_PWR_REASON_WIRED_F2 =       0x57,  // XSS A wired guide button; fat front bottom USB port, slim front right USB port
   SMC_PWR_REASON_WIRED_R2 =       0x58,  // XSS B wired guide button; slim back middle USB port
   SMC_PWR_REASON_WIRED_R3 =       0x59, //  XSS C wired guide button; slim back top USB port
   SMC_PWR_REASON_WIRED_R1 =       0x5A //  XSS D wired guide button; fat back USB port, slim back bottom USB port
-  // Possibles/reboot reasons  0x23, 0x2A, 0x42, 0x61, 0x64.
+  // Possible/reboot reasons  0x23, 0x2A, 0x42, 0x61, 0x64.
   // slim with wired controller when horizontal, 3 back usb ports top to bottom
   // 0x59, 0x58, 0x5A front left 0x56, right 0x57. slim with wireless controller
   // w/pnc when horizontal, 3 back usb ports top to bottom 0x55, 0x58, 0x5A

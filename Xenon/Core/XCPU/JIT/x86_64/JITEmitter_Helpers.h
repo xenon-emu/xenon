@@ -31,7 +31,7 @@ using namespace asmjit;
 #define SPRStruct(x) b->threadCtx->substruct(&sPPUThread::SPR).substruct(&sPPUThreadSPRs::x)
 #define SPRPtr(x) b->threadCtx->substruct(&sPPUThread::SPR).scalar(&sPPUThreadSPRs::x)
 #define SharedSPRStruct(x) b->ppeState->substruct(&sPPEState::SPR).substruct(&sPPESPRs::x)
-#define SharedSPRPtr(x) b->ppeState->substruct(&sPPEState::SPR).scalar(&sPPESPRs::x)
+#define SharedSPRPtr(x) b->ppeState->substruct(&sPPEState::SPR).scalar(&sPPUGlobalSPRs::x)
 #define CRValPtr() b->threadCtx->scalar(&sPPUThread::CR)
 #define CIAPtr() b->threadCtx->scalar(&sPPUThread::CIA)
 #define NIAPtr() b->threadCtx->scalar(&sPPUThread::NIA)

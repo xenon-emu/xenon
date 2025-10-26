@@ -11,7 +11,7 @@
 
 #include "XenonSOC.h"
 
-#include "Core/PCI/Devices/RAM/RAM.h"
+#include "Core/RAM/RAM.h"
 #include "Core/RootBus/RootBus.h"
 #include "Core/XCPU/eFuse.h"
 #include "Core/XCPU/Context/Reservations/XenonReservations.h"

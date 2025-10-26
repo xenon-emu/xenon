@@ -103,7 +103,7 @@ bool CallEpilogue(PPU *ppu, sPPEState *ppeState) {
   auto& thread = ppeState->ppuThread[ppeState->currentThread];
   // Check for external interrupts.
   if (thread.SPR.MSR.EE && ppu->xenonContext->xenonIIC.checkExtInterrupt(thread.SPR.PIR)) {
-    thread.exceptReg |= PPU_EX_EXT;
+    thread.exceptReg |= ppuExternalEx;
   }
 
   // Check if exceptions are pending and process them in order.
@@ -209,7 +209,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
     SetupPrologue(jitBuilder.get(), opcode, decodedInstr);
 
     // Check for Instruction storage/segment exceptions.
-    if ((curThread.exceptReg & PPU_EX_INSSTOR || curThread.exceptReg & PPU_EX_INSTSEGM)
+    if ((curThread.exceptReg & ppuInstrStorageEx || curThread.exceptReg & ppuInstrSegmentEx)
       || opcode == 0xFFFFFFFF || opcode == 0xCDCDCDCD) {
       readNextInstr = false;
     }

@@ -26,7 +26,7 @@
 #include "Base/Logging/Log.h"
 #include "Base/Types.h"
 
-#include "Core/PCI/Devices/RAM/RAM.h"
+#include "Core/RAM/RAM.h"
 #include "Core/PCI/Bridge/PCIBridge.h"
 #include "Core/XGPU/Microcode/ASTBlock.h"
 #include "Core/XGPU/PM4Opcodes.h"

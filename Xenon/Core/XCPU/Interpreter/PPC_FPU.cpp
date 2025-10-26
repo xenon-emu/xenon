@@ -91,8 +91,8 @@ inline void FPCheckExceptions(sPPEState *ppeState) {
   if (curThread.FPSCR.FEX && (curThread.SPR.MSR.FE0 || curThread.SPR.MSR.FE1)) {
     // Floating program exceptions are enabled and an exception is pending in
     // Floating Point Enabled Exception Summary bit of FPSCR.
-    curThread.exceptReg |= PPU_EX_PROG;
-    curThread.progExceptionType = PROGRAM_EXCEPTION_TYPE_FPU;
+    curThread.exceptReg |= ppuProgramEx;
+    curThread.progExceptionType = ppuProgExTypeFPU;
   }
 }
 
