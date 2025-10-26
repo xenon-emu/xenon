@@ -8,7 +8,7 @@
 #include <fstream>
 #include <filesystem>
 
-#include "Core/PCI/Devices/RAM/RAM.h"
+#include "Core/RAM/RAM.h"
 #include "Core/PCI/Bridge/PCIBridge.h"
 #include "Core/PCI/PCIDevice.h"
 

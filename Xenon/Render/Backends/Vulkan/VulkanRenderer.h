@@ -28,7 +28,7 @@
 
 #include "Base/Version.h"
 #include "Base/Hash.h"
-#include "Core/PCI/Devices/RAM/RAM.h"
+#include "Core/RAM/RAM.h"
 #include "Core/PCI/PCIe.h"
 #include "Render/Abstractions/Factory/ShaderFactory.h"
 #ifndef TOOL

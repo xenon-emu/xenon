@@ -18,7 +18,7 @@
 #include "Base/Hash.h"
 #include "Base/Types.h"
 
-#include "Core/PCI/Devices/RAM/RAM.h"
+#include "Core/RAM/RAM.h"
 #include "Core/PCI/PCIe.h"
 #include "Core/XGPU/Microcode/ASTBlock.h"
 #include "Core/XGPU/CommandProcessor.h"

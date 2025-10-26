@@ -12,7 +12,7 @@
 #include "Core/PCI/Bridge/HostBridge.h"
 #include "Core/PCI/Bridge/PCIBridge.h"
 #include "Core/PCI/Devices/NAND/NAND.h"
-#include "Core/PCI/Devices/RAM/RAM.h"
+#include "Core/RAM/RAM.h"
 #include "Core/PCI/Devices/AUDIOCTRLLR/AudioController.h"
 #include "Core/PCI/Devices/EHCI/EHCI0.h"
 #include "Core/PCI/Devices/EHCI/EHCI1.h"
