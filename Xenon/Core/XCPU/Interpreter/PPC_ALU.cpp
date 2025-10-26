@@ -507,121 +507,106 @@ void PPCInterpreter::PPCInterpreter_cntlzwx(sPPEState *ppeState) {
 
 // Condition Register AND
 void PPCInterpreter::PPCInterpreter_crand(sPPEState *ppeState) {
-  XL_FORM_BT_BA_BB;
-
-  const u32 a = CR_GET(BA);
-  const u32 b = CR_GET(BB);
+  const u32 a = CR_GET(_instr.crba);
+  const u32 b = CR_GET(_instr.crbb);
 
   const u32 crAnd = a & b;
 
   if (crAnd & 1)
-    BSET(curThread.CR.CR_Hex, 32, BT);
+    BSET(curThread.CR.CR_Hex, 32, _instr.crbd);
   else
-    BCLR(curThread.CR.CR_Hex, 32, BT);
+    BCLR(curThread.CR.CR_Hex, 32, _instr.crbd);
 }
 
 // Condition Register AND with Complement
 void PPCInterpreter::PPCInterpreter_crandc(sPPEState *ppeState) {
-  XL_FORM_BT_BA_BB;
-
-  const u32 a = CR_GET(BA);
-  const u32 b = CR_GET(BB);
+  const u32 a = CR_GET(_instr.crba);
+  const u32 b = CR_GET(_instr.crbb);
 
   const u32 crAndc = a & (1 ^ b);
 
   if (crAndc & 1)
-    BSET(curThread.CR.CR_Hex, 32, BT);
+    BSET(curThread.CR.CR_Hex, 32, _instr.crbd);
   else
-    BCLR(curThread.CR.CR_Hex, 32, BT);
+    BCLR(curThread.CR.CR_Hex, 32, _instr.crbd);
 }
 
 // Condition Register Equivalent
 void PPCInterpreter::PPCInterpreter_creqv(sPPEState *ppeState) {
-  XL_FORM_BT_BA_BB;
-
-  const u32 a = CR_GET(BA);
-  const u32 b = CR_GET(BB);
+  const u32 a = CR_GET(_instr.crba);
+  const u32 b = CR_GET(_instr.crbb);
 
   const u32 crEqv = 1 ^ (a ^ b);
 
   if (crEqv & 1)
-    BSET(curThread.CR.CR_Hex, 32, BT);
+    BSET(curThread.CR.CR_Hex, 32, _instr.crbd);
   else
-    BCLR(curThread.CR.CR_Hex, 32, BT);
+    BCLR(curThread.CR.CR_Hex, 32, _instr.crbd);
 }
 
 // Condition Register NAND
 void PPCInterpreter::PPCInterpreter_crnand(sPPEState *ppeState) {
-  XL_FORM_BT_BA_BB;
-
-  const u32 a = CR_GET(BA);
-  const u32 b = CR_GET(BB);
+  const u32 a = CR_GET(_instr.crba);
+  const u32 b = CR_GET(_instr.crbb);
 
   const u32 crNand = 1 ^ (a & b);
 
   if (crNand & 1)
-    BSET(curThread.CR.CR_Hex, 32, BT);
+    BSET(curThread.CR.CR_Hex, 32, _instr.crbd);
   else
-    BCLR(curThread.CR.CR_Hex, 32, BT);
+    BCLR(curThread.CR.CR_Hex, 32, _instr.crbd);
 }
 
 // Condition Register NOR
 void PPCInterpreter::PPCInterpreter_crnor(sPPEState *ppeState) {
-  XL_FORM_BT_BA_BB;
-
-  const u32 a = CR_GET(BA);
-  const u32 b = CR_GET(BB);
+  const u32 a = CR_GET(_instr.crba);
+  const u32 b = CR_GET(_instr.crbb);
 
   const u32 crNor = 1 ^ (a | b);
 
   if (crNor & 1)
-    BSET(curThread.CR.CR_Hex, 32, BT);
+    BSET(curThread.CR.CR_Hex, 32, _instr.crbd);
   else
-    BCLR(curThread.CR.CR_Hex, 32, BT);
+    BCLR(curThread.CR.CR_Hex, 32, _instr.crbd);
 }
 
 // Condition Register OR
 void PPCInterpreter::PPCInterpreter_cror(sPPEState *ppeState) {
-  XL_FORM_BT_BA_BB;
-  const u32 a = CR_GET(BA);
-  const u32 b = CR_GET(BB);
+  const u32 a = CR_GET(_instr.crba);
+  const u32 b = CR_GET(_instr.crbb);
 
   const u32 crOr = a | b;
 
   if (crOr & 1)
-    BSET(curThread.CR.CR_Hex, 32, BT);
+    BSET(curThread.CR.CR_Hex, 32, _instr.crbd);
   else
-    BCLR(curThread.CR.CR_Hex, 32, BT);
+    BCLR(curThread.CR.CR_Hex, 32, _instr.crbd);
 }
 
 // Condition Register OR with Complement
 void PPCInterpreter::PPCInterpreter_crorc(sPPEState *ppeState) {
-  XL_FORM_BT_BA_BB;
-
-  const u32 a = CR_GET(BA);
-  const u32 b = CR_GET(BB);
+  const u32 a = CR_GET(_instr.crba);
+  const u32 b = CR_GET(_instr.crbb);
 
   const u32 crOrc = a | (1 ^ b);
 
   if (crOrc & 1)
-    BSET(curThread.CR.CR_Hex, 32, BT);
+    BSET(curThread.CR.CR_Hex, 32, _instr.crbd);
   else
-    BCLR(curThread.CR.CR_Hex, 32, BT);
+    BCLR(curThread.CR.CR_Hex, 32, _instr.crbd);
 }
 
 // Condition Register XOR
 void PPCInterpreter::PPCInterpreter_crxor(sPPEState *ppeState) {
-  XL_FORM_BT_BA_BB;
-
-  const u32 a = CR_GET(BA);
-  const u32 b = CR_GET(BB);
+  const u32 a = CR_GET(_instr.crba);
+  const u32 b = CR_GET(_instr.crbb);
 
   const u32 crXor = a ^ b;
 
   if (crXor & 1)
-    BSET(curThread.CR.CR_Hex, 32, BT);
+    BSET(curThread.CR.CR_Hex, 32, _instr.crbd);
   else
-    BCLR(curThread.CR.CR_Hex, 32, BT);
+    BCLR(curThread.CR.CR_Hex, 32, _instr.crbd);
 }
 
 // Divide Double Word (x'7C00 03D2')

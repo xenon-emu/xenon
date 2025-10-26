@@ -18,11 +18,9 @@ void PPCInterpreter::PPCInterpreter_eieio(sPPEState *ppeState) {
 
 // System Call
 void PPCInterpreter::PPCInterpreter_sc(sPPEState *ppeState) {
-  SC_FORM_LEV;
-
   // Raise the exception.
   _ex |= PPU_EX_SC;
-  curThread.exceptHVSysCall = LEV & 1;
+  curThread.exceptHVSysCall = _instr.lev & 1;
 }
 
 // SLB Move To Entry
