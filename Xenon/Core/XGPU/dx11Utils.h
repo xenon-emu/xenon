@@ -1,0 +1,147 @@
+#pragma once
+
+#include <Windows.h>
+#include <d3d11.h>
+#include <d3dcompiler.h>
+
+#include "Base/Types.h"
+#include "Base/Logging/Log.h"
+
+//-----------------
+
+// helper class for compute shaders
+class CDX11ComputeShader
+{
+public:
+	CDX11ComputeShader( const char* name );
+	~CDX11ComputeShader();
+
+	// get shader object
+	inline ID3D11ComputeShader* GetShader() const { return m_shader; }
+
+	// get name of the shader
+	inline const char* GetName() const { return m_name; }
+
+	// load shader from provided data buffer
+	bool Load( ID3D11Device* dev, const void* data, const u32 dataSize );
+
+private:
+	ID3D11ComputeShader*	m_shader;
+	const char*				m_name;
+};
+
+//-----------------
+
+// helper class for geometry shaders
+class CDX11GeometryShader
+{
+public:
+	CDX11GeometryShader(const char* name);
+	~CDX11GeometryShader();
+
+	// get shader object
+	inline ID3D11GeometryShader* GetShader() const { return m_shader; }
+
+	// get name of the shader
+	inline const char* GetName() const { return m_name; }
+
+	// load shader from provided data buffer
+	bool Load(ID3D11Device* dev, const void* data, const u32 dataSize);
+
+private:
+	ID3D11GeometryShader*	m_shader;
+	const char*				m_name;
+};
+
+//-----------------
+
+// helper class with parameters
+class CDX11ConstantBuffer
+{
+public:
+	CDX11ConstantBuffer( void* dataPtr, const u32 dataSize );
+	~CDX11ConstantBuffer();
+
+	// create the buffer
+	bool Create( ID3D11Device* dev );
+
+	// get bindable buffer, will upload content if buffer content changed
+	ID3D11Buffer** GetBufferForBinding( ID3D11DeviceContext* context );
+
+protected:
+	bool					m_modified;
+
+private:
+	ID3D11Buffer*			m_buffer;
+
+	void*					m_dataPtr;
+	u32					m_dataSize;
+
+	bool FlushChanges( ID3D11DeviceContext* context );
+};
+
+//-----------------
+
+// helper template that wraps CPU side structure with constant buffer support
+template< typename T >
+class TDX11ConstantBuffer : public CDX11ConstantBuffer
+{
+public:
+	TDX11ConstantBuffer()
+		: CDX11ConstantBuffer( &m_data, sizeof(m_data) )
+	{
+	}
+
+	inline T& Get()
+	{
+		m_modified = true;
+		return m_data;
+	}
+
+	inline const T& Get() const 
+	{
+		return m_data;
+	}
+
+private:
+	T	m_data;
+};
+
+//-----------------
+
+/// Ring buffer for index data
+class CDX11BufferRing
+{
+public:
+	CDX11BufferRing( ID3D11Device* dev, ID3D11DeviceContext* context, const u32 size );
+	~CDX11BufferRing();
+
+	struct AllocInfo
+	{
+		u32	m_generation;
+		u32	m_offset;
+		u32	m_size;
+	};
+
+	// acquire memory 
+	void* Acquire( u32 size, u32 alignment, AllocInfo& outAlloc );
+
+	// commit acquired memory
+	void Commit( void* memory );
+
+	// get buffer
+	inline ID3D11Buffer* GetBuffer() const { return m_buffer; }
+
+private:
+	ID3D11Device*			m_device;
+	ID3D11DeviceContext*	m_context;
+
+	ID3D11Buffer*			m_buffer;
+	u32					m_pos;
+	u32					m_size;
+
+	u32					m_generation;
+	bool					m_isMapped;
+};
+
+//-----------------

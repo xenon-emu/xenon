@@ -84,6 +84,9 @@ if (Config::log.debugOnly)                                                      
   Base::Log::FmtLogMessage(Base::Log::Class::logClass, Base::Log::Level::Guest,          \
                            Base::Log::TrimSourcePath(__FILE__), __LINE__, __func__,      \
                            __VA_ARGS__)
+
+#define DEBUG_CHECK(x) if (!(x)) { printf( "Debug check failed, %s(%d)\n", __FILE__, __LINE__ ); }
+
 #else
 
 #include <format>
