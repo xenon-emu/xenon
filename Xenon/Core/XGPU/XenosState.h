@@ -88,6 +88,10 @@ public:
 
   // CP Pointer
   CommandProcessor *commandProcessor = nullptr;
+  u32 cpRBBase = 0;
+  u32 cpRBCntl = 0;
+  u32 cpWriteBackPtr = 0;
+  u32 cpRBWritePtr = 0;
 
   // Primary surface
   u32 fbSurfaceAddress = XE_FB_BASE;

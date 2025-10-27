@@ -13,9 +13,9 @@
 #include "Base/PathUtil.h"
 #include "Base/Logging/Log.h"
 
-#ifdef _DEBUG
+//#ifdef _DEBUG
 #define XE_DEBUG
-#endif
+//#endif
 
 Xe::Xenos::XGPU::XGPU(Render::Renderer *renderer, RAM *ram, PCIBridge *pciBridge) :
   render(renderer),
@@ -112,6 +112,8 @@ Xe::Xenos::XGPU::XGPU(Render::Renderer *renderer, RAM *ram, PCIBridge *pciBridge
   xenosState->commandProcessor = commandProcessor.get(); // CP expects xenosState, xenosState expects CP, this fixes it.
 
   xeVSyncWorkerThread = std::thread(&XGPU::xeVSyncWorkerThreadLoop, this);
+
+  xenonGPU = std::make_unique<STRIP_UNIQUE(xenonGPU)>(ramPtr, pciBridge);
 }
 
 Xe::Xenos::XGPU::~XGPU() {
@@ -150,6 +152,7 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
   return false;
 }
 
+bool go = 1;
 bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
   std::lock_guard lck(mutex);
   if (IsAddressMappedInBAR(static_cast<u32>(writeAddress))) {
@@ -159,6 +162,16 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
     u32 value = 0;
     memcpy(&value, data, size);
     xenosState->WriteRegister(reg, value);
+
+    xenonGPU.get()->WriteWord(value, writeAddress);
+
+    if (reg == XeRegister::CP_RB_BASE && value != 0 && xenosState.get()->cpRBCntl != 0) {
+      if (go) {
+        go = false;
+        xenonGPU.get()->Initialize(ramPtr->GetPointerToAddress(byteswap_be<u32>(value)), xenosState.get()->cpRBCntl & 0x3F);
+      }
+    }
+
 #ifdef XE_DEBUG
     // Silence VBLank interrupt related registers.
     if (reg != XeRegister::D1MODE_VBLANK_STATUS
@@ -270,7 +283,7 @@ void Xe::Xenos::XGPU::xeVSyncWorkerThreadLoop() {
     // Should be a 60Hz (16.6ms) timer, for testing purposes and because we're currently too slow we're setting up to 1s.
     // This actually controls the frequency in wich the kernel does Back -> Front buffer VdSwap commands, so by changing 
     // this we effectively can control the refresh rate of the emulated console (as long as the system runs fast enough). 
-    if (timerNow >= timerStart + 1s && (xenosState.get()->d1modeIntMask & 0x40000011)) {
+    if (timerNow >= timerStart + 250ms && (xenosState.get()->d1modeIntMask & 0x40000011)) {
       // Set  VBLANK Pending
       xenosState.get()->vblankVlineStatus |= 0x11000100; // Hardware dump shows this (byteswapped) value at interrupt time.
       xenosState.get()->d1modeIntMask &= ~0x40000011;
