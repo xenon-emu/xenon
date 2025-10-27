@@ -18,6 +18,8 @@
 #include "Core/XGPU/CommandProcessor.h"
 #include "Core/PCI/PCIe.h"
 
+#include "Core/XGPU/xenonGPU.h"
+
 /*
  *	XGPU.h Basic Xenos implementation.
  */
@@ -94,6 +96,8 @@ private:
   // Should fire an interrupt to a given CPU every time a vertical sync event happens.
   // Normally this is the spped of the display's refresh rate.
   void xeVSyncWorkerThreadLoop();
+
+  std::unique_ptr<CXenonGPU> xenonGPU = {};
 };
 } // namespace Xenos
 } // namespace Xe
