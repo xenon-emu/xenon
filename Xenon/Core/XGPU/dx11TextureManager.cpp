@@ -1042,9 +1042,6 @@ CDX11AbstractTexture* CDX11TextureManager::GetTexture(const u32 baseAddress, con
 {
 	TScopeLock lock(m_lock);
 
-	// ensure the address is a GPU address
-	DEBUG_CHECK((baseAddress & 0xF0000000) == 0);
-
 	// look in existing textures
 	// TODO: this is ultra lame
 	for (auto* ptr : m_textures)
