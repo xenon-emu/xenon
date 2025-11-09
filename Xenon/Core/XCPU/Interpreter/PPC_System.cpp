@@ -445,10 +445,6 @@ void PPCInterpreter::PPCInterpreter_mfmsr(sPPEState *ppeState) {
 // Move To Machine State Register
 void PPCInterpreter::PPCInterpreter_mtmsr(sPPEState *ppeState) {
   curThread.SPR.MSR.hexValue = GPRi(rs);
-
-  // Check for 32-bit mode of operation
-  if (!curThread.SPR.MSR.SF)
-    curThread.NIA = static_cast<u32>(curThread.NIA);
 }
 
 // Move To Machine State Register Doubleword
@@ -487,10 +483,6 @@ void PPCInterpreter::PPCInterpreter_mtmsrd(sPPEState *ppeState) {
     // MSR59 = (RS)59 | (RS)49
     curThread.SPR.MSR.DR = (regRS & 0x10) || (regRS & 0x4000) ? 1 : 0;
   }
-
-  // Check for 32-bit mode of operation.
-  if (!curThread.SPR.MSR.SF)
-    curThread.NIA = static_cast<u32>(curThread.NIA);
 }
 
 // Synchronize
