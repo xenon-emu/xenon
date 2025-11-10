@@ -157,10 +157,27 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
     thread.instrFetch = true;
     uPPCInstr op{ PPCInterpreter::MMURead32(ppeState, thread.CIA) };
     thread.instrFetch = false;
-    if (curThread.exceptReg & ppuInstrStorageEx || curThread.exceptReg & ppuInstrSegmentEx & instrCount != 0) {
-      LOG_DEBUG(Xenon, "***WARNING*** JIT Instr Exception when creating block when instrCount !=0. CIA {:#x},"
-        "InstrCount = {:#d}", thread.CIA, instrCount);
+
+    // Check for Instruction storage/segment exceptions. If found we must end the block.
+    if (curThread.exceptReg & ppuInstrStorageEx || curThread.exceptReg & ppuInstrSegmentEx) {
+      LOG_DEBUG(Xenon, "[JIT]: Instruction exception when creating block at CIA {:#x}, block start address {:#x}, instruction count {:#x}", 
+        thread.CIA, blockStartAddress, instrCount);
+
+      if (instrCount != 0) {
+        // We're a few instructions into the block, just end the block on the last instruction and start a new block on
+        // the faulting instruction. It will process the exception accordingly.
+        // We clear the exception condition or else the exception handler will run on the first instruction of last the 
+        // compiled block.
+        thread.exceptReg &= ~(ppuInstrStorageEx | ppuInstrSegmentEx);
+        break;
+      } else {
+        // Manually process the pending exceptions.
+        ppu->PPUCheckExceptions();
+        // Return from block creation. Next block will be one the handlers for instruction exceptions.
+        return nullptr;
+      }
     }
+
     u32 opcode = op.opcode;
     instrsTemp.push_back(opcode);
 
@@ -346,7 +363,7 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
     if (it == jitBlocksCache.end()) {
       // Block was not found. Attempt to create a new one.
       auto block = BuildJITBlock(blockStartAddress, numInstrs - instrsExecuted);
-      if (!block) { break; } // Block build attempt failed.
+      if (!block) { continue; } // Block build attempt failed.
 
       // Execute our block and increse executed instructions.
       block->codePtr(ppu, ppeState, enableHalt);

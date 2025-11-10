@@ -23,7 +23,7 @@
 #include "Core/XCPU/PPU/PowerPC.h"
 #include "Core/RootBus/RootBus.h"
 
-//#define JIT_DEBUG
+#define JIT_DEBUG
 
 class PPU;
 using JITFunc = fptr<void(PPU*, sPPEState*, bool)>;
