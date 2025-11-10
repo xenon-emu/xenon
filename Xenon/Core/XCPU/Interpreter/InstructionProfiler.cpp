@@ -259,9 +259,9 @@ void InstructionProfiler::DumpTopLS(size_t topN) const noexcept {
 
 void InstructionProfiler::DumpInstrCounts(eInstrProfileDumpType dumpType, size_t topN) {
   if(dumpType & ALU) { DumpTopALU(topN); }
-  if(dumpType & VXU) { DumpTopALU(topN); }
-  if(dumpType & FPU) { DumpTopALU(topN); }
-  if(dumpType & LS) { DumpTopALU(topN); }
+  if(dumpType & VXU) { DumpTopVXU(topN); }
+  if(dumpType & FPU) { DumpTopFPU(topN); }
+  if(dumpType & LS) { DumpTopLS(topN); }
 }
 
 } // namespace PPCInterpreter

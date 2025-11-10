@@ -141,7 +141,7 @@ void PPCInterpreter::ppcExecuteSingleInstruction(sPPEState *ppeState) {
 
   // If enabled dumps the ALU instr counts.
   if (dumpInstrCount && ppeState->ppuName == "PPU0") {
-    InstructionProfiler::Get().DumpInstrCounts(eInstrProfileDumpType::ALU);
+    InstructionProfiler::Get().DumpInstrCounts(eInstrProfileDumpType::All);
     dumpInstrCount = false;
   }
 
