@@ -38,12 +38,12 @@ CDX11RenderingWindow::CDX11RenderingWindow()
 
 	// wait for window being created
 	WaitForSingleObject( m_hSync, INFINITE );
-	printf( "DX11: Rendering window created, HWND=0x%08X", m_hWnd );
+	printf( "DX11: Rendering window created, HWND=0x%08X\n", m_hWnd );
 }
 
 CDX11RenderingWindow::~CDX11RenderingWindow()
 {
-	printf( "DX11: Closing window" );
+	printf( "DX11: Closing window\n" );
 
 	// close only if the window's there
 	if ( m_hWnd )
@@ -55,17 +55,17 @@ CDX11RenderingWindow::~CDX11RenderingWindow()
 		PostMessage( m_hWnd, WM_USER + 666, 0, 0 );
 	
 		// wait for window to close
-		printf( "DX11: Waiting for window to close..." );
+		printf( "DX11: Waiting for window to close...\n" );
 		WaitForSingleObject( m_hSync, INFINITE );
 	}
 
 	// wait for the window thread to finish
 	if ( m_hThread )
 	{
-		printf( "DX11: Waiting for window thread to finish..." );
+		printf( "DX11: Waiting for window thread to finish...\n" );
 		if ( WAIT_TIMEOUT == WaitForSingleObject( m_hThread, 2000 ) )
 		{
-			printf( "DX11: Window thread failed to close after 2s, killing it" );
+			printf( "DX11: Window thread failed to close after 2s, killing it\n" );
 			TerminateThread( m_hThread, 0 );
 		}
 
@@ -79,7 +79,7 @@ CDX11RenderingWindow::~CDX11RenderingWindow()
 	m_hSync = NULL;
 
 	// final message
-	printf( "DX11: Window closed" );
+	printf( "DX11: Window closed\n" );
 }
 
 DWORD CDX11RenderingWindow::ThreadProc( LPVOID lpParameter )
@@ -90,18 +90,18 @@ DWORD CDX11RenderingWindow::ThreadProc( LPVOID lpParameter )
 	Base::SetThreadName( GetCurrentThread(), "Window Thread");
 
 	// thread started
-	printf( "DX11: Window thread started" );
+	printf( "DX11: Window thread started\n" );
 
 	// create window
-	if ( !obj->CreateThreadWindow( "Xenon Recompiler by Dex (C) 2014-2015", 1280, 720 ) )
+	if ( !obj->CreateThreadWindow( "Xenon Emulator - DX11 Backend", 1280, 720 ) )
 	{
-		printf( "DX11: Failed to create rendering window" );
-		printf("Requested User Exit");
+		printf( "DX11: Failed to create rendering window\n" );
+		printf("Requested User Exit\n");
 		return 0;
 	}
 
 	// signal initialization
-	printf( "DX11: Window thread created the window" );
+	printf( "DX11: Window thread created the window\n" );
 	SetEvent( obj->m_hSync );
 
 	// process window messages
@@ -111,7 +111,7 @@ DWORD CDX11RenderingWindow::ThreadProc( LPVOID lpParameter )
 		// magic
 		if ( msg.message == (WM_USER + 666) )
 		{
-			printf( "DX11: Window received internal close request" );
+			printf( "DX11: Window received internal close request\n" );
 			PostQuitMessage( 0 );
 			continue;
 		}
@@ -122,17 +122,17 @@ DWORD CDX11RenderingWindow::ThreadProc( LPVOID lpParameter )
 	}
 
 	// request to exit app now
-	printf("Requested User Exit");
+	printf("Requested User Exit\n");
 
 	// close the window
 	DestroyWindow( obj->m_hWnd );
 
 	// signal initialization
-	printf( "DX11: Window thread closed the window" );
+	printf( "DX11: Window thread closed the window\n" );
 	SetEvent( obj->m_hSync );
 
 	// exit
-	printf( "DX11: Window thread finished" );
+	printf( "DX11: Window thread finished\n" );
 	return 0;
 }
 
@@ -207,7 +207,7 @@ LRESULT CDX11RenderingWindow::HandleMessage( UINT uMsg, WPARAM wParam, LPARAM lP
 		case WM_CLOSE:
 		{
 			// Floating windows cannot be closed like this
-			printf("Requested User Exit");
+			printf("Requested User Exit\n");
 			DestroyWindow( m_hWnd );
 			return 0;
 		}
@@ -218,7 +218,7 @@ LRESULT CDX11RenderingWindow::HandleMessage( UINT uMsg, WPARAM wParam, LPARAM lP
 			// hack
 			if ( wParam == VK_ESCAPE )
 			{
-				printf("Requested User Exit");
+				printf("Requested User Exit\n");
 			}
 			break;
 		}

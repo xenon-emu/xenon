@@ -41,6 +41,8 @@
 
 //-----------
 
+bool doFrameSwap = false;
+
 CXenonGPUExecutor::CXenonGPUExecutor(IXenonGPUAbstractLayer* abstractionLayer, RAM* ramPtr, PCIBridge* pciBridgePtr)
 	: m_abstractLayer(abstractionLayer)
 	, m_tiledMask(0xFFFFFFFFull)
@@ -49,7 +51,7 @@ CXenonGPUExecutor::CXenonGPUExecutor(IXenonGPUAbstractLayer* abstractionLayer, R
 	, m_vblankCounter(0)
 	, m_interruptAddr(0)
 	, m_interruptUserData(0)
-	, m_traceDumpRequested(true)
+	, m_traceDumpRequested(false)
 	, m_traceDumpFile(nullptr)
 	, m_logWriter(nullptr)
 	, ram(ramPtr)
@@ -368,6 +370,11 @@ bool CXenonGPUExecutor::ExecutePacketType3(CXenonGPUCommandBufferReader& reader,
 	// check read validity
 	const CFullReadCheck readerCheck(reader, count);
 
+	if (doFrameSwap) {
+		doSwap();
+		doFrameSwap = false;
+	}
+
 	// process opcode
 	switch (opcode)
 	{
@@ -503,7 +510,6 @@ bool CXenonGPUExecutor::ExecutePacketType3_INTERRUPT(CXenonGPUCommandBufferReade
 
 	LOG_DEBUG(Xenos, "[CP]: Executing Packet3 INTERRUPT. CPU Mask {:#x}", cpuMask);
 	pciBridge->RouteInterrupt(PRIO_XPS, cpuMask);
-	doSwap();
 	return true;
 }
 
@@ -1339,7 +1345,7 @@ void CXenonGPUExecutor::WriteRegister(const u32 registerIndex, const u32 registe
 		return;
 	}
 	if (registerIndex >= 0x4800 && registerIndex <= 0x5000) {
-		printf("GPU: Writing Constant to reg 0x%08X, data = 0x%08X\n", registerIndex, registerData);
+		//printf("GPU: Writing Constant to reg 0x%08X, data = 0x%08X\n", registerIndex, registerData);
 	}
 	// Direct write
 	if (registerData != m_registers[registerIndex].m_dword)

@@ -74,9 +74,6 @@ void CXenonGPU::WriteWord( const u32 val, const u32 addr)
 	{
 		u32 newWriteAddress = (const u32) val;
 		newWriteAddress = byteswap_be<u32>(newWriteAddress);
-		if (newWriteAddress >= 8100) {
-			printf("Hit");
-		}
 		m_commandBuffer.AdvanceWriteIndex( newWriteAddress ); // this allows GPU to read stuff
 	}
 	else if (regIndex == 0x70C) { // Command Processor Writeback Pointer

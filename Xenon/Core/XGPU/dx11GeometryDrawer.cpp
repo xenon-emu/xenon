@@ -80,11 +80,11 @@ CDX11GeometryDrawer::CDX11GeometryDrawer( ID3D11Device* dev, ID3D11DeviceContext
 
 	// create shader cache
 	m_shaderCache = new CDX11ShaderCache( dev );
-	m_shaderCache->SetDumpPath( L"Q://shaderdump//" );
+	m_shaderCache->SetDumpPath( L"C://Users//Yeimik//AppData//Roaming//Xenon//shaderdump//" );
 
 	// create microcode cache
 	m_microcodeCache = new CDX11MicrocodeCache();
-	m_microcodeCache->SetDumpPath( L"Q://shaderdump//" );
+	m_microcodeCache->SetDumpPath( L"C://Users//Yeimik//AppData//Roaming//Xenon//shaderdump//" );
 
 	// create constant buffer
 	m_vertexViewportState.Create( dev );

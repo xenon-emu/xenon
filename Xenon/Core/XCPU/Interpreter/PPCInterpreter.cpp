@@ -14,6 +14,7 @@ using namespace PPCInterpreter;
 // Forward Declaration
 Xe::XCPU::XenonContext* PPCInterpreter::xenonContext = nullptr;
 PPCInterpreter::PPCDecoder PPCInterpreter::ppcDecoder{};
+extern bool doFrameSwap;
 
 // Interpreter Single Instruction Processing.
 void PPCInterpreter::ppcExecuteSingleInstruction(sPPEState *ppeState) {
@@ -80,6 +81,9 @@ void PPCInterpreter::ppcExecuteSingleInstruction(sPPEState *ppeState) {
   // VdSwap Call. 2.0.17489.0
   if (static_cast<u32>(thread.CIA) == 0x800F8E20) {
     LOG_INFO(Xenon, "*** VdSwap ***");
+    if (doFrameSwap == false) {
+      doFrameSwap = true;
+    }
   }
 
   // Pretend ARGON hardware is present, to avoid the call
@@ -97,7 +101,7 @@ void PPCInterpreter::ppcExecuteSingleInstruction(sPPEState *ppeState) {
   // Skip bootanim (for now).
   if (static_cast<u32>(thread.CIA) == 0x80081EA4) {
     LOG_INFO(Xenon, "Skipping bootanim load.");
-    //thread.GPR[3] = 0;
+    thread.GPR[3] = 0;
   }
 
   if (static_cast<u32>(thread.CIA) == 0x800FC288) {
