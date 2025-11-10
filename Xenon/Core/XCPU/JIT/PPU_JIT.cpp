@@ -458,9 +458,19 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
     // So, these will break under BuildJITBlock, and to avoid the issue, it's done here
     bool skipBlock = false;
     switch (thread.NIA) {
+<<<<<<< HEAD
       // XDK 17.489.0 AudioChipCorder Device Detect bypass. This is not needed for
       // older console revisions
     case 0x801AF580:
+=======
+      // INIT_POWER_MODE bypass 2.0.17489.0
+    case 0x80081764:
+      // XDK 17.489.0 AudioChipCorder Device Detect bypass. This is not needed for
+      // older console revisions
+    case 0x801AF580:
+      // XamSetPowerMode call to KeSetPowerMode bypass.
+    case 0x817AC968:
+>>>>>>> e0822bb (Jit Fixes (#119))
       skipBlock = true;
       break;
     default:

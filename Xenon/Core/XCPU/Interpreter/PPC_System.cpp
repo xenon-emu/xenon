@@ -501,7 +501,7 @@ void PPCInterpreter::PPCInterpreter_mtspr(sPPEState *ppeState) {
     ppeState->SPR.TB.TBL = (GPRi(rd) & 0xFFFFFFFF);
     break;
   case eXenonSPR::TBUWO:
-    ppeState->SPR.TB.TBU = (GPRi(rd) & 0xFFFFFFFF);
+    ppeState->SPR.TB.TBU = ((GPRi(rd) >> 32) & 0xFFFFFFFF);
     break;
   case eXenonSPR::HSPRG0:
     curThread.SPR.HSPRG0 = GPRi(rd);

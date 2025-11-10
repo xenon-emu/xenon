@@ -94,7 +94,7 @@ namespace PPCInterpreter {
   }
 
   InstructionProfiler::InstructionProfiler() noexcept {
-    // No initialization required para el mapa dinámico.
+    // No initialization required para el mapa dinï¿½mico.
   }
 
   InstructionProfiler::~InstructionProfiler() = default;
