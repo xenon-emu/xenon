@@ -845,19 +845,9 @@ void PPCInterpreter::PPCInterpreter_mftb(sPPEState *ppeState) {
   */
 
   const u32 spr = (_instr.spr >> 5) | ((_instr.spr & 0x1f) << 5);
-
-  switch (spr) {
-  case TBLRO:
+  if (spr == TBLRO) {
     GPRi(rd) = ppeState->SPR.TB.TBL;
-    break;
-  case TBURO:
-    GPRi(rd) = ppeState->SPR.TB.TBU;
-    break;
-
-  default:
-    LOG_CRITICAL(Xenon, "MFTB -> Illegal instruction form!");
-    break;
-  }
+  } else { GPRi(rd) = ppeState->SPR.TB.TBU; }
 }
 
 // Move From One Condition Register Field

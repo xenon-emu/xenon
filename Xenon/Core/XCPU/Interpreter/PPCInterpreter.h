@@ -13,9 +13,12 @@
 #include "Core/RootBus/RootBus.h"
 #include "Core/XCPU/PPU/PowerPC.h"
 
+//#define ENABLE_INSTRUCTION_PROFILER // Enables instruction profiling code.
+
 namespace PPCInterpreter {
 
 extern PPCInterpreter::PPCDecoder ppcDecoder;
+
 extern Xe::XCPU::XenonContext *xenonContext;
 
 //

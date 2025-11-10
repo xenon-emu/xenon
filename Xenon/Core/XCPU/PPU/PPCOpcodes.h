@@ -593,6 +593,8 @@ extern void PPCInterpreterJIT_cmpi(sPPEState *ppeState, JITBlockBuilder *b, uPPC
 extern void PPCInterpreterJIT_cmpl(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_cmpli(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_cntlzdx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_extsbx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_extswx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_mfspr(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_mfocrf(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_mulldx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);

@@ -115,6 +115,8 @@ namespace PPCInterpreter {
       //{ 0x338, GETRC(srawi) },
       { 0x33A, GETRC(sradi) },
       { 0x33B, GETRC(sradi) },
+      { 0x3BA, GETRC(extsb) },
+      { 0x3DA, GETRC(extsw) },
     });
 #endif // defined ARCH_X86 || ARCH_X86_64
 

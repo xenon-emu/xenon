@@ -97,6 +97,8 @@ public:
 
   // Get ppeState
   sPPEState *GetPPUState() { return ppeState.get(); }
+  // Get ppuJIT
+  PPU_JIT *GetPPUJIT() { return ppuJIT.get(); }
 
   // Load a elf image from host memory. Copies into RAM
   // Returns entrypoint
@@ -168,7 +170,7 @@ private:
   std::unique_ptr<PPU_JIT> ppuJIT;
   friend class PPU_JIT;
   // Function call epilogue.
-  friend bool CallEpilogue(PPU *ppu, sPPEState *ppeState);
+  friend bool InstrEpilogue(PPU *ppu, sPPEState *ppeState);
 
   //
   // Helpers

@@ -286,8 +286,8 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
   // Start Profile
   MICROPROFILE_SCOPEI("[Xe::PPU]", "PPURunInstructions", MP_AUTO);
   for (size_t instrCount = 0; instrCount < numInstrs && ppuThreadActive; ++instrCount) {
-    // Halt if needed before executing the instruction
-    if (enableHalt && ppuHaltOn == curThread.CIA) {
+    // Halt if needed before executing the next instruction
+    if (enableHalt && ppuHaltOn == curThread.NIA) {
       Halt();
     }
 
