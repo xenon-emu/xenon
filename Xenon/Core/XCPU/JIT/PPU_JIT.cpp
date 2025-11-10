@@ -28,8 +28,116 @@ PPU_JIT::PPU_JIT(PPU *ppu) :
 
 // Destructor
 PPU_JIT::~PPU_JIT() {
+  std::lock_guard<std::mutex> lock(jitCacheMutex);
   for (auto &[hash, block] : jitBlocksCache)
     block.reset();
+  jitBlocksCache.clear();
+  pageBlockIndex.clear();
+  blockPageList.clear();
+}
+
+void PPU_JIT::RegisterBlockPages(u64 blockStart, u64 blockSize) {
+  constexpr u64 pageSize = 4096ULL;
+  if (blockSize == 0) return;
+
+  u64 pageCount = (blockSize + pageSize - 1) / pageSize;
+  u64 firstPage = blockStart & ~(pageSize - 1ULL);
+
+  std::lock_guard<std::mutex> lock(jitCacheMutex);
+  std::vector<u64> pages;
+  pages.reserve(static_cast<size_t>(pageCount));
+  for (u64 i = 0; i < pageCount; ++i) {
+    u64 pageBase = firstPage + i * pageSize;
+    pageBlockIndex[pageBase].insert(blockStart);
+    pages.push_back(pageBase);
+  }
+  blockPageList[blockStart] = std::move(pages);
+
+#ifdef JIT_DEBUG
+  LOG_DEBUG(Xenon, "[JIT]: Registered block {:#x} size {:#x} -> pages: {:#x}..{:#x}", blockStart, blockSize,
+            firstPage, firstPage + pageCount * pageSize - 1);
+#endif
+}
+
+void PPU_JIT::UnregisterBlock(u64 blockStart) {
+  std::lock_guard<std::mutex> lock(jitCacheMutex);
+  auto it = blockPageList.find(blockStart);
+  if (it == blockPageList.end()) {
+    return;
+  }
+  for (u64 pageBase : it->second) {
+    auto pit = pageBlockIndex.find(pageBase);
+    if (pit != pageBlockIndex.end()) {
+      pit->second.erase(blockStart);
+      if (pit->second.empty()) {
+        pageBlockIndex.erase(pit);
+      }
+    }
+  }
+  blockPageList.erase(it);
+
+#ifdef JIT_DEBUG
+  LOG_DEBUG(Xenon, "[JIT]: Unregistered block {:#x} from page index", blockStart);
+#endif
+}
+
+void PPU_JIT::InvalidateBlocksForRange(u64 startAddr, u64 endAddr) {
+  constexpr u64 pageSize = 4096ULL; // 4k is the minimum page size, can be easily increased to match p bit of tlbie/l.
+  if (startAddr >= endAddr) return;
+
+  u64 startPage = startAddr & ~(pageSize - 1ULL);
+  u64 endPage = (endAddr + pageSize - 1) & ~(pageSize - 1ULL);
+
+  std::vector<u64> blocksToInvalidate;
+  {
+    std::lock_guard<std::mutex> lock(jitCacheMutex);
+    for (u64 page = startPage; page < endPage; page += pageSize) {
+      auto pit = pageBlockIndex.find(page);
+      if (pit == pageBlockIndex.end()) continue;
+      for (u64 blk : pit->second) blocksToInvalidate.push_back(blk);
+    }
+  }
+
+  std::sort(blocksToInvalidate.begin(), blocksToInvalidate.end());
+  blocksToInvalidate.erase(std::unique(blocksToInvalidate.begin(), blocksToInvalidate.end()), blocksToInvalidate.end());
+
+  if (blocksToInvalidate.empty()) {
+#ifdef JIT_DEBUG
+    LOG_DEBUG(Xenon, "[JIT]: No JIT blocks to invalidate for range {:#x}-{:#x}", startAddr, endAddr);
+#endif
+    return;
+  }
+
+  for (u64 blkAddr : blocksToInvalidate) {
+    auto it = jitBlocksCache.find(blkAddr);
+    if (it != jitBlocksCache.end()) {
+#ifdef JIT_DEBUG
+      LOG_DEBUG(Xenon, "[JIT]: Invalidating block at {:#x} due to page invalidation range {:#x}-{:#x}", blkAddr, startAddr, endAddr);
+#endif
+      // Release resources
+      it->second.reset();
+      jitBlocksCache.erase(it);
+    }
+    // Unregister from page index (will clean mappings)
+    UnregisterBlock(blkAddr);
+  }
+}
+
+void PPU_JIT::InvalidateBlockAt(u64 blockAddr) {
+  InvalidateBlocksForRange(blockAddr, blockAddr + 1);
+}
+
+void PPU_JIT::InvalidateAllBlocks() {
+  std::lock_guard<std::mutex> lock(jitCacheMutex);
+#ifdef JIT_DEBUG
+  LOG_DEBUG(Xenon, "[JIT]: Invalidating ALL JIT blocks");
+#endif
+  for (auto &p : jitBlocksCache) {
+    p.second.reset();
+  }
+  jitBlocksCache.clear();
+  pageBlockIndex.clear();
+  blockPageList.clear();
 }
 
 // Gets current sPPUThread and uses ppeState to get the current Thread pointer.
@@ -316,7 +424,14 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
   }
 
   // Insert block into the block cache.
-  jitBlocksCache.emplace(blockStartAddress, std::move(block));
+  {
+    std::lock_guard<std::mutex> lock(jitCacheMutex);
+    jitBlocksCache.emplace(blockStartAddress, block);
+  }
+
+  // Register pages used by the block.
+  RegisterBlockPages(blockStartAddress, block->size);
+
   return jitBlocksCache.at(blockStartAddress);
 }
 #define GPR(x) curThread.GPR[x]
@@ -372,36 +487,42 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
       // For Testing and debugging purposes only.
       if (singleBlock) { break; }
     } else {
-      // We have a match, check for the block hash to see if it hasn't been modified.
-      auto &block = it->second;
-      u64 sum = 0;
-      if (block->size % 8 == 0) {
-        for (u64 i = 0; i < block->size / 8; i++) {
-          thread.instrFetch = true;
-          u64 val = PPCInterpreter::MMURead64(ppeState, block->ppuAddress + i * 8);
-          thread.instrFetch = false;
-          u64 top = val >> 32;
-          u64 bottom = val & 0xFFFFFFFF;
-          sum += top + bottom;
+      bool realMode = false;
+      realMode = !thread.SPR.MSR.DR || !thread.SPR.MSR.IR;
+      if (realMode) { // When in real mode TLB is disabled. Fallback to old approach.
+        // We have a match, check for the block hash to see if it hasn't been modified.
+        auto &block = it->second;
+        u64 sum = 0;
+        if (block->size % 8 == 0) {
+          for (u64 i = 0; i < block->size / 8; i++) {
+            thread.instrFetch = true;
+            u64 val = PPCInterpreter::MMURead64(ppeState, block->ppuAddress + i * 8);
+            thread.instrFetch = false;
+            u64 top = val >> 32;
+            u64 bottom = val & 0xFFFFFFFF;
+            sum += top + bottom;
+          }
         }
-      } else {
-        for (u64 i = 0; i != block->size / 4; i++) {
-          thread.instrFetch = true;
-          sum += PPCInterpreter::MMURead32(ppeState, block->ppuAddress + i * 4);
-          thread.instrFetch = false;
+        else {
+          for (u64 i = 0; i != block->size / 4; i++) {
+            thread.instrFetch = true;
+            sum += PPCInterpreter::MMURead32(ppeState, block->ppuAddress + i * 4);
+            thread.instrFetch = false;
+          }
         }
-      }
 
-      if (block->hash != sum) {
+        if (block->hash != sum) {
 #ifdef JIT_DEBUG
-        LOG_DEBUG(Xenon, "[JIT]: Block hash mismatch for block at address {:#x}", blockStartAddress);
+          LOG_DEBUG(Xenon, "[JIT]: Block hash mismatch for block at address {:#x}", blockStartAddress);
 #endif // JIT_DEBUG
-        // Blocks do not match. Erase it and retry.
-        block.reset();
-        jitBlocksCache.erase(blockStartAddress);
-        continue;
+          // Blocks do not match. Erase it and retry.
+          block.reset();
+          // Clean up page index mapping
+          UnregisterBlock(blockStartAddress);
+          jitBlocksCache.erase(blockStartAddress);
+          continue;
+        }
       }
-
       // Run block as usual.
       instrsExecuted += ExecuteJITBlock(blockStartAddress, enableHalt);
     }

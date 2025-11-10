@@ -10,7 +10,9 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
+#include <mutex>
 
 #include "Base/Arch.h"
 
@@ -23,7 +25,7 @@
 #include "Core/XCPU/PPU/PowerPC.h"
 #include "Core/RootBus/RootBus.h"
 
-#define JIT_DEBUG
+//#define JIT_DEBUG
 
 class PPU;
 using JITFunc = fptr<void(PPU*, sPPEState*, bool)>;
@@ -185,9 +187,7 @@ class JITBlock {
 public:
   JITBlock(asmjit::JitRuntime *rt, u64 ppuAddr, JITBlockBuilder *builder) :
     runtime(rt), ppuAddress(ppuAddr), builder(builder), size(builder->size)
-  {
-    isDirty = false;
-  }
+  {}
   ~JITBlock() {
     // Release (delete) the code pointer allocated by asmjit
     if (codePtr) {
@@ -214,8 +214,6 @@ public:
   u64 ppuAddress = 0;
   // PPC code size in bytes
   u64 size = 0;
-  // Tracks validation of the block, if Dirty the block is discarded and recompiled
-  bool isDirty = false;
   // Reference to JIT runtime
   asmjit::JitRuntime *runtime = nullptr;
   // Hash of all opcodes
@@ -232,10 +230,26 @@ public:
   std::shared_ptr<JITBlock> BuildJITBlock(u64 blockStartAddress, u64 maxBlockSize);
   void SetupContext(JITBlockBuilder *b);
   void InstrPrologue(JITBlockBuilder *b, u32 instrData);
+
+  // Page based indexing and iinvalidation methods.
+  void InvalidateBlocksForRange(u64 startAddr, u64 endAddr);
+  void InvalidateBlockAt(u64 blockAddr);
+  void InvalidateAllBlocks();
+
 private:
   PPU *ppu = nullptr; // "Linked" PPU
   sPPEState *ppeState = nullptr; // For easier thread access
   asmjit::JitRuntime jitRuntime;
+
   // Block Cache, contains all created and valid JIT'ed blocks.
   std::unordered_map<u64, std::shared_ptr<JITBlock>> jitBlocksCache = {};
+  // Page base -> set of block start addresses that cover that page.
+  std::unordered_map<u64, std::unordered_set<u64>> pageBlockIndex = {};
+  // Block start -> container of page bases it was registered under.
+  std::unordered_map<u64, std::vector<u64>> blockPageList = {};
+  // Mutex for thread safety.
+  std::mutex jitCacheMutex;
+  // Internal helpers for page based indexing.
+  void RegisterBlockPages(u64 blockStart, u64 blockSize);
+  void UnregisterBlock(u64 blockStart);
 };

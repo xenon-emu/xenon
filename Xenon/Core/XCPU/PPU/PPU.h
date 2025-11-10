@@ -97,6 +97,8 @@ public:
 
   // Get ppeState
   sPPEState *GetPPUState() { return ppeState.get(); }
+  // Get ppuJIT
+  PPU_JIT *GetPPUJIT() { return ppuJIT.get(); }
 
   // Load a elf image from host memory. Copies into RAM
   // Returns entrypoint

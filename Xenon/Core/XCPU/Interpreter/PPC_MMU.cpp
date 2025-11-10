@@ -199,6 +199,17 @@ void PPCInterpreter::PPCInterpreter_tlbiel(sPPEState *ppeState) {
     // Invalidate both ERAT's *** BUG *** !!!
     curThread.iERAT.invalidateAll();
     curThread.dERAT.invalidateAll();
+
+    // Invalidate JIT blocks conservatively (full set invalidation).
+    if (XeMain::GetCPU()) {
+      PPU *ppu = XeMain::GetCPU()->GetPPU(ppeState->ppuID);
+      if (ppu && ppu->GetPPUJIT()) {
+#ifdef MMU_DEBUG
+        LOG_DEBUG(Xenon_MMU, "[TLBIEL]: Congruence-class invalidation (class {:#x}). Invalidating all JIT blocks.", rb_44_51);
+#endif
+        ppu->GetPPUJIT()->InvalidateAllBlocks();
+      }
+    }
   } else {
     // The TLB is as selective as possible when invalidating TLB entries.The
     // invalidation match criteria is VPN[38:79 - p], L, LP, and LPID.
@@ -268,6 +279,29 @@ void PPCInterpreter::PPCInterpreter_tlbiel(sPPEState *ppeState) {
     // Invalidate both ERAT's *** BUG *** !!!
     curThread.iERAT.invalidateAll();
     curThread.dERAT.invalidateAll();
+
+    // Invalidate JIT blocks that map to the page/rango afectado por RB/p
+    if (XeMain::GetCPU()) {
+      PPU *ppu = XeMain::GetCPU()->GetPPU(ppeState->ppuID);
+      if (ppu && ppu->GetPPUJIT()) {
+        // Get page range based on 'p' (p = log2(pageSize))
+        u64 pageSize = (p < 64) ? (1ULL << p) : 0ULL;
+        if (pageSize == 0) {
+          // Fallback: full cache invalidation. (should never happen but for safety).
+#ifdef MMU_DEBUG
+          LOG_DEBUG(Xenon_MMU, "[TLBIEL]: Unknown page size (p={}), invalidating all JIT blocks", p);
+#endif
+          ppu->GetPPUJIT()->InvalidateAllBlocks();
+        } else {
+          u64 start = rb & ~(pageSize - 1ULL);
+          u64 end = start + pageSize;
+#ifdef MMU_DEBUG
+          LOG_DEBUG(Xenon_MMU, "[TLBIEL]: Invalidating JIT blocks for page {:#x} (size {:#x})", start, pageSize);
+#endif
+          ppu->GetPPUJIT()->InvalidateBlocksForRange(start, end);
+        }
+      }
+    }
   }
 }
 
