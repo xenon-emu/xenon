@@ -15,6 +15,15 @@ using namespace PPCInterpreter;
 Xe::XCPU::XenonContext* PPCInterpreter::xenonContext = nullptr;
 PPCInterpreter::PPCDecoder PPCInterpreter::ppcDecoder{};
 
+#ifdef ENABLE_INSTRUCTION_PROFILER
+#include "Core/XCPU/Interpreter/InstructionProfiler.h"
+
+// Flags for instruction counters
+bool dumpInstrCount = false;
+bool clearRecords = false;
+#endif // ENABLE_INSTRUCTION_PROFILER
+
+
 // Interpreter Single Instruction Processing.
 void PPCInterpreter::ppcExecuteSingleInstruction(sPPEState *ppeState) {
   sPPUThread &thread = curThread;
@@ -124,6 +133,24 @@ void PPCInterpreter::ppcExecuteSingleInstruction(sPPEState *ppeState) {
   if (thread.SPR.PIR == 0) {
     u8 a = 0;
   }
+
+  // Instruction Profiling
+#ifdef ENABLE_INSTRUCTION_PROFILER
+  // Increase ref counts for current instruction
+  InstructionProfiler::Get().Increment(PPCDecode(thread.CI.opcode));
+
+  // If enabled dumps the ALU instr counts.
+  if (dumpInstrCount && ppeState->ppuName == "PPU0") {
+    InstructionProfiler::Get().DumpInstrCounts(eInstrProfileDumpType::ALU);
+    dumpInstrCount = false;
+  }
+
+  // Clears all records
+  if (clearRecords) {
+    InstructionProfiler::Get().Reset();
+    clearRecords = false;
+  }
+#endif // ENABLE_INSTRUCTION_PROFILER
 
   instructionHandler function =
     ppcDecoder.decode(thread.CI.opcode);

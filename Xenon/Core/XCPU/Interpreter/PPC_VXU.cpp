@@ -1112,7 +1112,7 @@ void PPCInterpreter::PPCInterpreter_vsel128(sPPEState *ppeState) {
   VR(VMX128_VD128).dword[3] = (VR(VMX128_VA128).dword[3] & ~VR(VMX128_VD128).dword[3]) | (VR(VMX128_VB128).dword[3] & VR(VMX128_VD128).dword[3]);
 }
 
-// Vector Shift Left (x'1000 01C4') STUB!
+// Vector Shift Left (x'1000 01C4')
 void PPCInterpreter::PPCInterpreter_vsl(sPPEState* ppeState) {
   CHECK_VXU;
 
@@ -1121,7 +1121,8 @@ void PPCInterpreter::PPCInterpreter_vsl(sPPEState* ppeState) {
   Base::Vector128 res = VRi(va);
 
   for (s32 i = 0; i < 15; ++i) {
-    res.bytes[i ^ 0x3] = (res.bytes[i ^ 0x3] >> sh) | (res.bytes[(i + 1) ^ 0x3] << (8 - sh));
+    res.bytes[i ^ 0x3] = (res.bytes[i ^ 0x3] << sh)
+      | (res.bytes[(i + 1) ^ 0x3] >> (8 - sh));
   }
 
   VRi(vd) = res;
