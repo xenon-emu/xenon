@@ -137,11 +137,11 @@ void PPCInterpreter::ppcExecuteSingleInstruction(sPPEState *ppeState) {
   // Instruction Profiling
 #ifdef ENABLE_INSTRUCTION_PROFILER
   // Increase ref counts for current instruction
-  InstructionProfiler::Get().Increment(PPCDecode(thread.CI.opcode));
+  InstructionProfiler::Get().Increment(ppcDecoder.decodeName(thread.CI.opcode));
 
   // If enabled dumps the ALU instr counts.
   if (dumpInstrCount && ppeState->ppuName == "PPU0") {
-    InstructionProfiler::Get().DumpInstrCounts(eInstrProfileDumpType::ALU);
+    InstructionProfiler::Get().DumpInstrCounts(eInstrProfileDumpType::ALL);
     dumpInstrCount = false;
   }
 

@@ -60,9 +60,9 @@ namespace PPCInterpreter {
     void fillTables();
     void fillJITTables();
     void fillNameTables() {
-      #define GET_(name) std::string(#name)
-      #define GET(name) GET_(name), GET_(name)
-      #define GETRC(name) GET_(name##x), GET_(name##x)
+#define GET_(name) std::string(#name)
+#define GET(name) GET_(name), GET_(name)
+#define GETRC(name) GET_(name##x), GET_(name##x)
       for (auto& x : nameTable) {
         x = GET(invalid);
       }
@@ -114,164 +114,7 @@ namespace PPCInterpreter {
         { 0x35, GET(stfsu) },
         { 0x36, GET(stfd) },
         { 0x37, GET(stfdu) },
-      });
-      // Group 0x04 opcodes (field 21..31)
-      fillTable<std::string>(nameTable, 0x04, 11, 0, {
-        { 0x83, GET(lvewx128) },
-        { 0x403, GET(lvlx128) },
-        { 0x603, GET(lvlxl128) },
-        { 0x443, GET(lvrx128) },
-        { 0x643, GET(lvrxl128) },
-        { 0x3, GET(lvsl128) },
-        { 0x43, GET(lvsr128) },
-        { 0x2C3, GET(lvxl128) },
-        { 0x604, GET(mfvscr) },
-        { 0x644, GET(mtvscr) },
-        { 0x180, GET(vaddcuw) },
-        { 0xA, GET(vaddfp) },
-        { 0x300, GET(vaddsbs) },
-        { 0x340, GET(vaddshs) },
-        { 0x380, GET(vaddsws) },
-        { 0x0, GET(vaddubm) },
-        { 0x200, GET(vaddubs) },
-        { 0x40, GET(vadduhm) },
-        { 0x240, GET(vadduhs) },
-        { 0x80, GET(vadduwm) },
-        { 0x280, GET(vadduws) },
-        { 0x404, GET(vand) },
-        { 0x444, GET(vandc) },
-        { 0x502, GET(vavgsb) },
-        { 0x542, GET(vavgsh) },
-        { 0x582, GET(vavgsw) },
-        { 0x402, GET(vavgub) },
-        { 0x442, GET(vavguh) },
-        { 0x482, GET(vavguw) },
-        { 0x34A, GET(vcfsx) },
-        { 0x30A, GET(vcfux) },
-        { 0x3C6, GET(vcmpbfp) },
-        { 0xC6, GET(vcmpeqfp) },
-        { 0x6, GET(vcmpequb) },
-        { 0x46, GET(vcmpequh) },
-        { 0x86, GET(vcmpequw) },
-        { 0x1C6, GET(vcmpgefp) },
-        { 0x2C6, GET(vcmpgtfp) },
-        { 0x3C6, GET(vcmpgtsb) },
-        { 0x346, GET(vcmpgtsh) },
-        { 0x386, GET(vcmpgtsw) },
-        { 0x206, GET(vcmpgtub) },
-        { 0x246, GET(vcmpgtuh) },
-        { 0x286, GET(vcmpgtuw) },
-        { 0x3CA, GET(vctsxs) },
-        { 0x38A, GET(vctuxs) },
-        { 0x18A, GET(vexptefp) },
-        { 0x1CA, GET(vlogefp) },
-        { 0x2E, GET(vmaddfp) },
-        { 0x40A, GET(vmaxfp) },
-        { 0x102, GET(vmaxsb) },
-        { 0x142, GET(vmaxsh) },
-        { 0x182, GET(vmaxsw) },
-        { 0x2, GET(vmaxub) },
-        { 0x42, GET(vmaxuh) },
-        { 0x82, GET(vmaxuw) },
-        { 0x20, GET(vmhaddshs) },
-        { 0x21, GET(vmhraddshs) },
-        { 0x44A, GET(vminfp) },
-        { 0x302, GET(vminsb) },
-        { 0x342, GET(vminsh) },
-        { 0x382, GET(vminsw) },
-        { 0x202, GET(vminub) },
-        { 0x242, GET(vminuh) },
-        { 0x282, GET(vminuw) },
-        { 0x222, GET(vmladduhm) },
-        { 0xC, GET(vmrghb) },
-        { 0x4C, GET(vmrghh) },
-        { 0x8C, GET(vmrghw) },
-        { 0x10C, GET(vmrglb) },
-        { 0x14C, GET(vmrglh) },
-        { 0x18C, GET(vmrglw) },
-        { 0x25, GET(vmsummbm) },
-        { 0x28, GET(vmsumshm) },
-        { 0x29, GET(vmsumshs) },
-        { 0x24, GET(vmsumubm) },
-        { 0x26, GET(vmsumuhm) },
-        { 0x27, GET(vmsumuhs) },
-        { 0x308, GET(vmulesb) },
-        { 0x348, GET(vmulesh) },
-        { 0x208, GET(vmuleub) },
-        { 0x248, GET(vmuleuh) },
-        { 0x108, GET(vmulosb) },
-        { 0x148, GET(vmulosh) },
-        { 0x8, GET(vmuloub) },
-        { 0x48, GET(vmulouh) },
-        { 0x2F, GET(vnmsubfp) },
-        { 0x504, GET(vnor) },
-        { 0x484, GET(vor) },
-        { 0x2B, GET(vperm) },
-        { 0x30E, GET(vpkpx) },
-        { 0x18E, GET(vpkshss) },
-        { 0x10E, GET(vpkshus) },
-        { 0x1CE, GET(vpkswss) },
-        { 0x14E, GET(vpkswus) },
-        { 0xE, GET(vpkuhum) },
-        { 0x8E, GET(vpkuhus) },
-        { 0x4E, GET(vpkuwum) },
-        { 0xCE, GET(vpkuwus) },
-        { 0x10A, GET(vrefp) },
-        { 0x2CA, GET(vrfim) },
-        { 0x20A, GET(vrfin) },
-        { 0x28A, GET(vrfip) },
-        { 0x24A, GET(vrfiz) },
-        { 0x4, GET(vrlb) },
-        { 0x44, GET(vrlh) },
-        { 0x84, GET(vrlw) },
-        { 0x14A, GET(vrsqrtefp) },
-        { 0x2A, GET(vsel) },
-        { 0x1C4, GET(vsl) },
-        { 0x104, GET(vslb) },
-        { 0x2C, GET(vsldoi) },
-        { 0x10, GET(vsldoi128) },
-        { 0x144, GET(vslh) },
-        { 0x40C, GET(vslo) },
-        { 0x184, GET(vslw) },
-        { 0x20C, GET(vspltb) },
-        { 0x24C, GET(vsplth) },
-        { 0x30C, GET(vspltisb) },
-        { 0x34C, GET(vspltish) },
-        { 0x38C, GET(vspltisw) },
-        { 0x28C, GET(vspltw) },
-        { 0x24C, GET(vsr) },
-        { 0x304, GET(vsrab) },
-        { 0x344, GET(vsrah) },
-        { 0x384, GET(vsraw) },
-        { 0x204, GET(vsrb) },
-        { 0x244, GET(vsrh) },
-        { 0x44C, GET(vsro) },
-        { 0x284, GET(vsrw) },
-        { 0x580, GET(vsubcuw) },
-        { 0x4A, GET(vsubfp) },
-        { 0x700, GET(vsubsbs) },
-        { 0x740, GET(vsubshs) },
-        { 0x780, GET(vsubsws) },
-        { 0x400, GET(vsububm) },
-        { 0x600, GET(vsububs) },
-        { 0x440, GET(vsubuhm) },
-        { 0x640, GET(vsubuhs) },
-        { 0x480, GET(vsubuwm) },
-        { 0x680, GET(vsubuws) },
-        { 0x688, GET(vsum2sws) },
-        { 0x708, GET(vsum4sbs) },
-        { 0x648, GET(vsum4shs) },
-        { 0x608, GET(vsum4ubs) },
-        { 0x788, GET(vsumsws) },
-        { 0x34E, GET(vupkhpx) },
-        { 0x20E, GET(vupkhsb) },
-        { 0x24E, GET(vupkhsh) },
-        { 0x3CE, GET(vupklpx) },
-        { 0x28E, GET(vupklsb) },
-        { 0x28E, GET(vupklsb) },
-        { 0x2CE, GET(vupklsh) },
-        { 0x4C4, GET(vxor) },
-      });
+        });
       // Group 0x13 opcodes (field 21..30)
       fillTable<std::string>(nameTable, 0x13, 10, 1, {
         { 0x000, GET(mcrf) },
@@ -287,7 +130,7 @@ namespace PPCInterpreter {
         { 0x1A1, GET(crorc) },
         { 0x1C1, GET(cror) },
         { 0x210, GET(bcctr) },
-      });
+        });
       // Group 0x1E opcodes (field 27..30)
       fillTable<std::string>(nameTable, 0x1E, 4, 1, {
         { 0x0, GETRC(rldicl) },
@@ -300,7 +143,7 @@ namespace PPCInterpreter {
         { 0x7, GETRC(rldimi) },
         { 0x8, GETRC(rldcl) },
         { 0x9, GETRC(rldcr) },
-      });
+        });
       // Group 0x1F opcodes (field 21..30)
       fillTable<std::string>(nameTable, 0x1F, 10, 1, {
         { 0x000, GET(cmp) },
@@ -462,13 +305,13 @@ namespace PPCInterpreter {
         { 0x3DA, GETRC(extsw) },
         { 0x3D6, GET(icbi) },
         { 0x3F6, GET(dcbz) },
-      });
+        });
       // Group 0x3A opcodes (field 30..31)
       fillTable<std::string>(nameTable, 0x3A, 2, 0, {
         { 0x0, GET(ld) },
         { 0x1, GET(ldu) },
         { 0x2, GET(lwa) },
-      });
+        });
       // Group 0x3B opcodes (field 21..30)
       fillTable<std::string>(nameTable, 0x3B, 10, 1, {
         { 0x12, GETRC(fdivs), 5 },
@@ -481,12 +324,12 @@ namespace PPCInterpreter {
         { 0x1D, GETRC(fmadds), 5 },
         { 0x1E, GETRC(fnmsubs), 5 },
         { 0x1F, GETRC(fnmadds), 5 },
-      });
+        });
       // Group 0x3E opcodes (field 30..31)
       fillTable<std::string>(nameTable, 0x3E, 2, 0, {
         { 0x0, GET(std) },
         { 0x1, GET(stdu) },
-      });
+        });
       // Group 0x3F opcodes (field 21..30)
       fillTable<std::string>(nameTable, 0x3F, 10, 1, {
         { 0x026, GETRC(mtfsb1) },
@@ -521,14 +364,14 @@ namespace PPCInterpreter {
         { 0x32E, GETRC(fctid) },
         { 0x32F, GETRC(fctidz) },
         { 0x34E, GETRC(fcfid) },
-      });
+        });
     }
     PPCDecoder();
     ~PPCDecoder() = default;
     const std::array<instructionHandler, 0x20000> &getTable() const noexcept {
       return table;
     }
-    const std::array<instructionHandlerJIT, 0x20000>& getJITTable() const noexcept {
+    const std::array<instructionHandlerJIT, 0x20000> &getJITTable() const noexcept {
       return jitTable;
     }
     instructionHandler decode(u32 instr) const noexcept {
@@ -540,7 +383,7 @@ namespace PPCInterpreter {
       if (handler != PPCInterpreter_invalid) {
         return handler;
       } else {
-        #define GET_HANDLER(name) &PPCInterpreter_##name
+#define GET_HANDLER(name) &PPCInterpreter_##name
         // VMX128 Lookup.
         switch (ExtractBits(instr, 0, 5)) {
         case 4:
@@ -793,7 +636,7 @@ namespace PPCInterpreter {
           }
           break;
         }
-        #undef GET_HANDLER
+#undef GET_HANDLER
         return handler;
       }
     }
@@ -804,7 +647,263 @@ namespace PPCInterpreter {
       return nameTable;
     }
     std::string decodeName(u32 instr) const noexcept {
-      return getNameTable()[PPCDecode(instr)];
+      std::string name = "";
+
+      // VMX128 Lookup.
+      switch (ExtractBits(instr, 0, 5)) {
+      case 4:
+        switch ((ExtractBits(instr, 21, 27) << 4) | (ExtractBits(instr, 30, 31) << 0)) {
+        case 0b00000000011: name = GET_(lvsl128); break;
+        case 0b00001000011: name = GET_(lvsr128); break;
+        case 0b00010000011: name = GET_(lvewx128); break;
+        case 0b00011000011: name = GET_(lvx128); break;
+        case 0b00110000011: name = GET_(stvewx128); break;
+        case 0b00111000011: name = GET_(stvx128); break;
+        case 0b01011000011: name = GET_(lvxl128); break;
+        case 0b01111000011: name = GET_(stvxl128); break;
+        case 0b10000000011: name = GET_(lvlx128); break;
+        case 0b10001000011: name = GET_(lvrx128); break;
+        case 0b10100000011: name = GET_(stvlx128); break;
+        case 0b10101000011: name = GET_(stvrx128); break;
+        case 0b11000000011: name = GET_(lvlxl128); break;
+        case 0b11001000011: name = GET_(lvrxl128); break;
+        case 0b11100000011: name = GET_(stvlxl128); break;
+        case 0b11101000011: name = GET_(stvrxl128); break;
+        }
+        switch ((ExtractBits(instr, 21, 31) << 0)) {
+        case 0b00000000000: name = GET_(vaddubm); break;
+        case 0b00000000010: name = GET_(vmaxub); break;
+        case 0b00000000100: name = GET_(vrlb); break;
+        case 0b00000001000: name = GET_(vmuloub); break;
+        case 0b00000001010: name = GET_(vaddfp); break;
+        case 0b00000001100: name = GET_(vmrghb); break;
+        case 0b00000001110: name = GET_(vpkuhum); break;
+        case 0b00001000000: name = GET_(vadduhm); break;
+        case 0b00001000010: name = GET_(vmaxuh); break;
+        case 0b00001000100: name = GET_(vrlh); break;
+        case 0b00001001000: name = GET_(vmulouh); break;
+        case 0b00001001010: name = GET_(vsubfp); break;
+        case 0b00001001100: name = GET_(vmrghh); break;
+        case 0b00001001110: name = GET_(vpkuwum); break;
+        case 0b00010000000: name = GET_(vadduwm); break;
+        case 0b00010000010: name = GET_(vmaxuw); break;
+        case 0b00010000100: name = GET_(vrlw); break;
+        case 0b00010001100: name = GET_(vmrghw); break;
+        case 0b00010001110: name = GET_(vpkuhus); break;
+        case 0b00011001110: name = GET_(vpkuwus); break;
+        case 0b00100000010: name = GET_(vmaxsb); break;
+        case 0b00100000100: name = GET_(vslb); break;
+        case 0b00100001000: name = GET_(vmulosb); break;
+        case 0b00100001010: name = GET_(vrefp); break;
+        case 0b00100001100: name = GET_(vmrglb); break;
+        case 0b00100001110: name = GET_(vpkshus); break;
+        case 0b00101000010: name = GET_(vmaxsh); break;
+        case 0b00101000100: name = GET_(vslh); break;
+        case 0b00101001000: name = GET_(vmulosh); break;
+        case 0b00101001010: name = GET_(vrsqrtefp); break;
+        case 0b00101001100: name = GET_(vmrglh); break;
+        case 0b00101001110: name = GET_(vpkswus); break;
+        case 0b00110000000: name = GET_(vaddcuw); break;
+        case 0b00110000010: name = GET_(vmaxsw); break;
+        case 0b00110000100: name = GET_(vslw); break;
+        case 0b00110001010: name = GET_(vexptefp); break;
+        case 0b00110001100: name = GET_(vmrglw); break;
+        case 0b00110001110: name = GET_(vpkshss); break;
+        case 0b00111000100: name = GET_(vsl); break;
+        case 0b00111001010: name = GET_(vlogefp); break;
+        case 0b00111001110: name = GET_(vpkswss); break;
+        case 0b01000000000: name = GET_(vaddubs); break;
+        case 0b01000000010: name = GET_(vminub); break;
+        case 0b01000000100: name = GET_(vsrb); break;
+        case 0b01000001000: name = GET_(vmuleub); break;
+        case 0b01000001010: name = GET_(vrfin); break;
+        case 0b01000001100: name = GET_(vspltb); break;
+        case 0b01000001110: name = GET_(vupkhsb); break;
+        case 0b01001000000: name = GET_(vadduhs); break;
+        case 0b01001000010: name = GET_(vminuh); break;
+        case 0b01001000100: name = GET_(vsrh); break;
+        case 0b01001001000: name = GET_(vmuleuh); break;
+        case 0b01001001010: name = GET_(vrfiz); break;
+        case 0b01001001100: name = GET_(vsplth); break;
+        case 0b01001001110: name = GET_(vupkhsh); break;
+        case 0b01010000000: name = GET_(vadduws); break;
+        case 0b01010000010: name = GET_(vminuw); break;
+        case 0b01010000100: name = GET_(vsrw); break;
+        case 0b01010001010: name = GET_(vrfip); break;
+        case 0b01010001100: name = GET_(vspltw); break;
+        case 0b01010001110: name = GET_(vupklsb); break;
+        case 0b01011000100: name = GET_(vsr); break;
+        case 0b01011001010: name = GET_(vrfim); break;
+        case 0b01011001110: name = GET_(vupklsh); break;
+        case 0b01100000000: name = GET_(vaddsbs); break;
+        case 0b01100000010: name = GET_(vminsb); break;
+        case 0b01100000100: name = GET_(vsrab); break;
+        case 0b01100001000: name = GET_(vmulesb); break;
+        case 0b01100001010: name = GET_(vcfux); break;
+        case 0b01100001100: name = GET_(vspltisb); break;
+        case 0b01100001110: name = GET_(vpkpx); break;
+        case 0b01101000000: name = GET_(vaddshs); break;
+        case 0b01101000010: name = GET_(vminsh); break;
+        case 0b01101000100: name = GET_(vsrah); break;
+        case 0b01101001000: name = GET_(vmulesh); break;
+        case 0b01101001010: name = GET_(vcfsx); break;
+        case 0b01101001100: name = GET_(vspltish); break;
+        case 0b01101001110: name = GET_(vupkhpx); break;
+        case 0b01110000000: name = GET_(vaddsws); break;
+        case 0b01110000010: name = GET_(vminsw); break;
+        case 0b01110000100: name = GET_(vsraw); break;
+        case 0b01110001010: name = GET_(vctuxs); break;
+        case 0b01110001100: name = GET_(vspltisw); break;
+        case 0b01111001010: name = GET_(vctsxs); break;
+        case 0b01111001110: name = GET_(vupklpx); break;
+        case 0b10000000000: name = GET_(vsububm); break;
+        case 0b10000000010: name = GET_(vavgub); break;
+        case 0b10000000100: name = GET_(vand); break;
+        case 0b10000001010: name = GET_(vmaxfp); break;
+        case 0b10000001100: name = GET_(vslo); break;
+        case 0b10001000000: name = GET_(vsubuhm); break;
+        case 0b10001000010: name = GET_(vavguh); break;
+        case 0b10001000100: name = GET_(vandc); break;
+        case 0b10001001010: name = GET_(vminfp); break;
+        case 0b10001001100: name = GET_(vsro); break;
+        case 0b10010000000: name = GET_(vsubuwm); break;
+        case 0b10010000010: name = GET_(vavguw); break;
+        case 0b10010000100: name = GET_(vor); break;
+        case 0b10011000100: name = GET_(vxor); break;
+        case 0b10100000010: name = GET_(vavgsb); break;
+        case 0b10100000100: name = GET_(vnor); break;
+        case 0b10101000010: name = GET_(vavgsh); break;
+        case 0b10110000000: name = GET_(vsubcuw); break;
+        case 0b10110000010: name = GET_(vavgsw); break;
+        case 0b11000000000: name = GET_(vsububs); break;
+        case 0b11000000100: name = GET_(mfvscr); break;
+        case 0b11000001000: name = GET_(vsum4ubs); break;
+        case 0b11001000000: name = GET_(vsubuhs); break;
+        case 0b11001000100: name = GET_(mtvscr); break;
+        case 0b11001001000: name = GET_(vsum4shs); break;
+        case 0b11010000000: name = GET_(vsubuws); break;
+        case 0b11010001000: name = GET_(vsum2sws); break;
+        case 0b11100000000: name = GET_(vsubsbs); break;
+        case 0b11100001000: name = GET_(vsum4sbs); break;
+        case 0b11101000000: name = GET_(vsubshs); break;
+        case 0b11110000000: name = GET_(vsubsws); break;
+        case 0b11110001000: name = GET_(vsumsws); break;
+        }
+        switch ((ExtractBits(instr, 22, 31) << 0)) {
+        case 0b0000000110: name = GET_(vcmpequb); break;
+        case 0b0001000110: name = GET_(vcmpequh); break;
+        case 0b0010000110: name = GET_(vcmpequwx); break;
+        case 0b0011000110: name = GET_(vcmpeqfp); break;
+        case 0b0111000110: name = GET_(vcmpgefp); break;
+        case 0b1000000110: name = GET_(vcmpgtub); break;
+        case 0b1001000110: name = GET_(vcmpgtuh); break;
+        case 0b1010000110: name = GET_(vcmpgtuw); break;
+        case 0b1011000110: name = GET_(vcmpgtfp); break;
+        case 0b1100000110: name = GET_(vcmpgtsb); break;
+        case 0b1101000110: name = GET_(vcmpgtsh); break;
+        case 0b1110000110: name = GET_(vcmpgtsw); break;
+        case 0b1111000110: name = GET_(vcmpbfp); break;
+        }
+        switch ((ExtractBits(instr, 26, 31) << 0)) {
+        case 0b100000: name = GET_(vmhaddshs); break;
+        case 0b100001: name = GET_(vmhraddshs); break;
+        case 0b100010: name = GET_(vmladduhm); break;
+        case 0b100100: name = GET_(vmsumubm); break;
+        case 0b100101: name = GET_(vmsummbm); break;
+        case 0b100110: name = GET_(vmsumuhm); break;
+        case 0b100111: name = GET_(vmsumuhs); break;
+        case 0b101000: name = GET_(vmsumshm); break;
+        case 0b101001: name = GET_(vmsumshs); break;
+        case 0b101010: name = GET_(vsel); break;
+        case 0b101011: name = GET_(vperm); break;
+        case 0b101100: name = GET_(vsldoi); break;
+        case 0b101110: name = GET_(vmaddfp); break;
+        case 0b101111: name = GET_(vnmsubfp); break;
+        }
+        switch ((ExtractBits(instr, 27, 27) << 0)) {
+        case 0b1: name = GET_(vsldoi128); break;
+        }
+        break;
+      case 5:
+        switch ((ExtractBits(instr, 22, 22) << 5) | (ExtractBits(instr, 27, 27) << 0)) {
+        case 0b000000: name = GET_(vperm128); break;
+        }
+        switch ((ExtractBits(instr, 22, 25) << 2) | (ExtractBits(instr, 27, 27) << 0)) {
+        case 0b000001: name = GET_(vaddfp128); break;
+        case 0b000101: name = GET_(vsubfp128); break;
+        case 0b001001: name = GET_(vmulfp128); break;
+        case 0b001101: name = GET_(vmaddfp128); break;
+        case 0b010001: name = GET_(vmaddcfp128); break;
+        case 0b010101: name = GET_(vnmsubfp128); break;
+        case 0b011001: name = GET_(vmsum3fp128); break;
+        case 0b011101: name = GET_(vmsum4fp128); break;
+        case 0b100000: name = GET_(vpkshss128); break;
+        case 0b100001: name = GET_(vand128); break;
+        case 0b100100: name = GET_(vpkshus128); break;
+        case 0b100101: name = GET_(vandc128); break;
+        case 0b101000: name = GET_(vpkswss128); break;
+        case 0b101001: name = GET_(vnor128); break;
+        case 0b101100: name = GET_(vpkswus128); break;
+        case 0b101101: name = GET_(vor128); break;
+        case 0b110000: name = GET_(vpkuhum128); break;
+        case 0b110001: name = GET_(vxor128); break;
+        case 0b110100: name = GET_(vpkuhus128); break;
+        case 0b110101: name = GET_(vsel128); break;
+        case 0b111000: name = GET_(vpkuwum128); break;
+        case 0b111001: name = GET_(vslo128); break;
+        case 0b111100: name = GET_(vpkuwus128); break;
+        case 0b111101: name = GET_(vsro128); break;
+        }
+        break;
+      case 6:
+        switch ((ExtractBits(instr, 21, 22) << 5) | (ExtractBits(instr, 26, 27) << 0)) {
+        case 0b0100001: name = GET_(vpermwi128); break;
+        }
+        switch ((ExtractBits(instr, 21, 23) << 4) | (ExtractBits(instr, 26, 27) << 0)) {
+        case 0b1100001: name = GET_(vpkd3d128); break;
+        case 0b1110001: name = GET_(vrlimi128); break;
+        }
+        switch ((ExtractBits(instr, 21, 27) << 0)) {
+        case 0b0100011: name = GET_(vcfpsxws128); break;
+        case 0b0100111: name = GET_(vcfpuxws128); break;
+        case 0b0101011: name = GET_(vcsxwfp128); break;
+        case 0b0101111: name = GET_(vcuxwfp128); break;
+        case 0b0110011: name = GET_(vrfim128); break;
+        case 0b0110111: name = GET_(vrfin128); break;
+        case 0b0111011: name = GET_(vrfip128); break;
+        case 0b0111111: name = GET_(vrfiz128); break;
+        case 0b1100011: name = GET_(vrefp128); break;
+        case 0b1100111: name = GET_(vrsqrtefp128); break;
+        case 0b1101011: name = GET_(vexptefp128); break;
+        case 0b1101111: name = GET_(vlogefp128); break;
+        case 0b1110011: name = GET_(vspltw128); break;
+        case 0b1110111: name = GET_(vspltisw128); break;
+        case 0b1111111: name = GET_(vupkd3d128); break;
+        }
+        switch ((ExtractBits(instr, 22, 24) << 3) | (ExtractBits(instr, 27, 27) << 0)) {
+        case 0b000000: name = GET_(vcmpeqfp128); break;
+        case 0b001000: name = GET_(vcmpgefp128); break;
+        case 0b010000: name = GET_(vcmpgtfp128); break;
+        case 0b011000: name = GET_(vcmpbfp128); break;
+        case 0b100000: name = GET_(vcmpequw128); break;
+        }
+        switch ((ExtractBits(instr, 22, 25) << 2) | (ExtractBits(instr, 27, 27) << 0)) {
+        case 0b000101: name = GET_(vrlw128); break;
+        case 0b001101: name = GET_(vslw128); break;
+        case 0b010101: name = GET_(vsraw128); break;
+        case 0b011101: name = GET_(vsrw128); break;
+        case 0b101000: name = GET_(vmaxfp128); break;
+        case 0b101100: name = GET_(vminfp128); break;
+        case 0b110000: name = GET_(vmrghw128); break;
+        case 0b110100: name = GET_(vmrglw128); break;
+        case 0b111000: name = GET_(vupkhsb128); break;
+        case 0b111100: name = GET_(vupklsb128); break;
+        }
+        break;
+      }
+
+      if (name == "") { name = getNameTable()[PPCDecode(instr)]; }
+      return name;
     }
   private:
     // Fast lookup table
@@ -818,7 +917,7 @@ namespace PPCInterpreter {
       const bool isVxuMode = (count == static_cast<u32>(-1)) &&
         std::any_of(entries.begin(), entries.end(), [](const InstrInfo<T> &v) {
         return v.mask != 0;
-      });
+          });
 
       for (const auto &v : entries) {
         if (isVxuMode) {
