@@ -25,6 +25,7 @@ void PPCInterpreter::PPCInterpreterJIT_addx(sPPEState* ppeState, JITBlockBuilder
 void PPCInterpreter::PPCInterpreterJIT_addic(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   // TODO: Overflow Enable.
   Label end = COMP->newLabel(); // Self explanatory.
+  Label sfBitMode = COMP->newLabel();
 
   // Get rA value.
   x86::Gp rATemp = newGP64();
@@ -39,10 +40,30 @@ void PPCInterpreter::PPCInterpreterJIT_addic(sPPEState* ppeState, JITBlockBuilde
   COMP->btr(xer, 2); // Clear XER[CA] bit.
 #endif // LITTLE_ENDIAN
 
-  // Perform the Add.
+  // Check for 32bit mode of operation.
+  // Check for MSR[SF]:
+  x86::Gp tempMSR = newGP64(); // MSR is 64 bits wide.
+  COMP->mov(tempMSR, SPRPtr(MSR)); // Get MSR value.
+  COMP->bt(tempMSR, 63); // Check for bit 0(BE)(SF) on MSR.
+  COMP->jc(sfBitMode); // If set, use 64-bit add. (checks for carry flag from previous operation).
+  // Perform 32bit addition to check for carry.
+  COMP->add(rATemp.r32(), imm<s32>(instr.simm16));
+  // Get back the value of rA.
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+  // Check for carry.
+  COMP->jnc(sfBitMode);
+#ifdef __LITTLE_ENDIAN__
+  COMP->bts(xer, 29); // Set XER[CA] bit.
+#else
+  COMP->bts(xer, 2); // Set XER[CA] bit.
+#endif // LITTLE_ENDIAN
+
+  COMP->bind(sfBitMode);
+  // Perform the 64 bit Add.
   COMP->add(rATemp, imm<s64>(instr.simm16));
   // Check for carry.
   COMP->jnc(end);
+
 #ifdef __LITTLE_ENDIAN__
   COMP->bts(xer, 29); // Set XER[CA] bit.
 #else
@@ -55,7 +76,7 @@ void PPCInterpreter::PPCInterpreterJIT_addic(sPPEState* ppeState, JITBlockBuilde
   // Set rD value.
   COMP->mov(GPRPtr(instr.rd), rATemp);
 
-  if (instr.rc)
+  if (_instr.main & 1)
     J_ppuSetCR0(b, rATemp);
 }
 
@@ -66,11 +87,16 @@ void PPCInterpreter::PPCInterpreterJIT_addcx(sPPEState* ppeState, JITBlockBuilde
   */
 
   // TODO: Overflow Enable.
-  Label end = COMP->newLabel(); // Self explanatory.
+
+  Label end = COMP->newLabel();
+  Label sfBitMode = COMP->newLabel();
 
   // Get rA value.
   x86::Gp rATemp = newGP64();
   COMP->mov(rATemp, GPRPtr(instr.ra));
+  // Get rB value.
+  x86::Gp rBTemp = newGP64();
+  COMP->mov(rBTemp, GPRPtr(instr.rb));
 
   // XER[CA] Clear.
   x86::Gp xer = newGP64();
@@ -81,10 +107,30 @@ void PPCInterpreter::PPCInterpreterJIT_addcx(sPPEState* ppeState, JITBlockBuilde
   COMP->btr(xer, 2); // Clear XER[CA] bit.
 #endif // LITTLE_ENDIAN
 
-  // Perform the Add.
-  COMP->add(rATemp, GPRPtr(instr.rb));
+  // Check for 32bit mode of operation.
+  // Check for MSR[SF]:
+  x86::Gp tempMSR = newGP64(); // MSR is 64 bits wide.
+  COMP->mov(tempMSR, SPRPtr(MSR)); // Get MSR value.
+  COMP->bt(tempMSR, 63); // Check for bit 0(BE)(SF) on MSR.
+  COMP->jc(sfBitMode); // If set, use 64-bit add. (checks for carry flag from previous operation).
+  // Perform 32bit addition to check for carry.
+  COMP->add(rATemp.r32(), rBTemp.r32());
+  // Get back the value of rA.
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+  // Check for carry.
+  COMP->jnc(sfBitMode);
+#ifdef __LITTLE_ENDIAN__
+  COMP->bts(xer, 29); // Set XER[CA] bit.
+#else
+  COMP->bts(xer, 2); // Set XER[CA] bit.
+#endif // LITTLE_ENDIAN
+
+  COMP->bind(sfBitMode);
+  // Perform the 64 bit Add.
+  COMP->add(rATemp, rBTemp);
   // Check for carry.
   COMP->jnc(end);
+
 #ifdef __LITTLE_ENDIAN__
   COMP->bts(xer, 29); // Set XER[CA] bit.
 #else
@@ -318,6 +364,18 @@ void PPCInterpreter::PPCInterpreterJIT_mulldx(sPPEState *ppeState, JITBlockBuild
     J_ppuSetCR0(b, rATemp);
 }
 
+// Multiply Low Immediate (x'1C00 0000')
+void PPCInterpreter::PPCInterpreterJIT_mulli(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  x86::Gp rATemp = newGP64();
+
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+  COMP->imul(rATemp, imm<s64>(instr.simm16));
+  COMP->mov(GPRPtr(instr.rd), rATemp);
+
+  if (instr.rc)
+    J_ppuSetCR0(b, rATemp);
+}
+
 // NAND
 void PPCInterpreter::PPCInterpreterJIT_nandx(sPPEState *ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   /*
@@ -342,6 +400,19 @@ void PPCInterpreter::PPCInterpreterJIT_nandx(sPPEState *ppeState, JITBlockBuilde
   // _rc
   if (instr.rc)
     J_ppuSetCR0(b, rSTemp);
+}
+
+// Negate
+void PPCInterpreter::PPCInterpreterJIT_negx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  x86::Gp rATemp = newGP64();
+
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+  COMP->neg(rATemp);
+  COMP->mov(GPRPtr(instr.rs), rATemp);
+
+  // _rc
+  if (instr.rc)
+    J_ppuSetCR0(b, rATemp);
 }
 
 // NOR (x'7C00 00F8')
@@ -493,6 +564,18 @@ void PPCInterpreter::PPCInterpreterJIT_srdx(sPPEState* ppeState, JITBlockBuilder
   // RC
   if (instr.rc)
     J_ppuSetCR0(b, rsTemp);
+}
+
+// Subtract From (x'7C00 0050')
+void PPCInterpreter::PPCInterpreterJIT_subfx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+
+  x86::Gp rBTemp = newGP64();
+  COMP->mov(rBTemp, GPRPtr(instr.rb));
+  COMP->sub(rBTemp, GPRPtr(instr.ra));
+  COMP->mov(GPRPtr(instr.rs), rBTemp);
+  // RC
+  if (instr.rc)
+    J_ppuSetCR0(b, rBTemp);
 }
 
 // Shift Right Word (x'7C00 0430')
@@ -650,15 +733,11 @@ void PPCInterpreter::PPCInterpreterJIT_orx(sPPEState* ppeState, JITBlockBuilder*
 
   // rSTemp
   x86::Gp rSTemp = newGP64();
-  x86::Gp rBTemp = newGP64();
+ // x86::Gp rBTemp = newGP64();
 
   COMP->mov(rSTemp, GPRPtr(instr.rs));
-  COMP->mov(rBTemp, GPRPtr(instr.rb));
-
-  // rSTemp | rBTemp
-  COMP->or_(rSTemp, rBTemp);
-
-  // rA = rSTemp
+  //COMP->mov(rBTemp, GPRPtr(instr.rb));
+  COMP->or_(rSTemp, GPRPtr(instr.rb));
   COMP->mov(GPRPtr(instr.ra), rSTemp);
 
   if (instr.rc)
@@ -929,5 +1008,29 @@ void PPCInterpreter::PPCInterpreterJIT_cntlzdx(sPPEState* ppeState, JITBlockBuil
   // RC
   if (instr.rc)
     J_ppuSetCR0(b, tmp);
+}
+
+// Extend Sign Byte (x'7C00 0774')
+void PPCInterpreter::PPCInterpreterJIT_extsbx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  x86::Gp rSTemp = newGP64();
+
+  COMP->mov(rSTemp, GPRPtr(instr.rs));
+  COMP->movsx(rSTemp, rSTemp.r8()); // Sign-extend lower 8 bits to 64 bits.
+  COMP->mov(GPRPtr(instr.ra), rSTemp);
+
+  if (instr.rc)
+    J_ppuSetCR0(b, rSTemp);
+}
+
+// Extend Sign Word (x'7C00 07B4')
+void PPCInterpreter::PPCInterpreterJIT_extswx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  x86::Gp rSTemp = newGP64();
+
+  COMP->mov(rSTemp, GPRPtr(instr.rs));
+  COMP->movsxd(rSTemp, rSTemp.r32()); // Sign-extend lower 32 bits to 64 bits.
+  COMP->mov(GPRPtr(instr.ra), rSTemp);
+
+  if (instr.rc)
+    J_ppuSetCR0(b, rSTemp);
 }
 #endif

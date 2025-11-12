@@ -60,6 +60,7 @@ namespace PPCInterpreter {
     // Main opcodes (field 0..5)
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
     fillTable<instructionHandlerJIT>(jitTable, 0x00, 6, -1, {
+      { 0x07, GET(mulli) },
       { 0x0A, GET(cmpli) },
       { 0x0B, GET(cmpi) },
       //{ 0x0C, GET(addic) },
@@ -93,14 +94,16 @@ namespace PPCInterpreter {
     // Group 0x1F opcodes (field 21..30)
     fillTable<instructionHandlerJIT>(jitTable, 0x1F, 10, 1, {
       { 0x000, GET(cmp) },
-      //{ 0x00A, GETRC(addc) },
+      { 0x00A, GETRC(addc) },
       { 0x013, GET(mfocrf) },
       { 0x018, GETRC(slw) },
       { 0x01B, GETRC(sld) },
       { 0x01C, GETRC(and) },
       { 0x020, GET(cmpl) },
+      { 0x028, GETRC(subf) },
       { 0x03A, GETRC(cntlzd) },
       { 0x03C, GETRC(andc) },
+      { 0x068, GETRC(neg) },
       { 0x07C, GETRC(nor) },
       { 0x08A, GETRC(adde) },
       { 0x0E9, GETRC(mulld) },
@@ -115,6 +118,8 @@ namespace PPCInterpreter {
       //{ 0x338, GETRC(srawi) },
       { 0x33A, GETRC(sradi) },
       { 0x33B, GETRC(sradi) },
+      { 0x3BA, GETRC(extsb) },
+      { 0x3DA, GETRC(extsw) },
     });
 #endif // defined ARCH_X86 || ARCH_X86_64
 
