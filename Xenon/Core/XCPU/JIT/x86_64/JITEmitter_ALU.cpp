@@ -727,16 +727,8 @@ void PPCInterpreter::PPCInterpreterJIT_xoris(sPPEState* ppeState, JITBlockBuilde
 
 // OR (x'7C00 0378')
 void PPCInterpreter::PPCInterpreterJIT_orx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
-  /*
-    rA <- (rS) | (rB)
-  */
-
-  // rSTemp
   x86::Gp rSTemp = newGP64();
- // x86::Gp rBTemp = newGP64();
-
   COMP->mov(rSTemp, GPRPtr(instr.rs));
-  //COMP->mov(rBTemp, GPRPtr(instr.rb));
   COMP->or_(rSTemp, GPRPtr(instr.rb));
   COMP->mov(GPRPtr(instr.ra), rSTemp);
 
