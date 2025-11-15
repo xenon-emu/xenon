@@ -268,9 +268,10 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
 
     // Check for Instruction storage/segment exceptions. If found we must end the block.
     if (curThread.exceptReg & ppuInstrStorageEx || curThread.exceptReg & ppuInstrSegmentEx) {
+#ifdef JIT_DEBUG
       LOG_DEBUG(Xenon, "[JIT]: Instruction exception when creating block at CIA {:#x}, block start address {:#x}, instruction count {:#x}", 
         thread.CIA, blockStartAddress, instrCount);
-
+#endif
       if (instrCount != 0) {
         // We're a few instructions into the block, just end the block on the last instruction and start a new block on
         // the faulting instruction. It will process the exception accordingly.

@@ -60,6 +60,7 @@ namespace PPCInterpreter {
     // Main opcodes (field 0..5)
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
     fillTable<instructionHandlerJIT>(jitTable, 0x00, 6, -1, {
+      { 0x07, GET(mulli) },
       { 0x0A, GET(cmpli) },
       { 0x0B, GET(cmpi) },
       //{ 0x0C, GET(addic) },
@@ -76,6 +77,14 @@ namespace PPCInterpreter {
       { 0x1B, GET(xoris) },
       { 0x1C, GET(andi) },
       { 0x1D, GET(andis) },
+      { 0x20, GET(lwz) },
+      { 0x21, GET(lwzu) },
+      { 0x22, GET(lbz) },
+      { 0x23, GET(lbzu) },
+      { 0x24, GET(stw) },
+      { 0x25, GET(stwu) },
+      { 0x26, GET(stb) },
+      { 0x27, GET(stbu) },
     });
     // Group 0x1E opcodes (field 27..30)
     fillTable<instructionHandlerJIT>(jitTable, 0x1E, 4, 1, {
@@ -93,17 +102,29 @@ namespace PPCInterpreter {
     // Group 0x1F opcodes (field 21..30)
     fillTable<instructionHandlerJIT>(jitTable, 0x1F, 10, 1, {
       { 0x000, GET(cmp) },
-      //{ 0x00A, GETRC(addc) },
+      { 0x00A, GETRC(addc) },
       { 0x013, GET(mfocrf) },
+      { 0x017, GET(lwzx) },
       { 0x018, GETRC(slw) },
       { 0x01B, GETRC(sld) },
       { 0x01C, GETRC(and) },
       { 0x020, GET(cmpl) },
+      { 0x028, GETRC(subf) },
+      { 0x037, GET(lwzux) },
       { 0x03A, GETRC(cntlzd) },
       { 0x03C, GETRC(andc) },
+      { 0x057, GET(lbzx) },
+      { 0x068, GETRC(neg) },
+      { 0x077, GET(lbzux) },
       { 0x07C, GETRC(nor) },
       { 0x08A, GETRC(adde) },
+      { 0x095, GET(stdx) },
+      { 0x097, GET(stwx) },
+      { 0x0B5, GET(stdux) },
+      { 0x0B7, GET(stwux) },
+      { 0x0D7, GET(stbx) },
       { 0x0E9, GETRC(mulld) },
+      { 0x0F7, GET(stbux) },
       { 0x10A, GETRC(add) },
       { 0x13C, GETRC(xor) },
       { 0x153, GET(mfspr) },
@@ -112,10 +133,24 @@ namespace PPCInterpreter {
       { 0x1DC, GETRC(nand) },
       { 0x218, GETRC(srw) },
       { 0x21B, GETRC(srd) },
+      { 0x296, GET(stwbrx) },
       //{ 0x338, GETRC(srawi) },
       { 0x33A, GETRC(sradi) },
       { 0x33B, GETRC(sradi) },
+      { 0x3BA, GETRC(extsb) },
+      { 0x3DA, GETRC(extsw) },
     });
+    // Group 0x3A opcodes (field 30..31)
+    fillTable<instructionHandlerJIT>(jitTable, 0x3A, 2, 0, {
+      { 0x0, GET(ld) },
+      { 0x1, GET(ldu) },
+      //{ 0x2, GET(lwa) },
+      });
+    // Group 0x3E opcodes (field 30..31)
+    fillTable<instructionHandlerJIT>(jitTable, 0x3E, 2, 0, {
+      { 0x0, GET(std) },
+      { 0x1, GET(stdu) },
+      });
 #endif // defined ARCH_X86 || ARCH_X86_64
 
     #undef GET_
