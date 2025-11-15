@@ -38,7 +38,7 @@ struct READ_CAPACITY_DATA {
 // Data Buffers
 //
 
-class DataBuffer {
+class ODDDataBuffer {
 public:
   bool empty(void) { return _pointer >= _size; }
   u32 count(void) { return _size - _pointer; }
@@ -71,17 +71,17 @@ private:
 };
 
 //
-// Read Only Storage
+// Read Only Storage.
 //
 #ifdef _WIN32
-class Storage {
+class ReadOnlyStorage {
 public:
-  Storage(const std::string Filename) {
-    hFile = CreateFileA(Filename.data(), GENERIC_READ, FILE_SHARE_READ, nullptr,
-                        OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
+  ReadOnlyStorage(const std::string Filename) {
+    hFile = CreateFileA(Filename.data(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
+      OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
   }
 
-  ~Storage(void) {
+  ~ReadOnlyStorage(void) {
     if (hFile != INVALID_HANDLE_VALUE)
       CloseHandle(hFile);
     hFile = INVALID_HANDLE_VALUE;
@@ -101,19 +101,23 @@ public:
     Over.Offset = LODW(Offset);
     Over.OffsetHigh = HIDW(Offset);
     return (ReadFile(hFile, Destination, cu8s, &cbRead, &Over) &&
-            (cbRead == cu8s));
+      (cbRead == cu8s));
+  }
+
+  bool isHandleValid() {
+    return (hFile != INVALID_HANDLE_VALUE);
   }
 
 private:
   HANDLE hFile;
 };
 #else
-class Storage {
+class ReadOnlyStorage {
 public:
-  Storage(const std::string Filename) {
-    fd = open(Filename.c_str(), O_RDONLY);
+  ReadOnlyStorage(const std::string Filename) {
+    fd = open(Filename.c_str(), O_RDWR);
   }
-  ~Storage() {
+  ~ReadOnlyStorage() {
     if (fd != -1)
       close(fd);
     fd = -1;
@@ -126,17 +130,21 @@ public:
     return static_cast<u32>(st.st_size);
   }
 
-  bool Read(u64 Offset, u8* Destination, u32 cu8s) {
+  bool Read(u64 Offset, u8 *Destination, u32 cu8s) {
     if (lseek(fd, Offset, SEEK_SET) == (off_t)-1)
       return false;
     ssize_t bytesRead = read(fd, Destination, cu8s);
     return bytesRead == static_cast<ssize_t>(cu8s);
   }
 
+  bool isHandleValid() {
+    return (fd != -1);
+  }
+
 private:
   int fd;
 };
-#endif
+#endif // ifdef _WIN32
 
 //
 // SCSI Inquiry Data Structure
@@ -563,90 +571,66 @@ struct XE_ATAPI_DMA_STATE {
 };
 
 //
-// ATAPI Register State Structure
+// ATAPI Register State
 //
-struct XE_ATAPI_REGISTERS {
-  /* Command Block */
-
-  // Offset 0x0
-  u32 dataReg;
-  // Offset 0x1
-  struct {
-    // When Read
-    u32 errorReg;
-    // When written
-    u32 featuresReg;
+struct ATAPI_REG_STATE {
+  // Command Block
+  u32 data;         // Address 0x00
+  struct {          // Address 0x01
+    u32 error;      // When Read
+    u32 features;   // When Written
   };
-  // Offset 0x2
-  struct {
-    // When Read
-    u32 interruptReasonReg;
-    // When written
-    u32 sectorCountReg;
+  struct {                // Address 0x02
+    u32 interruptReason;  // When Read
+    u32 sectorCount;      // When Written
   };
-  // Offset 0x3
-  u32 lbaLowReg;
-  // Offset 0x4
-  u32 byteCountLowReg;
-  // Offset 0x5
-  u32 byteCountHighReg;
-  // Offset 0x6
-  u32 deviceReg;
-  // Offset 0x7
-  struct {
-    // When Read
-    u32 statusReg;
-    // When written
-    u32 commandReg;
+  u8 lbaLow;        // Address 0x03
+  u8 byteCountLow;  // Address 0x04
+  u8 byteCountHigh; // Address 0x05
+  u32 deviceSelect; // Address 0x06
+  struct {          // Address 0x07
+    u32 status;     // When Read
+    u32 command;    // When Written
   };
-  // Offset 0xA
-  struct {
-    // When Read
-    u32 altStatusReg;
-    // When written
-    u32 devControlReg;
+  // Control Block
+  struct {              // Address 0xA
+    u32 altStatus;      // When Read
+    u32 deviceControl;  // When Written
   };
-  // Offset 0x10
-  u32 SStatus;
-  // Offset 0x14
-  u32 SError;
-  // Offset 0x18
-  u32 SControl;
-  // Offset 0x1C
-  u32 SActive;          
-
-  /* Control Block */
-  // Offset 0x0
-  u32 dmaCmdReg;
-  // Offset 0x2
-  u32 dmaStatusReg;
-  // Offset 0x4
-  u32 dmaTableOffsetReg;
+  u32 SStatus;          // Address 0x10 (4 bytes)
+  u32 SError;           // Address 0x14 (4 bytes)
+  u32 SControl;         // Address 0x18 (4 bytes)
+  u32 SActive;          // Address 0x1C (4 bytes)
 
   // Transfer mode, set by the set features command using the subcommand 0x3.
   u32 ataTransferMode;
+
+  // DMA registers
+  u32 dmaCommand;
+  u32 dmaStatus;
+  u32 dmaTableOffset;
 };
 
-//
+
 // ATAPI Device State Structure
-//
-struct XE_ATAPI_DEV_STATE {
+struct ATAPI_DEV_STATE {
   // Register Set
-  XE_ATAPI_REGISTERS atapiRegs = {0};
-  // Data Read Buffer
-  DataBuffer dataReadBuffer;
-  // Data Write Buffer
-  DataBuffer dataWriteBuffer;
-  // ATAPI Inquiry Data
+  ATAPI_REG_STATE regs = {};
+  // Identify Data for our ODD Drive.
+  XE_ATAPI_IDENTIFY_DATA atapiIdentifyData = {};
+  // Inquiry data for our ODD Drive.
   XE_ATAPI_INQUIRY_DATA atapiInquiryData = {};
-  // ATA Identify structure.
-  XE_ATAPI_IDENTIFY_DATA atapiIdentifyData = {0};
+  // Mounted ISO Image.
+  std::unique_ptr<ReadOnlyStorage> mountedODDImage{};
+  // Input/Output buffers.
+  ODDDataBuffer dataInBuffer;
+  ODDDataBuffer dataOutBuffer;
   // SCSI Command Descriptor Block
   XE_CDB scsiCBD = {};
-  // Direct Memroy Access Processing
+  // DMA State
   XE_ATAPI_DMA_STATE dmaState = {};
-  // Mounted ISO Image
-  std::unique_ptr<Storage> mountedCDImage{};
+  // Do we have an image?
+  bool imageAttached = false;
 };
 
 class ODD : public PCIDevice {
@@ -664,21 +648,37 @@ private:
   // PCI Bridge pointer. Used for Interrupts.
   PCIBridge *parentBus;
 
-  // RAM pointer. Used for DMA.
-  RAM *mainMemory;
+  // RAM Pointer for DMA ops.
+  RAM *ramPtr;
 
   // ATAPI Device State.
-  XE_ATAPI_DEV_STATE atapiState = {};
+  ATAPI_DEV_STATE atapiState = {};
 
-  // SCSI Command Processing
-  void processSCSICommand();
+  // Worker Thread for DMA requests.
+  std::thread oddWorkerThread;
 
-  void doDMA();
+  // Thread running
+  volatile bool oddThreadRunning = false;
 
-  // Misc
-  void atapiReset();
+  // Thread loop for processing DMA requests, etc...
+  void oddThreadLoop();
+
+  // ATA Commands
   void atapiIdentifyPacketDeviceCommand();
   void atapiIdentifyCommand();
+
+  // Utilities
+  
+  // Returns the name of a given command.
+  std::string getATACommandName(u32 commandID);
+  // Returns the name of a given register.
+  std::string getATAPIRegisterName(u32 regID);
+  // DMA Worker.
+  void doDMA();
+  // Issues an interrupt if allowed.
+  void atapiIssueInterrupt();
+  // Processes a SCSI Command.
+  void processSCSICommand();
 };
 
 } // namespace PCIDev
