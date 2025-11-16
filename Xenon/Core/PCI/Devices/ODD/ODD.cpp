@@ -173,6 +173,8 @@ void Xe::PCIDev::ODD::Read(u64 readAddress, u8 *data, u64 size) {
       memcpy(data, &atapiState.regs.error, size);
       // Clear the error status on the status register
       atapiState.regs.status &= ~ATA_STATUS_ERR_CHK;
+      // Reset the error register
+      atapiState.regs.error = 0;
       return;
     case ATAPI_REG_INT_REAS:
       memcpy(data, &atapiState.regs.interruptReason, size);
@@ -190,8 +192,9 @@ void Xe::PCIDev::ODD::Read(u64 readAddress, u8 *data, u64 size) {
       memcpy(data, &atapiState.regs.deviceSelect, size);
       return;
     case ATAPI_REG_STATUS:
-      // TODO(bitsh1ft3r): Reading to the status reg should cancel any pending interrupts
       memcpy(data, &atapiState.regs.status, size);
+      // Cancel any interrupts that may be pending
+      parentBus->CancelInterrupt(PRIO_SATA_ODD);
       return;
     case ATAPI_REG_ALTERNATE_STATUS:
       // Reading to the alternate status register returns the contents of the Status register,
@@ -376,9 +379,8 @@ void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
           }
           atapiState.regs.ataTransferMode = inData;
           }
-          // Request interrupt - For some weird reason (it's 3am, dont honestly care rn)
-          // This doesnt work with the issue interrupt behavior TODO.
-          parentBus->RouteInterrupt(PRIO_SATA_ODD);
+          // Request interrupt
+          atapiIssueInterrupt();
         }
         break;
       default: {
@@ -523,7 +525,7 @@ void Xe::PCIDev::ODD::MemSet(u64 writeAddress, s32 data, u64 size) {
         atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ | ATA_STATUS_DF;
 
         // Request an interrupt
-        parentBus->RouteInterrupt(PRIO_SATA_CDROM);
+        parentBus->RouteInterrupt(PRIO_SATA_ODD);
         return;
       } break;
       case ATA_COMMAND_IDENTIFY_DEVICE: {
@@ -673,16 +675,16 @@ void Xe::PCIDev::ODD::atapiIdentifyCommand() {
   */
 
   // Set the drive status
-  atapiState.regs.status |= ATA_STATUS_ERR_CHK;
+  atapiState.regs.status = ATA_STATUS_ERR_CHK | ATA_STATUS_DRDY;
 
-  atapiState.regs.error |= ATA_ERROR_ABRT;
+  atapiState.regs.error = ATA_ERROR_ABRT;
   atapiState.regs.interruptReason = 0x1;
   atapiState.regs.lbaLow = 0x1;
   atapiState.regs.byteCountLow = 0x14;
   atapiState.regs.byteCountHigh = 0xEB;
 
   // Set interrupt reason
-  atapiState.regs.interruptReason = IDE_INTERRUPT_REASON_IO;
+  atapiState.regs.interruptReason = ATA_INTERRUPT_REASON_IO;
 
   // An interrupt must also be requested
   atapiIssueInterrupt();
@@ -750,7 +752,7 @@ void Xe::PCIDev::ODD::atapiIdentifyPacketDeviceCommand() {
 // Utilities
 //
 
-static const std::unordered_map<u32, const std::string> ataCommandNameMap = {
+static const std::unordered_map<u8, const std::string> ataCommandNameMap = {
   { 0x08, "DEVICE_RESET" },
   { 0x20, "READ_SECTORS" },
   { 0x25, "READ_DMA_EXT" },
@@ -789,7 +791,80 @@ std::string Xe::PCIDev::ODD::getATACommandName(u32 commandID) {
   }
 }
 
-static const std::unordered_map<u32, const std::string> atapiRegisterNameMap = {
+static const std::unordered_map<u8, const std::string> scsiCommandNameMap = {
+  // 6 Byte 'Standard' CDB
+  { 0x00, "TEST_UNIT_READY" },
+  { 0x03, "REQUEST_SENSE" },
+  { 0x04, "FORMAT_UNIT" },
+  { 0x12, "INQUIRY" },
+  { 0x15, "MODE_SELECT6" },
+  { 0x1A, "MODE_SENSE6" },
+  { 0x1B, "START_STOP" },
+  { 0x1E, "TOGGLE_LOCK" },
+  // 10 Byte CDB
+  { 0x23, "READ_FMT_CAP" },
+  { 0x25, "READ_CAPACITY" },
+  { 0x28, "READ10" },
+  { 0x2B, "SEEK10" },
+  { 0x2C, "ERASE10" },
+  { 0x2A, "WRITE10" },
+  { 0x2E, "VER_WRITE10" },
+  { 0x2F, "VERIFY10" },
+  { 0x35, "SYNC_CACHE" },
+  { 0x3B, "WRITE_BUF" },
+  { 0x3C, "READ_BUF" },
+  { 0x42, "READ_SUBCH" },
+  { 0x43, "READ_TOC" },
+  { 0x44, "READ_HEADER" },
+  { 0x45, "PLAY_AUDIO10" },
+  { 0x46, "GET_CONFIG" },
+  { 0x47, "PLAY_AUDIOMSF" },
+  { 0x4A, "EVENT_INFO" },
+  { 0x4B, "TOGGLE_PAUSE" },
+  { 0x4E, "STOP" },
+  { 0x51, "READ_INFO" },
+  { 0x52, "READ_TRK_INFO" },
+  { 0x53, "RES_TRACK" },
+  { 0x54, "SEND_OPC" },
+  { 0x55, "MODE_SELECT10" },
+  { 0x58, "REPAIR_TRACK" },
+  { 0x5A, "MODE_SENSE10" },
+  { 0x5B, "CLOSE_TRACK" },
+  { 0x5C, "READ_BUF_CAP" },
+  // 12 Byte CDB
+  { 0xA1, "BLANK" },
+  { 0xA3, "SEND_KEY" },
+  { 0xA4, "REPORT_KEY" },
+  { 0xA5, "PLAY_AUDIO12" },
+  { 0xA6, "LOAD_CD" },
+  { 0xA7, "SET_RD_AHEAD" },
+  { 0xA8, "READ12" },
+  { 0xAA, "WRITE12" },
+  { 0xAC, "GET_PERF" },
+  { 0xAD, "READ_DVD_S" },
+  { 0xB6, "SET_STREAM" },
+  { 0xB9, "READ_CD_MSF" },
+  { 0xBA, "SCAN" },
+  { 0xBB, "SET_CD_SPEED" },
+  { 0xBC, "PLAY_CD" },
+  { 0xBD, "MECH_STATUS" },
+  { 0xBE, "READ_CD" },
+  { 0xBF, "SEND_DVD_S" }
+};
+
+// Returns the command name as an std::string.
+std::string Xe::PCIDev::ODD::getSCSICommandName(u32 commandID) {
+  auto it = scsiCommandNameMap.find(commandID);
+  if (it != scsiCommandNameMap.end()) {
+    return it->second;
+  }
+  else {
+    LOG_ERROR(ODD, "Unknown Command: {:#x}", commandID);
+    return "Unknown Command";
+  }
+}
+
+static const std::unordered_map<u8, const std::string> atapiRegisterNameMap = {
   { 0x00, "Data" },
   { 0x01, "Error (Read)/Features (Write)" },
   { 0x02, "Interrupt Reason (Read)/ Sector Count (Write)" },
@@ -907,7 +982,7 @@ void Xe::PCIDev::ODD::atapiIssueInterrupt() {
 #ifdef ODD_DEBUG
     LOG_DEBUG(ODD, "Issuing interrupt.");
 #endif // ODD_DEBUG
-    parentBus->RouteInterrupt(PRIO_SATA_HDD);
+    parentBus->RouteInterrupt(PRIO_SATA_ODD);
   }
 }
 
@@ -925,28 +1000,31 @@ void Xe::PCIDev::ODD::processSCSICommand() {
   sectorCount = byteswap_be<u32>(static_cast<u32>(sectorCount));
   char sense[15] = {};
   sense[0] = 0x70;
+
+#ifdef ODD_DEBUG
+  LOG_DEBUG(ODD, "SCSI Command received: {}", getSCSICommandName(atapiState.scsiCBD.CDB6GENERIC.OperationCode));
+#endif // ODD_DEBUG
+
+
   switch (atapiState.scsiCBD.CDB12.OperationCode) {
   case SCSIOP_TEST_UNIT_READY:
-
+    atapiNopCommand();
     break;
   case SCSIOP_REQUEST_SENSE:
     LOG_DEBUG(ODD, "atapi_request_sense");
 
     // Copy our data struct
-    memcpy(atapiState.dataOutBuffer.get(), &sense,
-      sizeof(sense));
+    memcpy(atapiState.dataOutBuffer.get(), &sense, sizeof(sense));
     // Set the Status register to data request
     atapiState.regs.status |= ATA_STATUS_DRQ;
     break;
   case SCSIOP_INQUIRY:
     // Copy our data struct
-    memcpy(atapiState.dataOutBuffer.get(), &atapiState.atapiInquiryData,
-      sizeof(XE_ATAPI_INQUIRY_DATA));
+    memcpy(atapiState.dataOutBuffer.get(), &atapiState.atapiInquiryData, sizeof(XE_ATAPI_INQUIRY_DATA));
     // Set the Status register to data request
     atapiState.regs.status |= ATA_STATUS_DRQ;
-    atapiState.regs.SActive = 0x40; // SActive to 0x40, SATA driver in xboxkrnl checks this.
     break;
-  case SCSIOP_READ:
+  case SCSIOP_READ10:
     readOffset *= ATAPI_CDROM_SECTOR_SIZE;
     sectorCount *= ATAPI_CDROM_SECTOR_SIZE;
 
@@ -959,5 +1037,12 @@ void Xe::PCIDev::ODD::processSCSICommand() {
     LOG_ERROR(ODD, "Unknown SCSI Command requested: 0x{:X}", atapiState.scsiCBD.CDB12.OperationCode);
   }
 
-  atapiState.regs.interruptReason = IDE_INTERRUPT_REASON_IO;
+  atapiState.regs.interruptReason = ATA_INTERRUPT_REASON_IO;
+}
+
+// Does a basic setup of registers for an ATAPI command that has no outputs/errors.
+void Xe::PCIDev::ODD::atapiNopCommand() {
+  atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_CD | ATA_INTERRUPT_REASON_IO;
+  atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_REL;
+  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF;
 }

@@ -669,8 +669,10 @@ private:
 
   // Utilities
   
-  // Returns the name of a given command.
+  // Returns the name of a given ATAPI command.
   std::string getATACommandName(u32 commandID);
+  // Returns the name of a given SCSI command.
+  std::string getSCSICommandName(u32 commandID);
   // Returns the name of a given register.
   std::string getATAPIRegisterName(u32 regID);
   // DMA Worker.
@@ -679,6 +681,9 @@ private:
   void atapiIssueInterrupt();
   // Processes a SCSI Command.
   void processSCSICommand();
+
+  // Basic no-op command
+  void atapiNopCommand();
 };
 
 } // namespace PCIDev
