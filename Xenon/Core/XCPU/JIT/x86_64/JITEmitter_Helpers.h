@@ -35,7 +35,6 @@ using namespace asmjit;
 #define CRValPtr() b->threadCtx->scalar(&sPPUThread::CR)
 #define CIAPtr() b->threadCtx->scalar(&sPPUThread::CIA)
 #define NIAPtr() b->threadCtx->scalar(&sPPUThread::NIA)
-#define EXPtr() b->threadCtx->scalar(&sPPUThread::exceptReg) 
 #define LRPtr() SPRPtr(LR)
 
 inline x86::Gp Jrotl32(JITBlockBuilder *b, x86::Mem x, u32 n) {
