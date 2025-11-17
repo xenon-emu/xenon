@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <vector>
+#include <mutex>
 
 namespace PPCInterpreter {
 
