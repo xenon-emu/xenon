@@ -8,7 +8,7 @@
 #include "Base/Logging/Log.h"
 
 // Enables ODD Debug output
-#define ODD_DEBUG
+//#define ODD_DEBUG
 
 // Describes the ATA transfer modes available to the SET_TRNASFER_MODE subcommand.
 enum class ATA_TRANSFER_MODE {
@@ -796,16 +796,12 @@ void Xe::PCIDev::ODD::scsiRead10Command() {
   // Reset output buffer
   atapiState.dataOutBuffer.reset();
 
-  // Read/Sector Data for R/W operations
-  u64 readOffset = 0;
-  memcpy(&readOffset, &atapiState.scsiCBD.CDB12.LogicalBlock, 4);
-  u32 sectorCount = 0;
-  memcpy(&sectorCount, &atapiState.scsiCBD.CDB12.TransferLength, 4);
-  readOffset = byteswap_be<u32>(static_cast<u32>(readOffset));
-  sectorCount = byteswap_be<u32>(static_cast<u32>(sectorCount));
+  u32 sectorCount = ((u32)atapiState.scsiCBD.AsByte[7] << 8) | (atapiState.scsiCBD.AsByte[8]);
+  u32 readOffset = ((u32)atapiState.scsiCBD.AsByte[2] << 24) | ((u32)atapiState.scsiCBD.AsByte[3] << 16)
+    | ((u32)atapiState.scsiCBD.AsByte[4] << 8) | atapiState.scsiCBD.AsByte[5];
 
-  readOffset *= ATAPI_CDROM_SECTOR_SIZE;
   sectorCount *= ATAPI_CDROM_SECTOR_SIZE;
+  readOffset *= ATAPI_CDROM_SECTOR_SIZE;
 
 #ifdef ODD_DEBUG
   LOG_DEBUG(ODD, "Read10: Read Offset: {:#x}, Size: {:#x}", readOffset, sectorCount);
