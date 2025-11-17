@@ -631,6 +631,8 @@ struct ATAPI_DEV_STATE {
   XE_ATAPI_DMA_STATE dmaState = {};
   // Do we have an image?
   bool imageAttached = false;
+  // Is there a SCSI command pending for processing?
+  bool scsiCommandPending = false;
 };
 
 class ODD : public PCIDevice {

@@ -315,12 +315,10 @@ void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
       // command
       if (atapiState.dataInBuffer.size() >= XE_ATAPI_CDB_SIZE &&
           atapiState.regs.command == ATA_COMMAND_PACKET) {
-        // Process SCSI Command
-        processSCSICommand();
+        // Signal pending SCSI command.
+        atapiState.scsiCommandPending = true;
         // Reset our buffer ptr.
         atapiState.dataInBuffer.reset();
-        // Request an Interrupt.
-        atapiIssueInterrupt();
       }
       return;
     } break;
@@ -516,8 +514,6 @@ void Xe::PCIDev::ODD::MemSet(u64 writeAddress, s32 data, u64 size) {
       // command
       if (atapiState.dataInBuffer.size() >= XE_ATAPI_CDB_SIZE &&
           atapiState.regs.command == ATA_COMMAND_PACKET) {
-        // Process a SCSI command
-        processSCSICommand();
         // Reset our buffer pointer
         atapiState.dataInBuffer.reset();
         // Request an interrupt
@@ -765,6 +761,7 @@ void Xe::PCIDev::ODD::atapiIdentifyPacketDeviceCommand() {
 void Xe::PCIDev::ODD::scsiReadCapacityCommand() {
   // Reset output buffer
   atapiState.dataOutBuffer.reset();
+
   u8 capacityBuffer[8] = {};
   u32 imageCapacity = 0x200000; // 4Gb
   // LBA of this image
@@ -810,7 +807,11 @@ void Xe::PCIDev::ODD::scsiRead10Command() {
   readOffset *= ATAPI_CDROM_SECTOR_SIZE;
   sectorCount *= ATAPI_CDROM_SECTOR_SIZE;
 
-  atapiState.dataOutBuffer.init(sectorCount, false);
+#ifdef ODD_DEBUG
+  LOG_DEBUG(ODD, "Read10: Read Offset: {:#x}, Size: {:#x}", readOffset, sectorCount);
+#endif // ODD_DEBUG
+
+  atapiState.dataOutBuffer.init(sectorCount, true);
   atapiState.dataOutBuffer.reset();
   atapiState.mountedODDImage->Read(readOffset, atapiState.dataOutBuffer.get(), sectorCount);
   atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
@@ -976,8 +977,10 @@ void Xe::PCIDev::ODD::oddThreadLoop() {
     oddThreadRunning = XeRunning;
     if (!oddThreadRunning)
       break;
-    // Check for the DMA active command.
-    if (atapiState.regs.dmaCommand & XE_ATA_DMA_ACTIVE) {
+    // Check for the DMA active command, and only start the DMA engine if there's not any 
+    // pending SCSI command for processing. (Avoids race conditions)
+    if (atapiState.regs.dmaCommand & XE_ATA_DMA_ACTIVE
+      && atapiState.scsiCommandPending == false) {
 #ifdef ODD_DEBUG
       LOG_INFO(ODD, "Started DMA Operation. Direction : {}",(atapiState.regs.dmaCommand & XE_ATAPI_DMA_WR ? "Out" : "In"));
 #endif // ODD_DEBUG
@@ -994,8 +997,17 @@ void Xe::PCIDev::ODD::oddThreadLoop() {
       // After completion we must raise an interrupt.
       atapiIssueInterrupt();
     }
+    
+    // Check for pending SCSI commands.
+    if (atapiState.scsiCommandPending) {
+      processSCSICommand();
+      atapiState.scsiCommandPending = false;
+      // Request an Interrupt.
+      atapiIssueInterrupt();
+    }
+
     // Sleep for some time.
-    std::this_thread::sleep_for(5ms);
+    std::this_thread::sleep_for(50ns);
   }
 
   LOG_INFO(ODD, "Exiting ODD worker thread.");
@@ -1095,10 +1107,9 @@ void Xe::PCIDev::ODD::processSCSICommand() {
     atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
     atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
     break;
-  case SCSIOP_INQUIRY: {
+  case SCSIOP_INQUIRY:
     scsiInquiryCommand();
     break;
-  }
   case SCSIOP_READ10:
     scsiRead10Command();
     break;

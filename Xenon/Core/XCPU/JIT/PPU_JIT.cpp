@@ -339,6 +339,8 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
       case 0x800FC288: patchGPR(3, 0x0); break;
         // VdIsHSIOTrainingSucceeded return 1
       case 0x800F9130: patchGPR(3, 0x1); break;
+        // SATA SSC Speed patch (until I can get proper code pages working in ODD)
+      case 0x800C5B58: patchGPR(11, 0x3); break;
         // Pretend ARGON hardware is present, to avoid the call
       case 0x800819E0:
       case 0x80081A60: {
