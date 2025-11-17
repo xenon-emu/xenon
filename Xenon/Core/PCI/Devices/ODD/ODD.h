@@ -667,6 +667,11 @@ private:
   void atapiIdentifyPacketDeviceCommand();
   void atapiIdentifyCommand();
 
+  // SCSI Commands
+  void scsiReadCapacityCommand();
+  void scsiInquiryCommand();
+  void scsiRead10Command();
+
   // Utilities
   
   // Returns the name of a given ATAPI command.

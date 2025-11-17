@@ -29,6 +29,47 @@ enum class ATA_TRANSFER_MODE {
   ULTRA_DMA_MODE6 = 0x46,
 };
 
+// Data was pulled off of an PLDS DG-16D5S retail ODD.
+const u8 identifyDataBytes[] = {
+  0xC0, 0x85, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+  0x00, 0x00, 0x00, 0x00, 0x38, 0x44, 0x33, 0x31, 0x42, 0x42, 0x34, 0x32, 0x36, 0x36, 0x32, 0x31,
+  0x30, 0x30, 0x48, 0x36, 0x20, 0x4A, 0x20, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x35, 0x31,
+  0x32, 0x33, 0x20, 0x20, 0x20, 0x20, 0x4C, 0x50, 0x53, 0x44, 0x20, 0x20, 0x20, 0x20, 0x47, 0x44,
+  0x31, 0x2D, 0x44, 0x36, 0x53, 0x35, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x0F, 0x00, 0x40, 0x00, 0x04, 0x00, 0x02, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x03, 0x00, 0x78, 0x00, 0x78, 0x00, 0x78, 0x00, 0x78, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0xF8, 0x00, 0x10, 0x02, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x60, 0x00, 0x00, 0x00,
+  0xF8, 0x00, 0x10, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x3F, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+  0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+};
+
+const u8 atapiInquiryDataBytes[] = { 0x05, 0x80, 0x00, 0x32, 0x5B, 0x00, 0x00, 0x00, 0x50, 0x4C,
+0x44, 0x53, 0x20, 0x20, 0x20, 0x20, 0x44, 0x47, 0x2D, 0x31, 0x36, 0x44, 0x35, 0x53, 0x20, 0x20,
+0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x31, 0x35, 0x33, 0x32
+};
+
 Xe::PCIDev::ODD::ODD(const char* deviceName, u64 size, PCIBridge *parentPCIBridge, RAM *ram) 
   : PCIDevice(deviceName, size) {
   // Note:
@@ -74,10 +115,11 @@ Xe::PCIDev::ODD::ODD(const char* deviceName, u64 size, PCIBridge *parentPCIBridg
   atapiState.dataOutBuffer.init(ATAPI_CDROM_SECTOR_SIZE, true);
   atapiState.dataOutBuffer.reset();
 
-  // Set our Inquiry Data
-  constexpr char vendorIdentification[] = "PLDS   16D2S";
-  memcpy(&atapiState.atapiInquiryData.vendorIdentification,
-    vendorIdentification, sizeof(vendorIdentification));
+  // Set our identify data.
+  memcpy(&atapiState.atapiIdentifyData, identifyDataBytes, sizeof(atapiState.atapiIdentifyData));
+
+  // Set our inquiry data.
+  memcpy(&atapiState.atapiInquiryData, atapiInquiryDataBytes, sizeof(atapiState.atapiInquiryData));
 
   atapiState.mountedODDImage = std::make_unique<STRIP_UNIQUE(atapiState.mountedODDImage)>(Config::filepaths.oddImage);
 
@@ -249,8 +291,8 @@ void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
   memcpy(&inData, data, size);
 
 #ifdef ODD_DEBUG
-  LOG_DEBUG(ODD, "[Write]: Reg {}, address {:#x}, data {:#x}", getATAPIRegisterName(writeAddress & 0xFF),
-    writeAddress, inData);
+  LOG_DEBUG(ODD, "[Write]: Reg {}, address {:#x}, data {:#x}, byte count {:#d}", getATAPIRegisterName(writeAddress & 0xFF),
+    writeAddress, inData, size);
 #endif // ODD_DEBUG
 
   // Command Registers
@@ -313,6 +355,8 @@ void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
       switch (atapiState.regs.command) {
       case ATA_COMMAND_PACKET: {
         atapiState.regs.status |= ATA_STATUS_DRQ;
+        // Reset our input buffer.
+        atapiState.dataInBuffer.reset();
         return;
       } break;
       case ATA_COMMAND_IDENTIFY_PACKET_DEVICE: {
@@ -695,43 +739,9 @@ void Xe::PCIDev::ODD::atapiIdentifyPacketDeviceCommand() {
     LOG_ERROR(ODD, "Failed to initialize data buffer for atapiIdentifyPacketDeviceCommand");
   }
 
-  XE_ATAPI_IDENTIFY_DATA *identifyData;
-
   // Reset the pointer
   atapiState.dataOutBuffer.reset();
-  identifyData = (XE_ATAPI_IDENTIFY_DATA *)atapiState.dataOutBuffer.get();
-
-  // The data is stored in little endian
-  constexpr u8 serialNumber[] = { 0x38, 0x44, 0x33, 0x31, 0x42, 0x42, 0x34, 0x32,
-    0x36, 0x36, 0x32, 0x31, 0x30, 0x30, 0x48, 0x36, 0x20, 0x4a, 0x20, 0x20 };
-
-  constexpr u8 firmwareRevision[] = { 0x35, 0x31, 0x32, 0x33, 0x20, 0x20, 0x20, 0x20 };
-
-  constexpr u8 modelNumber[] = { 0x4c, 0x50, 0x53, 0x44, 0x20 ,0x20, 0x20, 0x20,
-    0x47, 0x44, 0x31, 0x2d, 0x44, 0x36, 0x53, 0x35,
-    0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20 };
-
-  // Set the data
-  identifyData->generalConfiguration = 0x85C0;
-  memcpy(&identifyData->serialNumber, &serialNumber, sizeof(serialNumber));
-  memcpy(&identifyData->firmwareRevision, &firmwareRevision, sizeof(firmwareRevision));
-  memcpy(&identifyData->modelNumber, &modelNumber, sizeof(modelNumber));
-
-  identifyData->capabilities = 0x0F00;
-  identifyData->reserved7 = 0x40;
-  identifyData->reserved8 = 0x00;
-  identifyData->reserved9 = 0x0200;
-  identifyData->translationFieldsValid = 0x6;
-  identifyData->advancedPIOModes = 0x3;
-  identifyData->minimumMWXferCycleTime = 0x78;
-  identifyData->recommendedMWXferCycleTime = 0x78;
-  identifyData->minimumPIOCycleTime = 0x78;
-  identifyData->minimumPIOCycleTimeIORDY = 0x78;
-  identifyData->majorRevision = 0xf8;
-  identifyData->minorRevision = 0x210;
-  identifyData->ultraDMASupport = 0x20;
-  identifyData->ultraDMAActive = 0x3f;
-
+  memcpy(atapiState.dataOutBuffer.get(), &atapiState.atapiIdentifyData, sizeof(atapiState.atapiIdentifyData));
 
   // Set the transfer size:
   // bytecount = LBA High << 8 | LBA Mid
@@ -746,6 +756,66 @@ void Xe::PCIDev::ODD::atapiIdentifyPacketDeviceCommand() {
 
   // Request interrupt
   atapiIssueInterrupt();
+}
+
+//
+// SCSI Commands
+//
+
+void Xe::PCIDev::ODD::scsiReadCapacityCommand() {
+  // Reset output buffer
+  atapiState.dataOutBuffer.reset();
+  u8 capacityBuffer[8] = {};
+  u32 imageCapacity = 0x200000; // 4Gb
+  // LBA of this image
+  capacityBuffer[0] = imageCapacity >> 24;
+  capacityBuffer[1] = imageCapacity >> 16;
+  capacityBuffer[2] = imageCapacity >> 8;
+  capacityBuffer[3] = imageCapacity;
+  // Block size
+  capacityBuffer[4] = u8(2048 >> 24);
+  capacityBuffer[5] = u8(2048 >> 16);
+  capacityBuffer[6] = u8(2048 >> 8);
+  capacityBuffer[7] = u8(2048);
+  memcpy(atapiState.dataOutBuffer.get(), &capacityBuffer, sizeof(capacityBuffer));
+
+  // Set parameters as expected.
+  atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
+  atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
+  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
+}
+
+void Xe::PCIDev::ODD::scsiInquiryCommand() {
+  // Reset output buffer
+  atapiState.dataOutBuffer.reset();
+  // Copy our data struct
+  memcpy(atapiState.dataOutBuffer.get(), &atapiState.atapiInquiryData, sizeof(XE_ATAPI_INQUIRY_DATA));
+  atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
+  atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
+  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
+}
+
+void Xe::PCIDev::ODD::scsiRead10Command() {
+  // Reset output buffer
+  atapiState.dataOutBuffer.reset();
+
+  // Read/Sector Data for R/W operations
+  u64 readOffset = 0;
+  memcpy(&readOffset, &atapiState.scsiCBD.CDB12.LogicalBlock, 4);
+  u32 sectorCount = 0;
+  memcpy(&sectorCount, &atapiState.scsiCBD.CDB12.TransferLength, 4);
+  readOffset = byteswap_be<u32>(static_cast<u32>(readOffset));
+  sectorCount = byteswap_be<u32>(static_cast<u32>(sectorCount));
+
+  readOffset *= ATAPI_CDROM_SECTOR_SIZE;
+  sectorCount *= ATAPI_CDROM_SECTOR_SIZE;
+
+  atapiState.dataOutBuffer.init(sectorCount, false);
+  atapiState.dataOutBuffer.reset();
+  atapiState.mountedODDImage->Read(readOffset, atapiState.dataOutBuffer.get(), sectorCount);
+  atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
+  atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
+  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
 }
 
 //
@@ -908,11 +978,21 @@ void Xe::PCIDev::ODD::oddThreadLoop() {
       break;
     // Check for the DMA active command.
     if (atapiState.regs.dmaCommand & XE_ATA_DMA_ACTIVE) {
+#ifdef ODD_DEBUG
+      LOG_INFO(ODD, "Started DMA Operation. Direction : {}",(atapiState.regs.dmaCommand & XE_ATAPI_DMA_WR ? "Out" : "In"));
+#endif // ODD_DEBUG
       // Start our DMA operation
       doDMA();
       // Change our DMA status after completion.
       atapiState.regs.dmaCommand &= ~1; // Clear active status.
       atapiState.regs.dmaStatus = XE_ATA_DMA_INTR; // Signal Interrupt.
+      atapiState.regs.SActive = 0x40;
+      atapiState.regs.status = ATA_STATUS_DRDY;
+      // Reset I/O data buffers
+      atapiState.dataInBuffer.reset();
+      atapiState.dataOutBuffer.reset();
+      // After completion we must raise an interrupt.
+      atapiIssueInterrupt();
     }
     // Sleep for some time.
     std::this_thread::sleep_for(5ms);
@@ -969,8 +1049,6 @@ void Xe::PCIDev::ODD::doDMA() {
     if (lastEntry) {
       // Reset the current position
       atapiState.dmaState.currentTableOffset = 0;
-      // After completion we must raise an interrupt
-      atapiIssueInterrupt();
       return;
     }
   }
@@ -988,61 +1066,51 @@ void Xe::PCIDev::ODD::atapiIssueInterrupt() {
 
 // Processes SCSI commands.
 void Xe::PCIDev::ODD::processSCSICommand() {
+  // Reset input buffer pointer
   atapiState.dataInBuffer.reset();
+  // Copy our CDB data.
   memcpy(&atapiState.scsiCBD.AsByte, atapiState.dataInBuffer.get(), 16);
 
-  // Read/Sector Data for R/W operations
-  u64 readOffset = 0;
-  memcpy(&readOffset, &atapiState.scsiCBD.CDB12.LogicalBlock, 4);
-  u32 sectorCount = 0;
-  memcpy(&sectorCount, &atapiState.scsiCBD.CDB12.TransferLength, 4);
-  readOffset = byteswap_be<u32>(static_cast<u32>(readOffset));
-  sectorCount = byteswap_be<u32>(static_cast<u32>(sectorCount));
-  char sense[15] = {};
-  sense[0] = 0x70;
+  // Get our command.
+  u8 commandID = atapiState.scsiCBD.AsByte[0];
 
 #ifdef ODD_DEBUG
-  LOG_DEBUG(ODD, "SCSI Command received: {}", getSCSICommandName(atapiState.scsiCBD.CDB6GENERIC.OperationCode));
+  LOG_DEBUG(ODD, "SCSI Command received: {}", getSCSICommandName(atapiState.scsiCBD.AsByte[0]));
 #endif // ODD_DEBUG
 
-
-  switch (atapiState.scsiCBD.CDB12.OperationCode) {
+  switch (commandID) {
   case SCSIOP_TEST_UNIT_READY:
     atapiNopCommand();
     break;
-  case SCSIOP_REQUEST_SENSE:
-    LOG_DEBUG(ODD, "atapi_request_sense");
-
-    // Copy our data struct
-    memcpy(atapiState.dataOutBuffer.get(), &sense, sizeof(sense));
-    // Set the Status register to data request
-    atapiState.regs.status |= ATA_STATUS_DRQ;
+  case SCSIOP_READ_CAPACITY:
+    scsiReadCapacityCommand();
     break;
-  case SCSIOP_INQUIRY:
-    // Copy our data struct
-    memcpy(atapiState.dataOutBuffer.get(), &atapiState.atapiInquiryData, sizeof(XE_ATAPI_INQUIRY_DATA));
-    // Set the Status register to data request
-    atapiState.regs.status |= ATA_STATUS_DRQ;
+  case SCSIOP_MODE_SELECT10:
+    atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
+    atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
+    atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
     break;
+  case SCSIOP_MODE_SENSE10:
+    atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
+    atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
+    atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
+    break;
+  case SCSIOP_INQUIRY: {
+    scsiInquiryCommand();
+    break;
+  }
   case SCSIOP_READ10:
-    readOffset *= ATAPI_CDROM_SECTOR_SIZE;
-    sectorCount *= ATAPI_CDROM_SECTOR_SIZE;
-
-    atapiState.dataOutBuffer.init(sectorCount, false);
-    atapiState.dataOutBuffer.reset();
-    atapiState.mountedODDImage->Read(readOffset, atapiState.dataOutBuffer.get(),
-      sectorCount);
+    scsiRead10Command();
     break;
   default:
     LOG_ERROR(ODD, "Unknown SCSI Command requested: 0x{:X}", atapiState.scsiCBD.CDB12.OperationCode);
   }
-
-  atapiState.regs.interruptReason = ATA_INTERRUPT_REASON_IO;
 }
 
 // Does a basic setup of registers for an ATAPI command that has no outputs/errors.
 void Xe::PCIDev::ODD::atapiNopCommand() {
-  atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_CD | ATA_INTERRUPT_REASON_IO;
-  atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_REL;
+  atapiState.regs.error = 0;
   atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF;
+  atapiState.regs.interruptReason &= ~7;
+  atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_CD | ATA_INTERRUPT_REASON_IO;
 }
