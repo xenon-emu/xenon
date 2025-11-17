@@ -268,9 +268,10 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
 
     // Check for Instruction storage/segment exceptions. If found we must end the block.
     if (curThread.exceptReg & ppuInstrStorageEx || curThread.exceptReg & ppuInstrSegmentEx) {
+#ifdef JIT_DEBUG
       LOG_DEBUG(Xenon, "[JIT]: Instruction exception when creating block at CIA {:#x}, block start address {:#x}, instruction count {:#x}", 
         thread.CIA, blockStartAddress, instrCount);
-
+#endif
       if (instrCount != 0) {
         // We're a few instructions into the block, just end the block on the last instruction and start a new block on
         // the faulting instruction. It will process the exception accordingly.
@@ -338,6 +339,8 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
       case 0x800FC288: patchGPR(3, 0x0); break;
         // VdIsHSIOTrainingSucceeded return 1
       case 0x800F9130: patchGPR(3, 0x1); break;
+        // SATA SSC Speed patch (until I can get proper code pages working in ODD)
+      case 0x800C5B58: patchGPR(11, 0x3); break;
         // Pretend ARGON hardware is present, to avoid the call
       case 0x800819E0:
       case 0x80081A60: {

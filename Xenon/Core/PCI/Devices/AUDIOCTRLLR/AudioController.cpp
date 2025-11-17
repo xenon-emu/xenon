@@ -18,6 +18,10 @@ Xe::PCIDev::AUDIOCTRLR::AUDIOCTRLR(const std::string &deviceName, u64 size) :
 
 void Xe::PCIDev::AUDIOCTRLR::Read(u64 readAddress, u8 *data, u64 size) {
   LOG_DEBUG(AudioController, "Device Read at address {:#x}, size {:#d}", readAddress, size);
+  if (static_cast<u32>(readAddress) == 0xea001618 || static_cast<u32>(readAddress) == 0xea001608) {
+    memset(data, 0xFF, size);
+  }
+  //memset(data, 0xFF, size);
 }
 
 void Xe::PCIDev::AUDIOCTRLR::ConfigRead(u64 readAddress, u8 *data, u64 size) {

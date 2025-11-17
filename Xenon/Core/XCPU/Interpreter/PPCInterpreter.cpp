@@ -119,6 +119,12 @@ void PPCInterpreter::ppcExecuteSingleInstruction(sPPEState *ppeState) {
     thread.GPR[3] = 1;
   }
 
+  // SATA SSC Speed. Patched for now until proper code is in place.
+  if (static_cast<u32>(thread.CIA) == 0x800C5B58) {
+    LOG_INFO(Xenon, "Setting SATA SSC Speed to 3.");
+    thread.GPR[11] = 3;
+  }
+
   // Skip media detection in XAM for now.
   if (static_cast<u32>(thread.CIA) == 0x8175E61C) {
     thread.GPR[3] = 0;
@@ -137,11 +143,11 @@ void PPCInterpreter::ppcExecuteSingleInstruction(sPPEState *ppeState) {
   // Instruction Profiling
 #ifdef ENABLE_INSTRUCTION_PROFILER
   // Increase ref counts for current instruction
-  InstructionProfiler::Get().Increment(PPCDecode(thread.CI.opcode));
+  InstructionProfiler::Get().Increment(ppcDecoder.decodeName(thread.CI.opcode));
 
   // If enabled dumps the ALU instr counts.
   if (dumpInstrCount && ppeState->ppuName == "PPU0") {
-    InstructionProfiler::Get().DumpInstrCounts(eInstrProfileDumpType::ALU);
+    InstructionProfiler::Get().DumpInstrCounts(eInstrProfileDumpType::ALL);
     dumpInstrCount = false;
   }
 

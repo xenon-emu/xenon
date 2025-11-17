@@ -332,7 +332,7 @@ struct XE_ATA_IDENTIFY_DATA {
 // ATA Register State
 //
 struct ATA_REG_STATE {
-  // Command
+  // Command Block
   u32 data;         // Address 0x00
   struct {          // Address 0x01
     u32 error;      // When Read
@@ -347,7 +347,7 @@ struct ATA_REG_STATE {
     u32 status;     // When Read
     u32 command;    // When Written
   };
-  // Control
+  // Control Block
   struct {              // Address 0xA
     u32 altStatus;      // When Read
     u32 deviceControl;  // When Written

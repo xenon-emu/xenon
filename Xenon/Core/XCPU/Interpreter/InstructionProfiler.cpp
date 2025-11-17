@@ -4,264 +4,275 @@
 
 #include "InstructionProfiler.h"
 
-#include "PPCInterpreter.h"
-#include "PPC_Instruction.h"
 #include "Base/Logging/Log.h"
 
-#include <vector>
 #include <algorithm>
-#include <unordered_set>
+#include <vector>
+#include <mutex>
 
 namespace PPCInterpreter {
 
-InstructionProfiler& InstructionProfiler::Get() noexcept {
-  static InstructionProfiler instance;
-  return instance;
-}
+  namespace {
 
-InstructionProfiler::InstructionProfiler() noexcept {
-  for (auto &c : counters_) c.store(0, std::memory_order_relaxed);
-  isALU_.fill(0);
-  isFPU_.fill(0);
-  isVXU_.fill(0);
-  isLS_.fill(0);
+    // ALU instructions
+    static const std::unordered_set<std::string> aluNames = {
+      "mulli", "subfic", "cmpli", "cmpi", "addic", "addi", "addis", "rlwimix", "rlwinmx", "rlwnmx", "ori", "oris",
+      "xori", "xoris", "andi", "andis", "crnor", "crandc", "crxor", "crnand", "crand", "creqv", "crorc", "cror",
+      "rldiclx", "rldicrx", "rldicx", "rldimix", "rldclx", "rldcrx", "cmp", "subfcx", "subfcox", "mulhdux", "addcx", "addcox",
+      "mulhwux", "mfocrf", "slwx", "cntlzwx", "sldx", "andx", "cmpl", "subfx", "subfox", "cntlzdx", "andcx", "mulhdx", "mulhwx",
+      "negx", "negox", "norx", "subfex", "subfeox", "addex", "addeox", "mtocrf", "subfzex", "subfzeox", "addzex", "addzeox",
+      "subfmex", "subfmeox", "mulldx", "mulldox", "addmex", "addmeox", "mullwx", "mullwox", "addx", "addox", "eqvx", "eciwx",
+      "xorx", "orcx", "ecowx", "orx", "divdux", "divduox", "divwux", "divwuox", "nandx", "divdx", "divdox", "divwx", "divwox",
+      "srwx", "srdx", "srawx", "sradx", "srawix", "sradix", "extshx", "extsbx", "extswx"
+    };
 
-  // ALU
-  static const std::unordered_set<std::string> aluNames = {
-    "addx","addox","addcx","addcox","addex","addeox","addi","addic","addis",
-    "addmex","addmeox","addzex","addzeox",
-    "andx","andcx","andi","andis",
-    "cmp","cmpi","cmpl","cmpli",
-    "cntlzdx","cntlzwx",
-    "crand","crandc","creqv","crnand","crnor","cror","crorc","crxor",
-    "divdx","divdux","divdox","divduox","divwx","divwox","divwux","divwuox",
-    "eqvx",
-    "extsbx","extshx","extswx",
-    "mcrf","mftb","mfocrf","mtocrf",
-    "mulli","mulldx","mulldox","mullwx","mullwox","mulhwx","mulhwux","mulhdx","mulhdux",
-    "nandx","negx","negox","norx",
-    "orcx","ori","oris","orx",
-    "rldicx","rldcrx","rldclx","rldiclx","rldicrx","rldimix",
-    "rlwimix","rlwnmx","rlwinmx",
-    "sldx","slwx",
-    "sradx","sradix","srawx","srawix",
-    "srdx","srwx",
-    "subfcx","subfcox","subfx","subfox","subfex","subfeox",
-    "subfmex","subfmeox","subfzex","subfzeox","subfic",
-    "xorx","xori","xoris"
-  };
+    // FPU instructions
+    static const std::unordered_set<std::string> fpuNames = {
+      "fdivs", "fsubs", "fadds", "fsqrts", "fres", "fmuls", "fmsubs", "fmadds", "fnmsubs", "fnmadds", "mtfsb1", 
+      "mcrfs", "mtfsb0", "mtfsfi", "mffs", "mtfsf", "fcmpu", "frsp", "fctiw", "fctiwz", "fdiv", "fsub", "fadd", 
+      "fsqrt", "fsel", "fmul", "frsqrte", "fmsub", "fmadd", "fnmsub", "fnmadd", "fcmpo", "fneg", "fmr", "fnabs",
+      "fabs", "fctid", "fctidz", "fcfid",
+    };
 
-  // FPU
-  static const std::unordered_set<std::string> fpuNames = {
-    "mcrfs","faddx","fabsx","faddsx","fcmpu","fcmpo","fctiwx","fctidx","fctidzx","fctiwzx",
-    "fcfidx","fdivx","fdivsx","fmaddx","fmaddsx","fmulx","fmulsx","fmrx","fmsubx","fmsubsx",
-    "fnabsx","fnmaddx","fnmaddsx","fnegx","fnmsubx","fnmsubsx","frspx","fsubx","fselx",
-    "fsubsx","fsqrtx","fsqrtsx","frsqrtex","mffsx","mtfsfx","mtfsb0x","mtfsb1x",
-    "fctid","fctidz","fctid","fcfid","fctid"
-  };
+    // VXU instructions
+    static const std::unordered_set<std::string> vxuNames = {
+      "vaddubm", "vmaxub", "vrlb", "vmuloub", "vaddfp", "vmrghb",
+      "vpkuhum", "vadduhm", "vmaxuh", "vrlh", "vmulouh", "vsubfp", "vmrghh", "vpkuwum", "vadduwm", "vmaxuw", "vrlw",
+      "vmrghw", "vpkuhus", "vpkuwus", "vmaxsb", "vslb", "vmulosb", "vrefp", "vmrglb", "vpkshus", "vmaxsh", "vslh",
+      "vmulosh", "vrsqrtefp", "vmrglh", "vpkswus", "vaddcuw", "vmaxsw", "vslw", "vexptefp", "vmrglw", "vpkshss", "vsl",
+      "vlogefp", "vpkswss", "vaddubs", "vminub", "vsrb", "vmuleub", "vrfin", "vspltb", "vupkhsb", "vadduhs", "vminuh",
+      "vsrh", "vmuleuh", "vrfiz", "vsplth", "vupkhsh", "vadduws", "vminuw", "vsrw", "vrfip", "vspltw", "vupklsb", "vsr",
+      "vrfim", "vupklsh", "vaddsbs", "vminsb", "vsrab", "vmulesb", "vcfux", "vspltisb", "vpkpx", "vaddshs", "vminsh",
+      "vsrah", "vmulesh", "vcfsx", "vspltish", "vupkhpx", "vaddsws", "vminsw", "vsraw", "vctuxs", "vspltisw", "vctsxs",
+      "vupklpx", "vsububm", "vavgub", "vand", "vmaxfp", "vslo", "vsubuhm", "vavguh", "vandc", "vminfp", "vsro", "vsubuwm",
+      "vavguw","vor", "vxor", "vavgsb", "vnor", "vavgsh", "vsubcuw", "vavgsw", "vsububs", "mfvscr", "vsum4ubs","vsubuhs",
+      "mtvscr", "vsum4shs", "vsubuws", "vsum2sws", "vsubsbs", "vsum4sbs", "vsubshs", "vsubsws", "vsumsws", "vcmpequb",
+      "vcmpequh", "vcmpequwx", "vcmpeqfp", "vcmpgefp", "vcmpgtub", "vcmpgtuh", "vcmpgtuw", "vcmpgtfp", "vcmpgtsb",
+      "vcmpgtsh", "vcmpgtsw", "vcmpbfp", "vmhaddshs", "vmhraddshs", "vmladduhm", "vmsumubm", "vmsummbm", "vmsumuhm",
+      "vmsumuhs", "vmsumshm", "vmsumshs", "vsel", "vperm", "vsldoi", "vmaddfp", "vnmsubfp", "vsldoi128", "vperm128",
+      "vaddfp128", "vsubfp128", "vmulfp128", "vmaddfp128", "vmaddcfp128", "vnmsubfp128", "vmsum3fp128", "vmsum4fp128",
+      "vpkshss128", "vand128", "vpkshus128", "vandc128", "vpkswss128", "vnor128", "vpkswus128", "vor128", "vpkuhum128",
+      "vxor128", "vpkuhus128", "vsel128", "vpkuwum128", "vslo128", "vpkuwus128", "vsro128", "vpermwi128", "vpkd3d128",
+      "vrlimi128", "vcfpsxws128", "vcfpuxws128", "vcsxwfp128", "vcuxwfp128", "vrfim128", "vrfin128", "vrfip128",
+      "vrfiz128", "vrefp128", "vrsqrtefp128", "vexptefp128", "vlogefp128", "vspltw128", "vspltisw128", "vupkd3d128",
+      "vcmpeqfp128", "vcmpgefp128", "vcmpgtfp128", "vcmpbfp128", "vcmpequw128", "vrlw128", "vslw128", "vsraw128",
+      "vsrw128", "vmaxfp128", "vminfp128", "vmrghw128", "vmrglw128", "vupkhsb128", "vupklsb128"
+    };
 
-  // VXU
-  static const std::unordered_set<std::string> vxuNames = {
-    "dss","dst","dstst","mfvscr","mtvscr",
-    "vaddfp","vaddfp128","vaddubs","vadduhm","vadduws","vaddshs","vavguh","vand","vand128","vandc","vandc128",
-    "vctsxs","vctuxs","vcfsx","vcfux","vcmpbfp","vcmpbfp128","vcmpeqfp","vcmpeqfp128","vcmpequwx","vcmpequw128",
-    "vcmpgefp128","vcsxwfp128","vcfpsxws128","vexptefp","vexptefp128","vnmsubfp","vnmsubfp128","vnor","vor","vor128",
-    "vspltw","vmaxuw","vmaxsh","vmaxuh","vmaxsw","vminsh","vminuh","vminuw","vmaxfp","vmaxfp128","vminfp","vminfp128",
-    "vmaddfp","vmulfp128","vmaddcfp128","vmrghb","vmrghh","vmrghw","vmrghw128","vmrglb","vmrglh","vmrglw","vmrglw128",
-    "vperm","vperm128","vpermwi128","vrlh","vrlimi128","vrfin","vrfin128","vrefp","vrefp128","vrsqrtefp","vrsqrtefp128",
-    "vsel","vsel128","vsl","vslo","vslb","vslh","vslw","vslw128","vsr","vsrh","vsrah","vsrw","vsrw128","vsraw128",
-    "vsldoi","vsldoi128","vspltb","vsplth","vspltisb","vspltish","vspltisw","vspltisw128","vsubfp128","vspltw128",
-    "vmsum3fp128","vmsum4fp128","vupkd3d128","vxor","vxor128","vmrghw128","vmrglw128","vmaxfp128","vminfp128"
-  };
+    // Load/Store instructions
+    static const std::unordered_set<std::string> lsNames = {
+      // Loads
+      "lwz", "lwzu", "lbz", "lbzu", "lhz", "lhzu", "lha", "lhau", "lmw", "lfs", "lfsu", "lfd", "lfdu", "lvsl", "lvebx",
+      "lwarx", "ldx", "lwzx", "lvsr", "lvehx", "ldux", "lwzux", "lvewx", "ldarx", "lbzx", "lvx", "lbzux", "lhzx",
+      "lhzux", "lwax", "lhax", "lvxl", "lwaux", "lhaux", "lvlx", "ldbrx", "lswx", "lwbrx", "lfsx", "lvrx", "lfsux",
+      "lswi", "lfdx", "lfdux", "lvlxl", "lhbrx", "lvrxl", "ld", "ldu", "lwa", "lvsl128", "lvsr128", "lvewx128", 
+      "lvx128", "lvxl128", "lvlx128", "lvrx128", "lvlxl128", "lvrxl128",
 
-  // Load/Store
-  static const std::unordered_set<std::string> lsNames = {
-    // Loads
-    "lbz","lbzu","lbzux","lbzx","lha","lhau","lhaux","lhax","lhbrx","lhz","lhzu","lhzux","lhzx",
-    "lwz","lwzu","lwzux","lwzx","lfs","lfsu","lfsx","lfsux","lfd","lfdu","lfdx","lfdux",
-    "lmw","lswi","lswi","lwarx","lwad","ld","ldu","ldx","ldux","ldbrx","lwad","lvebx","lvewx","lvxl","lvsl","lvrx","lvx",
-    // Stores
-    "stb","stbu","stbux","stbx","sth","sthbrx","sthu","sthux","sthx","stw","stwbrx","stwcx","stwu","stwux","stwx",
-    "stfs","stfsu","stfsux","stfsx","stfd","stfdx","stfdu","stfdux","stfiwx","std","stdu","stdx","stdcx","stmw","stswi",
-    "stvx","stvx128","stvewx","stvewx128","stvrx","stvrx128","stvlx","stvxl","stvlx128","stvlxl128","stvrxl","stvrxl128","stvlxl","stvlxl128"
-  };
+      // Stores
+      "stw", "stwu", "stb", "stbu", "sth", "sthu", "stmw", "stfs", "stfsu", "stfd", "stfdu", "stvebx", "stdx", "stwcx",
+      "stwx", "stvehx", "stdux", "stwux", "stvewx", "stdcx", "stbx", "stvx", "stbux", "sthx", "sthux", "stvxl", 
+      "stvlx", "stdbrx", "stswx", "stwbrx", "stfsx", "stvrx", "stfsux", "stswi", "stfdx", "stfdux",
+      "stvlxl", "sthbrx", "stvrxl", "stfiwx", "std", "stdu", "stvewx128", "stvx128", "stvxl128","stvlx128", "stvrx128",    
+      "stvlxl128", "stvrxl128",
+    };
 
-  const auto &nameTable = ppcDecoder.getNameTable();
-  for (size_t i = 0; i < nameTable.size(); ++i) {
-    const std::string &nm = nameTable[i];
-    if (aluNames.find(nm) != aluNames.end()) {
-      isALU_[i] = 1;
+    static inline bool comparePairDesc(const std::pair<std::string, u64> &a,
+      const std::pair<std::string, u64> &b) {
+      return a.second > b.second;
     }
-    if (fpuNames.find(nm) != fpuNames.end()) {
-      isFPU_[i] = 1;
+  } // anonymous namespace
+
+  InstructionProfiler &InstructionProfiler::Get() noexcept {
+    static InstructionProfiler instance;
+    return instance;
+  }
+
+  InstructionProfiler::InstructionProfiler() noexcept {
+    // No initialization required para el mapa dinámico.
+  }
+
+  InstructionProfiler::~InstructionProfiler() = default;
+
+  void InstructionProfiler::Increment(const std::string &instrName) noexcept {
+    {
+      std::shared_lock lock(countersMutex_);
+      auto it = counters_.find(instrName);
+      if (it != counters_.end()) {
+        it->second->fetch_add(1, std::memory_order_relaxed);
+        return;
+      }
     }
-    if (vxuNames.find(nm) != vxuNames.end()) {
-      isVXU_[i] = 1;
+
+    {
+      std::unique_lock lock(countersMutex_);
+      auto it = counters_.find(instrName);
+      if (it == counters_.end()) {
+        auto ptr = std::make_shared<std::atomic<u64>>(0);
+        // Emplace el par y luego incrementa.
+        auto res = counters_.emplace(instrName, ptr);
+        res.first->second->fetch_add(1, std::memory_order_relaxed);
+      }
+      else {
+        it->second->fetch_add(1, std::memory_order_relaxed);
+      }
     }
-    if (lsNames.find(nm) != lsNames.end()) {
-      isLS_[i] = 1;
+  }
+
+  void InstructionProfiler::Reset() noexcept {
+    std::unique_lock lock(countersMutex_);
+    for (auto &p : counters_) {
+      p.second->store(0, std::memory_order_relaxed);
     }
   }
-}
 
-void InstructionProfiler::Increment(u32 tableKey) noexcept {
-  if (tableKey < counters_.size()) {
-    counters_[tableKey].fetch_add(1, std::memory_order_relaxed);
-  }
-}
+  void InstructionProfiler::DumpTopAll(size_t topN) const noexcept {
+    std::vector<std::pair<std::string, u64>> vec;
+    {
+      std::shared_lock lock(countersMutex_);
+      vec.reserve(counters_.size());
+      for (const auto &p : counters_) {
+        u64 v = p.second->load(std::memory_order_relaxed);
+        if (v) vec.emplace_back(p.first, v);
+      }
+    }
 
-void InstructionProfiler::Reset() noexcept {
-  for (auto &c : counters_) c.store(0, std::memory_order_relaxed);
-}
+    if (vec.empty()) {
+      LOG_INFO(Xenon, "[InstructionProfiler]: no counts recorded.");
+      return;
+    }
 
-static inline bool comparePairDesc(const std::pair<u32, u64>& a,
-                                   const std::pair<u32, u64>& b) {
-  return a.second > b.second;
-}
+    std::sort(vec.begin(), vec.end(), comparePairDesc);
+    size_t limit = std::min(topN, vec.size());
 
-void InstructionProfiler::DumpTopAll(size_t topN) const noexcept {
-  std::vector<std::pair<u32, u64>> vec;
-  vec.reserve(counters_.size());
-  for (u32 i = 0; i < counters_.size(); ++i) {
-    auto v = counters_[i].load(std::memory_order_relaxed);
-    if (v) vec.emplace_back(i, v);
-  }
+    LOG_INFO(Xenon, "[InstructionProfiler]: Top {} instructions (all):", limit);
 
-  if (vec.empty()) {
-    LOG_INFO(Xenon, "[InstructionProfiler]: no counts recorded.");
-    return;
+    for (size_t i = 0; i < limit; ++i) {
+      const auto &p = vec[i];
+      LOG_INFO(Xenon, "  {:3} : {:>12} hits - {}", i + 1, p.second, p.first);
+    }
   }
 
-  std::sort(vec.begin(), vec.end(), comparePairDesc);
-  const auto &nameTable = ppcDecoder.getNameTable();
-  size_t limit = std::min(topN, vec.size());
+  void InstructionProfiler::DumpTopALU(size_t topN) const noexcept {
+    std::vector<std::pair<std::string, u64>> vec;
+    {
+      std::shared_lock lock(countersMutex_);
+      vec.reserve(counters_.size());
+      for (const auto &p : counters_) {
+        if (aluNames.find(p.first) == aluNames.end()) continue;
+        u64 v = p.second->load(std::memory_order_relaxed);
+        if (!v) continue;
+        vec.emplace_back(p.first, v);
+      }
+    }
 
-  LOG_INFO(Xenon, "[InstructionProfiler]: Top {} instructions (all):", limit);
+    if (vec.empty()) {
+      LOG_INFO(Xenon, "[InstructionProfiler]: no ALU instruction counts recorded.");
+      return;
+    }
 
-  for (size_t i = 0; i < limit; ++i) {
-    const auto &p = vec[i];
-    const std::string &name = nameTable[p.first];
-    LOG_INFO(Xenon, "  {:3} : {:>12} hits - {}", i + 1, p.second, name);
-  }
-}
+    std::sort(vec.begin(), vec.end(), comparePairDesc);
+    size_t limit = std::min(topN, vec.size());
 
-void InstructionProfiler::DumpTopALU(size_t topN) const noexcept {
-  std::vector<std::pair<u32, u64>> vec;
-  vec.reserve(counters_.size());
-  const auto &nameTable = ppcDecoder.getNameTable();
-  for (u32 i = 0; i < counters_.size(); ++i) {
-    if (!isALU_[i]) continue;
-    auto v = counters_[i].load(std::memory_order_relaxed);
-    if (!v) continue;
-    vec.emplace_back(i, v);
-  }
+    LOG_INFO(Xenon, "[InstructionProfiler]: Top {} ALU instructions (exact list):", limit);
 
-  if (vec.empty()) {
-    LOG_INFO(Xenon, "[InstructionProfiler]: no ALU instruction counts recorded.");
-    return;
-  }
-
-  std::sort(vec.begin(), vec.end(), comparePairDesc);
-  size_t limit = std::min(topN, vec.size());
-  
-  LOG_INFO(Xenon, "[InstructionProfiler]: Top {} ALU instructions (exact list):", limit);
-  
-  for (size_t i = 0; i < limit; ++i) {
-    const auto &p = vec[i];
-    const std::string &name = nameTable[p.first];
-    LOG_INFO(Xenon, "  {:3} : {:>12} hits - {}", i + 1, p.second, name);
-  }
-}
-
-void InstructionProfiler::DumpTopFPU(size_t topN) const noexcept {
-  std::vector<std::pair<u32, u64>> vec;
-  vec.reserve(counters_.size());
-  const auto &nameTable = ppcDecoder.getNameTable();
-  for (u32 i = 0; i < counters_.size(); ++i) {
-    if (!isFPU_[i]) continue;
-    auto v = counters_[i].load(std::memory_order_relaxed);
-    if (!v) continue;
-    vec.emplace_back(i, v);
+    for (size_t i = 0; i < limit; ++i) {
+      const auto &p = vec[i];
+      LOG_INFO(Xenon, "  {:3} : {:>12} hits - {}", i + 1, p.second, p.first);
+    }
   }
 
-  if (vec.empty()) {
-    LOG_INFO(Xenon, "[InstructionProfiler]: no FPU instruction counts recorded.");
-    return;
+  void InstructionProfiler::DumpTopFPU(size_t topN) const noexcept {
+    std::vector<std::pair<std::string, u64>> vec;
+    {
+      std::shared_lock lock(countersMutex_);
+      vec.reserve(counters_.size());
+      for (const auto &p : counters_) {
+        if (fpuNames.find(p.first) == fpuNames.end()) continue;
+        u64 v = p.second->load(std::memory_order_relaxed);
+        if (!v) continue;
+        vec.emplace_back(p.first, v);
+      }
+    }
+
+    if (vec.empty()) {
+      LOG_INFO(Xenon, "[InstructionProfiler]: no FPU instruction counts recorded.");
+      return;
+    }
+
+    std::sort(vec.begin(), vec.end(), comparePairDesc);
+    size_t limit = std::min(topN, vec.size());
+
+    LOG_INFO(Xenon, "[InstructionProfiler]: Top {} FPU instructions (exact list):", limit);
+
+    for (size_t i = 0; i < limit; ++i) {
+      const auto &p = vec[i];
+      LOG_INFO(Xenon, "  {:3} : {:>12} hits - {}", i + 1, p.second, p.first);
+    }
   }
 
-  std::sort(vec.begin(), vec.end(), comparePairDesc);
-  size_t limit = std::min(topN, vec.size());
+  void InstructionProfiler::DumpTopVXU(size_t topN) const noexcept {
+    std::vector<std::pair<std::string, u64>> vec;
+    {
+      std::shared_lock lock(countersMutex_);
+      vec.reserve(counters_.size());
+      for (const auto &p : counters_) {
+        if (vxuNames.find(p.first) == vxuNames.end()) continue;
+        u64 v = p.second->load(std::memory_order_relaxed);
+        if (!v) continue;
+        vec.emplace_back(p.first, v);
+      }
+    }
 
-  LOG_INFO(Xenon, "[InstructionProfiler]: Top {} FPU instructions (exact list):", limit);
+    if (vec.empty()) {
+      LOG_INFO(Xenon, "[InstructionProfiler]: no VXU instruction counts recorded.");
+      return;
+    }
 
-  for (size_t i = 0; i < limit; ++i) {
-    const auto &p = vec[i];
-    const std::string &name = nameTable[p.first];
-    LOG_INFO(Xenon, "  {:3} : {:>12} hits - {}", i + 1, p.second, name);
-  }
-}
+    std::sort(vec.begin(), vec.end(), comparePairDesc);
+    size_t limit = std::min(topN, vec.size());
 
-void InstructionProfiler::DumpTopVXU(size_t topN) const noexcept {
-  std::vector<std::pair<u32, u64>> vec;
-  vec.reserve(counters_.size());
-  const auto &nameTable = ppcDecoder.getNameTable();
-  for (u32 i = 0; i < counters_.size(); ++i) {
-    if (!isVXU_[i]) continue;
-    auto v = counters_[i].load(std::memory_order_relaxed);
-    if (!v) continue;
-    vec.emplace_back(i, v);
-  }
-  
-  if (vec.empty()) {
-    LOG_INFO(Xenon, "[InstructionProfiler]: no VXU instruction counts recorded.");
-    return;
-  }
-  
-  std::sort(vec.begin(), vec.end(), comparePairDesc);
-  size_t limit = std::min(topN, vec.size());
-  
-  LOG_INFO(Xenon, "[InstructionProfiler]: Top {} VXU instructions (exact list):", limit);
-  
-  for (size_t i = 0; i < limit; ++i) {
-    const auto &p = vec[i];
-    const std::string &name = nameTable[p.first];
-    LOG_INFO(Xenon, "  {:3} : {:>12} hits - {}", i + 1, p.second, name);
-  }
-}
+    LOG_INFO(Xenon, "[InstructionProfiler]: Top {} VXU instructions (exact list):", limit);
 
-void InstructionProfiler::DumpTopLS(size_t topN) const noexcept {
-  std::vector<std::pair<u32, u64>> vec;
-  vec.reserve(counters_.size());
-  const auto &nameTable = ppcDecoder.getNameTable();
-  for (u32 i = 0; i < counters_.size(); ++i) {
-    if (!isLS_[i]) continue;
-    auto v = counters_[i].load(std::memory_order_relaxed);
-    if (!v) continue;
-    vec.emplace_back(i, v);
+    for (size_t i = 0; i < limit; ++i) {
+      const auto &p = vec[i];
+      LOG_INFO(Xenon, "  {:3} : {:>12} hits - {}", i + 1, p.second, p.first);
+    }
   }
-  
-  if (vec.empty()) {
-    LOG_INFO(Xenon, "[InstructionProfiler]: no Load/Store instruction counts recorded.");
-    return;
-  }
-  
-  std::sort(vec.begin(), vec.end(), comparePairDesc);
-  size_t limit = std::min(topN, vec.size());
-  
-  LOG_INFO(Xenon, "[InstructionProfiler]: Top {} Load/Store instructions (exact list):", limit);
-  
-  for (size_t i = 0; i < limit; ++i) {
-    const auto &p = vec[i];
-    const std::string &name = nameTable[p.first];
-    LOG_INFO(Xenon, "  {:3} : {:>12} hits - {}", i + 1, p.second, name);
-  }
-}
 
-void InstructionProfiler::DumpInstrCounts(eInstrProfileDumpType dumpType, size_t topN) {
-  if(dumpType & ALU) { DumpTopALU(topN); }
-  if(dumpType & VXU) { DumpTopALU(topN); }
-  if(dumpType & FPU) { DumpTopALU(topN); }
-  if(dumpType & LS) { DumpTopALU(topN); }
-}
+  void InstructionProfiler::DumpTopLS(size_t topN) const noexcept {
+    std::vector<std::pair<std::string, u64>> vec;
+    {
+      std::shared_lock lock(countersMutex_);
+      vec.reserve(counters_.size());
+      for (const auto &p : counters_) {
+        if (lsNames.find(p.first) == lsNames.end()) continue;
+        u64 v = p.second->load(std::memory_order_relaxed);
+        if (!v) continue;
+        vec.emplace_back(p.first, v);
+      }
+    }
+
+    if (vec.empty()) {
+      LOG_INFO(Xenon, "[InstructionProfiler]: no Load/Store instruction counts recorded.");
+      return;
+    }
+
+    std::sort(vec.begin(), vec.end(), comparePairDesc);
+    size_t limit = std::min(topN, vec.size());
+
+    LOG_INFO(Xenon, "[InstructionProfiler]: Top {} Load/Store instructions (exact list):", limit);
+
+    for (size_t i = 0; i < limit; ++i) {
+      const auto &p = vec[i];
+      LOG_INFO(Xenon, "  {:3} : {:>12} hits - {}", i + 1, p.second, p.first);
+    }
+  }
+
+  void InstructionProfiler::DumpInstrCounts(eInstrProfileDumpType dumpType, size_t topN) {
+    if (dumpType & ALU) { DumpTopALU(topN); }
+    if (dumpType & VXU) { DumpTopVXU(topN); }
+    if (dumpType & FPU) { DumpTopFPU(topN); }
+    if (dumpType & LS) { DumpTopLS(topN); }
+  }
 
 } // namespace PPCInterpreter

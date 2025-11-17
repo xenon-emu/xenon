@@ -330,6 +330,30 @@ void PPCInterpreter::PPCInterpreter_tlbie(sPPEState *ppeState) {
     curThread.iERAT.invalidateElement(EA+i);
     curThread.dERAT.invalidateElement(EA+i);
   }
+
+  // Invalidate JIT blocks that map to the page/rango afectado por RB/p
+  if (XeMain::GetCPU()) {
+    PPU *ppu = XeMain::GetCPU()->GetPPU(ppeState->ppuID);
+    if (ppu && ppu->GetPPUJIT()) {
+      // Get page range based on 'p' (p = log2(pageSize))
+      u64 pageSize = (p < 64) ? (1ULL << p) : 0ULL;
+      if (pageSize == 0) {
+        // Fallback: full cache invalidation. (should never happen but for safety).
+#ifdef MMU_DEBUG
+        LOG_DEBUG(Xenon_MMU, "[TLBIE]: Unknown page size (p={}), invalidating all JIT blocks", p);
+#endif
+        ppu->GetPPUJIT()->InvalidateAllBlocks();
+      }
+      else {
+        u64 start = EA & ~(pageSize - 1ULL);
+        u64 end = start + pageSize;
+#ifdef MMU_DEBUG
+        LOG_DEBUG(Xenon_MMU, "[TLBIE]: Invalidating JIT blocks for page {:#x} (size {:#x})", start, pageSize);
+#endif
+        ppu->GetPPUJIT()->InvalidateBlocksForRange(start, end);
+      }
+    }
+  }
 }
 
 // TLB Synchronize
