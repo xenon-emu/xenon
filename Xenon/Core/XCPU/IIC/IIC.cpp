@@ -117,7 +117,7 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
     iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].REG_INT_MCACK = bsIntData;
     break;
   default:
-    LOG_ERROR(Xenon_IIC, "Unknown CPU Interrupt Ctrl Blck Reg being written: 0x{:X}", ppeIntCtrlBlckReg);
+    LOG_ERROR(Xenon_IIC, "Unknown CPU Interrupt Ctrl Blck Reg being written: {:#x}, data {:#x}", ppeIntCtrlBlckReg, intData);
     break;
   }
   mutex.unlock();
