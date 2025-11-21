@@ -42,6 +42,12 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
   size_t intIndex = 0;
   u32 bsIntData = static_cast<u32>(byteswap_be<u64>(intData));
 
+  // Check for address range that belongs to us. (For now)
+  if (ppeIntCtrlBlckID > 5) { 
+    mutex.unlock();
+    return; 
+  }
+
   auto& interrupts = iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts;
   switch (ppeIntCtrlBlckReg) {
   case Xe::XCPU::IIC::CPU_WHOAMI:
@@ -117,19 +123,24 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
     iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].REG_INT_MCACK = bsIntData;
     break;
   default:
-    LOG_ERROR(Xenon_IIC, "Unknown CPU Interrupt Ctrl Blck Reg being written: 0x{:X}", ppeIntCtrlBlckReg);
+    LOG_ERROR(Xenon_IIC, "Unknown CPU Interrupt Ctrl Blck Reg being written: {:#x}, data {:#x}", ppeIntCtrlBlckReg, intData);
     break;
   }
   mutex.unlock();
 }
 
-void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u8 *data, u64 size) {
+bool Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u8 *data, u64 size) {
   MICROPROFILE_SCOPEI("[Xe::IIC]", "ReadInterrupt", MP_AUTO);
-  std::scoped_lock lk(mutex);
-
   constexpr u32 mask = 0xF000;
   u8 ppeIntCtrlBlckID = static_cast<u8>((intAddress & mask) >> 12);
   u8 ppeIntCtrlBlckReg = intAddress & 0xFF;
+
+  // Check for address range that belongs to us. (For now)
+  if (ppeIntCtrlBlckID > 5) {
+    return false;
+  }
+
+  std::scoped_lock lk(mutex);
 
   auto &interrupts = iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts;
   switch (ppeIntCtrlBlckReg) {
@@ -175,9 +186,11 @@ void Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u8 *data, u64 size) 
     LOG_ERROR(Xenon_IIC, "Unknown interrupt being read 0x{:X}", ppeIntCtrlBlckReg);
     break;
   }
+
+  return true;
 }
 
-bool Xe::XCPU::IIC::XenonIIC::checkExtInterrupt(u8 ppuID) {
+bool Xe::XCPU::IIC::XenonIIC::checkExtInterrupt(u8 ppuID, bool bypassSignaled) {
   MICROPROFILE_SCOPEI("[Xe::IIC]", "CheckExternalInterrupt", MP_AUTO);
   std::scoped_lock lk(mutex);
 
@@ -187,7 +200,7 @@ bool Xe::XCPU::IIC::XenonIIC::checkExtInterrupt(u8 ppuID) {
   }
 
   // Check for some interrupt that was already signaled
-  if (iicState.ppeIntCtrlBlck[ppuID].intSignaled) {
+  if (iicState.ppeIntCtrlBlck[ppuID].intSignaled && !bypassSignaled) {
     return false;
   }
 

@@ -69,7 +69,8 @@ bool RootBus::Read(u64 readAddress, u8 *data, u64 size, bool soc) {
   for (auto &[name, dev] : connectedDevices) {
     if (readAddress >= dev->GetStartAddress() &&
         readAddress <= dev->GetEndAddress()) {
-      // Hit
+      // If the read is to SOC MMIO, we can't read from RAM.
+      if (soc && dev->GetDeviceName() == "RAM") { continue; }
       dev->Read(readAddress, data, size);
       return true;
     }
@@ -131,7 +132,8 @@ bool RootBus::Write(u64 writeAddress, const u8 *data, u64 size, bool soc) {
   for (auto &[name, dev] : connectedDevices) {
     if (writeAddress >= dev->GetStartAddress() &&
         writeAddress <= dev->GetEndAddress()) {
-      // Hit
+      // If the write is to SOC MMIO, we can't read from RAM.
+      if (soc && dev->GetDeviceName() == "RAM") { continue; }
       dev->Write(writeAddress, data, size);
       return true;
     }

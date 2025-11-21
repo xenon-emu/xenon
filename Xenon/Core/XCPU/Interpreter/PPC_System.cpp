@@ -2,9 +2,144 @@
 /* Copyright 2025 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
+#include <unordered_map>
+
 #include "Base/Logging/Log.h"
 
 #include "PPCInterpreter.h"
+
+//#define SYSCALL_DEBUG
+
+#ifdef SYSCALL_DEBUG
+static const std::unordered_map<u8, const std::string> syscallIndexMap17489 = {
+  { 0, "HvxGetVersion" },
+  { 1, "HvxStartupProcessors" },
+  { 2, "HvxQuiesceProcessor" },
+  { 3, "HvxFlushEntireTb" },
+  { 4, "HvxFlushSingleTb" },
+  { 5, "HvxRelocateAndFlush" },
+  { 6, "HvxGetSpecialPurposeRegister" },
+  { 7, "HvxSetSpecialPurposeRegister" },
+  { 8, "HvxGetSocRegister" },
+  { 9, "HvxSetSocRegister" },
+  { 10, "HvxSetTimebaseToZero" },
+  { 11, "HvxZeroPage" },
+  { 12, "HvxFlushDcacheRange" },
+  { 13, "HvxPostOutput" },
+  { 14, "HvxEnablePPUPerformanceMonitor" },
+  { 15, "HvxGetImagePageTableEntry" },
+  { 16, "HvxSetImagePageTableEntry" },
+  { 17, "HvxCreateImageMapping" },
+  { 18, "HvxMapImagePage" },
+  { 19, "HvxCompleteImageMapping" },
+  { 20, "HvxLoadImageData" },
+  { 21, "HvxFinishImageDataLoad" },
+  { 22, "HvxStartResolveImports" },
+  { 23, "HvxResolveImports" },
+  { 24, "HvxFinishImageLoad" },
+  { 25, "HvxAbandonImageLoad" },
+  { 26, "HvxUnmapImagePages" },
+  { 27, "HvxUnmapImage" },
+  { 28, "HvxUnmapImageRange" },
+  { 29, "HvxCreateUserMode" },
+  { 30, "HvxDeleteUserMode" },
+  { 31, "HvxFlushUserModeTb" },
+  { 32, "HvxSetPowerMode" },
+  { 33, "HvxShadowBoot" },
+  { 34, "HvxBlowFuses" },
+  { 35, "HvxFsbInterrupt" },
+  { 36, "HvxLockL2" },
+  { 37, "HvxDvdAuthBuildNVPage" },
+  { 38, "HvxDvdAuthVerifyNVPage" },
+  { 39, "HvxDvdAuthRecordAuthenticationPage" },
+  { 40, "HvxDvdAuthRecordXControl" },
+  { 41, "HvxDvdAuthGetAuthPage" },
+  { 42, "HvxDvdAuthVerifyAuthPage" },
+  { 43, "HvxDvdAuthGetNextLBAIndex" },
+  { 44, "HvxDvdAuthVerifyLBA" },
+  { 45, "HvxDvdAuthClearDiscAuthInfo" },
+  { 46, "HvxKeysInitialize" },
+  { 47, "HvxKeysGetKeyProperties" },
+  { 48, "HvxKeysGetStatus" },
+  { 49, "HvxKeysGenerateRandomKey" },
+  { 50, "HvxKeysGetFactoryChallenge" },
+  { 51, "HvxKeysSetFactoryResponse" },
+  { 52, "HvxKeysSaveBootLoader" },
+  { 53, "HvxKeysSaveKeyVault" },
+  { 54, "HvxKeysSetKey" },
+  { 55, "HvxKeysGetKey" },
+  { 56, "HvxKeysGetDigest" },
+  { 57, "HvxKeysRsaPrvCrypt" },
+  { 58, "HvxKeysHmacSha" },
+  { 59, "HvxKeysAesCbc" },
+  { 60, "HvxKeysDes2Cbc" },
+  { 61, "HvxKeysDesCbc" },
+  { 62, "HvxKeysObscureKey" },
+  { 63, "HvxKeysSaveSystemUpdate" },
+  { 64, "HvxKeysExecute" },
+  { 65, "HvxDvdAuthTestMode" },
+  { 66, "HvxEnableTimebase" },
+  { 67, "HvxHdcpCalculateMi" },
+  { 68, "HvxHdcpCalculateAKsvSignature" },
+  { 69, "HvxHdcpCalculateBKsvSignature" },
+  { 70, "HvxSetRevocationList" },
+  { 71, "HvxEncryptedAllocationReserve" },
+  { 72, "HvxEncryptedAllocationMap" },
+  { 73, "HvxEncryptedAllocationUnmap" },
+  { 74, "HvxEncryptedAllocationRelease" },
+  { 75, "HvxEncryptedSweepAddressRange" },
+  { 76, "HvxKeysExCreateKeyVault" },
+  { 77, "HvxKeysExLoadKeyVault" },
+  { 78, "HvxKeysExSaveKeyVault" },
+  { 79, "HvxKeysExSetKey" },
+  { 80, "HvxKeysExGetKey" },
+  { 81, "HvxGetUpdateSequence" },
+  { 82, "HvxSecurityInitialize" },
+  { 83, "HvxSecurityLoadSettings" },
+  { 84, "HvxSecuritySaveSettings" },
+  { 85, "HvxSecuritySetDetected" },
+  { 86, "HvxSecurityGetDetected" },
+  { 87, "HvxSecuritySetActivated" },
+  { 88, "HvxSecurityGetActivated" },
+  { 89, "HvxSecuritySetStat" },
+  { 90, "HvxGetProtectedFlags" },
+  { 91, "HvxSetProtectedFlag" },
+  { 92, "HvxDvdAuthGetAuthResults" },
+  { 93, "HvxDvdAuthSetDriveAuthResult" },
+  { 94, "HvxDvdAuthSetDiscAuthResult" },
+  { 95, "HvxImageTransformImageKey" },
+  { 96, "HvxImageXexHeader" },
+  { 97, "HvxRevokeLoad" },
+  { 98, "HvxRevokeSave" },
+  { 99, "HvxRevokeUpdate" },
+  { 100, "HvxDvdAuthGetMediaId" },
+  { 101, "HvxXexActivationGetNonce" },
+  { 102, "HvxXexActivationSetLicense" },
+  { 103, "HvxXexActivationVerifyOwnership" },
+  { 104, "HvxIptvSetBoundaryKey" },
+  { 105, "HvxIptvSetSessionKey" },
+  { 106, "HvxIptvVerifyOmac1Signature" },
+  { 107, "HvxIptvGetAesCtrTransform" },
+  { 108, "HvxIptvGetSessionKeyHash" },
+  { 109, "HvxImageDvdEmulationMode" },
+  { 110, "HvxImageUserMode" },
+  { 111, "HvxImageShim" },
+  { 112, "HvxExpansionInstall" },
+  { 113, "HvxExpansionCall" },
+  { 114, "HvxDvdAuthFwcr" },
+  { 115, "HvxDvdAuthFcrt" },
+  { 116, "HvxDvdAuthEx" },
+  { 117, "HvxTest" },
+};
+
+// Returns the register name as an std::string.
+static std::string getSyscallNameFromIndex17489(u32 syscallID) {
+  auto it = syscallIndexMap17489.find(syscallID);
+  if (it != syscallIndexMap17489.end()) {
+    return it->second;
+  } else { return "Unknown";}
+}
+#endif
 
 // Instruction Synchronize
 void PPCInterpreter::PPCInterpreter_isync(sPPEState *ppeState) {
@@ -21,6 +156,13 @@ void PPCInterpreter::PPCInterpreter_sc(sPPEState *ppeState) {
   // Raise the exception.
   _ex |= ppuSystemCallEx;
   curThread.exHVSysCall = _instr.lev & 1;
+#ifdef SYSCALL_DEBUG
+  if (curThread.GPR[0] != 0) { // Don't want to ouput every time that HvxGetVersions is called.
+    LOG_DEBUG(Xenon, "{}(Thread{:#d}): Issuing Syscall {}", ppeState->ppuName, (u8)ppeState->currentThread,
+      getSyscallNameFromIndex17489(curThread.GPR[0]));
+  }
+#endif // SYSCALL_DEBUG
+
 }
 
 // SLB Move To Entry
@@ -223,6 +365,9 @@ void PPCInterpreter::PPCInterpreter_mfspr(sPPEState *ppeState) {
   case eXenonSPR::DEC:
     GPRi(rs) = curThread.SPR.DEC;
     break;
+  case eXenonSPR::HDEC:
+    GPRi(rs) = ppeState->SPR.HDEC;
+    break;
   case eXenonSPR::SDR1:
     GPRi(rs) = ppeState->SPR.SDR1.hexValue;
     break;
@@ -349,9 +494,33 @@ void PPCInterpreter::PPCInterpreter_mtspr(sPPEState *ppeState) {
   case eXenonSPR::CFAR:
     curThread.SPR.CFAR = GPRi(rd);
     break;
-  case eXenonSPR::CTRLWR:
-    ppeState->SPR.CTRL.hexValue = static_cast<u32>(GPRi(rd));
+  case eXenonSPR::CTRLWR: {
+    uCTRL newCTRL;
+    newCTRL.hexValue = static_cast<u32>(GPRi(rd));
+    if (ppeState->currentThread == ePPUThread_Zero) {
+      // Thread Zero
+      if (ppeState->SPR.CTRL.TE1) {
+        // TE1 is set, do not modify it.
+        newCTRL.TE1 = 1;
+      }
+    } else {
+      // Thread One
+      if (ppeState->SPR.CTRL.TE0) {
+        // TE0 is set, do not modify it.
+        newCTRL.TE0 = 1;
+      }
+    }
+
+    // TODO: Check this, reversing and docs suggests this is the correct behavior.
+    // If a thread is being enabled, we must generate a reset interrupt on said thread.
+    if (ppeState->SPR.CTRL.TE0 == 0 && newCTRL.TE0) { ppeState->ppuThread[0].exceptReg |= ppuSystemResetEx; }
+    if (ppeState->SPR.CTRL.TE1 == 0 && newCTRL.TE1) { ppeState->ppuThread[1].exceptReg |= ppuSystemResetEx; }
+
+    LOG_TRACE(Xenon, "{} (Thread{:#d}): Setting ctrl to {:#x}", ppeState->ppuName, (u8)ppeState->currentThread, newCTRL.hexValue);
+
+    ppeState->SPR.CTRL = newCTRL;
     break;
+  }
   case eXenonSPR::VRSAVE:
     curThread.SPR.VRSAVE = static_cast<u32>(GPRi(rd));
     break;

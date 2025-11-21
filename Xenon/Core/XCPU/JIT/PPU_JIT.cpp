@@ -459,13 +459,9 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
     // So, these will break under BuildJITBlock, and to avoid the issue, it's done here
     bool skipBlock = false;
     switch (thread.NIA) {
-      // INIT_POWER_MODE bypass 2.0.17489.0
-    case 0x80081764:
       // XDK 17.489.0 AudioChipCorder Device Detect bypass. This is not needed for
       // older console revisions
     case 0x801AF580:
-      // XamSetPowerMode call to KeSetPowerMode bypass.
-    case 0x817AC968:
       skipBlock = true;
       break;
     default:
@@ -528,6 +524,10 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
       }
       // Run block as usual.
       instrsExecuted += ExecuteJITBlock(blockStartAddress, enableHalt);
+
+      // If the thread was suspended due to CTRL being written, we must end execution on said thread.
+      if (ppeState->currentThread == 0 && ppeState->SPR.CTRL.TE0 != true) { break; }
+      if (ppeState->currentThread == 1 && ppeState->SPR.CTRL.TE1 != true) { break; }
     }
   }
 }

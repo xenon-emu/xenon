@@ -58,16 +58,6 @@ void PPCInterpreter::ppcExecuteSingleInstruction(sPPEState *ppeState) {
     //GPR(3) = 0;
   }
 
-  // INIT_POWER_MODE bypass 2.0.17489.0.
-  if (static_cast<u32>(thread.CIA) == 0x80081764) {
-    return;
-  }
-
-  // XamSetPowerMode call to KeSetPowerMode bypass.
-  if (static_cast<u32>(thread.CIA) == 0x817AC968) {
-    return;
-  }
-
   // XDK 17.489.0 AudioChipCorder Device Detect bypass. This is not needed for
   // older console revisions.
   if (static_cast<u32>(thread.CIA) == 0x801AF580) {
