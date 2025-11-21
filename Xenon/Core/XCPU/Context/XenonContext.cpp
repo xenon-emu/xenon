@@ -171,9 +171,17 @@ bool XenonContext::HandleINTRead(u64 readAddr, u8 *data, size_t byteCount) {
   u64 dataOut = 0;
   u16 offset = readAddr - XE_SOCINTS_BLOCK_START;
   memcpy(&dataOut, reinterpret_cast<u8 *>(socINTBlock.get()) + offset, byteCount);
+  LOG_TRACE(Xenon, "SoC INT Read at address {:#x}, data {:#x}", readAddr, dataOut);
+  // Workaround for PowerMode setting where HV code checks for this specific bit changing.
+  // TODO: Implement correct behavior.
+  if (readAddr == 0x56020) {
+    if (socINTBlock->MiscellaneousInterruptGeneration2.AsBITS.InterruptState) {
+      dataOut |= 0x200;
+      socINTBlock->MiscellaneousInterruptGeneration2.AsBITS.InterruptState = 0;
+  } else { socINTBlock->MiscellaneousInterruptGeneration2.AsBITS.InterruptState = 1; }
+  }
   dataOut = byteswap_be<u64>(dataOut);
   memcpy(data, &dataOut, byteCount);
-  LOG_WARNING(Xenon, "SoC INT Read at address {:#x}, data {:#x}", readAddr, dataOut);
   return true;
 }
 
@@ -187,7 +195,7 @@ bool XenonContext::HandleINTWrite(u64 writeAddr, const u8 *data, size_t byteCoun
 
   memcpy(reinterpret_cast<u8*>(socINTBlock.get()) + offset, &dataIn, byteCount);
 
-  LOG_TRACE(Xenon, "SoC INT Write at address 0x{:X}, data 0x{:X}.", writeAddr, dataIn);
+  LOG_TRACE(Xenon, "SoC INT Write at address {:#x}, data {:#x}.", writeAddr, dataIn);
   return true;
 }
 

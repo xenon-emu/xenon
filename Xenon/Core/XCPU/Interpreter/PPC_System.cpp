@@ -8,7 +8,7 @@
 
 #include "PPCInterpreter.h"
 
-#define SYSCALL_DEBUG
+//#define SYSCALL_DEBUG
 
 #ifdef SYSCALL_DEBUG
 static const std::unordered_map<u8, const std::string> syscallIndexMap17489 = {
@@ -495,21 +495,30 @@ void PPCInterpreter::PPCInterpreter_mtspr(sPPEState *ppeState) {
     curThread.SPR.CFAR = GPRi(rd);
     break;
   case eXenonSPR::CTRLWR: {
-    u32 newValue = static_cast<u32>(GPRi(rd));
+    uCTRL newCTRL;
+    newCTRL.hexValue = static_cast<u32>(GPRi(rd));
     if (ppeState->currentThread == ePPUThread_Zero) {
       // Thread Zero
       if (ppeState->SPR.CTRL.TE1) {
         // TE1 is set, do not modify it.
-        newValue |= 0x00400000;
+        newCTRL.TE1 = 1;
       }
     } else {
       // Thread One
       if (ppeState->SPR.CTRL.TE0) {
         // TE0 is set, do not modify it.
-        newValue |= 0x00800000;
+        newCTRL.TE0 = 1;
       }
     }
-    ppeState->SPR.CTRL.hexValue = newValue;
+
+    // TODO: Check this, reversing and docs suggests this is the correct behavior.
+    // If a thread is being enabled, we must generate a reset interrupt on said thread.
+    if (ppeState->SPR.CTRL.TE0 == 0 && newCTRL.TE0) { ppeState->ppuThread[0].exceptReg |= ppuSystemResetEx; }
+    if (ppeState->SPR.CTRL.TE1 == 0 && newCTRL.TE1) { ppeState->ppuThread[1].exceptReg |= ppuSystemResetEx; }
+
+    LOG_TRACE(Xenon, "{} (Thread{:#d}): Setting ctrl to {:#x}", ppeState->ppuName, (u8)ppeState->currentThread, newCTRL.hexValue);
+
+    ppeState->SPR.CTRL = newCTRL;
     break;
   }
   case eXenonSPR::VRSAVE:

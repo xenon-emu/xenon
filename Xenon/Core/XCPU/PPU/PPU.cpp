@@ -203,7 +203,7 @@ void PPU::StartExecution(bool setHRMOR) {
 
   // If we're PPU0,thread0 then enable THRD 0 and set Reset Vector.
   if (ppeState->ppuID == 0 && setHRMOR) {
-    ppeState->SPR.CTRL.hexValue = 0x800000UL; // CTRL[TE0] = 1;
+    ppeState->SPR.CTRL.TE0 = 1; // Enable Thread 0
     ppeState->SPR.HRMOR.hexValue = 0x20000000000ULL;
     ppeState->ppuThread[ePPUThread_Zero].NIA = resetVector;
     // Also simulate 1BL if we're told to.
@@ -321,6 +321,10 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
 
     // Handle pending exceptions
     PPUCheckExceptions();
+
+    // If the thread was suspended due to CTRL being written, we must end execution on said thread.
+    if (ppeState->currentThread == 0 && ppeState->SPR.CTRL.TE0 != true) { break; }
+    if (ppeState->currentThread == 1 && ppeState->SPR.CTRL.TE1 != true) { break; }
 
     // Break after exec and if it's halted
     if ((enableHalt && ppuThreadState == eThreadState::Halted) || ppuThreadState == eThreadState::Resetting)
@@ -682,21 +686,20 @@ bool PPU::PPUCheckInterrupts() {
   bool WEXT = (ppeState->SPR.TSCR.hexValue & 0x100000) >> 20;
 
   // Check for external interrupts that enable execution
-  if (ppuThreadActive && !ppuThreadResetting && (ppuThreadState.load() == eThreadState::Halted || ppuThreadState.load() == eThreadState::Sleeping) && WEXT) {
+  if (ppuThreadActive && !ppuThreadResetting && (ppuThreadState.load() == eThreadState::Halted 
+    || ppuThreadState.load() == eThreadState::Sleeping) && WEXT) {
     // Check for an external interrupt that enables execution.
-    if (!xenonContext->xenonIIC.checkExtInterrupt(curThread.SPR.PIR)) {
+    if (!xenonContext->xenonIIC.checkExtInterrupt(curThread.SPR.PIR, true)) {
       return true;
     }
 
     // Proceed.
     LOG_DEBUG(Xenon, "{} was previously halted or sleeping, bringing online", ppeState->ppuName);
     ppuThreadState.store(eThreadState::Running);
-    // Enable thread 0 execution
-    ppeState->SPR.CTRL.hexValue = 0x800000;
-
-    // Issue reset
+    
+    // Enable thread 0 execution and issue a system reset exception.
+    ppeState->SPR.CTRL.TE0 = 1;
     ppeState->ppuThread[ePPUThread_Zero].exceptReg |= ppuSystemResetEx;
-    ppeState->ppuThread[ePPUThread_One].exceptReg |= ppuSystemResetEx;
 
     sPPUThread &thread = curThread;
 
@@ -905,6 +908,10 @@ u8 PPU::GetCurrentRunningThreads() {
 
   // Extract bits 22-23 in one step and directly map them to thread states
   u8 ctrlTE = (ppeState->SPR.CTRL.hexValue >> 22) & 0b11;
+  // If the thread state was changed to shut down both threads, set the thread state to sleeping.
+  if (!(ppeState->SPR.CTRL.TE0 || ppeState->SPR.CTRL.TE1)) {
+    ppuThreadState.store(eThreadState::Sleeping);
+  }
 
   // Directly map ctrlTE to thread states using bit shifting
   return (ctrlTE & 0b01) * ePPUThreadBit_One | (ctrlTE & 0b10) / 2 * ePPUThreadBit_Zero;
