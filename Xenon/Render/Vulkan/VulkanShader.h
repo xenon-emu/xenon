@@ -38,6 +38,7 @@ private:
   VulkanRenderer *renderer = nullptr;
   VkShaderModule vertexShader = VK_NULL_HANDLE;
   VkShaderModule fragmentShader = VK_NULL_HANDLE;
+  VkShaderModule computeShader = VK_NULL_HANDLE;
 };
 
 } // namespace Render

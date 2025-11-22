@@ -202,14 +202,12 @@ void VulkanRenderer::BackendStart() {
   resourceFactory = std::make_unique<VulkanResourceFactory>(this);
   shaderFactory = resourceFactory->CreateShaderFactory();
   fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) };
-  std::string versionString = "#version 450 core";
   shaderPath /= "vulkan";
   computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
     { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
   });
   if (!computeShaderProgram) {
     std::ofstream f{ shaderPath / "fb_deswizzle.comp" };
-    f.write(versionString.data(), versionString.size());
     f.write(computeShaderSource, sizeof(computeShaderSource));
     f.close();
     computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
@@ -222,11 +220,9 @@ void VulkanRenderer::BackendStart() {
   });
   if (!renderShaderPrograms) {
     std::ofstream vert{ shaderPath / "framebuffer.vert" };
-    vert.write(versionString.data(), versionString.size());
     vert.write(vertexShaderSource, sizeof(vertexShaderSource));
     vert.close();
     std::ofstream frag{ shaderPath / "framebuffer.frag" };
-    frag.write(versionString.data(), versionString.size());
     frag.write(fragmentShaderSource, sizeof(fragmentShaderSource));
     frag.close();
     renderShaderPrograms = shaderFactory->LoadFromFiles("Render", {

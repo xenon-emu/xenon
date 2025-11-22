@@ -8,28 +8,22 @@
 
 namespace Render {
 
-inline constexpr const char vertexShaderSource[] = R"glsl(
-out vec2 o_texture_coord;
+inline constexpr const char vertexShaderSource[] = R"glsl(#version 450 core
+layout(location = 0) out vec2 o_texture_coord;
 
 void main() {
-  o_texture_coord = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2);
+  o_texture_coord = vec2((gl_VertexIndex << 1) & 2, gl_VertexIndex & 2);
   gl_Position = vec4(o_texture_coord * vec2(2.0f, -2.0f) + vec2(-1.0f, 1.0f), 0.0f, 1.0f);
 })glsl";
 
-inline constexpr const char fragmentShaderSource[] = R"glsl(
-precision highp float;
-precision highp int;
-precision highp sampler2D;
-precision highp usampler2D;
-precision highp uimage2D;
+inline constexpr const char fragmentShaderSource[] = R"glsl(#version 450 core
 
-in vec2 o_texture_coord;
-
-out vec4 o_color;
+layout(location = 0) in vec2 i_texture_coord;
+layout(location = 0) out vec4 o_color;
 
 uniform usampler2D u_texture;
 void main() {
-  uint pixel = texture(u_texture, o_texture_coord).r;
+  uint pixel = texture(u_texture, i_texture_coord).r;
   // Gotta love BE vs LE (X360 works in BGRA, so we work in ARGB)
   float a = float((pixel >> 24u) & 0xFFu) / 255.0;
   float r = float((pixel >> 16u) & 0xFFu) / 255.0;
@@ -38,12 +32,7 @@ void main() {
   o_color = vec4(r, g, b, a);
 })glsl";
 
-inline constexpr const char computeShaderSource[] = R"glsl(
-precision highp float;
-precision highp int;
-precision highp sampler2D;
-precision highp usampler2D;
-precision highp uimage2D;
+inline constexpr const char computeShaderSource[] = R"glsl(#version 450 core
 
 layout (local_size_x = 16, local_size_y = 16) in;
 
