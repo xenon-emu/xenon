@@ -23,7 +23,7 @@ namespace PPCInterpreter {
       "negx", "negox", "norx", "subfex", "subfeox", "addex", "addeox", "mtocrf", "subfzex", "subfzeox", "addzex", "addzeox",
       "subfmex", "subfmeox", "mulldx", "mulldox", "addmex", "addmeox", "mullwx", "mullwox", "addx", "addox", "eqvx", "eciwx",
       "xorx", "orcx", "ecowx", "orx", "divdux", "divduox", "divwux", "divwuox", "nandx", "divdx", "divdox", "divwx", "divwox",
-      "srwx", "srdx", "srawx", "sradx", "srawix", "sradix", "extshx", "extsbx", "extswx"
+      "srwx", "srdx", "srawx", "sradx", "srawix", "sradix", "extshx", "extsbx", "extswx", "mcrf",
     };
 
     // FPU instructions
@@ -76,6 +76,12 @@ namespace PPCInterpreter {
       "stvlxl128", "stvrxl128",
     };
 
+    // System instructions
+    static const std::unordered_set<std::string> sysNames = {
+      "tdi", "twi", "bc", "sc", "b", "bclr", "rfid", "bcctr", "tw", "td", "mfmsr", "mtmsr", "tlbiel", "tlbie", "mfspr", 
+      "mftb", "slbmte", "slbie", "mtspr", "slbia", "tlbsync", 
+    };
+
     static inline bool comparePairDesc(const std::pair<std::string, u64> &a,
       const std::pair<std::string, u64> &b) {
       return a.second > b.second;
@@ -108,7 +114,6 @@ namespace PPCInterpreter {
       auto it = counters_.find(instrName);
       if (it == counters_.end()) {
         auto ptr = std::make_shared<std::atomic<u64>>(0);
-        // Emplace el par y luego incrementa.
         auto res = counters_.emplace(instrName, ptr);
         res.first->second->fetch_add(1, std::memory_order_relaxed);
       }
@@ -268,11 +273,41 @@ namespace PPCInterpreter {
     }
   }
 
+  void InstructionProfiler::DumpTopSYS(size_t topN) const noexcept {
+    std::vector<std::pair<std::string, u64>> vec;
+    {
+      std::shared_lock lock(countersMutex_);
+      vec.reserve(counters_.size());
+      for (const auto &p : counters_) {
+        if (sysNames.find(p.first) == sysNames.end()) continue;
+        u64 v = p.second->load(std::memory_order_relaxed);
+        if (!v) continue;
+        vec.emplace_back(p.first, v);
+      }
+    }
+
+    if (vec.empty()) {
+      LOG_INFO(Xenon, "[InstructionProfiler]: no System instruction counts recorded.");
+      return;
+    }
+
+    std::sort(vec.begin(), vec.end(), comparePairDesc);
+    size_t limit = std::min(topN, vec.size());
+
+    LOG_INFO(Xenon, "[InstructionProfiler]: Top {} System instructions (exact list):", limit);
+
+    for (size_t i = 0; i < limit; ++i) {
+      const auto &p = vec[i];
+      LOG_INFO(Xenon, "  {:3} : {:>12} hits - {}", i + 1, p.second, p.first);
+    }
+  }
+
   void InstructionProfiler::DumpInstrCounts(eInstrProfileDumpType dumpType, size_t topN) {
     if (dumpType & ALU) { DumpTopALU(topN); }
     if (dumpType & VXU) { DumpTopVXU(topN); }
     if (dumpType & FPU) { DumpTopFPU(topN); }
     if (dumpType & LS) { DumpTopLS(topN); }
+    if (dumpType & SYS) { DumpTopSYS(topN); }
   }
 
 } // namespace PPCInterpreter
