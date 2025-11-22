@@ -20,7 +20,8 @@ namespace PPCInterpreter {
     VXU = 1 << 1,
     FPU = 1 << 2,
     LS = 1 << 3,
-    ALL = ALU | VXU | FPU | LS
+    SYS = 1 << 4,
+    ALL = ALU | VXU | FPU | LS | SYS
   };
 
   // Quick instruction profiler for PPC Interpreter.
@@ -48,6 +49,7 @@ namespace PPCInterpreter {
     void DumpTopFPU(size_t topN = 20) const noexcept;
     void DumpTopVXU(size_t topN = 20) const noexcept;
     void DumpTopLS(size_t topN = 20) const noexcept;
+    void DumpTopSYS(size_t topN = 20) const noexcept;
     std::unordered_map<std::string, std::shared_ptr<std::atomic<u64>>> counters_;
     mutable std::shared_mutex countersMutex_;
   };
