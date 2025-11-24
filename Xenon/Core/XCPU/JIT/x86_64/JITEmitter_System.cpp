@@ -154,4 +154,14 @@ void PPCInterpreter::PPCInterpreterJIT_mfocrf(sPPEState* ppeState, JITBlockBuild
     COMP->mov(GPRPtr(instr.rd), crValue);
   }
 }
+
+// System Call
+void PPCInterpreter::PPCInterpreterJIT_sc(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  x86::Gp exReg = newGP16();
+  COMP->mov(exReg, EXPtr());
+  COMP->or_(exReg, ppuSystemCallEx);
+  COMP->mov(EXPtr(), exReg);
+  COMP->mov(b->threadCtx->scalar(&sPPUThread::exHVSysCall).Base(), imm<bool>(instr.lev & 1));
+}
+
 #endif
