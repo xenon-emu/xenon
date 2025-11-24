@@ -673,6 +673,7 @@ private:
   void scsiReadCapacityCommand();
   void scsiInquiryCommand();
   void scsiRead10Command();
+  void scsiReadTocCommand();
 
   // Utilities
   

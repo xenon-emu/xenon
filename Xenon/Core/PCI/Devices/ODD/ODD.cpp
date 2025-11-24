@@ -763,7 +763,7 @@ void Xe::PCIDev::ODD::scsiReadCapacityCommand() {
   atapiState.dataOutBuffer.reset();
 
   u8 capacityBuffer[8] = {};
-  u32 imageCapacity = 0x200000; // 4Gb
+  u32 imageCapacity = atapiState.mountedODDImage->Size() / ATAPI_CDROM_SECTOR_SIZE;
   // LBA of this image
   capacityBuffer[0] = imageCapacity >> 24;
   capacityBuffer[1] = imageCapacity >> 16;
@@ -810,6 +810,68 @@ void Xe::PCIDev::ODD::scsiRead10Command() {
   atapiState.dataOutBuffer.init(sectorCount, true);
   atapiState.dataOutBuffer.reset();
   atapiState.mountedODDImage->Read(readOffset, atapiState.dataOutBuffer.get(), sectorCount);
+  atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
+  atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
+  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
+}
+
+void Xe::PCIDev::ODD::scsiReadTocCommand() {
+  // Reset output buffer
+  atapiState.dataOutBuffer.reset();
+
+  // Minimal TOC: one data track (1) + lead-out (0xAA).
+  const u8 firstTrack = 1;
+  const u8 lastTrack = 1;
+
+  u32 imageCapacity = atapiState.mountedODDImage->Size() / ATAPI_CDROM_SECTOR_SIZE;
+
+  u8 numDescriptors = (lastTrack - firstTrack + 1) + 1;
+
+  u16 tocLen = static_cast<u16>(numDescriptors * 8 + 2);
+  size_t totalSize = 4 + numDescriptors * 8; // 4 bytes header + descriptors
+
+  if (!atapiState.dataOutBuffer.init(totalSize, true)) {
+    LOG_ERROR(ODD, "Failed to initialize TOC data buffer");
+    return;
+  }
+  atapiState.dataOutBuffer.reset();
+
+  u8 *buf = atapiState.dataOutBuffer.get();
+
+  // Header: 2 bytes BE length, 1 byte first track, 1 byte last track
+  buf[0] = static_cast<u8>((tocLen >> 8) & 0xFF);
+  buf[1] = static_cast<u8>(tocLen & 0xFF);
+  buf[2] = firstTrack;
+  buf[3] = lastTrack;
+
+  size_t off = 4;
+  // Track descriptors (one entry per track)
+  for (u8 t = firstTrack; t <= lastTrack; ++t) {
+    buf[off + 0] = 0x14; // ADR=1 (upper nibble), CONTROL=4 (lower nibble) -> data track
+    buf[off + 1] = t;    // Track number
+    buf[off + 2] = 0;    // Reserved
+    buf[off + 3] = 0;    // Reserved
+    // Address (LBA) MSB..LSB (track start).
+    u32 addr = 0;
+    buf[off + 4] = static_cast<u8>((addr >> 24) & 0xFF);
+    buf[off + 5] = static_cast<u8>((addr >> 16) & 0xFF);
+    buf[off + 6] = static_cast<u8>((addr >> 8) & 0xFF);
+    buf[off + 7] = static_cast<u8>((addr) & 0xFF);
+    off += 8;
+  }
+
+  // Lead-out descriptor
+  buf[off + 0] = 0x14;         // ADR=1, CONTROL=4
+  buf[off + 1] = 0xAA;         // Lead-out track number
+  buf[off + 2] = 0;
+  buf[off + 3] = 0;
+  u32 leadAddr = imageCapacity; // LBA of lead-out
+  buf[off + 4] = static_cast<u8>((leadAddr >> 24) & 0xFF);
+  buf[off + 5] = static_cast<u8>((leadAddr >> 16) & 0xFF);
+  buf[off + 6] = static_cast<u8>((leadAddr >> 8) & 0xFF);
+  buf[off + 7] = static_cast<u8>((leadAddr) & 0xFF);
+
+  // Signal status
   atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
   atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
   atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
@@ -1108,6 +1170,9 @@ void Xe::PCIDev::ODD::processSCSICommand() {
     break;
   case SCSIOP_READ10:
     scsiRead10Command();
+    break;
+  case SCSIOP_READ_TOC:
+    scsiReadTocCommand();
     break;
   default:
     LOG_ERROR(ODD, "Unknown SCSI Command requested: 0x{:X}", atapiState.scsiCBD.CDB12.OperationCode);
