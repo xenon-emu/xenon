@@ -58,6 +58,15 @@ namespace Xe::XCPU {
     // Global Xenon CPU Content (shared between PPUs)
     std::unique_ptr<XenonContext> xenonContext;
 
+    // TimeBase frequency timer
+    std::chrono::high_resolution_clock::time_point timeBaseUpdate{};
+
+    // High resolution timer thread for accumulating timebase ticks.
+    std::thread timeBaseThread{};
+    std::atomic<bool> timeBaseThreadActive{ false };
+    // Timer thread loop function.
+    void timeBaseThreadLoop();
+
     // The CPI shared across all cores, used for accurate time base emulation. 
     u32 sharedCPI = 0;
 

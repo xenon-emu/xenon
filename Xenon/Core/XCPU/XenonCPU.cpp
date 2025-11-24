@@ -2,6 +2,7 @@
 /* Copyright 2025 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
+#include "Base/Thread.h"
 #include "Base/Logging/Log.h"
 #include "Core/XCPU/XenonCPU.h"
 #include "Interpreter/PPCInterpreter.h"
@@ -46,6 +47,12 @@ namespace Xe::XCPU {
         xenonContext->socSecOTPBlock->EepromKey2[0] = fusesets[9].second;
         xenonContext->socSecOTPBlock->EepromHash1[0] = fusesets[10].second;
         xenonContext->socSecOTPBlock->EepromHash2[0] = fusesets[11].second;
+      }
+
+      // Start timebase timer thread.
+      if (!timeBaseThreadActive.load()) {
+        timeBaseThreadActive.store(true);
+        timeBaseThread = std::thread(&XenonCPU::timeBaseThreadLoop, this);
       }
     }
 
@@ -255,6 +262,30 @@ namespace Xe::XCPU {
     }
 
     return nullptr;
+  }
+
+  // TimeBase thread for increasing global timer counter.
+  void XenonCPU::timeBaseThreadLoop() {
+    Base::SetCurrentThreadName("[Xe] CPU Timer Thread");
+
+    using clock = std::chrono::high_resolution_clock;
+    auto last = clock::now();
+
+    while (timeBaseThreadActive.load()) {
+      // Sleep a little to avoid burning CPU. We compute elapsed and convert to ticks.
+      // The lower we sleep, the more accurate the timebase will be, but it will also be more CPU intensive.
+      std::this_thread::sleep_for(std::chrono::microseconds(100));
+      auto now = clock::now();
+      auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(now - last).count();
+      last = now;
+      if (elapsed <= 0) continue;
+      // Xbox 360 timebase = 50 MHz -> period = 20 ns per tick
+      // ticks = elapsed_ns / 20
+      u64 ticks = static_cast<u64>(elapsed) / 20ULL;
+      if (ticks == 0) continue;
+      // Accumulate globally
+      xenonContext->timeBaseGlobalCounter.fetch_add(ticks, std::memory_order_relaxed);
+    }
   }
 
 } // Xe::XCPU

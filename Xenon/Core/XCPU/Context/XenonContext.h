@@ -79,9 +79,15 @@ namespace Xe::XCPU {
     // Time Base switch, possibly RTC register, the TB counter only runs if this
     // value is set.
     bool timeBaseActive = false;
+
+    // Global timebase tick counter (Increments based on the timeBase frquency)
+    // The timer thread inside XenonCPU will increase this; each PPU reads the counter and applies the delta.
+    std::atomic<u64> timeBaseGlobalCounter{ 0 };
+
     //
     // SOC Blocks
     //
+    
     // Secure OTP Block
     std::unique_ptr<SOC::SOCSECOTP_ARRAY> socSecOTPBlock{};
     // Security Engine Block

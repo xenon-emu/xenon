@@ -47,9 +47,6 @@ public:
   // Start execution
   void StartExecution(bool setHRMOR = true);
 
-  // Calulate our Clocks Per Instruction
-  void CalculateCPI();
-
   // Reset the PPU state
   void Reset();
 
@@ -189,7 +186,9 @@ private:
   void CheckTimeBaseStatus();
   // Updates the current PPU's time base and decrementer based on
   // the amount of ticks per instr we should perform.
-  void UpdateTimeBase();
+  void UpdateTimeBase(u64 tbTicks = 0);
+  // Last applied global timebase counter value for this PPU instance
+  u64 lastAppliedTimeBaseCounter = 0;
   // Gets the current running threads.
   u8 GetCurrentRunningThreads();
   // Simulates the behavior of the 1BL inside the Xenon Secure ROM.
