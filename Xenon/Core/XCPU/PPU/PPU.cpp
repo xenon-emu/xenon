@@ -264,9 +264,6 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
       PPCInterpreter::ppcExecuteSingleInstruction(ppeState.get());
     }
 
-    // Increase Time Base Counter if enabled
-    CheckTimeBaseStatus();
-
     // Check for external interrupts
     if (curThread.SPR.MSR.EE && xenonContext->xenonIIC.checkExtInterrupt(curThread.SPR.PIR)) {
       _ex |= ppuExternalEx;
@@ -817,57 +814,30 @@ bool PPU::PPUCheckExceptions() {
   return false;
 }
 
-// Checks if the Timebase Logic is enabled and does the corresponding updates if true.
-void PPU::CheckTimeBaseStatus() {
-  // Start Profile
-  MICROPROFILE_SCOPEI("[Xe::PPU]", "CheckTimeBaseStatus", MP_AUTO);
-  // Increase Time Base Counter
-  if (xenonContext->timeBaseActive) {
-    // HID6[15]: Time-base and decrementer facility enable.
-    // 0 -> TBU, TBL, DEC, HDEC, and the hang-detection logic do not
-    // update. 1 -> TBU, TBL, DEC, HDEC, and the hang-detection logic
-    // are enabled to update
-    if (ppeState->SPR.HID6.tb_enable) {
-      // Read global timebase counter and apply delta since last applied
-      u64 global = xenonContext->timeBaseGlobalCounter.load(std::memory_order_relaxed);
-      u64 delta = 0;
-      if (global != lastAppliedTimeBaseCounter) {
-        if (global > lastAppliedTimeBaseCounter) {
-          delta = global - lastAppliedTimeBaseCounter;
-        } else {
-          // counter wrapped (unlikely but handle)
-          delta = global + (std::numeric_limits<u64>::max() - lastAppliedTimeBaseCounter) + 1ULL;    
-        }
-      }
-      if (delta) {
-        UpdateTimeBase(delta);
-        lastAppliedTimeBaseCounter = global;
-      }
-    }
-  }
-}
-
 // Updates the time base based on the amount of ticks and checks for decrementer
 // interrupts if enabled.
 void PPU::UpdateTimeBase(u64 tbTicks) {
-  // Sanity check, always update the TimeBase.
-  if (tbTicks == 0) { tbTicks = 1; }
-
-  // The Decrementer and the Time Base are driven by the same time frequency.
-  u32 newDec = 0;
-  u32 dec = 0;
-  // Update the Time Base.
-  ppeState->SPR.TB.hexValue += tbTicks;
-  // Get the decrementer value.
-  dec = curThread.SPR.DEC;
-  newDec = dec - tbTicks;
-  // Update the new decrementer value.
-  curThread.SPR.DEC = newDec;
-  // Check if Previous decrementer measurement is smaller than current and a
-  // decrementer exception is not pending.
-  if (newDec > dec && !(_ex & ppuDecrementerEx)) {
-    // The decrementer must issue an interrupt.
-    _ex |= ppuDecrementerEx;
+  // HID6[15]: Time-base and decrementer facility enable.
+  // 0 -> TBU, TBL, DEC, HDEC, and the hang-detection logic do not
+  // update. 1 -> TBU, TBL, DEC, HDEC, and the hang-detection logic
+  // are enabled to update
+  if (ppeState->SPR.HID6.tb_enable) {
+    // The Decrementer and the Time Base are driven by the same time frequency.
+    u32 newDec = 0;
+    u32 dec = 0;
+    // Update the Time Base.
+    ppeState->SPR.TB.hexValue += tbTicks;
+    // Get the decrementer value.
+    dec = curThread.SPR.DEC;
+    newDec = dec - tbTicks;
+    // Update the new decrementer value.
+    curThread.SPR.DEC = newDec;
+    // Check if Previous decrementer measurement is smaller than current and a
+    // decrementer exception is not pending.
+    if (newDec > dec && !(_ex & ppuDecrementerEx)) {
+      // The decrementer must issue an interrupt.
+      _ex |= ppuDecrementerEx;
+    }
   }
 }
 

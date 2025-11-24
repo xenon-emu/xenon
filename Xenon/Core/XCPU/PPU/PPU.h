@@ -92,6 +92,10 @@ public:
   // Get ppuJIT
   PPU_JIT *GetPPUJIT() { return ppuJIT.get(); }
 
+  // Updates the current PPU's time base and decrementer based on
+  // the amount of tb ticks given.
+  void UpdateTimeBase(u64 tbTicks);
+
   // Load a elf image from host memory. Copies into RAM
   // Returns entrypoint
   u64 loadElfImage(u8 *data, u64 size);
@@ -174,13 +178,6 @@ private:
   bool PPUCheckInterrupts();
   // Checks for pending exceptions
   bool PPUCheckExceptions();
-  // Checks if it should update the time base
-  void CheckTimeBaseStatus();
-  // Updates the current PPU's time base and decrementer based on
-  // the amount of ticks per instr we should perform.
-  void UpdateTimeBase(u64 tbTicks = 0);
-  // Last applied global timebase counter value for this PPU instance
-  u64 lastAppliedTimeBaseCounter = 0;
   // Gets the current running threads.
   u8 GetCurrentRunningThreads();
   // Simulates the behavior of the 1BL inside the Xenon Secure ROM.

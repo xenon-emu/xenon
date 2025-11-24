@@ -567,7 +567,7 @@ void Xe::PCIDev::SFCX::sfcxReadPageFromNAND(bool physical) {
   memset(sfcxState.pageBuffer, 0, sizeof(sfcxState.pageBuffer));
 
   // Simulate the time required to read
-  std::this_thread::sleep_for(150ns);
+  std::this_thread::sleep_for(250ns);
 
   // Perform the read
   memcpy(sfcxState.pageBuffer, &rawImageData[nandOffset], physical ? sfcxState.pageSizePhys : sfcxState.pageSize);
@@ -587,7 +587,7 @@ void Xe::PCIDev::SFCX::sfcxEraseBlock() {
   memset(sfcxState.pageBuffer, 0, sizeof(sfcxState.pageBuffer));
 
   // Simulate the time required to erase
-  std::this_thread::sleep_for(150ns);
+  std::this_thread::sleep_for(250ns);
 
   // Perform the erase
   memset(&rawImageData[nandOffset], 0, sfcxState.blockSizePhys);
@@ -639,7 +639,7 @@ void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND(bool physical) {
       sparePhysAddrPtr += sfcxState.spareSize; // Spare Size
     }
 
-    std::this_thread::sleep_for(150ns);
+    std::this_thread::sleep_for(250ns);
 
     // Increase read address
     physAddr += sfcxState.pageSizePhys;
@@ -683,7 +683,7 @@ void Xe::PCIDev::SFCX::sfcxDoDMAtoNAND() {
     sparePhysAddrPtr += sfcxState.spareSize; // Spare Size
 
     // Add a small delay to simulate the time it takes to read the page.
-    std::this_thread::sleep_for(150ns);
+    std::this_thread::sleep_for(250ns);
 
     // Increase read address
     physAddr += sfcxState.pageSizePhys;
