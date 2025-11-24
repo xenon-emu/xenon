@@ -68,11 +68,6 @@ public:
   // Runs a specified number of instructions
   void PPURunInstructions(u64 numInstrs, bool enableHalt = true);
 
-  // Sets the clocks per instruction
-  void SetCPI(u32 CPI) { clocksPerInstruction = CPI; }
-  // Gets the clocks per instruction
-  u32 GetCPI() { return clocksPerInstruction; }
-
   // Checks if the thread is active
   bool ThreadActive() {
     return ppuThreadState == eThreadState::Executing ||
@@ -137,9 +132,6 @@ private:
 
   // Xenon Memory Management Unit
   std::unique_ptr<Xe::XCPU::MMU::XenonMMU> xenonMMU;
-
-  // Amount of CPU clocls per instruction executed.
-  u32 clocksPerInstruction = 0;
 
   // Initial reset vector
   u32 resetVector = 0;

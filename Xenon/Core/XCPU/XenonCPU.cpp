@@ -153,9 +153,6 @@ namespace Xe::XCPU {
     ppu0->loadElfImage(elfBinary.get(), fileSize);
     // Start execution on the main thread
     ppu0->StartExecution(false);
-    // Get our CPI based on the first PPU, then share it across all PPUs
-    ppu1->SetCPI(ppu0->GetCPI());
-    ppu2->SetCPI(ppu0->GetCPI());
     // Start execution on the other threads
     ppu1->StartExecution(false);
     ppu2->StartExecution(false);

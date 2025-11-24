@@ -164,4 +164,17 @@ void PPCInterpreter::PPCInterpreterJIT_sc(sPPEState *ppeState, JITBlockBuilder *
   COMP->mov(b->threadCtx->scalar(&sPPUThread::exHVSysCall).Base(), imm<bool>(instr.lev & 1));
 }
 
+void PPCInterpreter::PPCInterpreterJIT_mftb(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  const u32 spr = (instr.spr >> 5) | ((instr.spr & 0x1f) << 5);
+  x86::Gp tbData = newGP64();
+  COMP->mov(tbData, SharedSPRPtr(TB));
+
+  if (spr == TBLRO) {
+    COMP->mov(GPRPtr(instr.rd), tbData);
+  } else { // TBURO
+    COMP->shr(tbData, 32);
+    COMP->mov(GPRPtr(instr.rd), tbData);
+  }
+}
+
 #endif
