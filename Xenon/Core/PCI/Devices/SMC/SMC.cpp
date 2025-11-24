@@ -774,9 +774,9 @@ void Xe::PCIDev::SMC::smcMainThread() {
     if (smcPCIState.clockIntEnabledReg == CLCK_INT_ENABLED) {
       // Clock Interrupt Not Taken.
       if (smcPCIState.clockIntStatusReg == CLCK_INT_READY) {
-        // Wait X time before next clock interrupt. TODO: Find the correct
-        // delay.
-        if (timerNow >= timerStart + 500ms) {
+        // According to sources online, this timer runs at a 10ms frequency.
+        // TODO: Verify on hardware.
+        if (timerNow >= timerStart + 10ms) {
           // Update internal timer.
           timerStart = std::chrono::steady_clock::now();
           mutex.lock();
