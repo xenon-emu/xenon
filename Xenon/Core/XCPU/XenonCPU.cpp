@@ -118,25 +118,9 @@ namespace Xe::XCPU {
     ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(xenonContext.get(), resetVector, 4); // Threads 4-5
     // Start execution on the main thread
     ppu0->StartExecution();
-    sharedCPI = ppu0->GetCPI();
-    // Get our CPI based on the first PPU, then share it across all PPUs
-    ppu1->SetCPI(GetCPI());
-    ppu2->SetCPI(GetCPI());
     // Start execution on the other threads
     ppu1->StartExecution();
     ppu2->StartExecution();
-  }
-
-  u32 XenonCPU::RunCPITests(u64 resetVector) {
-    // Create PPU element
-    ppu0.reset();
-    ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(xenonContext.get(), resetVector, 0); // Threads 0-1
-    // Start execution on the main thread
-    ppu0->StartExecution();
-    // Get CPU and reset PPU
-    u32 cpi = ppu0->GetCPI();
-    ppu0.reset();
-    return cpi;
   }
 
   void XenonCPU::LoadElf(const std::string path) {

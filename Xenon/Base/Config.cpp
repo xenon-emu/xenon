@@ -249,7 +249,6 @@ bool _smc::verify_toml(toml::value &value) {
 void _xcpu::from_toml(const toml::value &value) {
   ramSize = toml::find_or<std::string>(value, "RAMSize", ramSize);
   elfLoader = toml::find_or<bool>(value, "ElfLoader", elfLoader);
-  clocksPerInstruction = toml::find_or<s32&>(value, "CPI", clocksPerInstruction);
   overrideInitSkip = toml::find_or<bool>(value, "OverrideHWInit", overrideInitSkip);
   HW_INIT_SKIP_1 = toml::find_or<u64&>(value, "HW_INIT_SKIP1", HW_INIT_SKIP_1);
   HW_INIT_SKIP_2 = toml::find_or<u64&>(value, "HW_INIT_SKIP2", HW_INIT_SKIP_2);
@@ -268,12 +267,6 @@ void _xcpu::to_toml(toml::value &value) {
   value["ElfLoader"].comments().clear();
   value["ElfLoader"] = elfLoader;
   value["ElfLoader"].comments().push_back("# Disables normal codeflow and loads an elf from ElfBinary");
-
-  value["CPI"].comments().clear();
-  value["CPI"] = clocksPerInstruction;
-  value["CPI"].comments().push_back("# [DO NOT MODIFY] Clocks Per Instruction [DO NOT MODIFY]");
-  value["CPI"].comments().push_back("# If your system has a lower than average CPI, use CPI Bypass in HighlyExperimental");
-  value["CPI"].comments().push_back("# Note: This will mess with execution timing and may break time-sensitive things like XeLL");
 
   value["OverrideHWInit"].comments().clear();
   value["OverrideHWInit"] = overrideInitSkip;
@@ -311,7 +304,6 @@ bool _xcpu::verify_toml(toml::value &value) {
   to_toml(value);
   cache_value(ramSize);
   cache_value(elfLoader);
-  cache_value(clocksPerInstruction);
   cache_value(overrideInitSkip);
   cache_value(HW_INIT_SKIP_1);
   cache_value(HW_INIT_SKIP_2);
@@ -321,7 +313,6 @@ bool _xcpu::verify_toml(toml::value &value) {
   from_toml(value);
   verify_value(ramSize);
   verify_value(elfLoader);
-  verify_value(clocksPerInstruction);
   verify_value(overrideInitSkip);
   verify_value(HW_INIT_SKIP_1);
   verify_value(HW_INIT_SKIP_2);
@@ -452,7 +443,6 @@ void _highlyExperimental::from_toml(const toml::value &value) {
   tmpConsoleRevison = toml::find_or<s32&>(value, "ConsoleRevison", tmpConsoleRevison);
   consoleRevison = static_cast<eConsoleRevision>(tmpConsoleRevison);
   cpuExecutor = toml::find_or<std::string>(value, "CPUExecutor", cpuExecutor);
-  clocksPerInstructionBypass = toml::find_or<s32&>(value, "CPIBypass", clocksPerInstructionBypass);
 }
 void _highlyExperimental::to_toml(toml::value &value) {
   value.comments().clear();
@@ -469,19 +459,14 @@ void _highlyExperimental::to_toml(toml::value &value) {
   value["CPUExecutor"].comments().push_back("# JIT - Just In Time compilation, runs opcodes in 'blocks'");
   value["CPUExecutor"].comments().push_back("# Hybrid - JIT with Cached Interpreter fallback, uses faster block system with Interpreter opcodes");
   value["CPUExecutor"].comments().push_back("# [WARN] This is unfinished, you *will* break the emulator changing this");
-  value["CPIBypass"].comments().clear();
-  value["CPIBypass"] = clocksPerInstructionBypass;
-  value["CPIBypass"].comments().push_back("# Zero will use the estimated CPI for your system (view XCPU for more info)");
 }
 bool _highlyExperimental::verify_toml(toml::value &value) {
   to_toml(value);
   cache_value(consoleRevison);
   cache_value(cpuExecutor);
-  cache_value(clocksPerInstructionBypass);
   from_toml(value);
   verify_value(consoleRevison);
   verify_value(cpuExecutor);
-  verify_value(clocksPerInstructionBypass);
   return true;
 }
 

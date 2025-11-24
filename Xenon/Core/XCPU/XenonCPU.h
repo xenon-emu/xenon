@@ -38,9 +38,6 @@ namespace Xe::XCPU {
     void ContinueFromException();
     // Steps a given amount of cyles.
     void Step(int amount = 1);
-    // Runs a test to determine the 'Clocks per Instruction' the CPU implementation should increase in order to effectively
-    // step the time base.
-    u32 RunCPITests(u64 resetVector = 0x100);
     // Loads an PowerPC ELF file and starts its execution.
     void LoadElf(const std::string path);
     // Returns true if halted.
@@ -51,8 +48,6 @@ namespace Xe::XCPU {
     IIC::XenonIIC *GetIICPointer() { return &xenonContext->xenonIIC; }
     // Returns a pointer to a given PPU.
     PPU *GetPPU(u8 ppuID);
-    // Returns the current CPI value.
-    u32 GetCPI() { return sharedCPI; }
 
   private:
     // Global Xenon CPU Content (shared between PPUs)
@@ -66,9 +61,6 @@ namespace Xe::XCPU {
     std::atomic<bool> timeBaseThreadActive{ false };
     // Timer thread loop function.
     void timeBaseThreadLoop();
-
-    // The CPI shared across all cores, used for accurate time base emulation. 
-    u32 sharedCPI = 0;
 
     // Power Processing Units, the effective execution units inside the Xbox 360 CPU.
     std::unique_ptr<PPU> ppu0{};

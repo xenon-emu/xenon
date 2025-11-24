@@ -188,8 +188,7 @@ void XeMain::ReloadFiles() {
     return;
   GetCPU()->Halt();
   // Reset the SFCX
-  u32 cpi = xenonCPU->GetCPI();
-  sfcx = std::make_shared<STRIP_UNIQUE(sfcx)>("SFCX", SFCX_DEV_SIZE, Config::filepaths.nand, cpi, pciBridge.get(), ram.get());
+  sfcx = std::make_shared<STRIP_UNIQUE(sfcx)>("SFCX", SFCX_DEV_SIZE, Config::filepaths.nand, pciBridge.get(), ram.get());
   sfcx->Start();
   pciBridge->ResetPCIDevice(sfcx);
   // Reset the NAND
@@ -249,7 +248,7 @@ void XeMain::CreatePCIDevices(RAM *ram) {
   ethernet = std::make_shared<STRIP_UNIQUE(ethernet)>("ETHERNET", ETHERNET_DEV_SIZE, pciBridge.get(), ram);
   pciBridge->AddPCIDevice(ethernet);
 
-  sfcx = std::make_shared<STRIP_UNIQUE(sfcx)>("SFCX", SFCX_DEV_SIZE, Config::filepaths.nand, 0, pciBridge.get(), ram);
+  sfcx = std::make_shared<STRIP_UNIQUE(sfcx)>("SFCX", SFCX_DEV_SIZE, Config::filepaths.nand, pciBridge.get(), ram);
   if (sfcx->hasInitialised) {
     pciBridge->AddPCIDevice(sfcx);
     nand = std::make_shared<STRIP_UNIQUE(nand)>("NAND", sfcx.get());

@@ -828,7 +828,6 @@ void PPU::CheckTimeBaseStatus() {
     // update. 1 -> TBU, TBL, DEC, HDEC, and the hang-detection logic
     // are enabled to update
     if (ppeState->SPR.HID6.tb_enable) {
-      UpdateTimeBase();
       // Read global timebase counter and apply delta since last applied
       u64 global = xenonContext->timeBaseGlobalCounter.load(std::memory_order_relaxed);
       u64 delta = 0;
