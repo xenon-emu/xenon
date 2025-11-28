@@ -16,7 +16,7 @@ double calibrateCPUFrequency() {
   QueryPerformanceFrequency(&freq);
 
   LARGE_INTEGER t0, t1;
-  unsigned long long c0, c1;
+  u64 c0, c1;
 
   QueryPerformanceCounter(&t0);
   c0 = __rdtsc();

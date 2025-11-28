@@ -200,9 +200,6 @@ void PPU_JIT::InstrPrologue(JITBlockBuilder *b, u32 instrData) {
 // * Checks and advances TimeBase
 // * Checks for external interrupts and exceptions.
 bool InstrEpilogue(PPU *ppu, sPPEState *ppeState) {
-  // Check timebase and update if enabled.
-  ppu->CheckTimeBaseStatus();
-
   // Get current thread.
   auto &thread = ppeState->ppuThread[ppeState->currentThread];
   // Check for external interrupts.
