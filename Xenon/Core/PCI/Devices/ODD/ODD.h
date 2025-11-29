@@ -692,6 +692,22 @@ private:
 
   // Basic no-op command
   void atapiNopCommand();
+
+  //
+  // Authentication
+  //
+
+  // DVD Key for this particular ODD.
+  u8 dvdKey[16] = {};
+  
+  // Input Page data for 3B Auth command.
+  u8 pageData[74] = {};
+
+  // Flag for copying dma'd data into our page data buffer.
+  bool copyDataIntoPageData = false;
+
+  // Perform 3B Auth using this device DVD key and the incoming page data.
+  void perform3BAuth();
 };
 
 } // namespace PCIDev

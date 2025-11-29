@@ -7,6 +7,8 @@
 #include "Base/Config.h"
 #include "Base/Logging/Log.h"
 
+#include <plusaes/plusaes.hpp>
+
 // Enables ODD Debug output
 //#define ODD_DEBUG
 
@@ -174,6 +176,28 @@ Xe::PCIDev::ODD::ODD(const char* deviceName, u64 size, PCIBridge *parentPCIBridg
 
   // Device ready to receive commands.
   atapiState.regs.status = ATA_STATUS_DRDY;
+
+  // Get our DVD key.
+  std::ifstream file(Config::filepaths.dvdKeyPath);
+  if (!file.is_open()) {
+      LOG_ERROR(ODD, "Error opening DVD key file. Check your filepath. Key set to 0.");
+  } else {
+      std::string dvdkeyStr = "";
+      std::getline(file, dvdkeyStr);
+      if (dvdkeyStr.size() == 0x20) {
+          // Parse the input
+          std::string substr = dvdkeyStr.substr(0, 16);
+          u64 strDta = strtoull(substr.c_str(), nullptr, 16);
+          strDta = byteswap_be(strDta);
+          memcpy(&dvdKey, &strDta, 8);
+          substr = dvdkeyStr.substr(16, 16);
+          strDta = strtoull(substr.c_str(), nullptr, 16);
+          strDta = byteswap_be(strDta);
+          memcpy(&dvdKey[8], &strDta, 8);
+      } else {
+          LOG_ERROR(ODD, "DVD Key found is not 16 bytes long.");
+      }
+  }
 
   // Enter ODD Worker Thread
   oddWorkerThread = std::thread(&Xe::PCIDev::ODD::oddThreadLoop, this);
@@ -1054,6 +1078,12 @@ void Xe::PCIDev::ODD::oddThreadLoop() {
       atapiState.dataOutBuffer.reset();
       // After completion we must raise an interrupt.
       atapiIssueInterrupt();
+
+      // Check if we should copy the input buffer onto our page data.
+      if (copyDataIntoPageData) {
+        memcpy(pageData, atapiState.dataInBuffer.get(), sizeof(pageData));
+        copyDataIntoPageData = false;
+      }
     }
     
     // Check for pending SCSI commands.
@@ -1156,11 +1186,25 @@ void Xe::PCIDev::ODD::processSCSICommand() {
     scsiReadCapacityCommand();
     break;
   case SCSIOP_MODE_SELECT10:
+    // Save our page data for later.
+    copyDataIntoPageData = true;
+    // Check for page code.
+    if (!atapiState.scsiCBD.AsByte[2] == 0x3B) {
+        LOG_WARNING(ODD, "Unsupported MODE_SELECT Page code {:#x}", atapiState.scsiCBD.AsByte[2]);
+    }
     atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
     atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
     atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
     break;
   case SCSIOP_MODE_SENSE10:
+    if (atapiState.scsiCBD.AsByte[2] == 0x3B) {
+      // Page is 3B, get the page data and perform auth.
+      perform3BAuth();
+      break;
+    }
+
+    // Unsupported page code atm.
+    LOG_WARNING(ODD, "Unsupported MODE_SENSE Page code {:#x}", atapiState.scsiCBD.AsByte[2]);
     atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
     atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
     atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
@@ -1185,4 +1229,53 @@ void Xe::PCIDev::ODD::atapiNopCommand() {
   atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF;
   atapiState.regs.interruptReason &= ~7;
   atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_CD | ATA_INTERRUPT_REASON_IO;
+}
+
+// Performs drive authentication using the 0x3B page code.
+void Xe::PCIDev::ODD::perform3BAuth() {
+  // Reset our output buffer
+  atapiState.dataOutBuffer.reset();
+  
+  // Get our IV.
+  u8 aesCBCIv[16] = {};
+  memcpy(&aesCBCIv, &pageData[42], 16);
+
+  // Decrypted Page data.
+  u8 decryptedPageData[32] = {};
+
+  // Encrypted Response data.
+  u8 responseData[32] = {};
+
+  // Decrypt the input data using our DVD Key and provided IV in page.
+  plusaes::decrypt_cbc(&pageData[10], 0x20, dvdKey, 16, &aesCBCIv, decryptedPageData, 0x20, 0);
+
+  // Get our session key.
+  u8 sessionKey[16] = {};
+  memcpy(&sessionKey, &decryptedPageData[0], 16);
+
+  // Get our challenge.
+  u8 challengeData[16] = {};
+  memcpy(&challengeData, &decryptedPageData[16], 16);
+
+  // Craft our response.
+  memcpy(&responseData[16], &challengeData, 16);
+
+  u8 outPage[74] = {};
+
+  outPage[1] = 0x38;
+  // Out page [8] = challenge type.
+  outPage[8] = 0x3B;
+  // Out page [9] = 0.
+  outPage[9] = 0x30;
+
+  // Encrypt the challenge using the session key and the same IV provided.
+  plusaes::encrypt_cbc(responseData, 0x20, sessionKey, 16, &aesCBCIv, &outPage[10], 0x20, 0);
+
+  // Copy our age data into our output buffer.
+  memcpy(atapiState.dataOutBuffer.get(), &outPage, sizeof(outPage));
+
+  // Set status as expected.
+  atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
+  atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
+  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
 }

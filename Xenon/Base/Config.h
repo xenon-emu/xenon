@@ -201,6 +201,8 @@ inline struct _filepaths {
   std::string nand = "nand.bin";
   // ODD Image path
   std::string oddImage = "xenon.iso";
+  // DVD Key path
+  std::string dvdKeyPath = "dvdkey.txt";
   // HDD Image path
   std::string hddImage = "xenonHDD.img";
   // Elf binary path
@@ -220,6 +222,8 @@ inline struct _filepaths {
     nand = nandPath.string();
     auto oddImagePath = basePath / oddImage;
     oddImage = oddImagePath.string();
+    auto dvdKeyFilePath = basePath / dvdKeyPath;
+    dvdKeyPath = dvdKeyFilePath.string();
     auto hddImagePath = basePath / hddImage;
     hddImage = hddImagePath.string();
     auto elfBinaryPath = basePath / elfBinary;

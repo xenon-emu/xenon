@@ -344,6 +344,7 @@ void _filepaths::from_toml(const toml::value &value) {
   oneBl = toml::find_or<std::string>(value, "OneBL", oneBl);
   nand = toml::find_or<std::string>(value, "Nand", nand);
   oddImage = toml::find_or<std::string>(value, "ODDImage", oddImage);
+  dvdKeyPath = toml::find_or<std::string>(value, "DVDKeyPath", dvdKeyPath);
   hddImage = toml::find_or<std::string>(value, "HDDImage", hddImage);
   elfBinary = toml::find_or<std::string>(value, "ElfBinary", elfBinary);
   instrTestsPath = toml::find_or<std::string>(value, "InstrTestsPath", instrTestsPath);
@@ -354,6 +355,7 @@ void _filepaths::to_toml(toml::value &value) {
   value.comments().push_back("# Only Fuses, OneBL, and Nand are required");
   value.comments().push_back("# ElfBinary is used in the elf loader");
   value.comments().push_back("# ODDImage is Optical Disc Drive Image, takes an ISO file for Linux");
+  value.comments().push_back("# DVDKeyPath is the Optical Disc Drive Key, used for auth with Xbox 360 HV routines");
   value.comments().push_back("# HDDImage is the Hard Drive Disc Image, takes an Xbox360 Formatted (FATX) HDD image for the Xbox System/Linux storage purposes");
   value.comments().push_back("# InstrTestsPath is the base path for instruction test files (.s) for use in the test runner");
   value.comments().push_back("# InstrTestsBinPath is the path for the generated binary instruction test files (.bin)");
@@ -361,6 +363,7 @@ void _filepaths::to_toml(toml::value &value) {
   value["OneBL"] = oneBl;
   value["Nand"] = nand;
   value["ODDImage"] = oddImage;
+  value["DVDKeyPath"] = dvdKeyPath;
   value["HDDImage"] = hddImage;
   value["ElfBinary"] = elfBinary;
   value["InstrTestsPath"] = instrTestsPath;
@@ -372,6 +375,7 @@ bool _filepaths::verify_toml(toml::value &value) {
   cache_value(oneBl);
   cache_value(nand);
   cache_value(oddImage);
+  cache_value(dvdKeyPath);
   cache_value(hddImage);
   cache_value(elfBinary);
   cache_value(instrTestsPath);
@@ -381,6 +385,7 @@ bool _filepaths::verify_toml(toml::value &value) {
   verify_value(oneBl);
   verify_value(nand);
   verify_value(oddImage);
+  verify_value(dvdKeyPath);
   verify_value(hddImage);
   verify_value(elfBinary);
   verify_value(instrTestsPath);
