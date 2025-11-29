@@ -67,6 +67,8 @@ namespace PPCInterpreter {
       //{ 0x0D, GET(addic) },
       { 0x0E, GET(addi) },
       { 0x0F, GET(addis) },
+      { 0x10, GET(bc) },
+      { 0x11, GET(sc) },
       { 0x12, GET(b) },
       { 0x14, GETRC(rlwimi) },
       { 0x15, GETRC(rlwinm) },
@@ -86,6 +88,22 @@ namespace PPCInterpreter {
       { 0x26, GET(stb) },
       { 0x27, GET(stbu) },
     });
+    // Group 0x13 opcodes (field 21..30)
+    fillTable<instructionHandlerJIT>(jitTable, 0x13, 10, 1, {
+      //{ 0x000, GET(mcrf) },
+      //{ 0x010, GET(bclr) },
+      //{ 0x012, GET(rfid) },
+      //{ 0x021, GET(crnor) },
+      //{ 0x081, GET(crandc) },
+      //{ 0x096, GET(isync) },
+      //{ 0x0C1, GET(crxor) },
+      //{ 0x0E1, GET(crnand) },
+      //{ 0x101, GET(crand) },
+      //{ 0x121, GET(creqv) },
+      //{ 0x1A1, GET(crorc) },
+      //{ 0x1C1, GET(cror) },
+      { 0x210, GET(bcctr) },
+      });
     // Group 0x1E opcodes (field 27..30)
     fillTable<instructionHandlerJIT>(jitTable, 0x1E, 4, 1, {
       { 0x0, GETRC(rldicl) },
@@ -128,6 +146,7 @@ namespace PPCInterpreter {
       { 0x10A, GETRC(add) },
       { 0x13C, GETRC(xor) },
       { 0x153, GET(mfspr) },
+      { 0x173, GET(mftb) },
       { 0x19C, GETRC(orc) },
       { 0x1BC, GETRC(or) },
       { 0x1DC, GETRC(nand) },

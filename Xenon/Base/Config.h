@@ -160,8 +160,6 @@ inline struct _xcpu {
   std::string ramSize = "512MiB";
   // Loads an elf from the ElfBinary path
   bool elfLoader = false;
-  // CPI for your system, do not modify
-  s32 clocksPerInstruction = 0;
   // CB/SB HW_INIT_SKIP
   bool overrideInitSkip = false;
   u64 HW_INIT_SKIP_1 = 0;
@@ -203,6 +201,8 @@ inline struct _filepaths {
   std::string nand = "nand.bin";
   // ODD Image path
   std::string oddImage = "xenon.iso";
+  // DVD Key path
+  std::string dvdKeyPath = "dvdkey.txt";
   // HDD Image path
   std::string hddImage = "xenonHDD.img";
   // Elf binary path
@@ -222,6 +222,8 @@ inline struct _filepaths {
     nand = nandPath.string();
     auto oddImagePath = basePath / oddImage;
     oddImage = oddImagePath.string();
+    auto dvdKeyFilePath = basePath / dvdKeyPath;
+    dvdKeyPath = dvdKeyFilePath.string();
     auto hddImagePath = basePath / hddImage;
     hddImage = hddImagePath.string();
     auto elfBinaryPath = basePath / elfBinary;
@@ -283,7 +285,6 @@ inline struct _highlyExperimental {
   // Hybrid - JIT with Cached Interpreter fallback
   // JIT - Just In Time
   std::string cpuExecutor = "Interpreted";
-  s32 clocksPerInstructionBypass = 0;
 
   // TOML Conversion
   void to_toml(toml::value &value);

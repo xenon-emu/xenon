@@ -665,20 +665,20 @@ u64 PPCInterpreter::mmuContructEndAddressFromSecEngAddr(u64 inputAddress,
 
   switch (inputAddressInfo.regionType) {
   case SECENG_REGION_PHYS:
-    // Going to RAM directly.
+    // Low order 32 bits of te address map directly to the physical address. 
     outputAddress = inputAddressInfo.accessedAddr;
     break;
   case SECENG_REGION_HASHED:
-    // Going to RAM directly without hashing!
-    outputAddress = inputAddressInfo.accessedAddr;
+    // Only 30 bits of this address map to physical address.
+    outputAddress = (inputAddressInfo.accessedAddr & 0x3FFFFFFF);
     break;
   case SECENG_REGION_SOC:
     *socAccess = true;
     outputAddress = inputAddressInfo.accessedAddr;
     break;
   case SECENG_REGION_ENCRYPTED:
-    // Going to RAM directly without encryption!
-    outputAddress = inputAddressInfo.accessedAddr;
+    // Only 30 bits of this address map to physical address.
+    outputAddress = (inputAddressInfo.accessedAddr & 0x3FFFFFFF);
     break;
   default:
     break;

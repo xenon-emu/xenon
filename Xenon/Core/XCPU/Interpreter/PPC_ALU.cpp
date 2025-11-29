@@ -848,7 +848,7 @@ void PPCInterpreter::PPCInterpreter_mftb(sPPEState *ppeState) {
 
   switch (spr) {
   case TBLRO:
-    GPRi(rd) = ppeState->SPR.TB.TBL;
+    GPRi(rd) = ppeState->SPR.TB.hexValue;
     break;
   case TBURO:
     GPRi(rd) = ppeState->SPR.TB.TBU;

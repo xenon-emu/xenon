@@ -259,6 +259,7 @@ target_include_directories(Xenon SYSTEM PRIVATE
   ${XENON_THIRDPARTY_DIR}/fmt/include
   ${XENON_THIRDPARTY_DIR}/toml11
   ${XENON_THIRDPARTY_DIR}/asmjit/src
+  ${XENON_THIRDPARTY_DIR}/plusaes/include
 )
 
 # Add defines specific to Apple

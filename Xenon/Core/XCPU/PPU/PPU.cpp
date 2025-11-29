@@ -16,23 +16,6 @@
 #include "Core/XCPU/ElfABI.h"
 #include "Core/XCPU/JIT/PPU_JIT.h"
 
-// Clocks per instruction / Ticks per instruction
-static constexpr f64 cpi_a = -5.8868;
-static constexpr f64 cpi_b = 0.26415;
-static constexpr f64 cpi_c = 217.1;
-
-static constexpr u64 get_cpi_value(const u64 instrPerSecond) {
-  // Convert IPS to MIPS
-  f64 x = static_cast<f64>(instrPerSecond) / 1'000'000.0;
-
-  // Compute CPI: y = a + c / (x + b)
-  f64 cpif = cpi_a + (cpi_c / (x + cpi_b));
-
-  u64 cpi = static_cast<u64>(cpif);
-
-  return cpi == 0 ? 1 : cpi;
-}
-
 PPU::PPU(Xe::XCPU::XenonContext *inXenonContext, u64 resetVector, u32 PIR) :
   resetVector(resetVector)
 {
@@ -95,23 +78,6 @@ PPU::PPU(Xe::XCPU::XenonContext *inXenonContext, u64 resetVector, u32 PIR) :
   xenonContext = inXenonContext;
 
   xenonMMU = std::make_unique<STRIP_UNIQUE(xenonMMU)>(xenonContext);
-
-  if (Config::xcpu.clocksPerInstruction) {
-    clocksPerInstruction = Config::xcpu.clocksPerInstruction;
-    LOG_INFO(Xenon, "{}: Using cached CPI from Config, got {}", ppeState->ppuName, clocksPerInstruction);
-  } else {
-    CalculateCPI();
-    if (ppeState->ppuID == 0) {
-      Config::xcpu.clocksPerInstruction = clocksPerInstruction;
-    }
-  } 
-  if (!Config::highlyExperimental.clocksPerInstructionBypass) {
-    LOG_INFO(Xenon, "{}: {} clocks per instruction", ppeState->ppuName, clocksPerInstruction);
-  }
-  else {
-    LOG_INFO(Xenon, "{}: {} clocks per instruction (Overwritten! Actual CPI: {})", ppeState->ppuName, Config::highlyExperimental.clocksPerInstructionBypass, clocksPerInstruction);
-    clocksPerInstruction = Config::highlyExperimental.clocksPerInstructionBypass;
-  }
 
   // If we have a specific halt address, set it here
   ppuHaltOn = Config::debug.haltOnAddress;
@@ -213,19 +179,6 @@ void PPU::StartExecution(bool setHRMOR) {
   ppuThread = std::thread(&PPU::ThreadLoop, this);
 }
 
-void PPU::CalculateCPI() {
-  // Get the instructions per second that we're able to execute.
-  u32 instrPerSecond = GetIPS();
-
-  // Get our CPI
-  u64 cpi = get_cpi_value(instrPerSecond);
-
-  LOG_INFO(Xenon, "{} Speed: {:#d} instructions per second.", ppeState->ppuName, instrPerSecond);
-
-  // Find a way to calculate the right ticks/IPS ratio.
-  clocksPerInstruction = cpi;
-}
-
 void PPU::Reset() {
   // Signal that we are resetting
   ppuThreadState.store(eThreadState::Resetting);
@@ -310,9 +263,6 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
       // Execute instruction
       PPCInterpreter::ppcExecuteSingleInstruction(ppeState.get());
     }
-
-    // Increase Time Base Counter if enabled
-    CheckTimeBaseStatus();
 
     // Check for external interrupts
     if (curThread.SPR.MSR.EE && xenonContext->xenonIIC.checkExtInterrupt(curThread.SPR.PIR)) {
@@ -864,40 +814,30 @@ bool PPU::PPUCheckExceptions() {
   return false;
 }
 
-// Checks if the Timebase Logic is enabled and does the corresponding updates if true.
-void PPU::CheckTimeBaseStatus() {
-  // Start Profile
-  MICROPROFILE_SCOPEI("[Xe::PPU]", "CheckTimeBaseStatus", MP_AUTO);
-  // Increase Time Base Counter
-  if (xenonContext->timeBaseActive) {
-    // HID6[15]: Time-base and decrementer facility enable.
-    // 0 -> TBU, TBL, DEC, HDEC, and the hang-detection logic do not
-    // update. 1 -> TBU, TBL, DEC, HDEC, and the hang-detection logic
-    // are enabled to update
-    if (ppeState->SPR.HID6.tb_enable) {
-      UpdateTimeBase();
-    }
-  }
-}
-
 // Updates the time base based on the amount of ticks and checks for decrementer
 // interrupts if enabled.
-void PPU::UpdateTimeBase() {
-  // The Decrementer and the Time Base are driven by the same time frequency.
-  u32 newDec = 0;
-  u32 dec = 0;
-  // Update the Time Base.
-  ppeState->SPR.TB.hexValue += clocksPerInstruction;
-  // Get the decrementer value.
-  dec = curThread.SPR.DEC;
-  newDec = dec - clocksPerInstruction;
-  // Update the new decrementer value.
-  curThread.SPR.DEC = newDec;
-  // Check if Previous decrementer measurement is smaller than current and a
-  // decrementer exception is not pending.
-  if (newDec > dec && !(_ex & ppuDecrementerEx)) {
-    // The decrementer must issue an interrupt.
-    _ex |= ppuDecrementerEx;
+void PPU::UpdateTimeBase(u64 tbTicks) {
+  // HID6[15]: Time-base and decrementer facility enable.
+  // 0 -> TBU, TBL, DEC, HDEC, and the hang-detection logic do not
+  // update. 1 -> TBU, TBL, DEC, HDEC, and the hang-detection logic
+  // are enabled to update
+  if (ppeState->SPR.HID6.tb_enable) {
+    // The Decrementer and the Time Base are driven by the same time frequency.
+    u32 newDec = 0;
+    u32 dec = 0;
+    // Update the Time Base.
+    ppeState->SPR.TB.hexValue += tbTicks;
+    // Get the decrementer value.
+    dec = curThread.SPR.DEC;
+    newDec = dec - tbTicks;
+    // Update the new decrementer value.
+    curThread.SPR.DEC = newDec;
+    // Check if Previous decrementer measurement is smaller than current and a
+    // decrementer exception is not pending.
+    if (newDec > dec && !(_ex & ppuDecrementerEx)) {
+      // The decrementer must issue an interrupt.
+      _ex |= ppuDecrementerEx;
+    }
   }
 }
 

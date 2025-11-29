@@ -2,9 +2,38 @@
 /* Copyright 2025 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
+#include "Base/Thread.h"
 #include "Base/Logging/Log.h"
 #include "Core/XCPU/XenonCPU.h"
 #include "Interpreter/PPCInterpreter.h"
+
+#ifdef _WIN32
+#include <Windows.h>
+
+// Returns the CPU Frequency using Windows QueryPerformanceFrequency/QueryPerformanceCounter routines.
+double calibrateCPUFrequency() {
+  LARGE_INTEGER freq;
+  QueryPerformanceFrequency(&freq);
+
+  LARGE_INTEGER t0, t1;
+  u64 c0, c1;
+
+  QueryPerformanceCounter(&t0);
+  c0 = __rdtsc();
+
+  // Wait ~100 ms
+  Sleep(100); 
+
+  QueryPerformanceCounter(&t1);
+  c1 = __rdtsc();
+
+  double elapsedSec = double(t1.QuadPart - t0.QuadPart) / double(freq.QuadPart);
+  double cycles = double(c1 - c0);
+
+  return cycles / elapsedSec; // Frequency in Hz
+}
+
+#endif // _WIN32
 
 namespace Xe::XCPU {
 
@@ -46,6 +75,12 @@ namespace Xe::XCPU {
         xenonContext->socSecOTPBlock->EepromKey2[0] = fusesets[9].second;
         xenonContext->socSecOTPBlock->EepromHash1[0] = fusesets[10].second;
         xenonContext->socSecOTPBlock->EepromHash2[0] = fusesets[11].second;
+      }
+
+      // Start timebase timer thread.
+      if (!timeBaseThreadActive.load()) {
+        timeBaseThreadActive.store(true);
+        timeBaseThread = std::thread(&XenonCPU::timeBaseThreadLoop, this);
       }
     }
 
@@ -90,6 +125,9 @@ namespace Xe::XCPU {
   }
 
   XenonCPU::~XenonCPU() {
+    // First kill timer thread.
+    timeBaseThreadActive.store(false);
+
     LOG_INFO(Xenon, "Shutting PPU cores down...");
     ppu0.reset();
     ppu1.reset();
@@ -111,25 +149,9 @@ namespace Xe::XCPU {
     ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(xenonContext.get(), resetVector, 4); // Threads 4-5
     // Start execution on the main thread
     ppu0->StartExecution();
-    sharedCPI = ppu0->GetCPI();
-    // Get our CPI based on the first PPU, then share it across all PPUs
-    ppu1->SetCPI(GetCPI());
-    ppu2->SetCPI(GetCPI());
     // Start execution on the other threads
     ppu1->StartExecution();
     ppu2->StartExecution();
-  }
-
-  u32 XenonCPU::RunCPITests(u64 resetVector) {
-    // Create PPU element
-    ppu0.reset();
-    ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(xenonContext.get(), resetVector, 0); // Threads 0-1
-    // Start execution on the main thread
-    ppu0->StartExecution();
-    // Get CPU and reset PPU
-    u32 cpi = ppu0->GetCPI();
-    ppu0.reset();
-    return cpi;
   }
 
   void XenonCPU::LoadElf(const std::string path) {
@@ -162,9 +184,6 @@ namespace Xe::XCPU {
     ppu0->loadElfImage(elfBinary.get(), fileSize);
     // Start execution on the main thread
     ppu0->StartExecution(false);
-    // Get our CPI based on the first PPU, then share it across all PPUs
-    ppu1->SetCPI(ppu0->GetCPI());
-    ppu2->SetCPI(ppu0->GetCPI());
     // Start execution on the other threads
     ppu1->StartExecution(false);
     ppu2->StartExecution(false);
@@ -255,6 +274,62 @@ namespace Xe::XCPU {
     }
 
     return nullptr;
+  }
+
+  // TimeBase thread for increasing global timer counter.
+  void XenonCPU::timeBaseThreadLoop() {
+    Base::SetCurrentThreadName("[Xe] CPU Timer Thread");
+
+#ifdef _WIN32
+    // Get our CPU frequency.
+    double cpuFrequencyInHz = calibrateCPUFrequency();
+    // Target time in Ns we need to wait.
+    const double targetNs = 2500.0;
+    // Convert that to CPU cycles.
+    unsigned long long targetCPUCycles = static_cast<unsigned long long>((targetNs * 1e-9) * cpuFrequencyInHz);
+    unsigned long long startCycle = __rdtsc();
+    unsigned long long nextCycle = startCycle + targetCPUCycles;
+
+    while (timeBaseThreadActive.load()) {
+      // Wait x cycles.
+      while (__rdtsc() < nextCycle) {}
+
+      // We're waiting for approx 2500 Ns, which represent 125 XenonCPU cycles.
+      if (xenonContext->timeBaseActive) {
+        ppu0->UpdateTimeBase(125);
+        ppu1->UpdateTimeBase(125);
+        ppu2->UpdateTimeBase(125);
+      }
+      // Update our start cycle.
+      startCycle = __rdtsc();
+      // Add our target cycles amount.
+      nextCycle = startCycle + targetCPUCycles;
+    }
+#else
+    using clock = std::chrono::high_resolution_clock;
+    auto last = clock::now();
+    auto now = clock::now();
+
+    while (timeBaseThreadActive.load()) {
+      // Sleep a little to avoid burning CPU. We compute elapsed and convert to ticks.
+      // The lower we sleep, the more accurate the timebase will be, but it will also be more CPU intensive.
+      last = now;
+      std::this_thread::sleep_for(std::chrono::microseconds(100));
+      now = clock::now();
+      auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(now - last).count();
+      if (elapsed <= 0) continue;
+      // Xbox 360 timebase = 50 MHz -> period = 20 ns per tick
+      // ticks = elapsed_ns / 20
+      u64 ticks = static_cast<u64>(elapsed) / 20ULL;
+      if (ticks == 0) continue;
+      // Accumulate globally
+      if (xenonContext->timeBaseActive) {
+        ppu0->UpdateTimeBase(ticks);
+        ppu1->UpdateTimeBase(ticks);
+        ppu2->UpdateTimeBase(ticks);
+      }
+    }
+#endif // _WIN32
   }
 
 } // Xe::XCPU

@@ -7,6 +7,8 @@
 #include "Base/Config.h"
 #include "Base/Logging/Log.h"
 
+#include <plusaes/plusaes.hpp>
+
 // Enables ODD Debug output
 //#define ODD_DEBUG
 
@@ -174,6 +176,28 @@ Xe::PCIDev::ODD::ODD(const char* deviceName, u64 size, PCIBridge *parentPCIBridg
 
   // Device ready to receive commands.
   atapiState.regs.status = ATA_STATUS_DRDY;
+
+  // Get our DVD key.
+  std::ifstream file(Config::filepaths.dvdKeyPath);
+  if (!file.is_open()) {
+      LOG_ERROR(ODD, "Error opening DVD key file. Check your filepath. Key set to 0.");
+  } else {
+      std::string dvdkeyStr = "";
+      std::getline(file, dvdkeyStr);
+      if (dvdkeyStr.size() == 0x20) {
+          // Parse the input
+          std::string substr = dvdkeyStr.substr(0, 16);
+          u64 strDta = strtoull(substr.c_str(), nullptr, 16);
+          strDta = byteswap_be(strDta);
+          memcpy(&dvdKey, &strDta, 8);
+          substr = dvdkeyStr.substr(16, 16);
+          strDta = strtoull(substr.c_str(), nullptr, 16);
+          strDta = byteswap_be(strDta);
+          memcpy(&dvdKey[8], &strDta, 8);
+      } else {
+          LOG_ERROR(ODD, "DVD Key found is not 16 bytes long.");
+      }
+  }
 
   // Enter ODD Worker Thread
   oddWorkerThread = std::thread(&Xe::PCIDev::ODD::oddThreadLoop, this);
@@ -763,7 +787,7 @@ void Xe::PCIDev::ODD::scsiReadCapacityCommand() {
   atapiState.dataOutBuffer.reset();
 
   u8 capacityBuffer[8] = {};
-  u32 imageCapacity = 0x200000; // 4Gb
+  u32 imageCapacity = atapiState.mountedODDImage->Size() / ATAPI_CDROM_SECTOR_SIZE;
   // LBA of this image
   capacityBuffer[0] = imageCapacity >> 24;
   capacityBuffer[1] = imageCapacity >> 16;
@@ -810,6 +834,68 @@ void Xe::PCIDev::ODD::scsiRead10Command() {
   atapiState.dataOutBuffer.init(sectorCount, true);
   atapiState.dataOutBuffer.reset();
   atapiState.mountedODDImage->Read(readOffset, atapiState.dataOutBuffer.get(), sectorCount);
+  atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
+  atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
+  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
+}
+
+void Xe::PCIDev::ODD::scsiReadTocCommand() {
+  // Reset output buffer
+  atapiState.dataOutBuffer.reset();
+
+  // Minimal TOC: one data track (1) + lead-out (0xAA).
+  const u8 firstTrack = 1;
+  const u8 lastTrack = 1;
+
+  u32 imageCapacity = atapiState.mountedODDImage->Size() / ATAPI_CDROM_SECTOR_SIZE;
+
+  u8 numDescriptors = (lastTrack - firstTrack + 1) + 1;
+
+  u16 tocLen = static_cast<u16>(numDescriptors * 8 + 2);
+  size_t totalSize = 4 + numDescriptors * 8; // 4 bytes header + descriptors
+
+  if (!atapiState.dataOutBuffer.init(totalSize, true)) {
+    LOG_ERROR(ODD, "Failed to initialize TOC data buffer");
+    return;
+  }
+  atapiState.dataOutBuffer.reset();
+
+  u8 *buf = atapiState.dataOutBuffer.get();
+
+  // Header: 2 bytes BE length, 1 byte first track, 1 byte last track
+  buf[0] = static_cast<u8>((tocLen >> 8) & 0xFF);
+  buf[1] = static_cast<u8>(tocLen & 0xFF);
+  buf[2] = firstTrack;
+  buf[3] = lastTrack;
+
+  size_t off = 4;
+  // Track descriptors (one entry per track)
+  for (u8 t = firstTrack; t <= lastTrack; ++t) {
+    buf[off + 0] = 0x14; // ADR=1 (upper nibble), CONTROL=4 (lower nibble) -> data track
+    buf[off + 1] = t;    // Track number
+    buf[off + 2] = 0;    // Reserved
+    buf[off + 3] = 0;    // Reserved
+    // Address (LBA) MSB..LSB (track start).
+    u32 addr = 0;
+    buf[off + 4] = static_cast<u8>((addr >> 24) & 0xFF);
+    buf[off + 5] = static_cast<u8>((addr >> 16) & 0xFF);
+    buf[off + 6] = static_cast<u8>((addr >> 8) & 0xFF);
+    buf[off + 7] = static_cast<u8>((addr) & 0xFF);
+    off += 8;
+  }
+
+  // Lead-out descriptor
+  buf[off + 0] = 0x14;         // ADR=1, CONTROL=4
+  buf[off + 1] = 0xAA;         // Lead-out track number
+  buf[off + 2] = 0;
+  buf[off + 3] = 0;
+  u32 leadAddr = imageCapacity; // LBA of lead-out
+  buf[off + 4] = static_cast<u8>((leadAddr >> 24) & 0xFF);
+  buf[off + 5] = static_cast<u8>((leadAddr >> 16) & 0xFF);
+  buf[off + 6] = static_cast<u8>((leadAddr >> 8) & 0xFF);
+  buf[off + 7] = static_cast<u8>((leadAddr) & 0xFF);
+
+  // Signal status
   atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
   atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
   atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
@@ -992,6 +1078,12 @@ void Xe::PCIDev::ODD::oddThreadLoop() {
       atapiState.dataOutBuffer.reset();
       // After completion we must raise an interrupt.
       atapiIssueInterrupt();
+
+      // Check if we should copy the input buffer onto our page data.
+      if (copyDataIntoPageData) {
+        memcpy(pageData, atapiState.dataInBuffer.get(), sizeof(pageData));
+        copyDataIntoPageData = false;
+      }
     }
     
     // Check for pending SCSI commands.
@@ -1094,11 +1186,25 @@ void Xe::PCIDev::ODD::processSCSICommand() {
     scsiReadCapacityCommand();
     break;
   case SCSIOP_MODE_SELECT10:
+    // Save our page data for later.
+    copyDataIntoPageData = true;
+    // Check for page code.
+    if (!atapiState.scsiCBD.AsByte[2] == 0x3B) {
+        LOG_WARNING(ODD, "Unsupported MODE_SELECT Page code {:#x}", atapiState.scsiCBD.AsByte[2]);
+    }
     atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
     atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
     atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
     break;
   case SCSIOP_MODE_SENSE10:
+    if (atapiState.scsiCBD.AsByte[2] == 0x3B) {
+      // Page is 3B, get the page data and perform auth.
+      perform3BAuth();
+      break;
+    }
+
+    // Unsupported page code atm.
+    LOG_WARNING(ODD, "Unsupported MODE_SENSE Page code {:#x}", atapiState.scsiCBD.AsByte[2]);
     atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
     atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
     atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
@@ -1108,6 +1214,9 @@ void Xe::PCIDev::ODD::processSCSICommand() {
     break;
   case SCSIOP_READ10:
     scsiRead10Command();
+    break;
+  case SCSIOP_READ_TOC:
+    scsiReadTocCommand();
     break;
   default:
     LOG_ERROR(ODD, "Unknown SCSI Command requested: 0x{:X}", atapiState.scsiCBD.CDB12.OperationCode);
@@ -1120,4 +1229,53 @@ void Xe::PCIDev::ODD::atapiNopCommand() {
   atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF;
   atapiState.regs.interruptReason &= ~7;
   atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_CD | ATA_INTERRUPT_REASON_IO;
+}
+
+// Performs drive authentication using the 0x3B page code.
+void Xe::PCIDev::ODD::perform3BAuth() {
+  // Reset our output buffer
+  atapiState.dataOutBuffer.reset();
+  
+  // Get our IV.
+  u8 aesCBCIv[16] = {};
+  memcpy(&aesCBCIv, &pageData[42], 16);
+
+  // Decrypted Page data.
+  u8 decryptedPageData[32] = {};
+
+  // Encrypted Response data.
+  u8 responseData[32] = {};
+
+  // Decrypt the input data using our DVD Key and provided IV in page.
+  plusaes::decrypt_cbc(&pageData[10], 0x20, dvdKey, 16, &aesCBCIv, decryptedPageData, 0x20, 0);
+
+  // Get our session key.
+  u8 sessionKey[16] = {};
+  memcpy(&sessionKey, &decryptedPageData[0], 16);
+
+  // Get our challenge.
+  u8 challengeData[16] = {};
+  memcpy(&challengeData, &decryptedPageData[16], 16);
+
+  // Craft our response.
+  memcpy(&responseData[16], &challengeData, 16);
+
+  u8 outPage[74] = {};
+
+  outPage[1] = 0x38;
+  // Out page [8] = challenge type.
+  outPage[8] = 0x3B;
+  // Out page [9] = 0.
+  outPage[9] = 0x30;
+
+  // Encrypt the challenge using the session key and the same IV provided.
+  plusaes::encrypt_cbc(responseData, 0x20, sessionKey, 16, &aesCBCIv, &outPage[10], 0x20, 0);
+
+  // Copy our age data into our output buffer.
+  memcpy(atapiState.dataOutBuffer.get(), &outPage, sizeof(outPage));
+
+  // Set status as expected.
+  atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
+  atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
+  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
 }

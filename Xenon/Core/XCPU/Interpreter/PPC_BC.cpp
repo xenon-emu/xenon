@@ -19,10 +19,7 @@ void PPCInterpreter::PPCInterpreter_bc(sPPEState *ppeState) {
   if (ctrOk && condOk) {
     curThread.NIA = (_instr.aa ? 0 : curThread.CIA) + (EXTS(_instr.ds, 14) << 2);
     curThread.NIA = curThread.SPR.MSR.SF ? curThread.NIA : static_cast<u32>(curThread.NIA);
-  }
-
-  if (_instr.lk) {
-    curThread.SPR.LR = curThread.CIA + 4;
+    if (_instr.lk) { curThread.SPR.LR = curThread.CIA + 4; }
   }
 }
 
@@ -30,9 +27,7 @@ void PPCInterpreter::PPCInterpreter_bc(sPPEState *ppeState) {
 void PPCInterpreter::PPCInterpreter_b(sPPEState *ppeState) {
   curThread.NIA = (_instr.aa ? 0 : curThread.CIA) + _instr.bt24;
   curThread.NIA = curThread.SPR.MSR.SF ? curThread.NIA : static_cast<u32>(curThread.NIA);
-  if (_instr.lk) {
-    curThread.SPR.LR = curThread.CIA + 4;
-  }
+  if (_instr.lk) { curThread.SPR.LR = curThread.CIA + 4; }
 }
 
 // Branch Conditional to Count Register
@@ -41,10 +36,7 @@ void PPCInterpreter::PPCInterpreter_bcctr(sPPEState *ppeState) {
 
   if (condOk) {
     curThread.NIA = curThread.SPR.MSR.SF ? curThread.SPR.CTR & ~3 : static_cast<u32>(curThread.SPR.CTR & ~3);
-  }
-
-  if (_instr.lk) {
-    curThread.SPR.LR = curThread.CIA + 4;
+    if (_instr.lk) { curThread.SPR.LR = curThread.CIA + 4; }
   }
 }
 
@@ -68,9 +60,6 @@ void PPCInterpreter::PPCInterpreter_bclr(sPPEState *ppeState) {
 
   if (ctrOk && condOk) {
     curThread.NIA = curThread.SPR.MSR.SF ? curThread.SPR.LR & ~3 : static_cast<u32>(curThread.SPR.LR & ~3);
-  }
-
-  if (_instr.lk) {
-    curThread.SPR.LR = curThread.CIA + 4;
+    if (_instr.lk) { curThread.SPR.LR = curThread.CIA + 4; }
   }
 }

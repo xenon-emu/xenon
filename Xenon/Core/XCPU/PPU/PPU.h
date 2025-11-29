@@ -47,9 +47,6 @@ public:
   // Start execution
   void StartExecution(bool setHRMOR = true);
 
-  // Calulate our Clocks Per Instruction
-  void CalculateCPI();
-
   // Reset the PPU state
   void Reset();
 
@@ -70,11 +67,6 @@ public:
 
   // Runs a specified number of instructions
   void PPURunInstructions(u64 numInstrs, bool enableHalt = true);
-
-  // Sets the clocks per instruction
-  void SetCPI(u32 CPI) { clocksPerInstruction = CPI; }
-  // Gets the clocks per instruction
-  u32 GetCPI() { return clocksPerInstruction; }
 
   // Checks if the thread is active
   bool ThreadActive() {
@@ -99,6 +91,10 @@ public:
   sPPEState *GetPPUState() { return ppeState.get(); }
   // Get ppuJIT
   PPU_JIT *GetPPUJIT() { return ppuJIT.get(); }
+
+  // Updates the current PPU's time base and decrementer based on
+  // the amount of tb ticks given.
+  void UpdateTimeBase(u64 tbTicks);
 
   // Load a elf image from host memory. Copies into RAM
   // Returns entrypoint
@@ -141,9 +137,6 @@ private:
   // Xenon Memory Management Unit
   std::unique_ptr<Xe::XCPU::MMU::XenonMMU> xenonMMU;
 
-  // Amount of CPU clocls per instruction executed.
-  u32 clocksPerInstruction = 0;
-
   // Initial reset vector
   u32 resetVector = 0;
 
@@ -185,11 +178,6 @@ private:
   bool PPUCheckInterrupts();
   // Checks for pending exceptions
   bool PPUCheckExceptions();
-  // Checks if it should update the time base
-  void CheckTimeBaseStatus();
-  // Updates the current PPU's time base and decrementer based on
-  // the amount of ticks per instr we should perform.
-  void UpdateTimeBase();
   // Gets the current running threads.
   u8 GetCurrentRunningThreads();
   // Simulates the behavior of the 1BL inside the Xenon Secure ROM.

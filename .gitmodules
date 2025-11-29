@@ -47,3 +47,6 @@
 [submodule "Deps/ThirdParty/glslang"]
 	path = Deps/ThirdParty/glslang
 	url = https://github.com/KhronosGroup/glslang.git
+[submodule "Deps/ThirdParty/plusaes"]
+	path = Deps/ThirdParty/plusaes
+	url = https://github.com/kkAyataka/plusaes.git
