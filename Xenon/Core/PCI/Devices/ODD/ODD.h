@@ -645,8 +645,16 @@ struct ATAPI_DEV_STATE {
   // Auth page for XDVD.
   sXBOX_DVD_AUTH_PAGE xdvdAuthPage = {};
   // Challenge data
-  u8 xdvdChallengeDataEncrypted[XDVD_STRUCTURE_LEN];
-  u8 xdvdChallengeDataDecrypted[XDVD_STRUCTURE_LEN];
+  u8 xdvdChallengeDataEncrypted[XDVD_STRUCTURE_LEN] = {};
+  u8 xdvdChallengeDataDecrypted[XDVD_STRUCTURE_LEN] = {};
+  // Disc Type
+  u8 discImageType = discImageTypeInvalid;
+  // Image contains video partition?
+  bool imageContainsVideoPartition = false;
+  // Security Sector type
+  u8 securitySectorType = secSectorTypeInvalid;
+  // Security Sector data
+  u8 securitySectorData[ATAPI_CDROM_SECTOR_SIZE] = {};
 };
 
 class ODD : public PCIDevice {
@@ -725,6 +733,12 @@ private:
   void perform3BAuth();
 
   // XDVD
+  
+  // Returns true if the security sector found is a valid Original Xbox SS.
+  bool validateOriginalXboxSecuritySector(u8 *ssData);
+
+  // Returns true if the security sector found is a valid X360 SS.
+  bool validateX360SecuritySector(u8 *ssData);
 
   // Extracts the encrypted challenge table data.
   void xdvdGetEncryptedChallengeTable(u8 *outData);

@@ -10,7 +10,7 @@
 #include <plusaes/plusaes.hpp>
 
 // Enables ODD Debug output
-//#define ODD_DEBUG
+#define ODD_DEBUG
 
 // Describes the ATA transfer modes available to the SET_TRNASFER_MODE subcommand.
 enum class ATA_TRANSFER_MODE {
@@ -148,10 +148,79 @@ Xe::PCIDev::ODD::ODD(const char* deviceName, u64 size, PCIBridge *parentPCIBridg
     }
   }
 
+  // Buffer for image data.
+  u8 dataBuffer[ATAPI_CDROM_SECTOR_SIZE] = {};
+  memset(&dataBuffer, 0, sizeof(dataBuffer));
+
   if (!atapiState.imageAttached) {
     LOG_INFO(ODD, "No ODD image found - disabling device.");
+  } else {
+    // Check whether the image is an XGD2/3 or CD/DVD image
+    if (atapiState.mountedODDImage->Size() > 0xFDA0800LL) {
+      // 'Unproper' game backups, have the Xbox magic starting at sector 32.
+      atapiState.mountedODDImage->Read(65536, dataBuffer, ATAPI_CDROM_SECTOR_SIZE);
+
+      if (memcmp(dataBuffer, "MICROSOFT*XBOX*MEDIA", 20) != 0) {
+        // Check for XGD2
+        atapiState.mountedODDImage->Read(65536 + XGD2_GAME_PARTITION_START, dataBuffer, ATAPI_CDROM_SECTOR_SIZE);
+        if (memcmp(dataBuffer, "MICROSOFT*XBOX*MEDIA", 20) != 0) {
+          // Check for XGD3
+          atapiState.mountedODDImage->Read(65536 + XGD3_GAME_PARTITION_START, dataBuffer, ATAPI_CDROM_SECTOR_SIZE);
+          if (memcmp(dataBuffer, "MICROSOFT*XBOX*MEDIA", 20) != 0) {
+            // Unknown format, must be in CD/DVD format.
+            atapiState.discImageType = discImageTypeCD_DVD;
+          } else {
+            // Image is in XGD3 format and contains proper video partition.
+            LOG_INFO(ODD, "Found valid XGD3 Image.");
+            // Set image type.
+            atapiState.discImageType = discImageTypeXGD3;
+            // Set video partition flag.
+            atapiState.imageContainsVideoPartition = true;
+          }
+        } else {
+          // Image is in XGD2 format and contains proper video partition.
+          LOG_INFO(ODD, "Found valid XGD2 Image.");
+          // Set image type.
+          atapiState.discImageType = discImageTypeXGD2;
+          // Set video partition flag.
+          atapiState.imageContainsVideoPartition = true;
+        }
+      } else {
+        // Found it, image is an unproper dump.
+        LOG_ERROR(ODD, "Found unproper dump of an Xbox Media Disc. You must fix it with something like abgx360 or similar for use on Xenon");
+        // Set image type.
+        atapiState.discImageType = discImageTypeUnproperGameDump;
+      }
+
+    } else {
+      // Image is too small, has to be a CD/DVD
+      atapiState.discImageType = discImageTypeCD_DVD;
+    }
   }
 
+  u32 ssOffset = 0;
+
+  // Check and extract the SS.
+  if (atapiState.discImageType == discImageTypeXGD2) { ssOffset = XGD2_GAME_PARTITION_START - 0x800; }
+  else if(atapiState.discImageType == discImageTypeXGD3) { ssOffset = XGD3_GAME_PARTITION_START - 0x8800; }
+
+  if (ssOffset != 0) {
+    // Read the data
+    atapiState.mountedODDImage->Read(ssOffset, dataBuffer, ATAPI_CDROM_SECTOR_SIZE);
+  
+    if (validateOriginalXboxSecuritySector(dataBuffer)) {
+      LOG_INFO(ODD, "Found Original Xbox Security Sector.");
+      atapiState.securitySectorType = secSectorTypeOriginalXbox;
+      memcpy(&atapiState.securitySectorData, &dataBuffer, sizeof(atapiState.securitySectorData));
+    } else if (validateX360SecuritySector(dataBuffer)) {
+      LOG_INFO(ODD, "Found Xbox 360 Security Sector.");
+      atapiState.securitySectorType = secSectorTypeXbox360;
+      memcpy(&atapiState.securitySectorData, &dataBuffer, sizeof(atapiState.securitySectorData));
+    } else {
+      LOG_ERROR(ODD, "Security Sector Data is invalid.");
+    }
+  }
+  
   oddThreadRunning = atapiState.imageAttached;
 
   // Set the SCR's at offset 0xC0 (SiS-like)
@@ -921,12 +990,15 @@ void Xe::PCIDev::ODD::scsiReadDVDStructureCommand() {
   sREAD_DVD_STRUCTURE readDVDStruct = {};
   memcpy(&readDVDStruct, atapiState.dataInBuffer.get(), sizeof(sREAD_DVD_STRUCTURE));
 
-  u32 blockNum = (u32)readDVDStruct.RMDBlockNumber;
+  u32 blockNum = 0;
+  memcpy(&blockNum, &readDVDStruct.RMDBlockNumber, 4);
+  blockNum = byteswap_be(blockNum);
 
   switch (readDVDStruct.Format) {
   case 0x00: // Physical format info.
     if (readDVDStruct.LayerNumber == XDVD_STRUCTURE_LAYER && blockNum == XDVD_STRUCTURE_BLOCK_NUMBER) {
-
+      // Return the DVD strucutre data containing security sector and challenges.
+      memcpy(atapiState.dataOutBuffer.get(), &atapiState.securitySectorData, sizeof(atapiState.securitySectorData));
     }
     break;
   default:
@@ -1337,4 +1409,29 @@ void Xe::PCIDev::ODD::perform3BAuth() {
   atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
   atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
   atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
+}
+
+bool Xe::PCIDev::ODD::validateOriginalXboxSecuritySector(u8 *ssData) {
+  // startpsnL0 should be 0x060600
+  if ((ssData[0x5] != 0x06) || (ssData[0x6] != 0x06) || (ssData[0x7] != 0)) return false;
+  
+  // These 3 bytes should be zero
+  if ((ssData[0x4] != 0) || (ssData[0x8] != 0) || (ssData[0xC] != 0)) return false;
+  
+  // Offset 0x4ba tells us the software version (0x01 = Original XBOX)
+  if (ssData[0x4BA] != 0x01) return false;
+  return true;
+}
+
+bool Xe::PCIDev::ODD::validateX360SecuritySector(u8 *ssData) {
+  // startpsnL0 should be 0x04FB20 or 0x034100
+  if (((ssData[0x5] != 0x04) || (ssData[0x6] != 0xFB) || (ssData[0x7] != 0x20)) &&
+    ((ssData[0x5] != 0x03) || (ssData[0x6] != 0x41) || (ssData[0x7] != 0x00))) return false;
+  
+  // These 3 bytes should be zero
+  if ((ssData[0x4] != 0) || (ssData[0x8] != 0) || (ssData[0xC] != 0)) return false;
+  
+  // Offset 0x4ba tells us the software version (0x02 = XBOX 360)
+  if (ssData[0x4BA] != 0x02) return false;
+  return true;
 }

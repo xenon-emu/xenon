@@ -30,6 +30,10 @@
 // XDVD Structure Lenght
 #define XDVD_STRUCTURE_LEN 0x664
 
+// Game Partition Starting offsets
+#define XGD2_GAME_PARTITION_START 0xFD90000
+#define XGD3_GAME_PARTITION_START 0x2080000
+
 // Spindle speeds for XDVD drives
 // According to abgx360.
 enum eXDVDSpindleSpeed : u8 {
@@ -38,6 +42,23 @@ enum eXDVDSpindleSpeed : u8 {
   spindleSpeed5x = 2,
   spindleSpeed8x = 3,
   spindleSpeed12x = 4
+};
+
+// Image types
+enum eDiscImageType : u8 {
+  discImageTypeInvalid = 0,   // Invalid or not present
+  discImageTypeCD_DVD = 1,    // CD/DVD Image
+  discImageTypeUnproperGameDump = 2,  // Unproper dump of an Xbox Media disc.
+  discImageTypeXGD1 = 3,      // Xbox Game Disc 1 Format
+  discImageTypeXGD2 = 4,      // Xbox Game Disc 2 Format
+  discImageTypeXGD3 = 5       // Xbox Game Disc 3 Format
+};
+
+// Security Sector types
+enum eSecuritySectorType : u8 {
+  secSectorTypeInvalid = 0,       // Invalid or not found.
+  secSectorTypeXbox360 = 0,       // Xbox 360 SS.
+  secSectorTypeOriginalXbox = 0,  // Original Xbox SS.
 };
 
 // Publicly available Mode Sense/Select (10 byte)
