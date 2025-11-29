@@ -199,6 +199,19 @@ Xe::PCIDev::ODD::ODD(const char* deviceName, u64 size, PCIBridge *parentPCIBridg
       }
   }
 
+  // Setup our XDVD Auth page data and spindle speed.
+  // According to XEMU PR:
+  atapiState.sataSpindleSpeedControl = spindleSpeed12x; // Speed check is !=0 and !< 4;
+  // Zero out the page data.
+  memset(&atapiState.xdvdAuthPage, 0, sizeof(sXBOX_DVD_AUTH_PAGE));
+  // Page type
+  atapiState.xdvdAuthPage.PageCode = XMODE_PAGE_XBOX_SECURITY;
+  atapiState.xdvdAuthPage.PageLength = sizeof(sXBOX_DVD_AUTH_PAGE) - 2; // Page Code and size are not included
+  atapiState.xdvdAuthPage.Unk1 = 1; // xboxkrnl checks this. Don't know what it is.
+  atapiState.xdvdAuthPage.DiscCategoryAndVersion = 0xD1;
+  atapiState.xdvdAuthPage.Unk2 = 2;
+
+
   // Enter ODD Worker Thread
   oddWorkerThread = std::thread(&Xe::PCIDev::ODD::oddThreadLoop, this);
 }
@@ -901,6 +914,32 @@ void Xe::PCIDev::ODD::scsiReadTocCommand() {
   atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
 }
 
+void Xe::PCIDev::ODD::scsiReadDVDStructureCommand() {
+  // Reset output buffer
+  atapiState.dataOutBuffer.reset();
+
+  sREAD_DVD_STRUCTURE readDVDStruct = {};
+  memcpy(&readDVDStruct, atapiState.dataInBuffer.get(), sizeof(sREAD_DVD_STRUCTURE));
+
+  u32 blockNum = (u32)readDVDStruct.RMDBlockNumber;
+
+  switch (readDVDStruct.Format) {
+  case 0x00: // Physical format info.
+    if (readDVDStruct.LayerNumber == XDVD_STRUCTURE_LAYER && blockNum == XDVD_STRUCTURE_BLOCK_NUMBER) {
+
+    }
+    break;
+  default:
+    LOG_WARNING(ODD, "Read DVD structure: Unimplemented format {:#x}", readDVDStruct.Format);
+    break;
+  }
+
+  // Signal status
+  atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
+  atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
+  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
+}
+
 //
 // Utilities
 //
@@ -1188,26 +1227,43 @@ void Xe::PCIDev::ODD::processSCSICommand() {
   case SCSIOP_MODE_SELECT10:
     // Save our page data for later.
     copyDataIntoPageData = true;
-    // Check for page code.
-    if (!atapiState.scsiCBD.AsByte[2] == 0x3B) {
-        LOG_WARNING(ODD, "Unsupported MODE_SELECT Page code {:#x}", atapiState.scsiCBD.AsByte[2]);
-    }
-    atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
-    atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
-    atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
-    break;
-  case SCSIOP_MODE_SENSE10:
-    if (atapiState.scsiCBD.AsByte[2] == 0x3B) {
-      // Page is 3B, get the page data and perform auth.
-      perform3BAuth();
+    switch (atapiState.scsiCBD.modeSense.PageCode) {
+      copyDataIntoPageData = true;
+    case XMODE_PAGE_DVD_KEY_AUTH:
+      break;
+    default:
+      // Unsupported page code atm.
+      LOG_WARNING(ODD, "Unsupported MODE_SELECT Page code {:#x}", atapiState.scsiCBD.modeSense.PageCode);
+      atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
+      atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
+      atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
       break;
     }
-
-    // Unsupported page code atm.
-    LOG_WARNING(ODD, "Unsupported MODE_SENSE Page code {:#x}", atapiState.scsiCBD.AsByte[2]);
-    atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
-    atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
-    atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
+    break;
+  case SCSIOP_MODE_SENSE10:
+    switch (atapiState.scsiCBD.modeSense.PageCode) {
+    case XMODE_PAGE_DVD_KEY_AUTH:
+      // Get the page data and perform auth.
+      perform3BAuth();
+      break;
+    case XMODE_PAGE_XBOX_SECURITY:
+      // Reset our output buffer
+      atapiState.dataOutBuffer.reset();
+      // Copy our XDVD auth data structure
+      memcpy(atapiState.dataOutBuffer.get(), &atapiState.xdvdAuthPage, sizeof(sXBOX_DVD_AUTH_PAGE));
+      // Set status.
+      atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
+      atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
+      atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
+      break;
+    default:
+      // Unsupported page code atm.
+      LOG_WARNING(ODD, "Unsupported MODE_SENSE Page code {:#x}", atapiState.scsiCBD.modeSense.OperationCode);
+      atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
+      atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
+      atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
+      break;
+    }
     break;
   case SCSIOP_INQUIRY:
     scsiInquiryCommand();
@@ -1217,6 +1273,9 @@ void Xe::PCIDev::ODD::processSCSICommand() {
     break;
   case SCSIOP_READ_TOC:
     scsiReadTocCommand();
+    break;
+  case SCSIOP_READ_DVD_S:
+    scsiReadDVDStructureCommand();
     break;
   default:
     LOG_ERROR(ODD, "Unknown SCSI Command requested: 0x{:X}", atapiState.scsiCBD.CDB12.OperationCode);

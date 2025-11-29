@@ -23,6 +23,9 @@
 #include "Core/PCI/PCIDevice.h"
 #include "Core/XCPU/PPU/PPCInternal.h"
 
+// XDVD structures and enums
+#include "Core/PCI/Devices/ODD/XDVD.h"
+
 #define ODD_DEV_SIZE 0x30
 
 namespace Xe {
@@ -550,6 +553,10 @@ union XE_CDB {
   } CDB12, *PCDB12;
 #endif
 
+  // Used for mode page SCSI commands.
+  sMODE_SELECT10 modeSelect;
+  sMODE_SENSE10 modeSense;
+
   u32 AsUlong[4];
   u8 AsByte[16];
 };
@@ -633,6 +640,13 @@ struct ATAPI_DEV_STATE {
   bool imageAttached = false;
   // Is there a SCSI command pending for processing?
   bool scsiCommandPending = false;
+  // Spindle speed used in Mode sense/select commands.
+  u8 sataSpindleSpeedControl = spindleSpeedStopped;
+  // Auth page for XDVD.
+  sXBOX_DVD_AUTH_PAGE xdvdAuthPage = {};
+  // Challenge data
+  u8 xdvdChallengeDataEncrypted[XDVD_STRUCTURE_LEN];
+  u8 xdvdChallengeDataDecrypted[XDVD_STRUCTURE_LEN];
 };
 
 class ODD : public PCIDevice {
@@ -674,6 +688,7 @@ private:
   void scsiInquiryCommand();
   void scsiRead10Command();
   void scsiReadTocCommand();
+  void scsiReadDVDStructureCommand();
 
   // Utilities
   
@@ -708,6 +723,11 @@ private:
 
   // Perform 3B Auth using this device DVD key and the incoming page data.
   void perform3BAuth();
+
+  // XDVD
+
+  // Extracts the encrypted challenge table data.
+  void xdvdGetEncryptedChallengeTable(u8 *outData);
 };
 
 } // namespace PCIDev
