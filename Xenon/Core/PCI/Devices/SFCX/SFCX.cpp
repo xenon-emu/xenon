@@ -39,7 +39,11 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
 
   // Config Reg is VERY Important. Tells info
   // about Meta/NAND Type
-  sfcxState.configReg = 0x000043000;
+
+  // Set according to current system type.
+  u32 configReg = Config::highlyExperimental.consoleRevison == Config::eConsoleRevision::Xenon ? 0x01198030 : 0x000043000;
+
+  sfcxState.configReg = configReg;
   sfcxState.statusReg = 0x00000600;
   sfcxState.statusReg = 0x00000600;
   sfcxState.addressReg = 0x00F70030;
@@ -526,9 +530,6 @@ void Xe::PCIDev::SFCX::sfcxMainLoop() {
       // Set Status to Ready again
       sfcxState.statusReg &= ~STATUS_BUSY;
     }
-
-    // Sleep for some time.
-    std::this_thread::sleep_for(50ns);
   }
 }
 
