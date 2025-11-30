@@ -92,8 +92,8 @@ PPU::PPU(Xe::XCPU::XenonContext *inXenonContext, u64 resetVector, u32 PIR) :
     thread.SPR.DEC = 0x7FFFFFFF;
 
     // Resize ERATs
-    thread.iERAT.resizeCache(64);
-    thread.dERAT.resizeCache(64);
+    thread.iERAT.resizeCache(512);
+    thread.dERAT.resizeCache(512);
   }
 
   // Set PVR and PIR

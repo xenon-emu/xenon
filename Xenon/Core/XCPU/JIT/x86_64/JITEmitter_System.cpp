@@ -177,4 +177,155 @@ void PPCInterpreter::PPCInterpreterJIT_mftb(sPPEState *ppeState, JITBlockBuilder
   }
 }
 
+// Return from interrupt doubleword
+void PPCInterpreter::PPCInterpreterJIT_rfid(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  x86::Gp srr1 = newGP64();
+  x86::Gp msr  = newGP64();
+  x86::Gp tmp  = newGP64();
+
+  Label skipHVMESet = COMP->newLabel();
+  Label use64    = COMP->newLabel();
+
+  // MSR[1-2,4-32,37-41,49-50,52-57,60-63] <- SRR1[1-2,4-32,37-41,49-50,52-57,60-63]
+  COMP->mov(srr1, SPRPtr(SRR1));
+  COMP->mov(msr, srr1);
+
+  // MSR[0] <- SRR1[0] | SRR1[1]
+
+  Label setMSRSF = COMP->newLabel();
+  Label doneMSRSF = COMP->newLabel();
+
+  COMP->bt(srr1, 63); // SRR1[0]
+  COMP->jc(setMSRSF);
+  COMP->bt(srr1, 62); // SRR1[1]
+  COMP->jc(setMSRSF);
+  // SRR1[0] || SRR1[1] == 0
+  COMP->btr(msr, 63);
+  COMP->jmp(doneMSRSF);
+  COMP->bind(setMSRSF);
+  COMP->bts(msr, 63);
+  // Check was done and MSR was set.
+  COMP->bind(doneMSRSF);
+
+  // MSR[58] = SRR1[58] | SRR1[49]
+
+  Label setMSRIR = COMP->newLabel();
+  Label doneMSRIR = COMP->newLabel();
+
+  COMP->bt(srr1, 5); // SRR1[58]
+  COMP->jc(setMSRIR);
+  COMP->bt(srr1, 14); // SRR1[49]
+  COMP->jc(setMSRIR);
+  // SRR1[58] || SRR1[49] == 0
+  COMP->btr(msr, 5);
+  COMP->jmp(doneMSRIR);
+  COMP->bind(setMSRIR);
+  COMP->bts(msr, 5);
+  // Check was done and MSR was set.
+  COMP->bind(doneMSRIR);
+
+  // MSR[59] = SRR1[59] | SRR1[49]
+
+  Label setMSRDR = COMP->newLabel();
+  Label doneMSRDR = COMP->newLabel();
+
+  COMP->bt(srr1, 4); // SRR1[59]
+  COMP->jc(setMSRDR);
+  COMP->bt(srr1, 14); // SRR1[49]
+  COMP->jc(setMSRDR);
+  // SRR1[58] || SRR1[49] == 0
+  COMP->btr(msr, 4);
+  COMP->jmp(doneMSRDR);
+  COMP->bind(setMSRDR);
+  COMP->bts(msr, 4);
+  // Check was done and MSR was set.
+  COMP->bind(doneMSRDR);
+
+  // Check for HV bit in current MSR to skip setting HV and ME bits
+  x86::Gp currentMSR = newGP64();
+  COMP->mov(currentMSR, SPRPtr(MSR));
+  COMP->bt(currentMSR, 60); // MSR.HV
+  COMP->jnc(skipHVMESet);   // Jump if not in HV mode.
+
+  Label skipMSRSF = COMP->newLabel();
+  Label skipMSRME = COMP->newLabel();
+
+  // Set MSR[HV]
+  COMP->bt(srr1, 60); // SRR1[3]
+  COMP->jnc(skipMSRSF);
+  COMP->bts(msr, 60);
+  COMP->bind(skipMSRSF);
+  // Set MSR[ME]
+  COMP->bt(srr1, 12); // SRR1[51]
+  COMP->jnc(skipMSRME);
+  COMP->bts(msr, 12);
+  COMP->bind(skipMSRME);
+
+  // Skip setting HV and ME bits if not in HV mode
+  COMP->bind(skipHVMESet);
+  // Store composed MSR
+  COMP->mov(SPRPtr(MSR), msr);
+
+  // NIA <- SRR0 & ~3
+  x86::Gp srr0 = newGP64();
+  x86::Gp nia  = newGP64();
+  COMP->mov(srr0, SPRPtr(SRR0));
+  COMP->mov(nia, srr0);
+  COMP->and_(nia, imm<u64>(~3ULL));
+  COMP->mov(NIAPtr(), nia);
+
+  // If MSR.SF == 0 (32-bit mode), truncate NIA to 32 bits
+  COMP->bt(msr, 63);  // MSR.SF
+  COMP->jc(use64);    // if set -> 64-bit mode, skip truncation
+  COMP->and_(nia, imm<u32>(0xFFFFFFFF));
+  COMP->mov(NIAPtr(), nia);
+
+  COMP->bind(use64);
+}
+
+// Data Cache Block Zero
+void PPCInterpreter::PPCInterpreterJIT_dcbz(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  // Do nothing
+}
+
+// Instruction Synchronize
+void PPCInterpreter::PPCInterpreterJIT_isync(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  // Do nothing
+}
+
+// Synchronize
+void PPCInterpreter::PPCInterpreterJIT_sync(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  // Do nothing
+}
+
+// Data Cache Block Flush
+void PPCInterpreter::PPCInterpreterJIT_dcbf(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  // Do nothing
+}
+
+// Data Cache Block Invalidate
+void PPCInterpreter::PPCInterpreterJIT_dcbi(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  // Do nothing
+}
+
+// Data Cache Block Touch
+void PPCInterpreter::PPCInterpreterJIT_dcbt(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  // Do nothing
+}
+
+// Data Cache Block Store
+void PPCInterpreter::PPCInterpreterJIT_dcbst(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  // Do nothing
+}
+
+// Data Cache Block Touch for Store
+void PPCInterpreter::PPCInterpreterJIT_dcbtst(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  // Do nothing
+}
+
+// Instruction Cache Block Invalidate
+void PPCInterpreter::PPCInterpreterJIT_icbi(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  // Do nothing
+}
+
 #endif
