@@ -219,65 +219,26 @@ void PPCInterpreter::PPCInterpreter_slbie(sPPEState *ppeState) {
 
 // Return From Interrupt Doubleword
 void PPCInterpreter::PPCInterpreter_rfid(sPPEState *ppeState) {
-
   // Compose new MSR as per specs
-  const u64 srr1 = curThread.SPR.SRR1;
-  u64 new_msr = 0;
+  u64 srr1 = curThread.SPR.SRR1;
 
-  const u32 usr = BGET(srr1, 64, 49);
-  if (usr) {
-    //(("WARNING!! Cannot really do Problem mode"));
-    BSET(new_msr, 64, 49);
+  // MSR[1-2,4-32,37-41,49-50,52-57,60-63] <- SRR1[1-2,4-32,37-41,49-50,52-57,60-63]
+  curThread.SPR.MSR.hexValue = srr1;
+
+  // MSR[0] <- SRR1[0] | SRR1[1]
+  curThread.SPR.MSR.SF = (srr1 & 0x8000000000000000) || (srr1 & 0x4000000000000000) ? 1 : 0;
+  // MSR[58] = SRR1[58] | SRR1[49]
+  curThread.SPR.MSR.IR = (srr1 & 0x20) || (srr1 & 0x4000) ? 1 : 0;
+  // MSR[59] = SRR1[59] | SRR1[49]
+  curThread.SPR.MSR.DR = (srr1 & 0x10) || (srr1 & 0x4000) ? 1 : 0;
+
+  // If MSR[3] = 1 then bits [3,51] of SRR1 are placed into the corresponding bits of the MSR.
+  if (curThread.SPR.MSR.HV) {
+    curThread.SPR.MSR.HV = (srr1 & 0x1000000000000000) ? 1 : 0;
+    curThread.SPR.MSR.ME = (srr1 & 0x1000) ? 1 : 0;
   }
 
-  // MSR.0 = SRR1.0 | SRR1.1
-  const u32 b = BGET(srr1, 64, 0) || BGET(srr1, 64, 1);
-  if (b) {
-    BSET(new_msr, 64, 0);
-  }
-
-  const u32 b3 = BGET(curThread.SPR.MSR.hexValue, 64, 3);
-
-  // MSR.51 = (MSR.3 & SRR1.51) | ((~MSR.3) & MSR.51)
-  if ((b3 && BGET(srr1, 64, 51)) || (!b3 && BGET(curThread.SPR.MSR.hexValue, 64, 51))) {
-    BSET(new_msr, 64, 51);
-  }
-
-  // MSR.3 = MSR.3 & SRR1.3
-  if (b3 && BGET(srr1, 64, 3)) {
-    BSET(new_msr, 64, 3);
-  }
-
-  // MSR.48 = SRR1.48
-  if (BGET(srr1, 64, 48)) {
-    BSET(new_msr, 64, 48);
-  }
-
-  // MSR.58 = SRR1.58 | SRR1.49
-  if (usr || BGET(srr1, 64, 58)) {
-    BSET(new_msr, 64, 58);
-  }
-
-  // MSR.59 = SRR1.59 | SRR1.49
-  if (usr || BGET(srr1, 64, 59)) {
-    BSET(new_msr, 64, 59);
-  }
-
-  // MSR.1:2,4:32,37:41,49:50,52:57,60:63 = SRR1.<same>
-  new_msr = new_msr | (srr1 & (QMASK(1, 2) | QMASK(4, 32) | QMASK(37, 41) |
-                               QMASK(49, 50) | QMASK(52, 57) | QMASK(60, 63)));
-
-  // See what changed and take actions
-  // NB: we ignore a bunch of bits..
-  const u64 diff_msr = curThread.SPR.MSR.hexValue ^ new_msr;
-
-  // NB: we dont do half-modes
-  if (diff_msr & QMASK(58, 59)) {
-    curThread.SPR.MSR.IR = usr != 0 || (new_msr & QMASK(58, 59)) != 0;
-    curThread.SPR.MSR.DR = usr != 0 || (new_msr & QMASK(58, 59)) != 0;
-  }
-
-  curThread.SPR.MSR.hexValue = new_msr;
+  // NIA <- iea SRR0[0-61] || 0b00
   curThread.NIA = curThread.SPR.SRR0 & ~3;
 
   // Check for 32-bit mode of operation.

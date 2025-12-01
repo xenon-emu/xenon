@@ -2,6 +2,7 @@
 /* Copyright 2025 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
+#include "Core/XeMain.h"
 #include "JITEmitter_Helpers.h"
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
@@ -118,6 +119,116 @@ void PPCInterpreter::PPCInterpreterJIT_bc(sPPEState *ppeState, JITBlockBuilder *
   COMP->bind(use64);
   // Fail, do nothing.
   COMP->bind(fail);
+}
+
+// Branch Conditional to Link Register
+void PPCInterpreter::PPCInterpreterJIT_bclr(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  Label condTrue = COMP->newLabel();
+  Label condEnd = COMP->newLabel();
+  Label use64 = COMP->newLabel();
+
+  // If BO[2] == 0 then CTR -= 1
+  if ((instr.bo & 0x4) == 0) {
+    x86::Gp ctrDec = newGP64();
+    COMP->mov(ctrDec, SPRPtr(CTR));
+    COMP->sub(ctrDec, imm<u64>(1));
+    COMP->mov(SPRPtr(CTR), ctrDec);
+  }
+
+  // SFCX init skip hack: mirror interpreter behavior
+  // If SFCX is present and both skips are set:
+  // - If CIA == initSkip1 -> force condition false
+  // - If CIA == initSkip2 -> force condition true
+  if (XeMain::sfcx && XeMain::sfcx->initSkip1 && XeMain::sfcx->initSkip2) {
+    x86::Gp CIA = newGP64();
+    COMP->mov(CIA, CIAPtr());
+
+    // if (CIA == initSkip1) -> skip branch
+    Label notSkip1 = COMP->newLabel();
+    COMP->cmp(CIA, imm<u64>(XeMain::sfcx->initSkip1));
+    COMP->jne(notSkip1);
+    COMP->jmp(condEnd);
+    COMP->bind(notSkip1);
+
+    // if (CIA == initSkip2) -> force branch
+    Label notSkip2 = COMP->newLabel();
+    COMP->cmp(CIA, imm<u64>(XeMain::sfcx->initSkip2));
+    COMP->jne(notSkip2);
+    COMP->jmp(condTrue);
+    COMP->bind(notSkip2);
+  }
+
+  // CTR condition:
+  if (!(instr.bo & 0x4)) {
+    x86::Gp ctrChk = newGP64();
+    COMP->mov(ctrChk, SPRPtr(CTR));
+    COMP->test(ctrChk, ctrChk);
+    if (instr.bo & 0x2) {
+      // BO[1] == 1 -> branch when CTR == 0
+      COMP->jne(condEnd);
+    }
+    else {
+      // BO[1] == 0 -> branch when CTR != 0
+      COMP->je(condEnd);
+    }
+  }
+
+  // CR condition:
+  if (!(instr.bo & 0x10)) {
+    x86::Gp crVal = newGP32();
+    x86::Gp tmp = newGP32();
+
+    COMP->mov(crVal, CRValPtr());
+    const u32 shift = 31 - instr.bi;
+    COMP->mov(tmp, crVal);
+    COMP->shr(tmp, imm(shift));
+    COMP->and_(tmp, imm(1));
+
+    if (instr.bo & 0x8) {
+      // Expect CR bit == 1
+      COMP->test(tmp, tmp);
+      COMP->je(condEnd);
+    }
+    else {
+      // Expect CR bit == 0
+      COMP->test(tmp, tmp);
+      COMP->jne(condEnd);
+    }
+  }
+
+  // Conditions passed
+  COMP->bind(condTrue);
+
+  // Compute target from LR (mask low 2 bits)
+  x86::Gp lr = newGP64();
+  COMP->mov(lr, SPRPtr(LR));
+  COMP->and_(lr, imm<u64>(~3ULL));
+  COMP->mov(NIAPtr(), lr);
+
+  // Set LR if needed (LR = CIA + 4)
+  if (instr.lk) {
+    x86::Gp CIA = newGP64();
+    COMP->mov(CIA, CIAPtr());
+    COMP->add(CIA, imm<u32>(4));
+    COMP->mov(LRPtr(), CIA);
+  }
+
+  // Truncate NIA and LR to 32 bits if MSR.SF == 0 (32-bit mode)
+  x86::Gp msr = newGP64();
+  COMP->mov(msr, SPRPtr(MSR));
+  COMP->bt(msr, 63);       // MSR.SF (bit 63)
+  COMP->jc(use64);         // 64-bit mode: skip truncation
+
+  // 32-bit mode truncation
+  {
+    x86::Gp tmp32 = newGP32();
+    COMP->mov(tmp32, NIAPtr());
+    COMP->and_(tmp32, imm<u32>(0xFFFFFFFF));
+    COMP->mov(NIAPtr(), tmp32);
+  }
+
+  COMP->bind(use64);
+  COMP->bind(condEnd);
 }
 
 // Branch Conditional to Count Register
