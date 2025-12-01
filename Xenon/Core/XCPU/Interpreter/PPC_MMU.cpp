@@ -1179,10 +1179,9 @@ void PPCInterpreter::MMURead(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppeS
     // Integrated Interrupt Controller in real mode, used when the HV wants to
     // start a CPUs IC
     else if (EA >= XE_SOCINTS_BLOCK_START && EA <= XE_SOCINTS_BLOCK_START + XE_SOCINTS_BLOCK_SIZE) {
-      if (!cpuContext->xenonIIC.readInterrupt(EA, outData, byteCount)) {
-        // Pass it onto our context INT struct.
-        cpuContext->HandleSOCRead(EA, outData, byteCount);
-      }
+      // Pass it onto our context INT struct.
+      cpuContext->HandleSOCRead(EA, outData, byteCount);
+      cpuContext->xenonIIC.readInterrupt(EA, outData, byteCount);
       return;
     }
     // Try to handle the SoC read, may belong to one of the CPU SoC blocks.

@@ -4,18 +4,18 @@
 
 #pragma once
 
-#include <memory>
 #include <mutex>
-
-#include "Base/Types.h"
+#include <memory>
 
 #include "XenonSOC.h"
-
+#include "Base/Types.h"
 #include "Core/RAM/RAM.h"
-#include "Core/RootBus/RootBus.h"
 #include "Core/XCPU/eFuse.h"
-#include "Core/XCPU/Context/Reservations/XenonReservations.h"
 #include "Core/XCPU/IIC/IIC.h"
+#include "Core/RootBus/RootBus.h"
+#include "Core/XCPU/Context/XenonIIC/XenonIIC.h"
+#include "Core/XCPU/Context/Reservations/XenonReservations.h"
+
 
 namespace Xe::XCPU {
 
@@ -33,7 +33,6 @@ namespace Xe::XCPU {
       socSecEngBlock = std::make_unique<STRIP_UNIQUE(socSecEngBlock)>();
       socSecRNGBlock = std::make_unique<STRIP_UNIQUE(socSecRNGBlock)>();
       socCBIBlock = std::make_unique<STRIP_UNIQUE(socCBIBlock)>();
-      socINTBlock = std::make_unique<STRIP_UNIQUE(socINTBlock)>();
       socPMWBlock = std::make_unique<STRIP_UNIQUE(socPMWBlock)>();
       socPRVBlock = std::make_unique<STRIP_UNIQUE(socPRVBlock)>();
     }
@@ -44,7 +43,6 @@ namespace Xe::XCPU {
       socSecEngBlock.reset();
       socSecRNGBlock.reset();
       socCBIBlock.reset();
-      socINTBlock.reset();
       socPMWBlock.reset();
       socPRVBlock.reset();
     }
@@ -74,6 +72,9 @@ namespace Xe::XCPU {
     // This is a built-in interrupt controller that holds and coordinates interrupts betweeen the PPU's and the
     // external system peripherals.
     IIC::XenonIIC xenonIIC = {};
+
+    XeIIC iic = {};
+
     // Used for conditional load/store instructions regarding PowerPC atomic operations.
     XenonReservations xenonRes = {};
     // Time Base switch, possibly RTC register, the TB counter only runs if this
@@ -96,8 +97,6 @@ namespace Xe::XCPU {
     std::unique_ptr<SOC::SOCSECRNG_BLOCK> socSecRNGBlock{};
     // CBI Block
     std::unique_ptr<SOC::SOCCBI_BLOCK> socCBIBlock{};
-    // INT Block
-    std::unique_ptr<SOC::SOCINTS_BLOCK> socINTBlock{};
     // PMW Block
     std::unique_ptr<SOC::SOCPMW_BLOCK> socPMWBlock{};
     // Pervasive Block

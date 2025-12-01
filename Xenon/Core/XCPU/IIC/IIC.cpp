@@ -75,21 +75,7 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
   case Xe::XCPU::IIC::EOI:
     // If there are interrupts stored in the queue, remove the ack'd.
     if (!interrupts.empty()) {
-      u16 intIdx = 0;
-      for (auto& interrupt : iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts) {
-        if (interrupt.ack) {
-          break;
-        }
-        intIdx++;
-      }
-
-#ifdef IIC_DEBUG
-        LOG_DEBUG(Xenon_IIC, "EOI interrupt {} for thread 0x{:X} ",
-          getIntName(static_cast<u8>(iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts[intIdx].interrupt)),
-          ppeIntCtrlBlckID);
-#endif // IIC_DEBUG
-
-      interrupts.erase(interrupts.begin() + intIdx);
+      interrupts.erase(interrupts.begin());
 
       iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].intSignaled = false;
     }
@@ -97,21 +83,8 @@ void Xe::XCPU::IIC::XenonIIC::writeInterrupt(u64 intAddress, const u8 *data, u64
   case Xe::XCPU::IIC::EOI_SET_CPU_CURRENT_TSK_PRI:
     // If there are interrupts stored in the queue, remove the ack'd
     if (!interrupts.empty()) {
-      u16 intIdx = 0;
-      for (auto& interrupt : iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts) {
-        if (interrupt.ack) {
-          break;
-        }
-        intIdx++;
-      }
 
-#ifdef IIC_DEBUG
-        LOG_DEBUG(Xenon_IIC, "EOI + Set PRIO: interrupt {} for thread 0x{:X}, new PRIO: 0x{:X}",
-          getIntName(static_cast<u8>(iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].interrupts[intIdx].interrupt)),
-          ppeIntCtrlBlckID, static_cast<u8>(bsIntData));
-#endif // IIC_DEBUG
-
-      interrupts.erase(interrupts.begin() + intIdx);
+      interrupts.erase(interrupts.begin());
 
       iicState.ppeIntCtrlBlck[ppeIntCtrlBlckID].intSignaled = false;
     }
@@ -169,9 +142,6 @@ bool Xe::XCPU::IIC::XenonIIC::readInterrupt(u64 intAddress, u8 *data, u64 size) 
         }
         currPos++;
       }
-
-      // Set the top priority interrypt to signaled
-      interrupts[highestPrioPos].ack = true;
 
       u64 intData = byteswap_be<u64>(highestPrio);
       memcpy(data, &intData, size <= sizeof(intData) ? size : sizeof(intData));
