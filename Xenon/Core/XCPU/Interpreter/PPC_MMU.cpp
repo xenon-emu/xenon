@@ -1181,7 +1181,6 @@ void PPCInterpreter::MMURead(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppeS
     else if (EA >= XE_SOCINTS_BLOCK_START && EA <= XE_SOCINTS_BLOCK_START + XE_SOCINTS_BLOCK_SIZE) {
       // Pass it onto our context INT struct.
       cpuContext->HandleSOCRead(EA, outData, byteCount);
-      cpuContext->xenonIIC.readInterrupt(EA, outData, byteCount);
       return;
     }
     // Try to handle the SoC read, may belong to one of the CPU SoC blocks.
@@ -1207,7 +1206,7 @@ void PPCInterpreter::MMUWrite(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppe
     return;
 
   // Check if it's reserved
-  cpuContext->xenonRes.Check(EA);
+  cpuContext->xenonRes.Check(EA, (byteCount <= 4 ? true : false));
 
   bool socWrite = false;
 
@@ -1249,7 +1248,6 @@ void PPCInterpreter::MMUWrite(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppe
     // Integrated Interrupt Controller in real mode, used when the HV wants to
     // start a CPUs IC.
     else if (EA >= XE_SOCINTS_BLOCK_START && EA <= XE_SOCINTS_BLOCK_START + XE_SOCINTS_BLOCK_SIZE) {
-      cpuContext->xenonIIC.writeInterrupt(EA, data, byteCount);
       cpuContext->HandleSOCWrite(EA, data, byteCount);
       return;
     }
@@ -1292,7 +1290,7 @@ void PPCInterpreter::MMUMemSet(sPPEState *ppeState,
     return;
 
   // Check if it's reserved
-  xenonContext->xenonRes.Check(EA);
+  xenonContext->xenonRes.Check(EA, (size <= 4 ? true : false));
 
   bool socWrite = false;
 

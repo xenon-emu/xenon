@@ -5,37 +5,35 @@
 #pragma once
 
 #include <mutex>
+#include <queue>
 
 namespace Xe::XCPU {
 
-  // Debug output enable.
-  #define IIC_DEBUG
-
   // Interrupt Vectors
   enum eXeIntVectors : u8 {
-    prioIPI4        = 0x02, // Inter Processor Interrupt 4
-    prioIPI3        = 0x04, // Inter Processor Interrupt 3
-    prioSMM         = 0x05, // System Management Mode (SMC FIFO Request Interrupt)
-    prioSFCX        = 0x06, // Secure Flash Controller for Xbox Interrupt
-    prioSATAHDD     = 0x08, // SATA Hard Drive Disk Interrupt
-    prioSATAODD     = 0x09, // SATA Optical Disk Drive Interrupt
-    prioOHCI0       = 0x0B, // OHCI USB Controller 0 Interrupt
-    prioEHCI0       = 0x0C, // EHCI USB Controller 0 Interrupt
-    prioOHCI1       = 0x0D, // OHCI USB Controller 1 Interrupt
-    prioEHCI1       = 0x0E, // EHCI USB Controller 1 Interrupt
-    prioXMA         = 0x10, // Xbox Media Audio Interrupt
-    prioAUDIO       = 0x11, // Audio Controller Interrupt
-    prioENET        = 0x12, // Ethernet Controller Interrupt
-    prioXPS         = 0x15, // Xbox Procedural Synthesis Interrupt
-    prioGRAPHICS    = 0x16, // Xenos Graphics Engine Interrupt
-    prioPROFILER    = 0x18, // Profiler Interrupt
-    prioBIU         = 0x19, // BUS Interface Unit Interrupt
-    prioIOC         = 0x1A, // I/O Controller Interrupt
-    prioFSB         = 0x1B, // Front Side Bus Interrupt
-    prioIPI2        = 0x1C, // Inter Processor Interrupt 2
-    prioCLOCK       = 0x1D, // Clock Interrupt (SMC Timer)
-    prioIPI1        = 0x1E, // Inter Processor Interrupt 1
-    prioNONE        = 0x1F  // No Interrupt
+    prioIPI4        = 0x08, // Inter Processor Interrupt 4
+    prioIPI3        = 0x10, // Inter Processor Interrupt 3
+    prioSMM         = 0x14, // System Management Mode (SMC FIFO Request Interrupt)
+    prioSFCX        = 0x18, // Secure Flash Controller for Xbox Interrupt
+    prioSATAHDD     = 0x20, // SATA Hard Drive Disk Interrupt
+    prioSATAODD     = 0x24, // SATA Optical Disk Drive Interrupt
+    prioOHCI0       = 0x2C, // OHCI USB Controller 0 Interrupt
+    prioEHCI0       = 0x30, // EHCI USB Controller 0 Interrupt
+    prioOHCI1       = 0x34, // OHCI USB Controller 1 Interrupt
+    prioEHCI1       = 0x38, // EHCI USB Controller 1 Interrupt
+    prioXMA         = 0x40, // Xbox Media Audio Interrupt
+    prioAUDIO       = 0x44, // Audio Controller Interrupt
+    prioENET        = 0x4C, // Ethernet Controller Interrupt
+    prioXPS         = 0x54, // Xbox Procedural Synthesis Interrupt
+    prioGRAPHICS    = 0x58, // Xenos Graphics Engine Interrupt
+    prioPROFILER    = 0x60, // Profiler Interrupt
+    prioBIU         = 0x64, // BUS Interface Unit Interrupt
+    prioIOC         = 0x68, // I/O Controller Interrupt
+    prioFSB         = 0x6C, // Front Side Bus Interrupt
+    prioIPI2        = 0x70, // Inter Processor Interrupt 2
+    prioCLOCK       = 0x74, // Clock Interrupt (SMC Timer)
+    prioIPI1        = 0x78, // Inter Processor Interrupt 1
+    prioNONE        = 0x7C  // No Interrupt
   };
 
   //
@@ -222,32 +220,62 @@ namespace Xe::XCPU {
     u64 Reserved12[495]; // 28808
   } SOCINTS_BLOCK, * PSOCINTS_BLOCK;
 
-  class XeIIC {
+  // Structure represnting an Interrupt Packet
+    struct sInterruptPacket {
+    u8 interruptType = prioNONE;
+    bool acknowledged = false;
+
+    // Highest priority comes first
+    friend constexpr bool operator<(const sInterruptPacket& lhs, const sInterruptPacket& rhs) noexcept {
+      return lhs.interruptType > rhs.interruptType;
+    }
+  };
+
+  // Structure tracking the state of interrupts for each PPU Thread.
+  struct sInterruptState {
+    std::priority_queue<sInterruptPacket> pendingInterrupts;
+  };
+
+  class XenonIIC {
   public:
-    XeIIC();
-    ~XeIIC();
+    XenonIIC();
+    ~XenonIIC();
 
     // Read/Write routines
     void Write(u64 writeAddress, const u8* data, u64 size);
     void Read(u64 readAddress, u8* data, u64 size);
 
+    // Interrupt Generation Routine
+    void generateInterrupt(u8 interruptType, u8 cpusToInterrupt);
+    // Cancels a previously generated pending interrupt.
+    void cancelInterrupt(u8 interruptType, u8 cpusToInterrupt);
+    // Returns true if there are pending interrupts for the given thread.
+    bool hasPendingInterrupts(u8 threadID, bool ignorePendingACKd = false);
+
   private:
     // Our Interrupt Block
     std::unique_ptr<SOCINTS_BLOCK> socINTBlock = {};
 
+    // Interrupt States for each PPU Thread
+    sInterruptState interruptState[6] = {};
+
     // Mutex for thread safety
     std::recursive_mutex iicMutex;
 
-    // Interrupt Generation Routine
-    void generateInterrupt(u8 interruptType, u8 cpusToInterrupt);
+    // Erases the first element in the queue that has been ack'd.
+    void removeFirstACKdInterrupt(u8 threadID);
 
-    // Cancels a previously generated pending interrupt.
-    void cancelInterrupt(u8 interruptType, u8 cpusToInterrupt);
+    // Reads out the first element that has not been ACk'd and marks it as ack'd.
+    u8 acknowledgeInterrupt(u8 threadID);
 
     // Processes an access offset and returns a string from where it belongs to.
     std::string getSOCINTAccess(u32 offset);
 
     // Returns the name of the interrupt based on its type
-    std::string getIntName(u8 interruptType);
+    std::string getIntName(eXeIntVectors interruptType);
+
+    // Globals
+    static constexpr u32 ProcessorBlockSize = 0x1000;
+    static constexpr u32 ProcessorBlocksEnd = 6 * ProcessorBlockSize; // 0x6000
   };
 }

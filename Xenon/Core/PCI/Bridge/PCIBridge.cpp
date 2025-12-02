@@ -95,7 +95,7 @@ PCIBridge::~PCIBridge() {
   connectedPCIDevices.clear();
 }
 
-void PCIBridge::RegisterIIC(Xe::XCPU::IIC::XenonIIC *xenonIICPtr) {
+void PCIBridge::RegisterIIC(Xe::XCPU::XenonIIC *xenonIICPtr) {
   xenonIIC = xenonIICPtr;
 }
 
@@ -104,80 +104,80 @@ bool PCIBridge::RouteInterrupt(u8 prio, u8 targetCPU) {
   switch (prio) {
   case PRIO_CLOCK:
     if (pciBridgeState.PRIO_REG_CLCK.intEnabled) {
-      xenonIIC->genInterrupt(PRIO_CLOCK,
+      xenonIIC->generateInterrupt(PRIO_CLOCK,
         pciBridgeState.PRIO_REG_CLCK.targetCPU);
     }
     break;
   case PRIO_SATA_ODD:
     if (pciBridgeState.PRIO_REG_ODD.intEnabled) {
-      xenonIIC->genInterrupt(PRIO_SATA_ODD,
+      xenonIIC->generateInterrupt(PRIO_SATA_ODD,
         pciBridgeState.PRIO_REG_ODD.targetCPU);
     }
     break;
   case PRIO_SATA_HDD:
     if (pciBridgeState.PRIO_REG_HDD.intEnabled) {
-      xenonIIC->genInterrupt(PRIO_SATA_HDD,
+      xenonIIC->generateInterrupt(PRIO_SATA_HDD,
         pciBridgeState.PRIO_REG_HDD.targetCPU);
     }
     break;
   case PRIO_SMM:
     if (pciBridgeState.PRIO_REG_SMM.intEnabled) {
-      xenonIIC->genInterrupt(PRIO_SMM,
+      xenonIIC->generateInterrupt(PRIO_SMM,
         pciBridgeState.PRIO_REG_SMM.targetCPU);
     }
     break;
   case PRIO_OHCI_0:
     if (pciBridgeState.PRIO_REG_OHCI0.intEnabled) {
-      xenonIIC->genInterrupt(PRIO_OHCI_0,
+      xenonIIC->generateInterrupt(PRIO_OHCI_0,
         pciBridgeState.PRIO_REG_OHCI0.targetCPU);
     }
     break;
   case PRIO_OHCI_1:
     if (pciBridgeState.PRIO_REG_OHCI1.intEnabled) {
-      xenonIIC->genInterrupt(PRIO_OHCI_1,
+      xenonIIC->generateInterrupt(PRIO_OHCI_1,
         pciBridgeState.PRIO_REG_OHCI1.targetCPU);
     }
     break;
   case PRIO_EHCI_0:
     if (pciBridgeState.PRIO_REG_EHCI0.intEnabled) {
-      xenonIIC->genInterrupt(PRIO_EHCI_0,
+      xenonIIC->generateInterrupt(PRIO_EHCI_0,
         pciBridgeState.PRIO_REG_EHCI0.targetCPU);
     }
     break;
   case PRIO_EHCI_1:
     if (pciBridgeState.PRIO_REG_EHCI1.intEnabled) {
-      xenonIIC->genInterrupt(PRIO_EHCI_1,
+      xenonIIC->generateInterrupt(PRIO_EHCI_1,
         pciBridgeState.PRIO_REG_EHCI1.targetCPU);
     }
     break;
   case PRIO_XMA:
     if (pciBridgeState.PRIO_REG_XMA.intEnabled) {
-      xenonIIC->genInterrupt(PRIO_XMA,
+      xenonIIC->generateInterrupt(PRIO_XMA,
         pciBridgeState.PRIO_REG_XMA.targetCPU);
     }
     break;
   case PRIO_AUDIO:
     if (pciBridgeState.PRIO_REG_AUDIO.intEnabled) {
-      xenonIIC->genInterrupt(PRIO_AUDIO,
+      xenonIIC->generateInterrupt(PRIO_AUDIO,
         pciBridgeState.PRIO_REG_AUDIO.targetCPU);
     }
     break;
   case PRIO_ENET:
     if (pciBridgeState.PRIO_REG_ENET.intEnabled) {
-      xenonIIC->genInterrupt(PRIO_ENET,
+      xenonIIC->generateInterrupt(PRIO_ENET,
         pciBridgeState.PRIO_REG_ENET.targetCPU);
     }
     break;
   case PRIO_GRAPHICS:
     if (targetCPU != 0xFF) {
-      xenonIIC->genInterrupt(PRIO_GRAPHICS, targetCPU);
+      xenonIIC->generateInterrupt(PRIO_GRAPHICS, targetCPU);
     } else {
       LOG_ERROR(PCIBridge, "Routing GFX interrupt without target CPU index.");
     }
     break;
   case PRIO_XPS:
     if (targetCPU != 0xFF) {
-      xenonIIC->genInterrupt(PRIO_XPS, targetCPU);
+      xenonIIC->generateInterrupt(PRIO_XPS, targetCPU);
     }
     else {
       LOG_ERROR(PCIBridge, "Routing GFX interrupt without target CPU index.");
@@ -185,7 +185,7 @@ bool PCIBridge::RouteInterrupt(u8 prio, u8 targetCPU) {
     break;
   case PRIO_SFCX:
     if (pciBridgeState.PRIO_REG_SFCX.intEnabled) {
-      xenonIIC->genInterrupt(PRIO_SFCX,
+      xenonIIC->generateInterrupt(PRIO_SFCX,
         pciBridgeState.PRIO_REG_SFCX.targetCPU);
     }
     break;

@@ -1189,7 +1189,7 @@ void Xe::PCIDev::ODD::processSCSICommand() {
     // Save our page data for later.
     copyDataIntoPageData = true;
     // Check for page code.
-    if (!atapiState.scsiCBD.AsByte[2] == 0x3B) {
+    if (atapiState.scsiCBD.AsByte[2] != 0x3B) {
         LOG_WARNING(ODD, "Unsupported MODE_SELECT Page code {:#x}", atapiState.scsiCBD.AsByte[2]);
     }
     atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;

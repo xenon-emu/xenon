@@ -45,7 +45,7 @@ namespace Xe::XCPU {
     // Returns true of the halt was due to a 'trap' guest exception.
     bool IsHaltedByGuest();
     // Returns the IIC pointer from our context.  
-    IIC::XenonIIC *GetIICPointer() { return &xenonContext->xenonIIC; }
+    XenonIIC *GetIICPointer() { return &xenonContext->iic; }
     // Returns a pointer to a given PPU.
     PPU *GetPPU(u8 ppuID);
 

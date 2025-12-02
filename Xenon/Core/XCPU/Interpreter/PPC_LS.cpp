@@ -384,7 +384,7 @@ void PPCInterpreter::PPCInterpreter_stwcx(sPPEState *ppeState) {
     CR0 <- 0b00 || 0b0 || XER[SO]
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  u64 RA = EA & ~7;
+  u64 RA = EA & ~3;
   u32 CR = 0;
 
   // TODO: If address is not aligned by 4, then we must issue a trap.
@@ -1247,7 +1247,7 @@ void PPCInterpreter::PPCInterpreter_lwarx(sPPEState *ppeState) {
   rD <- (32)0 || MEM(EA,4)
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  u64 RA = EA & ~7;
+  u64 RA = EA & ~3;
 
   // TODO: If address is not aligned by 4, then we must issue a trap.
 

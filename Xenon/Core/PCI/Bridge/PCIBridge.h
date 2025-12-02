@@ -10,7 +10,7 @@
 #include "Core/PCI/PCIDevice.h"
 
 #include "Core/PCI/PCIe.h"
-#include "Core/XCPU/IIC/IIC.h"
+#include "Core/XCPU/Context/XenonIIC/XenonIIC.h"
 
 /*  Dev type          Config Address    BAR
     PCI Host Bridge     D0008000      E0000000
@@ -101,14 +101,14 @@ public:
   bool ConfigRead(u64 readAddress, u8 *data, u64 size);
   bool ConfigWrite(u64 writeAddress, const u8 *data, u64 size);
 
-  void RegisterIIC(Xe::XCPU::IIC::XenonIIC *xenonIICPtr);
+  void RegisterIIC(Xe::XCPU::XenonIIC *xenonIICPtr);
 
   bool RouteInterrupt(u8 prio, u8 targetCPU = 0xFF);
   void CancelInterrupt(u8 prio);
 
 private:
   // IIC Pointer used for interrupts
-  Xe::XCPU::IIC::XenonIIC *xenonIIC;
+  Xe::XCPU::XenonIIC *xenonIIC;
 
   // Connected device pointers
   std::unordered_map<std::string, std::shared_ptr<PCIDevice>> connectedPCIDevices;

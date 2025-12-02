@@ -18,10 +18,10 @@ bool XenonReservations::Register(PPU_RES *Res) {
   return true;
 }
 
-void XenonReservations::Scan(u64 PhysAddress) {
+void XenonReservations::Scan(u64 PhysAddress, bool word) {
   std::lock_guard lock(reservationLock);
   // Address must be aligned.
-  PhysAddress &= ~7;
+  PhysAddress &= (word ? ~3 : ~7);
 
   for (int i = 0; i < processors; i++) {
     // NB: order of checks matters!

@@ -11,7 +11,6 @@
 #include "Base/Types.h"
 #include "Core/RAM/RAM.h"
 #include "Core/XCPU/eFuse.h"
-#include "Core/XCPU/IIC/IIC.h"
 #include "Core/RootBus/RootBus.h"
 #include "Core/XCPU/Context/XenonIIC/XenonIIC.h"
 #include "Core/XCPU/Context/Reservations/XenonReservations.h"
@@ -71,9 +70,7 @@ namespace Xe::XCPU {
     // Xenon Integrated Interrupt Controller
     // This is a built-in interrupt controller that holds and coordinates interrupts betweeen the PPU's and the
     // external system peripherals.
-    IIC::XenonIIC xenonIIC = {};
-
-    XeIIC iic = {};
+    XenonIIC iic = {};
 
     // Used for conditional load/store instructions regarding PowerPC atomic operations.
     XenonReservations xenonRes = {};
