@@ -307,6 +307,9 @@ void Xe::XCPU::XenonIIC::removeFirstACKdInterrupt(u8 threadID) {
 #endif // IIC_DEBUG
 }
 
+// Acknowledges and returns the highest priority pending interrupt for a given thread.
+// NOTE: If the highest priority interrupt is the same priority as the current task priority, we return and ACK the next
+// higher priority interrupt instead.
 u8 Xe::XCPU::XenonIIC::acknowledgeInterrupt(u8 threadID) {
   // Set a lock
   std::lock_guard lock(iicMutex);
