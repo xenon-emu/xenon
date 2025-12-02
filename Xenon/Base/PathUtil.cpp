@@ -40,7 +40,7 @@ const fs::path GetBinaryDirectory() {
   // Unknown, just return rootdir
   fspath = fs::current_path() / "Xenon";
 #endif
-  return fs::weakly_canonical(fmt::format("{}/..", fspath.string()));
+  return fs::weakly_canonical(FMT("{}/..", fspath.string()));
 }
 
 static auto UserPaths = [] {

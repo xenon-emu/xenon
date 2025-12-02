@@ -15,8 +15,8 @@
 #endif
 
 // Helper functions for text/string formatting with the gui
-#define TextFmt(g, x, ...) g->Text(fmt::format(x, __VA_ARGS__))
-#define TextCopyFmt(g, x, v, ...) g->TextCopy(x, fmt::format(v, __VA_ARGS__))
+#define TextFmt(g, x, ...) g->Text(FMT(x, __VA_ARGS__))
+#define TextCopyFmt(g, x, v, ...) g->TextCopy(x, FMT(v, __VA_ARGS__))
 #define CustomBase(g, x, fmt, ...) TextFmt(g, x ": " fmt, __VA_ARGS__)
 #define CopyCustomBase(g, x, fmt, ...) TextCopyFmt(g, x, fmt, __VA_ARGS__)
 #define Custom(g, x, fmt, ...) CustomBase(g, #x, fmt, __VA_ARGS__)
@@ -28,7 +28,7 @@
 #define BFHexPtr(g, c, x) HexBase(g, #x, u32(c->x));
 #define U8Hex(g, c, x) HexBase(g, #x, static_cast<u32>(c.x))
 #define U8HexPtr(g, c, x) HexBase(g, #x, static_cast<u32>(c->x))
-#define HexArr(g, a, i) HexBase(g, fmt::format("[{}]", i), a[i])
+#define HexArr(g, a, i) HexBase(g, FMT("[{}]", i), a[i])
 #define Dec(g, c, x) CopyCustom(g, x, "{}", c.x)
 #define DecPtr(g, c, x) CopyCustom(g, x, "{}", c->x)
 #define U8Dec(g, c, x) CopyCustom(g, x, "{}", static_cast<u32>(c.x))
@@ -388,18 +388,18 @@ void RenderInstructions(Render::GUI *gui, sPPEState *state, ePPUThreadID thr, u6
     const u32 b3 = static_cast<u8>((instr >> 24) & 0xFF);
 #endif
     gui->IDGroup(i, [&] {
-      gui->TextCopySimple(fmt::format("{}{:08X}", addr == thread.CIA ? "[*] " : "", addr)); gui->SameLine(0.f, 2.f);
-      gui->TextCopySplit(fmt::format("{:02X}##{}", b0, addr), fmt::format("{:08X}", instr)); gui->SameLine(0.f, 2.f);
-      gui->TextCopySimple(fmt::format("{:02X}##{}", b1, addr + 1)); gui->SameLine(0.f, 2.f);
-      gui->TextCopySimple(fmt::format("{:02X}##{}", b2, addr + 2)); gui->SameLine(0.f, 2.f);
-      gui->TextCopySimple(fmt::format("{:02X}##{}", b3, addr + 3)); gui->SameLine(0.f, maxLineWidth > 800.f ? 270.f : 120.f);
-      gui->TextCopySimple(fmt::format("{}##{}", instrName, addr));
+      gui->TextCopySimple(FMT("{}{:08X}", addr == thread.CIA ? "[*] " : "", addr)); gui->SameLine(0.f, 2.f);
+      gui->TextCopySplit(FMT("{:02X}##{}", b0, addr), FMT("{:08X}", instr)); gui->SameLine(0.f, 2.f);
+      gui->TextCopySimple(FMT("{:02X}##{}", b1, addr + 1)); gui->SameLine(0.f, 2.f);
+      gui->TextCopySimple(FMT("{:02X}##{}", b2, addr + 2)); gui->SameLine(0.f, 2.f);
+      gui->TextCopySimple(FMT("{:02X}##{}", b3, addr + 3)); gui->SameLine(0.f, maxLineWidth > 800.f ? 270.f : 120.f);
+      gui->TextCopySimple(FMT("{}##{}", instrName, addr));
     });
   }
 }
 
 void PPUThreadDiassembly(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
-  if (gui->BeginSimpleWindow(fmt::format("Diassembly [{}:{}]", state->ppuName, static_cast<u8>(thr)))) {
+  if (gui->BeginSimpleWindow(FMT("Diassembly [{}:{}]", state->ppuName, static_cast<u8>(thr)))) {
     RenderInstructions(gui, state, thr, 16);
   }
   gui->EndWindow();
@@ -408,7 +408,7 @@ void PPUThreadDiassembly(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
 void PPUThreadRegisters(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
   if (!state)
     return;
-  if (gui->BeginSimpleWindow(fmt::format("Registers [{}:{}]", state->ppuName, static_cast<u8>(thr)))) {
+  if (gui->BeginSimpleWindow(FMT("Registers [{}:{}]", state->ppuName, static_cast<u8>(thr)))) {
     sPPUThread &ppuRegisters = state->ppuThread[thr];
     if (gui->BeginNode("GPRs")) {
       for (u64 i = 0; i < 32; ++i) {
@@ -490,7 +490,7 @@ void PPUThreadRegisters(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
     if (gui->BeginNode("SLBs")) {
       for (u64 i = 0; i < 64; ++i) {
         sSLBEntry &SLB = ppuRegisters.SLB[i];
-        if (gui->BeginNode(fmt::format("[{}]", i))) {
+        if (gui->BeginNode(FMT("[{}]", i))) {
           U8Hex(gui, SLB, V);
           U8Hex(gui, SLB, LP);
           U8Hex(gui, SLB, C);
@@ -633,8 +633,8 @@ bool builtWithDisassembly[6]{};
 void PPUThreadDockSpace(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
   if (!state)
     return;
-  if (gui->BeginSimpleWindow(fmt::format("{} [{}]", static_cast<u8>(thr), state->ppuName))) {
-    std::string id = fmt::format("{}:{}_DS", state->ppuName, static_cast<u8>(thr));
+  if (gui->BeginSimpleWindow(FMT("{} [{}]", static_cast<u8>(thr), state->ppuName))) {
+    std::string id = FMT("{}:{}_DS", state->ppuName, static_cast<u8>(thr));
     sPPUThread &thread = state->ppuThread[thr];
     ImGuiID dsId = ImGui::GetID(id.c_str());
     if (!ImGui::DockBuilderGetNode(dsId) || (rebuildThreadDS[thread.SPR.PIR] && !builtWithDisassembly[thread.SPR.PIR])) {
@@ -644,12 +644,12 @@ void PPUThreadDockSpace(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
         builtWithDisassembly[thread.SPR.PIR] = true;
         ImGuiID left, right;
         left = ImGui::DockBuilderSplitNode(dsId, ImGuiDir_Left, 1.f, nullptr, &right);
-        std::string disassemblyId = fmt::format("Diassembly [{}:{}]", state->ppuName, static_cast<u8>(thr));
-        std::string registersId = fmt::format("Registers [{}:{}]", state->ppuName, static_cast<u8>(thr));
+        std::string disassemblyId = FMT("Diassembly [{}:{}]", state->ppuName, static_cast<u8>(thr));
+        std::string registersId = FMT("Registers [{}:{}]", state->ppuName, static_cast<u8>(thr));
         ImGui::DockBuilderDockWindow(disassemblyId.c_str(), left);
         ImGui::DockBuilderDockWindow(registersId.c_str(), right);
       } else {
-        std::string registersId = fmt::format("Registers [{}:{}]", state->ppuName, static_cast<u8>(thr));
+        std::string registersId = FMT("Registers [{}:{}]", state->ppuName, static_cast<u8>(thr));
         ImGui::DockBuilderDockWindow(registersId.c_str(), dsId);
       }
 
@@ -668,7 +668,7 @@ void PPUThreadDockSpace(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
 }
 
 void PPURegisters(Render::GUI *gui, sPPEState *state) {
-  if (gui->BeginSimpleWindow(fmt::format("Registers [{}]", state->ppuID))) {
+  if (gui->BeginSimpleWindow(FMT("Registers [{}]", state->ppuID))) {
     Xe::XCPU::XenonCPU *CPU = XeMain::GetCPU();
     if (!CPU)
       return;
@@ -714,7 +714,7 @@ void PPURegisters(Render::GUI *gui, sPPEState *state) {
       if (gui->BeginNode("tlbSet0")) {
         for (u64 i = 0; i != 256; ++i) {
           TLBEntry &TLBEntry = TLB.tlbSet0[i];
-          if (gui->BeginNode(fmt::format("[{}]", i))) {
+          if (gui->BeginNode(FMT("[{}]", i))) {
             Bool(gui, TLBEntry, V);
             Hex(gui, TLBEntry, pte0);
             Hex(gui, TLBEntry, pte1);
@@ -726,7 +726,7 @@ void PPURegisters(Render::GUI *gui, sPPEState *state) {
       if (gui->BeginNode("tlbSet1")) {
         for (u64 i = 0; i != 256; ++i) {
           TLBEntry &TLBEntry = TLB.tlbSet1[i];
-          if (gui->BeginNode(fmt::format("[{}]", i))) {
+          if (gui->BeginNode(FMT("[{}]", i))) {
             Bool(gui, TLBEntry, V);
             Hex(gui, TLBEntry, pte0);
             Hex(gui, TLBEntry, pte1);
@@ -738,7 +738,7 @@ void PPURegisters(Render::GUI *gui, sPPEState *state) {
       if (gui->BeginNode("tlbSet2")) {
         for (u64 i = 0; i != 256; ++i) {
           TLBEntry &TLBEntry = TLB.tlbSet2[i];
-          if (gui->BeginNode(fmt::format("[{}]", i))) {
+          if (gui->BeginNode(FMT("[{}]", i))) {
             Bool(gui, TLBEntry, V);
             Hex(gui, TLBEntry, pte0);
             Hex(gui, TLBEntry, pte1);
@@ -750,7 +750,7 @@ void PPURegisters(Render::GUI *gui, sPPEState *state) {
       if (gui->BeginNode("tlbSet3")) {
         for (u64 i = 0; i != 256; ++i) {
           TLBEntry &TLBEntry = TLB.tlbSet3[i];
-          if (gui->BeginNode(fmt::format("[{}]", i))) {
+          if (gui->BeginNode(FMT("[{}]", i))) {
             Bool(gui, TLBEntry, V);
             Hex(gui, TLBEntry, pte0);
             Hex(gui, TLBEntry, pte1);
@@ -794,7 +794,7 @@ void PPUDockSpace(Render::GUI *gui, PPU *PPU) {
       }
       gui->EndMenuBar();
     }
-    std::string id = fmt::format("{}_DS", state->ppuName);
+    std::string id = FMT("{}_DS", state->ppuName);
     ImGuiID dsId = ImGui::GetID(id.c_str());
     if (!ImGui::DockBuilderGetNode(dsId)) {
       ImGui::DockBuilderRemoveNode(dsId);
@@ -803,9 +803,9 @@ void PPUDockSpace(Render::GUI *gui, PPU *PPU) {
       ImGuiID top, bottom;
       ImGui::DockBuilderSplitNode(dsId, ImGuiDir_Up, 0.f, &top, &bottom);
 
-      std::string registersId = fmt::format("Registers [{}]", state->ppuID);
-      std::string thread0Id = fmt::format("{} [{}]", 0, state->ppuName);
-      std::string thread1Id = fmt::format("{} [{}]", 1, state->ppuName);
+      std::string registersId = FMT("Registers [{}]", state->ppuID);
+      std::string thread0Id = FMT("{} [{}]", 0, state->ppuName);
+      std::string thread1Id = FMT("{} [{}]", 1, state->ppuName);
       ImGui::DockBuilderDockWindow(registersId.c_str(), top);
       ImGui::DockBuilderDockWindow(thread0Id.c_str(), bottom);
       ImGui::DockBuilderDockWindow(thread1Id.c_str(), bottom);
@@ -1041,7 +1041,7 @@ void Render::GUI::Render(Texture *texture) {
     if (ImGui::BeginMenu("Dump")) {
 #ifdef MICROPROFILE_WEBSERVER
       if (Button("Open")) {
-        std::string url = fmt::format("http://127.0.0.1:{}/", MicroProfileWebServerPort());
+        std::string url = FMT("http://127.0.0.1:{}/", MicroProfileWebServerPort());
 #ifdef _WIN32
         ShellExecuteA(nullptr, "open", url.data(), nullptr, nullptr, SW_SHOWNORMAL);
 #elif defined(__linux__)

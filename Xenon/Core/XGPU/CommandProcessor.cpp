@@ -661,7 +661,7 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
   fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "cache" };
   std::string typeString = shaderType == Xe::eShaderType::Pixel ? "pixel" : "vertex";
   u32 crc = CRC32::CRC32::calc(reinterpret_cast<const u8 *>(data.data()), data.size() * 4);
-  std::string baseString = fmt::format("{}_shader_{:X}", typeString, crc);
+  std::string baseString = FMT("{}_shader_{:X}", typeString, crc);
   {
     std::ofstream f{ shaderPath / (baseString + ".bin"), std::ios::out | std::ios::binary };
     f.write(reinterpret_cast<char *>(data.data()), data.size() * 4);
@@ -712,7 +712,7 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuff
   fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "cache" };
   std::string typeString = shaderType == Xe::eShaderType::Pixel ? "pixel" : "vertex";
   u32 crc = CRC32::CRC32::calc(reinterpret_cast<const u8 *>(data.data()), data.size() * 4);
-  std::string baseString = fmt::format("{}_shader_{:X}", typeString, crc);
+  std::string baseString = FMT("{}_shader_{:X}", typeString, crc);
   {
     std::ofstream f{ shaderPath / (baseString + ".bin"), std::ios::out | std::ios::binary };
     f.write(reinterpret_cast<char *>(data.data()), data.size() * 4);

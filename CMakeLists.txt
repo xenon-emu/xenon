@@ -263,8 +263,11 @@ target_include_directories(Xenon SYSTEM PRIVATE
   ${XENON_THIRDPARTY_DIR}/plusaes/include
 )
 
+# Add defines specific to Apple
+if (APPLE)
+  add_compile_definitions(SIMPLE_FMT)
 # Add defines specific to Windows
-if (WIN32)
+elseif (WIN32)
   target_link_libraries(Xenon PRIVATE ws2_32)
   add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
 

@@ -35,7 +35,7 @@ void Renderer::SDLInit() {
 
   // SDL3 window properties.
   SDL_PropertiesID props = SDL_CreateProperties();
-  const std::string title = fmt::format("Xenon {}", Base::Version);
+  const std::string title = FMT("Xenon {}", Base::Version);
   SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, title.c_str());
   // Set starting X and Y position to be centered
   SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_X_NUMBER, SDL_WINDOWPOS_CENTERED);
@@ -338,7 +338,7 @@ void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
 
   if (vsIt != pendingVertexShaders.end() && psIt != pendingPixelShaders.end()) {
     u64 combinedHash = (static_cast<u64>(vsHash) << 32) | psHash;
-    std::shared_ptr<Shader> shader = shaderFactory->LoadFromBinary(fmt::format("VS{:08X}_PS{:08X}", vsHash, psHash), {
+    std::shared_ptr<Shader> shader = shaderFactory->LoadFromBinary(FMT("VS{:08X}_PS{:08X}", vsHash, psHash), {
       { Render::eShaderType::Vertex, vsIt->second.second },
       { Render::eShaderType::Fragment, psIt->second.second }
     });

@@ -515,7 +515,7 @@ void Xe::PCIDev::SMC::smcMainThread() {
       bool noResponse = false;
 
       // Note that the first byte in the response is always Command ID.
-      // 
+      //
       // Data Buffer[0] is our message ID.
       mutex.lock();
       if (false) {
@@ -523,7 +523,7 @@ void Xe::PCIDev::SMC::smcMainThread() {
         ss << std::endl;
         for (u64 i = 0; i != sizeof(smcCoreState.fifoDataBuffer); i += 4) {
           for (u64 j = 0; j != 4; ++j) {
-            ss << fmt::format(" 0x{:02X}", static_cast<u16>(smcCoreState.fifoDataBuffer[i+j]));
+            ss << FMT(" 0x{:02X}", static_cast<u16>(smcCoreState.fifoDataBuffer[i+j]));
           }
           if (i != (sizeof(smcCoreState.fifoDataBuffer) - 4))
             ss << std::endl;

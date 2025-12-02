@@ -290,7 +290,7 @@ void DeleteOldLogs(const fs::path& path, u64 num_logs, const u16 logLimit) {
   const time_t timeNow = std::chrono::system_clock::to_time_t(Now);
   const tm* time = std::localtime(&timeNow);
   // We want to get rid of anything that isn't that current day's date
-  const std::string currentDate = fmt::format("{}-{}-{}", time->tm_mon + 1, time->tm_mday, 1900 + time->tm_year);
+  const std::string currentDate = FMT("{}-{}-{}", time->tm_mon + 1, time->tm_mday, 1900 + time->tm_year);
   if (filename.find(currentDate) == std::string::npos) {
     fs::remove_all(path);
     return;
@@ -318,7 +318,7 @@ u64 CreateIntegralTimestamp(const std::string &date) {
   }
   const std::string year = date.substr(yearPos + 1);
   const u64 yearInt = std::stoull(year);
-  const std::string timestamp = fmt::format("{}{}{}", month, day, yearInt - 1900);
+  const std::string timestamp = FMT("{}{}{}", month, day, yearInt - 1900);
   return std::stoull(timestamp);
 }
 
@@ -400,9 +400,9 @@ void Initialize(const std::string_view &logFile) {
   const std::chrono::time_point now = std::chrono::system_clock::now();
   const time_t timeNow = std::chrono::system_clock::to_time_t(now);
   const tm *time = std::localtime(&timeNow);
-  const std::string currentTime = fmt::format("{}-{}-{}", time->tm_hour, time->tm_min, time->tm_sec);
-  const std::string currentDate = fmt::format("{}-{}-{}", time->tm_mon + 1, time->tm_mday, 1900 + time->tm_year);
-  const std::string filename = fmt::format("{}_{}_{}.txt", filestemBase, currentDate, currentTime);
+  const std::string currentTime = FMT("{}-{}-{}", time->tm_hour, time->tm_min, time->tm_sec);
+  const std::string currentDate = FMT("{}-{}-{}", time->tm_mon + 1, time->tm_mday, 1900 + time->tm_year);
+  const std::string filename = FMT("{}_{}_{}.txt", filestemBase, currentDate, currentTime);
   CleanupOldLogs(filenameBase, LogDir);
   Impl::Initialize(logFile.empty() ? filename : logFile);
 }
@@ -429,10 +429,10 @@ void SetColorConsoleBackendEnabled(bool enabled) {
 
 void FmtLogMessageImpl(Class logClass, Level logLevel, const char *filename,
              u32 lineNum, const char *function, const std::string &format,
-             const fmt::format_args &args) {
+             const FMT_args &args) {
   if (!currentlyInitialising) [[likely]] {
     Impl::Instance().PushEntry(logClass, logLevel, filename, lineNum, function,
-                   fmt::vformat(format, args));
+                   VFMT(format, args));
   }
 }
 

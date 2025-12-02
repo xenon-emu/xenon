@@ -36,7 +36,7 @@ template <typename... Args>
 void FmtLogMessage(Class logClass, Level logLevel, const char *filename, u32 lineNum,
                    const char *function, const std::string &format, const Args&... args) {
   FmtLogMessageImpl(logClass, logLevel, filename, lineNum, function, format,
-                    fmt::make_format_args(args...));
+                    MK_FMT_ARGS(args...));
 }
 
 } // namespace Log

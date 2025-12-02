@@ -148,7 +148,7 @@ bool HostBridge::Write(u64 writeAddress, const u8 *data, u64 size) {
   if (false) {
     std::stringstream ss{};
     for (u64 i = 0; i != size; i++) {
-      ss << fmt::format("0x{:02X}{}", static_cast<u16>(data[i]), i != (size - 1) ? " " : "");
+      ss << FMT("0x{:02X}{}", static_cast<u16>(data[i]), i != (size - 1) ? " " : "");
     }
     LOG_DEBUG(HostBridge, "Address: 0x{:X} | Data({},0x{:X}): {}", writeAddress, size, size, ss.str());
   }
