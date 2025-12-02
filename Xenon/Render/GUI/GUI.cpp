@@ -615,7 +615,8 @@ void PPUThreadRegisters(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
       PPU_RES *ppuRes = ppuRegisters.ppuRes.get();
       U8HexPtr(gui, ppuRes, ppuID);
       BoolPtr(gui, ppuRes, valid);
-      HexPtr(gui, ppuRes, reservedAddr);
+      // volatile? nah! (Required with std::format on macOS)
+      HexBase(gui, "reservedAddr", static_cast<u64>(ppuRes->reservedAddr));
       gui->EndNode();
     }
     Hex(gui, ppuRegisters, CIA);
