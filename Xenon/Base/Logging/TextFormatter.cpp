@@ -17,10 +17,10 @@ std::string FormatLogMessage(const Entry &entry) {
   const char *levelName = GetLevelName(entry.logLevel);
 
   if (Config::log.advanced && entry.filename) {
-    return fmt::format("[{}] <{}> {}:{}:{}: {}", className, levelName, entry.filename,
+    return FMT("[{}] <{}> {}:{}:{}: {}", className, levelName, entry.filename,
       entry.function, entry.lineNum, entry.message);
   } else {
-    return fmt::format("[{}] <{}> {}", className, levelName, entry.message);
+    return FMT("[{}] <{}> {}", className, levelName, entry.message);
   }
 }
 

@@ -23,7 +23,7 @@ std::string NativeErrorToString(const s32 e) {
                              nullptr, e, MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US),
                              reinterpret_cast<char*>(&errString), 1, nullptr);
   if (!res) {
-    return fmt::format("Error code: {} (0x{:X})", e, e);
+    return FMT("Error code: {} (0x{:X})", e, e);
   }
   std::string ret{ errString };
   ::LocalFree(errString);
@@ -39,7 +39,7 @@ std::string NativeErrorToString(const s32 e) {
     // Thread safe (XSI-compliant)
     s32 secondErr = ::strerror_r(e, errString, sizeof(errString));
     if (secondErr != 0) {
-      return fmt::format("Error code: {} (0x{:X})", e, e);
+      return FMT("Error code: {} (0x{:X})", e, e);
     }
     return errString;
   #endif // GLIBC etc.

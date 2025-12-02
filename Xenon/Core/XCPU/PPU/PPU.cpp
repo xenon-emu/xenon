@@ -59,7 +59,7 @@ PPU::PPU(Xe::XCPU::XenonContext *inXenonContext, u64 resetVector, u32 PIR) :
   ppeState->ppuID = PIR / 2;
 
   // Set PPU Thread Name
-  ppeState->ppuName = fmt::format("PPU{}", ppeState->ppuID);
+  ppeState->ppuName = FMT("PPU{}", ppeState->ppuID);
 
   // Initialize Both threads as in a Reset
   for (u8 thrdNum = 0; thrdNum < 2; thrdNum++) {

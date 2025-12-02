@@ -76,7 +76,7 @@ void PPCInterpreter::ppcDebugLoadImageSymbols(sPPEState *ppeState,
   Kdinfo.SizeOfImage = MMURead32(ppeState, moduleInfoAddress + 12);
 
   Base::Log::NoFmtMessage(Base::Log::Class::DebugPrint, Base::Log::Level::Guest, "*** DebugLoadImageSymbols ***\n");
-  Base::Log::NoFmtMessage(Base::Log::Class::DebugPrint, Base::Log::Level::Guest, fmt::format("Loaded: {} at address 0x{:X} - 0x{:X}\n", moduleName, Kdinfo.BaseOfDll, (Kdinfo.BaseOfDll + Kdinfo.SizeOfImage)));
+  Base::Log::NoFmtMessage(Base::Log::Class::DebugPrint, Base::Log::Level::Guest, FMT("Loaded: {} at address 0x{:X} - 0x{:X}\n", moduleName, Kdinfo.BaseOfDll, (Kdinfo.BaseOfDll + Kdinfo.SizeOfImage)));
 }
 
 void PPCInterpreter::ppcDebugUnloadImageSymbols(sPPEState *ppeState,
