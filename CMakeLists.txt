@@ -154,6 +154,7 @@ macro(xenon_dep pkg target subdir)
         set(found_system ON)
       elseif (${pkg} STREQUAL "glslang")
         set(ENABLE_OPT OFF CACHE BOOL "" FORCE)
+        set(BUILD_EXTERNAL OFF CACHE BOOL "" FORCE)
       endif()
 
       message(STATUS "Using bundled ${pkg}")
@@ -262,11 +263,8 @@ target_include_directories(Xenon SYSTEM PRIVATE
   ${XENON_THIRDPARTY_DIR}/plusaes/include
 )
 
-# Add defines specific to Apple
-if (APPLE)
-  target_link_libraries(Xenon PRIVATE c++ c++abi)
 # Add defines specific to Windows
-elseif (WIN32)
+if (WIN32)
   target_link_libraries(Xenon PRIVATE ws2_32)
   add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
 

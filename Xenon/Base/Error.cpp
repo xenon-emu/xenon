@@ -30,19 +30,19 @@ std::string NativeErrorToString(const s32 e) {
   return ret;
 #else
   char errString[255] = {};
-#if defined(__GLIBC__) && (_GNU_SOURCE || (_POSIX_C_SOURCE < 200112L && _XOPEN_SOURCE < 600)) ||   \
-  defined(ANDROID)
-  // Thread safe (GNU-specific)
-  const char *str = ::strerror_r(e, errString, sizeof(errString));
-  return str;
-#else
-  // Thread safe (XSI-compliant)
-  s32 secondErr = ::strerror_r(e, errString, sizeof(errString));
-  if (secondErr != 0) {
-    return fmt::format("Error code: {} (0x{:X})", e, e);
-  }
-  return errString;
-#endif // GLIBC etc.
+  #if defined(__GLIBC__) && (_GNU_SOURCE || (_POSIX_C_SOURCE < 200112L && _XOPEN_SOURCE < 600)) ||   \
+    defined(ANDROID)
+    // Thread safe (GNU-specific)
+    const char *str = ::strerror_r(e, errString, sizeof(errString));
+    return str;
+  #else
+    // Thread safe (XSI-compliant)
+    s32 secondErr = ::strerror_r(e, errString, sizeof(errString));
+    if (secondErr != 0) {
+      return fmt::format("Error code: {} (0x{:X})", e, e);
+    }
+    return errString;
+  #endif // GLIBC etc.
 #endif // _WIN32
 }
 
