@@ -429,7 +429,7 @@ void SetColorConsoleBackendEnabled(bool enabled) {
 
 void FmtLogMessageImpl(Class logClass, Level logLevel, const char *filename,
              u32 lineNum, const char *function, const std::string &format,
-             const FMT_args &args) {
+             const FMT_ARGS &args) {
   if (!currentlyInitialising) [[likely]] {
     Impl::Instance().PushEntry(logClass, logLevel, filename, lineNum, function,
                    VFMT(format, args));
