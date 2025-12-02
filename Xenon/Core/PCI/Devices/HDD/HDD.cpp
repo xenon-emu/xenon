@@ -724,9 +724,6 @@ void Xe::PCIDev::HDD::hddThreadLoop() {
       ataState.regs.dmaCommand &= ~1; // Clear active status.
       ataState.regs.dmaStatus = XE_ATA_DMA_INTR; // Signal Interrupt.
     }
-
-    // Sleep for some time.
-    std::this_thread::sleep_for(50ns);
   }
 
   LOG_INFO(HDD, "Exiting HDD worker thread.");

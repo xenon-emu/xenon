@@ -265,7 +265,7 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
     }
 
     // Check for external interrupts
-    if (curThread.SPR.MSR.EE && xenonContext->xenonIIC.checkExtInterrupt(curThread.SPR.PIR)) {
+    if (curThread.SPR.MSR.EE && xenonContext->iic.hasPendingInterrupts(curThread.SPR.PIR)) {
       _ex |= ppuExternalEx;
     }
 
@@ -639,7 +639,7 @@ bool PPU::PPUCheckInterrupts() {
   if (ppuThreadActive && !ppuThreadResetting && (ppuThreadState.load() == eThreadState::Halted 
     || ppuThreadState.load() == eThreadState::Sleeping) && WEXT) {
     // Check for an external interrupt that enables execution.
-    if (!xenonContext->xenonIIC.checkExtInterrupt(curThread.SPR.PIR, true)) {
+    if (!xenonContext->iic.hasPendingInterrupts(curThread.SPR.PIR, true)) {
       return true;
     }
 
@@ -657,9 +657,9 @@ bool PPU::PPUCheckInterrupts() {
 
     // ACK and EOI the interrupt
     u64 intData = 0;
-    xenonContext->xenonIIC.readInterrupt(thread.SPR.PIR * 0x1000 + 0x50050, reinterpret_cast<u8*>(&intData), sizeof(intData));
+    xenonContext->iic.Read(thread.SPR.PIR * 0x1000 + 0x50050, reinterpret_cast<u8*>(&intData), sizeof(intData));
     intData = 0;
-    xenonContext->xenonIIC.writeInterrupt(thread.SPR.PIR * 0x1000 + 0x50060, reinterpret_cast<u8*>(&intData), sizeof(intData));
+    xenonContext->iic.Write(thread.SPR.PIR * 0x1000 + 0x50060, reinterpret_cast<u8*>(&intData), sizeof(intData));
   }
 
   return false;
