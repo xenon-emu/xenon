@@ -15,10 +15,12 @@
 #define FMT(...) fmt::format(__VA_ARGS__)
 #define MK_FMT_ARGS(...) fmt::make_format_args(__VA_ARGS__)
 #define VFMT(...) fmt::vformat(__VA_ARGS__)
+#define FMT_ARGS fmt::format_args
 #else
 #define FMT(...) std::format(__VA_ARGS__)
 #define MK_FMT_ARGS(...) std::make_format_args(__VA_ARGS__)
 #define VFMT(...) std::vformat(__VA_ARGS__)
+#define FMT_ARGS std::format_args
 #endif
 
 #include "Logging/Log.h"
