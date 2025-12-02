@@ -6,6 +6,7 @@
 , ninja
 , pkg-config
 , roboto
+, libxcb
 , sdl3
 , fmt_11
 , toml11
@@ -76,6 +77,12 @@ let
     rev = "9ecdd59ca514ef56e95e9285c74f6bde4c6e1c97";
     hash = "sha256-/RWgtPLu5GLe3fkLRjI8SURs0hjQa0eleWRSieYYeCo=";
   };
+  plusaes = fetchFromGitHub {
+    owner = "kkAyataka";
+    repo = "plusaes";
+    rev = "f9e58596fc67e180d9b6d097226f97bd496af0d8";
+    hash = "sha256-z72uaeu4LaO+rEhfLGa/ht49AGW5FgULQv3H8RXmbFM=";
+  };
 in
 stdenv.mkDerivation {
   name = "xenon";
@@ -86,6 +93,7 @@ stdenv.mkDerivation {
   buildInputs = [
     fmt_11 toml11
   ] ++ lib.optionals withGraphics [
+    libxcb
     sdl3
     python3 # Needed for glslang
     vulkan-headers
@@ -112,9 +120,11 @@ stdenv.mkDerivation {
     rm -rf $sourceRoot/Deps/ThirdParty/asmjit
     rm -rf $sourceRoot/Deps/ThirdParty/cryptopp
     rm -rf $sourceRoot/Deps/ThirdParty/microprofile
+    rm -rf $sourceRoot/Deps/ThirdParty/plusaes
     cp -r ${asmjit} $sourceRoot/Deps/ThirdParty/asmjit
     cp -r ${cryptopp} $sourceRoot/Deps/ThirdParty/cryptopp
     cp -r ${microprofile} $sourceRoot/Deps/ThirdParty/microprofile
+    cp -r ${plusaes} $sourceRoot/Deps/ThirdParty/plusaes
     chmod -R +w $sourceRoot
   '';
 

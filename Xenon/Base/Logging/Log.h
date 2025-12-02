@@ -26,7 +26,7 @@ constexpr const char* TrimSourcePath(const std::string_view &source) {
 
 /// Logs a message to the global logger, using fmt
 void FmtLogMessageImpl(Class logClass, Level logLevel, const char *filename,
-                       u32 lineNum, const char *function, const char *format,
+                       u32 lineNum, const char *function, const std::string &format,
                        const fmt::format_args& args);
 
 /// Logs a message without any formatting
@@ -34,7 +34,7 @@ void NoFmtMessage(Class logClass, Level logLevel, const std::string &message);
 
 template <typename... Args>
 void FmtLogMessage(Class logClass, Level logLevel, const char *filename, u32 lineNum,
-                   const char *function, const char *format, const Args&... args) {
+                   const char *function, const std::string &format, const Args&... args) {
   FmtLogMessageImpl(logClass, logLevel, filename, lineNum, function, format,
                     fmt::make_format_args(args...));
 }
