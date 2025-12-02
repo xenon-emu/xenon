@@ -1026,27 +1026,4 @@ void PPCInterpreter::PPCInterpreterJIT_cntlzdx(sPPEState* ppeState, JITBlockBuil
     J_ppuSetCR0(b, tmp);
 }
 
-// Extend Sign Byte (x'7C00 0774')
-void PPCInterpreter::PPCInterpreterJIT_extsbx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
-  x86::Gp rSTemp = newGP64();
-
-  COMP->mov(rSTemp, GPRPtr(instr.rs));
-  COMP->movsx(rSTemp, rSTemp.r8()); // Sign-extend lower 8 bits to 64 bits.
-  COMP->mov(GPRPtr(instr.ra), rSTemp);
-
-  if (instr.rc)
-    J_ppuSetCR0(b, rSTemp);
-}
-
-// Extend Sign Word (x'7C00 07B4')
-void PPCInterpreter::PPCInterpreterJIT_extswx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
-  x86::Gp rSTemp = newGP64();
-
-  COMP->mov(rSTemp, GPRPtr(instr.rs));
-  COMP->movsxd(rSTemp, rSTemp.r32()); // Sign-extend lower 32 bits to 64 bits.
-  COMP->mov(GPRPtr(instr.ra), rSTemp);
-
-  if (instr.rc)
-    J_ppuSetCR0(b, rSTemp);
-}
 #endif

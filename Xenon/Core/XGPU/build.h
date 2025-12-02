@@ -4,8 +4,10 @@
 #include <stdio.h>
 #include <math.h>
 #include <float.h>
+#ifdef _WIN32
 #include <winsock2.h>
 #include <Windows.h>
+#endif
 #include <time.h>
 #include <mutex>
 
