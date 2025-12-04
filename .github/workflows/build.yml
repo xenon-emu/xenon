@@ -226,14 +226,14 @@ jobs:
           build
           Deps
 
-        key: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-deps-${{ hashFiles('build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**/CMakeLists.txt', 'build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**cmake/**') }}
+        key: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-deps-cache-${{ hashFiles('build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**/CMakeLists.txt', 'build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**cmake/**') }}
         restore-keys: |
-          xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-deps-ccache-
+          xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-deps-cache-${{ hashFiles('build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**/CMakeLists.txt', 'build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**cmake/**') }}
 
     - name: Cache CMake Build
       uses: hendrikmuhs/ccache-action@v1.2.18
       env:
-        cache-name: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-ccache
+        cache-name: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-cache
       with:
         append-timestamp: false
         key: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
@@ -249,7 +249,7 @@ jobs:
     - name: Prepare Artifact Folder
       run: |
         mkdir -p artifact
-        cp -r "${{github.workspace}}/build/Xenon.exe" "artifact/xenon-gcc-amd64-${{env.BUILD_TYPE}}.exe"
+        cp -r "${{github.workspace}}/build/Xenon.exe" "artifact/Xenon-amd64-gcc-${{env.BUILD_TYPE}}.exe"
 
     - name: Upload Windows-GCC Artifact
       uses: actions/upload-artifact@main
@@ -298,7 +298,7 @@ jobs:
             ${{github.workspace}}/build
           key: xenon-${{runner.os}}-aarch64-clang-${{env.BUILD_TYPE}}-deps-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
           restore-keys: |
-            xenon-${{runner.os}}-aarch64-clang-${{env.BUILD_TYPE}}-deps-ccache-
+            xenon-${{runner.os}}-aarch64-clang-${{env.BUILD_TYPE}}-deps-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
 
       - name: Cache CMake Build
         uses: hendrikmuhs/ccache-action@v1.2.18
