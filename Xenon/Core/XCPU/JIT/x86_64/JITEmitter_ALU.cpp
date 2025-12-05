@@ -44,8 +44,8 @@ void PPCInterpreter::PPCInterpreterJIT_addic(sPPEState* ppeState, JITBlockBuilde
   // Check for MSR[SF]:
   x86::Gp tempMSR = newGP64(); // MSR is 64 bits wide.
   COMP->mov(tempMSR, SPRPtr(MSR)); // Get MSR value.
-  COMP->bt(tempMSR, 63); // Check for bit 0(BE)(SF) on MSR.
-  COMP->jc(sfBitMode); // If set, use 64-bit add. (checks for carry flag from previous operation).
+  COMP->bt(tempMSR, 63);  // Check for bit 0(BE)(SF) on MSR.
+  COMP->jc(sfBitMode);    // If set, use 64-bit add. (checks for carry flag from previous operation).
   // Perform 32bit addition to check for carry.
   COMP->add(rATemp.r32(), imm<s32>(instr.simm16));
   // Get back the value of rA.
@@ -76,7 +76,7 @@ void PPCInterpreter::PPCInterpreterJIT_addic(sPPEState* ppeState, JITBlockBuilde
   // Set rD value.
   COMP->mov(GPRPtr(instr.rd), rATemp);
 
-  if (_instr.main & 1)
+  if (instr.main & 1)
     J_ppuSetCR0(b, rATemp);
 }
 
