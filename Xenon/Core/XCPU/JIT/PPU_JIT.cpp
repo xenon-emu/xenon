@@ -232,6 +232,10 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
   signature->setArg(0, jitBuilder->ppu->Base());
   signature->setArg(1, jitBuilder->ppeState->Base());
   signature->setArg(2, jitBuilder->haltBool);
+
+  // Enable AVX support
+  signature->frame().setAvxEnabled();
+
 #endif
 
   // Temporary container holding all instructions data in the block.

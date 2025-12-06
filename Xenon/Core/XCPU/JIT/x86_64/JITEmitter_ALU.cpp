@@ -1116,6 +1116,64 @@ void PPCInterpreter::PPCInterpreterJIT_cntlzwx(sPPEState* ppeState, JITBlockBuil
     J_ppuSetCR0(b, tmp);
 }
 
+// Condition Register AND
+void PPCInterpreter::PPCInterpreterJIT_crand(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Bit position in CRBA
+  u8 shiftCra = 31 - instr.crba;
+  // Bit position in CRBB
+  u8 shiftCrb = 31 - instr.crbb;
+  // Bit position in CRBD
+  u8 shiftCrd = 31 - instr.crbd;
+
+  Label clearCRD = COMP->newLabel();
+  Label end = COMP->newLabel();
+
+  x86::Gp crData = newGP32();
+
+  COMP->mov(crData, CRValPtr());
+  COMP->bt(crData, imm<u8>(shiftCra));
+  COMP->jnc(clearCRD);
+  COMP->bt(crData, imm<u8>(shiftCrb));
+  COMP->jnc(clearCRD);
+  // Both bits are set, set CRBD
+  COMP->bts(crData, imm<u8>(shiftCrd));
+  COMP->jmp(end);
+  COMP->bind(clearCRD);
+  // One bit is missing, clear CRBD
+  COMP->btr(crData, imm<u8>(shiftCrd));
+  COMP->bind(end);
+  COMP->mov(CRValPtr(), crData);
+}
+
+// Condition Register OR
+void PPCInterpreter::PPCInterpreterJIT_cror(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Bit position in CRBA
+  u8 shiftCra = 31 - instr.crba;
+  // Bit position in CRBB
+  u8 shiftCrb = 31 - instr.crbb;
+  // Bit position in CRBD
+  u8 shiftCrd = 31 - instr.crbd;
+
+  Label setCRD = COMP->newLabel();
+  Label end = COMP->newLabel();
+
+  x86::Gp crData = newGP32();
+
+  COMP->mov(crData, CRValPtr());
+  COMP->bt(crData, imm<u8>(shiftCra));
+  COMP->jc(setCRD);
+  COMP->bt(crData, imm<u8>(shiftCrb));
+  COMP->jc(setCRD);
+  // No bits are set, clear CRBD
+  COMP->btr(crData, imm<u8>(shiftCrd));
+  COMP->jmp(end);
+  COMP->bind(setCRD);
+  // One bit is set, set CRBD
+  COMP->bts(crData, imm<u8>(shiftCrd));
+  COMP->bind(end);
+  COMP->mov(CRValPtr(), crData);
+}
+
 // Extend Sign Byte (x'7C00 0774')
 void PPCInterpreter::PPCInterpreterJIT_extsbx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   x86::Gp rSTemp = newGP64();

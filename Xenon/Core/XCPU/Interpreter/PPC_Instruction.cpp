@@ -117,10 +117,10 @@ namespace PPCInterpreter {
       { 0x096, GET(isync) },
       //{ 0x0C1, GET(crxor) },
       //{ 0x0E1, GET(crnand) },
-      //{ 0x101, GET(crand) },
+      { 0x101, GET(crand) },
       //{ 0x121, GET(creqv) },
       //{ 0x1A1, GET(crorc) },
-      //{ 0x1C1, GET(cror) },
+      { 0x1C1, GET(cror) },
       { 0x210, GET(bcctr) },
       });
     // Group 0x1E opcodes (field 27..30)
@@ -236,7 +236,7 @@ namespace PPCInterpreter {
       //{ 0x1B2, GET(slbie) },
       //{ 0x1B6, GET(ecowx) },
       //{ 0x1B7, GET(sthux) },
-      { 0x1BC, GETRC(or ) },
+      { 0x1BC, GETRC(or) },
       //{ 0x1C9, GETRC(divdu) },
       //{ 0x3C9, GETRC(divduo) },
       //{ 0x1CB, GETRC(divwu) },
