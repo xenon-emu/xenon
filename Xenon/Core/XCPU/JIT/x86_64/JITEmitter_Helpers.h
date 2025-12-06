@@ -299,4 +299,68 @@ inline void J_AddDidCarrySetCarry(JITBlockBuilder* b, x86::Gp a, x86::Gp result)
   // Set XER[CA] value.
   COMP->mov(SPRPtr(XER), xer);
 }
+
+#define FAST_TRAP
+
+// Trap Helper
+inline void TrapCheck(JITBlockBuilder* b, x86::Gp ra, x86::Gp rb, u32 TO) {
+  // if (a < b) & TO[0] then TRAP
+  // if (a > b) & TO[1] then TRAP
+  // if (a = b) & TO[2] then TRAP
+  // if (a < unsigned b) & TO[3] then TRAP
+  // if (a > unsigned b) & TO[4] then TRAP
+
+  // Check TO
+  if (!TO) { return; }
+
+  Label end = COMP->newLabel();
+  Label doTrap = COMP->newLabel();
+
+  // Compare our values
+  COMP->cmp(ra, rb);
+
+  if (TO & (1 << 4)) {
+    // a < b
+    COMP->jl(doTrap);
+  }
+  if (TO & (1 << 3)) {
+    // a > b
+    COMP->jg(doTrap);
+  }
+  if (TO & (1 << 2)) {
+    // a = b
+    COMP->je(doTrap);
+  }
+  if (TO & (1 << 1)) {
+    // a <u b
+    COMP->jb(doTrap);
+  }
+  if (TO & (1 << 0)) {
+    // a >u b
+    COMP->ja(doTrap);
+  }
+
+  // Invalid, nothing to do.
+  COMP->jmp(end);
+
+  // Trap was valid, invoke our trap handler.
+  COMP->bind(doTrap);
+#ifdef FAST_TRAP
+  // Faster path for trap processing, directly raise exception and set exception type.
+  x86::Gp exceptReg = newGP16();
+  COMP->mov(exceptReg, EXPtr());
+  COMP->or_(exceptReg, ppuProgramEx);
+  COMP->mov(EXPtr(), exceptReg);
+  COMP->mov(exceptReg, b->threadCtx->scalar(&sPPUThread::progExceptionType));
+  COMP->mov(exceptReg, ppuProgExTypeTRAP);
+  COMP->mov(b->threadCtx->scalar(&sPPUThread::progExceptionType), exceptReg);
+#else
+  // Slow but pretty, use our old function to print out debug messages, etc...
+  InvokeNode* inv = nullptr;
+  b->compiler->invoke(&inv, imm((void*)PPCInterpreter::ppcInterpreterTrap), FuncSignature::build<void, void*, u32>());
+  inv->setArg(0, b->ppeState->Base());
+  inv->setArg(1, rb);
+#endif // FAST_TRAP
+  COMP->bind(end);
+}
 #endif

@@ -6,6 +6,42 @@
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
 
+// Trap Doubleword Immediate
+void PPCInterpreter::PPCInterpreterJIT_tdi(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  x86::Gp rATemp = newGP64();
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+  x86::Gp simm = newGP64();
+  COMP->mov(simm, imm<s64>(instr.simm16));
+  TrapCheck(b, rATemp, simm, static_cast<u32>(instr.bo));
+}
+
+// Trap Word Immediate
+void PPCInterpreter::PPCInterpreterJIT_twi(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  x86::Gp rATemp = newGP32();
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+  x86::Gp simm = newGP32();
+  COMP->mov(simm, imm<s32>(instr.simm16));
+  TrapCheck(b, rATemp, simm, static_cast<u32>(instr.bo));
+}
+
+// Trap Doubleword
+void PPCInterpreter::PPCInterpreterJIT_td(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  x86::Gp rATemp = newGP64();
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+  x86::Gp rBTemp = newGP64();
+  COMP->mov(rBTemp, GPRPtr(instr.rb));
+  TrapCheck(b, rATemp, rBTemp, static_cast<u32>(instr.bo));
+}
+
+// Trap Word
+void PPCInterpreter::PPCInterpreterJIT_tw(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  x86::Gp rATemp = newGP32();
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+  x86::Gp rBTemp = newGP32();
+  COMP->mov(rBTemp, GPRPtr(instr.rb));
+  TrapCheck(b, rATemp, rBTemp, static_cast<u32>(instr.bo));
+}
+
 // Add (x'7C00 0214')
 void PPCInterpreter::PPCInterpreterJIT_addx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr){
   /*
@@ -341,13 +377,24 @@ void PPCInterpreter::PPCInterpreterJIT_cmpli(sPPEState* ppeState, JITBlockBuilde
   }
 }
 
+// Multiply High Word (x'7C00 0096')
+void PPCInterpreter::PPCInterpreterJIT_mulhwx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  x86::Gp rATemp = newGP32();
+  x86::Gp rBTemp = newGP32();
+  x86::Gp result = newGP64();
+
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+  COMP->mov(rBTemp, GPRPtr(instr.rb));
+  COMP->imul(result.r32(), rATemp, rBTemp); // Multiplication is signed.
+  COMP->movsxd(result, result);
+  COMP->mov(GPRPtr(instr.rd), result);
+
+  if (instr.rc)
+    J_ppuSetCR0(b, result);
+}
+
 // Multiply Low Doubleword (x'7C00 01D2')
 void PPCInterpreter::PPCInterpreterJIT_mulldx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
-  /*
-    prod[0-127] <- (rA) * (rB)
-    rD <- prod[64-127]
-  */
-
   x86::Gp rATemp = newGP64();
   x86::Gp rBTemp = newGP64();
 
@@ -576,6 +623,69 @@ void PPCInterpreter::PPCInterpreterJIT_subfx(sPPEState *ppeState, JITBlockBuilde
   // RC
   if (instr.rc)
     J_ppuSetCR0(b, rBTemp);
+}
+
+// Subtract from Immediate Carrying (x'2000 0000')
+void PPCInterpreter::PPCInterpreterJIT_subfic(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  // TODO: Overflow Enable.
+  Label end = COMP->newLabel(); // Self explanatory.
+  Label sfBitMode = COMP->newLabel();
+
+  // Get rA value.
+  x86::Gp rATemp = newGP64();
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+  COMP->not_(rATemp);
+
+  // XER[CA] Clear.
+  x86::Gp xer = newGP64();
+  COMP->mov(xer, SPRPtr(XER));
+#ifdef __LITTLE_ENDIAN__
+  COMP->btr(xer, 29); // Clear XER[CA] bit.
+#else
+  COMP->btr(xer, 2); // Clear XER[CA] bit.
+#endif // LITTLE_ENDIAN
+
+  // Check for 32bit mode of operation.
+  // Check for MSR[SF]:
+  x86::Gp tempMSR = newGP64(); // MSR is 64 bits wide.
+  COMP->mov(tempMSR, SPRPtr(MSR)); // Get MSR value.
+  COMP->bt(tempMSR, 63);  // Check for bit 0(BE)(SF) on MSR.
+  COMP->jc(sfBitMode);    // If set, use 64-bit add. (checks for carry flag from previous operation).
+  // Set Carry flag
+  COMP->stc();
+  // Perform 32bit addition to check for carry.
+  COMP->adc(rATemp.r32(), imm<s32>(instr.simm16));
+  // Check for carry.
+  COMP->jnc(sfBitMode);
+#ifdef __LITTLE_ENDIAN__
+  COMP->bts(xer, 29); // Set XER[CA] bit.
+#else
+  COMP->bts(xer, 2); // Set XER[CA] bit.
+#endif // LITTLE_ENDIAN
+
+  COMP->bind(sfBitMode);
+
+  // Get back the value of rA.
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+  COMP->not_(rATemp);
+  // Set Carry flag
+  COMP->stc();
+  // Perform the 64 bit Add.
+  COMP->adc(rATemp, imm<s64>(instr.simm16));
+  // Check for carry.
+  COMP->jnc(end);
+
+#ifdef __LITTLE_ENDIAN__
+  COMP->bts(xer, 29); // Set XER[CA] bit.
+#else
+  COMP->bts(xer, 2); // Set XER[CA] bit.
+#endif // LITTLE_ENDIAN
+
+  COMP->bind(end);
+  // Set XER[CA] value.
+  COMP->mov(SPRPtr(XER), xer);
+  // Set rD value.
+  COMP->mov(GPRPtr(instr.rd), rATemp);
 }
 
 // Shift Right Word (x'7C00 0430')
@@ -986,14 +1096,18 @@ void PPCInterpreter::PPCInterpreterJIT_rlwimix(sPPEState* ppeState, JITBlockBuil
 
 // Count Leading Zeros Double Word (x'7C00 0074')
 void PPCInterpreter::PPCInterpreterJIT_cntlzdx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
-  /*
-  n <- 0
-  do while n < 64
-    if rS[n] = 1 then leave
-    n <- n + 1
-  rA <- n
-  */
   x86::Gp tmp = newGP64();
+  COMP->lzcnt(tmp, GPRPtr(instr.rs));
+  COMP->mov(GPRPtr(instr.ra), tmp);
+
+  // RC
+  if (instr.rc)
+    J_ppuSetCR0(b, tmp);
+}
+
+// Count Leading Zeros Word (x'7C00 0034')
+void PPCInterpreter::PPCInterpreterJIT_cntlzwx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  x86::Gp tmp = newGP32();
   COMP->lzcnt(tmp, GPRPtr(instr.rs));
   COMP->mov(GPRPtr(instr.ra), tmp);
 

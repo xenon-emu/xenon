@@ -278,6 +278,58 @@ void PPCInterpreter::PPCInterpreterJIT_ldu(sPPEState *ppeState, JITBlockBuilder 
   COMP->bind(endLabel);
 }
 
+// Load Double Word with Update Indexed (x'7C00 006A')
+void PPCInterpreter::PPCInterpreterJIT_ldux(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  Label endLabel = COMP->newLabel();
+  x86::Gp EA = newGP64();
+  x86::Gp data64 = newGP64();
+  x86::Gp exceptReg = newGP16();
+
+  COMP->mov(EA, GPRPtr(instr.ra));
+  COMP->add(EA, GPRPtr(instr.rb));
+  // Invoke the MMU Read
+  InvokeNode* read = nullptr;
+  COMP->invoke(&read, imm((void*)MMURead64), FuncSignature::build<u64, sPPEState*, u64, ePPUThreadID>());
+  read->setArg(0, b->ppeState->Base());
+  read->setArg(1, EA);
+  read->setArg(2, ePPUThread_None);
+  read->setRet(0, data64);
+  // Check for exceptions DStor/DSeg and return if found.
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+  COMP->mov(GPRPtr(instr.rd), data64);
+  COMP->mov(GPRPtr(instr.ra), EA);
+  COMP->bind(endLabel);
+}
+
+// Load Double Word Indexed (x'7C00 002A')
+void PPCInterpreter::PPCInterpreterJIT_ldx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  Label endLabel = COMP->newLabel();
+  x86::Gp EA = newGP64();
+  x86::Gp data64 = newGP64();
+  x86::Gp exceptReg = newGP16();
+
+  if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.rb));
+  // Invoke the MMU Read
+  InvokeNode* read = nullptr;
+  COMP->invoke(&read, imm((void*)MMURead64), FuncSignature::build<u64, sPPEState*, u64, ePPUThreadID>());
+  read->setArg(0, b->ppeState->Base());
+  read->setArg(1, EA);
+  read->setArg(2, ePPUThread_None);
+  read->setRet(0, data64);
+  // Check for exceptions DStor/DSeg and return if found.
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+  COMP->mov(GPRPtr(instr.rd), data64);
+  COMP->bind(endLabel);
+}
+
 //
 // Store
 //
