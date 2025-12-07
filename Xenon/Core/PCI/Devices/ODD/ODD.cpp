@@ -1123,26 +1123,17 @@ void Xe::PCIDev::ODD::doDMA() {
     u32 bufferAddress = atapiState.dmaState.currentPRD.physAddress;
     // Buffer Pointer in main memory
     u8 *bufferInMemory = ramPtr->GetPointerToAddress(bufferAddress);
+    // ATA DMA Spec states then the host will write a size of 0 to request 64K of data.
+    if (size == 0) { size = 65536; }
 
     if (readOperation) {
       // Reading from us
       size = std::fmin(static_cast<u32>(size), atapiState.dataOutBuffer.count());
-
-      // Buffer overrun? Apparently there can be entries in the PRDT which have a zero byte count.
-      if (size == 0) {
-        LOG_WARNING(ODD, "[DMA Worker Read] Entry read size is zero.");
-      }
-
       memcpy(bufferInMemory, atapiState.dataOutBuffer.get(), size);
       atapiState.dataOutBuffer.resize(size);
-    }
-    else {
+    } else {
       // Writing to us
       size = std::fmin(static_cast<u32>(size), atapiState.dataInBuffer.count());
-      // Buffer overrun? Apparently there can be entries in the PRDT which have a zero byte count.
-      if (size == 0) {
-        LOG_WARNING(ODD, "[DMA Worker Write] Entry write size is zero.");
-      }
       memcpy(atapiState.dataInBuffer.get(), bufferInMemory, size);
       atapiState.dataInBuffer.resize(size);
     }
