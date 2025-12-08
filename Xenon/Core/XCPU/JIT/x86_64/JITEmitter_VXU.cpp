@@ -19,6 +19,36 @@
 #define newXMM() b->compiler->newXmm()
 
 //
+// VMX 128 Instruction bitfields
+//
+
+// Re declared here because of the way JIT uses CI
+
+#define VMX128_VD128   (instr.VMX128.VD128l | (instr.VMX128.VD128h << 5))
+#define VMX128_VA128   (instr.VMX128.VA128l | (instr.VMX128.VA128h << 5) | (instr.VMX128.VA128H << 6))
+#define VMX128_VB128   (instr.VMX128.VB128l | (instr.VMX128.VB128h << 5))
+
+#define VMX128_1_VD128 (instr.VMX128_1.VD128l | (instr.VMX128_1.VD128h << 5))
+
+#define VMX128_2_VD128 (instr.VMX128_2.VD128l | (instr.VMX128_2.VD128h << 5))
+#define VMX128_2_VA128 (instr.VMX128_2.VA128l | (instr.VMX128_2.VA128h << 5) | (instr.VMX128_2.VA128H << 6))
+#define VMX128_2_VB128 (instr.VMX128_2.VB128l | (instr.VMX128_2.VB128h << 5))
+#define VMX128_2_VC    (instr.VMX128_2.VC)
+
+#define VMX128_3_VD128 (instr.VMX128_3.VD128l | (instr.VMX128_3.VD128h << 5))
+#define VMX128_3_VB128 (instr.VMX128_3.VB128l | (instr.VMX128_3.VB128h << 5))
+#define VMX128_3_IMM   (instr.VMX128_3.IMM)
+
+#define VMX128_5_VD128 (instr.VMX128_5.VD128l | (instr.VMX128_5.VD128h << 5))
+#define VMX128_5_VA128 (instr.VMX128_5.VA128l | (instr.VMX128_5.VA128h << 5)) | (instr.VMX128_5.VA128H << 6)
+#define VMX128_5_VB128 (instr.VMX128_5.VB128l | (instr.VMX128_5.VB128h << 5))
+#define VMX128_5_SH    (instr.VMX128_5.SH)
+
+#define VMX128_R_VD128 (instr.VMX128_R.VD128l | (instr.VMX128_R.VD128h << 5))
+#define VMX128_R_VA128 (instr.VMX128_R.VA128l | (instr.VMX128_R.VA128h << 5) | (instr.VMX128_R.VA128H << 6))
+#define VMX128_R_VB128 (instr.VMX128_R.VB128l | (instr.VMX128_R.VB128h << 5))
+
+//
 // Helpers
 // 
 
@@ -215,6 +245,90 @@ void PPCInterpreter::PPCInterpreterJIT_vaddcuw(sPPEState *ppeState, JITBlockBuil
 
   // Store result to vD
   COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Logical AND (x'1000 0404')
+void PPCInterpreter::PPCInterpreterJIT_vand(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  // Load vA and vB (128-bit vectors)
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // Bitwise AND: vD = vA & vB
+  COMP->vpand(vD, vA, vB);
+
+  // Store result to vD (VPR[vd])
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector 128 Logical AND
+void PPCInterpreter::PPCInterpreterJIT_vand128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  // Load vA and vB (128-bit vectors)
+  COMP->vmovdqa(vA, VPRPtr(VMX128_VA128));
+  COMP->vmovdqa(vB, VPRPtr(VMX128_VB128));
+
+  // Bitwise AND: vD = vA & vB
+  COMP->vpand(vD, vA, vB);
+
+  // Store result to vD (VPR[vd])
+  COMP->vmovdqa(VPRPtr(VMX128_VD128), vD);
+}
+
+// Vector Logical AND with Complement (x'1000 0444')
+void PPCInterpreter::PPCInterpreterJIT_vandc(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  // Load vA and vB (128-bit vectors)
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // vandc = vA & ~vB
+  // AVX vpandn dest, src1, src2 -> dest = ~src1 & src2
+  // so pass (vB, vA) to get (~vB) & vA
+  COMP->vpandn(vD, vB, vA);
+
+  // Store result to vD (VPR[vd])
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector 128 Logical AND with Complement
+void PPCInterpreter::PPCInterpreterJIT_vandc128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  // Load vA and vB (128-bit vectors)
+  COMP->vmovdqa(vA, VPRPtr(VMX128_VA128));
+  COMP->vmovdqa(vB, VPRPtr(VMX128_VB128));
+
+  // vandc = vA & ~vB
+  // AVX vpandn dest, src1, src2 -> dest = ~src1 & src2
+  // so pass (vB, vA) to get (~vB) & vA
+  COMP->vpandn(vD, vB, vA);
+
+  // Store result to vD (VPR[vd])
+  COMP->vmovdqa(VPRPtr(VMX128_VD128), vD);
 }
 
 // Vector Subtract Floating Point (x'1000 004A')
@@ -695,6 +809,210 @@ void PPCInterpreter::PPCInterpreterJIT_vrfim128(sPPEState *ppeState, JITBlockBui
 
   // Store result to vD
   COMP->vmovaps(VPRPtr(VMX128_3_VD128), vD);
+}
+
+// Vector Logical OR (x'1000 0484')
+void PPCInterpreter::PPCInterpreterJIT_vor(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  // Load vA and vB (128-bit vectors)
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // Bitwise OR: vD = vA | vB
+  // Use vorps (bitwise OR on packed single) consistent with other emitters' usage.
+  COMP->vorps(vD, vA, vB);
+
+  // Store result to vD (VPR[vd])
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector 128 Logical OR
+void PPCInterpreter::PPCInterpreterJIT_vor128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  // Load vA and vB (128-bit vectors)
+  COMP->vmovdqa(vA, VPRPtr(VMX128_VA128));
+  COMP->vmovdqa(vB, VPRPtr(VMX128_VB128));
+
+  // Bitwise OR: vD = vA | vB
+  // Use vorps (bitwise OR on packed single) consistent with other emitters' usage.
+  COMP->vorps(vD, vA, vB);
+
+  // Store result to vD (VPR[vd])
+  COMP->vmovdqa(VPRPtr(VMX128_VD128), vD);
+}
+
+// Vector Logical NOR (x'1000 0504')
+void PPCInterpreter::PPCInterpreterJIT_vnor(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Xmm vAllOnes = b->compiler->newXmm();
+  x86::Gp tmp = b->compiler->newGpd();
+
+  // Load vA and vB (128-bit vectors)
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // vTemp = vA | vB
+  COMP->vorps(vD, vA, vB);
+
+  // Create all-ones mask (0xFFFFFFFF per dword)
+  COMP->mov(tmp, 0xFFFFFFFFu);
+  COMP->vmovd(vAllOnes, tmp);
+  COMP->vpbroadcastd(vAllOnes, vAllOnes);
+
+  // Invert bits: vD = ~vD  -> XOR with all-ones
+  COMP->vpxor(vD, vD, vAllOnes);
+
+  // Store result to vD (VPR[vd])
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector 128 Logical NOR
+void PPCInterpreter::PPCInterpreterJIT_vnor128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Xmm vAllOnes = b->compiler->newXmm();
+  x86::Gp tmp = b->compiler->newGpd();
+
+  // Load vA and vB (128-bit vectors)
+  COMP->vmovdqa(vA, VPRPtr(VMX128_VA128));
+  COMP->vmovdqa(vB, VPRPtr(VMX128_VB128));
+
+  // vTemp = vA | vB
+  COMP->vorps(vD, vA, vB);
+
+  // Create all-ones mask (0xFFFFFFFF per dword)
+  COMP->mov(tmp, 0xFFFFFFFFu);
+  COMP->vmovd(vAllOnes, tmp);
+  COMP->vpbroadcastd(vAllOnes, vAllOnes);
+
+  // Invert bits: vD = ~vD  -> XOR with all-ones
+  COMP->vpxor(vD, vD, vAllOnes);
+
+  // Store result to vD (VPR[vd])
+  COMP->vmovdqa(VPRPtr(VMX128_VD128), vD);
+}
+
+// Vector Logical XOR (x'1000 04C4')
+void PPCInterpreter::PPCInterpreterJIT_vxor(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  // Load vA and vB (128-bit vectors)
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // Bitwise XOR: vD = vA ^ vB
+  COMP->vpxor(vD, vA, vB);
+
+  // Store result to vD (VPR[vd])
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector 128 Logical XOR
+void PPCInterpreter::PPCInterpreterJIT_vxor128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  // Load vA and vB (128-bit vectors)
+  COMP->vmovdqa(vA, VPRPtr(VMX128_VA128));
+  COMP->vmovdqa(vB, VPRPtr(VMX128_VB128));
+
+  // Bitwise XOR: vD = vA ^ vB
+  COMP->vpxor(vD, vA, vB);
+
+  // Store result to vD (VPR[vd])
+  COMP->vmovdqa(VPRPtr(VMX128_VD128), vD);
+}
+
+// Vector Conditional Select (x'1000 002A')
+void PPCInterpreter::PPCInterpreterJIT_vsel(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  // vD = (vA & ~vC) | (vB & vC)
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vC = newXMM();
+  x86::Xmm tA = newXMM(); // holds ~vC & vA
+  x86::Xmm tB = newXMM(); // holds vB & vC
+  x86::Xmm vD = newXMM();
+
+  // Load vectors
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+  COMP->vmovdqa(vC, VPRPtr(instr.vc));
+
+  // tA = ~vC & vA  -> vpandn dest, src1, src2  => dest = ~src1 & src2
+  COMP->vpandn(tA, vC, vA);
+
+  // tB = vB & vC
+  COMP->vpand(tB, vB, vC);
+
+  // vD = tA | tB
+  COMP->vorps(vD, tA, tB);
+
+  // Store result
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector 128 Conditional Select
+void PPCInterpreter::PPCInterpreterJIT_vsel128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  // vD = (vA & ~vC) | (vB & vC)
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vC = newXMM();
+  x86::Xmm tA = newXMM(); // holds ~vC & vA
+  x86::Xmm tB = newXMM(); // holds vB & vC
+  x86::Xmm vD = newXMM();
+
+  // Load vectors
+  COMP->vmovdqa(vA, VPRPtr(VMX128_VA128));
+  COMP->vmovdqa(vB, VPRPtr(VMX128_VB128));
+  COMP->vmovdqa(vC, VPRPtr(VMX128_VD128));
+
+  // tA = ~vC & vA  -> vpandn dest, src1, src2  => dest = ~src1 & src2
+  COMP->vpandn(tA, vC, vA);
+
+  // tB = vB & vC
+  COMP->vpand(tB, vB, vC);
+
+  // vD = tA | tB
+  COMP->vorps(vD, tA, tB);
+
+  // Store result
+  COMP->vmovdqa(VPRPtr(VMX128_VD128), vD);
 }
 
 //
