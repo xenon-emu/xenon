@@ -226,6 +226,33 @@ void PPCInterpreter::PPCInterpreterJIT_lwzx(sPPEState *ppeState, JITBlockBuilder
   COMP->bind(endLabel);
 }
 
+// Load Word Byte-Reverse Indexed (x'7C00 042C')
+void PPCInterpreter::PPCInterpreterJIT_lwbrx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  Label endLabel = COMP->newLabel();
+  x86::Gp EA = newGP64();
+  x86::Gp data64 = newGP64();
+  x86::Gp exceptReg = newGP16();
+
+  if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.rb));
+  // Invoke the MMU Read
+  InvokeNode *read = nullptr;
+  COMP->invoke(&read, imm((void *)MMURead32), FuncSignature::build<u32, sPPEState *, u64, ePPUThreadID>());
+  read->setArg(0, b->ppeState->Base());
+  read->setArg(1, EA);
+  read->setArg(2, ePPUThread_None);
+  read->setRet(0, data64.r32());
+  // Check for exceptions DStor/DSeg and return if found.
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+  COMP->bswap(data64.r32());
+  COMP->mov(GPRPtr(instr.rd), data64);
+  COMP->bind(endLabel);
+}
+
 // Load Double Word (x'E800 0000')
 void PPCInterpreter::PPCInterpreterJIT_ld(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   Label endLabel = COMP->newLabel();

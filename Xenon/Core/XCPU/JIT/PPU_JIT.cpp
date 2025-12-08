@@ -296,7 +296,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
 
     // Saves a few cycles to cache the value here
     u32 decodedInstr = PPCDecode(opcode);
-    auto emitter = PPCInterpreter::ppcDecoder.getJITTable()[decodedInstr];
+    auto emitter = PPCInterpreter::ppcDecoder.decodeJIT(opcode);
     static thread_local std::unordered_map<u32, u32> opcodeHashCache;
     u32 opName = opcodeHashCache.contains(opcode) ? opcodeHashCache[opcode] : opcodeHashCache[opcode] =
       Base::JoaatStringHash(PPCInterpreter::ppcDecoder.getNameTable()[decodedInstr]);
