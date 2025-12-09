@@ -49,7 +49,7 @@ public:
       } else {
         key = arg + 1;
       }
-      
+
       for (Param *p = First; p; p = p->next) {
         if (p->name == key) {
           if (p->hasValue) {
@@ -141,7 +141,7 @@ public:
       }
     }
   }
-  
+
   template <typename T>
     requires (std::is_integral_v<T> && std::is_unsigned_v<T>)
   T Get(u64 i = 0) const {

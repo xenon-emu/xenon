@@ -5,8 +5,10 @@
 #pragma once
 
 #include <fstream>
+#include <queue>
 #include <thread>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 #ifndef NO_GFX
 #include <SDL3/SDL.h>
@@ -34,24 +36,72 @@ namespace Render {
 
 class GUI;
 
-struct DrawJob {
-  bool indexed = false;
-  Xe::XGPU::XeDrawParams params = {};
-  u32 shaderVS = 0, shaderPS = 0;
-  u64 shaderHash = 0;
+enum class RenderCommandType : u8 {
+  BindShader,
+  UploadBuffer,
+  SetViewport,
+  SetScissor,
+  ClearColor,
+  ClearDepth,
+  Draw,
+  DrawIndexed,
+  CopyResolve,
+  Present
 };
 
-struct BufferLoadJob {
-  BufferLoadJob(const std::string &name, const std::vector<u8> &data, const eBufferType type, const eBufferUsage usage) :
-    name(name), data(data),
-    type(type), usage(usage) {
-    hash = Base::JoaatStringHash(name);
-  }
-  std::string name = {};
-  u32 hash = 0;
-  std::vector<u8> data = {};
-  eBufferType type;
-  eBufferUsage usage;
+struct RenderCommand {
+  RenderCommandType type;
+
+  struct BindShaderCmd {
+    u32 vsHash;
+    u32 psHash;
+  };
+
+  struct UploadBufferCmd {
+    u32 bufferHash;
+    std::vector<u8> data;
+    eBufferType type;
+    eBufferUsage usage;
+  };
+
+  struct ViewportCmd {
+    s32 x, y;
+    u32 w, h;
+  };
+
+  struct ClearColorCmd {
+    u8 r, g, b, a;
+  };
+
+  struct ClearDepthCmd {
+    f32 depth;
+  };
+
+  struct DrawCmd {
+    Xe::XGPU::XeDrawParams params;
+  };
+
+  struct DrawIndexedCmd {
+    Xe::XGPU::XeDrawParams params;
+    Xe::XGPU::XeIndexBufferInfo indexInfo;
+  };
+
+  struct CopyResolveCmd {
+    Xe::XGPU::XenosState *state;
+  };
+
+  using Payload = std::variant<
+    BindShaderCmd,
+    UploadBufferCmd,
+    ViewportCmd,
+    ClearColorCmd,
+    ClearDepthCmd,
+    DrawCmd,
+    DrawIndexedCmd,
+    CopyResolveCmd
+  >;
+
+  Payload payload;
 };
 
 class Renderer {
@@ -93,7 +143,7 @@ public:
 
   bool IssueCopy(Xe::XGPU::XenosState *state);
 
-  void TryLinkShaderPair(u32 vsHash, u32 psHash);
+  Xe::XGPU::XeShader *GetOrCreateShader(u32 vsHash, u32 psHash);
 
   void HandleEvents();
 
@@ -129,40 +179,28 @@ public:
   // Backbuffer texture
   std::unique_ptr<Texture> backbuffer{};
 
-  // Shader texture queue
-  std::mutex drawQueueMutex{};
-  std::vector<DrawJob> previousJobs{};
-  std::queue<DrawJob> drawQueue{};
-
-  // Shader load queue
-  std::mutex bufferQueueMutex{};
-  std::queue<BufferLoadJob> bufferLoadQueue{};
-  std::unordered_map<u64, std::shared_ptr<Buffer>> createdBuffers{};
+  // Command queue
+  std::mutex renderQueueMutex{};
+  std::queue<RenderCommand> renderQueue = {};
 
   // GUI Helpers
   bool DebuggerActive();
 
   void SetDebuggerActive(s8 specificPPU = -1);
 
+  std::unordered_map<u64, std::shared_ptr<Buffer>> createdBuffers{};
+
   // Recompiled shaders
   std::mutex programLinkMutex{};
-  std::unordered_map<u32, std::pair<Xe::Microcode::AST::Shader*, std::vector<u32>>> pendingVertexShaders{};
-  std::unordered_map<u32, std::pair<Xe::Microcode::AST::Shader*, std::vector<u32>>> pendingPixelShaders{};
+  std::unordered_map<u32, std::pair<Xe::Microcode::AST::Shader *, std::vector<u32>>> pendingVertexShaders{};
+  std::unordered_map<u32, std::pair<Xe::Microcode::AST::Shader *, std::vector<u32>>> pendingPixelShaders{};
   std::unordered_map<u64, Xe::XGPU::XeShader> linkedShaderPrograms{};
-  std::atomic<u32> currentVertexShader = 0;
-  u32 pendingVertexShader = 0;
-  std::atomic<u32> currentPixelShader = 0;
-  u32 pendingPixelShader = 0;
-  std::atomic<bool> readyToLink = false;
-  std::atomic<bool> readyForFrame = false;
-  std::mutex copyQueueMutex{};
-  std::queue<Xe::XGPU::XenosState*> copyQueue{};
+  Xe::XGPU::XeShader *activeShader = nullptr;
   // Frame wait
   std::atomic<bool> waiting = false;
   std::atomic<u32> waitTime = 0;
   // Internal swap counter
   std::atomic<u32> swapCount;
-  bool frameReady = false;
 
   // Shaders
   std::shared_ptr<Shader> computeShaderProgram{};

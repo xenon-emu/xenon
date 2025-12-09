@@ -182,18 +182,6 @@ void CommandProcessor::cpExecuteIndirectBuffer(u32 bufferPtr, u32 bufferSize) {
 
 void CommandProcessor::CPSetSQProgramCntl(u32 value) {
   state->programCntl = value;
-
-#ifndef NO_GFX
-  // Update shader hashes
-  u32 vsHash = render->currentVertexShader.load();
-  u32 psHash = render->currentPixelShader.load();
-  
-  if (vsHash && psHash) {
-    render->readyToLink.store(true);
-    render->pendingVertexShader = vsHash;
-    render->pendingPixelShader = psHash;
-  }
-#endif
 }
 
 // Executes a single packet from the ringbuffer.
@@ -202,13 +190,13 @@ bool CommandProcessor::ExecutePacket(RingBuffer *ringBuffer) {
   const u32 packetData = ringBuffer->ReadAndSwap<u32>();
   // Get the packet type.
   const CPPacketType packetType = static_cast<CPPacketType>(packetData >> 30);
-  
+
   // TODO: Check if we should actually return if it's a nul-packet
   if (!packetData) {
     LOG_WARNING(Xenos, "CP[PrimaryBuffer]: found packet with zero data!");
     return true;
   }
-  
+
   if (packetData == 0xCDCDCDCD) {
     LOG_WARNING(Xenos, "CP[PrimaryBuffer]: found packet with uninitialized data!");
     return true;
@@ -235,7 +223,7 @@ bool CommandProcessor::ExecutePacket(RingBuffer *ringBuffer) {
 // Executes a packet type 0. Description is in CPPacketType enum.
 bool CommandProcessor::ExecutePacketType0(RingBuffer *ringBuffer, u32 packetData) {
   const u32 regCount = ((packetData >> 16) & 0x3FFF) + 1;
-  
+
   if (ringBuffer->readCount() < (regCount * sizeof(u32))) {
     LOG_ERROR(Xenos, "CP[ExecutePacketType0]: Data overflow, read count 0x{:X}, registers count 0x{:X})",
       ringBuffer->readCount(), regCount * sizeof(u32));
@@ -243,7 +231,7 @@ bool CommandProcessor::ExecutePacketType0(RingBuffer *ringBuffer, u32 packetData
   }
 
   // Base register to start from.
-  const u32 baseIndex = (packetData & 0x7FFF); 
+  const u32 baseIndex = (packetData & 0x7FFF);
   // Tells wheter the write is to one or multiple regs starting at specified register at base index.
   const u32 singleRegWrite = (packetData >> 15) & 0x1;
 
@@ -294,7 +282,7 @@ bool CommandProcessor::ExecutePacketType3(RingBuffer *ringBuffer, u32 packetData
   const u32 dataCount = ((packetData >> 16) & 0x3FFF) + 1;
   // Get the read offset.
   auto data_start_offset = ringBuffer->readOffset();
-  
+
   if (ringBuffer->readCount() < dataCount * sizeof(u32)) {
     LOG_ERROR(Xenos, "CP[ExecutePacketType3]: Data overflow, read count 0x{:X}, registers count 0x{:X})",
       ringBuffer->readCount(), dataCount * sizeof(u32));
@@ -434,7 +422,7 @@ bool CommandProcessor::ExecutePacketType3_REG_RMW(RingBuffer *ringBuffer, u32 pa
     const u32 andValue = state->ReadRawRegister(andMask & 0x1FFF);
     value &= andValue;
   } else {
-    // & imm  
+    // & imm
     value &= andMask;
   }
 
@@ -577,7 +565,7 @@ public:
     dest->Visit(*exprVisitor);
     src->Visit(*exprVisitor);
   }
-  
+
   virtual void OnConditionPush(Microcode::AST::ExpressionNode::Ptr condition) override final {
     condition->Visit(*exprVisitor);
   }
@@ -654,10 +642,10 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
   u32 dwordCount = size / 4;
   data.resize(dwordCount);
   memcpy(data.data(), addrPtr, size);
-  for (u32 &value : data) { 
+  for (u32 &value : data) {
     value = byteswap_be(value);
   }
-  
+
   fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "cache" };
   std::string typeString = shaderType == Xe::eShaderType::Pixel ? "pixel" : "vertex";
   u32 crc = CRC32::CRC32::calc(reinterpret_cast<const u8 *>(data.data()), data.size() * 4);
@@ -668,22 +656,34 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
     f.close();
   }
 
-  std::pair<Microcode::AST::Shader*, std::vector<u32>> shader = LoadShader(shaderType, data, baseString);
+  std::pair<Microcode::AST::Shader *, std::vector<u32>> shader = LoadShader(shaderType, data, baseString);
 
   switch (shaderType) {
-  case eShaderType::Pixel:{
+  case eShaderType::Vertex:
+  case eShaderType::Pixel: {
 #ifndef NO_GFX
-    render->pendingPixelShaders[crc] = shader;
-    render->currentPixelShader.store(crc);
+    {
+      std::lock_guard<std::mutex> lock(render->programLinkMutex);
+
+      if (shaderType == eShaderType::Pixel)
+        render->pendingPixelShaders[crc] = shader;
+      else
+        render->pendingVertexShaders[crc] = shader;
+    }
+
+    Render::RenderCommand cmd{};
+    cmd.type = Render::RenderCommandType::BindShader;
+    cmd.payload = Render::RenderCommand::BindShaderCmd{
+      .vsHash = (shaderType == eShaderType::Vertex ? crc : 0),
+      .psHash = (shaderType == eShaderType::Pixel  ? crc : 0)
+    };
+    LOG_DEBUG(Xenos, "[CP::IM_LOAD] {}Shader CRC: 0x{:08X}", shaderType == eShaderType::Pixel ? "Pixel" : "Vertex", crc);
+
+    {
+      std::lock_guard<std::mutex> qlock(render->renderQueueMutex);
+      render->renderQueue.push(std::move(cmd));
+    }
 #endif
-    LOG_DEBUG(Xenos, "[CP::IM_LOAD] PixelShader CRC: 0x{:08X}", crc);
-  } break;
-  case eShaderType::Vertex:{
-#ifndef NO_GFX
-    render->pendingVertexShaders[crc] = shader;
-    render->currentVertexShader.store(crc);
-#endif
-    LOG_DEBUG(Xenos, "[CP::IM_LOAD] VertexShader CRC: 0x{:08X}", crc);
   } break;
   case eShaderType::Unknown:
   default: {
@@ -701,7 +701,7 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuff
   const u32 startSize = ringBuffer->ReadAndSwap<u32>();
   const u32 start = startSize >> 16;
   const u64 sizeDwords = (startSize & 0xFFFF);
-  
+
   std::vector<u32> data{};
   data.resize(sizeDwords);
   ringBuffer->Read(data.data(), data.size());
@@ -718,23 +718,36 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuff
     f.write(reinterpret_cast<char *>(data.data()), data.size() * 4);
     f.close();
   }
-  
-  std::pair<Microcode::AST::Shader*, std::vector<u32>> shader = LoadShader(shaderType, data, baseString);
+
+  std::pair<Microcode::AST::Shader *, std::vector<u32>> shader = LoadShader(shaderType, data, baseString);
 
   switch (shaderType) {
-  case eShaderType::Pixel:{
+  case eShaderType::Vertex:
+  case eShaderType::Pixel: {
 #ifndef NO_GFX
-    render->pendingPixelShaders[crc] = shader;
-    render->currentPixelShader.store(crc);
+    {
+      std::lock_guard<std::mutex> lock(render->programLinkMutex);
+
+      if (shaderType == eShaderType::Pixel)
+        render->pendingPixelShaders[crc] = shader;
+      else
+        render->pendingVertexShaders[crc] = shader;
+    }
+
+    Render::RenderCommand cmd{};
+    cmd.type = Render::RenderCommandType::BindShader;
+
+    cmd.payload = Render::RenderCommand::BindShaderCmd{
+      .vsHash = (shaderType == eShaderType::Vertex ? crc : 0),
+      .psHash = (shaderType == eShaderType::Pixel  ? crc : 0)
+    };
+    LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] {}Shader CRC: 0x{:08X}", shaderType == eShaderType::Pixel ? "Pixel" : "Vertex", crc);
+
+    {
+      std::lock_guard<std::mutex> qlock(render->renderQueueMutex);
+      render->renderQueue.push(std::move(cmd));
+    }
 #endif
-    LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] PixelShader CRC: 0x{:08X}", crc);
-  } break;
-  case eShaderType::Vertex:{
-#ifndef NO_GFX
-    render->pendingVertexShaders[crc] = shader;
-    render->currentVertexShader.store(crc);
-#endif
-    LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] VertexShader CRC: 0x{:08X}", crc);
   } break;
   case eShaderType::Unknown:
   default: {
@@ -1065,45 +1078,51 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
     if (modeControl == eModeControl::xeCopy) {
       // Copy to eDRAM, and clear if needed
 #ifndef NO_GFX
+      Render::RenderCommand cmd{};
+      cmd.type = Render::RenderCommandType::CopyResolve;
+      cmd.payload = Render::RenderCommand::CopyResolveCmd{ state };
+
       {
-        std::lock_guard<std::mutex> lock(render->copyQueueMutex);
-        render->copyQueue.push(state);
+        std::lock_guard<std::mutex> lock(render->renderQueueMutex);
+        render->renderQueue.push(cmd);
       }
 #endif
       return true;
     }
-    {
+
+    XeDrawParams params = {};
+    params.state = state;
+    params.indexBufferInfo = indexBufferInfo;
+    params.vgtDrawInitiator = state->vgtDrawInitiator;
+    params.maxVertexIndex = state->maxVertexIndex;
+    params.minVertexIndex = state->minVertexIndex;
+    params.indexOffset = state->indexOffset;
+    params.multiPrimitiveIndexBufferResetIndex = state->multiPrimitiveIndexBufferResetIndex;
+    params.currentBinIdMin = state->currentBinIdMin;
+
 #ifndef NO_GFX
-      std::lock_guard<std::mutex> lock(render->drawQueueMutex);
-      u64 combinedShaderHash = (static_cast<u64>(render->currentVertexShader.load()) << 32) | render->currentPixelShader.load();
-#endif
-      XeDrawParams params = {};
-      params.state = state;
-      params.indexBufferInfo = indexBufferInfo;
-      params.vgtDrawInitiator = state->vgtDrawInitiator;
-      params.maxVertexIndex = state->maxVertexIndex;
-      params.minVertexIndex = state->minVertexIndex;
-      params.indexOffset = state->indexOffset;
-      params.multiPrimitiveIndexBufferResetIndex = state->multiPrimitiveIndexBufferResetIndex;
-      params.currentBinIdMin = state->currentBinIdMin;
-#ifndef NO_GFX
-      Render::DrawJob drawJob = {};
-      drawJob.params = params;
-      drawJob.indexed = isIndexedDraw;
-      drawJob.shaderPS = render->currentPixelShader.load();
-      drawJob.shaderVS = render->currentVertexShader.load();
-      drawJob.shaderHash = combinedShaderHash;
-      // Queue off to the Renderer
-      render->drawQueue.push(drawJob);
-#endif
+    // Queue off to the Renderer
+    Render::RenderCommand cmd{};
+    cmd.type = isIndexedDraw
+      ? Render::RenderCommandType::DrawIndexed
+      : Render::RenderCommandType::Draw;
+
+    if (isIndexedDraw) {
+      cmd.payload = Render::RenderCommand::DrawIndexedCmd{ params, indexBufferInfo };
+    } else {
+      cmd.payload = Render::RenderCommand::DrawCmd{ params };
     }
+
+    {
+      std::lock_guard<std::mutex> lock(render->renderQueueMutex);
+      render->renderQueue.push(std::move(cmd));
+    }
+#endif
 #ifndef NO_GFX
-    LOG_DEBUG(Xenos, "[CP] Draw {}: PrimType {}, IndexCount {}, VS: 0x{:X}, PS: 0x{:X}",
+    LOG_DEBUG(Xenos, "[CP] Draw {}: PrimType {}, IndexCount {}",
       isIndexedDraw ? "Indexed" : "Auto",
       (u32)state->vgtDrawInitiator.primitiveType,
-      state->vgtDrawInitiator.numIndices,
-      render->currentVertexShader.load(),
-      render->currentPixelShader.load());
+      state->vgtDrawInitiator.numIndices);
 #else
     LOG_DEBUG(Xenos, "[CP] Draw {}: PrimType {}, IndexCount {}",
       isIndexedDraw ? "Indexed" : "Auto",
@@ -1122,7 +1141,7 @@ bool CommandProcessor::ExecutePacketType3_DRAW_INDX(RingBuffer *ringBuffer, u32 
   // Initiate fetch of index buffer and draw.
   // Generally used by Xbox 360 Direct3D 9 for kDMA and kAutoIndex sources.
   // With a VIZ Query token as the first one.
-  
+
   u32 dataCountRemaining = dataCount;
 
   if (!dataCountRemaining) {
@@ -1179,7 +1198,31 @@ bool CommandProcessor::ExecutePacketType3_LOAD_ALU_CONSTANT(RingBuffer* ringBuff
     u32 data = 0;
     u8 *dataPtr = ram->GetPointerToAddress(readAddress + n * 4);
     memcpy(&data, dataPtr, sizeof(data));
-    state->WriteRegister(static_cast<XeRegister>(index), data);
+#ifndef NO_GFX
+    Render::RenderCommand cmd{};
+    cmd.type = Render::RenderCommandType::UploadBuffer;
+
+    cmd.payload = Render::RenderCommand::UploadBufferCmd{
+      "ALUConsts"_j,
+      {},
+      Render::eBufferType::Storage,
+      Render::eBufferUsage::DynamicDraw
+    };
+
+    auto &upload = std::get<Render::RenderCommand::UploadBufferCmd>(cmd.payload);
+
+    upload.data.resize(sizeInDwords * 4);
+
+    for (u32 i = 0; i < sizeInDwords; ++i) {
+      u32 v = state->ReadRegister(static_cast<XeRegister>(index - sizeInDwords + i));
+      memcpy(upload.data.data() + i * 4, &v, 4);
+    }
+
+    {
+      std::lock_guard<std::mutex> lock(render->renderQueueMutex);
+      render->renderQueue.push(std::move(cmd));
+    }
+#endif
   }
   return true;
 }

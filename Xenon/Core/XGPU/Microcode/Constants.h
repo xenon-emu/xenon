@@ -260,7 +260,7 @@ typedef enum {
   MARK_VS_FETCH_DONE = 15,
 } instr_cf_opc_t;
 
-inline std::string GetCFOpcodeName(instr_cf_opc_t op) {
+inline constexpr std::string_view GetCFOpcodeName(instr_cf_opc_t op) {
   #define CASE(x) case x: return #x
   switch (op) {
   CASE(NOP);
@@ -273,6 +273,7 @@ inline std::string GetCFOpcodeName(instr_cf_opc_t op) {
   CASE(COND_EXEC_PRED_CLEAN); CASE(COND_EXEC_PRED_CLEAN_END);
   CASE(MARK_VS_FETCH_DONE);
   }
+  #undef CASE
   return {};
 }
 
@@ -386,7 +387,7 @@ union instr_cf_t {
            (opc == COND_EXEC) || (opc == COND_EXEC_END) ||
            (opc == COND_PRED_EXEC) || (opc == COND_PRED_EXEC_END) ||
            (opc == COND_EXEC_PRED_CLEAN) ||
-           (opc == COND_EXEC_PRED_CLEAN_END);    
+           (opc == COND_EXEC_PRED_CLEAN_END);
   }
 
   inline bool is_cond_exec() const {
@@ -562,4 +563,4 @@ static_assert(sizeof(instr_cf_t) == 8, "Invalid size");
 
 #pragma pack(pop)
 
-} // namespace Xe::UCode
+} // namespace Xe
