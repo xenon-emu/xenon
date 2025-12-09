@@ -85,7 +85,7 @@ void OGLRenderer::BackendSDLProperties(SDL_PropertiesID properties) {
   SDL_SetBooleanProperty(properties, SDL_PROP_WINDOW_CREATE_OPENGL_BOOLEAN, true);
 }
 void OGLRenderer::BackendSDLInit() {
-  // Set as a debug context 
+  // Set as a debug context
   SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG));
   // Set OpenGL SDL Properties
   SANITY_CHECK(SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1));

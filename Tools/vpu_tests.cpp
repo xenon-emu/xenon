@@ -4,7 +4,11 @@
 #include "Base/Param.h"
 #include "Base/Types.h"
 #include "Base/Vector128.h"
+#ifdef _MSC_VER
 #include <intrin.h>
+#else
+#include <immintrin.h>
+#endif
 
 Base::Vector128 VR[128]{};
 struct DummyInstr {

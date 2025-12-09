@@ -201,42 +201,50 @@ void Renderer::UpdateConstants(Xe::XGPU::XenosState *state) {
 
   // Boolean shader constants
   {
-    //SHADER_CONSTANT_BOOL_000_031 - SHADER_CONSTANT_BOOL_224_255
+    // SHADER_CONSTANT_BOOL_000_031 - SHADER_CONSTANT_BOOL_224_255
     u32 begin = static_cast<u32>(XeRegister::SHADER_CONSTANT_BOOL_000_031);
     const u64 mask = state->GetDirtyBlock(begin);
     if (mask & 0xFF) {
       u32 *ptr = reinterpret_cast<u32 *>(state->GetRegisterPointer(static_cast<XeRegister>(begin)));
       u32 *dest = &boolConsts.values[begin];
-      memcpy(dest, ptr, sizeof(u32) * 8);
+      std::memcpy(dest, ptr, sizeof(u32) * 8);
     }
   }
 
-  Render::BufferLoadJob floatBufferJob = {
-    "FloatConsts",
-    std::vector<u8>(
-      reinterpret_cast<u8*>(floatConsts.values),
-      reinterpret_cast<u8*>(floatConsts.values) + sizeof(floatConsts.values)
-    ),
-    Render::eBufferType::Storage,
-    Render::eBufferUsage::DynamicDraw
-  };
-  Render::BufferLoadJob boolBufferJob = {
-    "CommonBoolConsts",
-    std::vector<u8>(
-      reinterpret_cast<u8*>(boolConsts.values),
-      reinterpret_cast<u8*>(boolConsts.values) + sizeof(boolConsts.values)
-    ),
-    Render::eBufferType::Storage,
-    Render::eBufferUsage::DynamicDraw
-  };
+  // Upload float constants
+  {
+    RenderCommand cmd{};
+    cmd.type = RenderCommandType::UploadBuffer;
+    cmd.payload = RenderCommand::UploadBufferCmd{
+      "FloatConsts"_j,
+      std::vector<u8>(
+        reinterpret_cast<u8*>(floatConsts.values),
+        reinterpret_cast<u8*>(floatConsts.values) + sizeof(floatConsts.values)
+      ),
+      eBufferType::Storage,
+      eBufferUsage::DynamicDraw
+    };
 
-  {
-    std::lock_guard<std::mutex> lock(bufferQueueMutex);
-    bufferLoadQueue.push(floatBufferJob);
+    std::lock_guard<std::mutex> lock(renderQueueMutex);
+    renderQueue.push(std::move(cmd));
   }
+
+  // Upload bool constants
   {
-    std::lock_guard<std::mutex> lock(bufferQueueMutex);
-    bufferLoadQueue.push(boolBufferJob);
+    RenderCommand cmd{};
+    cmd.type = RenderCommandType::UploadBuffer;
+    cmd.payload = RenderCommand::UploadBufferCmd{
+      "CommonBoolConsts"_j,
+      std::vector<u8>(
+        reinterpret_cast<u8*>(boolConsts.values),
+        reinterpret_cast<u8*>(boolConsts.values) + sizeof(boolConsts.values)
+      ),
+      eBufferType::Storage,
+      eBufferUsage::DynamicDraw
+    };
+
+    std::lock_guard<std::mutex> lock(renderQueueMutex);
+    renderQueue.push(std::move(cmd));
   }
 }
 
@@ -262,10 +270,9 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
   const u32 destPitch = state->copyDestPitch.copyDestPitch;
   const u32 destHeight = state->copyDestPitch.copyDestHeight;
 
-  u64 combinedHash = (static_cast<u64>(currentVertexShader.load()) << 32) | currentPixelShader.load();
-  auto shader = linkedShaderPrograms[combinedHash];
-  if (shader.vertexShader) {
-    for (const auto *fetch : shader.vertexShader->vertexFetches) {
+  Xe::XGPU::XeShader *shader = activeShader;
+  if (shader && shader->vertexShader) {
+    for (const auto *fetch : shader->vertexShader->vertexFetches) {
       u32 fetchSlot = fetch->fetchSlot;
       u32 regBase = static_cast<u32>(XeRegister::SHADER_CONSTANT_FETCH_00_0) + fetchSlot * 2;
 
@@ -295,18 +302,20 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
         ::memcpy(&uploadBytes[i * 4], &w, 4);
       }
 
-      Render::BufferLoadJob fetchBufferJob = {
-        "VertexFetch",
+      RenderCommand cmd{};
+      cmd.type = RenderCommandType::UploadBuffer;
+      cmd.payload = RenderCommand::UploadBufferCmd{
+        "VertexFetch"_j,          // or some hash based on slot/address if you want reuse
         std::move(uploadBytes),
-        Render::eBufferType::Vertex,
-        Render::eBufferUsage::StaticDraw
+        eBufferType::Vertex,
+        eBufferUsage::StaticDraw
       };
+
       {
-        std::lock_guard<std::mutex> lock(bufferQueueMutex);
-        bufferLoadQueue.push(fetchBufferJob);
+        std::lock_guard<std::mutex> lock(renderQueueMutex);
+        renderQueue.push(std::move(cmd));
       }
       LOG_INFO(Xenos, "Uploaded vertex fetch buffer: slot={}, addr=0x{:X}, size={} bytes", fetchSlot, byteAddress, byteSize);
-
     }
   }
   // Clear
@@ -332,116 +341,147 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
   return true;
 }
 
-void Renderer::TryLinkShaderPair(u32 vsHash, u32 psHash) {
+Xe::XGPU::XeShader *Renderer::GetOrCreateShader(u32 vsHash, u32 psHash) {
+  if (!vsHash || !psHash)
+    return nullptr;
+
+  const u64 combinedHash = (static_cast<u64>(vsHash) << 32) | psHash;
+
+  // Fast path: already linked
+  if (auto it = linkedShaderPrograms.find(combinedHash); it != linkedShaderPrograms.end()) {
+    return &it->second;
+  }
+
+  // Slow path: need to link, protect shared maps
+  std::lock_guard<std::mutex> lock(programLinkMutex);
+
+  // Double-check now that we hold the lock
+  if (auto it = linkedShaderPrograms.find(combinedHash); it != linkedShaderPrograms.end()) {
+    return &it->second;
+  }
+
   auto vsIt = pendingVertexShaders.find(vsHash);
   auto psIt = pendingPixelShaders.find(psHash);
 
-  if (vsIt != pendingVertexShaders.end() && psIt != pendingPixelShaders.end()) {
-    u64 combinedHash = (static_cast<u64>(vsHash) << 32) | psHash;
-    std::shared_ptr<Shader> shader = shaderFactory->LoadFromBinary(FMT("VS{:08X}_PS{:08X}", vsHash, psHash), {
-      { Render::eShaderType::Vertex, vsIt->second.second },
+  if (vsIt == pendingVertexShaders.end() || psIt == pendingPixelShaders.end()) {
+    // Shader(s) not ready yet
+    return nullptr;
+  }
+
+  // This is basically the guts of TryLinkShaderPair, but localized
+  std::shared_ptr<Shader> shader = shaderFactory->LoadFromBinary(
+    FMT("VS{:08X}_PS{:08X}", vsHash, psHash),
+    {
+      { Render::eShaderType::Vertex,   vsIt->second.second },
       { Render::eShaderType::Fragment, psIt->second.second }
-    });
+    }
+  );
 
-    if (shader) {
-      Xe::XGPU::XeShader xeShader{};
-      xeShader.program = std::move(shader);
-      xeShader.pixelShader = psIt->second.first;
-      xeShader.pixelShaderHash = psIt->first;
-      xeShader.vertexShader = vsIt->second.first;
-      xeShader.vertexShaderHash = vsIt->first;
+  if (!shader) {
+    LOG_ERROR(Xenos, "Failed to link shader program 0x{:08X}_0x{:08X}", vsHash, psHash);
+    return nullptr;
+  }
 
-      // Create texture handles
-      for (u64 i = 0; i != xeShader.pixelShader->usedTextures.size(); ++i)
-        xeShader.textures.push_back(resourceFactory->CreateTexture());
-      for (u64 i = 0; i != xeShader.vertexShader->usedTextures.size(); ++i)
-        xeShader.textures.push_back(resourceFactory->CreateTexture());
-      for (auto &texture : xeShader.textures)
-        texture->CreateTextureHandle(width, height, GetXenosFlags());
+  Xe::XGPU::XeShader xeShader{};
+  xeShader.program = std::move(shader);
+  xeShader.pixelShader = psIt->second.first;
+  xeShader.pixelShaderHash = psIt->first;
+  xeShader.vertexShader = vsIt->second.first;
+  xeShader.vertexShaderHash = vsIt->first;
 
-      if (xeShader.vertexShader) {
-        // Bind VAO once for this shader program's attributes setup.
-        // Assuming OnBind creates/binds an appropriate VAO for the current context/shader.
-        OnBind();
+  // Create texture handles
+  for (u64 i = 0; i != xeShader.pixelShader->usedTextures.size(); ++i)
+    xeShader.textures.push_back(resourceFactory->CreateTexture());
+  for (u64 i = 0; i != xeShader.vertexShader->usedTextures.size(); ++i)
+    xeShader.textures.push_back(resourceFactory->CreateTexture());
+  for (auto &texture : xeShader.textures)
+    texture->CreateTextureHandle(width, height, GetXenosFlags());
 
-        for (const auto &[fetch_key, location] : xeShader.vertexShader->attributeLocationMap) {
-          // Find the original full fetch definition from the shader's list
-          const Xe::Microcode::AST::VertexFetch *fetch = nullptr;
-          for (const auto *f : xeShader.vertexShader->vertexFetches) {
-            if (f->fetchSlot == fetch_key.slot && f->fetchOffset == fetch_key.offset && f->fetchStride == fetch_key.stride) {
-              fetch = f;
-              break;
-            }
-          }
-          if (!fetch)
-            continue;
+  // Vertex attrib setup
+  if (xeShader.vertexShader) {
+    OnBind(); // bind VAO / context-specific stuff
 
-          u32 fetchSlot = fetch->fetchSlot;
-          u32 regBase = static_cast<u32>(XeRegister::SHADER_CONSTANT_FETCH_00_0) + fetchSlot * 2;
-
-          Xe::ShaderConstantFetch fetchData{};
-          for (u32 i = 0; i != 6; ++i)
-            fetchData.rawHex[i] = byteswap_be<u32>(XeMain::xenos->xenosState->ReadRegister(static_cast<XeRegister>(regBase + i)));
-
-          if (fetchData.Vertex[0].Type == Xe::eConstType::Texture) {
-              // Texture fetches for vertex shaders are currently skipped as per original code.
-            continue;
-          } else if (fetchData.Vertex[0].Type == Xe::eConstType::Vertex) {
-            u32 fetchAddress = fetchData.Vertex[0].BaseAddress << 2;
-            u32 fetchSize = fetchData.Vertex[0].Size << 2;
-
-            u8 *data = ramPointer->GetPointerToAddress(fetchAddress);
-            if (!data) {
-              LOG_WARNING(Xenos, "VertexFetch: Invalid memory for slot {} (addr=0x{:X})", fetchSlot, fetchAddress);
-              continue;
-            }
-
-            const size_t wordCount = fetchSize / 4;
-            std::vector<u32> rawWords(wordCount);
-
-            memcpy(rawWords.data(), data, wordCount * sizeof(u32));
-            std::vector<f32> dataVec;
-            dataVec.resize(wordCount);
-            for (u64 i = 0; i != wordCount; ++i) {
-              dataVec[i] = std::bit_cast<f32, u32>(rawWords[i]);
-            }
-
-            u64 bufferKey = (static_cast<u64>(fetchAddress) << 32) | fetchSize;
-
-            std::shared_ptr<Buffer> buffer = nullptr;
-            auto it = createdBuffers.find(bufferKey);
-            if (it != createdBuffers.end()) {
-              buffer = it->second;
-              if (buffer->GetSize() < fetchSize) {
-                buffer->DestroyBuffer();
-                buffer->CreateBuffer(static_cast<u32>(fetchSize), dataVec.data(), Render::eBufferUsage::StaticDraw, Render::eBufferType::Vertex);
-              } else {
-                buffer->UpdateBuffer(0, static_cast<u32>(fetchSize), dataVec.data());
-              }
-            } else {
-              buffer = resourceFactory->CreateBuffer();
-              buffer->CreateBuffer(static_cast<u32>(fetchSize), dataVec.data(), Render::eBufferUsage::StaticDraw, Render::eBufferType::Vertex);
-              createdBuffers.insert({ bufferKey, buffer });
-            }
-
-            // Bind the buffer to the current VAO
-            buffer->Bind();
-
-            // Setup vertex attributes for this fetch.
-            const u32 components = fetch->GetComponentCount();
-            const u32 offset = fetch->fetchOffset * 4;
-            const u32 stride = fetch->fetchStride * 4;
-            VertexFetch(location, components, fetch->isFloat, fetch->isNormalized, offset, stride);
-          }
+    for (const auto &[fetch_key, location] : xeShader.vertexShader->attributeLocationMap) {
+      const Xe::Microcode::AST::VertexFetch *fetch = nullptr;
+      for (const auto *f : xeShader.vertexShader->vertexFetches) {
+        if (f->fetchSlot   == fetch_key.slot &&
+            f->fetchOffset == fetch_key.offset &&
+            f->fetchStride == fetch_key.stride) {
+          fetch = f;
+          break;
         }
       }
+      if (!fetch)
+        continue;
 
-      linkedShaderPrograms[combinedHash] = xeShader;
-      //LOG_DEBUG(Xenos, "Linked shader program 0x{:016X} (VS:0x{:08X}, PS:0x{:08X})", combinedHash, vsHash, psHash);
-    } else {
-      LOG_ERROR(Xenos, "Failed to link shader program 0x{:016X} (VS:0x{:08X}, PS:0x{:08X})", combinedHash, vsHash, psHash);
+      u32 fetchSlot = fetch->fetchSlot;
+      u32 regBase   = static_cast<u32>(XeRegister::SHADER_CONSTANT_FETCH_00_0) + fetchSlot * 2;
+
+      Xe::ShaderConstantFetch fetchData{};
+      for (u32 i = 0; i != 6; ++i)
+        fetchData.rawHex[i] = byteswap_be<u32>(
+          XeMain::xenos->xenosState->ReadRegister(static_cast<XeRegister>(regBase + i))
+        );
+
+      if (fetchData.Vertex[0].Type == Xe::eConstType::Texture) {
+        // Vertex shader texture fetches skipped for now
+        continue;
+      } else if (fetchData.Vertex[0].Type == Xe::eConstType::Vertex) {
+        u32 fetchAddress = fetchData.Vertex[0].BaseAddress << 2;
+        u32 fetchSize    = fetchData.Vertex[0].Size        << 2;
+
+        u8 *data = ramPointer->GetPointerToAddress(fetchAddress);
+        if (!data) {
+          LOG_WARNING(Xenos, "VertexFetch: Invalid memory for slot {} (addr=0x{:X})",
+                      fetchSlot, fetchAddress);
+          continue;
+        }
+
+        const u64 wordCount = fetchSize / 4;
+        std::vector<u32> rawWords(wordCount);
+        memcpy(rawWords.data(), data, wordCount * sizeof(u32));
+
+        std::vector<f32> dataVec;
+        dataVec.resize(wordCount);
+        for (u64 i = 0; i != wordCount; ++i) {
+          dataVec[i] = std::bit_cast<f32, u32>(rawWords[i]);
+        }
+
+        u64 bufferKey = (static_cast<u64>(fetchAddress) << 32) | fetchSize;
+
+        std::shared_ptr<Buffer> buffer = nullptr;
+        auto it = createdBuffers.find(bufferKey);
+        if (it != createdBuffers.end()) {
+          buffer = it->second;
+          if (buffer->GetSize() < fetchSize) {
+            buffer->DestroyBuffer();
+            buffer->CreateBuffer(static_cast<u32>(fetchSize), dataVec.data(),
+                                 Render::eBufferUsage::StaticDraw, Render::eBufferType::Vertex);
+          } else {
+            buffer->UpdateBuffer(0, static_cast<u32>(fetchSize), dataVec.data());
+          }
+        } else {
+          buffer = resourceFactory->CreateBuffer();
+          buffer->CreateBuffer(static_cast<u32>(fetchSize), dataVec.data(),
+                               Render::eBufferUsage::StaticDraw, Render::eBufferType::Vertex);
+          createdBuffers.insert({ bufferKey, buffer });
+        }
+
+        // Bind the buffer to the current VAO
+        buffer->Bind();
+
+        const u32 components = fetch->GetComponentCount();
+        const u32 offset = fetch->fetchOffset * 4;
+        const u32 stride = fetch->fetchStride * 4;
+        VertexFetch(location, components, fetch->isFloat, fetch->isNormalized, offset, stride);
+      }
     }
   }
+
+  auto [it, inserted] =
+    linkedShaderPrograms.emplace(combinedHash, std::move(xeShader));
+
+  return &it->second;
 }
 
 void Renderer::Thread() {
@@ -461,52 +501,6 @@ void Renderer::Thread() {
     if (!threadRunning)
       break;
 
-    // Buffer load
-    {
-      std::lock_guard<std::mutex> lock(bufferQueueMutex);
-      while (!bufferLoadQueue.empty()) {
-        BufferLoadJob job = bufferLoadQueue.front();
-        bufferLoadQueue.pop();
-
-        auto &bufferEntry = createdBuffers[job.hash];
-        if (bufferEntry) {
-          bufferEntry->UpdateBuffer(0, static_cast<u32>(job.data.size()), job.data.data());
-#ifdef XE_DEBUG
-          LOG_DEBUG(Xenos, "Updated buffer '{}', size: {}", job.name, job.data.size());
-#endif
-        } else {
-          bufferEntry = resourceFactory->CreateBuffer();
-          bufferEntry->CreateBuffer(static_cast<u32>(job.data.size()), job.data.data(), job.usage, job.type);
-#ifdef XE_DEBUG
-          LOG_DEBUG(Xenos, "Created buffer '{}', size: {}", job.name, job.data.size());
-#endif
-        }
-      }
-    }
-
-    if (readyToLink.load()) {
-      const bool hasVS = pendingVertexShaders.contains(pendingVertexShader);
-      const bool hasPS = pendingPixelShaders.contains(pendingPixelShader);
-
-      if (hasVS && hasPS) {
-        u64 combined = (static_cast<u64>(pendingVertexShader) << 32) | pendingPixelShader;
-#ifdef XE_DEBUG
-        LOG_DEBUG(Xenos, "Linking VS: 0x{:08X}, PS: 0x{:08X}", pendingVertexShader, pendingPixelShader);
-#endif
-        TryLinkShaderPair(pendingVertexShader, pendingPixelShader);
-        readyToLink.store(false);
-      }
-    }
-
-    // Copy job
-    {
-      std::lock_guard<std::mutex> lock(copyQueueMutex);
-      if (!copyQueue.empty()) {
-        IssueCopy(copyQueue.front());
-        copyQueue.pop();
-      }
-    }
-
     // Clear the display
     if (XeMain::xenos)
       Clear();
@@ -516,7 +510,7 @@ void Renderer::Thread() {
         fbPointer = ramPointer->GetPointerToAddress(XeMain::xenos->GetSurface());
         const u32 *ui_fbPointer = reinterpret_cast<const u32 *>(fbPointer);
         pixelSSBO->UpdateBuffer(0, pitch, ui_fbPointer);
-    
+
         if (computeShaderProgram.get()) {
           computeShaderProgram->Bind();
           pixelSSBO->Bind();
@@ -537,31 +531,68 @@ void Renderer::Thread() {
           renderShaderPrograms->Unbind();
         }
       }
-    
-      // Frame sync
-      std::vector<DrawJob> currentFrameJobs;
-      {
-        std::lock_guard<std::mutex> lock(drawQueueMutex);
-        while (!drawQueue.empty()) {
-          currentFrameJobs.push_back(std::move(drawQueue.front()));
-          drawQueue.pop();
+    }
+
+    std::vector<RenderCommand> frameCommands;
+    {
+      std::lock_guard<std::mutex> lock(renderQueueMutex);
+      while (!renderQueue.empty()) {
+        frameCommands.push_back(std::move(renderQueue.front()));
+        renderQueue.pop();
+      }
+    }
+
+    for (auto &cmd : frameCommands) {
+      switch (cmd.type) {
+        case RenderCommandType::BindShader: {
+          auto &c = std::get<RenderCommand::BindShaderCmd>(cmd.payload);
+          activeShader = GetOrCreateShader(c.vsHash, c.psHash);
+          break;
         }
-      }
-    
-      if (!currentFrameJobs.empty()) {
-        previousJobs = std::move(currentFrameJobs);
-      }
-    
-      for (const auto &drawJob : previousJobs) {
-        u64 combinedHash = (static_cast<u64>(drawJob.shaderVS) << 32) | drawJob.shaderPS;
-        auto shaderIt = linkedShaderPrograms.find(combinedHash);
-        if (shaderIt != linkedShaderPrograms.end() && shaderIt->second.program) {
-          shaderIt->second.program->Bind();
-          if (drawJob.indexed) {
-            DrawIndexed(shaderIt->second, drawJob.params, drawJob.params.indexBufferInfo);
+
+        case RenderCommandType::UploadBuffer: {
+          auto &c = std::get<RenderCommand::UploadBufferCmd>(cmd.payload);
+
+          auto &buffer = createdBuffers[c.bufferHash];
+          if (!buffer) {
+            buffer = resourceFactory->CreateBuffer();
+            buffer->CreateBuffer(c.data.size(), c.data.data(), c.usage, c.type);
           } else {
-            Draw(shaderIt->second, drawJob.params);
+            buffer->UpdateBuffer(0, c.data.size(), c.data.data());
           }
+          break;
+        }
+
+        case RenderCommandType::CopyResolve: {
+          auto &c = std::get<RenderCommand::CopyResolveCmd>(cmd.payload);
+          IssueCopy(c.state);
+          break;
+        }
+
+        case RenderCommandType::ClearColor: {
+          auto &c = std::get<RenderCommand::ClearColorCmd>(cmd.payload);
+          UpdateClearColor(c.r, c.g, c.b, c.a);
+          break;
+        }
+
+        case RenderCommandType::ClearDepth: {
+          auto &c = std::get<RenderCommand::ClearDepthCmd>(cmd.payload);
+          UpdateClearDepth(c.depth);
+          break;
+        }
+
+        case RenderCommandType::Draw: {
+          auto &c = std::get<RenderCommand::DrawCmd>(cmd.payload);
+          if (activeShader && activeShader->program)
+            Draw(*activeShader, c.params);
+          break;
+        }
+
+        case RenderCommandType::DrawIndexed: {
+          auto &c = std::get<RenderCommand::DrawIndexedCmd>(cmd.payload);
+          if (activeShader && activeShader->program)
+            DrawIndexed(*activeShader, c.params, c.indexInfo);
+          break;
         }
       }
     }

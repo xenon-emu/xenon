@@ -23,7 +23,7 @@
     pkgs = pkgsLut.${system};
   in {
     packages = {
-      inherit (pkgs) default xenon xenon-cli xenon-static xenon-cli-static;
+      inherit (pkgs) default xenon xenon-tools xenon-cli xenon-static xenon-tools-static xenon-cli-static;
     };
     hydraJobs = {
       inherit (self) packages;
@@ -44,9 +44,11 @@
       xenon = self.callPackage ./xenon.nix {};
     in {
       xenon-static = (self.extend staticOverlay).pkgsStatic.xenon;
+      xenon-tools-static = (self.extend staticOverlay).pkgsStatic.xenon-tools;
       xenon-cli-static = (self.extend staticOverlay).pkgsStatic.xenon-cli;
       default = xenon;
       inherit xenon;
+      xenon-tools = self.callPackage ./xenon-tools.nix {};
       xenon-cli = self.callPackage ./xenon.nix { withGraphics = false; };
     };
     nix.settings = {
