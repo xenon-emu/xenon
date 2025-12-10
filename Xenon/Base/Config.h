@@ -276,6 +276,21 @@ enum class eConsoleRevision : const u8 {
 };
 
 //
+// USB Passthrough
+//
+inline struct _usb {
+  // Enable USB passthrough
+  bool enablePassthrough = false;
+  // List of devices to passthrough (format: "VID:PID", e.g., "045E:028E" for Xbox 360 controller)
+  std::vector<std::string> passthroughDevices = {};
+
+  // TOML Conversion
+  void to_toml(toml::value &value);
+  void from_toml(const toml::value &value);
+  bool verify_toml(toml::value &value);
+} usb;
+
+//
 // Highly experimental (things that can either break the emulator or drastically increase performance)
 //
 inline struct _highlyExperimental {

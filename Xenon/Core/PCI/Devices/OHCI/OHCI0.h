@@ -4,17 +4,17 @@
 
 #pragma once
 
-#include "Core/PCI/PCIDevice.h"
-#include "Core/PCI/Devices/OHCI/OHCI.h"
+#include "OHCI.h"
 
 namespace Xe {
 namespace PCIDev {
 
-class OHCI0 : public Xe::PCIDev::OHCI {
+// OHCI Controller 0 - 4 ports
+// This controller is typically used for Xbox 360 controllers and accessories
+class OHCI0 : public OHCI {
 public:
   OHCI0(const std::string &deviceName, u64 size);
-
-private:
+  ~OHCI0() override = default;
 };
 
 } // namespace PCIDev

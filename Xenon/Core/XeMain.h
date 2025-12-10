@@ -21,6 +21,7 @@
 #include "Core/PCI/Devices/ODD/ODD.h"
 #include "Core/PCI/Devices/OHCI/OHCI0.h"
 #include "Core/PCI/Devices/OHCI/OHCI1.h"
+#include "Core/PCI/Devices/OHCI/USBPassthrough.h"
 #include "Core/PCI/Devices/SFCX/SFCX.h"
 #include "Core/PCI/Devices/SMC/SMC.h"
 #include "Core/PCI/Devices/XMA/XMA.h"
@@ -51,6 +52,13 @@ extern void LoadConfig();
 extern void CreateBridges();
 extern void CreatePCIDevices(RAM *ram);
 extern void CreateRootBus();
+
+// USB Passthrough helpers
+extern void AttachConfiguredUSBDevices();
+extern bool AttachUSBDevice(u16 vendorId, u16 productId);
+extern bool DetachUSBDevice(u16 vendorId, u16 productId);
+extern std::vector<Xe::PCIDev::USBDeviceInfo> EnumerateUSBDevices();
+extern std::vector<Xe::PCIDev::USBDeviceInfo> GetAttachedUSBDevices();
 
 extern Xe::XCPU::XenonCPU *GetCPU();
 

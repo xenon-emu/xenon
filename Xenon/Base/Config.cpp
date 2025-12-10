@@ -443,6 +443,44 @@ bool _log::verify_toml(toml::value &value) {
   return true;
 }
 
+void _usb::from_toml(const toml::value &value) {
+  enablePassthrough = toml::find_or<bool>(value, "EnablePassthrough", enablePassthrough);
+  if (value.contains("PassthroughDevices")) {
+    const auto& devices = value.at("PassthroughDevices");
+    if (devices.is_array()) {
+      passthroughDevices.clear();
+      for (const auto& dev : devices.as_array()) {
+        if (dev.is_string()) {
+      passthroughDevices.push_back(dev.as_string());
+        }
+      }
+    }
+  }
+}
+void _usb::to_toml(toml::value &value) {
+  value["EnablePassthrough"].comments().clear();
+  value["EnablePassthrough"] = enablePassthrough;
+  value["EnablePassthrough"].comments().push_back("# Enable USB device passthrough to the emulated Xbox 360");
+  value["EnablePassthrough"].comments().push_back("# Requires WinUSB driver installed on the device (use Zadig)");
+  value["PassthroughDevices"].comments().clear();
+  toml::array devArray;
+  for (const auto& dev : passthroughDevices) {
+    devArray.push_back(dev);
+  }
+  value["PassthroughDevices"] = devArray;
+  value["PassthroughDevices"].comments().push_back("# List of USB devices to passthrough");
+  value["PassthroughDevices"].comments().push_back("# Format: \"VID:PID\" (hexadecimal, e.g., \"045E:028E\" for Xbox 360 Controller)");
+  value["PassthroughDevices"].comments().push_back("# Use Device Manager or USBDeview to find VID/PID");
+}
+bool _usb::verify_toml(toml::value &value) {
+  to_toml(value);
+  cache_value(enablePassthrough);
+  cache_value(passthroughDevices);
+  from_toml(value);
+  verify_value(enablePassthrough);
+  return true;
+}
+
 void _highlyExperimental::from_toml(const toml::value &value) {
   s32 tmpConsoleRevison = static_cast<s32>(consoleRevison);
   tmpConsoleRevison = toml::find_or<s32&>(value, "ConsoleRevison", tmpConsoleRevison);
@@ -493,6 +531,7 @@ bool verifyConfig(const fs::path &path, toml::value &data) {
   verify_section(filepaths, Paths);
   verify_section(debug, Debug);
   verify_section(log, Log);
+  verify_section(usb, USB);
   verify_section(highlyExperimental, HighlyExperimental);
   return true;
 }
@@ -522,6 +561,7 @@ void loadConfig(const fs::path &path) {
   read_section(filepaths, Paths);
   read_section(debug, Debug);
   read_section(log, Log);
+  read_section(usb, USB);
   read_section(highlyExperimental, HighlyExperimental);
 }
 
