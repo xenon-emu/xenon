@@ -307,8 +307,8 @@ namespace PPCInterpreter {
     // Group 0x3B opcodes (field 21..30)
     fillTable<instructionHandlerJIT>(jitTable, 0x3B, 10, 1, {
       //{ 0x12, GETRC(fdivs), 5 },
-      //{ 0x14, GETRC(fsubs), 5 },
-      //{ 0x15, GETRC(fadds), 5 },
+      { 0x14, GETRC(fsubs), 5 },
+      { 0x15, GETRC(fadds), 5 },
       //{ 0x16, GETRC(fsqrts), 5 },
       //{ 0x18, GETRC(fres), 5 },
       //{ 0x19, GETRC(fmuls), 5 },
@@ -337,8 +337,8 @@ namespace PPCInterpreter {
       //{ 0x00F, GETRC(fctiwz) },
 
       //{ 0x012, GETRC(fdiv), 5 },
-      //{ 0x014, GETRC(fsub), 5 },
-      //{ 0x015, GETRC(fadd), 5 },
+      { 0x014, GETRC(fsub), 5 },
+      { 0x015, GETRC(fadd), 5 },
       //{ 0x016, GETRC(fsqrt), 5 },
       //{ 0x017, GETRC(fsel), 5 },
       //{ 0x019, GETRC(fmul), 5 },

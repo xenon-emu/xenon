@@ -700,6 +700,21 @@ extern void PPCInterpreterJIT_stdux(sPPEState *ppeState, JITBlockBuilder *b, uPP
 extern void PPCInterpreterJIT_stdx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 
 //
+// FPU JIT emitters
+//
+
+extern void PPCInterpreterJIT_faddx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_faddsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_fsubx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_fsubsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_fmulx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_fmulsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_fmaddx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_fmaddsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_fnmaddx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_fnmaddsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+
+//
 // VXU JIT emitters
 //
 
