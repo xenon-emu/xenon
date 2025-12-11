@@ -236,7 +236,9 @@ void XeMain::CreatePCIDevices(RAM *ram) {
   ohci1 = std::make_shared<STRIP_UNIQUE(ohci1)>("OHCI1", OHCI_DEV_SIZE);
   // Set RAM pointer for USB DMA operations
   ohci0->SetRAM(ram);
+  ohci0->SetPCIBridge(pciBridge.get());
   ohci1->SetRAM(ram);
+  ohci1->SetPCIBridge(pciBridge.get());
   pciBridge->AddPCIDevice(ohci0);
   pciBridge->AddPCIDevice(ohci1);
 
