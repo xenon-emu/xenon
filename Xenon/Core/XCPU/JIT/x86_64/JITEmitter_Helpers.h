@@ -38,6 +38,13 @@ using namespace asmjit;
 #define EXPtr() b->threadCtx->scalar(&sPPUThread::exceptReg) 
 #define LRPtr() SPRPtr(LR)
 
+// XER CA bit position (platform-dependent)
+#ifdef __LITTLE_ENDIAN__
+  constexpr u32 XER_CA_BIT = 29;
+#else
+  constexpr u32 XER_CA_BIT = 2;
+#endif
+
 inline x86::Gp Jrotl32(JITBlockBuilder *b, x86::Mem x, u32 n) {
   x86::Gp tmp = newGP32();
   COMP->mov(tmp, x); // Cast value to 32 bit register
@@ -91,7 +98,6 @@ inline x86::Gp J_BuildCRU(JITBlockBuilder *b, x86::Gp lhs, x86::Gp rhs) {
   COMP->bind(end);
 
   // SO bit (summary overflow)
-  // TODO: Check this.
 #ifdef __LITTLE_ENDIAN__
   COMP->mov(tmp.r32(), SPRPtr(XER));
   COMP->shr(tmp.r32(), imm(31));
@@ -99,10 +105,10 @@ inline x86::Gp J_BuildCRU(JITBlockBuilder *b, x86::Gp lhs, x86::Gp rhs) {
   COMP->mov(tmp.r32(), SPRPtr(XER));
   COMP->and_(tmp.r32(), imm(1));
 #endif
-COMP->shl(tmp, imm(3 - CR_BIT_SO));
-COMP->or_(crValue.r8(), tmp.r8());
+  COMP->shl(tmp, imm(3 - CR_BIT_SO));
+  COMP->or_(crValue.r8(), tmp.r8());
 
-return crValue;
+  return crValue;
 }
 
 // CR Signed comparison. Uses x86's JG and JL.
@@ -141,7 +147,6 @@ inline x86::Gp J_BuildCRS(JITBlockBuilder* b, x86::Gp lhs, x86::Gp rhs) {
   COMP->bind(end);
 
   // SO bit (summary overflow)
-  // TODO: Check this.
 #ifdef __LITTLE_ENDIAN__
   COMP->mov(tmp.r32(), SPRPtr(XER));
   COMP->shr(tmp.r32(), imm(31));
@@ -160,9 +165,9 @@ inline x86::Gp J_BuildCRS(JITBlockBuilder* b, x86::Gp lhs, x86::Gp rhs) {
 inline void J_SetCRField(JITBlockBuilder *b, x86::Gp field, u32 index) {
   // Temp storage for the CR current value.
   x86::Gp tempCR = newGP32();
-  // Shift formula
-  u32 sh = (7 - index) * 4;
-  uint32_t clearMask = ~(0xF << sh);
+  // Shift formula - computed at compile time
+  const u32 sh = (7 - index) * 4;
+  const u32 clearMask = ~(0xFu << sh);
 
   // Load CR value to temp storage.
   COMP->mov(tempCR, CRValPtr());
@@ -232,12 +237,12 @@ inline void J_ppuSetCR(JITBlockBuilder *b, x86::Gp value, u32 index) {
     x86::Gp zero32 = newGP32();
     COMP->xor_(zero32, zero32);
     x86::Gp field = J_BuildCRS(b, value.r32(), zero32);
-    J_SetCRField(b, field, index);
+  J_SetCRField(b, field, index);
     COMP->jmp(done);
   }
 
   // 64-bit compare
-  COMP->bind(use64);
+COMP->bind(use64);
   {
     x86::Gp zero64 = newGP64();
     COMP->xor_(zero64, zero64);
@@ -281,19 +286,11 @@ inline void J_AddDidCarrySetCarry(JITBlockBuilder* b, x86::Gp a, x86::Gp result)
   COMP->bind(resultCheck);
   COMP->jl(setTrue);
 
-#ifdef __LITTLE_ENDIAN__
-  COMP->btr(xer, 29); // Clear XER[CA] bit.
-#else
-  COMP->btr(xer, 2); // Clear XER[CA] bit.
-#endif // LITTLE_ENDIAN
+  COMP->btr(xer, XER_CA_BIT); // Clear XER[CA] bit.
   COMP->jmp(done);
 
   COMP->bind(setTrue);
-#ifdef __LITTLE_ENDIAN__
-  COMP->bts(xer, 29); // Set XER[CA] bit.
-#else
-  COMP->bts(xer, 2); // Set XER[CA] bit.
-#endif // LITTLE_ENDIAN
+  COMP->bts(xer, XER_CA_BIT); // Set XER[CA] bit.
 
   COMP->bind(done);
   // Set XER[CA] value.
@@ -310,7 +307,7 @@ inline void TrapCheck(JITBlockBuilder* b, x86::Gp ra, x86::Gp rb, u32 TO) {
   // if (a < unsigned b) & TO[3] then TRAP
   // if (a > unsigned b) & TO[4] then TRAP
 
-  // Check TO
+  // Check TO - early exit if no conditions to check
   if (!TO) { return; }
 
   Label end = COMP->newLabel();
@@ -319,12 +316,13 @@ inline void TrapCheck(JITBlockBuilder* b, x86::Gp ra, x86::Gp rb, u32 TO) {
   // Compare our values
   COMP->cmp(ra, rb);
 
+  // Generate conditional jumps only for enabled conditions
   if (TO & (1 << 4)) {
-    // a < b
+    // a < b (signed)
     COMP->jl(doTrap);
   }
   if (TO & (1 << 3)) {
-    // a > b
+    // a > b (signed)
     COMP->jg(doTrap);
   }
   if (TO & (1 << 2)) {
@@ -332,19 +330,19 @@ inline void TrapCheck(JITBlockBuilder* b, x86::Gp ra, x86::Gp rb, u32 TO) {
     COMP->je(doTrap);
   }
   if (TO & (1 << 1)) {
-    // a <u b
-    COMP->jb(doTrap);
+    // a <u b (unsigned)
+ COMP->jb(doTrap);
   }
   if (TO & (1 << 0)) {
-    // a >u b
+  // a >u b (unsigned)
     COMP->ja(doTrap);
   }
 
-  // Invalid, nothing to do.
+  // No trap condition met, skip to end
   COMP->jmp(end);
 
   // Trap was valid, invoke our trap handler.
-  COMP->bind(doTrap);
+COMP->bind(doTrap);
 #ifdef FAST_TRAP
   // Faster path for trap processing, directly raise exception and set exception type.
   x86::Gp exceptReg = newGP16();
