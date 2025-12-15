@@ -234,14 +234,8 @@ void XeMain::CreatePCIDevices(RAM *ram) {
   LOG_INFO(Xenon, "Creating PCI Devices...");
   ohci0 = std::make_shared<STRIP_UNIQUE(ohci0)>("OHCI0", OHCI_DEV_SIZE);
   ohci1 = std::make_shared<STRIP_UNIQUE(ohci1)>("OHCI1", OHCI_DEV_SIZE);
-  // Set RAM pointer for USB DMA operations
-  ohci0->SetRAM(ram);
-  ohci1->SetRAM(ram);
   pciBridge->AddPCIDevice(ohci0);
   pciBridge->AddPCIDevice(ohci1);
-
-  // Attach configured USB passthrough devices
-  AttachConfiguredUSBDevices();
 
   ehci0 = std::make_shared<STRIP_UNIQUE(ehci0)>("EHCI0", EHCI_DEV_SIZE);
   ehci1 = std::make_shared<STRIP_UNIQUE(ehci1)>("EHCI1", EHCI_DEV_SIZE);
@@ -273,88 +267,6 @@ void XeMain::CreatePCIDevices(RAM *ram) {
   pciBridge->AddPCIDevice(smcCore);
 
   sfcx->Start();
-}
-
-void XeMain::AttachConfiguredUSBDevices() {
-  if (!Config::usb.enablePassthrough) {
-    LOG_INFO(Xenon, "USB passthrough disabled in config");
-    return;
-  }
-
-  LOG_INFO(Xenon, "Attaching configured USB passthrough devices...");
-
-  for (const auto& deviceStr : Config::usb.passthroughDevices) {
-    // Parse VID:PID format (e.g., "045E:028E")
-    size_t colonPos = deviceStr.find(':');
-    if (colonPos == std::string::npos || colonPos == 0 || colonPos == deviceStr.length() - 1) {
-  LOG_WARNING(Xenon, "Invalid USB device format '{}', expected 'VID:PID'", deviceStr);
-      continue;
-    }
-
-try {
-      std::string vidStr = deviceStr.substr(0, colonPos);
-      std::string pidStr = deviceStr.substr(colonPos + 1);
-
-      u16 vid = static_cast<u16>(std::stoul(vidStr, nullptr, 16));
-      u16 pid = static_cast<u16>(std::stoul(pidStr, nullptr, 16));
-
-      if (AttachUSBDevice(vid, pid)) {
-        LOG_INFO(Xenon, "Attached USB device {:04X}:{:04X}", vid, pid);
-      } else {
-        LOG_WARNING(Xenon, "Failed to attach USB device {:04X}:{:04X}", vid, pid);
-      }
-    } catch (const std::exception& e) {
-      LOG_ERROR(Xenon, "Failed to parse USB device '{}': {}", deviceStr, e.what());
-    }
-  }
-}
-
-bool XeMain::AttachUSBDevice(u16 vendorId, u16 productId) {
-  // Try OHCI0 first, then OHCI1
-  if (ohci0 && ohci0->AttachUSBDevice(vendorId, productId)) {
-    return true;
-  }
-  if (ohci1 && ohci1->AttachUSBDevice(vendorId, productId)) {
-    return true;
-  }
-  return false;
-}
-
-bool XeMain::DetachUSBDevice(u16 vendorId, u16 productId) {
-  bool detached = false;
-  if (ohci0) {
-    detached |= ohci0->DetachUSBDevice(vendorId, productId);
-  }
-  if (ohci1) {
-    detached |= ohci1->DetachUSBDevice(vendorId, productId);
-  }
-  return detached;
-}
-
-std::vector<Xe::PCIDev::USBDeviceInfo> XeMain::EnumerateUSBDevices() {
-  // Use OHCI0's passthrough manager to enumerate
-  if (ohci0) {
-    auto* manager = ohci0->GetPassthroughManager();
-    if (manager) {
-      return manager->EnumerateDevices();
-    }
-  }
-  return {};
-}
-
-std::vector<Xe::PCIDev::USBDeviceInfo> XeMain::GetAttachedUSBDevices() {
-  std::vector<Xe::PCIDev::USBDeviceInfo> devices;
-
-  if (ohci0) {
-    auto ohci0Devices = ohci0->GetAttachedDevices();
-    devices.insert(devices.end(), ohci0Devices.begin(), ohci0Devices.end());
-  }
-  if (ohci1) {
-    auto ohci1Devices = ohci1->GetAttachedDevices();
-    devices.insert(devices.end(), ohci1Devices.begin(), ohci1Devices.end());
-  }
-
-  return devices;
 }
 
 Xe::XCPU::XenonCPU *XeMain::GetCPU() {
