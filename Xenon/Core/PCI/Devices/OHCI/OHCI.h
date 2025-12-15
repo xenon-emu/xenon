@@ -14,7 +14,6 @@
 
 // Forward declaration
 class RAM;
-class PCIBridge;
 
 #define OHCI_DEV_SIZE 0x1000
 #define OHCI_MAX_PORTS 9
@@ -110,7 +109,6 @@ public:
 
   // Set RAM pointer for DMA operations
   void SetRAM(RAM* ram);
-  void SetPCIBridge(PCIBridge* bridgePtr);
 
   // USB Passthrough interface
   USBPassthroughManager* GetPassthroughManager() { return passthroughManager.get(); }
@@ -142,8 +140,6 @@ protected:
 
   // RAM pointer for DMA
   RAM* ramPtr;
-  // PCI Bridge for interrupts
-  PCIBridge* parentBus;
 
   // Per-port device tracking
   std::array<PortDeviceInfo, OHCI_MAX_PORTS> portDevices;
