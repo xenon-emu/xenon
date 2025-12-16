@@ -180,7 +180,7 @@ public:
   std::unique_ptr<Texture> backbuffer{};
 
   // Command queue
-  std::mutex renderQueueMutex{};
+  Base::FutexMutex renderQueueMutex{};
   std::queue<RenderCommand> renderQueue = {};
 
   // GUI Helpers
@@ -191,7 +191,7 @@ public:
   std::unordered_map<u64, std::shared_ptr<Buffer>> createdBuffers{};
 
   // Recompiled shaders
-  std::mutex programLinkMutex{};
+  Base::FutexMutex programLinkMutex{};
   std::unordered_map<u32, std::pair<Xe::Microcode::AST::Shader *, std::vector<u32>>> pendingVertexShaders{};
   std::unordered_map<u32, std::pair<Xe::Microcode::AST::Shader *, std::vector<u32>>> pendingPixelShaders{};
   std::unordered_map<u64, Xe::XGPU::XeShader> linkedShaderPrograms{};

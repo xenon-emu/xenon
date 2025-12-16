@@ -14,7 +14,7 @@ private:
   std::list<u64> keys;
   // Doubly linked list storing keys for LRU tracking
   std::unordered_map<u64, std::pair<u64, std::list<u64>::iterator>> cache;
-  std::mutex cacheMutex;
+  Base::FutexMutex cacheMutex;
 
 public:
   ~LRUCache() {
@@ -24,7 +24,7 @@ public:
   }
 
   void resizeCache(size_t size) {
-    std::lock_guard<std::mutex> lock(cacheMutex);
+    std::lock_guard<Base::FutexMutex> lock(cacheMutex);
     capacity = size;
     while (keys.size() > capacity) {
       u64 lru = keys.back();
@@ -34,7 +34,7 @@ public:
   }
 
   const u64 getElement(u64 key) {
-    std::lock_guard<std::mutex> lock(cacheMutex);
+    std::lock_guard<Base::FutexMutex> lock(cacheMutex);
     auto it = cache.find(key);
     if (it == cache.end()) {
       return static_cast<u64>(-1);
@@ -47,10 +47,10 @@ public:
   }
 
   void putElement(u64 key, u64 value) {
-    std::lock_guard<std::mutex> lock(cacheMutex);
+    std::lock_guard<Base::FutexMutex> lock(cacheMutex);
     if (capacity == 0)
       return;
-    
+
     auto it = cache.find(key);
     if (it != cache.end()) {
       // Key exists, move it to front and update value
@@ -71,7 +71,7 @@ public:
   }
 
   void invalidateElement(u64 key) {
-    std::lock_guard<std::mutex> lock(cacheMutex);
+    std::lock_guard<Base::FutexMutex> lock(cacheMutex);
     auto it = cache.find(key);
     if (it != cache.end()) {
       auto listIt = it->second.second;
@@ -81,7 +81,7 @@ public:
   }
 
   void invalidateAll() {
-    std::lock_guard<std::mutex> lock(cacheMutex);
+    std::lock_guard<Base::FutexMutex> lock(cacheMutex);
     if (!keys.empty()) {
       keys.clear();
     }

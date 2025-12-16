@@ -74,7 +74,7 @@ public:
   bool ConfigWrite(u64 writeAddress, const u8 *data, u64 size);
 
 private:
-  std::mutex mutex{};
+  Base::FutexMutex mutex{};
 
   GENRAL_PCI_DEVICE_CONFIG_SPACE hostBridgeConfigSpace{};
 

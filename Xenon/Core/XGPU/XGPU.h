@@ -66,7 +66,7 @@ private:
   // PCI Bridge pointer. Used for Interrupts.
   PCIBridge *parentBus = nullptr;
   // Mutex handle
-  std::recursive_mutex mutex = {};
+  Base::FutexRecursiveMutex mutex = {};
   // XGPU Config Space Data at address 0xD0010000.
   GENRAL_PCI_DEVICE_CONFIG_SPACE xgpuConfigSpace = {};
   // PCI Device Size, using when determining PCI device size of each BAR in Linux.
