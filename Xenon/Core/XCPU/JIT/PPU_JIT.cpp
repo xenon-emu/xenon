@@ -28,7 +28,7 @@ PPU_JIT::PPU_JIT(PPU *ppu) :
 
 // Destructor
 PPU_JIT::~PPU_JIT() {
-  std::lock_guard<std::mutex> lock(jitCacheMutex);
+  std::lock_guard<Base::FutexMutex> lock(jitCacheMutex);
   for (auto &[hash, block] : jitBlocksCache)
     block.reset();
   jitBlocksCache.clear();
@@ -43,7 +43,7 @@ void PPU_JIT::RegisterBlockPages(u64 blockStart, u64 blockSize) {
   u64 pageCount = (blockSize + pageSize - 1) / pageSize;
   u64 firstPage = blockStart & ~(pageSize - 1ULL);
 
-  std::lock_guard<std::mutex> lock(jitCacheMutex);
+  std::lock_guard<Base::FutexMutex> lock(jitCacheMutex);
   std::vector<u64> pages;
   pages.reserve(static_cast<size_t>(pageCount));
   for (u64 i = 0; i < pageCount; ++i) {
@@ -60,7 +60,7 @@ void PPU_JIT::RegisterBlockPages(u64 blockStart, u64 blockSize) {
 }
 
 void PPU_JIT::UnregisterBlock(u64 blockStart) {
-  std::lock_guard<std::mutex> lock(jitCacheMutex);
+  std::lock_guard<Base::FutexMutex> lock(jitCacheMutex);
   auto it = blockPageList.find(blockStart);
   if (it == blockPageList.end()) { return; }
   for (u64 pageBase : it->second) {
@@ -116,7 +116,7 @@ void PPU_JIT::InvalidateBlocksForRange(u64 startAddr, u64 endAddr) {
 
   std::vector<u64> blocksToInvalidate;
   {
-    std::lock_guard<std::mutex> lock(jitCacheMutex);
+    std::lock_guard<Base::FutexMutex> lock(jitCacheMutex);
     for (u64 page = startPage; page < endPage; page += pageSize) {
       auto pit = pageBlockIndex.find(page);
       if (pit == pageBlockIndex.end()) continue;
@@ -157,7 +157,7 @@ void PPU_JIT::InvalidateBlockAt(u64 blockAddr) {
 }
 
 void PPU_JIT::InvalidateAllBlocks() {
-  std::lock_guard<std::mutex> lock(jitCacheMutex);
+  std::lock_guard<Base::FutexMutex> lock(jitCacheMutex);
 #ifdef JIT_DEBUG
   LOG_DEBUG(Xenon, "[JIT]: Invalidating ALL JIT blocks");
 #endif
@@ -495,7 +495,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
 
   // Insert block into the block cache.
   {
-    std::lock_guard<std::mutex> lock(jitCacheMutex);
+    std::lock_guard<Base::FutexMutex> lock(jitCacheMutex);
     jitBlocksCache.emplace(blockStartAddress, block);
 
     // Try to link this block to its target

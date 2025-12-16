@@ -257,7 +257,7 @@ public:
   }
 private:
   // Mutex, stops other threads from writing to values without the previous one finishing
-  std::recursive_mutex mutex;
+  Base::FutexRecursiveMutex mutex;
 
   // Parent PCI Bridge (used for interrupts/communication)
   PCIBridge *pciBridge;

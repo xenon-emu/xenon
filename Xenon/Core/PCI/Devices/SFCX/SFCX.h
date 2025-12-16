@@ -215,7 +215,7 @@ private:
   // PCI Bridge pointer. Used for Interrupts.
   PCIBridge *parentBus = nullptr;
   // Mutex for thread-safe behavior.
-  std::recursive_mutex mutex;
+  Base::FutexRecursiveMutex mutex;
   // RAM pointer. Used for DMA.
   RAM *mainMemory = nullptr;
   // Read a page from memory to page buffer.

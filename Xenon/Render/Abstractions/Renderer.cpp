@@ -225,7 +225,7 @@ void Renderer::UpdateConstants(Xe::XGPU::XenosState *state) {
       eBufferUsage::DynamicDraw
     };
 
-    std::lock_guard<std::mutex> lock(renderQueueMutex);
+    std::lock_guard<Base::FutexMutex> lock(renderQueueMutex);
     renderQueue.push(std::move(cmd));
   }
 
@@ -243,7 +243,7 @@ void Renderer::UpdateConstants(Xe::XGPU::XenosState *state) {
       eBufferUsage::DynamicDraw
     };
 
-    std::lock_guard<std::mutex> lock(renderQueueMutex);
+    std::lock_guard<Base::FutexMutex> lock(renderQueueMutex);
     renderQueue.push(std::move(cmd));
   }
 }
@@ -312,7 +312,7 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
       };
 
       {
-        std::lock_guard<std::mutex> lock(renderQueueMutex);
+        std::lock_guard<Base::FutexMutex> lock(renderQueueMutex);
         renderQueue.push(std::move(cmd));
       }
       LOG_INFO(Xenos, "Uploaded vertex fetch buffer: slot={}, addr=0x{:X}, size={} bytes", fetchSlot, byteAddress, byteSize);
@@ -353,7 +353,7 @@ Xe::XGPU::XeShader *Renderer::GetOrCreateShader(u32 vsHash, u32 psHash) {
   }
 
   // Slow path: need to link, protect shared maps
-  std::lock_guard<std::mutex> lock(programLinkMutex);
+  std::lock_guard<Base::FutexMutex> lock(programLinkMutex);
 
   // Double-check now that we hold the lock
   if (auto it = linkedShaderPrograms.find(combinedHash); it != linkedShaderPrograms.end()) {
@@ -535,7 +535,7 @@ void Renderer::Thread() {
 
     std::vector<RenderCommand> frameCommands;
     {
-      std::lock_guard<std::mutex> lock(renderQueueMutex);
+      std::lock_guard<Base::FutexMutex> lock(renderQueueMutex);
       while (!renderQueue.empty()) {
         frameCommands.push_back(std::move(renderQueue.front()));
         renderQueue.pop();

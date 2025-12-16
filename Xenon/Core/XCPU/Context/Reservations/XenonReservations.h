@@ -39,7 +39,7 @@ public:
   }
 private:
   s32 numReservations;
-  std::recursive_mutex reservationLock;
+  Base::FutexRecursiveMutex reservationLock;
   s32 processors;
   struct PPU_RES *reservations[6];
 };

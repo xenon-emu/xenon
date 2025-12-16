@@ -260,7 +260,7 @@ namespace Xe::XCPU {
     sInterruptState interruptState[6] = {};
 
     // Mutex for thread safety
-    std::recursive_mutex iicMutex;
+    Base::FutexRecursiveMutex iicMutex;
 
     // Erases the first element in the queue that has been ack'd.
     void removeFirstACKdInterrupt(u8 threadID);
