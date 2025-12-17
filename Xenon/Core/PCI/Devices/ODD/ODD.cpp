@@ -1118,7 +1118,7 @@ void Xe::PCIDev::ODD::doDMA() {
     // This bit specifies that we're facing the last entry in the PRD Table
     bool lastEntry = atapiState.dmaState.currentPRD.control & 0x8000;
     // The byte count to read/write
-    u16 size = atapiState.dmaState.currentPRD.sizeInBytes;
+    u32 size = atapiState.dmaState.currentPRD.sizeInBytes;
     // The address in memory to be written to/read from
     u32 bufferAddress = atapiState.dmaState.currentPRD.physAddress;
     // Buffer Pointer in main memory
