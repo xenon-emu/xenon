@@ -312,9 +312,9 @@ namespace PPCInterpreter {
       { 0x16, GETRC(fsqrts), 5 },
       //{ 0x18, GETRC(fres), 5 },
       { 0x19, GETRC(fmuls), 5 },
-      //{ 0x1C, GETRC(fmsubs), 5 },
-      //{ 0x1D, GETRC(fmadds), 5 },
-      //{ 0x1E, GETRC(fnmsubs), 5 },
+      { 0x1C, GETRC(fmsubs), 5 },
+      { 0x1D, GETRC(fmadds), 5 },
+      { 0x1E, GETRC(fnmsubs), 5 },
       { 0x1F, GETRC(fnmadds), 5 },
       });
     // Group 0x3E opcodes (field 30..31)
@@ -343,19 +343,19 @@ namespace PPCInterpreter {
       { 0x017, GETRC(fsel), 5 },
       { 0x019, GETRC(fmul), 5 },
       //{ 0x01A, GETRC(frsqrte), 5 },
-      //{ 0x01C, GETRC(fmsub), 5 },
-      //{ 0x01D, GETRC(fmadd), 5 },
-      //{ 0x01E, GETRC(fnmsub), 5 },
+      { 0x01C, GETRC(fmsub), 5 },
+      { 0x01D, GETRC(fmadd), 5 },
+      { 0x01E, GETRC(fnmsub), 5 },
       { 0x01F, GETRC(fnmadd), 5 },
 
       { 0x020, GET(fcmpo) },
       { 0x028, GETRC(fneg) },
       { 0x048, GETRC(fmr) },
       //{ 0x088, GETRC(fnabs) },
-      //{ 0x108, GETRC(fabs) },
-      //{ 0x32E, GETRC(fctid) },
-      //{ 0x32F, GETRC(fctidz) },
-      //{ 0x34E, GETRC(fcfid) },
+      { 0x108, GETRC(fabs) },
+      { 0x32E, GETRC(fctid) },
+      { 0x32F, GETRC(fctidz) },
+      { 0x34E, GETRC(fcfid) },
       });
 #endif // defined ARCH_X86 || ARCH_X86_64
 

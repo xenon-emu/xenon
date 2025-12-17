@@ -3390,6 +3390,548 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwzx(sPPEState* ppeState, JITBlockBuil
   }
 }
 
+// Floating Absolute Value (x'FC00 0210')
+void PPCInterpreter::PPCInterpreterJIT_fabsx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  // Ensure FPU is enabled
+  J_checkFPUEnabled(b);
+
+  // Operate on raw 64-bit representation to clear the sign bit
+  x86::Gp frb = newGP64();
+  x86::Gp absMask = newGP64();
+
+  // Load frB (raw bits)
+  COMP->mov(frb, FPRPtr(instr.frb));
+
+  // Mask to clear sign bit (keep magnitude)
+  COMP->mov(absMask, 0x7FFFFFFFFFFFFFFFull);
+  COMP->and_(frb, absMask);
+
+  // Store result to frD
+  COMP->mov(FPRPtr(instr.frd), frb);
+
+  // If Rc bit is set, update CR1
+  if (instr.rc) {
+    J_ppuSetCR1(b);
+  }
+}
+
+// Floating Convert to Integer Double Word (x'FC00 065C')
+void PPCInterpreter::PPCInterpreterJIT_fctidx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  x86::Xmm frb = newXMM();
+  x86::Gp frbBits = newGP64();
+  x86::Gp converted = newGP64();
+  x86::Gp result = newGP64();
+
+  COMP->vmovsd(frb, FPRPtr(instr.frb));
+  COMP->vmovq(frbBits, frb);
+
+  // Check for SNaN and set VXSNAN
+  J_checkAndSetSNaN(b, frb);
+
+  // Check if NaN (exp=0x7FF and frac!=0)
+  x86::Gp isNaN = newGP32();
+  x86::Gp expBits = newGP64();
+  x86::Gp fracBits = newGP64();
+  x86::Gp fracMask = newGP64();
+
+  COMP->xor_(isNaN, isNaN);
+  COMP->mov(expBits, frbBits);
+  COMP->shr(expBits, 52);
+  COMP->and_(expBits, 0x7FF);
+
+  Label notNaN = b->compiler->newLabel();
+  COMP->cmp(expBits.r32(), 0x7FF);
+  COMP->jne(notNaN);
+
+  COMP->mov(fracMask, 0x000FFFFFFFFFFFFFull);
+  COMP->mov(fracBits, frbBits);
+  COMP->and_(fracBits, fracMask);
+  COMP->test(fracBits, fracBits);
+  COMP->jz(notNaN);
+  COMP->mov(isNaN, 1);
+  COMP->bind(notNaN);
+
+  // Check if +Infinity (exp=0x7FF, frac=0, sign=0)
+  x86::Gp isPosInf = newGP32();
+  COMP->xor_(isPosInf, isPosInf);
+  {
+    Label notPosInf = b->compiler->newLabel();
+    COMP->cmp(expBits.r32(), 0x7FF);
+    COMP->jne(notPosInf);
+    COMP->mov(fracMask, 0x000FFFFFFFFFFFFFull);
+    COMP->mov(fracBits, frbBits);
+    COMP->and_(fracBits, fracMask);
+    COMP->test(fracBits, fracBits);
+    COMP->jnz(notPosInf);
+    COMP->bt(frbBits, 63);
+    COMP->jc(notPosInf);
+    COMP->mov(isPosInf, 1);
+    COMP->bind(notPosInf);
+  }
+
+  // Check if -Infinity (exp=0x7FF, frac=0, sign=1)
+  x86::Gp isNegInf = newGP32();
+  COMP->xor_(isNegInf, isNegInf);
+  {
+    Label notNegInf = b->compiler->newLabel();
+    COMP->cmp(expBits.r32(), 0x7FF);
+    COMP->jne(notNegInf);
+    COMP->mov(fracMask, 0x000FFFFFFFFFFFFFull);
+    COMP->mov(fracBits, frbBits);
+    COMP->and_(fracBits, fracMask);
+    COMP->test(fracBits, fracBits);
+    COMP->jnz(notNegInf);
+    COMP->bt(frbBits, 63);
+    COMP->jnc(notNegInf);
+    COMP->mov(isNegInf, 1);
+    COMP->bind(notNegInf);
+  }
+
+  // Labels for different cases
+  Label handleNaN = b->compiler->newLabel();
+  Label handlePosInf = b->compiler->newLabel();
+  Label handleNegInf = b->compiler->newLabel();
+  Label handlePosOverflow = b->compiler->newLabel();
+  Label handleNegOverflow = b->compiler->newLabel();
+  Label doConversion = b->compiler->newLabel();
+  Label storeResult = b->compiler->newLabel();
+
+  // Check for NaN
+  COMP->test(isNaN, isNaN);
+  COMP->jnz(handleNaN);
+
+  // Check for +Inf
+  COMP->test(isPosInf, isPosInf);
+  COMP->jnz(handlePosInf);
+
+  // Check for -Inf
+  COMP->test(isNegInf, isNegInf);
+  COMP->jnz(handleNegInf);
+
+  // Check bounds for overflow
+  // Max int64 is 2^63-1 = 9223372036854775807.0 = 0x43DFFFFFFFFFFFFF
+  // Min int64 is -2^63 = -9223372036854775808.0 = 0xC3E0000000000000
+  x86::Xmm maxVal = newXMM();
+  x86::Xmm minVal = newXMM();
+  x86::Gp maxBits = newGP64();
+  x86::Gp minBits = newGP64();
+
+  COMP->mov(maxBits, 0x43DFFFFFFFFFFFFFull);
+  COMP->vmovq(maxVal, maxBits);
+  COMP->mov(minBits, 0xC3E0000000000000ull);
+  COMP->vmovq(minVal, minBits);
+
+  COMP->vucomisd(frb, maxVal);
+  COMP->ja(handlePosOverflow);
+
+  COMP->vucomisd(minVal, frb);
+  COMP->ja(handleNegOverflow);
+
+  COMP->jmp(doConversion);
+
+  // NaN -> 0x8000000000000000 and set VXCVI
+  COMP->bind(handleNaN);
+  {
+    x86::Gp fpscr = newGP32();
+    COMP->mov(fpscr, FPSCRPtr().Ptr<u32>());
+    COMP->or_(fpscr, (1u << 8) | FPSCR_VX_BIT | FPSCR_FX_BIT);  // VXCVI
+    COMP->and_(fpscr, ~((1u << 14) | (1u << 13)));  // Clear FI, FR
+    COMP->mov(FPSCRPtr().Ptr<u32>(), fpscr);
+  }
+  COMP->mov(result, 0x8000000000000000ull);
+  COMP->jmp(storeResult);
+
+  // +Inf -> 0x7FFFFFFFFFFFFFFF and set VXCVI
+  COMP->bind(handlePosInf);
+  {
+    x86::Gp fpscr = newGP32();
+    COMP->mov(fpscr, FPSCRPtr().Ptr<u32>());
+    COMP->or_(fpscr, (1u << 8) | FPSCR_VX_BIT | FPSCR_FX_BIT);
+    COMP->and_(fpscr, ~((1u << 14) | (1u << 13)));
+    COMP->mov(FPSCRPtr().Ptr<u32>(), fpscr);
+  }
+  COMP->mov(result, 0x7FFFFFFFFFFFFFFFull);
+  COMP->jmp(storeResult);
+
+  // -Inf -> 0x8000000000000000 and set VXCVI
+  COMP->bind(handleNegInf);
+  {
+    x86::Gp fpscr = newGP32();
+    COMP->mov(fpscr, FPSCRPtr().Ptr<u32>());
+    COMP->or_(fpscr, (1u << 8) | FPSCR_VX_BIT | FPSCR_FX_BIT);
+    COMP->and_(fpscr, ~((1u << 14) | (1u << 13)));
+    COMP->mov(FPSCRPtr().Ptr<u32>(), fpscr);
+  }
+  COMP->mov(result, 0x8000000000000000ull);
+  COMP->jmp(storeResult);
+
+  // Positive overflow -> 0x7FFFFFFFFFFFFFFF
+  COMP->bind(handlePosOverflow);
+  {
+    x86::Gp fpscr = newGP32();
+    COMP->mov(fpscr, FPSCRPtr().Ptr<u32>());
+    COMP->or_(fpscr, (1u << 8) | FPSCR_VX_BIT | FPSCR_FX_BIT);
+    COMP->and_(fpscr, ~((1u << 14) | (1u << 13)));
+    COMP->mov(FPSCRPtr().Ptr<u32>(), fpscr);
+  }
+  COMP->mov(result, 0x7FFFFFFFFFFFFFFFull);
+  COMP->jmp(storeResult);
+
+  // Negative overflow -> 0x8000000000000000
+  COMP->bind(handleNegOverflow);
+  {
+    x86::Gp fpscr = newGP32();
+    COMP->mov(fpscr, FPSCRPtr().Ptr<u32>());
+    COMP->or_(fpscr, (1u << 8) | FPSCR_VX_BIT | FPSCR_FX_BIT);
+    COMP->and_(fpscr, ~((1u << 14) | (1u << 13)));
+    COMP->mov(FPSCRPtr().Ptr<u32>(), fpscr);
+  }
+  COMP->mov(result, 0x8000000000000000ull);
+  COMP->jmp(storeResult);
+
+  // Normal conversion using FPSCR rounding mode
+  COMP->bind(doConversion);
+  {
+    // Save and setup MXCSR for rounding mode
+    x86::Gp mxcsrOrig = newGP32();
+    x86::Mem mxcsrSlot = b->compiler->newStack(4, 4);
+    COMP->stmxcsr(mxcsrSlot);
+    COMP->mov(mxcsrOrig, mxcsrSlot);
+
+    // Get FPSCR rounding mode
+    x86::Gp fpscr = newGP32();
+    x86::Gp roundMode = newGP32();
+    COMP->mov(fpscr, FPSCRPtr().Ptr<u32>());
+    COMP->mov(roundMode, fpscr);
+    COMP->and_(roundMode, 0x3);
+
+    // Map PPC rounding mode to x86 MXCSR
+    x86::Gp mxcsrNew = newGP32();
+    COMP->mov(mxcsrNew, mxcsrOrig);
+    COMP->and_(mxcsrNew, ~(0x3 << 13));
+
+    Label rmNearest = b->compiler->newLabel();
+    Label rmTowardZero = b->compiler->newLabel();
+    Label rmPlusInf = b->compiler->newLabel();
+    Label rmMinusInf = b->compiler->newLabel();
+    Label rmDone = b->compiler->newLabel();
+
+    COMP->test(roundMode, roundMode);
+    COMP->jz(rmNearest);
+    COMP->cmp(roundMode, 1);
+    COMP->je(rmTowardZero);
+    COMP->cmp(roundMode, 2);
+    COMP->je(rmPlusInf);
+    COMP->jmp(rmMinusInf);
+
+    COMP->bind(rmNearest);
+    COMP->jmp(rmDone);
+
+    COMP->bind(rmTowardZero);
+    COMP->or_(mxcsrNew, 0x3 << 13);
+    COMP->jmp(rmDone);
+
+    COMP->bind(rmPlusInf);
+    COMP->or_(mxcsrNew, 0x2 << 13);
+    COMP->jmp(rmDone);
+
+    COMP->bind(rmMinusInf);
+    COMP->or_(mxcsrNew, 0x1 << 13);
+
+    COMP->bind(rmDone);
+    COMP->mov(mxcsrSlot, mxcsrNew);
+    COMP->ldmxcsr(mxcsrSlot);
+
+    // Convert using vcvtsd2si (respects MXCSR rounding)
+    COMP->vcvtsd2si(converted, frb);
+
+    // Restore MXCSR
+    COMP->mov(mxcsrSlot, mxcsrOrig);
+    COMP->ldmxcsr(mxcsrSlot);
+
+    COMP->mov(result, converted);
+
+    // Check for inexact: convert back and compare
+    x86::Xmm reconverted = newXMM();
+    COMP->vcvtsi2sd(reconverted, reconverted, converted);
+
+    x86::Gp fpscrTmp = newGP32();
+    COMP->mov(fpscrTmp, FPSCRPtr().Ptr<u32>());
+    COMP->and_(fpscrTmp, ~((1u << 14) | (1u << 13)));  // Clear FI, FR
+
+    Label notInexact = b->compiler->newLabel();
+    COMP->vucomisd(frb, reconverted);
+    COMP->je(notInexact);
+
+    // Inexact - set FI and FX
+    COMP->or_(fpscrTmp, (1u << 14) | FPSCR_FX_BIT);
+
+    // Check FR (result magnitude increased)
+    x86::Gp absBefore = newGP64();
+    x86::Gp absAfter = newGP64();
+    x86::Gp absMask = newGP64();
+    COMP->mov(absMask, 0x7FFFFFFFFFFFFFFFull);
+    COMP->vmovq(absBefore, frb);
+    COMP->and_(absBefore, absMask);
+    COMP->vmovq(absAfter, reconverted);
+    COMP->and_(absAfter, absMask);
+
+    Label noFR = b->compiler->newLabel();
+    COMP->cmp(absAfter, absBefore);
+    COMP->jbe(noFR);
+    COMP->or_(fpscrTmp, (1u << 13));
+
+    COMP->bind(noFR);
+    COMP->bind(notInexact);
+    COMP->mov(FPSCRPtr().Ptr<u32>(), fpscrTmp);
+  }
+
+  COMP->bind(storeResult);
+  COMP->mov(FPRPtr(instr.frd), result);
+
+  if (instr.rc) {
+    J_ppuSetCR1(b);
+  }
+}
+
+// Floating Convert to Integer Double Word with Round toward Zero (x'FC00 065E')
+void PPCInterpreter::PPCInterpreterJIT_fctidzx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  x86::Xmm frb = newXMM();
+  x86::Gp frbBits = newGP64();
+  x86::Gp converted = newGP64();
+  x86::Gp result = newGP64();
+
+  COMP->vmovsd(frb, FPRPtr(instr.frb));
+  COMP->vmovq(frbBits, frb);
+
+  J_checkAndSetSNaN(b, frb);
+
+  // Check if NaN
+  x86::Gp isNaN = newGP32();
+  x86::Gp expBits = newGP64();
+  x86::Gp fracBits = newGP64();
+  x86::Gp fracMask = newGP64();
+
+  COMP->xor_(isNaN, isNaN);
+  COMP->mov(expBits, frbBits);
+  COMP->shr(expBits, 52);
+  COMP->and_(expBits, 0x7FF);
+
+  Label notNaN = b->compiler->newLabel();
+  COMP->cmp(expBits.r32(), 0x7FF);
+  COMP->jne(notNaN);
+
+  COMP->mov(fracMask, 0x000FFFFFFFFFFFFFull);
+  COMP->mov(fracBits, frbBits);
+  COMP->and_(fracBits, fracMask);
+  COMP->test(fracBits, fracBits);
+  COMP->jz(notNaN);
+  COMP->mov(isNaN, 1);
+  COMP->bind(notNaN);
+
+  // Check if +Infinity
+  x86::Gp isPosInf = newGP32();
+  COMP->xor_(isPosInf, isPosInf);
+  {
+    Label notPosInf = b->compiler->newLabel();
+    COMP->cmp(expBits.r32(), 0x7FF);
+    COMP->jne(notPosInf);
+    COMP->mov(fracMask, 0x000FFFFFFFFFFFFFull);
+    COMP->mov(fracBits, frbBits);
+    COMP->and_(fracBits, fracMask);
+    COMP->test(fracBits, fracBits);
+    COMP->jnz(notPosInf);
+    COMP->bt(frbBits, 63);
+    COMP->jc(notPosInf);
+    COMP->mov(isPosInf, 1);
+    COMP->bind(notPosInf);
+  }
+
+  // Check if -Infinity
+  x86::Gp isNegInf = newGP32();
+  COMP->xor_(isNegInf, isNegInf);
+  {
+    Label notNegInf = b->compiler->newLabel();
+    COMP->cmp(expBits.r32(), 0x7FF);
+    COMP->jne(notNegInf);
+    COMP->mov(fracMask, 0x000FFFFFFFFFFFFFull);
+    COMP->mov(fracBits, frbBits);
+    COMP->and_(fracBits, fracMask);
+    COMP->test(fracBits, fracBits);
+    COMP->jnz(notNegInf);
+    COMP->bt(frbBits, 63);
+    COMP->jnc(notNegInf);
+    COMP->mov(isNegInf, 1);
+    COMP->bind(notNegInf);
+  }
+
+  Label handleNaN = b->compiler->newLabel();
+  Label handlePosInf = b->compiler->newLabel();
+  Label handleNegInf = b->compiler->newLabel();
+  Label handlePosOverflow = b->compiler->newLabel();
+  Label handleNegOverflow = b->compiler->newLabel();
+  Label doConversion = b->compiler->newLabel();
+  Label storeResult = b->compiler->newLabel();
+
+  COMP->test(isNaN, isNaN);
+  COMP->jnz(handleNaN);
+
+  COMP->test(isPosInf, isPosInf);
+  COMP->jnz(handlePosInf);
+
+  COMP->test(isNegInf, isNegInf);
+  COMP->jnz(handleNegInf);
+
+  // Check bounds
+  x86::Xmm maxVal = newXMM();
+  x86::Xmm minVal = newXMM();
+  x86::Gp maxBits = newGP64();
+  x86::Gp minBits = newGP64();
+
+  COMP->mov(maxBits, 0x43DFFFFFFFFFFFFFull);
+  COMP->vmovq(maxVal, maxBits);
+  COMP->mov(minBits, 0xC3E0000000000000ull);
+  COMP->vmovq(minVal, minBits);
+
+  COMP->vucomisd(frb, maxVal);
+  COMP->ja(handlePosOverflow);
+
+  COMP->vucomisd(minVal, frb);
+  COMP->ja(handleNegOverflow);
+
+  COMP->jmp(doConversion);
+
+  COMP->bind(handleNaN);
+  {
+    x86::Gp fpscr = newGP32();
+    COMP->mov(fpscr, FPSCRPtr().Ptr<u32>());
+    COMP->or_(fpscr, (1u << 8) | FPSCR_VX_BIT | FPSCR_FX_BIT);
+    COMP->and_(fpscr, ~((1u << 14) | (1u << 13)));
+    COMP->mov(FPSCRPtr().Ptr<u32>(), fpscr);
+  }
+  COMP->mov(result, 0x8000000000000000ull);
+  COMP->jmp(storeResult);
+
+  COMP->bind(handlePosInf);
+  {
+    x86::Gp fpscr = newGP32();
+    COMP->mov(fpscr, FPSCRPtr().Ptr<u32>());
+    COMP->or_(fpscr, (1u << 8) | FPSCR_VX_BIT | FPSCR_FX_BIT);
+    COMP->and_(fpscr, ~((1u << 14) | (1u << 13)));
+    COMP->mov(FPSCRPtr().Ptr<u32>(), fpscr);
+  }
+  COMP->mov(result, 0x7FFFFFFFFFFFFFFFull);
+  COMP->jmp(storeResult);
+
+  COMP->bind(handleNegInf);
+  {
+    x86::Gp fpscr = newGP32();
+    COMP->mov(fpscr, FPSCRPtr().Ptr<u32>());
+    COMP->or_(fpscr, (1u << 8) | FPSCR_VX_BIT | FPSCR_FX_BIT);
+    COMP->and_(fpscr, ~((1u << 14) | (1u << 13)));
+    COMP->mov(FPSCRPtr().Ptr<u32>(), fpscr);
+  }
+  COMP->mov(result, 0x8000000000000000ull);
+  COMP->jmp(storeResult);
+
+  COMP->bind(handlePosOverflow);
+  {
+    x86::Gp fpscr = newGP32();
+    COMP->mov(fpscr, FPSCRPtr().Ptr<u32>());
+    COMP->or_(fpscr, (1u << 8) | FPSCR_VX_BIT | FPSCR_FX_BIT);
+    COMP->and_(fpscr, ~((1u << 14) | (1u << 13)));
+    COMP->mov(FPSCRPtr().Ptr<u32>(), fpscr);
+  }
+  COMP->mov(result, 0x7FFFFFFFFFFFFFFFull);
+  COMP->jmp(storeResult);
+
+  COMP->bind(handleNegOverflow);
+  {
+    x86::Gp fpscr = newGP32();
+    COMP->mov(fpscr, FPSCRPtr().Ptr<u32>());
+    COMP->or_(fpscr, (1u << 8) | FPSCR_VX_BIT | FPSCR_FX_BIT);
+    COMP->and_(fpscr, ~((1u << 14) | (1u << 13)));
+    COMP->mov(FPSCRPtr().Ptr<u32>(), fpscr);
+  }
+  COMP->mov(result, 0x8000000000000000ull);
+  COMP->jmp(storeResult);
+
+  // Normal conversion with truncation (toward zero)
+  COMP->bind(doConversion);
+  {
+    // vcvttsd2si always truncates toward zero
+    COMP->vcvttsd2si(converted, frb);
+    COMP->mov(result, converted);
+
+    // Check for inexact
+    x86::Xmm reconverted = newXMM();
+    COMP->vcvtsi2sd(reconverted, reconverted, converted);
+
+    x86::Gp fpscrTmp = newGP32();
+    COMP->mov(fpscrTmp, FPSCRPtr().Ptr<u32>());
+    COMP->and_(fpscrTmp, ~((1u << 14) | (1u << 13)));
+
+    Label notInexact = b->compiler->newLabel();
+    COMP->vucomisd(frb, reconverted);
+    COMP->je(notInexact);
+
+    COMP->or_(fpscrTmp, (1u << 14) | FPSCR_FX_BIT);
+
+    x86::Gp absBefore = newGP64();
+    x86::Gp absAfter = newGP64();
+    x86::Gp absMask = newGP64();
+    COMP->mov(absMask, 0x7FFFFFFFFFFFFFFFull);
+    COMP->vmovq(absBefore, frb);
+    COMP->and_(absBefore, absMask);
+    COMP->vmovq(absAfter, reconverted);
+    COMP->and_(absAfter, absMask);
+
+    Label noFR = b->compiler->newLabel();
+    COMP->cmp(absAfter, absBefore);
+    COMP->jbe(noFR);
+    COMP->or_(fpscrTmp, (1u << 13));
+
+    COMP->bind(noFR);
+    COMP->bind(notInexact);
+    COMP->mov(FPSCRPtr().Ptr<u32>(), fpscrTmp);
+  }
+
+  COMP->bind(storeResult);
+  COMP->mov(FPRPtr(instr.frd), result);
+
+  if (instr.rc) {
+    J_ppuSetCR1(b);
+  }
+}
+
+// Floating Convert from Integer Double Word (x'FC00 069C')
+void PPCInterpreter::PPCInterpreterJIT_fcfidx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  x86::Gp frbInt = newGP64();
+  x86::Xmm frd = newXMM();
+
+  // Load frB as signed 64-bit integer (stored as raw bits in FPR)
+  COMP->mov(frbInt, FPRPtr(instr.frb));
+
+  // Convert signed int64 to double
+  COMP->vcvtsi2sd(frd, frd, frbInt);
+
+  // Store result
+  COMP->vmovsd(FPRPtr(instr.frd), frd);
+
+  // Classify and set FPRF
+  J_classifyAndSetFPRF(b, frd);
+
+  if (instr.rc) {
+    J_ppuSetCR1(b);
+  }
+}
+
 //
 // Bugged instructions, mostly rounding and CR errors, but still
 // NOTE: Most of these are far more superior here than on the interpreter in terms of accuracy, 
@@ -4015,6 +4557,945 @@ void PPCInterpreter::PPCInterpreterJIT_fsqrtsx(sPPEState* ppeState, JITBlockBuil
 
   COMP->bind(storeResult);
 
+  COMP->vmovsd(FPRPtr(instr.frd), frd);
+  J_classifyAndSetFPRF(b, frd);
+
+  if (instr.rc) {
+    J_ppuSetCR1(b);
+  }
+}
+
+// Floating Multiply-Add (Double-Precision) (x'FC00 003A')
+void PPCInterpreter::PPCInterpreterJIT_fmaddx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  // Ensure FPU is enabled
+  J_checkFPUEnabled(b);
+
+  x86::Xmm fra = newXMM();
+  x86::Xmm frb = newXMM();
+  x86::Xmm frc = newXMM();
+  x86::Xmm frd = newXMM();
+
+  COMP->vmovsd(fra, FPRPtr(instr.fra));
+  COMP->vmovsd(frb, FPRPtr(instr.frb));
+  COMP->vmovsd(frc, FPRPtr(instr.frc));
+
+  // Reset FPSCR exception bits
+  J_resetFPSCRExceptionBits(b);
+
+  // Set VXSNAN / VX / FX if any SNaN
+  J_checkAndSetSNaN(b, fra);
+  J_checkAndSetSNaN(b, frb);
+  J_checkAndSetSNaN(b, frc);
+
+  // NaN priority: fra > frb > frc
+  x86::Gp snanFlagA = newGP32();
+  x86::Gp snanQNaNA = newGP64();
+  COMP->xor_(snanFlagA, snanFlagA);
+  J_checkSNaNAndGetQNaN(b, fra, snanFlagA, snanQNaNA);
+
+  x86::Gp qnanFlagA = newGP32();
+  x86::Gp qnanValueA = newGP64();
+  COMP->xor_(qnanFlagA, qnanFlagA);
+  J_checkQNaNAndGetValue(b, fra, qnanFlagA, qnanValueA);
+
+  x86::Gp snanFlagB = newGP32();
+  x86::Gp snanQNaNB = newGP64();
+  COMP->xor_(snanFlagB, snanFlagB);
+  J_checkSNaNAndGetQNaN(b, frb, snanFlagB, snanQNaNB);
+
+  x86::Gp qnanFlagB = newGP32();
+  x86::Gp qnanValueB = newGP64();
+  COMP->xor_(qnanFlagB, qnanFlagB);
+  J_checkQNaNAndGetValue(b, frb, qnanFlagB, qnanValueB);
+
+  x86::Gp snanFlagC = newGP32();
+  x86::Gp snanQNaNC = newGP64();
+  COMP->xor_(snanFlagC, snanFlagC);
+  J_checkSNaNAndGetQNaN(b, frc, snanFlagC, snanQNaNC);
+
+  x86::Gp qnanFlagC = newGP32();
+  x86::Gp qnanValueC = newGP64();
+  COMP->xor_(qnanFlagC, qnanFlagC);
+  J_checkQNaNAndGetValue(b, frc, qnanFlagC, qnanValueC);
+
+  // Inf * 0 invalid operation
+  x86::Gp vximzFlag = newGP32();
+  J_checkInfMulZero(b, fra, frc, vximzFlag);
+
+  Label checkQNaNA = b->compiler->newLabel();
+  Label checkNaNB = b->compiler->newLabel();
+  Label checkQNaNB = b->compiler->newLabel();
+  Label checkNaNC = b->compiler->newLabel();
+  Label checkQNaNC = b->compiler->newLabel();
+  Label checkVximz = b->compiler->newLabel();
+  Label computeFMA = b->compiler->newLabel();
+  Label storeResult = b->compiler->newLabel();
+
+  // fra SNaN
+  COMP->test(snanFlagA, snanFlagA);
+  COMP->jz(checkQNaNA);
+  COMP->vmovq(frd, snanQNaNA);
+  COMP->jmp(storeResult);
+
+  // fra QNaN
+  COMP->bind(checkQNaNA);
+  COMP->test(qnanFlagA, qnanFlagA);
+  COMP->jz(checkNaNB);
+  COMP->vmovq(frd, qnanValueA);
+  COMP->jmp(storeResult);
+
+  // frb SNaN
+  COMP->bind(checkNaNB);
+  COMP->test(snanFlagB, snanFlagB);
+  COMP->jz(checkQNaNB);
+  COMP->vmovq(frd, snanQNaNB);
+  COMP->jmp(storeResult);
+
+  // frb QNaN
+  COMP->bind(checkQNaNB);
+  COMP->test(qnanFlagB, qnanFlagB);
+  COMP->jz(checkNaNC);
+  COMP->vmovq(frd, qnanValueB);
+  COMP->jmp(storeResult);
+
+  // frc SNaN
+  COMP->bind(checkNaNC);
+  COMP->test(snanFlagC, snanFlagC);
+  COMP->jz(checkQNaNC);
+  COMP->vmovq(frd, snanQNaNC);
+  COMP->jmp(storeResult);
+
+  // frc QNaN
+  COMP->bind(checkQNaNC);
+  COMP->test(qnanFlagC, qnanFlagC);
+  COMP->jz(checkVximz);
+  COMP->vmovq(frd, qnanValueC);
+  COMP->jmp(storeResult);
+
+  // VXIMZ (Inf * 0)
+  COMP->bind(checkVximz);
+  COMP->test(vximzFlag, vximzFlag);
+  COMP->jz(computeFMA);
+  {
+    x86::Gp defaultQNaN = newGP64();
+    COMP->mov(defaultQNaN, PPC_DEFAULT_QNAN);
+    COMP->vmovq(frd, defaultQNaN);
+  }
+  COMP->jmp(storeResult);
+
+  // Normal FMA path
+  COMP->bind(computeFMA);
+
+  x86::Gp mxcsrMem = newGP32();
+  x86::Mem mxcsrSlot = b->compiler->newStack(4, 4);
+  COMP->stmxcsr(mxcsrSlot);
+  COMP->mov(mxcsrMem, mxcsrSlot);
+  COMP->and_(mxcsrMem, ~0x3F);
+  COMP->mov(mxcsrSlot, mxcsrMem);
+  COMP->ldmxcsr(mxcsrSlot);
+
+  // frd = fra * frc + frb
+  COMP->vmovaps(frd, fra);
+  COMP->vfmadd213sd(frd, frc, frb);
+
+  COMP->stmxcsr(mxcsrSlot);
+  COMP->mov(mxcsrMem, mxcsrSlot);
+  {
+    Label notInexact = b->compiler->newLabel();
+    COMP->bt(mxcsrMem, 5);
+    COMP->jnc(notInexact);
+
+    x86::Gp fpscr = newGP32();
+    COMP->mov(fpscr, FPSCRPtr().Ptr<u32>());
+    COMP->or_(fpscr, FPSCR_FX_BIT);
+    COMP->mov(FPSCRPtr().Ptr<u32>(), fpscr);
+
+    COMP->bind(notInexact);
+  }
+
+  COMP->bind(storeResult);
+  COMP->vmovsd(FPRPtr(instr.frd), frd);
+
+  J_classifyAndSetFPRF(b, frd);
+
+  if (instr.rc) {
+    J_ppuSetCR1(b);
+  }
+}
+
+// Floating Multiply-Subtract (Double-Precision) (x'FC00 0038')
+void PPCInterpreter::PPCInterpreterJIT_fmsubx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  // Ensure FPU is enabled
+  J_checkFPUEnabled(b);
+
+  x86::Xmm fra = newXMM();
+  x86::Xmm frb = newXMM();
+  x86::Xmm frc = newXMM();
+  x86::Xmm frd = newXMM();
+
+  COMP->vmovsd(fra, FPRPtr(instr.fra));
+  COMP->vmovsd(frb, FPRPtr(instr.frb));
+  COMP->vmovsd(frc, FPRPtr(instr.frc));
+
+  // Reset FPSCR exception bits
+  J_resetFPSCRExceptionBits(b);
+
+  J_checkAndSetSNaN(b, fra);
+  J_checkAndSetSNaN(b, frb);
+  J_checkAndSetSNaN(b, frc);
+
+  // NaN priority: fra > frb > frc
+  x86::Gp snanFlagA = newGP32();
+  x86::Gp snanQNaNA = newGP64();
+  COMP->xor_(snanFlagA, snanFlagA);
+  J_checkSNaNAndGetQNaN(b, fra, snanFlagA, snanQNaNA);
+
+  x86::Gp qnanFlagA = newGP32();
+  x86::Gp qnanValueA = newGP64();
+  COMP->xor_(qnanFlagA, qnanFlagA);
+  J_checkQNaNAndGetValue(b, fra, qnanFlagA, qnanValueA);
+
+  x86::Gp snanFlagB = newGP32();
+  x86::Gp snanQNaNB = newGP64();
+  COMP->xor_(snanFlagB, snanFlagB);
+  J_checkSNaNAndGetQNaN(b, frb, snanFlagB, snanQNaNB);
+
+  x86::Gp qnanFlagB = newGP32();
+  x86::Gp qnanValueB = newGP64();
+  COMP->xor_(qnanFlagB, qnanFlagB);
+  J_checkQNaNAndGetValue(b, frb, qnanFlagB, qnanValueB);
+
+  x86::Gp snanFlagC = newGP32();
+  x86::Gp snanQNaNC = newGP64();
+  COMP->xor_(snanFlagC, snanFlagC);
+  J_checkSNaNAndGetQNaN(b, frc, snanFlagC, snanQNaNC);
+
+  x86::Gp qnanFlagC = newGP32();
+  x86::Gp qnanValueC = newGP64();
+  COMP->xor_(qnanFlagC, qnanFlagC);
+  J_checkQNaNAndGetValue(b, frc, qnanFlagC, qnanValueC);
+
+  // Inf * 0 invalid operation
+  x86::Gp vximzFlag = newGP32();
+  J_checkInfMulZero(b, fra, frc, vximzFlag);
+
+  Label checkQNaNA = b->compiler->newLabel();
+  Label checkNaNB = b->compiler->newLabel();
+  Label checkQNaNB = b->compiler->newLabel();
+  Label checkNaNC = b->compiler->newLabel();
+  Label checkQNaNC = b->compiler->newLabel();
+  Label checkVximz = b->compiler->newLabel();
+  Label computeFMS = b->compiler->newLabel();
+  Label storeResult = b->compiler->newLabel();
+
+  // fra SNaN
+  COMP->test(snanFlagA, snanFlagA);
+  COMP->jz(checkQNaNA);
+  COMP->vmovq(frd, snanQNaNA);
+  COMP->jmp(storeResult);
+
+  // fra QNaN
+  COMP->bind(checkQNaNA);
+  COMP->test(qnanFlagA, qnanFlagA);
+  COMP->jz(checkNaNB);
+  COMP->vmovq(frd, qnanValueA);
+  COMP->jmp(storeResult);
+
+  // frb SNaN
+  COMP->bind(checkNaNB);
+  COMP->test(snanFlagB, snanFlagB);
+  COMP->jz(checkQNaNB);
+  COMP->vmovq(frd, snanQNaNB);
+  COMP->jmp(storeResult);
+
+  // frb QNaN
+  COMP->bind(checkQNaNB);
+  COMP->test(qnanFlagB, qnanFlagB);
+  COMP->jz(checkNaNC);
+  COMP->vmovq(frd, qnanValueB);
+  COMP->jmp(storeResult);
+
+  // frc SNaN
+  COMP->bind(checkNaNC);
+  COMP->test(snanFlagC, snanFlagC);
+  COMP->jz(checkQNaNC);
+  COMP->vmovq(frd, snanQNaNC);
+  COMP->jmp(storeResult);
+
+  // frc QNaN
+  COMP->bind(checkQNaNC);
+  COMP->test(qnanFlagC, qnanFlagC);
+  COMP->jz(checkVximz);
+  COMP->vmovq(frd, qnanValueC);
+  COMP->jmp(storeResult);
+
+  // VXIMZ (Inf * 0)
+  COMP->bind(checkVximz);
+  COMP->test(vximzFlag, vximzFlag);
+  COMP->jz(computeFMS);
+  {
+    x86::Gp defaultQNaN = newGP64();
+    COMP->mov(defaultQNaN, PPC_DEFAULT_QNAN);
+    COMP->vmovq(frd, defaultQNaN);
+  }
+  COMP->jmp(storeResult);
+
+  // Normal FMS path
+  COMP->bind(computeFMS);
+
+  x86::Gp mxcsrMem = newGP32();
+  x86::Mem mxcsrSlot = b->compiler->newStack(4, 4);
+  COMP->stmxcsr(mxcsrSlot);
+  COMP->mov(mxcsrMem, mxcsrSlot);
+  COMP->and_(mxcsrMem, ~0x3F);
+  COMP->mov(mxcsrSlot, mxcsrMem);
+  COMP->ldmxcsr(mxcsrSlot);
+
+  // frd = (fra * frc) - frb
+  COMP->vmovaps(frd, fra);
+  COMP->vfmsub213sd(frd, frc, frb);
+
+  COMP->stmxcsr(mxcsrSlot);
+  COMP->mov(mxcsrMem, mxcsrSlot);
+  {
+    Label notInexact = b->compiler->newLabel();
+    COMP->bt(mxcsrMem, 5);
+    COMP->jnc(notInexact);
+
+    x86::Gp fpscr = newGP32();
+    COMP->mov(fpscr, FPSCRPtr().Ptr<u32>());
+    COMP->or_(fpscr, FPSCR_FX_BIT);
+    COMP->mov(FPSCRPtr().Ptr<u32>(), fpscr);
+
+    COMP->bind(notInexact);
+  }
+
+  COMP->bind(storeResult);
+  COMP->vmovsd(FPRPtr(instr.frd), frd);
+  J_classifyAndSetFPRF(b, frd);
+
+  if (instr.rc) {
+    J_ppuSetCR1(b);
+  }
+}
+// Floating Multiply-Add Single (x'EC00 003A')
+void PPCInterpreter::PPCInterpreterJIT_fmaddsx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  x86::Xmm fra = newXMM();
+  x86::Xmm frb = newXMM();
+  x86::Xmm frc = newXMM();
+  x86::Xmm frd = newXMM();
+
+  COMP->vmovsd(fra, FPRPtr(instr.fra));
+  COMP->vmovsd(frb, FPRPtr(instr.frb));
+  COMP->vmovsd(frc, FPRPtr(instr.frc));
+
+  J_resetFPSCRExceptionBits(b);
+  J_checkAndSetSNaN(b, fra);
+  J_checkAndSetSNaN(b, frb);
+  J_checkAndSetSNaN(b, frc);
+
+  x86::Gp snanFlagA = newGP32();
+  x86::Gp snanQNaNA = newGP64();
+  COMP->xor_(snanFlagA, snanFlagA);
+  J_checkSNaNAndGetQNaN(b, fra, snanFlagA, snanQNaNA);
+
+  x86::Gp qnanFlagA = newGP32();
+  x86::Gp qnanValueA = newGP64();
+  COMP->xor_(qnanFlagA, qnanFlagA);
+  J_checkQNaNAndGetValue(b, fra, qnanFlagA, qnanValueA);
+
+  x86::Gp snanFlagB = newGP32();
+  x86::Gp snanQNaNB = newGP64();
+  COMP->xor_(snanFlagB, snanFlagB);
+  J_checkSNaNAndGetQNaN(b, frb, snanFlagB, snanQNaNB);
+
+  x86::Gp qnanFlagB = newGP32();
+  x86::Gp qnanValueB = newGP64();
+  COMP->xor_(qnanFlagB, qnanFlagB);
+  J_checkQNaNAndGetValue(b, frb, qnanFlagB, qnanValueB);
+
+  x86::Gp snanFlagC = newGP32();
+  x86::Gp snanQNaNC = newGP64();
+  COMP->xor_(snanFlagC, snanFlagC);
+  J_checkSNaNAndGetQNaN(b, frc, snanFlagC, snanQNaNC);
+
+  x86::Gp qnanFlagC = newGP32();
+  x86::Gp qnanValueC = newGP64();
+  COMP->xor_(qnanFlagC, qnanFlagC);
+  J_checkQNaNAndGetValue(b, frc, qnanFlagC, qnanValueC);
+
+  x86::Gp vximzFlag = newGP32();
+  J_checkInfMulZero(b, fra, frc, vximzFlag);
+
+  Label checkQNaNA = b->compiler->newLabel();
+  Label checkNaNB = b->compiler->newLabel();
+  Label checkQNaNB = b->compiler->newLabel();
+  Label checkNaNC = b->compiler->newLabel();
+  Label checkQNaNC = b->compiler->newLabel();
+  Label checkVximz = b->compiler->newLabel();
+  Label computeFMA = b->compiler->newLabel();
+  Label storeResult = b->compiler->newLabel();
+
+  COMP->test(snanFlagA, snanFlagA);
+  COMP->jz(checkQNaNA);
+  COMP->vmovq(frd, snanQNaNA);
+  COMP->jmp(storeResult);
+
+  COMP->bind(checkQNaNA);
+  COMP->test(qnanFlagA, qnanFlagA);
+  COMP->jz(checkNaNB);
+  COMP->vmovq(frd, qnanValueA);
+  COMP->jmp(storeResult);
+
+  COMP->bind(checkNaNB);
+  COMP->test(snanFlagB, snanFlagB);
+  COMP->jz(checkQNaNB);
+  COMP->vmovq(frd, snanQNaNB);
+  COMP->jmp(storeResult);
+
+  COMP->bind(checkQNaNB);
+  COMP->test(qnanFlagB, qnanFlagB);
+  COMP->jz(checkNaNC);
+  COMP->vmovq(frd, qnanValueB);
+  COMP->jmp(storeResult);
+
+  COMP->bind(checkNaNC);
+  COMP->test(snanFlagC, snanFlagC);
+  COMP->jz(checkQNaNC);
+  COMP->vmovq(frd, snanQNaNC);
+  COMP->jmp(storeResult);
+
+  COMP->bind(checkQNaNC);
+  COMP->test(qnanFlagC, qnanFlagC);
+  COMP->jz(checkVximz);
+  COMP->vmovq(frd, qnanValueC);
+  COMP->jmp(storeResult);
+
+  COMP->bind(checkVximz);
+  COMP->test(vximzFlag, vximzFlag);
+  COMP->jz(computeFMA);
+  {
+    x86::Gp defaultQNaN = newGP64();
+    COMP->mov(defaultQNaN, PPC_DEFAULT_QNAN);
+    COMP->vmovq(frd, defaultQNaN);
+  }
+  COMP->jmp(storeResult);
+
+  COMP->bind(computeFMA);
+  COMP->vmovaps(frd, fra);
+  COMP->vfmadd213sd(frd, frc, frb);
+  J_roundToSingle(b, frd);
+
+  COMP->bind(storeResult);
+  COMP->vmovsd(FPRPtr(instr.frd), frd);
+  J_classifyAndSetFPRF(b, frd);
+
+  if (instr.rc) {
+    J_ppuSetCR1(b);
+  }
+}
+
+// Floating Multiply-Subtract Single (x'EC00 0038')
+void PPCInterpreter::PPCInterpreterJIT_fmsubsx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  x86::Xmm fra = newXMM();
+  x86::Xmm frb = newXMM();
+  x86::Xmm frc = newXMM();
+  x86::Xmm frd = newXMM();
+
+  COMP->vmovsd(fra, FPRPtr(instr.fra));
+  COMP->vmovsd(frb, FPRPtr(instr.frb));
+  COMP->vmovsd(frc, FPRPtr(instr.frc));
+
+  J_resetFPSCRExceptionBits(b);
+  J_checkAndSetSNaN(b, fra);
+  J_checkAndSetSNaN(b, frb);
+  J_checkAndSetSNaN(b, frc);
+
+  x86::Gp snanFlagA = newGP32();
+  x86::Gp snanQNaNA = newGP64();
+  COMP->xor_(snanFlagA, snanFlagA);
+  J_checkSNaNAndGetQNaN(b, fra, snanFlagA, snanQNaNA);
+
+  x86::Gp qnanFlagA = newGP32();
+  x86::Gp qnanValueA = newGP64();
+  COMP->xor_(qnanFlagA, qnanFlagA);
+  J_checkQNaNAndGetValue(b, fra, qnanFlagA, qnanValueA);
+
+  x86::Gp snanFlagB = newGP32();
+  x86::Gp snanQNaNB = newGP64();
+  COMP->xor_(snanFlagB, snanFlagB);
+  J_checkSNaNAndGetQNaN(b, frb, snanFlagB, snanQNaNB);
+
+  x86::Gp qnanFlagB = newGP32();
+  x86::Gp qnanValueB = newGP64();
+  COMP->xor_(qnanFlagB, qnanFlagB);
+  J_checkQNaNAndGetValue(b, frb, qnanFlagB, qnanValueB);
+
+  x86::Gp snanFlagC = newGP32();
+  x86::Gp snanQNaNC = newGP64();
+  COMP->xor_(snanFlagC, snanFlagC);
+  J_checkSNaNAndGetQNaN(b, frc, snanFlagC, snanQNaNC);
+
+  x86::Gp qnanFlagC = newGP32();
+  x86::Gp qnanValueC = newGP64();
+  COMP->xor_(qnanFlagC, qnanFlagC);
+  J_checkQNaNAndGetValue(b, frc, qnanFlagC, qnanValueC);
+
+  x86::Gp vximzFlag = newGP32();
+  J_checkInfMulZero(b, fra, frc, vximzFlag);
+
+  Label checkQNaNA = b->compiler->newLabel();
+  Label checkNaNB = b->compiler->newLabel();
+  Label checkQNaNB = b->compiler->newLabel();
+  Label checkNaNC = b->compiler->newLabel();
+  Label checkQNaNC = b->compiler->newLabel();
+  Label checkVximz = b->compiler->newLabel();
+  Label computeFMS = b->compiler->newLabel();
+  Label storeResult = b->compiler->newLabel();
+
+  COMP->test(snanFlagA, snanFlagA);
+  COMP->jz(checkQNaNA);
+  COMP->vmovq(frd, snanQNaNA);
+  COMP->jmp(storeResult);
+
+  COMP->bind(checkQNaNA);
+  COMP->test(qnanFlagA, qnanFlagA);
+  COMP->jz(checkNaNB);
+  COMP->vmovq(frd, qnanValueA);
+  COMP->jmp(storeResult);
+
+  COMP->bind(checkNaNB);
+  COMP->test(snanFlagB, snanFlagB);
+  COMP->jz(checkQNaNB);
+  COMP->vmovq(frd, snanQNaNB);
+  COMP->jmp(storeResult);
+
+  COMP->bind(checkQNaNB);
+  COMP->test(qnanFlagB, qnanFlagB);
+  COMP->jz(checkNaNC);
+  COMP->vmovq(frd, qnanValueB);
+  COMP->jmp(storeResult);
+
+  COMP->bind(checkNaNC);
+  COMP->test(snanFlagC, snanFlagC);
+  COMP->jz(checkQNaNC);
+  COMP->vmovq(frd, snanQNaNC);
+  COMP->jmp(storeResult);
+
+  COMP->bind(checkQNaNC);
+  COMP->test(qnanFlagC, qnanFlagC);
+  COMP->jz(checkVximz);
+  COMP->vmovq(frd, qnanValueC);
+  COMP->jmp(storeResult);
+
+  COMP->bind(checkVximz);
+  COMP->test(vximzFlag, vximzFlag);
+  COMP->jz(computeFMS);
+  {
+    x86::Gp defaultQNaN = newGP64();
+    COMP->mov(defaultQNaN, PPC_DEFAULT_QNAN);
+    COMP->vmovq(frd, defaultQNaN);
+  }
+  COMP->jmp(storeResult);
+
+  COMP->bind(computeFMS);
+  COMP->vmovaps(frd, fra);
+  COMP->vfmsub213sd(frd, frc, frb);
+  J_roundToSingle(b, frd);
+
+  COMP->bind(storeResult);
+  COMP->vmovsd(FPRPtr(instr.frd), frd);
+
+  J_classifyAndSetFPRF(b, frd);
+
+  if (instr.rc) {
+    J_ppuSetCR1(b);
+  }
+}
+
+// Floating Negative Multiply-Subtract (Double-Precision) (x'FC00 003C')
+void PPCInterpreter::PPCInterpreterJIT_fnmsubx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  // Ensure FPU is enabled
+  J_checkFPUEnabled(b);
+
+  x86::Xmm fra = newXMM();
+  x86::Xmm frb = newXMM();
+  x86::Xmm frc = newXMM();
+  x86::Xmm frd = newXMM();
+
+  COMP->vmovsd(fra, FPRPtr(instr.fra));
+  COMP->vmovsd(frb, FPRPtr(instr.frb));
+  COMP->vmovsd(frc, FPRPtr(instr.frc));
+
+  J_resetFPSCRExceptionBits(b);
+
+  J_checkAndSetSNaN(b, fra);
+  J_checkAndSetSNaN(b, frb);
+  J_checkAndSetSNaN(b, frc);
+
+  // NaN priority: fra > frb > frc
+  x86::Gp snanFlagA = newGP32();
+  x86::Gp snanQNaNA = newGP64();
+  COMP->xor_(snanFlagA, snanFlagA);
+  J_checkSNaNAndGetQNaN(b, fra, snanFlagA, snanQNaNA);
+
+  x86::Gp qnanFlagA = newGP32();
+  x86::Gp qnanValueA = newGP64();
+  COMP->xor_(qnanFlagA, qnanFlagA);
+  J_checkQNaNAndGetValue(b, fra, qnanFlagA, qnanValueA);
+
+  x86::Gp snanFlagB = newGP32();
+  x86::Gp snanQNaNB = newGP64();
+  COMP->xor_(snanFlagB, snanFlagB);
+  J_checkSNaNAndGetQNaN(b, frb, snanFlagB, snanQNaNB);
+
+  x86::Gp qnanFlagB = newGP32();
+  x86::Gp qnanValueB = newGP64();
+  COMP->xor_(qnanFlagB, qnanFlagB);
+  J_checkQNaNAndGetValue(b, frb, qnanFlagB, qnanValueB);
+
+  x86::Gp snanFlagC = newGP32();
+  x86::Gp snanQNaNC = newGP64();
+  COMP->xor_(snanFlagC, snanFlagC);
+  J_checkSNaNAndGetQNaN(b, frc, snanFlagC, snanQNaNC);
+
+  x86::Gp qnanFlagC = newGP32();
+  x86::Gp qnanValueC = newGP64();
+  COMP->xor_(qnanFlagC, qnanFlagC);
+  J_checkQNaNAndGetValue(b, frc, qnanFlagC, qnanValueC);
+
+  // Inf * 0 invalid operation
+  x86::Gp vximzFlag = newGP32();
+  J_checkInfMulZero(b, fra, frc, vximzFlag);
+
+  Label checkQNaNA = b->compiler->newLabel();
+  Label checkNaNB = b->compiler->newLabel();
+  Label checkQNaNB = b->compiler->newLabel();
+  Label checkNaNC = b->compiler->newLabel();
+  Label checkQNaNC = b->compiler->newLabel();
+  Label checkVximz = b->compiler->newLabel();
+  Label computeFMS = b->compiler->newLabel();
+  Label negateResult = b->compiler->newLabel();
+  Label storeResult = b->compiler->newLabel();
+
+  // fra SNaN
+  COMP->test(snanFlagA, snanFlagA);
+  COMP->jz(checkQNaNA);
+  COMP->vmovq(frd, snanQNaNA);
+  COMP->jmp(storeResult);
+
+  // fra QNaN
+  COMP->bind(checkQNaNA);
+  COMP->test(qnanFlagA, qnanFlagA);
+  COMP->jz(checkNaNB);
+  COMP->vmovq(frd, qnanValueA);
+  COMP->jmp(storeResult);
+
+  // frb SNaN
+  COMP->bind(checkNaNB);
+  COMP->test(snanFlagB, snanFlagB);
+  COMP->jz(checkQNaNB);
+  COMP->vmovq(frd, snanQNaNB);
+  COMP->jmp(storeResult);
+
+  // frb QNaN
+  COMP->bind(checkQNaNB);
+  COMP->test(qnanFlagB, qnanFlagB);
+  COMP->jz(checkNaNC);
+  COMP->vmovq(frd, qnanValueB);
+  COMP->jmp(storeResult);
+
+  // frc SNaN
+  COMP->bind(checkNaNC);
+  COMP->test(snanFlagC, snanFlagC);
+  COMP->jz(checkQNaNC);
+  COMP->vmovq(frd, snanQNaNC);
+  COMP->jmp(storeResult);
+
+  // frc QNaN
+  COMP->bind(checkQNaNC);
+  COMP->test(qnanFlagC, qnanFlagC);
+  COMP->jz(checkVximz);
+  COMP->vmovq(frd, qnanValueC);
+  COMP->jmp(storeResult);
+
+  // VXIMZ
+  COMP->bind(checkVximz);
+  COMP->test(vximzFlag, vximzFlag);
+  COMP->jz(computeFMS);
+  {
+    x86::Gp defaultQNaN = newGP64();
+    COMP->mov(defaultQNaN, PPC_DEFAULT_QNAN);
+    COMP->vmovq(frd, defaultQNaN);
+  }
+  COMP->jmp(storeResult);
+
+  COMP->bind(computeFMS);
+
+  // Clear MXCSR exception flags before FMA
+  x86::Gp mxcsrMem = newGP32();
+  x86::Mem mxcsrSlot = b->compiler->newStack(4, 4);
+  COMP->stmxcsr(mxcsrSlot);
+  COMP->mov(mxcsrMem, mxcsrSlot);
+  COMP->and_(mxcsrMem, ~0x3F);
+  COMP->mov(mxcsrSlot, mxcsrMem);
+  COMP->ldmxcsr(mxcsrSlot);
+
+  COMP->vmovaps(frd, fra);
+  COMP->vfmsub213sd(frd, frc, frb);
+
+  COMP->stmxcsr(mxcsrSlot);
+  COMP->mov(mxcsrMem, mxcsrSlot);
+  {
+    Label notInexact = b->compiler->newLabel();
+    COMP->bt(mxcsrMem, 5);
+    COMP->jnc(notInexact);
+
+    x86::Gp fpscr = newGP32();
+    COMP->mov(fpscr, FPSCRPtr().Ptr<u32>());
+    COMP->or_(fpscr, FPSCR_FX_BIT);
+    COMP->mov(FPSCRPtr().Ptr<u32>(), fpscr);
+
+    COMP->bind(notInexact);
+  }
+
+  // Now negate the finite/Inf result. If result is NaN from FMA, do not negate.
+  COMP->bind(negateResult);
+  {
+    x86::Gp resultBits = newGP64();
+    x86::Gp expBits = newGP64();
+    x86::Gp fracBits = newGP64();
+    Label notNaN = b->compiler->newLabel();
+
+    COMP->vmovq(resultBits, frd);
+    COMP->mov(expBits, resultBits);
+    COMP->shr(expBits, 52);
+    COMP->and_(expBits, 0x7FF);
+    COMP->cmp(expBits.r32(), 0x7FF);
+    COMP->jne(notNaN);
+
+    x86::Gp fracMask = newGP64();
+    COMP->mov(fracMask, 0x000FFFFFFFFFFFFFull);
+    COMP->mov(fracBits, resultBits);
+    COMP->and_(fracBits, fracMask);
+    COMP->test(fracBits, fracBits);
+    COMP->jnz(storeResult);  // NaN from FMA, don't negate
+
+    COMP->bind(notNaN);
+    x86::Gp signMask = newGP64();
+    COMP->mov(signMask, 0x8000000000000000ull);
+    COMP->xor_(resultBits, signMask);
+    COMP->vmovq(frd, resultBits);
+  }
+
+  COMP->bind(storeResult);
+  COMP->vmovsd(FPRPtr(instr.frd), frd);
+  J_classifyAndSetFPRF(b, frd);
+
+  if (instr.rc) {
+    J_ppuSetCR1(b);
+  }
+}
+
+// Floating Negative Multiply-Subtract Single (x'EC00 003C')
+void PPCInterpreter::PPCInterpreterJIT_fnmsubsx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  // Ensure FPU is enabled
+  J_checkFPUEnabled(b);
+
+  x86::Xmm fra = newXMM();
+  x86::Xmm frb = newXMM();
+  x86::Xmm frc = newXMM();
+  x86::Xmm frd = newXMM();
+
+  COMP->vmovsd(fra, FPRPtr(instr.fra));
+  COMP->vmovsd(frb, FPRPtr(instr.frb));
+  COMP->vmovsd(frc, FPRPtr(instr.frc));
+
+  J_resetFPSCRExceptionBits(b);
+
+  J_checkAndSetSNaN(b, fra);
+  J_checkAndSetSNaN(b, frb);
+  J_checkAndSetSNaN(b, frc);
+
+  // NaN priority: fra > frb > frc
+  x86::Gp snanFlagA = newGP32();
+  x86::Gp snanQNaNA = newGP64();
+  COMP->xor_(snanFlagA, snanFlagA);
+  J_checkSNaNAndGetQNaN(b, fra, snanFlagA, snanQNaNA);
+
+  x86::Gp qnanFlagA = newGP32();
+  x86::Gp qnanValueA = newGP64();
+  COMP->xor_(qnanFlagA, qnanFlagA);
+  J_checkQNaNAndGetValue(b, fra, qnanFlagA, qnanValueA);
+
+  x86::Gp snanFlagB = newGP32();
+  x86::Gp snanQNaNB = newGP64();
+  COMP->xor_(snanFlagB, snanFlagB);
+  J_checkSNaNAndGetQNaN(b, frb, snanFlagB, snanQNaNB);
+
+  x86::Gp qnanFlagB = newGP32();
+  x86::Gp qnanValueB = newGP64();
+  COMP->xor_(qnanFlagB, qnanFlagB);
+  J_checkQNaNAndGetValue(b, frb, qnanFlagB, qnanValueB);
+
+  x86::Gp snanFlagC = newGP32();
+  x86::Gp snanQNaNC = newGP64();
+  COMP->xor_(snanFlagC, snanFlagC);
+  J_checkSNaNAndGetQNaN(b, frc, snanFlagC, snanQNaNC);
+
+  x86::Gp qnanFlagC = newGP32();
+  x86::Gp qnanValueC = newGP64();
+  COMP->xor_(qnanFlagC, qnanFlagC);
+  J_checkQNaNAndGetValue(b, frc, qnanFlagC, qnanValueC);
+
+  // Infinity flags and denormals for single?precision semantics
+  x86::Gp infFlagA = newGP32();
+  COMP->xor_(infFlagA, infFlagA);
+  J_checkInfinity(b, fra, infFlagA);
+
+  x86::Gp infFlagB = newGP32();
+  COMP->xor_(infFlagB, infFlagB);
+  J_checkInfinity(b, frb, infFlagB);
+
+  x86::Gp infFlagC = newGP32();
+  COMP->xor_(infFlagC, infFlagC);
+  J_checkInfinity(b, frc, infFlagC);
+
+  x86::Gp denormFlag = newGP32();
+  COMP->xor_(denormFlag, denormFlag);
+  J_checkDenormal(b, fra, denormFlag);
+  J_checkDenormal(b, frb, denormFlag);
+  J_checkDenormal(b, frc, denormFlag);
+
+  // Inf * 0
+  x86::Gp vximzFlag = newGP32();
+  J_checkInfMulZero(b, fra, frc, vximzFlag);
+
+  Label checkQNaNA = b->compiler->newLabel();
+  Label checkNaNB = b->compiler->newLabel();
+  Label checkQNaNB = b->compiler->newLabel();
+  Label checkNaNC = b->compiler->newLabel();
+  Label checkQNaNC = b->compiler->newLabel();
+  Label checkVximz = b->compiler->newLabel();
+  Label checkDenorm = b->compiler->newLabel();
+  Label computeFMS = b->compiler->newLabel();
+  Label roundAndNegate = b->compiler->newLabel();
+  Label storeResult = b->compiler->newLabel();
+
+  // fra SNaN
+  COMP->test(snanFlagA, snanFlagA);
+  COMP->jz(checkQNaNA);
+  COMP->vmovq(frd, snanQNaNA);
+  COMP->jmp(storeResult);
+
+  // fra QNaN
+  COMP->bind(checkQNaNA);
+  COMP->test(qnanFlagA, qnanFlagA);
+  COMP->jz(checkNaNB);
+  COMP->vmovq(frd, qnanValueA);
+  COMP->jmp(storeResult);
+
+  // frb SNaN
+  COMP->bind(checkNaNB);
+  COMP->test(snanFlagB, snanFlagB);
+  COMP->jz(checkQNaNB);
+  COMP->vmovq(frd, snanQNaNB);
+  COMP->jmp(storeResult);
+
+  // frb QNaN
+  COMP->bind(checkQNaNB);
+  COMP->test(qnanFlagB, qnanFlagB);
+  COMP->jz(checkNaNC);
+  COMP->vmovq(frd, qnanValueB);
+  COMP->jmp(storeResult);
+
+  // frc SNaN
+  COMP->bind(checkNaNC);
+  COMP->test(snanFlagC, snanFlagC);
+  COMP->jz(checkQNaNC);
+  COMP->vmovq(frd, snanQNaNC);
+  COMP->jmp(storeResult);
+
+  // frc QNaN
+  COMP->bind(checkQNaNC);
+  COMP->test(qnanFlagC, qnanFlagC);
+  COMP->jz(checkVximz);
+  COMP->vmovq(frd, qnanValueC);
+  COMP->jmp(storeResult);
+
+  // VXIMZ
+  COMP->bind(checkVximz);
+  COMP->test(vximzFlag, vximzFlag);
+  COMP->jz(checkDenorm);
+  {
+    x86::Gp defaultQNaN = newGP64();
+    COMP->mov(defaultQNaN, PPC_DEFAULT_QNAN);
+    COMP->vmovq(frd, defaultQNaN);
+  }
+  COMP->jmp(storeResult);
+
+  // Denormal handling: if any denorm and no infinity, go to default QNaN
+  COMP->bind(checkDenorm);
+  COMP->test(denormFlag, denormFlag);
+  COMP->jz(computeFMS);
+
+  {
+    x86::Gp hasInf = newGP32();
+    COMP->mov(hasInf, infFlagA);
+    COMP->or_(hasInf, infFlagB);
+    COMP->or_(hasInf, infFlagC);
+    COMP->test(hasInf, hasInf);
+    COMP->jnz(computeFMS);
+  }
+
+  {
+    x86::Gp defaultQNaN = newGP64();
+    COMP->mov(defaultQNaN, PPC_DEFAULT_QNAN);
+    COMP->vmovq(frd, defaultQNaN);
+  }
+  COMP->jmp(storeResult);
+
+  // Normal FMS path
+  COMP->bind(computeFMS);
+  COMP->vmovaps(frd, fra);
+  COMP->vfmsub213sd(frd, frc, frb);
+
+  // Round to single then negate unless NaN from FMA
+  COMP->bind(roundAndNegate);
+  J_roundToSingle(b, frd);
+
+  {
+    x86::Gp resultBits = newGP64();
+    x86::Gp expBits = newGP64();
+    x86::Gp fracBits = newGP64();
+    Label notNaN = b->compiler->newLabel();
+
+    COMP->vmovq(resultBits, frd);
+    COMP->mov(expBits, resultBits);
+    COMP->shr(expBits, 52);
+    COMP->and_(expBits, 0x7FF);
+    COMP->cmp(expBits.r32(), 0x7FF);
+    COMP->jne(notNaN);
+
+    x86::Gp fracMask = newGP64();
+    COMP->mov(fracMask, 0x000FFFFFFFFFFFFFull);
+    COMP->mov(fracBits, resultBits);
+    COMP->and_(fracBits, fracMask);
+    COMP->test(fracBits, fracBits);
+    COMP->jnz(storeResult);  // NaN from FMA, don't negate
+
+    COMP->bind(notNaN);
+    x86::Gp signMask = newGP64();
+    COMP->mov(signMask, 0x8000000000000000ull);
+    COMP->xor_(resultBits, signMask);
+    COMP->vmovq(frd, resultBits);
+  }
+
+  COMP->bind(storeResult);
   COMP->vmovsd(FPRPtr(instr.frd), frd);
   J_classifyAndSetFPRF(b, frd);
 

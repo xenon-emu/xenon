@@ -264,11 +264,6 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
       PPCInterpreter::ppcExecuteSingleInstruction(ppeState.get());
     }
 
-    // Check for external interrupts
-    if (curThread.SPR.MSR.EE && xenonContext->iic.hasPendingInterrupts(curThread.SPR.PIR)) {
-      _ex |= ppuExternalEx;
-    }
-
     // Handle pending exceptions
     PPUCheckExceptions();
 
@@ -774,28 +769,7 @@ bool PPU::PPUCheckExceptions() {
       exceptions &= ~ppuProgramEx;
       return true;
     }
-    //
-    // 5. External, Decrementer, and Hypervisor Decrementer
-    //
-    // External
-    if (exceptions & ppuExternalEx && thread.SPR.MSR.EE) {
-      PPUExternalException(ppeState.get());
-      exceptions &= ~ppuExternalEx;
-      return true;
-    }
-    // Decrementer. A dec exception may be present but will only be taken when
-    // the EE bit of MSR is set.
-    if (exceptions & ppuDecrementerEx && thread.SPR.MSR.EE) {
-      PPUDecrementerException(ppeState.get());
-      exceptions &= ~ppuDecrementerEx;
-      return true;
-    }
-    // Hypervisor Decrementer
-    if (exceptions & ppuHypervisorDecrementerEx) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Hypervisor Decrementer.", ppeState->ppuName, static_cast<u8>(curThreadId));
-      exceptions &= ~ppuHypervisorDecrementerEx;
-      return true;
-    }
+
     // VX Unavailable.
     if (exceptions & ppuVXUnavailableEx) {
       PPUVXUnavailableException(ppeState.get());
@@ -803,6 +777,32 @@ bool PPU::PPUCheckExceptions() {
       return true;
     }
   }
+
+  // No higher exceptions are present, check and process External Exceptions
+  // This is done here to avoid bugs due to how PPC exceptions work.
+  if (thread.SPR.MSR.EE) {
+    // Only check on the IIC if EE is set.
+    if (xenonContext->iic.hasPendingInterrupts(thread.SPR.PIR)) {
+      PPUExternalException(ppeState.get());
+      return true;
+    }
+
+    // Decrementer. A dec exception may be present but will only be taken when
+    // the EE bit of MSR is set.
+    if (exceptions & ppuDecrementerEx) {
+      PPUDecrementerException(ppeState.get());
+      exceptions &= ~ppuDecrementerEx;
+      return true;
+    }
+
+    // Hypervisor Decrementer
+    if (exceptions & ppuHypervisorDecrementerEx) {
+      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Hypervisor Decrementer.", ppeState->ppuName, static_cast<u8>(curThreadId));
+      exceptions &= ~ppuHypervisorDecrementerEx;
+      return true;
+    }
+  }
+
   // No exceptions have ocurred.
   return false;
 }

@@ -226,16 +226,8 @@ void PPU_JIT::InstrPrologue(JITBlockBuilder *b, u32 instrData) {
 }
 
 // Instruction Epilogue
-// * Checks and advances TimeBase
 // * Checks for external interrupts and exceptions.
 bool InstrEpilogue(PPU *ppu, sPPEState *ppeState) {
-  // Get current thread.
-  auto &thread = ppeState->ppuThread[ppeState->currentThread];
-  // Check for external interrupts.
-  if (thread.SPR.MSR.EE && ppu->xenonContext->iic.hasPendingInterrupts(thread.SPR.PIR)) {
-    thread.exceptReg |= ppuExternalEx;
-  }
-
   // Check if exceptions are pending and process them in order.
   return ppu->PPUCheckExceptions();
 }
