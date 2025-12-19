@@ -133,7 +133,7 @@ inline void J_FlushDenormalsToZero(JITBlockBuilder *b, x86::Xmm vec) {
 void PPCInterpreter::PPCInterpreterJIT_vaddfp(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure VXU is enabled
   J_checkVXUEnabled(b);
-  
+
   x86::Xmm vA = newXMM();
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
@@ -1081,7 +1081,7 @@ void PPCInterpreter::PPCInterpreterJIT_vspltw128(sPPEState *ppeState, JITBlockBu
 
 // Vector Shift Left Integer Byte (x'1000 0104')
 // NOTE: Theres a faster path for emulating this instruction, but requires AVX-512 for using vpsllvm.
-void PPCInterpreter::PPCInterpreterJIT_vslb(sPPEState * ppeState, JITBlockBuilder * b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_vslb(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure VXU is enabled
   J_checkVXUEnabled(b);
 
@@ -1552,27 +1552,27 @@ void PPCInterpreter::PPCInterpreterJIT_vexptefp(sPPEState *ppeState, JITBlockBui
 
   // Optimized minimax polynomial coefficients for 2^x on [0, 1)
   // p(x) = C0 + x*(C1 + x*(C2 + x*(C3 + x*C4)))
-  
+
   // C0 = 1.0
   COMP->mov(tempGp, 0x3F800000); // 1.0f
   COMP->vmovd(vC0, tempGp);
   COMP->vbroadcastss(vC0, vC0);
-  
+
   // C1 = 0.693147180559945 (ln 2)
   COMP->mov(tempGp, 0x3F317218); // 0.6931472f
   COMP->vmovd(vC1, tempGp);
   COMP->vbroadcastss(vC1, vC1);
-  
+
   // C2 = 0.240226506959101 (ln2^2 / 2)
   COMP->mov(tempGp, 0x3E75FDF0); // 0.2402265f
   COMP->vmovd(vC2, tempGp);
   COMP->vbroadcastss(vC2, vC2);
-  
+
   // C3 = 0.0555041086648216 (ln2^3 / 6)
   COMP->mov(tempGp, 0x3D635847); // 0.0555041f
   COMP->vmovd(vC3, tempGp);
   COMP->vbroadcastss(vC3, vC3);
-  
+
   // C4 = 0.00961812910762848 (ln2^4 / 24)
   COMP->mov(tempGp, 0x3C1D9539); // 0.0096181f
   COMP->vmovd(vC4, tempGp);
@@ -1582,7 +1582,7 @@ void PPCInterpreter::PPCInterpreterJIT_vexptefp(sPPEState *ppeState, JITBlockBui
   COMP->mov(tempGp, 0xFFFF0000);
   COMP->vmovd(vMantissaMask, tempGp);
   COMP->vbroadcastss(vMantissaMask, vMantissaMask);
-  
+
   // Rounding bit for round-to-nearest behavior
   COMP->mov(tempGp, 0x00008000);
   COMP->vmovd(vRoundBit, tempGp);
@@ -1707,192 +1707,192 @@ void PPCInterpreter::PPCInterpreterJIT_vlogefp(sPPEState *ppeState, JITBlockBuil
   // vD = log2(vB) for each element
  // Compute log2(x) = exponent + log2(mantissa) with mantissa in [1,2)
 
- x86::Xmm vB = newXMM();
- x86::Xmm vD = newXMM();
- x86::Xmm vInput = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Xmm vInput = newXMM();
 
- // Load vB
- COMP->vmovaps(vB, VPRPtr(instr.vb));
- COMP->vmovaps(vInput, vB);
+  // Load vB
+  COMP->vmovaps(vB, VPRPtr(instr.vb));
+  COMP->vmovaps(vInput, vB);
 
- // Instead of calling the generic flush helper, explicitly clear denormals using integer ops:
- // denormal if exponent ==0 and mantissa !=0 -> set lane to zero.
+  // Instead of calling the generic flush helper, explicitly clear denormals using integer ops:
+  // denormal if exponent ==0 and mantissa !=0 -> set lane to zero.
 
- x86::Gp tempGp = newGP32();
- x86::Xmm vBits = newXMM();
- x86::Xmm vExpMask = newXMM();
- x86::Xmm vMantMask = newXMM();
- x86::Xmm vExpShift = newXMM();
- x86::Xmm vMantI = newXMM();
- x86::Xmm vZeroInt = newXMM();
- x86::Xmm vAllOnes = newXMM();
- x86::Xmm vExpEqZero = newXMM();
- x86::Xmm vMantEqZero = newXMM();
- x86::Xmm vMantNotZero = newXMM();
- x86::Xmm vDenormMask = newXMM();
- x86::Xmm vKeepMask = newXMM();
+  x86::Gp tempGp = newGP32();
+  x86::Xmm vBits = newXMM();
+  x86::Xmm vExpMask = newXMM();
+  x86::Xmm vMantMask = newXMM();
+  x86::Xmm vExpShift = newXMM();
+  x86::Xmm vMantI = newXMM();
+  x86::Xmm vZeroInt = newXMM();
+  x86::Xmm vAllOnes = newXMM();
+  x86::Xmm vExpEqZero = newXMM();
+  x86::Xmm vMantEqZero = newXMM();
+  x86::Xmm vMantNotZero = newXMM();
+  x86::Xmm vDenormMask = newXMM();
+  x86::Xmm vKeepMask = newXMM();
 
- // Bitwise copy of input bits
- COMP->vmovaps(vBits, vB);
+  // Bitwise copy of input bits
+  COMP->vmovaps(vBits, vB);
 
- // Prepare integer masks
- COMP->mov(tempGp,0x7F800000);
- COMP->vmovd(vExpMask, tempGp);
- COMP->vpbroadcastd(vExpMask, vExpMask);
+  // Prepare integer masks
+  COMP->mov(tempGp, 0x7F800000);
+  COMP->vmovd(vExpMask, tempGp);
+  COMP->vpbroadcastd(vExpMask, vExpMask);
 
- COMP->mov(tempGp,0x007FFFFF);
- COMP->vmovd(vMantMask, tempGp);
- COMP->vpbroadcastd(vMantMask, vMantMask);
+  COMP->mov(tempGp, 0x007FFFFF);
+  COMP->vmovd(vMantMask, tempGp);
+  COMP->vpbroadcastd(vMantMask, vMantMask);
 
- // Zero and all-ones integer vectors
- COMP->vxorps(vZeroInt, vZeroInt, vZeroInt); // zero
- COMP->mov(tempGp,0xFFFFFFFFu);
- COMP->vmovd(vAllOnes, tempGp);
- COMP->vpbroadcastd(vAllOnes, vAllOnes);
+  // Zero and all-ones integer vectors
+  COMP->vxorps(vZeroInt, vZeroInt, vZeroInt); // zero
+  COMP->mov(tempGp, 0xFFFFFFFFu);
+  COMP->vmovd(vAllOnes, tempGp);
+  COMP->vpbroadcastd(vAllOnes, vAllOnes);
 
- // Extract exponent bits (integer) and shift right by23
- COMP->vpand(vExpShift, vBits, vExpMask);
- COMP->vpsrld(vExpShift, vExpShift,23);
+  // Extract exponent bits (integer) and shift right by23
+  COMP->vpand(vExpShift, vBits, vExpMask);
+  COMP->vpsrld(vExpShift, vExpShift, 23);
 
- // Extract mantissa bits (integer)
- COMP->vpand(vMantI, vBits, vMantMask);
+  // Extract mantissa bits (integer)
+  COMP->vpand(vMantI, vBits, vMantMask);
 
- // exp ==0 ?
- COMP->vpcmpeqd(vExpEqZero, vExpShift, vZeroInt);
- // mant ==0 ?
- COMP->vpcmpeqd(vMantEqZero, vMantI, vZeroInt);
- // mant !=0
- COMP->vpxor(vMantNotZero, vMantEqZero, vAllOnes);
+  // exp ==0 ?
+  COMP->vpcmpeqd(vExpEqZero, vExpShift, vZeroInt);
+  // mant ==0 ?
+  COMP->vpcmpeqd(vMantEqZero, vMantI, vZeroInt);
+  // mant !=0
+  COMP->vpxor(vMantNotZero, vMantEqZero, vAllOnes);
 
- // denormal lanes = expEqZero & mantNotZero
- COMP->vpand(vDenormMask, vExpEqZero, vMantNotZero);
+  // denormal lanes = expEqZero & mantNotZero
+  COMP->vpand(vDenormMask, vExpEqZero, vMantNotZero);
 
- // keep mask = ~denorm
- COMP->vpxor(vKeepMask, vDenormMask, vAllOnes);
+  // keep mask = ~denorm
+  COMP->vpxor(vKeepMask, vDenormMask, vAllOnes);
 
- // Zero-out denormal lanes
- COMP->vpand(vB, vB, vKeepMask);
+  // Zero-out denormal lanes
+  COMP->vpand(vB, vB, vKeepMask);
 
- // Save modified input for special-case detection
- COMP->vmovaps(vInput, vB);
+  // Save modified input for special-case detection
+  COMP->vmovaps(vInput, vB);
 
- // Continue with rest of implementation...
+  // Continue with rest of implementation...
 
- // Temps
- x86::Xmm vExpInt = newXMM();
- x86::Xmm vMantInt = newXMM();
- x86::Xmm vMant = newXMM();
- x86::Xmm vF = newXMM();
- x86::Xmm vPoly = newXMM();
- x86::Xmm vExp = newXMM();
- x86::Xmm vOneBits = newXMM(); //0x3F800000 (1.0f bits)
- x86::Xmm vExpBiasInt = newXMM(); //127 as int
- x86::Xmm vOne = newXMM();
+  // Temps
+  x86::Xmm vExpInt = newXMM();
+  x86::Xmm vMantInt = newXMM();
+  x86::Xmm vMant = newXMM();
+  x86::Xmm vF = newXMM();
+  x86::Xmm vPoly = newXMM();
+  x86::Xmm vExp = newXMM();
+  x86::Xmm vOneBits = newXMM(); //0x3F800000 (1.0f bits)
+  x86::Xmm vExpBiasInt = newXMM(); //127 as int
+  x86::Xmm vOne = newXMM();
 
- // Load ones/biases used later
- COMP->mov(tempGp,0x3F800000);
- COMP->vmovd(vOneBits, tempGp);
- COMP->vpbroadcastd(vOneBits, vOneBits);
+  // Load ones/biases used later
+  COMP->mov(tempGp, 0x3F800000);
+  COMP->vmovd(vOneBits, tempGp);
+  COMP->vpbroadcastd(vOneBits, vOneBits);
 
- COMP->mov(tempGp,127);
- COMP->vmovd(vExpBiasInt, tempGp);
- COMP->vpbroadcastd(vExpBiasInt, vExpBiasInt);
+  COMP->mov(tempGp, 127);
+  COMP->vmovd(vExpBiasInt, tempGp);
+  COMP->vpbroadcastd(vExpBiasInt, vExpBiasInt);
 
- // Extract exponent -> integer value (use modified vB so denormals are treated as zero)
- COMP->vpand(vExpInt, vB, vExpMask);
- COMP->vpsrld(vExpInt, vExpInt,23);
- COMP->vpsubd(vExpInt, vExpInt, vExpBiasInt); // exp -127
- COMP->vcvtdq2ps(vExp, vExpInt); // to float
+  // Extract exponent -> integer value (use modified vB so denormals are treated as zero)
+  COMP->vpand(vExpInt, vB, vExpMask);
+  COMP->vpsrld(vExpInt, vExpInt, 23);
+  COMP->vpsubd(vExpInt, vExpInt, vExpBiasInt); // exp -127
+  COMP->vcvtdq2ps(vExp, vExpInt); // to float
 
- // Extract mantissa and set exponent bits to127 to get mantissa in [1,2) (use vB)
- COMP->vpand(vMantInt, vB, vMantMask);
- COMP->vpor(vMantInt, vMantInt, vOneBits);
- COMP->vmovaps(vMant, vMantInt);
+  // Extract mantissa and set exponent bits to127 to get mantissa in [1,2) (use vB)
+  COMP->vpand(vMantInt, vB, vMantMask);
+  COMP->vpor(vMantInt, vMantInt, vOneBits);
+  COMP->vmovaps(vMant, vMantInt);
 
- // f = mantissa -1.0
- COMP->mov(tempGp,0x3F800000);
- COMP->vmovd(vOne, tempGp);
- COMP->vbroadcastss(vOne, vOne);
- COMP->vsubps(vF, vMant, vOne);
+  // f = mantissa -1.0
+  COMP->mov(tempGp, 0x3F800000);
+  COMP->vmovd(vOne, tempGp);
+  COMP->vbroadcastss(vOne, vOne);
+  COMP->vsubps(vF, vMant, vOne);
 
- // Polynomial approximation for log2(1+f) on f in [0,1)
- // Use4th-order Horner: (((c4*f + c3)*f + c2)*f + c1)*f)
- x86::Xmm vC1 = newXMM();
- x86::Xmm vC2 = newXMM();
- x86::Xmm vC3 = newXMM();
- x86::Xmm vC4 = newXMM();
+  // Polynomial approximation for log2(1+f) on f in [0,1)
+  // Use4th-order Horner: (((c4*f + c3)*f + c2)*f + c1)*f)
+  x86::Xmm vC1 = newXMM();
+  x86::Xmm vC2 = newXMM();
+  x86::Xmm vC3 = newXMM();
+  x86::Xmm vC4 = newXMM();
 
- // Coefficients (approximate): these map to float bit patterns
- COMP->mov(tempGp,0x3FB8AA3B); // ~1.442695 (1/ln2)
- COMP->vmovd(vC1, tempGp);
- COMP->vbroadcastss(vC1, vC1);
+  // Coefficients (approximate): these map to float bit patterns
+  COMP->mov(tempGp, 0x3FB8AA3B); // ~1.442695 (1/ln2)
+  COMP->vmovd(vC1, tempGp);
+  COMP->vbroadcastss(vC1, vC1);
 
- COMP->mov(tempGp,0xBE38D6AD); // ~-0.7213475 (-1/(2 ln2))
- COMP->vmovd(vC2, tempGp);
- COMP->vbroadcastss(vC2, vC2);
+  COMP->mov(tempGp, 0xBE38D6AD); // ~-0.7213475 (-1/(2 ln2))
+  COMP->vmovd(vC2, tempGp);
+  COMP->vbroadcastss(vC2, vC2);
 
- COMP->mov(tempGp,0x3EE3E6B0); // ~0.48089835 (1/(3 ln2))
- COMP->vmovd(vC3, tempGp);
- COMP->vbroadcastss(vC3, vC3);
+  COMP->mov(tempGp, 0x3EE3E6B0); // ~0.48089835 (1/(3 ln2))
+  COMP->vmovd(vC3, tempGp);
+  COMP->vbroadcastss(vC3, vC3);
 
- COMP->mov(tempGp,0xBE2E1476); // ~-0.36067376 (-1/(4 ln2))
- COMP->vmovd(vC4, tempGp);
- COMP->vbroadcastss(vC4, vC4);
+  COMP->mov(tempGp, 0xBE2E1476); // ~-0.36067376 (-1/(4 ln2))
+  COMP->vmovd(vC4, tempGp);
+  COMP->vbroadcastss(vC4, vC4);
 
- // Horner evaluation
- COMP->vmovaps(vPoly, vC4);
- COMP->vmulps(vPoly, vPoly, vF);
- COMP->vaddps(vPoly, vPoly, vC3);
- COMP->vmulps(vPoly, vPoly, vF);
- COMP->vaddps(vPoly, vPoly, vC2);
- COMP->vmulps(vPoly, vPoly, vF);
- COMP->vaddps(vPoly, vPoly, vC1);
- COMP->vmulps(vPoly, vPoly, vF);
- // No constant term (log2(1+f) has zero constant)
+  // Horner evaluation
+  COMP->vmovaps(vPoly, vC4);
+  COMP->vmulps(vPoly, vPoly, vF);
+  COMP->vaddps(vPoly, vPoly, vC3);
+  COMP->vmulps(vPoly, vPoly, vF);
+  COMP->vaddps(vPoly, vPoly, vC2);
+  COMP->vmulps(vPoly, vPoly, vF);
+  COMP->vaddps(vPoly, vPoly, vC1);
+  COMP->vmulps(vPoly, vPoly, vF);
+  // No constant term (log2(1+f) has zero constant)
 
- // result = exponent + poly
- COMP->vaddps(vD, vExp, vPoly);
+  // result = exponent + poly
+  COMP->vaddps(vD, vExp, vPoly);
 
- // Special cases
- x86::Xmm vZero = newXMM();
- x86::Xmm vPosInf = newXMM();
- x86::Xmm vNegInf = newXMM();
- x86::Xmm vQNaNBit = newXMM();
- x86::Xmm vQNaN = newXMM();
- x86::Xmm vCmpNaN = newXMM();
- x86::Xmm vCmpPosInf = newXMM();
- x86::Xmm vCmpNeg = newXMM();
- x86::Xmm vCmpZero = newXMM();
+  // Special cases
+  x86::Xmm vZero = newXMM();
+  x86::Xmm vPosInf = newXMM();
+  x86::Xmm vNegInf = newXMM();
+  x86::Xmm vQNaNBit = newXMM();
+  x86::Xmm vQNaN = newXMM();
+  x86::Xmm vCmpNaN = newXMM();
+  x86::Xmm vCmpPosInf = newXMM();
+  x86::Xmm vCmpNeg = newXMM();
+  x86::Xmm vCmpZero = newXMM();
 
- COMP->vxorps(vZero, vZero, vZero);
- COMP->mov(tempGp,0x7F800000); COMP->vmovd(vPosInf, tempGp); COMP->vbroadcastss(vPosInf, vPosInf);
- COMP->mov(tempGp,0xFF800000); COMP->vmovd(vNegInf, tempGp); COMP->vbroadcastss(vNegInf, vNegInf);
- COMP->mov(tempGp,0x00400000); COMP->vmovd(vQNaNBit, tempGp); COMP->vbroadcastss(vQNaNBit, vQNaNBit);
+  COMP->vxorps(vZero, vZero, vZero);
+  COMP->mov(tempGp, 0x7F800000); COMP->vmovd(vPosInf, tempGp); COMP->vbroadcastss(vPosInf, vPosInf);
+  COMP->mov(tempGp, 0xFF800000); COMP->vmovd(vNegInf, tempGp); COMP->vbroadcastss(vNegInf, vNegInf);
+  COMP->mov(tempGp, 0x00400000); COMP->vmovd(vQNaNBit, tempGp); COMP->vbroadcastss(vQNaNBit, vQNaNBit);
 
- // NaN test: unordered with itself
- COMP->vcmpps(vCmpNaN, vInput, vInput,3);
- // +inf
- COMP->vcmpps(vCmpPosInf, vInput, vPosInf,0);
- // negative values (less than zero)
- COMP->vcmpps(vCmpNeg, vInput, vZero,1);
- // zero
- COMP->vcmpps(vCmpZero, vInput, vZero,0);
+  // NaN test: unordered with itself
+  COMP->vcmpps(vCmpNaN, vInput, vInput, 3);
+  // +inf
+  COMP->vcmpps(vCmpPosInf, vInput, vPosInf, 0);
+  // negative values (less than zero)
+  COMP->vcmpps(vCmpNeg, vInput, vZero, 1);
+  // zero
+  COMP->vcmpps(vCmpZero, vInput, vZero, 0);
 
- // Create QNaN by setting quiet bit
- COMP->vorps(vQNaN, vInput, vQNaNBit);
+  // Create QNaN by setting quiet bit
+  COMP->vorps(vQNaN, vInput, vQNaNBit);
 
- // Apply special cases (order matters - NaN should override others)
- // negative -> QNaN
- COMP->vblendvps(vD, vD, vQNaN, vCmpNeg);
- // NaN -> QNaN
- COMP->vblendvps(vD, vD, vQNaN, vCmpNaN);
- // +inf -> +inf (log2(+inf) = +inf)
- COMP->vblendvps(vD, vD, vPosInf, vCmpPosInf);
- // zero -> -inf
- COMP->vblendvps(vD, vD, vNegInf, vCmpZero);
+  // Apply special cases (order matters - NaN should override others)
+  // negative -> QNaN
+  COMP->vblendvps(vD, vD, vQNaN, vCmpNeg);
+  // NaN -> QNaN
+  COMP->vblendvps(vD, vD, vQNaN, vCmpNaN);
+  // +inf -> +inf (log2(+inf) = +inf)
+  COMP->vblendvps(vD, vD, vPosInf, vCmpPosInf);
+  // zero -> -inf
+  COMP->vblendvps(vD, vD, vNegInf, vCmpZero);
 
- // Store result
- COMP->vmovaps(VPRPtr(instr.vd), vD);
- }
+  // Store result
+  COMP->vmovaps(VPRPtr(instr.vd), vD);
+}
 
- #endif
+#endif
