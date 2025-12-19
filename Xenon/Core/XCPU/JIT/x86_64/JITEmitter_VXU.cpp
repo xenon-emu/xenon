@@ -18,35 +18,40 @@
 
 #define newXMM() b->compiler->newXmm()
 
+// Selects the right byte/word from a vector. 
+// We need to flip logical indices (0,1,2,3,4,5,6,7,...) = (3,2,1,0,7,6,5,4,...)
+#define VEC128_BYTE_VMX_TO_AVX(idx) ((idx) ^ 0x3)
+#define VEC128_WORD_VMX_TO_AVX(idx) ((idx) ^ 0x1)
+
 //
 // VMX 128 Instruction bitfields
 //
 
 // Re declared here because of the way JIT uses CI
 
-#define VMX128_VD128   (instr.VMX128.VD128l | (instr.VMX128.VD128h << 5))
-#define VMX128_VA128   (instr.VMX128.VA128l | (instr.VMX128.VA128h << 5) | (instr.VMX128.VA128H << 6))
-#define VMX128_VB128   (instr.VMX128.VB128l | (instr.VMX128.VB128h << 5))
+#define J_VMX128_VD128   (instr.VMX128.VD128l | (instr.VMX128.VD128h << 5))
+#define J_VMX128_VA128   (instr.VMX128.VA128l | (instr.VMX128.VA128h << 5) | (instr.VMX128.VA128H << 6))
+#define J_VMX128_VB128   (instr.VMX128.VB128l | (instr.VMX128.VB128h << 5))
 
-#define VMX128_1_VD128 (instr.VMX128_1.VD128l | (instr.VMX128_1.VD128h << 5))
+#define J_VMX128_1_VD128 (instr.VMX128_1.VD128l | (instr.VMX128_1.VD128h << 5))
 
-#define VMX128_2_VD128 (instr.VMX128_2.VD128l | (instr.VMX128_2.VD128h << 5))
-#define VMX128_2_VA128 (instr.VMX128_2.VA128l | (instr.VMX128_2.VA128h << 5) | (instr.VMX128_2.VA128H << 6))
-#define VMX128_2_VB128 (instr.VMX128_2.VB128l | (instr.VMX128_2.VB128h << 5))
-#define VMX128_2_VC    (instr.VMX128_2.VC)
+#define J_VMX128_2_VD128 (instr.VMX128_2.VD128l | (instr.VMX128_2.VD128h << 5))
+#define J_VMX128_2_VA128 (instr.VMX128_2.VA128l | (instr.VMX128_2.VA128h << 5) | (instr.VMX128_2.VA128H << 6))
+#define J_VMX128_2_VB128 (instr.VMX128_2.VB128l | (instr.VMX128_2.VB128h << 5))
+#define J_VMX128_2_VC    (instr.VMX128_2.VC)
 
-#define VMX128_3_VD128 (instr.VMX128_3.VD128l | (instr.VMX128_3.VD128h << 5))
-#define VMX128_3_VB128 (instr.VMX128_3.VB128l | (instr.VMX128_3.VB128h << 5))
-#define VMX128_3_IMM   (instr.VMX128_3.IMM)
+#define J_VMX128_3_VD128 (instr.VMX128_3.VD128l | (instr.VMX128_3.VD128h << 5))
+#define J_VMX128_3_VB128 (instr.VMX128_3.VB128l | (instr.VMX128_3.VB128h << 5))
+#define J_VMX128_3_IMM   (instr.VMX128_3.IMM)
 
-#define VMX128_5_VD128 (instr.VMX128_5.VD128l | (instr.VMX128_5.VD128h << 5))
-#define VMX128_5_VA128 (instr.VMX128_5.VA128l | (instr.VMX128_5.VA128h << 5)) | (instr.VMX128_5.VA128H << 6)
-#define VMX128_5_VB128 (instr.VMX128_5.VB128l | (instr.VMX128_5.VB128h << 5))
-#define VMX128_5_SH    (instr.VMX128_5.SH)
+#define J_VMX128_5_VD128 (instr.VMX128_5.VD128l | (instr.VMX128_5.VD128h << 5))
+#define J_VMX128_5_VA128 (instr.VMX128_5.VA128l | (instr.VMX128_5.VA128h << 5)) | (instr.VMX128_5.VA128H << 6)
+#define J_VMX128_5_VB128 (instr.VMX128_5.VB128l | (instr.VMX128_5.VB128h << 5))
+#define J_VMX128_5_SH    (instr.VMX128_5.SH)
 
-#define VMX128_R_VD128 (instr.VMX128_R.VD128l | (instr.VMX128_R.VD128h << 5))
-#define VMX128_R_VA128 (instr.VMX128_R.VA128l | (instr.VMX128_R.VA128h << 5) | (instr.VMX128_R.VA128H << 6))
-#define VMX128_R_VB128 (instr.VMX128_R.VB128l | (instr.VMX128_R.VB128h << 5))
+#define J_VMX128_R_VD128 (instr.VMX128_R.VD128l | (instr.VMX128_R.VD128h << 5))
+#define J_VMX128_R_VA128 (instr.VMX128_R.VA128l | (instr.VMX128_R.VA128h << 5) | (instr.VMX128_R.VA128H << 6))
+#define J_VMX128_R_VB128 (instr.VMX128_R.VB128l | (instr.VMX128_R.VB128h << 5))
 
 //
 // Helpers
@@ -88,10 +93,10 @@ inline void J_FlushDenormalsToZero(JITBlockBuilder *b, x86::Xmm vec) {
   // Simpler approach: Use ANDPS with a mask that preserves only normalized values
   // A float is denormal if (bits & 0x7F800000) == 0 and (bits & 0x007FFFFF) != 0
 
-  x86::Xmm absVal = b->compiler->newXmm();
-  x86::Xmm expMask = b->compiler->newXmm();
-  x86::Xmm cmpResult = b->compiler->newXmm();
-  x86::Gp tempGp = b->compiler->newGpq();
+  x86::Xmm absVal = newXMM();
+  x86::Xmm expMask = newXMM();
+  x86::Xmm cmpResult = newXMM();
+  x86::Gp tempGp = newGP64();
 
   // Absolute value mask (clear sign bit): 0x7FFFFFFF
   COMP->mov(tempGp, 0x7FFFFFFF7FFFFFFF);
@@ -112,7 +117,7 @@ inline void J_FlushDenormalsToZero(JITBlockBuilder *b, x86::Xmm vec) {
 
   // Compare: if exponent bits are zero, the value is denormal or zero
   // We want to keep the value only if exponent bits are non-zero
-  x86::Xmm zeroVec = b->compiler->newXmm();
+  x86::Xmm zeroVec = newXMM();
   COMP->vxorps(zeroVec, zeroVec, zeroVec);
 
   // cmpResult = (cmpResult != 0) ? 0xFFFFFFFF : 0x00000000
@@ -133,10 +138,7 @@ void PPCInterpreter::PPCInterpreterJIT_vaddfp(sPPEState *ppeState, JITBlockBuild
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vA (128-bit vector from VPR[va])
   COMP->vmovaps(vA, VPRPtr(instr.va));
-
-  // Load vB (128-bit vector from VPR[vb])
   COMP->vmovaps(vB, VPRPtr(instr.vb));
 
   // Flush denormal inputs to zero (VMX behavior)
@@ -150,7 +152,6 @@ void PPCInterpreter::PPCInterpreterJIT_vaddfp(sPPEState *ppeState, JITBlockBuild
   // Flush denormal result to zero (VMX behavior)
   J_FlushDenormalsToZero(b, vD);
 
-  // Store result to vD (VPR[vd])
   COMP->vmovaps(VPRPtr(instr.vd), vD);
 }
 
@@ -163,11 +164,8 @@ void PPCInterpreter::PPCInterpreterJIT_vaddfp128(sPPEState *ppeState, JITBlockBu
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vA (128-bit vector from VPR[va])
-  COMP->vmovaps(vA, VPRPtr(VMX128_VA128));
-
-  // Load vB (128-bit vector from VPR[vb])
-  COMP->vmovaps(vB, VPRPtr(VMX128_VB128));
+  COMP->vmovaps(vA, VPRPtr(J_VMX128_VA128));
+  COMP->vmovaps(vB, VPRPtr(J_VMX128_VB128));
 
   // Flush denormal inputs to zero (VMX behavior)
   J_FlushDenormalsToZero(b, vA);
@@ -180,8 +178,7 @@ void PPCInterpreter::PPCInterpreterJIT_vaddfp128(sPPEState *ppeState, JITBlockBu
   // Flush denormal result to zero (VMX behavior)
   J_FlushDenormalsToZero(b, vD);
 
-  // Store result to vD (VPR[vd])
-  COMP->vmovaps(VPRPtr(VMX128_VD128), vD);
+  COMP->vmovaps(VPRPtr(J_VMX128_VD128), vD);
 }
 
 // Vector Add Carry Unsigned Word (x'1000 0180')
@@ -196,7 +193,6 @@ void PPCInterpreter::PPCInterpreterJIT_vaddcuw(sPPEState *ppeState, JITBlockBuil
   x86::Xmm vCmp = newXMM();
   x86::Xmm vOne = newXMM();
 
-  // Load vA and vB (128-bit vectors)
   COMP->vmovdqa(vA, VPRPtr(instr.va));
   COMP->vmovdqa(vB, VPRPtr(instr.vb));
 
@@ -219,7 +215,7 @@ void PPCInterpreter::PPCInterpreterJIT_vaddcuw(sPPEState *ppeState, JITBlockBuil
   // But easier: compare vSum < vA using unsigned trick
 
   x86::Xmm vSignBit = newXMM();
-  x86::Gp tempGp = b->compiler->newGpq();
+  x86::Gp tempGp = newGP64();
 
   // Create sign bit mask: 0x80000000 for each dword
   COMP->mov(tempGp, 0x8000000080000000ULL);
@@ -243,7 +239,6 @@ void PPCInterpreter::PPCInterpreterJIT_vaddcuw(sPPEState *ppeState, JITBlockBuil
   // Convert mask to 1 or 0: vD = vCmp & 1
   COMP->vpand(vD, vCmp, vOne);
 
-  // Store result to vD
   COMP->vmovdqa(VPRPtr(instr.vd), vD);
 }
 
@@ -256,14 +251,9 @@ void PPCInterpreter::PPCInterpreterJIT_vand(sPPEState *ppeState, JITBlockBuilder
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vA and vB (128-bit vectors)
   COMP->vmovdqa(vA, VPRPtr(instr.va));
   COMP->vmovdqa(vB, VPRPtr(instr.vb));
-
-  // Bitwise AND: vD = vA & vB
   COMP->vpand(vD, vA, vB);
-
-  // Store result to vD (VPR[vd])
   COMP->vmovdqa(VPRPtr(instr.vd), vD);
 }
 
@@ -276,15 +266,10 @@ void PPCInterpreter::PPCInterpreterJIT_vand128(sPPEState *ppeState, JITBlockBuil
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vA and vB (128-bit vectors)
-  COMP->vmovdqa(vA, VPRPtr(VMX128_VA128));
-  COMP->vmovdqa(vB, VPRPtr(VMX128_VB128));
-
-  // Bitwise AND: vD = vA & vB
+  COMP->vmovdqa(vA, VPRPtr(J_VMX128_VA128));
+  COMP->vmovdqa(vB, VPRPtr(J_VMX128_VB128));
   COMP->vpand(vD, vA, vB);
-
-  // Store result to vD (VPR[vd])
-  COMP->vmovdqa(VPRPtr(VMX128_VD128), vD);
+  COMP->vmovdqa(VPRPtr(J_VMX128_VD128), vD);
 }
 
 // Vector Logical AND with Complement (x'1000 0444')
@@ -296,16 +281,9 @@ void PPCInterpreter::PPCInterpreterJIT_vandc(sPPEState *ppeState, JITBlockBuilde
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vA and vB (128-bit vectors)
   COMP->vmovdqa(vA, VPRPtr(instr.va));
   COMP->vmovdqa(vB, VPRPtr(instr.vb));
-
-  // vandc = vA & ~vB
-  // AVX vpandn dest, src1, src2 -> dest = ~src1 & src2
-  // so pass (vB, vA) to get (~vB) & vA
   COMP->vpandn(vD, vB, vA);
-
-  // Store result to vD (VPR[vd])
   COMP->vmovdqa(VPRPtr(instr.vd), vD);
 }
 
@@ -318,17 +296,10 @@ void PPCInterpreter::PPCInterpreterJIT_vandc128(sPPEState *ppeState, JITBlockBui
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vA and vB (128-bit vectors)
-  COMP->vmovdqa(vA, VPRPtr(VMX128_VA128));
-  COMP->vmovdqa(vB, VPRPtr(VMX128_VB128));
-
-  // vandc = vA & ~vB
-  // AVX vpandn dest, src1, src2 -> dest = ~src1 & src2
-  // so pass (vB, vA) to get (~vB) & vA
+  COMP->vmovdqa(vA, VPRPtr(J_VMX128_VA128));
+  COMP->vmovdqa(vB, VPRPtr(J_VMX128_VB128));
   COMP->vpandn(vD, vB, vA);
-
-  // Store result to vD (VPR[vd])
-  COMP->vmovdqa(VPRPtr(VMX128_VD128), vD);
+  COMP->vmovdqa(VPRPtr(J_VMX128_VD128), vD);
 }
 
 // Vector Subtract Floating Point (x'1000 004A')
@@ -340,7 +311,6 @@ void PPCInterpreter::PPCInterpreterJIT_vsubfp(sPPEState *ppeState, JITBlockBuild
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vA and vB (128-bit vectors)
   COMP->vmovaps(vA, VPRPtr(instr.va));
   COMP->vmovaps(vB, VPRPtr(instr.vb));
 
@@ -355,7 +325,6 @@ void PPCInterpreter::PPCInterpreterJIT_vsubfp(sPPEState *ppeState, JITBlockBuild
   // Flush denormal result to zero (VMX behavior)
   J_FlushDenormalsToZero(b, vD);
 
-  // Store result to vD
   COMP->vmovaps(VPRPtr(instr.vd), vD);
 }
 
@@ -368,9 +337,8 @@ void PPCInterpreter::PPCInterpreterJIT_vsubfp128(sPPEState *ppeState, JITBlockBu
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vA and vB (128-bit vectors)
-  COMP->vmovaps(vA, VPRPtr(VMX128_VA128));
-  COMP->vmovaps(vB, VPRPtr(VMX128_VB128));
+  COMP->vmovaps(vA, VPRPtr(J_VMX128_VA128));
+  COMP->vmovaps(vB, VPRPtr(J_VMX128_VB128));
 
   // Flush denormal inputs to zero (VMX behavior)
   J_FlushDenormalsToZero(b, vA);
@@ -383,8 +351,7 @@ void PPCInterpreter::PPCInterpreterJIT_vsubfp128(sPPEState *ppeState, JITBlockBu
   // Flush denormal result to zero (VMX behavior)
   J_FlushDenormalsToZero(b, vD);
 
-  // Store result to vD
-  COMP->vmovaps(VPRPtr(VMX128_VD128), vD);
+  COMP->vmovaps(VPRPtr(J_VMX128_VD128), vD);
 }
 
 // Vector Maximum Floating Point (x'1000 040A')
@@ -396,7 +363,6 @@ void PPCInterpreter::PPCInterpreterJIT_vmaxfp(sPPEState *ppeState, JITBlockBuild
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vA and vB
   COMP->vmovaps(vA, VPRPtr(instr.va));
   COMP->vmovaps(vB, VPRPtr(instr.vb));
 
@@ -405,7 +371,7 @@ void PPCInterpreter::PPCInterpreterJIT_vmaxfp(sPPEState *ppeState, JITBlockBuild
   J_FlushDenormalsToZero(b, vB);
 
   // Compare: mask = (vA >= vB)  (predicate 13 = GE used elsewhere)
-  x86::Xmm vCmp = b->compiler->newXmm();
+  x86::Xmm vCmp = newXMM();
   COMP->vcmpps(vCmp, vA, vB, 13); // GE
 
   // Blend: vD = (vCmp ? vA : vB)  -> select the larger float per-lane
@@ -413,14 +379,14 @@ void PPCInterpreter::PPCInterpreterJIT_vmaxfp(sPPEState *ppeState, JITBlockBuild
 
   // NaN handling: if either input is NaN, return QNaN (quiet bit set).
   // Build NaN masks for inputs and combine.
-  x86::Xmm vNaNA = b->compiler->newXmm();
-  x86::Xmm vNaNB = b->compiler->newXmm();
-  x86::Xmm vAnyNaN = b->compiler->newXmm();
-  x86::Xmm vQNaNBit = b->compiler->newXmm();
-  x86::Xmm vQNaNA = b->compiler->newXmm();
-  x86::Xmm vQNaNB = b->compiler->newXmm();
-  x86::Xmm vQNaN = b->compiler->newXmm();
-  x86::Gp tmp = b->compiler->newGpd();
+  x86::Xmm vNaNA = newXMM();
+  x86::Xmm vNaNB = newXMM();
+  x86::Xmm vAnyNaN = newXMM();
+  x86::Xmm vQNaNBit = newXMM();
+  x86::Xmm vQNaNA = newXMM();
+  x86::Xmm vQNaNB = newXMM();
+  x86::Xmm vQNaN = newXMM();
+  x86::Gp tmp = newGP32();
 
   // Detect NaNs: unordered with itself => NaN (predicate 3 = UNORD)
   COMP->vcmpps(vNaNA, vA, vA, 3);
@@ -448,7 +414,6 @@ void PPCInterpreter::PPCInterpreterJIT_vmaxfp(sPPEState *ppeState, JITBlockBuild
   // Flush denormal result to zero (VMX behavior)
   J_FlushDenormalsToZero(b, vD);
 
-  // Store result
   COMP->vmovaps(VPRPtr(instr.vd), vD);
 }
 
@@ -461,16 +426,15 @@ void PPCInterpreter::PPCInterpreterJIT_vmaxfp128(sPPEState *ppeState, JITBlockBu
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vA and vB
-  COMP->vmovaps(vA, VPRPtr(VMX128_VA128));
-  COMP->vmovaps(vB, VPRPtr(VMX128_VB128));
+  COMP->vmovaps(vA, VPRPtr(J_VMX128_VA128));
+  COMP->vmovaps(vB, VPRPtr(J_VMX128_VB128));
 
   // Flush denormals to zero (VMX behavior)
   J_FlushDenormalsToZero(b, vA);
   J_FlushDenormalsToZero(b, vB);
 
   // Compare: mask = (vA >= vB)  (predicate 13 = GE used elsewhere)
-  x86::Xmm vCmp = b->compiler->newXmm();
+  x86::Xmm vCmp = newXMM();
   COMP->vcmpps(vCmp, vA, vB, 13); // GE
 
   // Blend: vD = (vCmp ? vA : vB)  -> select the larger float per-lane
@@ -478,14 +442,14 @@ void PPCInterpreter::PPCInterpreterJIT_vmaxfp128(sPPEState *ppeState, JITBlockBu
 
   // NaN handling: if either input is NaN, return QNaN (quiet bit set).
   // Build NaN masks for inputs and combine.
-  x86::Xmm vNaNA = b->compiler->newXmm();
-  x86::Xmm vNaNB = b->compiler->newXmm();
-  x86::Xmm vAnyNaN = b->compiler->newXmm();
-  x86::Xmm vQNaNBit = b->compiler->newXmm();
-  x86::Xmm vQNaNA = b->compiler->newXmm();
-  x86::Xmm vQNaNB = b->compiler->newXmm();
-  x86::Xmm vQNaN = b->compiler->newXmm();
-  x86::Gp tmp = b->compiler->newGpd();
+  x86::Xmm vNaNA = newXMM();
+  x86::Xmm vNaNB = newXMM();
+  x86::Xmm vAnyNaN = newXMM();
+  x86::Xmm vQNaNBit = newXMM();
+  x86::Xmm vQNaNA = newXMM();
+  x86::Xmm vQNaNB = newXMM();
+  x86::Xmm vQNaN = newXMM();
+  x86::Gp tmp = newGP32();
 
   // Detect NaNs: unordered with itself => NaN (predicate 3 = UNORD)
   COMP->vcmpps(vNaNA, vA, vA, 3);
@@ -513,8 +477,7 @@ void PPCInterpreter::PPCInterpreterJIT_vmaxfp128(sPPEState *ppeState, JITBlockBu
   // Flush denormal result to zero (VMX behavior)
   J_FlushDenormalsToZero(b, vD);
 
-  // Store result
-  COMP->vmovaps(VPRPtr(VMX128_VD128), vD);
+  COMP->vmovaps(VPRPtr(J_VMX128_VD128), vD);
 }
 
 // Vector Minimum Floating Point (x'1000 044A')
@@ -526,7 +489,6 @@ void PPCInterpreter::PPCInterpreterJIT_vminfp(sPPEState *ppeState, JITBlockBuild
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vA and vB
   COMP->vmovaps(vA, VPRPtr(instr.va));
   COMP->vmovaps(vB, VPRPtr(instr.vb));
 
@@ -535,21 +497,21 @@ void PPCInterpreter::PPCInterpreterJIT_vminfp(sPPEState *ppeState, JITBlockBuild
   J_FlushDenormalsToZero(b, vB);
 
   // Compare: mask = (vA <= vB) -> select smaller per-lane
-  x86::Xmm vCmp = b->compiler->newXmm();
+  x86::Xmm vCmp = newXMM();
   COMP->vcmpps(vCmp, vA, vB, 2); // LE
 
   // Blend: vD = (vCmp ? vA : vB)
   COMP->vblendvps(vD, vB, vA, vCmp);
 
   // NaN handling: if either input is NaN, return QNaN (quiet bit set).
-  x86::Xmm vNaNA = b->compiler->newXmm();
-  x86::Xmm vNaNB = b->compiler->newXmm();
-  x86::Xmm vAnyNaN = b->compiler->newXmm();
-  x86::Xmm vQNaNBit = b->compiler->newXmm();
-  x86::Xmm vQNaNA = b->compiler->newXmm();
-  x86::Xmm vQNaNB = b->compiler->newXmm();
-  x86::Xmm vQNaN = b->compiler->newXmm();
-  x86::Gp tmp = b->compiler->newGpd();
+  x86::Xmm vNaNA = newXMM();
+  x86::Xmm vNaNB = newXMM();
+  x86::Xmm vAnyNaN = newXMM();
+  x86::Xmm vQNaNBit = newXMM();
+  x86::Xmm vQNaNA = newXMM();
+  x86::Xmm vQNaNB = newXMM();
+  x86::Xmm vQNaN = newXMM();
+  x86::Gp tmp = newGP32();
 
   // Detect NaNs: unordered with itself => NaN (predicate 3 = UNORD)
   COMP->vcmpps(vNaNA, vA, vA, 3);
@@ -576,7 +538,6 @@ void PPCInterpreter::PPCInterpreterJIT_vminfp(sPPEState *ppeState, JITBlockBuild
   // Flush denormal result to zero (VMX behavior)
   J_FlushDenormalsToZero(b, vD);
 
-  // Store result
   COMP->vmovaps(VPRPtr(instr.vd), vD);
 }
 
@@ -589,30 +550,29 @@ void PPCInterpreter::PPCInterpreterJIT_vminfp128(sPPEState *ppeState, JITBlockBu
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vA and vB
-  COMP->vmovaps(vA, VPRPtr(VMX128_VA128));
-  COMP->vmovaps(vB, VPRPtr(VMX128_VB128));
+  COMP->vmovaps(vA, VPRPtr(J_VMX128_VA128));
+  COMP->vmovaps(vB, VPRPtr(J_VMX128_VB128));
 
   // Flush denormal inputs to zero (VMX behavior)
   J_FlushDenormalsToZero(b, vA);
   J_FlushDenormalsToZero(b, vB);
 
   // Compare: mask = (vA <= vB) -> select smaller per-lane
-  x86::Xmm vCmp = b->compiler->newXmm();
+  x86::Xmm vCmp = newXMM();
   COMP->vcmpps(vCmp, vA, vB, 2); // LE
 
   // Blend: vD = (vCmp ? vA : vB)
   COMP->vblendvps(vD, vB, vA, vCmp);
 
   // NaN handling: if either input is NaN, return QNaN (quiet bit set).
-  x86::Xmm vNaNA = b->compiler->newXmm();
-  x86::Xmm vNaNB = b->compiler->newXmm();
-  x86::Xmm vAnyNaN = b->compiler->newXmm();
-  x86::Xmm vQNaNBit = b->compiler->newXmm();
-  x86::Xmm vQNaNA = b->compiler->newXmm();
-  x86::Xmm vQNaNB = b->compiler->newXmm();
-  x86::Xmm vQNaN = b->compiler->newXmm();
-  x86::Gp tmp = b->compiler->newGpd();
+  x86::Xmm vNaNA = newXMM();
+  x86::Xmm vNaNB = newXMM();
+  x86::Xmm vAnyNaN = newXMM();
+  x86::Xmm vQNaNBit = newXMM();
+  x86::Xmm vQNaNA = newXMM();
+  x86::Xmm vQNaNB = newXMM();
+  x86::Xmm vQNaN = newXMM();
+  x86::Gp tmp = newGP32();
 
   // Detect NaNs: unordered with itself => NaN (predicate 3 = UNORD)
   COMP->vcmpps(vNaNA, vA, vA, 3);
@@ -639,8 +599,7 @@ void PPCInterpreter::PPCInterpreterJIT_vminfp128(sPPEState *ppeState, JITBlockBu
   // Flush denormal result to zero (VMX behavior)
   J_FlushDenormalsToZero(b, vD);
 
-  // Store result
-  COMP->vmovaps(VPRPtr(VMX128_VD128), vD);
+  COMP->vmovaps(VPRPtr(J_VMX128_VD128), vD);
 }
 
 // Vector Round to Floating-Point Integer Nearest (x'1000 020A')
@@ -651,7 +610,6 @@ void PPCInterpreter::PPCInterpreterJIT_vrfin(sPPEState *ppeState, JITBlockBuilde
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vB
   COMP->vmovaps(vB, VPRPtr(instr.vb));
 
   // Flush denormal inputs to zero (VMX behavior)
@@ -660,7 +618,6 @@ void PPCInterpreter::PPCInterpreterJIT_vrfin(sPPEState *ppeState, JITBlockBuilde
   // Round to nearest integer (roundps with mode 0 = round to nearest)
   COMP->vroundps(vD, vB, 0x00);
 
-  // Store result to vD
   COMP->vmovaps(VPRPtr(instr.vd), vD);
 }
 
@@ -672,8 +629,7 @@ void PPCInterpreter::PPCInterpreterJIT_vrfin128(sPPEState *ppeState, JITBlockBui
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vB
-  COMP->vmovaps(vB, VPRPtr(VMX128_3_VB128));
+  COMP->vmovaps(vB, VPRPtr(J_VMX128_3_VB128));
 
   // Flush denormal inputs to zero (VMX behavior)
   J_FlushDenormalsToZero(b, vB);
@@ -681,8 +637,7 @@ void PPCInterpreter::PPCInterpreterJIT_vrfin128(sPPEState *ppeState, JITBlockBui
   // Round to nearest integer (roundps with mode 0 = round to nearest)
   COMP->vroundps(vD, vB, 0x00);
 
-  // Store result to vD
-  COMP->vmovaps(VPRPtr(VMX128_3_VD128), vD);
+  COMP->vmovaps(VPRPtr(J_VMX128_3_VD128), vD);
 }
 
 // Vector Round to Floating-Point Integer toward Zero (x'1000 024A')
@@ -693,7 +648,6 @@ void PPCInterpreter::PPCInterpreterJIT_vrfiz(sPPEState *ppeState, JITBlockBuilde
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vB
   COMP->vmovaps(vB, VPRPtr(instr.vb));
 
   // Flush denormal inputs to zero (VMX behavior)
@@ -702,7 +656,6 @@ void PPCInterpreter::PPCInterpreterJIT_vrfiz(sPPEState *ppeState, JITBlockBuilde
   // Round toward zero (truncate) (roundps with mode 3 = truncate)
   COMP->vroundps(vD, vB, 0x03);
 
-  // Store result to vD
   COMP->vmovaps(VPRPtr(instr.vd), vD);
 }
 
@@ -714,8 +667,7 @@ void PPCInterpreter::PPCInterpreterJIT_vrfiz128(sPPEState *ppeState, JITBlockBui
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vB
-  COMP->vmovaps(vB, VPRPtr(VMX128_3_VB128));
+  COMP->vmovaps(vB, VPRPtr(J_VMX128_3_VB128));
 
   // Flush denormal inputs to zero (VMX behavior)
   J_FlushDenormalsToZero(b, vB);
@@ -723,8 +675,7 @@ void PPCInterpreter::PPCInterpreterJIT_vrfiz128(sPPEState *ppeState, JITBlockBui
   // Round toward zero (truncate) (roundps with mode 3 = truncate)
   COMP->vroundps(vD, vB, 0x03);
 
-  // Store result to vD
-  COMP->vmovaps(VPRPtr(VMX128_3_VD128), vD);
+  COMP->vmovaps(VPRPtr(J_VMX128_3_VD128), vD);
 }
 
 // Vector Round to Floating-Point Integer toward +Infinity (x'1000 028A')
@@ -735,7 +686,6 @@ void PPCInterpreter::PPCInterpreterJIT_vrfip(sPPEState *ppeState, JITBlockBuilde
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vB
   COMP->vmovaps(vB, VPRPtr(instr.vb));
 
   // Flush denormal inputs to zero (VMX behavior)
@@ -744,7 +694,6 @@ void PPCInterpreter::PPCInterpreterJIT_vrfip(sPPEState *ppeState, JITBlockBuilde
   // Round toward +infinity (ceil) (roundps with mode 2 = ceil)
   COMP->vroundps(vD, vB, 0x02);
 
-  // Store result to vD
   COMP->vmovaps(VPRPtr(instr.vd), vD);
 }
 
@@ -756,8 +705,7 @@ void PPCInterpreter::PPCInterpreterJIT_vrfip128(sPPEState *ppeState, JITBlockBui
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vB
-  COMP->vmovaps(vB, VPRPtr(VMX128_3_VB128));
+  COMP->vmovaps(vB, VPRPtr(J_VMX128_3_VB128));
 
   // Flush denormal inputs to zero (VMX behavior)
   J_FlushDenormalsToZero(b, vB);
@@ -765,8 +713,7 @@ void PPCInterpreter::PPCInterpreterJIT_vrfip128(sPPEState *ppeState, JITBlockBui
   // Round toward +infinity (ceil) (roundps with mode 2 = ceil)
   COMP->vroundps(vD, vB, 0x02);
 
-  // Store result to vD
-  COMP->vmovaps(VPRPtr(VMX128_3_VD128), vD);
+  COMP->vmovaps(VPRPtr(J_VMX128_3_VD128), vD);
 }
 
 // Vector Round to Floating-Point Integer toward -Infinity (x'1000 02CA')
@@ -777,7 +724,6 @@ void PPCInterpreter::PPCInterpreterJIT_vrfim(sPPEState *ppeState, JITBlockBuilde
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vB
   COMP->vmovaps(vB, VPRPtr(instr.vb));
 
   // Flush denormal inputs to zero (VMX behavior)
@@ -786,7 +732,6 @@ void PPCInterpreter::PPCInterpreterJIT_vrfim(sPPEState *ppeState, JITBlockBuilde
   // Round toward -infinity (floor) (roundps with mode 1 = floor)
   COMP->vroundps(vD, vB, 0x01);
 
-  // Store result to vD
   COMP->vmovaps(VPRPtr(instr.vd), vD);
 }
 
@@ -798,8 +743,7 @@ void PPCInterpreter::PPCInterpreterJIT_vrfim128(sPPEState *ppeState, JITBlockBui
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vB
-  COMP->vmovaps(vB, VPRPtr(VMX128_3_VB128));
+  COMP->vmovaps(vB, VPRPtr(J_VMX128_3_VB128));
 
   // Flush denormal inputs to zero (VMX behavior)
   J_FlushDenormalsToZero(b, vB);
@@ -807,8 +751,7 @@ void PPCInterpreter::PPCInterpreterJIT_vrfim128(sPPEState *ppeState, JITBlockBui
   // Round toward -infinity (floor) (roundps with mode 1 = floor)
   COMP->vroundps(vD, vB, 0x01);
 
-  // Store result to vD
-  COMP->vmovaps(VPRPtr(VMX128_3_VD128), vD);
+  COMP->vmovaps(VPRPtr(J_VMX128_3_VD128), vD);
 }
 
 // Vector Logical OR (x'1000 0484')
@@ -820,15 +763,9 @@ void PPCInterpreter::PPCInterpreterJIT_vor(sPPEState *ppeState, JITBlockBuilder 
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vA and vB (128-bit vectors)
   COMP->vmovdqa(vA, VPRPtr(instr.va));
   COMP->vmovdqa(vB, VPRPtr(instr.vb));
-
-  // Bitwise OR: vD = vA | vB
-  // Use vorps (bitwise OR on packed single) consistent with other emitters' usage.
   COMP->vorps(vD, vA, vB);
-
-  // Store result to vD (VPR[vd])
   COMP->vmovdqa(VPRPtr(instr.vd), vD);
 }
 
@@ -841,16 +778,10 @@ void PPCInterpreter::PPCInterpreterJIT_vor128(sPPEState *ppeState, JITBlockBuild
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
 
-  // Load vA and vB (128-bit vectors)
-  COMP->vmovdqa(vA, VPRPtr(VMX128_VA128));
-  COMP->vmovdqa(vB, VPRPtr(VMX128_VB128));
-
-  // Bitwise OR: vD = vA | vB
-  // Use vorps (bitwise OR on packed single) consistent with other emitters' usage.
+  COMP->vmovdqa(vA, VPRPtr(J_VMX128_VA128));
+  COMP->vmovdqa(vB, VPRPtr(J_VMX128_VB128));
   COMP->vorps(vD, vA, vB);
-
-  // Store result to vD (VPR[vd])
-  COMP->vmovdqa(VPRPtr(VMX128_VD128), vD);
+  COMP->vmovdqa(VPRPtr(J_VMX128_VD128), vD);
 }
 
 // Vector Logical NOR (x'1000 0504')
@@ -861,25 +792,16 @@ void PPCInterpreter::PPCInterpreterJIT_vnor(sPPEState *ppeState, JITBlockBuilder
   x86::Xmm vA = newXMM();
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
-  x86::Xmm vAllOnes = b->compiler->newXmm();
-  x86::Gp tmp = b->compiler->newGpd();
+  x86::Xmm vAllOnes = newXMM();
+  x86::Gp tmp = newGP32();
 
-  // Load vA and vB (128-bit vectors)
   COMP->vmovdqa(vA, VPRPtr(instr.va));
   COMP->vmovdqa(vB, VPRPtr(instr.vb));
-
-  // vTemp = vA | vB
   COMP->vorps(vD, vA, vB);
-
-  // Create all-ones mask (0xFFFFFFFF per dword)
   COMP->mov(tmp, 0xFFFFFFFFu);
   COMP->vmovd(vAllOnes, tmp);
   COMP->vpbroadcastd(vAllOnes, vAllOnes);
-
-  // Invert bits: vD = ~vD  -> XOR with all-ones
   COMP->vpxor(vD, vD, vAllOnes);
-
-  // Store result to vD (VPR[vd])
   COMP->vmovdqa(VPRPtr(instr.vd), vD);
 }
 
@@ -891,26 +813,17 @@ void PPCInterpreter::PPCInterpreterJIT_vnor128(sPPEState *ppeState, JITBlockBuil
   x86::Xmm vA = newXMM();
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
-  x86::Xmm vAllOnes = b->compiler->newXmm();
-  x86::Gp tmp = b->compiler->newGpd();
+  x86::Xmm vAllOnes = newXMM();
+  x86::Gp tmp = newGP32();
 
-  // Load vA and vB (128-bit vectors)
-  COMP->vmovdqa(vA, VPRPtr(VMX128_VA128));
-  COMP->vmovdqa(vB, VPRPtr(VMX128_VB128));
-
-  // vTemp = vA | vB
+  COMP->vmovdqa(vA, VPRPtr(J_VMX128_VA128));
+  COMP->vmovdqa(vB, VPRPtr(J_VMX128_VB128));
   COMP->vorps(vD, vA, vB);
-
-  // Create all-ones mask (0xFFFFFFFF per dword)
   COMP->mov(tmp, 0xFFFFFFFFu);
   COMP->vmovd(vAllOnes, tmp);
   COMP->vpbroadcastd(vAllOnes, vAllOnes);
-
-  // Invert bits: vD = ~vD  -> XOR with all-ones
   COMP->vpxor(vD, vD, vAllOnes);
-
-  // Store result to vD (VPR[vd])
-  COMP->vmovdqa(VPRPtr(VMX128_VD128), vD);
+  COMP->vmovdqa(VPRPtr(J_VMX128_VD128), vD);
 }
 
 // Vector Logical XOR (x'1000 04C4')
@@ -921,15 +834,9 @@ void PPCInterpreter::PPCInterpreterJIT_vxor(sPPEState *ppeState, JITBlockBuilder
   x86::Xmm vA = newXMM();
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
-
-  // Load vA and vB (128-bit vectors)
   COMP->vmovdqa(vA, VPRPtr(instr.va));
   COMP->vmovdqa(vB, VPRPtr(instr.vb));
-
-  // Bitwise XOR: vD = vA ^ vB
   COMP->vpxor(vD, vA, vB);
-
-  // Store result to vD (VPR[vd])
   COMP->vmovdqa(VPRPtr(instr.vd), vD);
 }
 
@@ -941,16 +848,10 @@ void PPCInterpreter::PPCInterpreterJIT_vxor128(sPPEState *ppeState, JITBlockBuil
   x86::Xmm vA = newXMM();
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
-
-  // Load vA and vB (128-bit vectors)
-  COMP->vmovdqa(vA, VPRPtr(VMX128_VA128));
-  COMP->vmovdqa(vB, VPRPtr(VMX128_VB128));
-
-  // Bitwise XOR: vD = vA ^ vB
+  COMP->vmovdqa(vA, VPRPtr(J_VMX128_VA128));
+  COMP->vmovdqa(vB, VPRPtr(J_VMX128_VB128));
   COMP->vpxor(vD, vA, vB);
-
-  // Store result to vD (VPR[vd])
-  COMP->vmovdqa(VPRPtr(VMX128_VD128), vD);
+  COMP->vmovdqa(VPRPtr(J_VMX128_VD128), vD);
 }
 
 // Vector Conditional Select (x'1000 002A')
@@ -980,7 +881,6 @@ void PPCInterpreter::PPCInterpreterJIT_vsel(sPPEState *ppeState, JITBlockBuilder
   // vD = tA | tB
   COMP->vorps(vD, tA, tB);
 
-  // Store result
   COMP->vmovdqa(VPRPtr(instr.vd), vD);
 }
 
@@ -998,9 +898,9 @@ void PPCInterpreter::PPCInterpreterJIT_vsel128(sPPEState *ppeState, JITBlockBuil
   x86::Xmm vD = newXMM();
 
   // Load vectors
-  COMP->vmovdqa(vA, VPRPtr(VMX128_VA128));
-  COMP->vmovdqa(vB, VPRPtr(VMX128_VB128));
-  COMP->vmovdqa(vC, VPRPtr(VMX128_VD128));
+  COMP->vmovdqa(vA, VPRPtr(J_VMX128_VA128));
+  COMP->vmovdqa(vB, VPRPtr(J_VMX128_VB128));
+  COMP->vmovdqa(vC, VPRPtr(J_VMX128_VD128));
 
   // tA = ~vC & vA  -> vpandn dest, src1, src2  => dest = ~src1 & src2
   COMP->vpandn(tA, vC, vA);
@@ -1011,8 +911,436 @@ void PPCInterpreter::PPCInterpreterJIT_vsel128(sPPEState *ppeState, JITBlockBuil
   // vD = tA | tB
   COMP->vorps(vD, tA, tB);
 
-  // Store result
-  COMP->vmovdqa(VPRPtr(VMX128_VD128), vD);
+  COMP->vmovdqa(VPRPtr(J_VMX128_VD128), vD);
+}
+
+// Vector Splat Immediate Signed Byte (x'1000 030C')
+void PPCInterpreter::PPCInterpreterJIT_vspltisb(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  // Get the immediate value, sign-extend to 8 bits
+  s8 simm = static_cast<s8>(instr.vsimm);
+
+  // Broadcast the value to all 16 bytes of the XMM register
+  x86::Xmm vD = newXMM();
+  x86::Gp tmp = newGP32();
+
+  // Move the sign-extended value into a Gp register
+  // Replicate it to all bytes of a 32-bit value, then broadcast
+  u32 byteVal = static_cast<u8>(simm);
+
+  COMP->mov(tmp, byteVal);
+  COMP->vmovd(vD, tmp);
+  COMP->vpbroadcastb(vD, vD);
+
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Splat Immediate Signed Halfword (x'1000 034C')
+void PPCInterpreter::PPCInterpreterJIT_vspltish(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vD = newXMM();
+  x86::Gp tmp = newGP32();
+
+  s16 simm = static_cast<s16>(instr.vsimm);
+  u32 halfVal = static_cast<u16>(simm);
+
+  COMP->mov(tmp, halfVal);
+  COMP->vmovd(vD, tmp);
+  COMP->vpbroadcastw(vD, vD);
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Splat Immediate Signed Word (x'1000 038C')
+void PPCInterpreter::PPCInterpreterJIT_vspltisw(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vD = newXMM();
+  x86::Gp tmp = newGP32();
+
+  s32 simm = static_cast<s32>(instr.vsimm);
+  u32 wordVal = static_cast<u32>(simm);
+
+  COMP->mov(tmp, wordVal);
+  COMP->vmovd(vD, tmp);
+  COMP->vpbroadcastd(vD, vD);
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector 128 Splat Immediate Signed Word
+void PPCInterpreter::PPCInterpreterJIT_vspltisw128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vD = newXMM();
+  x86::Gp tmp = newGP32();
+
+  s32 simm = static_cast<s32>(J_VMX128_3_IMM);
+  u32 wordVal = static_cast<u32>(simm);
+
+  COMP->mov(tmp, wordVal);
+  COMP->vmovd(vD, tmp);
+  COMP->vpbroadcastd(vD, vD);
+  COMP->vmovdqa(VPRPtr(J_VMX128_3_VD128), vD);
+}
+
+// Vector Splat Byte (x'1000 020C')
+void PPCInterpreter::PPCInterpreterJIT_vspltb(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Gp tmp = newGP32();
+
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // Map VMX byte index to x86/XMM byte index
+  u32 idx = static_cast<u32>(instr.vuimm) & 0x0F;
+
+  // Extract the selected byte from vB into tmp (gp reg) and broadcast it to all bytes
+  COMP->vpextrb(tmp, vB, imm<u32>(VEC128_BYTE_VMX_TO_AVX(idx)));
+  COMP->vmovd(vD, tmp);
+  COMP->vpbroadcastb(vD, vD);
+
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Splat Halfword (x'1000 024C')
+void PPCInterpreter::PPCInterpreterJIT_vsplth(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Gp tmp = newGP32();
+
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  u32 idx = static_cast<u32>(instr.vuimm) & 0x7;
+
+  // Extract the selected 16-bit halfword into tmp and broadcast it to all halfwords.
+  COMP->vpextrw(tmp, vB, imm<u32>(VEC128_WORD_VMX_TO_AVX(idx)));
+  COMP->vmovd(vD, tmp);
+  COMP->vpbroadcastw(vD, vD);
+
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Splat Word (x'1000 028C')
+void PPCInterpreter::PPCInterpreterJIT_vspltw(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Gp tmp = newGP32();
+
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // UIMM selects a 32-bit word element [0..3] (VMX ordering).
+  u32 idx = static_cast<u32>(instr.vuimm) & 0x3;
+
+  // Convert VMX index to x86/XMM element ordering and extract the dword.
+  COMP->vpextrd(tmp, vB, imm<u32>(idx));
+
+  // Move extracted dword into an XMM and broadcast to all dword lanes.
+  COMP->vmovd(vD, tmp);
+  COMP->vpbroadcastd(vD, vD);
+
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector 128 Splat Word
+void PPCInterpreter::PPCInterpreterJIT_vspltw128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Gp tmp = newGP32();
+
+  COMP->vmovdqa(vB, VPRPtr(J_VMX128_3_VB128));
+
+  // UIMM selects a 32-bit word element [0..3] (VMX ordering).
+  u32 idx = static_cast<u32>(J_VMX128_3_IMM) & 0x3;
+
+  // Convert VMX index to x86/XMM element ordering and extract the dword.
+  COMP->vpextrd(tmp, vB, imm<u32>(idx));
+
+  // Move extracted dword into an XMM and broadcast to all dword lanes.
+  COMP->vmovd(vD, tmp);
+  COMP->vpbroadcastd(vD, vD);
+
+  COMP->vmovdqa(VPRPtr(J_VMX128_3_VD128), vD);
+}
+
+// Vector Shift Left Integer Byte (x'1000 0104')
+// NOTE: Theres a faster path for emulating this instruction, but requires AVX-512 for using vpsllvm.
+void PPCInterpreter::PPCInterpreterJIT_vslb(sPPEState * ppeState, JITBlockBuilder * b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  // Registers
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  // Temps for unpack/shift/pack
+  x86::Xmm zero = newXMM();
+  x86::Xmm aLoW = newXMM();
+  x86::Xmm aHiW = newXMM();
+  x86::Xmm bLoW = newXMM();
+  x86::Xmm bHiW = newXMM();
+  x86::Xmm rLoW = newXMM();
+  x86::Xmm rHiW = newXMM();
+  x86::Xmm maskLowByte = newXMM();
+  x86::Xmm tmpX = newXMM(); // temp XMM for constants/comparisons
+  x86::Gp tmp = newGP64();
+
+  // Load operands
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  COMP->vxorps(zero, zero, zero);
+
+  // Expand bytes -> words (interleave with zero high byte)
+  // aLoW  contains words for bytes 0..7, aHiW for bytes 8..15
+  COMP->vpunpcklbw(aLoW, vA, zero);
+  COMP->vpunpckhbw(aHiW, vA, zero);
+
+  // same for counts
+  COMP->vpunpcklbw(bLoW, vB, zero);
+  COMP->vpunpckhbw(bHiW, vB, zero);
+
+  // Mask counts to low 3 bits (count & 7) - create 64-bit pattern 4x words of 0x0007
+  COMP->mov(tmp, 0x0007000700070007ULL);
+  COMP->vmovq(tmpX, tmp);
+  COMP->vpbroadcastq(tmpX, tmpX);
+  COMP->vpand(bLoW, bLoW, tmpX);
+  COMP->vpand(bHiW, bHiW, tmpX);
+
+  // Prepare mask to keep low byte later
+  COMP->mov(tmp, 0x00FF00FF00FF00FFULL);
+  COMP->vmovq(maskLowByte, tmp);
+  COMP->vpbroadcastq(maskLowByte, maskLowByte);
+
+  // Initialize accumulators to zero
+  COMP->vxorps(rLoW, rLoW, rLoW);
+  COMP->vxorps(rHiW, rHiW, rHiW);
+
+  for (int k = 0; k <= 7; ++k) {
+    // Build word vector filled with k for comparison (64-bit pattern of four words)
+    u64 pat = (u64)k | ((u64)k << 16) | ((u64)k << 32) | ((u64)k << 48);
+    COMP->mov(tmp, pat);
+    COMP->vmovq(tmpX, tmp);
+    COMP->vpbroadcastq(tmpX, tmpX); // tmpX = [k,k,k,k,...] as words
+
+    // Compare counts == k -> mask_k (word-wise)
+    x86::Xmm maskLo = newXMM();
+    x86::Xmm maskHi = newXMM();
+    COMP->vpcmpeqw(maskLo, bLoW, tmpX);
+    COMP->vpcmpeqw(maskHi, bHiW, tmpX);
+
+    // Shift aLoW / aHiW by immediate k (word lanes)
+    x86::Xmm shiftedLo = newXMM();
+    x86::Xmm shiftedHi = newXMM();
+    COMP->vpsllw(shiftedLo, aLoW, k); // immediate shift per-word
+    COMP->vpsllw(shiftedHi, aHiW, k);
+
+    // Mask to keep only low byte of each word (since we shifted words)
+    COMP->vpand(shiftedLo, shiftedLo, maskLowByte);
+    COMP->vpand(shiftedHi, shiftedHi, maskLowByte);
+
+    // Select lanes where count == k and OR into accumulator
+    COMP->vpand(shiftedLo, shiftedLo, maskLo);
+    COMP->vpand(shiftedHi, shiftedHi, maskHi);
+    COMP->vpor(rLoW, rLoW, shiftedLo);
+    COMP->vpor(rHiW, rHiW, shiftedHi);
+  }
+
+  // Pack words back to bytes. Since high bytes are zeroed/truncated, vpackuswb will
+  // place the low bytes into the result.
+  COMP->vpackuswb(vD, rLoW, rHiW);
+
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Shift Left Half Word (x'1000 0104')
+// NOTE: Theres a faster path for emulating this instruction, but requires AVX-512 for using vpsllvm.
+void PPCInterpreter::PPCInterpreterJIT_vslh(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  x86::Xmm maskCount = newXMM();
+  x86::Xmm tmpX = newXMM();
+  x86::Xmm acc = newXMM();
+  x86::Gp tmp = newGP64();
+
+  // Load operands
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // Mask counts to low 4 bits (count & 0x0F)
+  COMP->mov(tmp, 0x000F000F000F000FULL);
+  COMP->vmovq(maskCount, tmp);
+  COMP->vpbroadcastq(maskCount, maskCount);
+  COMP->vpand(vB, vB, maskCount);
+
+  // Initialize accumulator to zero
+  COMP->vxorps(acc, acc, acc);
+
+  // For each possible shift 0..15 compute vA << k and select lanes where vB == k
+  for (int k = 0; k <= 15; ++k) {
+    // Build word vector filled with k for comparison
+    u64 pat = (u64)(u16)k | ((u64)(u16)k << 16) | ((u64)(u16)k << 32) | ((u64)(u16)k << 48);
+    COMP->mov(tmp, pat);
+    COMP->vmovq(tmpX, tmp);
+    COMP->vpbroadcastq(tmpX, tmpX); // tmpX = [k,k,k,k,...] in words
+
+    // Compare counts == k -> mask_k (word-wise)
+    x86::Xmm mask = newXMM();
+    COMP->vpcmpeqw(mask, vB, tmpX);
+
+    // Shift vA by immediate k (per-word)
+    x86::Xmm shifted = newXMM();
+    COMP->vpsllw(shifted, vA, k); // logical left shift of 16-bit lanes
+
+    // Select lanes where count == k and OR into accumulator
+    COMP->vpand(shifted, shifted, mask);
+    COMP->vpor(acc, acc, shifted);
+  }
+
+  // Store result to vD (VPR[vd])
+  COMP->vmovdqa(VPRPtr(instr.vd), acc);
+}
+
+// Vector Shift Left Integer Word (x'1000 0184')
+void PPCInterpreter::PPCInterpreterJIT_vslw(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  x86::Xmm maskCount = newXMM();
+  x86::Gp tmp = newGP32();
+
+  // Load operands
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // Mask counts to low 5 bits (count & 0x1F) per dword lane.
+  COMP->mov(tmp, imm<u32>(0x1F));
+  COMP->vmovd(maskCount, tmp);
+  COMP->vpbroadcastd(maskCount, maskCount);
+  COMP->vpand(vB, vB, maskCount);
+
+  // Perform variable per-dword left shifts: vD = vA << vB
+  // Uses AVX2 VPSLLVD (variable dword shifts)
+  COMP->vpsllvd(vD, vA, vB);
+
+  // Store result to vD (VPR[vd])
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector 128 Shift Left Integer Word
+void PPCInterpreter::PPCInterpreterJIT_vslw128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  x86::Xmm maskCount = newXMM();
+  x86::Gp tmp = newGP32();
+
+  // Load operands
+  COMP->vmovdqa(vA, VPRPtr(J_VMX128_VA128));
+  COMP->vmovdqa(vB, VPRPtr(J_VMX128_VB128));
+
+  // Mask counts to low 5 bits (count & 0x1F) per dword lane.
+  COMP->mov(tmp, imm<u32>(0x1F));
+  COMP->vmovd(maskCount, tmp);
+  COMP->vpbroadcastd(maskCount, maskCount);
+  COMP->vpand(vB, vB, maskCount);
+
+  // Perform variable per-dword left shifts: vD = vA << vB
+  // Uses AVX2 VPSLLVD (variable dword shifts)
+  COMP->vpsllvd(vD, vA, vB);
+
+  // Store result to vD (VPR[vd])
+  COMP->vmovdqa(VPRPtr(J_VMX128_VD128), vD);
+}
+
+// Vector Shift Right Integer Word (x'1000 0284')
+void PPCInterpreter::PPCInterpreterJIT_vsrw(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  x86::Xmm maskCount = newXMM();
+  x86::Gp tmp = newGP32();
+
+  // Load operands
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // Mask counts to low 5 bits (count & 0x1F) per dword lane.
+  COMP->mov(tmp, imm<u32>(0x1F));
+  COMP->vmovd(maskCount, tmp);
+  COMP->vpbroadcastd(maskCount, maskCount);
+  COMP->vpand(vB, vB, maskCount);
+
+  // Perform variable per-dword left shifts: vD = vA >> vB
+  // Uses AVX2 VPSRLVD (variable dword shifts)
+  COMP->vpsrlvd(vD, vA, vB);
+
+  // Store result to vD (VPR[vd])
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector 128 Shift Right Integer Word
+void PPCInterpreter::PPCInterpreterJIT_vsrw128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  x86::Xmm maskCount = newXMM();
+  x86::Gp tmp = newGP32();
+
+  // Load operands
+  COMP->vmovdqa(vA, VPRPtr(J_VMX128_VA128));
+  COMP->vmovdqa(vB, VPRPtr(J_VMX128_VB128));
+
+  // Mask counts to low 5 bits (count & 0x1F) per dword lane.
+  COMP->mov(tmp, imm<u32>(0x1F));
+  COMP->vmovd(maskCount, tmp);
+  COMP->vpbroadcastd(maskCount, maskCount);
+  COMP->vpand(vB, vB, maskCount);
+
+  // Perform variable per-dword left shifts: vD = vA >> vB
+  // Uses AVX2 VPSRLVD (variable dword shifts)
+  COMP->vpsrlvd(vD, vA, vB);
+
+  // Store result to vD (VPR[vd])
+  COMP->vmovdqa(VPRPtr(J_VMX128_VD128), vD);
 }
 
 //
@@ -1026,16 +1354,16 @@ void PPCInterpreter::PPCInterpreterJIT_vrefp(sPPEState *ppeState, JITBlockBuilde
 
   x86::Xmm vB = newXMM();
   x86::Xmm vD = newXMM();
-  x86::Xmm vTmp = b->compiler->newXmm();
-  x86::Xmm vZero = b->compiler->newXmm();
-  x86::Xmm vTwo = b->compiler->newXmm();
-  x86::Xmm vOne = b->compiler->newXmm();
-  x86::Xmm vPosInf = b->compiler->newXmm();
-  x86::Xmm vNegInf = b->compiler->newXmm();
-  x86::Xmm vIsNaN = b->compiler->newXmm();
-  x86::Xmm vQNaNBit = b->compiler->newXmm();
-  x86::Xmm vQNaN = b->compiler->newXmm();
-  x86::Gp tmp = b->compiler->newGpd();
+  x86::Xmm vTmp = newXMM();
+  x86::Xmm vZero = newXMM();
+  x86::Xmm vTwo = newXMM();
+  x86::Xmm vOne = newXMM();
+  x86::Xmm vPosInf = newXMM();
+  x86::Xmm vNegInf = newXMM();
+  x86::Xmm vIsNaN = newXMM();
+  x86::Xmm vQNaNBit = newXMM();
+  x86::Xmm vQNaN = newXMM();
+  x86::Gp tmp = newGP32();
 
   // Load vB
   COMP->vmovaps(vB, VPRPtr(instr.vb));
@@ -1152,7 +1480,7 @@ void PPCInterpreter::PPCInterpreterJIT_vnmsubfp(sPPEState *ppeState, JITBlockBui
 
   // Negate the result: vD = -vD (XOR with sign bit mask)
   x86::Xmm vSignMask = newXMM();
-  x86::Gp tempGp = b->compiler->newGpq();
+  x86::Gp tempGp = newGP64();
   COMP->mov(tempGp, 0x8000000080000000ULL);
   COMP->vmovq(vSignMask, tempGp);
   COMP->vpbroadcastq(vSignMask, vSignMask);
@@ -1189,7 +1517,7 @@ void PPCInterpreter::PPCInterpreterJIT_vexptefp(sPPEState *ppeState, JITBlockBui
   J_FlushDenormalsToZero(b, vB);
 
   // Constants
-  x86::Gp tempGp = b->compiler->newGpd();
+  x86::Gp tempGp = newGP32();
   x86::Xmm vOne = newXMM();
   x86::Xmm vClampMin = newXMM();
   x86::Xmm vClampMax = newXMM();
@@ -1390,7 +1718,7 @@ void PPCInterpreter::PPCInterpreterJIT_vlogefp(sPPEState *ppeState, JITBlockBuil
  // Instead of calling the generic flush helper, explicitly clear denormals using integer ops:
  // denormal if exponent ==0 and mantissa !=0 -> set lane to zero.
 
- x86::Gp tempGp = b->compiler->newGpd();
+ x86::Gp tempGp = newGP32();
  x86::Xmm vBits = newXMM();
  x86::Xmm vExpMask = newXMM();
  x86::Xmm vMantMask = newXMM();

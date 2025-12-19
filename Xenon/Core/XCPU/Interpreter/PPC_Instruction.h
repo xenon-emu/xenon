@@ -686,20 +686,20 @@ namespace PPCInterpreter {
         //case 0b00010001110: handler = GET_HANDLER(vpkuhus); break;
         //case 0b00011001110: handler = GET_HANDLER(vpkuwus); break;
         //case 0b00100000010: handler = GET_HANDLER(vmaxsb); break;
-        //case 0b00100000100: handler = GET_HANDLER(vslb); break;
+        case 0b00100000100: handler = GET_HANDLER(vslb); break;
         //case 0b00100001000: handler = GET_HANDLER(vmulosb); break;
         //case 0b00100001010: handler = GET_HANDLER(vrefp); break;
         //case 0b00100001100: handler = GET_HANDLER(vmrglb); break;
         //case 0b00100001110: handler = GET_HANDLER(vpkshus); break;
         //case 0b00101000010: handler = GET_HANDLER(vmaxsh); break;
-        //case 0b00101000100: handler = GET_HANDLER(vslh); break;
+        case 0b00101000100: handler = GET_HANDLER(vslh); break;
         //case 0b00101001000: handler = GET_HANDLER(vmulosh); break;
         //case 0b00101001010: handler = GET_HANDLER(vrsqrtefp); break;
         //case 0b00101001100: handler = GET_HANDLER(vmrglh); break;
         //case 0b00101001110: handler = GET_HANDLER(vpkswus); break;
         case 0b00110000000: handler = GET_HANDLER(vaddcuw); break;
         //case 0b00110000010: handler = GET_HANDLER(vmaxsw); break;
-        //case 0b00110000100: handler = GET_HANDLER(vslw); break;
+        case 0b00110000100: handler = GET_HANDLER(vslw); break;
         //case 0b00110001010: handler = GET_HANDLER(vexptefp); break;
         //case 0b00110001100: handler = GET_HANDLER(vmrglw); break;
         //case 0b00110001110: handler = GET_HANDLER(vpkshss); break;
@@ -711,20 +711,20 @@ namespace PPCInterpreter {
         //case 0b01000000100: handler = GET_HANDLER(vsrb); break;
         //case 0b01000001000: handler = GET_HANDLER(vmuleub); break;
         case 0b01000001010: handler = GET_HANDLER(vrfin); break;
-        //case 0b01000001100: handler = GET_HANDLER(vspltb); break;
+        case 0b01000001100: handler = GET_HANDLER(vspltb); break;
         //case 0b01000001110: handler = GET_HANDLER(vupkhsb); break;
         //case 0b01001000000: handler = GET_HANDLER(vadduhs); break;
         //case 0b01001000010: handler = GET_HANDLER(vminuh); break;
         //case 0b01001000100: handler = GET_HANDLER(vsrh); break;
         //case 0b01001001000: handler = GET_HANDLER(vmuleuh); break;
         case 0b01001001010: handler = GET_HANDLER(vrfiz); break;
-        //case 0b01001001100: handler = GET_HANDLER(vsplth); break;
+        case 0b01001001100: handler = GET_HANDLER(vsplth); break;
         //case 0b01001001110: handler = GET_HANDLER(vupkhsh); break;
         //case 0b01010000000: handler = GET_HANDLER(vadduws); break;
         //case 0b01010000010: handler = GET_HANDLER(vminuw); break;
-        //case 0b01010000100: handler = GET_HANDLER(vsrw); break;
+        case 0b01010000100: handler = GET_HANDLER(vsrw); break;
         case 0b01010001010: handler = GET_HANDLER(vrfip); break;
-        //case 0b01010001100: handler = GET_HANDLER(vspltw); break;
+        case 0b01010001100: handler = GET_HANDLER(vspltw); break;
         //case 0b01010001110: handler = GET_HANDLER(vupklsb); break;
         //case 0b01011000100: handler = GET_HANDLER(vsr); break;
         case 0b01011001010: handler = GET_HANDLER(vrfim); break;
@@ -734,20 +734,20 @@ namespace PPCInterpreter {
         //case 0b01100000100: handler = GET_HANDLER(vsrab); break;
         //case 0b01100001000: handler = GET_HANDLER(vmulesb); break;
         //case 0b01100001010: handler = GET_HANDLER(vcfux); break;
-        //case 0b01100001100: handler = GET_HANDLER(vspltisb); break;
+        case 0b01100001100: handler = GET_HANDLER(vspltisb); break;
         //case 0b01100001110: handler = GET_HANDLER(vpkpx); break;
         //case 0b01101000000: handler = GET_HANDLER(vaddshs); break;
         //case 0b01101000010: handler = GET_HANDLER(vminsh); break;
         //case 0b01101000100: handler = GET_HANDLER(vsrah); break;
         //case 0b01101001000: handler = GET_HANDLER(vmulesh); break;
         //case 0b01101001010: handler = GET_HANDLER(vcfsx); break;
-        //case 0b01101001100: handler = GET_HANDLER(vspltish); break;
+        case 0b01101001100: handler = GET_HANDLER(vspltish); break;
         //case 0b01101001110: handler = GET_HANDLER(vupkhpx); break;
         //case 0b01110000000: handler = GET_HANDLER(vaddsws); break;
         //case 0b01110000010: handler = GET_HANDLER(vminsw); break;
         //case 0b01110000100: handler = GET_HANDLER(vsraw); break;
         //case 0b01110001010: handler = GET_HANDLER(vctuxs); break;
-        //case 0b01110001100: handler = GET_HANDLER(vspltisw); break;
+        case 0b01110001100: handler = GET_HANDLER(vspltisw); break;
         //case 0b01111001010: handler = GET_HANDLER(vctsxs); break;
         //case 0b01111001110: handler = GET_HANDLER(vupklpx); break;
         //case 0b10000000000: handler = GET_HANDLER(vsububm); break;
@@ -870,8 +870,8 @@ namespace PPCInterpreter {
         //case 0b1100111: handler = GET_HANDLER(vrsqrtefp128); break;
         //case 0b1101011: handler = GET_HANDLER(vexptefp128); break;
         //case 0b1101111: handler = GET_HANDLER(vlogefp128); break;
-        //case 0b1110011: handler = GET_HANDLER(vspltw128); break;
-        //case 0b1110111: handler = GET_HANDLER(vspltisw128); break;
+        case 0b1110011: handler = GET_HANDLER(vspltw128); break;
+        case 0b1110111: handler = GET_HANDLER(vspltisw128); break;
         //case 0b1111111: handler = GET_HANDLER(vupkd3d128); break;
         }
         switch ((ExtractBits(instr, 22, 24) << 3) | (ExtractBits(instr, 27, 27) << 0)) {
@@ -883,9 +883,9 @@ namespace PPCInterpreter {
         }
         switch ((ExtractBits(instr, 22, 25) << 2) | (ExtractBits(instr, 27, 27) << 0)) {
         //case 0b000101: handler = GET_HANDLER(vrlw128); break;
-        //case 0b001101: handler = GET_HANDLER(vslw128); break;
+        case 0b001101: handler = GET_HANDLER(vslw128); break;
         //case 0b010101: handler = GET_HANDLER(vsraw128); break;
-        //case 0b011101: handler = GET_HANDLER(vsrw128); break;
+        case 0b011101: handler = GET_HANDLER(vsrw128); break;
         case 0b101000: handler = GET_HANDLER(vmaxfp128); break;
         case 0b101100: handler = GET_HANDLER(vminfp128); break;
         //case 0b110000: handler = GET_HANDLER(vmrghw128); break;
