@@ -55,16 +55,14 @@ void PPU_JIT::RegisterBlockPages(u64 blockStart, u64 blockSize) {
 
 #ifdef JIT_DEBUG
   LOG_DEBUG(Xenon, "[JIT]: Registered block {:#x} size {:#x} -> pages: {:#x}..{:#x}", blockStart, blockSize,
-            firstPage, firstPage + pageCount * pageSize - 1);
+    firstPage, firstPage + pageCount * pageSize - 1);
 #endif
 }
 
 void PPU_JIT::UnregisterBlock(u64 blockStart) {
   std::lock_guard<std::mutex> lock(jitCacheMutex);
   auto it = blockPageList.find(blockStart);
-  if (it == blockPageList.end()) {
-    return;
-  }
+  if (it == blockPageList.end()) { return; }
   for (u64 pageBase : it->second) {
     auto pit = pageBlockIndex.find(pageBase);
     if (pit != pageBlockIndex.end()) {
@@ -79,6 +77,34 @@ void PPU_JIT::UnregisterBlock(u64 blockStart) {
 #ifdef JIT_DEBUG
   LOG_DEBUG(Xenon, "[JIT]: Unregistered block {:#x} from page index", blockStart);
 #endif
+}
+
+// Try to link a block to its target if the target block exists
+void PPU_JIT::TryLinkBlock(JITBlock *block) {
+  if (!block || !block->canLink || block->linkTargetAddr == 0) {
+    return;
+  }
+
+  // Check if target block exists in cache
+  auto it = jitBlocksCache.find(block->linkTargetAddr);
+  if (it != jitBlocksCache.end() && it->second) {
+    block->linkedBlock = it->second.get();
+#ifdef JIT_DEBUG
+    LOG_DEBUG(Xenon, "[JIT]: Linked block {:#x} -> {:#x}", block->ppuAddress, block->linkTargetAddr);
+#endif
+  }
+}
+
+// Unlink all blocks that link to a specific target address (called when invalidating)
+void PPU_JIT::UnlinkBlocksTo(u64 targetAddr) {
+  for (auto &[addr, block] : jitBlocksCache) {
+    if (block && block->linkTargetAddr == targetAddr) {
+      block->linkedBlock = nullptr;
+#ifdef JIT_DEBUG
+      LOG_DEBUG(Xenon, "[JIT]: Unlinked block {:#x} (target {:#x} invalidated)", addr, targetAddr);
+#endif
+    }
+  }
 }
 
 void PPU_JIT::InvalidateBlocksForRange(u64 startAddr, u64 endAddr) {
@@ -109,6 +135,9 @@ void PPU_JIT::InvalidateBlocksForRange(u64 startAddr, u64 endAddr) {
   }
 
   for (u64 blkAddr : blocksToInvalidate) {
+    // First unlink any blocks that point to this one
+    UnlinkBlocksTo(blkAddr);
+
     auto it = jitBlocksCache.find(blkAddr);
     if (it != jitBlocksCache.end()) {
 #ifdef JIT_DEBUG
@@ -197,18 +226,21 @@ void PPU_JIT::InstrPrologue(JITBlockBuilder *b, u32 instrData) {
 }
 
 // Instruction Epilogue
-// * Checks and advances TimeBase
 // * Checks for external interrupts and exceptions.
 bool InstrEpilogue(PPU *ppu, sPPEState *ppeState) {
-  // Get current thread.
-  auto &thread = ppeState->ppuThread[ppeState->currentThread];
-  // Check for external interrupts.
-  if (thread.SPR.MSR.EE && ppu->xenonContext->iic.hasPendingInterrupts(thread.SPR.PIR)) {
-    thread.exceptReg |= ppuExternalEx;
-  }
-
   // Check if exceptions are pending and process them in order.
   return ppu->PPUCheckExceptions();
+}
+
+// Pre-computed instruction name hashes for fast comparison during block building
+namespace JITOpcodeHashes {
+  // Branch instructions that end blocks
+  static constexpr u32 BCLR = "bclr"_j;
+  static constexpr u32 BCCTR = "bcctr"_j;
+  static constexpr u32 BC = "bc"_j;
+  static constexpr u32 B = "b"_j;
+  static constexpr u32 RFID = "rfid"_j;
+  static constexpr u32 INVALID = "invalid"_j;
 }
 
 #undef GPR
@@ -232,10 +264,16 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
   signature->setArg(0, jitBuilder->ppu->Base());
   signature->setArg(1, jitBuilder->ppeState->Base());
   signature->setArg(2, jitBuilder->haltBool);
+
+  // Enable AVX support
+  signature->frame().setAvxEnabled();
+
 #endif
 
   // Temporary container holding all instructions data in the block.
+  // Pre-allocate to reduce reallocations during block building
   std::vector<u32> instrsTemp{};
+  instrsTemp.reserve(maxBlockSize > 64 ? 64 : static_cast<size_t>(maxBlockSize));
 
   // Setup our block context.
   SetupContext(jitBuilder.get());
@@ -245,6 +283,10 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
   //
 
   u64 instrCount = 0;
+
+  // Block linking info - track if this block ends with an unconditional branch
+  bool blockCanLink = false;
+  u64 blockLinkTarget = 0;
 
   while (XeRunning && !XePaused) {
     auto &thread = curThread;
@@ -266,14 +308,14 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
     // Check for Instruction storage/segment exceptions. If found we must end the block.
     if (curThread.exceptReg & ppuInstrStorageEx || curThread.exceptReg & ppuInstrSegmentEx) {
 #ifdef JIT_DEBUG
-      LOG_DEBUG(Xenon, "[JIT]: Instruction exception when creating block at CIA {:#x}, block start address {:#x}, instruction count {:#x}", 
+      LOG_DEBUG(Xenon, "[JIT]: Instruction exception when creating block at CIA {:#x}, block start address {:#x}, instruction count {:#x}",
         thread.CIA, blockStartAddress, instrCount);
 #endif
       if (instrCount != 0) {
         // We're a few instructions into the block, just end the block on the last instruction and start a new block on
-        // the faulting instruction. It will process the exception accordingly.
-        // We clear the exception condition or else the exception handler will run on the first instruction of last the 
-        // compiled block.
+           // the faulting instruction. It will process the exception accordingly.
+             // We clear the exception condition or else the exception handler will run on the first instruction of last the 
+             // compiled block.
         thread.exceptReg &= ~(ppuInstrStorageEx | ppuInstrSegmentEx);
         break;
       } else {
@@ -287,17 +329,15 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
     u32 opcode = op.opcode;
     instrsTemp.push_back(opcode);
 
-
     // Decode and emit
 
     // Saves a few cycles to cache the value here
     u32 decodedInstr = PPCDecode(opcode);
-    auto emitter = PPCInterpreter::ppcDecoder.getJITTable()[decodedInstr];
-    static thread_local std::unordered_map<u32, u32> opcodeHashCache;
-    u32 opName = opcodeHashCache.contains(opcode) ? opcodeHashCache[opcode] : opcodeHashCache[opcode] =
-      Base::JoaatStringHash(PPCInterpreter::ppcDecoder.getNameTable()[decodedInstr]);
+    auto emitter = PPCInterpreter::ppcDecoder.decodeJIT(opcode);
 
-
+    // Compute instruction name hash - use direct computation instead of thread_local map
+    // The hash is only needed for block termination check, so compute it efficiently
+    u32 opName = Base::JoaatStringHash(PPCInterpreter::ppcDecoder.getNameTable()[decodedInstr]);
 
     // Setup our instruction prologue.
     InstrPrologue(jitBuilder.get(), opcode);
@@ -393,8 +433,32 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
     // Check if the last instruction was a branch or a jump (rfid). We must end the block if any is found or the block
     // is at the maximum available size.
     instrCount++;
-    if (opName == "bclr"_j || opName == "bcctr"_j || opName == "bc"_j || opName == "b"_j || opName == "rfid"_j ||
-      opName == "invalid"_j || instrCount >= maxBlockSize)
+
+    // Check for block-ending instructions and determine if we can link
+    bool isBlockEnd = false;
+    if (opName == JITOpcodeHashes::B) {
+      isBlockEnd = true;
+      // Unconditional branch - can link if not a function call (LK=0)
+      if (!op.lk) {
+        s64 offset = EXTS(op.li, 24) << 2;
+        if (op.aa) {
+          // Absolute address
+          blockLinkTarget = static_cast<u64>(offset);
+        } else {
+          // Relative address
+          blockLinkTarget = thread.CIA + offset;
+        }
+        blockCanLink = true;
+      }
+    } else if (opName == JITOpcodeHashes::BCLR || opName == JITOpcodeHashes::BCCTR ||
+      opName == JITOpcodeHashes::BC || opName == JITOpcodeHashes::RFID ||
+      opName == JITOpcodeHashes::INVALID) {
+      isBlockEnd = true;
+      // These are conditional or indirect branches - cannot link
+      blockCanLink = false;
+    }
+
+    if (isBlockEnd || instrCount >= maxBlockSize)
       break;
   }
 
@@ -419,16 +483,37 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
     return nullptr; // Block build failed.
   }
 
-  // Create block hash. Needs improvement.
-  block->hash = 0;
-  for (auto &instr : instrsTemp) {
-    block->hash += instr;
-  }
+  // Create block hash
+  u64 hash = 0;
+  for (const auto &instr : instrsTemp) { hash += instr; }
+  block->hash = hash;
+
+  // Set up block linking info
+  block->canLink = blockCanLink;
+  block->linkTargetAddr = blockLinkTarget;
+  block->linkedBlock = nullptr; // Will be linked later if target exists
 
   // Insert block into the block cache.
   {
     std::lock_guard<std::mutex> lock(jitCacheMutex);
     jitBlocksCache.emplace(blockStartAddress, block);
+
+    // Try to link this block to its target
+    if (blockCanLink && blockLinkTarget != 0) {
+      TryLinkBlock(block.get());
+    }
+
+    // Check if any existing blocks want to link to this new block
+    for (auto &[addr, existingBlock] : jitBlocksCache) {
+      if (existingBlock && existingBlock->canLink &&
+        existingBlock->linkTargetAddr == blockStartAddress &&
+        existingBlock->linkedBlock == nullptr) {
+        existingBlock->linkedBlock = block.get();
+#ifdef JIT_DEBUG
+        LOG_DEBUG(Xenon, "[JIT]: Linked existing block {:#x} -> {:#x}", addr, blockStartAddress);
+#endif
+      }
+    }
   }
 
   // Register pages used by the block.
@@ -491,20 +576,23 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
         // We have a match, check for the block hash to see if it hasn't been modified.
         auto &block = it->second;
         u64 sum = 0;
-        if (block->size % 8 == 0) {
-          for (u64 i = 0; i < block->size / 8; i++) {
+        const u64 blockSize = block->size;
+        const u64 blockAddr = block->ppuAddress;
+
+        // Optimized hash verification - read 64-bits at a time when possible
+        if (blockSize % 8 == 0) {
+          const u64 count = blockSize / 8;
+          for (u64 i = 0; i < count; i++) {
             thread.instrFetch = true;
-            u64 val = PPCInterpreter::MMURead64(ppeState, block->ppuAddress + i * 8);
+            u64 val = PPCInterpreter::MMURead64(ppeState, blockAddr + i * 8);
             thread.instrFetch = false;
-            u64 top = val >> 32;
-            u64 bottom = val & 0xFFFFFFFF;
-            sum += top + bottom;
+            sum += (val >> 32) + (val & 0xFFFFFFFF);
           }
-        }
-        else {
-          for (u64 i = 0; i != block->size / 4; i++) {
+        } else {
+          const u64 count = blockSize / 4;
+          for (u64 i = 0; i < count; i++) {
             thread.instrFetch = true;
-            sum += PPCInterpreter::MMURead32(ppeState, block->ppuAddress + i * 4);
+            sum += PPCInterpreter::MMURead32(ppeState, blockAddr + i * 4);
             thread.instrFetch = false;
           }
         }
@@ -521,8 +609,31 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
           continue;
         }
       }
+
       // Run block as usual.
-      instrsExecuted += ExecuteJITBlock(blockStartAddress, enableHalt);
+      JITBlock *currentBlock = it->second.get();
+      currentBlock->codePtr(ppu, ppeState, enableHalt);
+      instrsExecuted += currentBlock->size / 4;
+
+      // Block linking optimization: follow linked blocks without returning to dispatcher
+      // Only do this if we're not in single-block mode and have instructions remaining
+      while (!singleBlock && currentBlock->linkedBlock != nullptr &&
+        instrsExecuted < numInstrs && (XeRunning && !XePaused)) {
+        // Verify that NIA matches the linked block's address
+        // (exception handlers or interrupts may have changed NIA)
+        if (thread.NIA != currentBlock->linkTargetAddr) {
+          break;
+        }
+
+        // Check thread suspension
+        if (ppeState->currentThread == 0 && ppeState->SPR.CTRL.TE0 != true) { break; }
+        if (ppeState->currentThread == 1 && ppeState->SPR.CTRL.TE1 != true) { break; }
+
+        // Execute linked block
+        currentBlock = currentBlock->linkedBlock;
+        currentBlock->codePtr(ppu, ppeState, enableHalt);
+        instrsExecuted += currentBlock->size / 4;
+      }
 
       // If the thread was suspended due to CTRL being written, we must end execution on said thread.
       if (ppeState->currentThread == 0 && ppeState->SPR.CTRL.TE0 != true) { break; }

@@ -9,6 +9,10 @@
 #include "Base/SystemDevice.h"
 #include "Core/PCI/Bridge/HostBridge.h"
 
+// Physical memory address space
+#define PHYS_MEMORY_START 0x00000000  // Physical memory (RAM) start address
+#define PHYS_MEMORY_END   0x3FFFFFFF  // Physical memory (RAM) end address
+
 // PCI Configuration region
 #define PCI_CONFIG_REGION_ADDRESS 0xD0000000
 #define PCI_CONFIG_REGION_SIZE 0x1000000
@@ -36,6 +40,8 @@ private:
   std::shared_ptr<HostBridge> hostBridge{};
   u32 deviceCount;
   std::unordered_map<std::string, std::shared_ptr<SystemDevice>> connectedDevices;
-
+  // Direct device pointers for both RAM and SFCX
+  SystemDevice* ramDevice{ nullptr };
+  SystemDevice* sfcxDevice{ nullptr };
   std::unique_ptr<u8> biuData{ std::make_unique<STRIP_UNIQUE(biuData)>(0x10000) };
 };

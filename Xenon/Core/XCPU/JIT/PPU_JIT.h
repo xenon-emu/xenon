@@ -98,7 +98,7 @@ template <typename T>
 class ASMJitPtr {
 public:
   ASMJitPtr(const asmjit::x86::Gp &baseReg, u64 offset = 0) :
-    base(baseReg), offset(offset)
+base(baseReg), offset(offset)
   {}
 
   template<typename fT>
@@ -125,7 +125,7 @@ public:
   }
 
   operator asmjit::x86::Gp() const {
-    return base;
+return base;
   }
 
   u64 Offset() {
@@ -142,17 +142,21 @@ private:
 #endif
 
 using namespace asmjit;
+
+// Forward declaration
+class JITBlock;
+
 class JITBlockBuilder {
 public:
   JITBlockBuilder(u64 addr, asmjit::JitRuntime *rt) :
-    ppuAddr(addr), runtime(rt)
+  ppuAddr(addr), runtime(rt)
   {
     code.init(runtime->environment(), runtime->cpuFeatures());
   }
   ~JITBlockBuilder() {
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
     delete ppu;
-    delete ppeState;
+ delete ppeState;
     delete threadCtx;
 #endif
     ppuAddr = 0;
@@ -191,7 +195,7 @@ public:
   ~JITBlock() {
     // Release (delete) the code pointer allocated by asmjit
     if (codePtr) {
-      runtime->release(codePtr);
+runtime->release(codePtr);
     }
   }
 
@@ -218,6 +222,14 @@ public:
   asmjit::JitRuntime *runtime = nullptr;
   // Hash of all opcodes
   u64 hash = 0;
+  
+  // Block linking support
+  // Target address for unconditional branches (0 if conditional or not a branch)
+  u64 linkTargetAddr = 0;
+  // Cached pointer to the linked block (nullptr if not yet linked or target doesn't exist)
+  JITBlock* linkedBlock = nullptr;
+  // Whether this block ends with an unconditional branch that can be linked
+  bool canLink = false;
 };
 
 class PPU_JIT {
@@ -231,7 +243,7 @@ public:
   void SetupContext(JITBlockBuilder *b);
   void InstrPrologue(JITBlockBuilder *b, u32 instrData);
 
-  // Page based indexing and iinvalidation methods.
+  // Page based indexing and invalidation methods.
   void InvalidateBlocksForRange(u64 startAddr, u64 endAddr);
   void InvalidateBlockAt(u64 blockAddr);
   void InvalidateAllBlocks();
@@ -252,4 +264,8 @@ private:
   // Internal helpers for page based indexing.
   void RegisterBlockPages(u64 blockStart, u64 blockSize);
   void UnregisterBlock(u64 blockStart);
+  
+  // Block linking helpers
+  void TryLinkBlock(JITBlock* block);
+  void UnlinkBlocksTo(u64 targetAddr);
 };

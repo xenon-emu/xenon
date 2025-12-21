@@ -331,6 +331,7 @@ public:
     for (auto &reg : thread.VR) { reg.x = 0; reg.y = 0; reg.z = 0; reg.w = 0; }
     thread.CR.CR_Hex = 0;
     thread.SPR.XER.hexValue = 0;
+    thread.FPSCR.FPSCR_Hex = 0;
 
     // Set NIA for this test case.
     thread.NIA = testCase.executionAddress;

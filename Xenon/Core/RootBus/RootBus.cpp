@@ -37,6 +37,10 @@ void RootBus::AddDevice(std::shared_ptr<SystemDevice> device) {
   deviceCount++;
   LOG_INFO(RootBus, "Device attached: {}", device->GetDeviceName());
   connectedDevices.insert({ device->GetDeviceName(), device });
+
+  // Get specific pointers
+  if (device->GetDeviceName() == "RAM") { ramDevice = device.get(); }
+  if (device->GetDeviceName() == "NAND") { sfcxDevice = device.get();}
 }
 
 void RootBus::ResetDevice(std::shared_ptr<SystemDevice> device) {
@@ -59,21 +63,26 @@ void RootBus::ResetDevice(std::shared_ptr<SystemDevice> device) {
 
 bool RootBus::Read(u64 readAddress, u8 *data, u64 size, bool soc) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "RootBus::Read", MP_AUTO);
-  // Configuration Read?
-  if (readAddress >= PCI_CONFIG_REGION_ADDRESS &&
-      readAddress <= PCI_CONFIG_REGION_ADDRESS + PCI_CONFIG_REGION_SIZE) {
-    ConfigRead(readAddress, data, size);
+
+  // Fast path, most reads go to RAM, so check there first.
+  if (!soc && readAddress < PHYS_MEMORY_END) {
+    ramDevice->Read(readAddress, data, size);
     return true;
   }
 
-  for (auto &[name, dev] : connectedDevices) {
-    if (readAddress >= dev->GetStartAddress() &&
-        readAddress <= dev->GetEndAddress()) {
-      // If the read is to SOC MMIO, we can't read from RAM.
-      if (soc && dev->GetDeviceName() == "RAM") { continue; }
-      dev->Read(readAddress, data, size);
-      return true;
-    }
+  // SFCX
+  if (readAddress >= sfcxDevice->GetStartAddress() &&
+    readAddress <= sfcxDevice->GetEndAddress()) {
+    // Hit
+    sfcxDevice->Read(readAddress, data, size);
+    return true;
+  }
+
+  // Configuration Read?
+  if (readAddress >= PCI_CONFIG_REGION_ADDRESS &&
+    readAddress <= PCI_CONFIG_REGION_ADDRESS + PCI_CONFIG_REGION_SIZE) {
+    ConfigRead(readAddress, data, size);
+    return true;
   }
 
   // Check on the other busses
@@ -81,16 +90,10 @@ bool RootBus::Read(u64 readAddress, u8 *data, u64 size, bool soc) {
     return true;
   }
 
-  if (!soc) {
-    // Device not found
-    LOG_ERROR(RootBus, "Read failed at address 0x{:X}", readAddress);
-
-    // Any reads to bus that don't belong to any device are always 0xFF
-    memset(data, 0xFF, size);
-  } else {
-    memset(data, 0, size);
-  }
-
+  // Device not found
+  LOG_ERROR(RootBus, "Read failed at address 0x{:X}", readAddress);
+  // Any reads to bus that don't belong to any device are always 0xFF
+  memset(data, 0xFF, size);
   return false;
 }
 
@@ -122,21 +125,25 @@ bool RootBus::MemSet(u64 writeAddress, s32 data, u64 size) {
 
 bool RootBus::Write(u64 writeAddress, const u8 *data, u64 size, bool soc) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "RootBus::Write", MP_AUTO);
+
+  if (!soc && writeAddress < 0x3FFFFFFF) {
+    ramDevice->Write(writeAddress, data, size);
+    return true;
+  }
+
+  // SFCX
+  if (writeAddress >= sfcxDevice->GetStartAddress() &&
+    writeAddress <= sfcxDevice->GetEndAddress()) {
+    // Hit
+    sfcxDevice->Write(writeAddress, data, size);
+    return true;
+  }
+
   // PCI Configuration Write?
   if (writeAddress >= PCI_CONFIG_REGION_ADDRESS &&
       writeAddress <= PCI_CONFIG_REGION_ADDRESS + PCI_CONFIG_REGION_SIZE) {
     ConfigWrite(writeAddress, data, size);
     return true;
-  }
-
-  for (auto &[name, dev] : connectedDevices) {
-    if (writeAddress >= dev->GetStartAddress() &&
-        writeAddress <= dev->GetEndAddress()) {
-      // If the write is to SOC MMIO, we can't read from RAM.
-      if (soc && dev->GetDeviceName() == "RAM") { continue; }
-      dev->Write(writeAddress, data, size);
-      return true;
-    }
   }
 
   // Check on the other busses
@@ -145,9 +152,7 @@ bool RootBus::Write(u64 writeAddress, const u8 *data, u64 size, bool soc) {
   }
 
   // Device or address not found
-  if (!soc) {
-    LOG_ERROR(RootBus, "Write to {:#x} failed, data {:#x}", writeAddress, *reinterpret_cast<const u64*>(data));
-  }
+  LOG_ERROR(RootBus, "Write to {:#x} failed, data {:#x}", writeAddress, *reinterpret_cast<const u64*>(data));
   return false;
 }
 

@@ -328,4 +328,9 @@ void PPCInterpreter::PPCInterpreterJIT_icbi(sPPEState* ppeState, JITBlockBuilder
   // Do nothing
 }
 
+// Enforce In Order Execution of IO
+void PPCInterpreter::PPCInterpreterJIT_eieio(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+  // Do nothing
+}
+
 #endif
