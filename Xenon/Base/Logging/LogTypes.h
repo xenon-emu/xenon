@@ -37,6 +37,7 @@ enum class Class : const u8 {
   System,                 // Base System messages
   Render,                 // OpenGL and Window messages
   Xenon,                  // Xenon CPU messages
+  JIT,                    // JIT Subsystem
   Xenon_IIC,              // Xenon Integrated Interrupt Controller
   Xenon_MMU,              // Xenon MMU debugging messages
   Xenon_PostBus,          // Xenon Post Bus output messages

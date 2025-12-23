@@ -11,6 +11,8 @@
 #include "Core/XCPU/PPU/PPU.h"
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
 
+#include "Core/XCPU/JIT/TranslationExample.h"
+
 #define BLR_OPCODE 0x4e800020
 #define curThreadId   ppeState->currentThread
 #define curThread     ppeState->ppuThread[curThreadId]
@@ -310,9 +312,10 @@ public:
         }
       }
     } else if (currentTestMode == ePPUTestingMode::JITx86) {
+
+      Xe::XCPU::JIT::TranslateAndPrintExample(ppeState, ppeState->ppuThread[ppeState->currentThread].NIA);
       ppuJIT->ExecuteJITInstrs(0x100, true, false, true);
     }
-
 
     // Assert test state expectations.
     bool testResult = CheckTestResults(testCase);
