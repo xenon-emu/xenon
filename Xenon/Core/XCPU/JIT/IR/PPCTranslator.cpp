@@ -65,6 +65,10 @@ namespace Xe::XCPU::JIT {
       ctx.builder->CreateReturn();
     }
 
+    // Transfer ownership of all values (constants, registers) to the function
+    // This ensures they live as long as the function
+    ctx.builder->TransferValuesToFunction();
+
     return function;
   }
 
@@ -75,9 +79,9 @@ namespace Xe::XCPU::JIT {
   bool PPCTranslator::TranslateInstruction(TranslationContext &ctx, uPPCInstr instr, u64 address) {
     // Decode instruction opcode
     u32 opcode = instr.opcode;
-
+    
     // Add debug comment
-    std::string comment = "PPC @ " + std::to_string(address) + " opcode=" + std::to_string(instr.main);
+    std::string comment = "PPC Code @ " + FMT("{:#x}", address) + " InstrData = " + FMT("{:#x}", opcode);
     ctx.builder->CreateComment(comment);
 
     IRTranslatorHandler handler = irTranslatorDecoder.Decode(opcode);
@@ -97,26 +101,28 @@ namespace Xe::XCPU::JIT {
   // Helper Functions
   //=============================================================================
 
+  // TODO: Move these to IRTranslator_LoadStore.cpp
+
   IR::IRValue *PPCTranslator::ComputeEAIndexed(TranslationContext &ctx, u32 rA, u32 rB) {
-    auto *rAVal = ctx.GetGPR(rA);
-    auto *rBVal = ctx.GetGPR(rB);
+    auto *rAVal = ctx.LoadGPR(rA);
+    auto *rBVal = ctx.LoadGPR(rB);
     return ctx.builder->Add(rAVal, rBVal);
   }
 
   IR::IRValue *PPCTranslator::ComputeEA_0_Indexed(TranslationContext &ctx, u32 rA, u32 rB) {
-    auto *rBVal = ctx.GetGPR(rB);
+    auto *rBVal = ctx.LoadGPR(rB);
     // rA = 0?
     if (rA == 0) {
       // EA = rB Value
       return rBVal;
     }
 
-    auto *rAVal = ctx.GetGPR(rA);
+    auto *rAVal = ctx.LoadGPR(rA);
     return ctx.builder->Add(rAVal, rBVal);
   }
 
   IR::IRValue *PPCTranslator::ComputeEAImmediate(TranslationContext &ctx, u32 rA, u64 imm) {
-    auto *rAVal = ctx.GetGPR(rA);
+    auto *rAVal = ctx.LoadGPR(rA);
     auto *immVal = ctx.builder->LoadConstInt64(imm);
     return ctx.builder->Add(rAVal, immVal);
   }
@@ -130,7 +136,7 @@ namespace Xe::XCPU::JIT {
       return immVal;
     }
 
-    auto *rAVal = ctx.GetGPR(rA);
+    auto *rAVal = ctx.LoadGPR(rA);
     return ctx.builder->Add(rAVal, immVal);
   }
 

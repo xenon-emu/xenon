@@ -36,12 +36,8 @@ namespace Xe::XCPU::JIT {
     return true;
   }
 
-  //=============================================================================
   // Instruction Translation Stubs
-  // Each function translates a PPC instruction to IR
-  //=============================================================================
 
-  // Main Opcodes (0x00 - 0x3F)
   // bool IRTranslate_tdi(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_twi(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_mulli(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
@@ -63,8 +59,6 @@ namespace Xe::XCPU::JIT {
   // bool IRTranslate_xoris(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_andi(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_andis(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
-
-  // Load/Store Instructions
   // bool IRTranslate_lwz(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_lwzu(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_lbz(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
@@ -81,8 +75,6 @@ namespace Xe::XCPU::JIT {
   // bool IRTranslate_sthu(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_lmw(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_stmw(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
-
-  // Floating-Point Load/Store Instructions
   // bool IRTranslate_lfs(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_lfsu(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_lfd(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
@@ -91,8 +83,6 @@ namespace Xe::XCPU::JIT {
   // bool IRTranslate_stfsu(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_stfd(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_stfdu(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
-
-  // Group 0x13 Opcodes (Branch Processor)
   // bool IRTranslate_mcrf(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   bool IRTranslate_bclr(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_rfid(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
@@ -106,16 +96,12 @@ namespace Xe::XCPU::JIT {
   // bool IRTranslate_crorc(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_cror(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_bcctr(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
-
-  // Group 0x1E Opcodes (Rotate/Shift 64-bit)
   // bool IRTranslate_rldiclx(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_rldicrx(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_rldicx(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_rldimix(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_rldclx(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_rldcrx(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
-
-  // Group 0x1F Opcodes (ALU Extended)
   // bool IRTranslate_cmp(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_tw(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_lvsl(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
@@ -274,13 +260,9 @@ namespace Xe::XCPU::JIT {
   // bool IRTranslate_extswx(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_icbi(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_dcbz(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
-
-  // Group 0x3A Opcodes (Load Doubleword)
   // bool IRTranslate_ld(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_ldu(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_lwa(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
-
-  // Group 0x3B Opcodes (Floating-Point Single)
   // bool IRTranslate_fdivsx(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_fsubsx(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_faddsx(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
@@ -291,12 +273,8 @@ namespace Xe::XCPU::JIT {
   // bool IRTranslate_fmaddsx(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_fnmsubsx(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_fnmaddsx(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
-
-  // Group 0x3E Opcodes (Store Doubleword)
   // bool IRTranslate_std(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_stdu(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
-
-  // Group 0x3F Opcodes (Floating-Point Double)
   // bool IRTranslate_mtfsb1x(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_mcrfs(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_mtfsb0x(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);

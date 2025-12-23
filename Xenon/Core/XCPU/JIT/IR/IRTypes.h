@@ -127,23 +127,23 @@ namespace Xe::XCPU::JIT::IR {
 
   inline const char *IRRegisterTypeToString(IRRegisterType type) {
     switch (type) {
-    case IRRegisterType::GPR: return "gpr";
-    case IRRegisterType::FPR: return "fpr";
-    case IRRegisterType::VR: return "vr";
-    case IRRegisterType::LR: return "lr";
-    case IRRegisterType::CTR: return "ctr";
-    case IRRegisterType::XER: return "xer";
-    case IRRegisterType::CR: return "cr";
-    case IRRegisterType::FPSCR: return "fpscr";
-    case IRRegisterType::VSCR: return "vscr";
-    case IRRegisterType::MSR: return "msr";
-    case IRRegisterType::SRR0: return "srr0";
-    case IRRegisterType::SRR1: return "srr1";
-    case IRRegisterType::DAR: return "dar";
-    case IRRegisterType::DSISR: return "dsisr";
-    case IRRegisterType::Temp: return "temp";
+    case IRRegisterType::GPR: return "GPR";
+    case IRRegisterType::FPR: return "FPR";
+    case IRRegisterType::VR: return "VR";
+    case IRRegisterType::LR: return "LR";
+    case IRRegisterType::CTR: return "CTR";
+    case IRRegisterType::XER: return "XER";
+    case IRRegisterType::CR: return "CR";
+    case IRRegisterType::FPSCR: return "FPSCR";
+    case IRRegisterType::VSCR: return "VSCR";
+    case IRRegisterType::MSR: return "MSR";
+    case IRRegisterType::SRR0: return "SRR0";
+    case IRRegisterType::SRR1: return "SRR1";
+    case IRRegisterType::DAR: return "DAR";
+    case IRRegisterType::DSISR: return "DSISR";
+    case IRRegisterType::Temp: return "TEMP";
     }
-    return "unknown";
+    return "Unknown";
   }
 
   //=============================================================================
@@ -152,6 +152,7 @@ namespace Xe::XCPU::JIT::IR {
 
   // Basic operation performed by the IR
   // PPC Instructions should be easily mapped to this
+  // TODO: Fix this, there are unnecesary ops here.
   enum class IROp : u16 {
     // Control Flow
     Comment,        // Debug Comment
@@ -377,35 +378,35 @@ namespace Xe::XCPU::JIT::IR {
 
   inline const char *IRCmpPredicateToString(IRCmpPredicate pred) {
     switch (pred) {
-    case IRCmpPredicate::EQ: return "eq";
-    case IRCmpPredicate::NE: return "ne";
-    case IRCmpPredicate::SLT: return "slt";
-    case IRCmpPredicate::SLE: return "sle";
-    case IRCmpPredicate::SGT: return "sgt";
-    case IRCmpPredicate::SGE: return "sge";
-    case IRCmpPredicate::ULT: return "ult";
-    case IRCmpPredicate::ULE: return "ule";
-    case IRCmpPredicate::UGT: return "ugt";
-    case IRCmpPredicate::UGE: return "uge";
-    case IRCmpPredicate::FOEQ: return "foeq";
-    case IRCmpPredicate::FONE: return "fone";
-    case IRCmpPredicate::FOLT: return "folt";
-    case IRCmpPredicate::FOLE: return "fole";
-    case IRCmpPredicate::FOGT: return "fogt";
-    case IRCmpPredicate::FOGE: return "foge";
-    case IRCmpPredicate::FUEQ: return "fueq";
-    case IRCmpPredicate::FUNE: return "fune";
-    case IRCmpPredicate::FULT: return "fult";
-    case IRCmpPredicate::FULE: return "fule";
-    case IRCmpPredicate::FUGT: return "fugt";
-    case IRCmpPredicate::FUGE: return "fuge";
-    case IRCmpPredicate::VEQ: return "veq";
-    case IRCmpPredicate::VSGT: return "vsgt";
-    case IRCmpPredicate::VSGE: return "vsge";
-    case IRCmpPredicate::VUGT: return "vugt";
-    case IRCmpPredicate::VUGE: return "vuge";
+    case IRCmpPredicate::EQ: return "EQ";
+    case IRCmpPredicate::NE: return "NE";
+    case IRCmpPredicate::SLT: return "SLT";
+    case IRCmpPredicate::SLE: return "SLE";
+    case IRCmpPredicate::SGT: return "SGT";
+    case IRCmpPredicate::SGE: return "SGE";
+    case IRCmpPredicate::ULT: return "ULT";
+    case IRCmpPredicate::ULE: return "ULE";
+    case IRCmpPredicate::UGT: return "UGT";
+    case IRCmpPredicate::UGE: return "UGE";
+    case IRCmpPredicate::FOEQ: return "FOEQ";
+    case IRCmpPredicate::FONE: return "FONE";
+    case IRCmpPredicate::FOLT: return "FOLT";
+    case IRCmpPredicate::FOLE: return "FOLE";
+    case IRCmpPredicate::FOGT: return "FOGT";
+    case IRCmpPredicate::FOGE: return "FOGE";
+    case IRCmpPredicate::FUEQ: return "FUEQ";
+    case IRCmpPredicate::FUNE: return "FUNE";
+    case IRCmpPredicate::FULT: return "FULT";
+    case IRCmpPredicate::FULE: return "FULE";
+    case IRCmpPredicate::FUGT: return "FUGT";
+    case IRCmpPredicate::FUGE: return "FUGE";
+    case IRCmpPredicate::VEQ: return "VEQ";
+    case IRCmpPredicate::VSGT: return "VSGT";
+    case IRCmpPredicate::VSGE: return "VSGE";
+    case IRCmpPredicate::VUGT: return "VUGT";
+    case IRCmpPredicate::VUGE: return "VUGE";
     }
-    return "unknown";
+    return "Unknown";
   }
 
   //=============================================================================
@@ -667,6 +668,14 @@ namespace Xe::XCPU::JIT::IR {
       return !basicBlocks.empty() ? basicBlocks[0].get() : nullptr;
     }
 
+    // Take ownership of values from IRBuilder
+    // This ensures constants and registers live as long as the function
+    void TakeOwnership(std::vector<std::unique_ptr<IRValue>> &&values) {
+      for (auto &v : values) {
+        ownedValues.push_back(std::move(v));
+      }
+    }
+
     // Metadata
     void SetMetadata(const std::string &key, const std::string &value) {
       metadata[key] = value;
@@ -688,6 +697,7 @@ namespace Xe::XCPU::JIT::IR {
     std::string name;
     u64 address;
     std::vector<std::unique_ptr<IRBasicBlock>> basicBlocks;
+    std::vector<std::unique_ptr<IRValue>> ownedValues;
     std::unordered_map<std::string, std::string> metadata;
   };
 

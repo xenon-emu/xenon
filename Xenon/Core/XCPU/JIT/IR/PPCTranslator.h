@@ -11,6 +11,7 @@
 
 #include <memory>
 #include <unordered_map>
+#include <format>
 
 //=============================================================================
 // PPC to IR Frontend
@@ -56,6 +57,7 @@ namespace Xe::XCPU::JIT {
     std::unordered_map<u32, IR::IRValue *> vrValues;        // VR v0-v127
 
     // Special register values
+    // TODO: Fill the missing regs
     IR::IRValue *lrValue = nullptr; // Link Register
     IR::IRValue *ctrValue = nullptr;   // Count Register
     IR::IRValue *xer = nullptr;   // XER
@@ -77,14 +79,14 @@ namespace Xe::XCPU::JIT {
         return it->second;
       }
 
-      std::string blockName = "block_" + std::to_string(address);
+      std::string blockName = std::format("block_{:X}", address);
       auto *block = builder->CreateBasicBlock(blockName);
       addressToBlock[address] = block;
       return block;
     }
 
-    // Get the current value of a GPR
-    IR::IRValue *GetGPR(u32 index) {
+    // Get the current value of a GPR (loads from register if not already in SSA map)
+    IR::IRValue *LoadGPR(u32 index) {
       auto it = gprValues.find(index);
       if (it != gprValues.end()) {
         return it->second;
@@ -97,17 +99,15 @@ namespace Xe::XCPU::JIT {
       return value;
     }
 
-    // Set the value of a GPR
-    void SetGPR(u32 index, IR::IRValue *value) {
-      // In SSA form, we just update the mapping
+    // Emit a store to a GPR and update SSA mapping
+    void StoreGPR(u32 index, IR::IRValue *value) {
       gprValues[index] = value;
-
-      // Also emit a store to the actual register
       auto *reg = builder->CreateGPR(index);
       builder->StoreReg(reg, value);
     }
+
     // Get the current value of an FPR
-    IR::IRValue *GetFPR(u32 index) {
+    IR::IRValue *LoadFPR(u32 index) {
       auto it = fprValues.find(index);
       if (it != fprValues.end()) {
         return it->second;
@@ -120,15 +120,15 @@ namespace Xe::XCPU::JIT {
       return value;
     }
 
-    // Set the value of an FPR
-    void SetFPR(u32 index, IR::IRValue *value) {
+    // Emit a store to an FPR and update SSA mapping
+    void StoreFPR(u32 index, IR::IRValue *value) {
       fprValues[index] = value;
       auto *reg = builder->CreateFPR(index);
       builder->StoreReg(reg, value);
     }
 
     /// Get the current value of a VR
-    IR::IRValue *GetVR(u32 index) {
+    IR::IRValue *LoadVR(u32 index) {
       auto it = vrValues.find(index);
       if (it != vrValues.end()) {
         return it->second;
@@ -141,38 +141,38 @@ namespace Xe::XCPU::JIT {
       return value;
     }
 
-    // Set the value of a VR
-    void SetVR(u32 index, IR::IRValue *value) {
+    // Emit a store to a VR and update SSA mapping
+    void StoreVR(u32 index, IR::IRValue *value) {
       vrValues[index] = value;
       auto *reg = builder->CreateVR(index);
       builder->StoreReg(reg, value);
     }
 
     // Get the current value of LR
-    IR::IRValue *GetLR() {
+    IR::IRValue *LoadLR() {
       if (lrValue) return lrValue;
       auto *reg = builder->CreateRegister(IR::IRRegisterType::LR, 0, IR::IRType::INT64);
       lrValue = builder->LoadReg(reg);
       return lrValue;
     }
 
-    // Set the value of LR
-    void SetLR(IR::IRValue *value) {
+    // Emit a store to LR and update SSA mapping
+    void StoreLR(IR::IRValue *value) {
       lrValue = value;
       auto *reg = builder->CreateRegister(IR::IRRegisterType::LR, 0, IR::IRType::INT64);
       builder->StoreReg(reg, value);
     }
 
     // Get the current value of CTR
-    IR::IRValue *GetCTR() {
+    IR::IRValue *LoadCTR() {
       if (ctrValue) return ctrValue;
       auto *reg = builder->CreateRegister(IR::IRRegisterType::CTR, 0, IR::IRType::INT64);
       ctrValue = builder->LoadReg(reg);
       return ctrValue;
     }
 
-    // Set the value of CTR
-    void SetCTR(IR::IRValue *value) {
+    // Emit a store to CTR and update SSA mapping
+    void StoreCTR(IR::IRValue *value) {
       ctrValue = value;
       auto *reg = builder->CreateRegister(IR::IRRegisterType::CTR, 0, IR::IRType::INT64);
       builder->StoreReg(reg, value);
@@ -200,9 +200,9 @@ namespace Xe::XCPU::JIT {
     bool TranslateInstruction(TranslationContext &ctx, uPPCInstr instruction, u64 address);
 
     // Helper functions
-    // ----------------
+  // ----------------
 
-    // Compute effective address EA for load/store
+  // Compute effective address EA for load/store
 
     // EA = value(rA) + value(rB)
     IR::IRValue *ComputeEAIndexed(TranslationContext &ctx, u32 rA, u32 rB);

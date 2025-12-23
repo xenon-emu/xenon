@@ -11,6 +11,7 @@
 #include <string>
 #include <sstream>
 #include <iomanip>
+#include <format>
 
 //=============================================================================
 // IR Printer
@@ -20,19 +21,17 @@
 
 namespace Xe::XCPU::JIT {
 
-  /// Prints IR function to a string
+  // Prints IR function to a string
   class IRPrinter {
   public:
-    /// Print an IR function
+    // Print an IR function
     static std::string PrintFunction(const IR::IRFunction *function) {
       if (!function) {
         return "nullptr function";
       }
 
       std::string output;
-      output += "function " + function->GetName();
-      output += " @ 0x" + ToHex(function->GetAddress());
-      output += " {\n";
+      output += FMT("function {} @ {:#x} {{\n", function->GetName(), function->GetAddress());
 
       for (const auto &bb : function->GetBasicBlocks()) {
         output += PrintBasicBlock(bb.get());
@@ -42,7 +41,7 @@ namespace Xe::XCPU::JIT {
       return output;
     }
 
-    /// Print a basic block
+    // Print a basic block
     static std::string PrintBasicBlock(const IR::IRBasicBlock *block) {
       if (!block) {
         return "";
@@ -87,7 +86,7 @@ namespace Xe::XCPU::JIT {
       return output;
     }
 
-    /// Print an instruction
+    // Print an instruction
     static std::string PrintInstruction(const IR::IRInstruction *inst) {
       if (!inst) {
         return "";
@@ -98,12 +97,12 @@ namespace Xe::XCPU::JIT {
       // Add source location if available
       u64 srcLoc = inst->GetSourceLocation();
       if (srcLoc != 0) {
-        output += "[0x" + ToHex(srcLoc) + "] ";
+        output += FMT("[{:#x}] ", srcLoc);
       }
 
       // Print value name for non-void instructions
       if (inst->GetType() != IR::IRType::Void) {
-        output += "%" + ToHex(inst->GetId()) + " = ";
+        output += FMT("%{} = ", inst->GetId());
       }
 
       // Print opcode
@@ -136,7 +135,7 @@ namespace Xe::XCPU::JIT {
       return output;
     }
 
-    /// Print a value
+    // Print a value
     static std::string PrintValue(const IR::IRValue *value) {
       if (!value) {
         return "null";
@@ -145,18 +144,16 @@ namespace Xe::XCPU::JIT {
       switch (value->GetKind()) {
       case IR::IRValue::ValueKind::ConstantInt: {
         auto *constant = static_cast<const IR::IRConstantInt *>(value);
-        return std::string(IR::IRTypeToString(constant->GetType())) + " 0x" +
-          ToHex(constant->GetValue());
+        return FMT("{} {:#x}", IR::IRTypeToString(constant->GetType()), constant->GetValue());
       }
 
       case IR::IRValue::ValueKind::Register: {
         auto *reg = static_cast<const IR::IRRegister *>(value);
-        return std::string(IR::IRRegisterTypeToString(reg->GetRegisterType())) +
-          std::to_string(reg->GetRegisterIndex());
+        return FMT("{}{}", IR::IRRegisterTypeToString(reg->GetRegisterType()), reg->GetRegisterIndex());
       }
 
       case IR::IRValue::ValueKind::Instruction:
-        return "%" + std::to_string(value->GetId());
+        return FMT("%{}", value->GetId());
 
       case IR::IRValue::ValueKind::BasicBlock: {
         auto *block = static_cast<const IR::IRBasicBlock *>(value);
@@ -164,17 +161,8 @@ namespace Xe::XCPU::JIT {
       }
 
       default:
-        return "%" + std::to_string(value->GetId());
+        return FMT("%{}", value->GetId());
       }
-    }
-
-  private:
-    /// Helper function to convert a value to hexadecimal string
-    template<typename T>
-    static std::string ToHex(T value) {
-      std::ostringstream oss;
-      oss << std::hex << std::uppercase << value;
-      return oss.str();
     }
   };
 

@@ -23,9 +23,6 @@ namespace Xe::XCPU::JIT::IR {
   public:
     explicit IRBuilder(IRFunction *func) : function(func), currentBlock(nullptr) {}
 
-    // Basic Block Management
-    // ----------------------
-
     // Creates a new basic block with the given name
     IRBasicBlock *CreateBasicBlock(const std::string &name) {
       if (!function) return nullptr;
@@ -33,23 +30,17 @@ namespace Xe::XCPU::JIT::IR {
     }
 
     // Sets the current insertion point for new instructions
-    void SetInsertPoint(IRBasicBlock *block) {
-      currentBlock = block;
-    }
+    void SetInsertPoint(IRBasicBlock *block) { currentBlock = block; }
 
     // Gets the current insertion point
-    IRBasicBlock *GetInsertBlock() const {
-      return currentBlock;
-    }
-
-    // Constant Creation
-    // -----------------
+    IRBasicBlock *GetInsertBlock() const { return currentBlock; }
 
     // Create an integer constant
     IRConstantInt *CreateConstInt(IRType type, u64 value) {
-      auto *constant = new IRConstantInt(type, value);
-      ownedValues.emplace_back(constant);
-      return constant;
+      auto constant = std::make_unique<IRConstantInt>(type, value);
+      auto *ptr = constant.get();
+      ownedValues.push_back(std::move(constant));
+      return ptr;
     }
 
     // Create an 8-bit integer constant
@@ -74,30 +65,31 @@ namespace Xe::XCPU::JIT::IR {
 
     // Create a F32 constant
     IRConstantFloat32 *LoadConstFloat32(f32 value) {
-      auto *constant = new IRConstantFloat32(IRType::FLOAT32, value);
-      ownedValues.emplace_back(constant);
-      return constant;
+      auto constant = std::make_unique<IRConstantFloat32>(IRType::FLOAT32, value);
+      auto *ptr = constant.get();
+      ownedValues.push_back(std::move(constant));
+      return ptr;
     }
 
     // Create a F64 constant
     IRConstantFloat64 *LoadConstFloat64(f64 value) {
-      auto *constant = new IRConstantFloat64(IRType::FLOAT64, value);
-      ownedValues.emplace_back(constant);
-      return constant;
+      auto constant = std::make_unique<IRConstantFloat64>(IRType::FLOAT64, value);
+      auto *ptr = constant.get();
+      ownedValues.push_back(std::move(constant));
+      return ptr;
     }
 
     // Create a Vector128 constant
     IRConstantVec128 *LoadConstFloat64(Base::Vector128 value) {
-      auto *constant = new IRConstantVec128(IRType::VEC128, value);
-      ownedValues.emplace_back(constant);
-      return constant;
+      auto constant = std::make_unique<IRConstantVec128>(IRType::VEC128, value);
+      auto *ptr = constant.get();
+      ownedValues.push_back(std::move(constant));
+      return ptr;
     }
 
     // Create a zero constant of the given type
     IRConstantInt *CreateConstZero(IRType type) {
-      auto *constant = new IRConstantInt(type, 0);
-      ownedValues.emplace_back(constant);
-      return constant;
+      return CreateConstInt(type, 0);
     }
 
     // Create zero constant Int8
@@ -114,52 +106,50 @@ namespace Xe::XCPU::JIT::IR {
 
     // Create zero constant Float 32
     IRConstantFloat32 *LoadZeroFloat32() {
-      auto *constant = new IRConstantFloat32(IRType::FLOAT32, 0);
-      ownedValues.emplace_back(constant);
-      return constant;
+      auto constant = std::make_unique<IRConstantFloat32>(IRType::FLOAT32, 0);
+      auto *ptr = constant.get();
+      ownedValues.push_back(std::move(constant));
+      return ptr;
     }
 
     // Create zero constant Float 64
     IRConstantFloat64 *LoadZeroFloat64() {
-      auto *constant = new IRConstantFloat64(IRType::FLOAT64, 0);
-      ownedValues.emplace_back(constant);
-      return constant;
+      auto constant = std::make_unique<IRConstantFloat64>(IRType::FLOAT64, 0);
+      auto *ptr = constant.get();
+      ownedValues.push_back(std::move(constant));
+      return ptr;
     }
 
     // Create zero constant Vector 128
     IRConstantVec128 *LoadZeroVec128() {
-      auto *constant = new IRConstantVec128(IRType::VEC128, Base::Vector128{ 0 });
-      ownedValues.emplace_back(constant);
-      return constant;
+      auto constant = std::make_unique<IRConstantVec128>(IRType::VEC128, Base::Vector128{ 0 });
+      auto *ptr = constant.get();
+      ownedValues.push_back(std::move(constant));
+      return ptr;
     }
-
-    // Register Access
-    // ---------------
 
     // Create a reference to a PPC register
     IRRegister *CreateRegister(IRRegisterType regType, u32 index, IRType type) {
-      auto *reg = new IRRegister(regType, index, type);
-      ownedValues.emplace_back(reg);
-      return reg;
+      auto reg = std::make_unique<IRRegister>(regType, index, type);
+      auto *ptr = reg.get();
+      ownedValues.push_back(std::move(reg));
+      return ptr;
     }
 
-    /// Create a reference to a GPR (General Purpose Register)
+    // Create a reference to a GPR (General Purpose Register)
     IRRegister *CreateGPR(u32 index) {
       return CreateRegister(IRRegisterType::GPR, index, IRType::INT64);
     }
 
-    /// Create a reference to an FPR (Floating Point Register)
+    // Create a reference to an FPR (Floating Point Register)
     IRRegister *CreateFPR(u32 index) {
       return CreateRegister(IRRegisterType::FPR, index, IRType::FLOAT64);
     }
 
-    /// Create a reference to a Vector Register
+    // Create a reference to a Vector Register
     IRRegister *CreateVR(u32 index) {
       return CreateRegister(IRRegisterType::VR, index, IRType::VEC128);
     }
-
-    // Instruction Creation Helpers
-    // -----------------------------
 
     // Load value from a PPC register
     IRInstruction *LoadReg(IRRegister *reg) {
@@ -168,7 +158,7 @@ namespace Xe::XCPU::JIT::IR {
       return inst;
     }
 
-    /// Store value to a PPC register
+    // Store value to a PPC register
     IRInstruction *StoreReg(IRRegister *reg, IRValue *value) {
       auto *inst = CreateInstruction(IROp::StoreReg, IRType::Void);
       inst->AddOperand(reg);
@@ -190,9 +180,6 @@ namespace Xe::XCPU::JIT::IR {
       inst->AddOperand(value);
       return inst;
     }
-
-    // Instructions Creation
-    // ----------------------------------
 
     // Create a signed integer comparison
     IRInstruction *CreateCmpS(IRCmpPredicate pred, IRValue *lhs, IRValue *rhs) {
@@ -538,9 +525,6 @@ namespace Xe::XCPU::JIT::IR {
       return inst;
     }
 
-    // Vector Operations
-    // -----------------
-
     // Create a vector addition
     IRInstruction *CreateVAdd(IRValue *lhs, IRValue *rhs) {
       auto *inst = CreateInstruction(IROp::VAdd, IRType::VEC128);
@@ -597,60 +581,54 @@ namespace Xe::XCPU::JIT::IR {
       return inst;
     }
 
-    // Control Flow
-    // ------------
-
     // NOTE: All terminator instructions should set addToBlock as false.
 
     // Create an unconditional branch
     IRInstruction *CreateBranch(IRBasicBlock *target) {
-      auto *inst = CreateInstruction(IROp::Branch, IRType::Void, false);
+      auto inst = std::make_unique<IRInstruction>(IROp::Branch, IRType::Void);
+      auto *ptr = inst.get();
+      if (currentSourceAddress != 0) { inst->SetSourceLocation(currentSourceAddress); }
       inst->AddOperand(target);
       if (currentBlock) {
-        // Transferir ownership al basic block para el terminator
-        auto instPtr = TransferOwnership(inst);
-        currentBlock->SetTerminator(std::move(instPtr));
+        currentBlock->SetTerminator(std::move(inst));
         currentBlock->AddSuccessor(target);
         target->AddPredecessor(currentBlock);
       }
-      return inst;
+      return ptr;
     }
 
     // Create a conditional branch
     IRInstruction *CreateBranchCond(IRValue *condition, IRBasicBlock *trueBlock,
       IRBasicBlock *falseBlock) {
-      auto *inst = CreateInstruction(IROp::BranchCond, IRType::Void, false);
+      auto inst = std::make_unique<IRInstruction>(IROp::BranchCond, IRType::Void);
+      auto *ptr = inst.get();
+      if (currentSourceAddress != 0) { inst->SetSourceLocation(currentSourceAddress); }
       inst->AddOperand(condition);
       inst->AddOperand(trueBlock);
       inst->AddOperand(falseBlock);
       if (currentBlock) {
-        // Transferir ownership al basic block para el terminator
-        auto instPtr = TransferOwnership(inst);
-        currentBlock->SetTerminator(std::move(instPtr));
+        currentBlock->SetTerminator(std::move(inst));
         currentBlock->AddSuccessor(trueBlock);
         currentBlock->AddSuccessor(falseBlock);
         trueBlock->AddPredecessor(currentBlock);
         falseBlock->AddPredecessor(currentBlock);
       }
-      return inst;
+      return ptr;
     }
 
     // Create a return instruction
     IRInstruction *CreateReturn(IRValue *value = nullptr) {
-      auto *inst = CreateInstruction(IROp::Return, IRType::Void, false);
+      auto inst = std::make_unique<IRInstruction>(IROp::Return, IRType::Void);
+      auto *ptr = inst.get();
+      if (currentSourceAddress != 0) { inst->SetSourceLocation(currentSourceAddress); }
       if (value) {
         inst->AddOperand(value);
       }
       if (currentBlock) {
-        // Transferir ownership al basic block para el terminator
-        auto instPtr = TransferOwnership(inst);
-        currentBlock->SetTerminator(std::move(instPtr));
+        currentBlock->SetTerminator(std::move(inst));
       }
-      return inst;
+      return ptr;
     }
-
-    // Special PPC Operations
-    // ----------------------
 
     // Create a count leading zeros instruction
     IRInstruction *CreateCountLeadingZeros(IRValue *value) {
@@ -678,9 +656,6 @@ namespace Xe::XCPU::JIT::IR {
       inst->AddOperand(length);
       return inst;
     }
-
-    // Condition Register Operations
-    // -----------------------------
 
     // Create a CR bit set instruction
     IRInstruction *CreateCRSetBit(IRValue *crIndex, IRValue *bitIndex, IRValue *value) {
@@ -727,6 +702,14 @@ namespace Xe::XCPU::JIT::IR {
     // Set source location for the next instructions
     void SetCurrentSourceLocation(u64 address) { currentSourceAddress = address; }
 
+    // Move all owned values to the function for proper lifetime management
+    // This should be called after building is complete
+    void TransferValuesToFunction() {
+      if (function) {
+        function->TakeOwnership(std::move(ownedValues));
+      }
+    }
+
   private:
     IRFunction *function;
     IRBasicBlock *currentBlock;
@@ -734,32 +717,18 @@ namespace Xe::XCPU::JIT::IR {
     std::vector<std::unique_ptr<IRValue>> ownedValues;
 
     // Core instruction creation helper
-    IRInstruction *CreateInstruction(IROp op, IRType type, bool addToBlock = true) {
-      auto *inst = new IRInstruction(op, type);
-      ownedValues.emplace_back(inst);
+    IRInstruction *CreateInstruction(IROp op, IRType type) {
+      auto inst = std::make_unique<IRInstruction>(op, type);
+      auto *ptr = inst.get();
       if (currentSourceAddress != 0) { inst->SetSourceLocation(currentSourceAddress); }
-      if (addToBlock && currentBlock) {
-        auto instPtr = TransferOwnership(inst);
-        currentBlock->AddInstruction(std::move(instPtr));
+      if (currentBlock) {
+        currentBlock->AddInstruction(std::move(inst));
       }
-      return inst;
-    }
-
-    // Helper for transfering ownership from ownedValues to basic block
-    std::unique_ptr<IRInstruction> TransferOwnership(IRInstruction *inst) {
-      // Buscar y extraer el unique_ptr del vector ownedValues
-      for (auto it = ownedValues.begin(); it != ownedValues.end(); ++it) {
-        if (it->get() == inst) {
-          // Extraer el unique_ptr y remover del vector
-          auto ptr = std::unique_ptr<IRInstruction>(
-            static_cast<IRInstruction*>(it->release())
-          );
-          ownedValues.erase(it);
-          return ptr;
-        }
+      else {
+        // If no block, store in owned values temporarily
+        ownedValues.push_back(std::move(inst));
       }
-      // Esto no debería ocurrir, pero por seguridad
-      return std::unique_ptr<IRInstruction>(inst);
+      return ptr;
     }
   };
 

@@ -7,41 +7,6 @@
 
 namespace Xe::XCPU::JIT {
 
-  bool IRTranslate_addx(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr) {
-    auto *builder = ctx.builder.get();
-
-    // Load operands from GPRs
-    auto *raReg = builder->CreateGPR(instr.ra);
-    auto *rbReg = builder->CreateGPR(instr.rb);
-
-    auto *raVal = builder->LoadReg(raReg);
-    auto *rbVal = builder->LoadReg(rbReg);
-
-    // Perform the addition: rD = rA + rB
-    auto *result = builder->Add(raVal, rbVal);
-
-    // Store result to rD
-    auto *rdReg = builder->CreateGPR(instr.rd);
-    builder->StoreReg(rdReg, result);
-
-    // Update GPR value in context for SSA tracking
-    ctx.SetGPR(instr.rd, result);
-
-    // Handle OE bit (overflow enable)
-    if (instr.oe) {
-      // TODO: Implement overflow detection and XER[OV] update
-      // For now, we create a comment noting this needs implementation
-      builder->CreateComment("TODO: OE bit - overflow detection");
-    }
-
-    // Handle Rc bit (record CR0)
-    if (instr.rc) {
-      translator.UpdateCR0(ctx, result);
-    }
-
-    return true;
-  }
-
   bool IRTranslate_bclr(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr) {
     auto *builder = ctx.builder.get();
 
@@ -64,7 +29,7 @@ namespace Xe::XCPU::JIT {
       builder->SetInsertPoint(decrementCtrBlock);
 
       // Load CTR, decrement, store back
-      auto *ctrVal = ctx.GetCTR();
+      auto *ctrVal = ctx.LoadCTR();
       if (!ctrVal) {
         auto *ctrReg = builder->CreateRegister(IR::IRRegisterType::SPR, static_cast<u32>(eXenonSPR::CTR), IR::IRType::INT64);
         ctrVal = builder->LoadReg(ctrReg);
@@ -73,9 +38,8 @@ namespace Xe::XCPU::JIT {
       auto *one = builder->LoadConstInt64(1);
       auto *newCtr = builder->Sub(ctrVal, one);
 
-      auto *ctrReg = builder->CreateRegister(IR::IRRegisterType::SPR, static_cast<u32>(eXenonSPR::CTR), IR::IRType::INT64);
-      builder->StoreReg(ctrReg, newCtr);
-      ctx.SetCTR(newCtr);
+      // Store CTR and update SSA
+      ctx.StoreCTR(newCtr);
 
       builder->CreateBranch(checkCondBlock);
     }
@@ -91,7 +55,7 @@ namespace Xe::XCPU::JIT {
     IR::IRValue *ctrCondition = nullptr;
     if ((bo & 0x4) == 0) {
       // Need to check CTR
-      auto *ctrVal = ctx.GetCTR();
+      auto *ctrVal = ctx.LoadCTR();
       if (!ctrVal) {
         auto *ctrReg = builder->CreateRegister(IR::IRRegisterType::SPR, static_cast<u32>(eXenonSPR::CTR), IR::IRType::INT64);
         ctrVal = builder->LoadReg(ctrReg);
@@ -104,13 +68,11 @@ namespace Xe::XCPU::JIT {
         // BO[1] == 1: branch if CTR == 0 (invert ctrNotZero)
         auto *ctrIsZero = builder->CmpEQ(ctrVal, zero);
         ctrCondition = ctrIsZero;
-      }
-      else {
+      } else {
         // BO[1] == 0: branch if CTR != 0
         ctrCondition = ctrNotZero;
       }
-    }
-    else {
+    } else {
       // BO[2] == 1: CTR check always passes
       ctrCondition = builder->LoadConstInt8(1);
     }
@@ -128,14 +90,12 @@ namespace Xe::XCPU::JIT {
         // BO[3] == 1: branch if CR bit is set
         auto *one = builder->LoadConstInt8(1);
         crCondition = builder->CmpEQ(crBit, one);
-      }
-      else {
+      } else {
         // BO[3] == 0: branch if CR bit is clear
         auto *zero = builder->LoadConstInt8(0);
         crCondition = builder->CmpEQ(crBit, zero);
       }
-    }
-    else {
+    } else {
       // BO[4] == 1: CR check always passes
       crCondition = builder->LoadConstInt8(1);
     }
@@ -145,6 +105,7 @@ namespace Xe::XCPU::JIT {
       builder->CreateZExt(ctrCondition, IR::IRType::INT64),
       builder->CreateZExt(crCondition, IR::IRType::INT64)
     );
+
     auto *shouldBranch = builder->CmpNE(finalCondition, builder->LoadConstInt64(0));
 
     // Step 5: Create conditional branch
@@ -154,7 +115,7 @@ namespace Xe::XCPU::JIT {
     builder->SetInsertPoint(takeBranchBlock);
 
     // Load LR value
-    auto *lrVal = ctx.GetLR();
+    auto *lrVal = ctx.LoadLR();
     if (!lrVal) {
       auto *lrReg = builder->CreateRegister(IR::IRRegisterType::SPR, static_cast<u32>(eXenonSPR::LR), IR::IRType::INT64);
       lrVal = builder->LoadReg(lrReg);
@@ -170,16 +131,14 @@ namespace Xe::XCPU::JIT {
     // If LK bit is set, save return address (CIA + 4) to LR
     if (lk) {
       auto *returnAddr = builder->LoadConstInt64(ctx.currentAddress + 4);
-      auto *lrReg = builder->CreateRegister(IR::IRRegisterType::SPR, static_cast<u32>(eXenonSPR::LR), IR::IRType::INT64);
-      builder->StoreReg(lrReg, returnAddr);
-      ctx.SetLR(returnAddr);
+      ctx.StoreLR(returnAddr);
     }
-
-    // Create return instruction (block terminator)
-    builder->CreateReturn();
 
     // Step 7: Fall-through block - continue to next instruction
     builder->SetInsertPoint(fallThroughBlock);
+
+    // Create return instruction (block terminator)
+    builder->CreateReturn();
 
     // Mark block as terminated
     ctx.blockTerminated = true;
