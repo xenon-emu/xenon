@@ -9,7 +9,9 @@
 #include <vector>
 
 #include "Base/Types.h"
+#include "Base/assert.h"
 #include "Base/Vector128.h"
+#include "Core/XCPU/JIT/IR/IROpcodes.h"
 
 //=============================================================================
 // IR Types
@@ -22,7 +24,6 @@
 namespace Xe::XCPU::JIT::IR {
 
   // Forward declarations
-  class IRValue;
   class IRInstruction;
   class IRBasicBlock;
   class IRFunction;
@@ -106,21 +107,33 @@ namespace Xe::XCPU::JIT::IR {
     VR,     // v0-v127 (128-bit)
 
     // Special Purpose Registers
-    SPR,
+    SPR,    // Special Purpose Register (generic)
+    XER,    // Fixed-Point Exception Register
     LR,     // Link Register
     CTR,    // Count Register
-    XER,    // Fixed-Point Exception Register
-    CR,     // Condition Register
-    FPSCR,  // Floating-Point Status and Control Register
-    VSCR,   // Vector Status and Control Register
-
-    // System Registers
-    MSR,    // Machine State Register
-    SRR0,   // Save/Restore Register 0
-    SRR1,   // Save/Restore Register 1
-    DAR,    // Data Address Register
+    CFAR,   // Used in Linux, unknown definition atm.
     DSISR,  // Data Storage Interrupt Status Register
-
+    DAR,    // Data Address Register
+    DEC,    // Decrementer Register
+    SRR0,   // Machine Status Save/Restore Register 0
+    SRR1,   // Machine Status Save/Restore Register 1
+    ACCR,   // Address Compare Control Register
+    VRSAVE, // VXU Register Save
+    SPRG0,  // Software Use Special Purpose Register 0
+    SPRG1,  // Software Use Special Purpose Register 1
+    SPRG2,  // Software Use Special Purpose Register 2
+    SPRG3,  // Software Use Special Purpose Register 3
+    HSPRG0, // Hypervisor Software Use Special Purpose Register 0
+    HSPRG1, // Hypervisor Software Use Special Purpose Register 1
+    HSRR0,  // Hypervisor Save Restore Register 0
+    HSRR1,  // Hypervisor Save Restore Register 1
+    TSRL,   // Thread Status Register Local
+    TSRR,   // Thread Status Register Remote
+    PPE_TLB_Index_Hint, // PPE Translation Lookaside Buffer Index Hint Register
+    DABR,   // Data Address Beakpoint Register
+    DABRX,  // Data Address Beakpoint Register Extension
+    MSR,    // Machine State Register
+    PIR,    // Processor Identification Register
     // Virtual/temporary register
     Temp,
   };
@@ -130,211 +143,36 @@ namespace Xe::XCPU::JIT::IR {
     case IRRegisterType::GPR: return "GPR";
     case IRRegisterType::FPR: return "FPR";
     case IRRegisterType::VR: return "VR";
+    case IRRegisterType::SPR: return "Generic SPR";
+    case IRRegisterType::XER: return "XER";
     case IRRegisterType::LR: return "LR";
     case IRRegisterType::CTR: return "CTR";
-    case IRRegisterType::XER: return "XER";
-    case IRRegisterType::CR: return "CR";
-    case IRRegisterType::FPSCR: return "FPSCR";
-    case IRRegisterType::VSCR: return "VSCR";
-    case IRRegisterType::MSR: return "MSR";
+    case IRRegisterType::CFAR: return "CFAR";
+    case IRRegisterType::DSISR: return "DSISR";
+    case IRRegisterType::DAR: return "DAR";
+    case IRRegisterType::DEC: return "DEC";
     case IRRegisterType::SRR0: return "SRR0";
     case IRRegisterType::SRR1: return "SRR1";
-    case IRRegisterType::DAR: return "DAR";
-    case IRRegisterType::DSISR: return "DSISR";
+    case IRRegisterType::ACCR: return "ACCR";
+    case IRRegisterType::VRSAVE: return "VRSAVE";
+    case IRRegisterType::SPRG0: return "SPRG0";
+    case IRRegisterType::SPRG1: return "SPRG1";
+    case IRRegisterType::SPRG2: return "SPRG2";
+    case IRRegisterType::SPRG3: return "SPRG3";
+    case IRRegisterType::HSPRG0: return "HSPRG0";
+    case IRRegisterType::HSPRG1: return "HSPRG1";
+    case IRRegisterType::HSRR0: return "HSRR0";
+    case IRRegisterType::HSRR1: return "HSRR1";
+    case IRRegisterType::TSRL: return "TSRL";
+    case IRRegisterType::TSRR: return "TSRR";
+    case IRRegisterType::PPE_TLB_Index_Hint: return "PPE_TLB_Index_Hint";
+    case IRRegisterType::DABR: return "DABR";
+    case IRRegisterType::DABRX: return "DABRX";
+    case IRRegisterType::MSR: return "MSR";
+    case IRRegisterType::PIR: return "PIR";
     case IRRegisterType::Temp: return "TEMP";
     }
     return "Unknown";
-  }
-
-  //=============================================================================
-  // IR Opcodes
-  //=============================================================================
-
-  // Basic operation performed by the IR
-  // PPC Instructions should be easily mapped to this
-  // TODO: Fix this, there are unnecesary ops here.
-  enum class IROp : u16 {
-    // Control Flow
-    Comment,        // Debug Comment
-    Nop,            // No operation
-    Branch,         // Unconditional branch
-    BranchCond,     // Conditional branch
-    Call,           // Function call
-    Return,         // Return from function
-
-    // Memory Operations
-    Load,           // Load from memory
-    Store,          // Store to memory
-    LoadReg,        // Load from PPC register
-    StoreReg,       // Store to PPC register
-    CondLoad,       // Conditional load (lwarx/ldwarx)
-    CondStore,      // Conditional Store (stwcx/stdcx)
-
-    // Arithmetic (Integer)
-    Add,            // Addition
-    Sub,            // Subtraction
-    Mul,            // Multiplication
-    DivS,           // Division (signed)
-    DivU,           // Division (unsigned)
-    ModS,           // Modulo (signed)
-    ModU,           // Modulo (unsigned)
-    Neg,            // Negation
-
-    // Arithmetic (Floating Point)
-    FAdd,          // FP Addition
-    FSub,          // FP Subtraction
-    FMul,          // FP Multiplication
-    FDiv,          // FP Division
-    FNeg,  // FP Negation
-    FAbs,          // FP Absolute value
-    FSqrt,         // FP Square root
-    FMA,           // Fused multiply-add
-
-    // Bitwise Operations
-    And,   // Bitwise AND
-    Or,            // Bitwise OR
-    Xor,        // Bitwise XOR
-    Not,           // Bitwise NOT
-    Shl,    // Shift left
-    Shr, // Logical shift right
-    Sar,// Arithmetic shift right
-    Rotl,       // Rotate left
-    Rotr,    // Rotate right
-
-    // Comparison
-    Cmp,         // Compare (signed)
-    CmpU,          // Compare (unsigned)
-    FCmp,     // FP Compare
-
-    // Type Conversions
-    ZExt,          // Zero extend
-    SExt,        // Sign extend
-    Trunc,         // Truncate
-    FPToSI,        // Float to signed int
-    FPToUI,     // Float to unsigned int
-    SIToFP,        // Signed int to float
-    UIToFP,        // Unsigned int to float
-    FPExt,       // FP extend (f32 -> f64)
-    FPTrunc,     // FP truncate (f64 -> f32)
-    Bitcast,  // Bitcast (reinterpret bits)
-
-    // Vector Operations (VMX/AltiVec)
-    VAdd,          // Vector add
-    VSub,          // Vector subtract
-    VMul,          // Vector multiply
-    VDiv,          // Vector divide
-    VAnd,    // Vector AND
-    VOr,           // Vector OR
-    VXor,          // Vector XOR
-    VSplat,        // Vector splat (broadcast scalar)
-    VExtract,      // Extract vector element
-    VInsert,       // Insert vector element
-    VShuffle,      // Vector shuffle
-
-    // Special PPC Operations
-    CountLeadingZeros,  // Count leading zeros (cntlzw/cntlzd)
-    ExtractBits,        // Extract bit field
-    InsertBits,   // Insert bit field
-
-    // Condition Register Operations
-    CRSetBit,      // Set CR bit
-    CRGetBit,      // Get CR bit
-    CRAnd,    // CR AND
-    CROr,          // CR OR
-    CRXor,         // CR XOR
-    CRNand,        // CR NAND
-    CRNor,         // CR NOR
-
-    // System/Special Operations
-    Syscall,       // System call
-    Trap,  // Trap instruction
-    Sync,          // Synchronize
-    Isync,         // Instruction synchronize
-
-    // Intrinsics (for direct PPC instruction mapping when needed)
-    Intrinsic,     // Generic intrinsic call
-  };
-
-  inline const char *IROpToString(IROp op) {
-    switch (op) {
-    case IROp::Comment: return "comment";
-    case IROp::Nop: return "nop";
-    case IROp::Branch: return "br";
-    case IROp::BranchCond: return "br_cond";
-    case IROp::Call: return "call";
-    case IROp::Return: return "ret";
-    case IROp::Load: return "load";
-    case IROp::Store: return "store";
-    case IROp::LoadReg: return "load_reg";
-    case IROp::StoreReg: return "store_reg";
-    case IROp::CondLoad: return "cond_load";
-    case IROp::CondStore: return "cond_store";
-    case IROp::Add: return "add";
-    case IROp::Sub: return "sub";
-    case IROp::Mul: return "mul";
-    case IROp::DivS: return "div";
-    case IROp::DivU: return "divu";
-    case IROp::ModS: return "mod";
-    case IROp::ModU: return "modu";
-    case IROp::Neg: return "neg";
-    case IROp::FAdd: return "fadd";
-    case IROp::FSub: return "fsub";
-    case IROp::FMul: return "fmul";
-    case IROp::FDiv: return "fdiv";
-    case IROp::FNeg: return "fneg";
-    case IROp::FAbs: return "fabs";
-    case IROp::FSqrt: return "fsqrt";
-    case IROp::FMA: return "fma";
-    case IROp::And: return "and";
-    case IROp::Or: return "or";
-    case IROp::Xor: return "xor";
-    case IROp::Not: return "not";
-    case IROp::Shl: return "shl";
-    case IROp::Shr: return "shr";
-    case IROp::Sar: return "sar";
-    case IROp::Rotl: return "rotl";
-    case IROp::Rotr: return "rotr";
-    case IROp::Cmp: return "cmp";
-    case IROp::CmpU: return "cmpu";
-    case IROp::FCmp: return "fcmp";
-    case IROp::ZExt: return "zext";
-    case IROp::SExt: return "sext";
-    case IROp::Trunc: return "trunc";
-    case IROp::FPToSI: return "fptosi";
-    case IROp::FPToUI: return "fptoui";
-    case IROp::SIToFP: return "sitofp";
-    case IROp::UIToFP: return "uitofp";
-    case IROp::FPExt: return "fpext";
-    case IROp::FPTrunc: return "fptrunc";
-    case IROp::Bitcast: return "bitcast";
-    case IROp::VAdd: return "vadd";
-    case IROp::VSub: return "vsub";
-    case IROp::VMul: return "vmul";
-    case IROp::VDiv: return "vdiv";
-    case IROp::VAnd: return "vand";
-    case IROp::VOr: return "vor";
-    case IROp::VXor: return "vxor";
-    case IROp::VSplat: return "vsplat";
-    case IROp::VExtract: return "vextract";
-    case IROp::VInsert: return "vinsert";
-    case IROp::VShuffle: return "vshuffle";
-    case IROp::CountLeadingZeros: return "clz";
-    case IROp::ExtractBits: return "extract_bits";
-    case IROp::InsertBits: return "insert_bits";
-    case IROp::CRSetBit: return "cr_set";
-    case IROp::CRGetBit: return "cr_get";
-    case IROp::CRAnd: return "crand";
-    case IROp::CROr: return "cror";
-    case IROp::CRXor: return "crxor";
-    case IROp::CRNand: return "crnand";
-    case IROp::CRNor: return "crnor";
-    case IROp::Syscall: return "syscall";
-    case IROp::Trap: return "trap";
-    case IROp::Sync: return "sync";
-    case IROp::Isync: return "isync";
-    case IROp::Intrinsic: return "intrinsic";
-    }
-    return "unknown";
   }
 
   //=============================================================================
@@ -410,7 +248,7 @@ namespace Xe::XCPU::JIT::IR {
   }
 
   //=============================================================================
-  // IR Value
+  // IR IRValue
   //=============================================================================
 
   // Represents a value in the IR (SSA form)
@@ -418,23 +256,123 @@ namespace Xe::XCPU::JIT::IR {
   // This allows full SSA to be performed as well as code/comp opts later on
   class IRValue {
   public:
-    // The kind of IR Value
+    // The kind of IR IRValue
     enum class ValueKind : u8 {
+      Generic,          // Generic value
+      Constant,         // Constant value
       Instruction,      // Result of an instruction
-      ConstantInt,      // Constant int value
-      ConstantFloat,    // Constant float value
-      ConstantVec128,   // Constant vec value
       Register,         // PPC register reference
       BasicBlock,       // Basic block label
       Argument,         // Function argument
     };
 
-    IRValue(ValueKind k, IRType t) : kind(k), type(t), id(nextId++) {}
+    typedef union {
+      s8 i8;
+      u8 u8;
+      s16 i16;
+      u16 u16;
+      s32 i32;
+      u32 u32;
+      s64 i64;
+      u64 u64;
+      f32 flt32;
+      f64 flt64;
+      Base::Vector128 vec128;
+    } ConstantValue;
+
+    IRValue(ValueKind k = ValueKind::Generic, IRType t = IRType::Void) : kind(k), type(t), id(nextId++) {}
     virtual ~IRValue() = default;
 
     ValueKind GetKind() const { return kind; }
     IRType GetType() const { return type; }
     u32 GetId() const { return id; }
+
+    // Returns wheter this is a constValue value of any given type.
+    inline bool IsConstant() { return isConstantVal; }
+
+    // Setters for constValue values
+
+    void SetZero(IRType newType);
+    void SetConstant(s8 value);
+    void SetConstant(u8 value);
+    void SetConstant(s16 value);
+    void SetConstant(u16 value);
+    void SetConstant(s32 value);
+    void SetConstant(u32 value);
+    void SetConstant(s64 value);
+    void SetConstant(u64 value);
+    void SetConstant(f32 value);
+    void SetConstant(f64 value);
+    void SetConstant(const Base::Vector128 &value);
+
+    // Returns the constValue value stored in this IRValue
+    ConstantValue GetValue() const { return constValue; }
+
+    // Operations for constValue values
+    
+    bool IsConstantTrue() const;
+    bool IsConstantFalse() const;
+    bool IsConstantZero() const;
+    bool IsConstantOne() const;
+    bool IsConstantEQ(IRValue *operand) const;
+    bool IsConstantNE(IRValue *operand) const;
+    bool IsConstantSLT(IRValue *operand) const;
+    bool IsConstantSLE(IRValue *operand) const;
+    bool IsConstantSGT(IRValue *operand) const;
+    bool IsConstantSGE(IRValue *operand) const;
+    bool IsConstantULT(IRValue *operand) const;
+    bool IsConstantULE(IRValue *operand) const;
+    bool IsConstantUGT(IRValue *operand) const;
+    bool IsConstantUGE(IRValue *operand) const;
+
+    void Cast(IRType newType);
+    void ZeroExtend(IRType newType);
+    void SignExtend(IRType newType);
+    void Truncate(IRType newType);
+    void Convert(IRType newType);
+    void Round(RoundingMode roundMode);
+    void Add(IRValue *operand);
+    void Sub(IRValue *operand);
+    void Mul(IRValue *operand);
+    void MulHi(IRValue *operand, bool isUnsigned);
+    void Div(IRValue *operand, bool isUnsigned);
+    void Max(IRValue *operand);
+    static void MulAdd(IRValue *dest, IRValue *value1, IRValue *value2, IRValue *value3);
+    static void MulSub(IRValue *dest, IRValue *value1, IRValue *value2, IRValue *value3);
+    void Neg();
+    void Abs();
+    void Sqrt();
+    void RSqrt();
+    void Recip();
+    void And(IRValue *operand);
+    void Or(IRValue *operand);
+    void Xor(IRValue *operand);
+    void Not();
+    void Shl(IRValue *operand);
+    void Shr(IRValue *operand);
+    void Sha(IRValue *operand);
+    void Extract(IRValue *vec, IRValue *index);
+    void Select(IRValue *operand, IRValue *ctrl);
+    void Splat(IRValue *operand);
+    void VectorCompareEQ(IRValue *operand, IRType type);
+    void VectorCompareSGT(IRValue *operand, IRType type);
+    void VectorCompareSGE(IRValue *operand, IRType type);
+    void VectorCompareUGT(IRValue *operand, IRType type);
+    void VectorCompareUGE(IRValue *operand, IRType type);
+    void VectorConvertI2F(IRValue *operand, bool isUnsigned);
+    void VectorConvertF2I(IRValue *operand, bool isUnsigned);
+    void VectorShl(IRValue *operand, IRType type);
+    void VectorShr(IRValue *operand, IRType type);
+    void VectorRol(IRValue *operand, IRType type);
+    void VectorAdd(IRValue *operand, IRType type, bool isUnsigned, bool saturate);
+    void VectorSub(IRValue *operand, IRType type, bool isUnsigned, bool saturate);
+    void DotProduct3(IRValue *operand);
+    void DotProduct4(IRValue *operand);
+    void VectorAverage(IRValue *operand, IRType type, bool isUnsigned, bool saturate);
+    void ByteSwap();
+    void CountLeadingZeros(const IRValue *operand);
+    bool Compare(IROp opcode, IRValue *operand);
+
 
     // For use tracking
     void AddUse(IRInstruction *inst) { uses.push_back(inst); }
@@ -445,79 +383,17 @@ namespace Xe::XCPU::JIT::IR {
     }
 
   protected:
+    // Kind of IRValue we hold
     ValueKind kind;
+    // Constant value this IRValue holds
+    ConstantValue constValue = {};
+    // This is a constValue IRValue
+    bool isConstantVal = false;
     IRType type;
     u32 id;
     std::vector<IRInstruction *> uses;
 
     static inline u32 nextId = 0;
-  };
-
-  //=============================================================================
-  // Constant Values
-  //=============================================================================
-
-  // These represent values that never change, such as instruction immediates
-
-  // Integer Constants (8/16/32/64 bits)
-  class IRConstantInt : public IRValue {
-  public:
-    IRConstantInt(IRType t, u64 val) : IRValue(ValueKind::ConstantInt, t), value(val) {}
-
-    u64 GetValue() const { return value; }
-
-    std::string ToString() const override {
-      return std::string(IRTypeToString(type)) + " " + std::to_string(value);
-    }
-
-  private:
-    u64 value;
-  };
-
-  // Float 32 Constants
-  class IRConstantFloat32 : public IRValue {
-  public:
-    IRConstantFloat32(IRType t, f32 val) : IRValue(ValueKind::ConstantFloat, t), value(val) {}
-
-    u64 GetValue() const { return value; }
-
-    std::string ToString() const override {
-      return std::string(IRTypeToString(type)) + " " + std::to_string(value);
-    }
-
-  private:
-    f32 value;
-  };
-
-  // Float 64 Constants
-  class IRConstantFloat64 : public IRValue {
-  public:
-    IRConstantFloat64(IRType t, f64 val) : IRValue(ValueKind::ConstantFloat, t), value(val) {}
-
-    f64 GetValue() const { return value; }
-
-    std::string ToString() const override {
-      return std::string(IRTypeToString(type)) + " " + std::to_string(value);
-    }
-
-  private:
-    f64 value;
-  };
-
-  // Vector 128 Constants
-  class IRConstantVec128 : public IRValue {
-  public:
-    IRConstantVec128(IRType t, Base::Vector128 val) : IRValue(ValueKind::ConstantVec128, t), value(val) {}
-
-    Base::Vector128 GetValue() const { return value; }
-
-    std::string ToString() const override {
-      return std::string(IRTypeToString(type)) + " X = [" + std::to_string(value.x) + "] | Y = [" + std::to_string(value.y)
-        + "] | Z = [" + std::to_string(value.z) + "] | W = [" + std::to_string(value.w);
-    }
-
-  private:
-    Base::Vector128 value;
   };
 
   //=============================================================================
@@ -550,7 +426,7 @@ namespace Xe::XCPU::JIT::IR {
   // Represents an instruction in the IR
   class IRInstruction : public IRValue {
   public:
-    IRInstruction(IROp o, IRType t) : IRValue(ValueKind::Instruction, t), op(o) {}
+    IRInstruction(IROp o, IRType t = IRType::Void) : IRValue(ValueKind::Instruction, t), op(o) {}
 
     IROp GetOpcode() const { return op; }
 
@@ -580,10 +456,79 @@ namespace Xe::XCPU::JIT::IR {
     u64 GetSourceLocation() const { return sourceAddress; }
 
     std::string ToString() const override {
+      // Special formatting for high-level register operations
+      switch (op) {
+      case IROp::LoadGPR: {
+        if (!operands.empty()) {
+          if (auto *idx = dynamic_cast<IRValue *>(operands[0])) {
+            return "%" + std::to_string(id) + " = LoadGPR[" + std::to_string(idx->GetValue().u32) + "]";
+          }
+        }
+        break;
+      }
+      case IROp::StoreGPR: {
+        if (operands.size() >= 2) {
+          if (auto *idx = dynamic_cast<IRValue *>(operands[0])) {
+            return "StoreGPR[" + std::to_string(idx->GetValue().u32) + "] %" + std::to_string(operands[1]->GetId());
+          }
+        }
+        break;
+      }
+      case IROp::LoadFPR: {
+        if (!operands.empty()) {
+          if (auto *idx = dynamic_cast<IRValue *>(operands[0])) {
+            return "%" + std::to_string(id) + " = LoadFPR[" + std::to_string(idx->GetValue().u32) + "]";
+          }
+        }
+        break;
+      }
+      case IROp::StoreFPR: {
+        if (operands.size() >= 2) {
+          if (auto *idx = dynamic_cast<IRValue *>(operands[0])) {
+            return "StoreFPR[" + std::to_string(idx->GetValue().u32) + "] %" + std::to_string(operands[1]->GetId());
+          }
+        }
+        break;
+      }
+      case IROp::LoadVR: {
+        if (!operands.empty()) {
+          if (auto *idx = dynamic_cast<IRValue *>(operands[0])) {
+            return "%" + std::to_string(id) + " = LoadVR[" + std::to_string(idx->GetValue().u32) + "]";
+          }
+        }
+        break;
+      }
+      case IROp::StoreVR: {
+        if (operands.size() >= 2) {
+          if (auto *idx = dynamic_cast<IRValue *>(operands[0])) {
+            return "StoreVR[" + std::to_string(idx->GetValue().u32) + "] %" + std::to_string(operands[1]->GetId());
+          }
+        }
+        break;
+      }
+      case IROp::LoadSPR: {
+        std::string sprName = GetMetadata("spr_name");
+        if (!sprName.empty()) {
+          return "%" + std::to_string(id) + " = Load" + sprName;
+        }
+        break;
+      }
+      case IROp::StoreSPR: {
+        std::string sprName = GetMetadata("spr_name");
+        if (!sprName.empty() && operands.size() >= 2) {
+          return "Store" + sprName + " %" + std::to_string(operands[1]->GetId());
+        }
+        break;
+      }
+      default:
+        break;
+      }
+
+      // Default formatting
       std::string result = "%" + std::to_string(id) + " = " + IROpToString(op);
-      for (auto *op : operands) {
-        if (op) {
-          result += " %" + std::to_string(op->GetId());
+      for (auto *operand : operands) {
+        if (operand) {
+          result += " %" + std::to_string(operand->GetId());
         }
       }
       return result;

@@ -45,8 +45,8 @@ namespace Xe::XCPU::JIT {
   // bool IRTranslate_cmpli(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_cmpi(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_addic(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
-  // bool IRTranslate_addi(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
-  // bool IRTranslate_addis(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
+  //bool IRTranslate_addi(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
+  //bool IRTranslate_addis(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_bc(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_sc(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_b(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
@@ -185,7 +185,7 @@ namespace Xe::XCPU::JIT {
   // bool IRTranslate_eciwx(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_lhzux(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_xorx(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
-  // bool IRTranslate_mfspr(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
+  bool IRTranslate_mfspr(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_lwax(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_dst(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_lhax(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
@@ -205,7 +205,7 @@ namespace Xe::XCPU::JIT {
   // bool IRTranslate_divduox(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_divwux(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_divwuox(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
-  // bool IRTranslate_mtspr(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
+  bool IRTranslate_mtspr(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_dcbi(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_nandx(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);
   // bool IRTranslate_slbia(PPCTranslator &translator, TranslationContext &ctx, uPPCInstr instr);

@@ -16,7 +16,7 @@ namespace Xe::XCPU::JIT {
 
   std::unique_ptr<IR::IRFunction> PPCTranslator::TranslateBlock(sPPEState *ppeState, u64 startAddress, u32 maxInstructions) {
     // Create IR function
-    std::string funcName = "ppc_func_" + std::to_string(startAddress);
+    std::string funcName = "ppc_func_" + FMT("{:#x}", startAddress);
     auto function = std::make_unique<IR::IRFunction>(funcName, startAddress);
 
     // Create translation context
@@ -39,9 +39,7 @@ namespace Xe::XCPU::JIT {
       ctx.builder->SetCurrentSourceLocation(currentAddr);
 
       // Fetch instruction (this would normally go through MMU)
-      u32 instrData = 0; // Simple ADD
-
-      instrData = PPCInterpreter::MMURead32(ppeState, currentAddr);
+      u32 instrData = PPCInterpreter::MMURead32(ppeState, currentAddr);
 
       uPPCInstr instruction;
       instruction.opcode = instrData;
@@ -79,7 +77,7 @@ namespace Xe::XCPU::JIT {
   bool PPCTranslator::TranslateInstruction(TranslationContext &ctx, uPPCInstr instr, u64 address) {
     // Decode instruction opcode
     u32 opcode = instr.opcode;
-    
+
     // Add debug comment
     std::string comment = "PPC Code @ " + FMT("{:#x}", address) + " InstrData = " + FMT("{:#x}", opcode);
     ctx.builder->CreateComment(comment);
@@ -95,7 +93,6 @@ namespace Xe::XCPU::JIT {
     // Execute the handler to emit IR
     return handler(*this, ctx, instr);
   }
-
 
   //=============================================================================
   // Helper Functions
@@ -123,13 +120,12 @@ namespace Xe::XCPU::JIT {
 
   IR::IRValue *PPCTranslator::ComputeEAImmediate(TranslationContext &ctx, u32 rA, u64 imm) {
     auto *rAVal = ctx.LoadGPR(rA);
-    auto *immVal = ctx.builder->LoadConstInt64(imm);
+    auto *immVal = ctx.builder->LoadConstS64(imm);
     return ctx.builder->Add(rAVal, immVal);
   }
 
-
   IR::IRValue *PPCTranslator::ComputeEA_0_Immediate(TranslationContext &ctx, u32 rA, u64 imm) {
-    auto *immVal = ctx.builder->LoadConstInt64(imm);
+    auto *immVal = ctx.builder->LoadConstS64(imm);
     // rA = 0?
     if (rA == 0) {
       // EA = rB Value
@@ -138,20 +134,6 @@ namespace Xe::XCPU::JIT {
 
     auto *rAVal = ctx.LoadGPR(rA);
     return ctx.builder->Add(rAVal, immVal);
-  }
-
-  void PPCTranslator::UpdateCR0(TranslationContext &ctx, IR::IRValue *value) {
-    // TODO: Implement CR0 update
-    // CR0 bits: LT, GT, EQ, SO
-    // Compare value with 0 and set CR0 bits accordingly
-  }
-
-  IR::IRValue *PPCTranslator::SignExtend(TranslationContext &ctx, IR::IRValue *value, IR::IRType targetType) {
-    return ctx.builder->CreateSExt(value, targetType);
-  }
-
-  IR::IRValue *PPCTranslator::ZeroExtend(TranslationContext &ctx, IR::IRValue *value, IR::IRType targetType) {
-    return ctx.builder->CreateZExt(value, targetType);
   }
 
 } // namespace Xe::XCPU::JIT

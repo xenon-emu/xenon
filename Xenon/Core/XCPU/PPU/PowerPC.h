@@ -195,6 +195,11 @@ union uPPCInstr {
   } VMX128_R;
 };
 
+// Zero/Signed Extend Utils
+constexpr s64 SignExtend16(u32 v) { return (s64)((s16)v); }
+constexpr s64 SignExtend26(u32 v) { return (s64)(v & 0x02000000 ? (s32)v | 0xFC000000 : (s32)(v)); }
+constexpr u64 ZeroExtend16(u32 v) { return (u64)((u16)v); }
+
 //
 // PPU Registers Definitions, for both LE and BE byte orderings.
 //

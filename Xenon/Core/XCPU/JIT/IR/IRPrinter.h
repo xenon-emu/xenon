@@ -142,14 +142,14 @@ namespace Xe::XCPU::JIT {
       }
 
       switch (value->GetKind()) {
-      case IR::IRValue::ValueKind::ConstantInt: {
-        auto *constant = static_cast<const IR::IRConstantInt *>(value);
-        return FMT("{} {:#x}", IR::IRTypeToString(constant->GetType()), constant->GetValue());
+      case IR::IRValue::ValueKind::Constant: {
+        auto *constant = static_cast<const IR::IRValue *>(value);
+        return FMT("{} {:#x}", IR::IRTypeToString(constant->GetType()), constant->GetValue().u32);
       }
 
       case IR::IRValue::ValueKind::Register: {
         auto *reg = static_cast<const IR::IRRegister *>(value);
-        return FMT("{}{}", IR::IRRegisterTypeToString(reg->GetRegisterType()), reg->GetRegisterIndex());
+        return FMT("{}[{}]", IR::IRRegisterTypeToString(reg->GetRegisterType()), reg->GetRegisterIndex());
       }
 
       case IR::IRValue::ValueKind::Instruction:
