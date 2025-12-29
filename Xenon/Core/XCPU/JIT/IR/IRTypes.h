@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "Base/Types.h"
-#include "Base/assert.h"
+#include "Base/Assert.h"
 #include "Base/Vector128.h"
 #include "Core/XCPU/JIT/IR/IROpcodes.h"
 
