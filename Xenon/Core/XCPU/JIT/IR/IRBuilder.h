@@ -412,10 +412,101 @@ namespace Xe::XCPU::JIT::IR {
       return inst;
     }
 
+    // Is NaN
     IRValue *IsNan(IRValue *value) {
       auto *inst = CreateInstruction(IROp::IsNaN, IRType::INT8);
       inst->AddOperand(value);
       return inst;
+    }
+
+    // Generic Compare
+    IRValue *CreateCompare(IROp opType, IRValue *value1, IRValue *value2) {
+      if (value1->IsConstant() && value2->IsConstant()) {
+        return LoadConstS8(value1->Compare(opType, value2) ? 1 : 0);
+      }
+      
+      auto *inst = CreateInstruction(opType, IRType::INT8);
+      inst->AddOperand(value1);
+      inst->AddOperand(value2);
+      return inst;
+    }
+
+    // Compare Equal
+    IRValue *CompareEQ(IRValue *value1, IRValue *value2) {
+      return CreateCompare(IROp::CompareEQ, value1, value2);
+    }
+    // Compare Not Equal
+    IRValue *CompareNE(IRValue *value1, IRValue *value2) {
+      return CreateCompare(IROp::CompareNE, value1, value2);
+    }
+    // Compare Signed Larger Than
+    IRValue *CompareSLT(IRValue *value1, IRValue *value2) {
+      return CreateCompare(IROp::CompareSLT, value1, value2);
+    }
+    // Compare Signed Larger or Equal
+    IRValue *CompareSLE(IRValue *value1, IRValue *value2) {
+      return CreateCompare(IROp::CompareSLE, value1, value2);
+    }
+    // Compare Signed Greater Than
+    IRValue *CompareSGT(IRValue *value1, IRValue *value2) {
+      return CreateCompare(IROp::CompareSGT, value1, value2);
+    }
+    // Compare Signed Greater Or Equal
+    IRValue *CompareSGE(IRValue *value1, IRValue *value2) {
+      return CreateCompare(IROp::CompareSGE, value1, value2);
+    }
+    // Compare Unsigned Larger Than
+    IRValue *CompareULT(IRValue *value1, IRValue *value2) {
+      return CreateCompare(IROp::CompareULT, value1, value2);
+    }
+    // Compare Unsigned Larger or Equal
+    IRValue *CompareULE(IRValue *value1, IRValue *value2) {
+      return CreateCompare(IROp::CompareULE, value1, value2);
+    }
+    // Compare Unsigned Greater Than
+    IRValue *CompareUGT(IRValue *value1, IRValue *value2) {
+      return CreateCompare(IROp::CompareUGT, value1, value2);
+    }
+    // Compare Unsigned Greater Or Equal
+    IRValue *CompareUGE(IRValue *value1, IRValue *value2) {
+      return CreateCompare(IROp::CompareUGE, value1, value2);
+    }
+
+    // Did Saturate
+    IRValue *DidSaturate(IRValue *value1) {
+      auto *inst = CreateInstruction(IROp::DidSaturate, IRType::INT8);
+      inst->AddOperand(value1);
+      return inst;
+    }
+
+    // Generic Vector Compare
+    IRValue *CreateVectorCompare(IROp opType, IRValue *value1, IRValue *value2, IRType typeToCompare) {
+      auto *inst = CreateInstruction(opType, value1->GetType());
+      inst->AddOperand(value1);
+      inst->AddOperand(value2);
+      inst->AddOperand(LoadConstU32(static_cast<u32>(typeToCompare)));
+      return inst;
+    }
+
+    // Vector Compare EQ
+    IRValue *VectorCompareEQ(IRValue *value1, IRValue *value2, IRType typeToCompare) {
+      return CreateVectorCompare(IROp::VectorCompareEQ, value1, value2, typeToCompare);
+    }
+    // Vector Compare Signed Greater Than
+    IRValue *VectorCompareSGT(IRValue *value1, IRValue *value2, IRType typeToCompare) {
+      return CreateVectorCompare(IROp::VectorCompareSGT, value1, value2, typeToCompare);
+    }
+    // Vector Compare Signed Greater or Equal
+    IRValue *VectorCompareSGE(IRValue *value1, IRValue *value2, IRType typeToCompare) {
+      return CreateVectorCompare(IROp::VectorCompareSGE, value1, value2, typeToCompare);
+    }
+    // Vector Compare Unsigned Greater Than
+    IRValue *VectorCompareUGT(IRValue *value1, IRValue *value2, IRType typeToCompare) {
+      return CreateVectorCompare(IROp::VectorCompareUGT, value1, value2, typeToCompare);
+    }
+    // Vector Compare Unsigned Greater or Equal
+    IRValue *VectorCompareUGE(IRValue *value1, IRValue *value2, IRType typeToCompare) {
+      return CreateVectorCompare(IROp::VectorCompareUGE, value1, value2, typeToCompare);
     }
 
     // Add
@@ -433,6 +524,44 @@ namespace Xe::XCPU::JIT::IR {
       inst->AddOperand(value2);
       return inst;
     }
+
+    // Add with the value of the Carry flag
+    IRValue *AddWithCarry(IRValue *value1, IRValue *value2, IRValue *carry) {
+      auto *inst = CreateInstruction(IROp::AddWithCarry, value1->GetType());
+      inst->AddOperand(value1);
+      inst->AddOperand(value2);
+      inst->AddOperand(carry);
+      return inst;
+    }
+
+    // Vector Add
+    IRValue *VectorAdd(IRValue *value1, IRValue *value2, IRType opernadType) {
+      auto *inst = CreateInstruction(IROp::VectorAdd, value1->GetType());
+      inst->AddOperand(value1);
+      inst->AddOperand(value2);
+      inst->AddOperand(LoadConstU32(static_cast<u32>(opernadType)));
+      return inst;
+    }
+
+    // Subtract
+    IRValue *Sub(IRValue *value1, IRValue *value2) {
+      // TODO: Add constant checks for runtime subtraction
+
+      auto *inst = CreateInstruction(IROp::Sub, value1->GetType());
+      inst->AddOperand(value1);
+      inst->AddOperand(value2);
+      return inst;
+    }
+
+    // Vector Subtract
+    IRValue *VectorSub(IRValue *value1, IRValue *value2, IRType opernadType) {
+      auto *inst = CreateInstruction(IROp::VectorSub, value1->GetType());
+      inst->AddOperand(value1);
+      inst->AddOperand(value2);
+      inst->AddOperand(LoadConstU32(static_cast<u32>(opernadType)));
+      return inst;
+    }
+
 
     // Debug and Metadata
     // ------------------
