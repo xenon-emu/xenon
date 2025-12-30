@@ -45,16 +45,18 @@ namespace Xe::XCPU::JIT::IR {
     };
 
 
+    // Abstracts an asmjit ErrorHandler for error printing.
     class X86ErrorHandler : public asmjit::ErrorHandler {
     public:
 
-      // TODO: expand the handler
+      // TODO: Pasrse error and print emiter state maybe?
       void handleError(asmjit::Error err, const char* message, asmjit::BaseEmitter* origin) override {
-        printf("AsmJit error: %s\n", message);
-        LOG_ERROR(JIT, "!!ASMJIT THREW AN ERROR!! {}", message);
+        LOG_ERROR(JIT, "[asmjit]: Error: {}", message);
       }
     };
 
+    // X86_64 CodeGen backend
+    // This is where all of the x86 code generation is performed from the optimized IR
     class X86Backend : public CodeGenBackend {
     public:
 
@@ -84,8 +86,11 @@ namespace Xe::XCPU::JIT::IR {
       asmjit::CodeHolder mHolder;       // Holds current function code
       asmjit::x86::Compiler mCompiler;  // X86 Compiler interface
       asmjit::JitRuntime mRuntime;      // The Runtime
-      X86ErrorHandler mErrorHandler;
-      asmjit::StringLogger mLogger;
+      X86ErrorHandler mErrorHandler;    // Error Handler for asmjit
+      asmjit::StringLogger mLogger;     // Logger for the geenrated assembly
+
+      // CodeGen options
+      CodeGenOptions codeGenOpts = {0};
     };
 
 } // namespace Xe::XCPU::JIT::IR

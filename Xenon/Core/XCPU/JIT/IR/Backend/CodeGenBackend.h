@@ -42,11 +42,12 @@ namespace Xe::XCPU::JIT::IR {
     // x86_64 Specific Options
     bool enableAVX2 = false;    // AVX2 for FPU and VXU
     bool enableAVX512 = false;  // Future AVX512 support
+    // Specific backend options
+    bool enableAssemblyPrint = false; // If supported, print generated assembly to console
   };
 
   // Holds Context for emission of current IRFunction
-  struct EmitterContext {
-  };
+  struct EmitterContext {};
 
   //=============================================================================
   // CodeGenBackend - Abstract Backend Interface

@@ -63,18 +63,24 @@ namespace Xe::XCPU::JIT {
     }
 
     
-    // well this is a test example, at the end we want to make a backend instance per PPU code in PPU.h
-    //
+    // Compile and execute our IR inside the backend.
     if (irFunction) {
       std::unique_ptr<IR::CodeGenBackend> bck = IR::CreateCodeGenBackend();
-      if (!bck->Initialize({ 0 })) {
+
+      // Setup our code gen options
+      // TODO: We must first check if the host supports AVX/AVX512/etc...
+      IR::CodeGenOptions opts = { 0 };
+      opts.enableAssemblyPrint = true; // This is the basic example
+      opts.enableAVX2 = true;
+
+      if (!bck->Initialize(opts)) {
         LOG_ERROR(JIT, "Failer to Initialise BackEnd!");
         return;
       }
-      // compile block
+      // Compile block
       IR::CodeBlock block = bck->Compile(irFunction.get());
 
-      // run Jitted code
+      // Run Jitted code
       if (block.codePtr)
         block.codePtr(ppeState);
     }

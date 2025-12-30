@@ -12,7 +12,7 @@
 #define newGP16()  COMP.newGpw()
 #define newGP8()   COMP.newGpb()
 #define newGPptr() COMP.newGpz()
-#define newXMM128() COMP.newXmm() // 128 bit reg (32x4)
+#define newXmm() COMP.newXmm() // FP Reg/VMX Reg: 128 bit reg (32x4)
 
 #define GPRPtr(x) context->threadCtx->array(&sPPUThread::GPR).Ptr(x)
 #define SPRStruct(x) context->threadCtx->substruct(&sPPUThread::SPR).substruct(&sPPUThreadSPRs::x)
