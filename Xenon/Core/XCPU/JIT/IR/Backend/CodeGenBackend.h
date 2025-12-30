@@ -7,7 +7,15 @@
 #include <memory>
 
 #include "Base/Types.h"
+#include "Base/Logging/Log.h"
 #include "Core/XCPU/JIT/IR/IRTypes.h"
+#include "Core/XCPU/PPU/PowerPC.h"
+
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
+#include "asmjit/x86.h"
+#else
+#include "asmjit/core.h"
+#endif
 
 //=============================================================================
 // Code Generation Backend Interface
@@ -17,10 +25,14 @@
 //=============================================================================
 
 namespace Xe::XCPU::JIT::IR {
+  class CodeGenBackend;
+  struct CodeBlock;
 
+  using JITFunc = fptr<void(sPPEState*)>;
+  
   // Compiled code block result
   struct CodeBlock {
-    void *codePtr = nullptr;    // Pointer to executable code
+    JITFunc codePtr = nullptr;  // Pointer to executable code
     u64 codeSize = 0;           // Size of generated code in bytes
     u64 codeAddress = 0;        // Original PPC address
   };
@@ -30,6 +42,10 @@ namespace Xe::XCPU::JIT::IR {
     // x86_64 Specific Options
     bool enableAVX2 = false;    // AVX2 for FPU and VXU
     bool enableAVX512 = false;  // Future AVX512 support
+  };
+
+  // Holds Context for emission of current IRFunction
+  struct EmitterContext {
   };
 
   //=============================================================================
@@ -57,7 +73,7 @@ namespace Xe::XCPU::JIT::IR {
 
     // Check if the backend supports the current platform
     virtual bool IsSupported() const = 0;
-
+ 
   protected:
     CodeGenOptions options;
   };

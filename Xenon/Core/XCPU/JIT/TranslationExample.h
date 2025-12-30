@@ -6,6 +6,7 @@
 
 #include "Core/XCPU/JIT/IR/IRPrinter.h"
 #include "Core/XCPU/JIT/IR/PPCTranslator.h"
+#include "IR/Backend/CodeGenBackend.h"
 
 /*
 SSA PROPERTIES:
@@ -59,6 +60,23 @@ namespace Xe::XCPU::JIT {
       LOG_INFO(JIT, "Generated IR:\n{}", irText);
     } else {
        LOG_ERROR(JIT, "Failed to translate block at {:#x}", address);
+    }
+
+    
+    // well this is a test example, at the end we want to make a backend instance per PPU code in PPU.h
+    //
+    if (irFunction) {
+      std::unique_ptr<IR::CodeGenBackend> bck = IR::CreateCodeGenBackend();
+      if (!bck->Initialize({ 0 })) {
+        LOG_ERROR(JIT, "Failer to Initialise BackEnd!");
+        return;
+      }
+      // compile block
+      IR::CodeBlock block = bck->Compile(irFunction.get());
+
+      // run Jitted code
+      if (block.codePtr)
+        block.codePtr(ppeState);
     }
   }
 
