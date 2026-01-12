@@ -551,8 +551,12 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
     default:
       break;
     }
+
     // Skip to next block if needed.
-    if (skipBlock) { instrsExecuted++; thread.NIA += 4; }
+    if (skipBlock) {
+      instrsExecuted++;
+      thread.NIA += 4;
+    }
 
     // Get next block start address.
     u64 blockStartAddress = thread.NIA;
@@ -568,7 +572,8 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
       instrsExecuted += block->size / 4;
 
       // For Testing and debugging purposes only.
-      if (singleBlock) { break; }
+      if (singleBlock)
+        break;
     } else {
       bool realMode = false;
       realMode = !thread.SPR.MSR.DR || !thread.SPR.MSR.IR;
@@ -626,8 +631,13 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
         }
 
         // Check thread suspension
-        if (ppeState->currentThread == 0 && ppeState->SPR.CTRL.TE0 != true) { break; }
-        if (ppeState->currentThread == 1 && ppeState->SPR.CTRL.TE1 != true) { break; }
+        if (ppeState->currentThread == 0 && !ppeState->SPR.CTRL.TE0) {
+          break;
+        }
+
+        if (ppeState->currentThread == 1 && !ppeState->SPR.CTRL.TE1) {
+          break;
+        }
 
         // Execute linked block
         currentBlock = currentBlock->linkedBlock;
@@ -636,8 +646,13 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
       }
 
       // If the thread was suspended due to CTRL being written, we must end execution on said thread.
-      if (ppeState->currentThread == 0 && ppeState->SPR.CTRL.TE0 != true) { break; }
-      if (ppeState->currentThread == 1 && ppeState->SPR.CTRL.TE1 != true) { break; }
+      if (ppeState->currentThread == 0 && !ppeState->SPR.CTRL.TE0) {
+        break;
+      }
+
+      if (ppeState->currentThread == 1 && !ppeState->SPR.CTRL.TE1) {
+        break;
+      }
     }
   }
 }

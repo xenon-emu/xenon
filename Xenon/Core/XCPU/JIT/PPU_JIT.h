@@ -222,7 +222,7 @@ runtime->release(codePtr);
   asmjit::JitRuntime *runtime = nullptr;
   // Hash of all opcodes
   u64 hash = 0;
-  
+
   // Block linking support
   // Target address for unconditional branches (0 if conditional or not a branch)
   u64 linkTargetAddr = 0;

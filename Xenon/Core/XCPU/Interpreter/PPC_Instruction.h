@@ -114,7 +114,7 @@ namespace PPCInterpreter {
         { 0x35, GET(stfsu) },
         { 0x36, GET(stfd) },
         { 0x37, GET(stfdu) },
-        });
+      });
       // Group 0x13 opcodes (field 21..30)
       fillTable<std::string>(nameTable, 0x13, 10, 1, {
         { 0x000, GET(mcrf) },
@@ -130,7 +130,7 @@ namespace PPCInterpreter {
         { 0x1A1, GET(crorc) },
         { 0x1C1, GET(cror) },
         { 0x210, GET(bcctr) },
-        });
+      });
       // Group 0x1E opcodes (field 27..30)
       fillTable<std::string>(nameTable, 0x1E, 4, 1, {
         { 0x0, GETRC(rldicl) },
@@ -143,7 +143,7 @@ namespace PPCInterpreter {
         { 0x7, GETRC(rldimi) },
         { 0x8, GETRC(rldcl) },
         { 0x9, GETRC(rldcr) },
-        });
+      });
       // Group 0x1F opcodes (field 21..30)
       fillTable<std::string>(nameTable, 0x1F, 10, 1, {
         { 0x000, GET(cmp) },
@@ -305,13 +305,13 @@ namespace PPCInterpreter {
         { 0x3DA, GETRC(extsw) },
         { 0x3D6, GET(icbi) },
         { 0x3F6, GET(dcbz) },
-        });
+      });
       // Group 0x3A opcodes (field 30..31)
       fillTable<std::string>(nameTable, 0x3A, 2, 0, {
         { 0x0, GET(ld) },
         { 0x1, GET(ldu) },
         { 0x2, GET(lwa) },
-        });
+      });
       // Group 0x3B opcodes (field 21..30)
       fillTable<std::string>(nameTable, 0x3B, 10, 1, {
         { 0x12, GETRC(fdivs), 5 },
@@ -324,12 +324,12 @@ namespace PPCInterpreter {
         { 0x1D, GETRC(fmadds), 5 },
         { 0x1E, GETRC(fnmsubs), 5 },
         { 0x1F, GETRC(fnmadds), 5 },
-        });
+      });
       // Group 0x3E opcodes (field 30..31)
       fillTable<std::string>(nameTable, 0x3E, 2, 0, {
         { 0x0, GET(std) },
         { 0x1, GET(stdu) },
-        });
+      });
       // Group 0x3F opcodes (field 21..30)
       fillTable<std::string>(nameTable, 0x3F, 10, 1, {
         { 0x026, GETRC(mtfsb1) },
@@ -364,7 +364,7 @@ namespace PPCInterpreter {
         { 0x32E, GETRC(fctid) },
         { 0x32F, GETRC(fctidz) },
         { 0x34E, GETRC(fcfid) },
-        });
+      });
     }
     PPCDecoder();
     ~PPCDecoder() = default;
@@ -641,6 +641,7 @@ namespace PPCInterpreter {
       }
     }
     instructionHandlerJIT decodeJIT(u32 instr) const noexcept {
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
       instructionHandlerJIT handler = getJITTable()[PPCDecode(instr)];
 #define GET_HANDLER(name) &PPCInterpreterJIT_##name
       // VMX128 Lookup.
@@ -897,6 +898,9 @@ namespace PPCInterpreter {
       }
 #undef GET_HANDLER
       return handler;
+#else
+      return &PPCInterpreter::PPCInterpreterJIT_invalid;
+#endif // ifdef x86_64
     }
     const std::array<std::string, 0x20000> &getNameTable() const noexcept {
       return nameTable;
@@ -1172,7 +1176,7 @@ namespace PPCInterpreter {
       const bool isVxuMode = (count == static_cast<u32>(-1)) &&
         std::any_of(entries.begin(), entries.end(), [](const InstrInfo<T> &v) {
         return v.mask != 0;
-          });
+        });
 
       for (const auto &v : entries) {
         if (isVxuMode) {
