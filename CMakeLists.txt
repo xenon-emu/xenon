@@ -268,7 +268,8 @@ if (APPLE)
   add_compile_definitions(SIMPLE_FMT)
 # Add defines specific to Windows
 elseif (WIN32)
-  target_link_libraries(Xenon PRIVATE ws2_32)
+  # Synchronization is needed for WaitOnAddress/WakeByAddressSingle
+  target_link_libraries(Xenon PRIVATE ws2_32 synchronization)
   add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
 
   # Disables Warnings
