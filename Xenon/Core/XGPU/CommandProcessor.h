@@ -124,13 +124,13 @@ private:
   volatile bool cpWorkerThreadRunning = true;
 
   // Command Processor Worker Thread Loop
-  // Whenever there's valid commands in the read/write Ptrs, this will process 
+  // Whenever there's valid commands in the read/write Ptrs, this will process
   // all commands and perform tasks associated with them
   void cpWorkerThreadLoop();
 
   // Software loads ME and PFP uCode
   // libXenon driver loads it and after it verifies it
-  
+
   // CP PFP Write Address (offset)
   u32 cpPFPuCodeAddress = 0;
   // CP ME Write Address (offset)
@@ -151,12 +151,12 @@ private:
   // in memory where it wants to read the data from the gpu.
   // We need to handle both pointers to memory, and also the size of the RingBuffer.
   // If both pointers are valid then only then we can start to process commands.
-  // Since we don't have to deal with buffers, and simply read/write to memory, 
+  // Since we don't have to deal with buffers, and simply read/write to memory,
   // we can directly use pointers to real memory like hardware does.
 
   // CP RingBuffer Base Address in memory.
   std::atomic<u8*> cpRingBufferBasePtr = nullptr;
-  
+
   // RingBuffer Size.
   std::atomic<size_t> cpRingBufferSize = 0;
 

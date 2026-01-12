@@ -67,7 +67,10 @@ void VulkanRenderer::BackendStart() {
     .set_minimum_version(1, 2)
     .add_required_extensions({
       // Explicitly request the extension when not using Vulkan 1.3 core
-      VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME
+      VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME,
+      // We want to set vertex input layours per-draw
+      // For various reasons, this makes life easier with Xenos
+      VK_EXT_VERTEX_INPUT_DYNAMIC_STATE_EXTENSION_NAME
     })
     .select();
 
@@ -86,8 +89,16 @@ void VulkanRenderer::BackendStart() {
     .dynamicRendering = VK_TRUE,
   };
 
+  // Enable VK_EXT_vertex_input_dynamic_state
+  VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT vidFeat{
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT,
+    .pNext = nullptr,
+    .vertexInputDynamicState = VK_TRUE,
+  };
+
   vkb::DeviceBuilder deviceBuilder{ vkbPhys };
   deviceBuilder.add_pNext(&dynFeat);
+  deviceBuilder.add_pNext(&vidFeat);
 
   auto devRet = deviceBuilder.build();
 
@@ -166,13 +177,14 @@ void VulkanRenderer::BackendStart() {
   }
   swapchainImages = imagesRet.value();
 
-
   chosenFormat.format = vkbSwapchain.image_format;
 
   width = vkbSwapchain.extent.width;
   height = vkbSwapchain.extent.height;
 
   swapchainImageCount = swapchainImageViews.size();
+
+  swapchainImageLayouts.assign(swapchainImageCount, VK_IMAGE_LAYOUT_UNDEFINED);
 
   imagesInFlight.assign(swapchainImageCount, VK_NULL_HANDLE);
 
@@ -248,6 +260,25 @@ void VulkanRenderer::BackendShutdown() {
 
   DestroyPipelines();
 
+  // destroy guest pipelines / layout / shader modules / vb
+  for (auto& it : guestPipelines_) dispatch.destroyPipeline(it.second, nullptr);
+  guestPipelines_.clear();
+
+  if (guestPL_) { dispatch.destroyPipelineLayout(guestPL_, nullptr); guestPL_ = VK_NULL_HANDLE; }
+
+  for (auto& it : vsModules_) dispatch.destroyShaderModule(it.second, nullptr);
+  for (auto& it : psModules_) dispatch.destroyShaderModule(it.second, nullptr);
+  vsModules_.clear();
+  psModules_.clear();
+
+  if (guestVB_) {
+    if (guestVBMap_) { vmaUnmapMemory(allocator, guestVBAlloc_); guestVBMap_ = nullptr; }
+    vmaDestroyBuffer(allocator, guestVB_, guestVBAlloc_);
+    guestVB_ = VK_NULL_HANDLE;
+    guestVBAlloc_ = VK_NULL_HANDLE;
+    guestVBCap_ = 0;
+  }
+
   for (auto sem : renderFinishedPerImage) {
     if (sem)
       dispatch.destroySemaphore(sem, nullptr);
@@ -284,7 +315,9 @@ void VulkanRenderer::BackendShutdown() {
   vkb::destroy_instance(vkbInstance);
 }
 
-static void CmdImageBarrier(VkCommandBuffer cmd, vkb::DispatchTable &dispatch, VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout) {
+static void CmdImageBarrier(VkCommandBuffer cmd, vkb::DispatchTable &dispatch,
+                            VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout)
+{
   VkImageMemoryBarrier b{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
   b.oldLayout = oldLayout;
   b.newLayout = newLayout;
@@ -300,9 +333,11 @@ static void CmdImageBarrier(VkCommandBuffer cmd, vkb::DispatchTable &dispatch, V
   VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
   VkPipelineStageFlags dstStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 
+  // default for UNDEFINED -> COLOR_ATTACHMENT_OPTIMAL (or any "first use")
   b.srcAccessMask = 0;
   b.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
+  // COLOR_ATTACHMENT_OPTIMAL -> PRESENT_SRC_KHR
   if (oldLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL &&
       newLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR)
   {
@@ -310,6 +345,16 @@ static void CmdImageBarrier(VkCommandBuffer cmd, vkb::DispatchTable &dispatch, V
     dstStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
     b.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     b.dstAccessMask = 0;
+  }
+
+  // PRESENT_SRC_KHR -> COLOR_ATTACHMENT_OPTIMAL (re-acquired image)
+  if (oldLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR &&
+      newLayout == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+  {
+    srcStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    dstStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    b.srcAccessMask = 0;
+    b.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
   }
 
   dispatch.cmdPipelineBarrier(cmd, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &b);
@@ -458,6 +503,8 @@ void VulkanRenderer::CreateFbImage(u32 w, u32 h) {
     dispatch.destroySampler(fbSampler, nullptr);
     fbSampler = VK_NULL_HANDLE;
   }
+
+  fbLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
   VkImageCreateInfo ii{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
   ii.imageType = VK_IMAGE_TYPE_2D;
@@ -714,16 +761,340 @@ void VulkanRenderer::BackendBindPixelBuffer(Buffer *buffer) {
   UpdateDescriptors((VkBuffer)vkBuffer->GetBackendHandle(), (VkDeviceSize)vkBuffer->GetSize());
 }
 
-void VulkanRenderer::VertexFetch(const u32 location, const u32 components, bool isFloat, bool isNormalized, const u32 fetchOffset, const u32 fetchStride) {
+static VkFormat VkFormatForFloatComps(u32 comps) {
+  switch (comps) {
+    case 1: return VK_FORMAT_R32_SFLOAT;
+    case 2: return VK_FORMAT_R32G32_SFLOAT;
+    case 3: return VK_FORMAT_R32G32B32_SFLOAT;
+    default: return VK_FORMAT_R32G32B32A32_SFLOAT;
+  }
+}
 
+static VkPrimitiveTopology TopologyFromXenos(u32 primType /*Xe::XGPU::ePrimitiveType*/) {
+  // Most games will start with TRIANGLE_LIST.
+  (void)primType;
+  return VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+}
+
+static u64 MakeGuestPipeKey(u32 vs, u32 ps, u32 primType) {
+  // pack primType in low 8 bits (hack)
+  return ((u64)vs << 32) ^ (u64)ps ^ ((u64)primType & 0xFFull);
+}
+
+void VulkanRenderer::EnsureGuestVB(VkDeviceSize minBytes) {
+  if (guestVB_ && guestVBCap_ >= minBytes)
+    return;
+
+  // destroy old
+  if (guestVB_) {
+    if (guestVBMap_) {
+      vmaUnmapMemory(allocator, guestVBAlloc_);
+      guestVBMap_ = nullptr;
+    }
+    vmaDestroyBuffer(allocator, guestVB_, guestVBAlloc_);
+    guestVB_ = VK_NULL_HANDLE;
+    guestVBAlloc_ = VK_NULL_HANDLE;
+    guestVBCap_ = 0;
+  }
+
+  VkBufferCreateInfo bi{ VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+  bi.size = minBytes;
+  bi.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+  bi.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+  VmaAllocationCreateInfo ai{};
+  ai.usage = VMA_MEMORY_USAGE_AUTO;
+  ai.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT |
+             VMA_ALLOCATION_CREATE_MAPPED_BIT;
+
+  VmaAllocationInfo ainfo{};
+  VkResult r = vmaCreateBuffer(allocator, &bi, &ai, &guestVB_, &guestVBAlloc_, &ainfo);
+  if (r != VK_SUCCESS) {
+    LOG_ERROR(Render, "vmaCreateBuffer(guestVB) failed: 0x{:x}", (u32)r);
+    return;
+  }
+
+  guestVBCap_ = minBytes;
+  guestVBMap_ = ainfo.pMappedData;
+  if (!guestVBMap_) {
+    // if VMA didn't map it, map now
+    vmaMapMemory(allocator, guestVBAlloc_, &guestVBMap_);
+  }
+}
+
+void VulkanRenderer::BuildVertexBuffer_HardcodedTriangle() {
+  // layout: location0 = vec4 position
+  struct Vtx { float x,y,z,w; };
+  const Vtx tri[3] = {
+    { -0.8f, -0.8f, 0.0f, 1.0f },
+    {  0.8f, -0.8f, 0.0f, 1.0f },
+    {  0.0f,  0.8f, 0.0f, 1.0f },
+  };
+
+  EnsureGuestVB(sizeof(tri));
+  if (!guestVBMap_) return;
+
+  memcpy(guestVBMap_, tri, sizeof(tri));
+  // host coherent due to VMA flags; otherwise you'd flush here
+}
+
+VkShaderModule VulkanRenderer::GetOrCreateShaderModule(u32 hash, bool isVertex) {
+  auto& map = isVertex ? vsModules_ : psModules_;
+  if (!hash) return VK_NULL_HANDLE;
+
+  if (auto it = map.find(hash); it != map.end())
+    return it->second;
+
+  std::vector<u32> spv;
+
+  {
+    std::lock_guard<Base::FutexMutex> lock(programLinkMutex);
+
+    if (isVertex) {
+      auto it = pendingVertexShaders.find(hash);
+      if (it == pendingVertexShaders.end()) {
+        LOG_WARNING(Render, "VS hash {:08X} not found in pendingVertexShaders", hash);
+        return VK_NULL_HANDLE;
+      }
+      spv = it->second.second;
+    } else {
+      auto it = pendingPixelShaders.find(hash);
+      if (it == pendingPixelShaders.end()) {
+        LOG_WARNING(Render, "PS hash {:08X} not found in pendingPixelShaders", hash);
+        return VK_NULL_HANDLE;
+      }
+      spv = it->second.second;
+    }
+  }
+
+  if (spv.empty()) {
+    LOG_WARNING(Render, "Shader {:08X} SPIR-V is empty", hash);
+    return VK_NULL_HANDLE;
+  }
+
+  VkShaderModuleCreateInfo ci{ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
+  ci.codeSize = spv.size() * sizeof(u32);
+  ci.pCode = spv.data();
+
+  VkShaderModule mod = VK_NULL_HANDLE;
+  VkResult r = dispatch.createShaderModule(&ci, nullptr, &mod);
+  if (r != VK_SUCCESS) {
+    LOG_ERROR(Render, "vkCreateShaderModule failed: 0x{:x}", (u32)r);
+    return VK_NULL_HANDLE;
+  }
+
+  map.emplace(hash, mod);
+  return mod;
+}
+
+void VulkanRenderer::EnsureGuestPipelineLayout() {
+  if (guestPL_) return;
+
+  // HACK: no descriptor sets, no push constants, nothing.
+  // this is just to get *something* executing.
+  VkPipelineLayoutCreateInfo pl{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+  pl.setLayoutCount = 0;
+  pl.pushConstantRangeCount = 0;
+
+  VkResult r = dispatch.createPipelineLayout(&pl, nullptr, &guestPL_);
+  if (r != VK_SUCCESS) {
+    LOG_ERROR(Render, "vkCreatePipelineLayout(guest) failed: 0x{:x}", (u32)r);
+    guestPL_ = VK_NULL_HANDLE;
+  }
+}
+
+VkPipeline VulkanRenderer::CreateGuestGraphicsPipeline(VkShaderModule vs, VkShaderModule ps, u32 primType) {
+  EnsureGuestPipelineLayout();
+  if (!guestPL_) return VK_NULL_HANDLE;
+
+  VkPipelineShaderStageCreateInfo stages[2]{};
+  stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+  stages[0].module = vs;
+  stages[0].pName = "main";
+  stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+  stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+  stages[1].module = ps;
+  stages[1].pName = "main";
+
+  // Vertex input state can be empty because we use VK_EXT_vertex_input_dynamic_state.
+  VkPipelineVertexInputStateCreateInfo vi{ VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
+
+  VkPipelineInputAssemblyStateCreateInfo ia{ VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO };
+  ia.topology = TopologyFromXenos(primType);
+  ia.primitiveRestartEnable = VK_FALSE;
+
+  // enable dynamic viewport/scissor + dynamic vertex input
+  VkDynamicState dynStates[] = {
+    VK_DYNAMIC_STATE_VIEWPORT,
+    VK_DYNAMIC_STATE_SCISSOR,
+    VK_DYNAMIC_STATE_VERTEX_INPUT_EXT
+  };
+  VkPipelineDynamicStateCreateInfo dyn{ VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO };
+  dyn.dynamicStateCount = (u32)std::size(dynStates);
+  dyn.pDynamicStates = dynStates;
+
+  VkPipelineViewportStateCreateInfo vp{ VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO };
+  vp.viewportCount = 1;
+  vp.scissorCount = 1;
+
+  VkPipelineRasterizationStateCreateInfo rs{ VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO };
+  rs.polygonMode = VK_POLYGON_MODE_FILL;
+  rs.cullMode = VK_CULL_MODE_NONE;
+  rs.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+  rs.lineWidth = 1.0f;
+
+  VkPipelineMultisampleStateCreateInfo ms{ VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO };
+  ms.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+  VkPipelineColorBlendAttachmentState cbAtt{};
+  cbAtt.colorWriteMask =
+    VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+    VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+  VkPipelineColorBlendStateCreateInfo cb{ VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO };
+  cb.attachmentCount = 1;
+  cb.pAttachments = &cbAtt;
+
+  // dynamic rendering format
+  VkPipelineRenderingCreateInfoKHR rendering{
+    .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
+    .pNext = nullptr,
+    .viewMask = 0,
+    .colorAttachmentCount = 1,
+    .pColorAttachmentFormats = &chosenFormat.format,
+    .depthAttachmentFormat = VK_FORMAT_UNDEFINED,
+    .stencilAttachmentFormat = VK_FORMAT_UNDEFINED,
+  };
+
+  VkGraphicsPipelineCreateInfo gp{ VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
+  gp.pNext = &rendering;
+  gp.stageCount = 2;
+  gp.pStages = stages;
+  gp.pVertexInputState = &vi;
+  gp.pInputAssemblyState = &ia;
+  gp.pViewportState = &vp;
+  gp.pRasterizationState = &rs;
+  gp.pMultisampleState = &ms;
+  gp.pColorBlendState = &cb;
+  gp.pDynamicState = &dyn;
+  gp.layout = guestPL_;
+  gp.renderPass = VK_NULL_HANDLE;
+  gp.subpass = 0;
+
+#if defined(VK_PIPELINE_CREATE_RENDERING_BIT)
+  gp.flags |= VK_PIPELINE_CREATE_RENDERING_BIT;
+#elif defined(VK_PIPELINE_CREATE_RENDERING_BIT_KHR)
+  gp.flags |= VK_PIPELINE_CREATE_RENDERING_BIT_KHR;
+#endif
+
+  VkPipeline pipe = VK_NULL_HANDLE;
+  VkResult r = dispatch.createGraphicsPipelines(VK_NULL_HANDLE, 1, &gp, nullptr, &pipe);
+  if (r != VK_SUCCESS) {
+    LOG_ERROR(Render, "vkCreateGraphicsPipelines(guest) failed: 0x{:x}", (u32)r);
+    return VK_NULL_HANDLE;
+  }
+  return pipe;
+}
+
+VkPipeline VulkanRenderer::EnsureGuestPipeline(u32 vsHash, u32 psHash, u32 primType) {
+  VkShaderModule vs = GetOrCreateShaderModule(vsHash, true);
+  VkShaderModule ps = GetOrCreateShaderModule(psHash, false);
+  if (!vs || !ps) return VK_NULL_HANDLE;
+
+  u64 key = MakeGuestPipeKey(vsHash, psHash, primType);
+  if (auto it = guestPipelines_.find(key); it != guestPipelines_.end())
+    return it->second;
+
+  VkPipeline p = CreateGuestGraphicsPipeline(vs, ps, primType);
+  if (!p) return VK_NULL_HANDLE;
+
+  guestPipelines_.emplace(key, p);
+  return p;
+}
+
+void VulkanRenderer::EmitGuestDraws(VkCommandBuffer cmd) {
+  if (pendingDraws_.empty())
+    return;
+
+  // HACK: Always upload a triangle to prove shader + pipeline path.
+  BuildVertexBuffer_HardcodedTriangle();
+
+  // HACK: Always assume location 0 position vec4 float.
+  VkVertexInputBindingDescription2EXT bind{ VK_STRUCTURE_TYPE_VERTEX_INPUT_BINDING_DESCRIPTION_2_EXT };
+  bind.binding = 0;
+  bind.stride = sizeof(float) * 4;
+  bind.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+  bind.divisor = 1;
+
+  VkVertexInputAttributeDescription2EXT attr{ VK_STRUCTURE_TYPE_VERTEX_INPUT_ATTRIBUTE_DESCRIPTION_2_EXT };
+  attr.location = 0;
+  attr.binding = 0;
+  attr.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+  attr.offset = 0;
+
+  // Apply once for all draws
+  dispatch.cmdSetVertexInputEXT(cmd, 1, &bind, 1, &attr);
+
+  VkDeviceSize vbOff = 0;
+  dispatch.cmdBindVertexBuffers(cmd, 0, 1, &guestVB_, &vbOff);
+
+  for (auto& d : pendingDraws_) {
+    const u32 vsHash = d.shader.vertexShaderHash;
+    const u32 psHash = d.shader.pixelShaderHash;
+
+    const u32 primType = (u32)d.params.vgtDrawInitiator.primitiveType;
+    VkPipeline pipe = EnsureGuestPipeline(vsHash, psHash, primType);
+    if (!pipe) continue;
+
+    dispatch.cmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipe);
+
+    if (!d.indexed) {
+      // Auto-index draw: use numIndices as vertex count (hack).
+      u32 vcount = d.params.vgtDrawInitiator.numIndices;
+      if (!vcount) vcount = 3;
+      dispatch.cmdDraw(cmd, vcount, 1, 0, 0);
+    } else {
+      // HACK: treat indexed as non-indexed for now.
+      // Implement real index upload + cmdBindIndexBuffer later.
+      u32 vcount = d.params.vgtDrawInitiator.numIndices;
+      if (!vcount) vcount = 3;
+      dispatch.cmdDraw(cmd, vcount, 1, 0, 0);
+    }
+  }
+
+  pendingDraws_.clear();
+  pendingVFetches_.clear();
+}
+
+void VulkanRenderer::VertexFetch(const u32 location, const u32 components, bool isFloat, bool isNormalized,
+                                 const u32 fetchOffset, const u32 fetchStride) {
+  PendingVFetch f{};
+  f.location = location;
+  f.components = components;
+  f.isFloat = isFloat;
+  f.isNormalized = isNormalized;
+  f.fetchOffset = fetchOffset;
+  f.fetchStride = fetchStride;
+  pendingVFetches_.push_back(f);
 }
 
 void VulkanRenderer::Draw(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params) {
-
+  PendingDraw d{};
+  d.shader = shader;
+  d.params = params;
+  d.indexed = false;
+  pendingDraws_.push_back(std::move(d));
 }
 
-void VulkanRenderer::DrawIndexed(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) {
-
+void VulkanRenderer::DrawIndexed(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params,
+                                 Xe::XGPU::XeIndexBufferInfo indexBufferInfo) {
+  PendingDraw d{};
+  d.shader = shader;
+  d.params = params;
+  d.indexed = true;
+  d.indexInfo = indexBufferInfo;
+  pendingDraws_.push_back(std::move(d));
 }
 
 void VulkanRenderer::OnCompute() {
@@ -796,9 +1167,9 @@ void VulkanRenderer::OnSwap(SDL_Window *window) {
   VkImage image = swapchainImages[imageIndex];
   VkImageView view = swapchainImageViews[imageIndex];
 
-  CmdImageBarrier(cmd, dispatch, image,
-                  VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
-                  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  VkImageLayout old = swapchainImageLayouts[imageIndex];
+  CmdImageBarrier(cmd, dispatch, image, old, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+  swapchainImageLayouts[imageIndex] = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
   VkClearValue clear{};
   clear.color = {{0.f, 0.f, 0.f, 1.f}};
@@ -816,8 +1187,7 @@ void VulkanRenderer::OnSwap(SDL_Window *window) {
   ri.colorAttachmentCount = 1;
   ri.pColorAttachments = &colorAtt;
 
-  CmdBeginRendering(dispatch, cmd, &ri);
-
+  // Compute pass
   CmdImageBarrier2(dispatch, cmd, fbImage,
     VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, 0, fbLayout,
     VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_GENERAL);
@@ -838,19 +1208,19 @@ void VulkanRenderer::OnSwap(SDL_Window *window) {
   u32 gy = ((u32)pc.resHeight + 15u) / 16u;
   dispatch.cmdDispatch(cmd, gx, gy, 1);
 
-  // Barrier + transition to readable for fragment sampling
+  // Make compute writes visible to fragment sampling
   CmdImageBarrier2(dispatch, cmd, fbImage,
     VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_ACCESS_SHADER_WRITE_BIT, fbLayout,
     VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
   fbLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+  // Render pass
+  CmdBeginRendering(dispatch, cmd, &ri);
 
   VkRect2D sc{
     { 0, 0 },
     { (u32)width, (u32)height }
   };
-
-  dispatch.cmdSetScissor(cmd, 0, 1, &sc);
 
   VkViewport vp{
     0.f, 0.f,
@@ -858,19 +1228,23 @@ void VulkanRenderer::OnSwap(SDL_Window *window) {
     0.f, 1.f
   };
 
+  dispatch.cmdSetScissor(cmd, 0, 1, &sc);
   dispatch.cmdSetViewport(cmd, 0, 1, &vp);
 
   dispatch.cmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderPipe);
   dispatch.cmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, renderPL, 0, 1, &renderSet, 0, nullptr);
   dispatch.cmdDraw(cmd, 3, 1, 0, 0);
 
+  EmitGuestDraws(cmd);
+
   ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), cmd);
 
   CmdEndRendering(dispatch, cmd);
 
   CmdImageBarrier(cmd, dispatch, image,
-                  VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                  swapchainImageLayouts[imageIndex],
                   VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+  swapchainImageLayouts[imageIndex] = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 
   dispatch.endCommandBuffer(cmd);
 
@@ -1008,6 +1382,8 @@ void VulkanRenderer::RecreateSwapchain() {
 
   swapchainImageCount = (u32)swapchainImageViews.size();
   imagesInFlight.assign(swapchainImageCount, VK_NULL_HANDLE);
+
+  swapchainImageLayouts.assign(swapchainImageCount, VK_IMAGE_LAYOUT_UNDEFINED);
 
   // Recreate per-image render-finished semaphores
   renderFinishedPerImage.resize(swapchainImageCount, VK_NULL_HANDLE);

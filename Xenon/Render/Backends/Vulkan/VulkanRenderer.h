@@ -91,6 +91,51 @@ public:
   void UpdateDescriptors(VkBuffer pixelBuffer, VkDeviceSize pixelBufferSize);
   void RecreateSwapchain();
 
+  // Hack
+  void EnsureGuestVB(VkDeviceSize minBytes);
+  void BuildVertexBuffer_HardcodedTriangle();
+  VkShaderModule GetOrCreateShaderModule(u32 hash, bool isVertex);
+  void EnsureGuestPipelineLayout();
+  VkPipeline CreateGuestGraphicsPipeline(VkShaderModule vs, VkShaderModule ps, u32 primType);
+  VkPipeline EnsureGuestPipeline(u32 vsHash, u32 psHash, u32 primType);
+  void EmitGuestDraws(VkCommandBuffer cmd);
+
+  struct PendingVFetch {
+    u32 location = 0;
+    u32 components = 0;
+    bool isFloat = true;
+    bool isNormalized = false;
+    u32 fetchOffset = 0;
+    u32 fetchStride = 0;
+  };
+
+  struct PendingDraw {
+    Xe::XGPU::XeShader shader{};
+    Xe::XGPU::XeDrawParams params{};
+    bool indexed = false;
+    Xe::XGPU::XeIndexBufferInfo indexInfo{};
+  };
+
+  std::vector<PendingVFetch> pendingVFetches_;
+  std::vector<PendingDraw> pendingDraws_;
+
+  // shader module caches keyed by CRC hash
+  std::unordered_map<u32, VkShaderModule> vsModules_;
+  std::unordered_map<u32, VkShaderModule> psModules_;
+
+  // pipeline caches: key = (vs<<32)|(ps) + primType in low bits
+  std::unordered_map<u64, VkPipeline> guestPipelines_;
+  VkPipelineLayout guestPL_ = VK_NULL_HANDLE;
+
+  // super dumb vertex buffer for bring-up
+  VkBuffer guestVB_ = VK_NULL_HANDLE;
+  VmaAllocation guestVBAlloc_ = VK_NULL_HANDLE;
+  void* guestVBMap_ = nullptr;
+  VkDeviceSize guestVBCap_ = 0;
+
+  // helper
+  bool guestPipelineInit_ = false;
+
   // vk-bootstrap
   vkb::Instance vkbInstance{};
   vkb::InstanceDispatchTable instanceDispatch{};
@@ -111,6 +156,7 @@ public:
   VkPresentModeKHR chosenPresentMode{};
   u32 swapchainImageCount = 0;
   std::vector<VkImage> swapchainImages{};
+  std::vector<VkImageLayout> swapchainImageLayouts{};
   std::vector<VkImageView> swapchainImageViews{};
   std::vector<VkFramebuffer> swapchainFramebuffers{};
   VkExtent2D swapchainExtent{ 0, 0 };

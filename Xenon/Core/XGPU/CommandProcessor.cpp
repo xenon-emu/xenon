@@ -595,24 +595,10 @@ void VisitAll(const Microcode::AST::ControlFlowGraph *cf, Microcode::AST::Statem
   }
 }
 
-std::pair<Microcode::AST::Shader*, std::vector<u32>> LoadShader(eShaderType shaderType, const std::vector<u32> &data, std::string baseString) {
+std::pair<Microcode::AST::Shader *, std::vector<u32>> LoadShader(eShaderType shaderType, const std::vector<u32> &data, std::string baseString) {
   fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "cache" };
   fs::path path{ shaderPath / (baseString + ".spv") };
   std::vector<u32> code{};
-  // Vali: Temporarily disable cache, emitting isn't 100% yet
-  // Plus, I need to figure Shader ptr out
-  /*{
-    std::ifstream file{ path, std::ios::in | std::ios::binary };
-    std::error_code error;
-    if (fs::exists(path, error) && file.is_open()) {
-      u64 fileSize = fs::file_size(path);
-      code.resize(fileSize / 4);
-      file.read(reinterpret_cast<char*>(code.data()), fileSize);
-      file.close();
-      return code;
-    }
-    file.close();
-  }*/
   Microcode::AST::Shader *shader = Microcode::AST::Shader::DecompileMicroCode(reinterpret_cast<const u8*>(data.data()), data.size() * 4, shaderType);
 #ifndef NO_GFX
   Microcode::AST::ShaderCodeWriterSirit writer{ shaderType };
