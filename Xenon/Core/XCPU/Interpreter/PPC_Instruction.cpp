@@ -60,53 +60,53 @@ namespace PPCInterpreter {
     // Main opcodes (field 0..5)
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
     fillTable<instructionHandlerJIT>(jitTable, 0x00, 6, -1, {
-          { 0x02, GET(tdi) },
-          { 0x03, GET(twi) },
-          { 0x07, GET(mulli) },
-          { 0x08, GET(subfic) },
-          { 0x0A, GET(cmpli) },
-          { 0x0B, GET(cmpi) },
-          { 0x0C, GET(addic) },
-          { 0x0D, GET(addic) },
-          { 0x0E, GET(addi) },
-          { 0x0F, GET(addis) },
-          { 0x10, GET(bc) },
-          { 0x11, GET(sc) },
-          { 0x12, GET(b) },
-          { 0x14, GETRC(rlwimi) },
-          { 0x15, GETRC(rlwinm) },
-          { 0x17, GETRC(rlwnm) },
-          { 0x18, GET(ori) },
-          { 0x19, GET(oris) },
-          { 0x1A, GET(xori) },
-          { 0x1B, GET(xoris) },
-          { 0x1C, GET(andi) },
-          { 0x1D, GET(andis) },
-          { 0x20, GET(lwz) },
-          { 0x21, GET(lwzu) },
-          { 0x22, GET(lbz) },
-          { 0x23, GET(lbzu) },
-          { 0x24, GET(stw) },
-          { 0x25, GET(stwu) },
-          { 0x26, GET(stb) },
-          { 0x27, GET(stbu) },
-          //{ 0x28, GET(lhz) },
-          //{ 0x29, GET(lhzu) },
-          //{ 0x2A, GET(lha) },
-          //{ 0x2B, GET(lhau) },
-          //{ 0x2C, GET(sth) },
-          //{ 0x2D, GET(sthu) },
-          //{ 0x2E, GET(lmw) },
-          //{ 0x2F, GET(stmw) },
-          //{ 0x30, GET(lfs) },
-          //{ 0x31, GET(lfsu) },
-          //{ 0x32, GET(lfd) },
-          //{ 0x33, GET(lfdu) },
-          //{ 0x34, GET(stfs) },
-          //{ 0x35, GET(stfsu) },
-          //{ 0x36, GET(stfd) },
-          //{ 0x37, GET(stfdu) },
-      });
+      { 0x02, GET(tdi) },
+      { 0x03, GET(twi) },
+      { 0x07, GET(mulli) },
+      { 0x08, GET(subfic) },
+      { 0x0A, GET(cmpli) },
+      { 0x0B, GET(cmpi) },
+      { 0x0C, GET(addic) },
+      { 0x0D, GET(addic) },
+      { 0x0E, GET(addi) },
+      { 0x0F, GET(addis) },
+      { 0x10, GET(bc) },
+      { 0x11, GET(sc) },
+      { 0x12, GET(b) },
+      { 0x14, GETRC(rlwimi) },
+      { 0x15, GETRC(rlwinm) },
+      { 0x17, GETRC(rlwnm) },
+      { 0x18, GET(ori) },
+      { 0x19, GET(oris) },
+      { 0x1A, GET(xori) },
+      { 0x1B, GET(xoris) },
+      { 0x1C, GET(andi) },
+      { 0x1D, GET(andis) },
+      { 0x20, GET(lwz) },
+      { 0x21, GET(lwzu) },
+      { 0x22, GET(lbz) },
+      { 0x23, GET(lbzu) },
+      { 0x24, GET(stw) },
+      { 0x25, GET(stwu) },
+      { 0x26, GET(stb) },
+      { 0x27, GET(stbu) },
+      //{ 0x28, GET(lhz) },
+      //{ 0x29, GET(lhzu) },
+      //{ 0x2A, GET(lha) },
+      //{ 0x2B, GET(lhau) },
+      //{ 0x2C, GET(sth) },
+      //{ 0x2D, GET(sthu) },
+      //{ 0x2E, GET(lmw) },
+      //{ 0x2F, GET(stmw) },
+      //{ 0x30, GET(lfs) },
+      //{ 0x31, GET(lfsu) },
+      //{ 0x32, GET(lfd) },
+      //{ 0x33, GET(lfdu) },
+      //{ 0x34, GET(stfs) },
+      //{ 0x35, GET(stfsu) },
+      //{ 0x36, GET(stfd) },
+      //{ 0x37, GET(stfdu) },
+    });
     // Group 0x13 opcodes (field 21..30)
     fillTable<instructionHandlerJIT>(jitTable, 0x13, 10, 1, {
       //{ 0x000, GET(mcrf) },
@@ -122,7 +122,7 @@ namespace PPCInterpreter {
       //{ 0x1A1, GET(crorc) },
       { 0x1C1, GET(cror) },
       { 0x210, GET(bcctr) },
-      });
+    });
     // Group 0x1E opcodes (field 27..30)
     fillTable<instructionHandlerJIT>(jitTable, 0x1E, 4, 1, {
       { 0x0, GETRC(rldicl) },
@@ -135,7 +135,7 @@ namespace PPCInterpreter {
       { 0x7, GETRC(rldimi) },
       { 0x8, GETRC(rldcl) },
       { 0x9, GETRC(rldcr) },
-      });
+    });
     // Group 0x1F opcodes (field 21..30)
     fillTable<instructionHandlerJIT>(jitTable, 0x1F, 10, 1, {
       { 0x000, GET(cmp) },
@@ -297,13 +297,13 @@ namespace PPCInterpreter {
       { 0x3DA, GETRC(extsw) },
       { 0x3D6, GET(icbi) },
       //{ 0x3F6, GET(dcbz) },
-      });
+    });
     // Group 0x3A opcodes (field 30..31)
     fillTable<instructionHandlerJIT>(jitTable, 0x3A, 2, 0, {
       { 0x0, GET(ld) },
       { 0x1, GET(ldu) },
       //{ 0x2, GET(lwa) },
-      });
+    });
     // Group 0x3B opcodes (field 21..30)
     fillTable<instructionHandlerJIT>(jitTable, 0x3B, 10, 1, {
       { 0x12, GETRC(fdivs), 5 },
@@ -316,12 +316,12 @@ namespace PPCInterpreter {
       { 0x1D, GETRC(fmadds), 5 },
       { 0x1E, GETRC(fnmsubs), 5 },
       { 0x1F, GETRC(fnmadds), 5 },
-      });
+    });
     // Group 0x3E opcodes (field 30..31)
     fillTable<instructionHandlerJIT>(jitTable, 0x3E, 2, 0, {
       { 0x0, GET(std) },
       { 0x1, GET(stdu) },
-      });
+    });
     // Group 0x3F opcodes (field 21..30)
     fillTable<instructionHandlerJIT>(jitTable, 0x3F, 10, 1, {
       //{ 0x026, GETRC(mtfsb1) },
@@ -356,7 +356,7 @@ namespace PPCInterpreter {
       { 0x32E, GETRC(fctid) },
       { 0x32F, GETRC(fctidz) },
       { 0x34E, GETRC(fcfid) },
-      });
+    });
 #endif // defined ARCH_X86 || ARCH_X86_64
 
     #undef GET_

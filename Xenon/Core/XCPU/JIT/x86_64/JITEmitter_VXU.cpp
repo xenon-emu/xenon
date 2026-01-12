@@ -417,7 +417,7 @@ void PPCInterpreter::PPCInterpreterJIT_vmaxfp(sPPEState *ppeState, JITBlockBuild
   COMP->vmovaps(VPRPtr(instr.vd), vD);
 }
 
-// Vector 128 Maximum Floating Point 
+// Vector 128 Maximum Floating Point
 void PPCInterpreter::PPCInterpreterJIT_vmaxfp128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure VXU is enabled
   J_checkVXUEnabled(b);

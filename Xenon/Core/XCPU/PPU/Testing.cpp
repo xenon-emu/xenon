@@ -285,7 +285,7 @@ public:
     if (currentTestMode == ePPUTestingMode::Interpreter) {
       bool testRunning = true;
       while (testRunning) {
-        sPPUThread& thread = ppeState->ppuThread[ppeState->currentThread];
+        sPPUThread &thread = ppeState->ppuThread[ppeState->currentThread];
         // Update previous instruction address
         thread.PIA = thread.CIA;
         // Update current instruction address
@@ -298,14 +298,14 @@ public:
           LOG_CRITICAL(Xenon, "[Testing]: Invalid opcode found.");
           return false;
         }
+
         if (_ex & ppuInstrStorageEx || _ex & ppuInstrSegmentEx) {
           return false;
         }
 
         if (thread.CI.opcode == BLR_OPCODE) {
           testRunning = false;
-        }
-        else {
+        } else {
           PPCInterpreter::ppcExecuteSingleInstruction(ppeState);
         }
       }
@@ -326,9 +326,15 @@ public:
   bool SetupTestState(TestCase &testCase) {
     sPPUThread &thread = ppeState->ppuThread[ppeState->currentThread];
     // Clear registers involved in tests.
-    for (auto &reg : thread.GPR) { reg = 0; }
-    for (auto &reg : thread.FPR) { reg.setValue(0.0); }
-    for (auto &reg : thread.VR) { reg.x = 0; reg.y = 0; reg.z = 0; reg.w = 0; }
+    for (auto &reg : thread.GPR)
+      reg = 0;
+
+    for (auto &reg : thread.FPR)
+      reg.setValue(0.0);
+
+    for (auto &reg : thread.VR)
+      reg.x = reg.y = reg.z = reg.w = 0;
+
     thread.CR.CR_Hex = 0;
     thread.SPR.XER.hexValue = 0;
     thread.FPSCR.FPSCR_Hex = 0;
