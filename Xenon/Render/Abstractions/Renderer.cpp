@@ -598,6 +598,11 @@ void Renderer::Thread() {
             DrawIndexed(*activeShader, c.params, c.indexInfo);
           break;
         }
+
+        default: {
+          // Do nothing for other cases right now.
+          break;
+        }
       }
     }
 
