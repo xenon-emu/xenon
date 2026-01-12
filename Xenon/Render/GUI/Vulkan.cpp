@@ -55,8 +55,11 @@ void Render::VulkanGUI::InitBackend(void *context) {
   initInfo.DescriptorPool = imguiDescriptorPool;
   initInfo.MinImageCount = 2;
   initInfo.ImageCount = renderer->swapchainImageCount > 0 ? renderer->swapchainImageCount : 2;
-  initInfo.ImageCount = 4;
   initInfo.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+  initInfo.UseDynamicRendering = true;
+  initInfo.PipelineRenderingCreateInfo = { VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO };
+  initInfo.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+  initInfo.PipelineRenderingCreateInfo.pColorAttachmentFormats = &renderer->chosenFormat.format;
 
   if (!ImGui_ImplVulkan_Init(&initInfo)) {
     LOG_ERROR(System, "Failed to initialize ImGui's Vulkan backend");
@@ -75,10 +78,10 @@ void Render::VulkanGUI::BeginSwap() {
 }
 
 void Render::VulkanGUI::EndSwap() {
-  //ImGuiIO &io = ImGui::GetIO();
-  //if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
-  //  ImGui::UpdatePlatformWindows();
-  //  ImGui::RenderPlatformWindowsDefault();
-  //}
+  ImGuiIO &io = ImGui::GetIO();
+  if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+    ImGui::UpdatePlatformWindows();
+    ImGui::RenderPlatformWindowsDefault();
+  }
 }
 #endif

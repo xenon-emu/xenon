@@ -24,4 +24,8 @@ void Render::DummyBuffer::Unbind() {
 void Render::DummyBuffer::DestroyBuffer() {
   LOG_INFO(Render, "DummyBuffer::DestroyBuffer");
 }
+
+void *Render::DummyBuffer::GetBackendHandle()  {
+  return reinterpret_cast<void *>(&DummyHandle);
+}
 #endif

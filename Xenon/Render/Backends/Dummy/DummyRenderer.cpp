@@ -68,6 +68,10 @@ void DummyRenderer::UpdateViewportFromState(const Xe::XGPU::XenosState *state) {
   LOG_INFO(Render, "DummyRenderer::UpdateViewportFromState");
 }
 
+void DummyRenderer::BackendBindPixelBuffer(Buffer *buffer) {
+  LOG_INFO(Render, "DummyRenderer::BackendBindPixelBuffer");
+}
+
 void DummyRenderer::VertexFetch(const u32 location, const u32 components, bool isFloat, bool isNormalized, const u32 fetchOffset, const u32 fetchStride) {
   LOG_INFO(Render, "DummyRenderer::VertexFetch: loc:{}, comps:{}, float:{}, normalized:{}, offset:{}, stride:{}", location, components, isFloat ? "yes" : "no",
     isNormalized ? "yes" : "no", fetchOffset, fetchStride);

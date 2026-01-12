@@ -10,7 +10,7 @@
 
 #ifndef NO_GFX
 namespace Render {
-  
+
 enum class eShaderType : u8 {
   Vertex,
   Fragment,

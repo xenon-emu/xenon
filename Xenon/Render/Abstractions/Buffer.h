@@ -10,7 +10,8 @@ namespace Render {
 enum class eBufferUsage : u8 {
   StaticDraw,
   DynamicDraw,
-  StreamDraw
+  StreamDraw,
+  ReadOnly
 };
 
 enum class eBufferType : u8 {
@@ -28,6 +29,7 @@ public:
   virtual void Bind(u32 binding = 1) = 0;
   virtual void Unbind() = 0;
   virtual void DestroyBuffer() = 0;
+  virtual void *GetBackendHandle() = 0;
   virtual void SetSize(u64 size) { Size = size; }
   virtual u64 GetSize() const { return Size; }
   virtual void SetType(eBufferType type) { Type = type; }

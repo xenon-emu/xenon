@@ -38,6 +38,16 @@
 
 namespace Render {
 
+inline constexpr u32 MAX_FRAMES_IN_FLIGHT = 2;
+
+struct FbConvertPC {
+ s32 internalWidth;
+ s32 internalHeight;
+ s32 resWidth;
+ s32 resHeight;
+};
+static_assert(sizeof(FbConvertPC) == 16);
+
 class VulkanRenderer : public Renderer {
 public:
   void BackendSDLProperties(SDL_PropertiesID properties) override;
@@ -51,6 +61,7 @@ public:
   void UpdateClearColor(u8 r, u8 b, u8 g, u8 a) override;
   void UpdateClearDepth(f64 depth) override;
   void UpdateViewportFromState(const Xe::XGPU::XenosState *state) override;
+  void BackendBindPixelBuffer(Buffer *buffer) override;
   void Clear() override;
 
   void VertexFetch(const u32 location, const u32 components, bool isFloat, bool isNormalized, const u32 fetchOffset, const u32 fetchStride) override;
@@ -65,10 +76,19 @@ public:
   void *GetBackendContext() override;
   u32 GetBackendID() override;
 
-  void CreateCommandBuffer();
-  void BeginCommandBuffer();
-  void EndCommandBuffer();
+  void DestroyPipelines();
 
+  void CreateCommandPoolAndBuffers();
+  void CreateSyncObjects();
+  void CreateDescriptorLayouts();
+  void CreateDescriptorPoolAndSets();
+
+  void CreateFbImage(u32 w, u32 h);
+
+  void CreateComputePipeline();
+  void CreateRenderPipeline();
+
+  void UpdateDescriptors(VkBuffer pixelBuffer, VkDeviceSize pixelBufferSize);
   void RecreateSwapchain();
 
   // vk-bootstrap
@@ -80,7 +100,6 @@ public:
   vkb::Device vkbDevice{};
 
   // Core
-  u64 currentFrame = 0;
   s32 graphicsQueueFamily = 0;
   VmaAllocator allocator = VK_NULL_HANDLE;
   VkQueue graphicsQueue = VK_NULL_HANDLE;
@@ -90,7 +109,7 @@ public:
   VkSwapchainKHR swapchain = VK_NULL_HANDLE;
   VkSurfaceFormatKHR chosenFormat{ VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
   VkPresentModeKHR chosenPresentMode{};
-  u32 swapchainImageCount = 2;
+  u32 swapchainImageCount = 0;
   std::vector<VkImage> swapchainImages{};
   std::vector<VkImageView> swapchainImageViews{};
   std::vector<VkFramebuffer> swapchainFramebuffers{};
@@ -98,19 +117,34 @@ public:
 
   // Command buffers
   VkCommandPool commandPool = VK_NULL_HANDLE;
-  VkCommandBuffer commandBuffer = VK_NULL_HANDLE;
+  std::array<VkCommandBuffer, MAX_FRAMES_IN_FLIGHT> commandBuffers{};
 
   // Synchronization
-  std::vector<VkSemaphore> availableSemaphores{};
-  std::vector<VkSemaphore> finishedSemaphores{};
-  std::vector<VkFence> inFlightFences{};
+  std::array<VkSemaphore, MAX_FRAMES_IN_FLIGHT> imageAvailable{};
+  std::vector<VkSemaphore> renderFinishedPerImage{};
+  std::array<VkFence, MAX_FRAMES_IN_FLIGHT> inFlight{};
   std::vector<VkFence> imagesInFlight{};
+  u32 currentFrame = 0;
 
-  // Render pass
-  VkRenderPass renderPass = VK_NULL_HANDLE;
+  // Converted backbuffer
+  VkImage fbImage = VK_NULL_HANDLE;
+  VmaAllocation fbAlloc = VK_NULL_HANDLE;
+  VkImageView fbView = VK_NULL_HANDLE;
+  VkSampler fbSampler = VK_NULL_HANDLE;
+  VkImageLayout fbLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
-  // Framebuffers
-  std::vector<VkFramebuffer> framebuffers{};
+  // Descriptors
+  VkDescriptorSetLayout computeSetLayout = VK_NULL_HANDLE;
+  VkDescriptorSetLayout renderSetLayout = VK_NULL_HANDLE;
+  VkDescriptorPool descPool = VK_NULL_HANDLE;
+  VkDescriptorSet computeSet = VK_NULL_HANDLE;
+  VkDescriptorSet renderSet  = VK_NULL_HANDLE;
+
+  // Pipelines
+  VkPipelineLayout computePL = VK_NULL_HANDLE;
+  VkPipeline computePipe = VK_NULL_HANDLE;
+  VkPipelineLayout renderPL = VK_NULL_HANDLE;
+  VkPipeline renderPipe = VK_NULL_HANDLE;
 };
 
 } // namespace Render
