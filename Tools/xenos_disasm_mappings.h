@@ -9,18 +9,13 @@
 
 #define CASE(x) case Xe::x: return #x
 
-enum class ShaderType {
-  Vertex,
-  Pixel,
-};
+static Xe::eShaderType ParseShaderType(const std::string& path) {
+  if (path.find("vertex") != std::string::npos || path.find("vs") != std::string::npos)
+    return Xe::eShaderType::Vertex;
+  if (path.find("pixel") != std::string::npos || path.find("ps") != std::string::npos)
+    return Xe::eShaderType::Pixel;
 
-static ShaderType ParseShaderType(const std::string& path) {
-  if (path.find("vertex") != std::string::npos)
-    return ShaderType::Vertex;
-  if (path.find("pixel") != std::string::npos)
-    return ShaderType::Pixel;
-
-  LOG_ERROR(Core, "Cannot infer shader type from path '{}' (expected 'vertex' or 'pixel' in name)", path);
+  LOG_ERROR(Core, "Cannot infer shader type from path '{}' (expected 'vertex'/'vs' or 'pixel'/'ps' in name)", path);
   ::abort();
 }
 
@@ -128,7 +123,7 @@ static std::string MaskToString(u32 mask) {
   if (mask & 0x8)
     out.push_back('w');
   if (out.empty())
-    out = "0";
+    out = "xyzw";
   return out;
 }
 
@@ -144,23 +139,23 @@ static std::string SwizzleToString(u32 swiz8) {
   return out;
 }
 
-// Our working assumption for src*_sel:
-//   0 -> GPR register
-//   1 -> Constant register
 static std::string FormatSrcReg(u32 reg, u32 sel, u32 swiz8, bool negate) {
   std::string r;
-  if (sel)
-    r = "c" + std::to_string(reg);
-  else
-    r = "r" + std::to_string(reg);
+
+  switch (sel) {
+    case 0: r = "r" + std::to_string(reg); break; // GPR
+    case 1: r = "c" + std::to_string(reg); break;  // const
+    case 2: r = "r" + std::to_string(reg); break; // (TEMP HACK) treat as GPR until mapped
+    case 3: r = "r" + std::to_string(reg); break;
+    default: r = "r" + std::to_string(reg); break;
+  }
 
   r.push_back('.');
   r += SwizzleToString(swiz8);
-
   if (negate)
     r = "-" + r;
-
   return r;
 }
+
 
 #undef CASE

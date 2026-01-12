@@ -34,11 +34,12 @@ public:
   void Bind() override;
   void Unbind() override;
   void Destroy() override;
-private:
-  VulkanRenderer *renderer = nullptr;
+
   VkShaderModule vertexShader = VK_NULL_HANDLE;
   VkShaderModule fragmentShader = VK_NULL_HANDLE;
   VkShaderModule computeShader = VK_NULL_HANDLE;
+private:
+  VulkanRenderer *renderer = nullptr;
 };
 
 } // namespace Render

@@ -24,6 +24,7 @@ public:
   void Bind(u32 binding) override;
   void Unbind() override;
   void DestroyBuffer() override;
+  void *GetBackendHandle() override;
 private:
   u32 ConvertBufferType(eBufferType type);
   u32 ConvertUsage(eBufferUsage usage);

@@ -8,6 +8,8 @@
 
 void Render::VulkanBuffer::CreateBuffer(u64 size, const void *data, eBufferUsage usage, eBufferType type) {
   DestroyBuffer();
+  SetSize(size);
+  SetType(type);
 
   VkBufferCreateInfo bufferInfo = {};
   bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
@@ -19,11 +21,12 @@ void Render::VulkanBuffer::CreateBuffer(u64 size, const void *data, eBufferUsage
   createInfo.flags = VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT | VMA_ALLOCATION_CREATE_MAPPED_BIT;
 
   vmaCreateBuffer(renderer->allocator, &bufferInfo, &createInfo, &buffer, &allocation, &allocationInfo);
-  memcpy(allocationInfo.pMappedData, data, size);
+  if (data && size)
+    ::memcpy(allocationInfo.pMappedData, data, size);
 }
 
 void Render::VulkanBuffer::UpdateBuffer(u64 offset, u64 size, const void *data) {
-  memcpy(reinterpret_cast<void *>(reinterpret_cast<size_t>(allocationInfo.pMappedData) + offset), data, size);
+  ::memcpy(reinterpret_cast<void *>(reinterpret_cast<size_t>(allocationInfo.pMappedData) + offset), data, size);
 }
 
 void Render::VulkanBuffer::Bind(u32 binding) {
@@ -37,7 +40,15 @@ void Render::VulkanBuffer::Unbind() {
 void Render::VulkanBuffer::DestroyBuffer() {
   if (buffer != VK_NULL_HANDLE) {
     vmaDestroyBuffer(renderer->allocator, buffer, allocation);
+    buffer = VK_NULL_HANDLE;
+    allocation = VK_NULL_HANDLE;
+    allocationInfo = {};
+    SetSize(0);
   }
+}
+
+void *Render::VulkanBuffer::GetBackendHandle() {
+  return buffer;
 }
 
 VkBufferUsageFlags Render::VulkanBuffer::ConvertBufferType(eBufferType type) {
@@ -73,6 +84,9 @@ VkBufferUsageFlags Render::VulkanBuffer::ConvertUsage(eBufferUsage usage) {
     break;
   case eBufferUsage::StreamDraw:
     flags |= VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    break;
+  case eBufferUsage::ReadOnly:
+    flags = 0;
     break;
   }
 

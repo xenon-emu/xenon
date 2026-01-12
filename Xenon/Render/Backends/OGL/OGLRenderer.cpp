@@ -287,6 +287,10 @@ void OGLRenderer::UpdateViewportFromState(const Xe::XGPU::XenosState *state) {
   glDepthRangef(nearZ, farZ);
 }
 
+void OGLRenderer::BackendBindPixelBuffer(Buffer *buffer) {
+  // This is only really needed for Vulkan, OpenGL doesn't give a shit
+}
+
 void OGLRenderer::UpdateClearColor(u8 r, u8 b, u8 g, u8 a) {
   glClearColor((static_cast<f32>(r) / 255.f), (static_cast<f32>(g) / 255.f), (static_cast<f32>(b) / 255.f), (static_cast<f32>(a) / 255.f));
 }

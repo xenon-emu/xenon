@@ -66,7 +66,6 @@ std::shared_ptr<Shader> VulkanShaderFactory::LoadFromBinary(
   return shader;
 }
 
-
 static eShaderType GetShaderType(const std::string &line) {
   switch (Base::JoaatStringHash(line)) {
   case "#vertex"_j: return eShaderType::Vertex;
@@ -117,24 +116,33 @@ std::shared_ptr<Shader> VulkanShaderFactory::LoadFromFiles(
   const std::unordered_map<eShaderType, fs::path> &sources)
 {
   auto shader = std::make_shared<VulkanShader>(renderer);
-  bool deadFile = false;
 
   for (auto& [type, path] : sources) {
-    std::ifstream f(path, std::ios::in);
-    if (!fs::exists(path) || !f.is_open()) {
-      LOG_ERROR(System, "Failed to open shader '{}'", path.string());
-      deadFile = true;
-      continue;
+    std::error_code ec;
+    if (!fs::exists(path, ec)) {
+      LOG_ERROR(System, "Shader file does not exist '{}'", path.string());
+      return nullptr;
     }
-    u64 fileSize = fs::file_size(path);
-    std::vector<char> src(fileSize, '\0');
-    f.read(src.data(), src.size());
-    f.close();
-    shader->CompileFromSource(type, src.data());
-  }
 
-  if (deadFile) {
-    return nullptr;
+    std::ifstream f(path, std::ios::in | std::ios::binary);
+    if (!f.is_open()) {
+      LOG_ERROR(System, "Failed to open shader '{}'", path.string());
+      return nullptr;
+    }
+
+    const auto fileSize = (size_t)fs::file_size(path, ec);
+    if (ec || fileSize == 0) {
+      LOG_ERROR(System, "Failed to read shader size '{}'", path.string());
+      return nullptr;
+    }
+
+    std::string src;
+    src.resize(fileSize);
+    f.read(src.data(), (std::streamsize)src.size());
+    f.close();
+
+    LOG_INFO(Render, "Compiling {} (t:{}) from {}", name, (u8)type, path.string());
+    shader->CompileFromSource(type, src.c_str());
   }
 
   if (!shader->Link()) {

@@ -51,6 +51,10 @@ void Render::OGLBuffer::DestroyBuffer() {
   }
 }
 
+void *Render::OGLBuffer::GetBackendHandle()  {
+  return reinterpret_cast<void *>(&BufferHandle);
+}
+
 u32 Render::OGLBuffer::ConvertBufferType(Render::eBufferType type) {
   switch (type) {
   case Render::eBufferType::Vertex: return GL_ARRAY_BUFFER;

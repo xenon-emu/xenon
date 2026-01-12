@@ -87,11 +87,12 @@ void Renderer::CreateHandles() {
   backbuffer->CreateTextureHandle(width, height, GetBackbufferFlags());
 
   // Init pixel buffer
-  pitch = width * height * sizeof(u32);
-  pixels.resize(pitch, COLOR(30, 30, 30, 255)); // Init with dark grey
+  pixels.resize(width * height, COLOR(30, 30, 30, 255)); // Init with dark grey
+  pitch = pixels.size() * sizeof(u32);
   pixelSSBO = resourceFactory->CreateBuffer();
-  pixelSSBO->CreateBuffer(pixels.size(), pixels.data(), eBufferUsage::DynamicDraw, eBufferType::Storage);
+  pixelSSBO->CreateBuffer(pitch, pixels.data(), eBufferUsage::DynamicDraw, eBufferType::Storage);
   pixelSSBO->Bind();
+  BackendBindPixelBuffer(pixelSSBO.get());
 
   // Create our GUI
   gui = resourceFactory->CreateGUI();
@@ -148,7 +149,8 @@ void Renderer::Resize(u32 x, u32 y) {
   // Update pitch
   pitch = width * height * sizeof(u32);
   // Update buffer
-  pixelSSBO->UpdateBuffer(0, pixels.size(), pixels.data());
+  pixelSSBO->UpdateBuffer(0, pitch, pixels.data());
+  BackendBindPixelBuffer(pixelSSBO.get());
   LOG_DEBUG(Render, "Resized window to {}x{}", width, height);
 }
 
@@ -516,9 +518,11 @@ void Renderer::Thread() {
           pixelSSBO->Bind();
 
           if (XeMain::xenos) {
-            computeShaderProgram->SetUniformInt("internalWidth", XeMain::xenos->GetWidth());
-            computeShaderProgram->SetUniformInt("internalHeight", XeMain::xenos->GetHeight());
+            internalWidth = XeMain::xenos->GetWidth();
+            internalHeight = XeMain::xenos->GetHeight();
           }
+          computeShaderProgram->SetUniformInt("internalWidth", internalWidth);
+          computeShaderProgram->SetUniformInt("internalHeight", internalHeight);
           computeShaderProgram->SetUniformInt("resWidth", width);
           computeShaderProgram->SetUniformInt("resHeight", height);
           OnCompute();

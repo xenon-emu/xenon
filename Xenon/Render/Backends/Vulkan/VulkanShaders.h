@@ -6,14 +6,14 @@
 
 #ifndef NO_GFX
 
-namespace Render {
+namespace Render::Vulkan {
 
 inline constexpr const char vertexShaderSource[] = R"glsl(#version 450 core
 layout(location = 0) out vec2 o_texture_coord;
 
 void main() {
   o_texture_coord = vec2((gl_VertexIndex << 1) & 2, gl_VertexIndex & 2);
-  gl_Position = vec4(o_texture_coord * vec2(2.0f, -2.0f) + vec2(-1.0f, 1.0f), 0.0f, 1.0f);
+  gl_Position = vec4(o_texture_coord * 2.0f + vec2(-1.0f), 0.0f, 1.0f);
 })glsl";
 
 inline constexpr const char fragmentShaderSource[] = R"glsl(#version 450 core
@@ -21,7 +21,8 @@ inline constexpr const char fragmentShaderSource[] = R"glsl(#version 450 core
 layout(location = 0) in vec2 i_texture_coord;
 layout(location = 0) out vec4 o_color;
 
-uniform usampler2D u_texture;
+layout(set = 0, binding = 0) uniform usampler2D u_texture;
+
 void main() {
   uint pixel = texture(u_texture, i_texture_coord).r;
   // Gotta love BE vs LE (X360 works in BGRA, so we work in ARGB)
@@ -41,11 +42,12 @@ layout (std430, binding = 1) buffer pixel_buffer {
   uint pixel_data[];
 };
 
-uniform int internalWidth;
-uniform int internalHeight;
-
-uniform int resWidth;
-uniform int resHeight;
+layout(push_constant) uniform Push {
+  int internalWidth;
+  int internalHeight;
+  int resWidth;
+  int resHeight;
+} pc;
 
 // This is black magic to convert tiles to linear, just don't touch it
 int xeFbConvert(int width, int addr) {
@@ -59,20 +61,20 @@ int xeFbConvert(int width, int addr) {
 void main() {
   ivec2 texel_pos = ivec2(gl_GlobalInvocationID.xy);
   // OOB check, but shouldn't be needed
-  if (texel_pos.x >= resWidth || texel_pos.y >= resHeight)
+  if (texel_pos.x >= pc.resWidth || texel_pos.y >= pc.resHeight)
     return;
 
   // Scale accordingly
-  float scaleX = float(internalWidth) / float(resWidth);
-  float scaleY = float(internalHeight) / float(resHeight);
+  float scaleX = float(pc.internalWidth) / float(pc.resWidth);
+  float scaleY = float(pc.internalHeight) / float(pc.resHeight);
 
   // Map to source resolution
   int srcX = int(float(texel_pos.x) * scaleX);
   int srcY = int(float(texel_pos.y) * scaleY);
 
   // God only knows how this indexing works
-  int stdIndex = (srcY * internalWidth + srcX);
-  int xeIndex = xeFbConvert(internalWidth, stdIndex * 4);
+  int stdIndex = (srcY * pc.internalWidth + srcX);
+  int xeIndex = xeFbConvert(pc.internalWidth, stdIndex * 4);
 
   uint packedColor = pixel_data[xeIndex];
   imageStore(o_texture, texel_pos, uvec4(packedColor, 0, 0, 0));

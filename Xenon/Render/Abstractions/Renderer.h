@@ -118,6 +118,7 @@ public:
   virtual void UpdateViewport(s32 x, s32 y, u32 width, u32 height) = 0;
   virtual void UpdateClearColor(u8 r, u8 b, u8 g, u8 a) = 0;
   virtual void UpdateClearDepth(f64 depth) = 0;
+  virtual void BackendBindPixelBuffer(Buffer *buffer) = 0;
   virtual void Clear() = 0;
 
   virtual void UpdateViewportFromState(const Xe::XGPU::XenosState *state) = 0;
@@ -156,6 +157,8 @@ public:
   // Window Resolution
   u32 width = 1280;
   u32 height = 720;
+  u32 internalWidth = 1280;
+  u32 internalHeight = 720;
 
   // Render Lost Lost
   bool focusLost = false;

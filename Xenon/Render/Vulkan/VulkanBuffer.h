@@ -28,6 +28,7 @@ public:
   void Bind(u32 binding) override;
   void Unbind() override;
   void DestroyBuffer() override;
+  void *GetBackendHandle() override;
 private:
   VkBufferUsageFlags ConvertBufferType(eBufferType type);
   VkBufferUsageFlags ConvertUsage(eBufferUsage usage);

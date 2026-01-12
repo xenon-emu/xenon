@@ -12,9 +12,9 @@
 #include <spirv/unified1/GLSL.std.450.h>
 
 struct XenosSpirvCompiler {
-  explicit XenosSpirvCompiler(ShaderType type) :
+  explicit XenosSpirvCompiler(Xe::eShaderType type) :
     shaderType(type),
-    isPixel(type == ShaderType::Pixel)
+    isPixel(type == Xe::eShaderType::Pixel)
   {}
 
   void InitModule() {
@@ -210,6 +210,8 @@ struct XenosSpirvCompiler {
 
       case Xe::FMT_32_FLOAT:
       case Xe::FMT_32: {
+        Sirit::Id zero = mod.Constant(floatType, 0.f);
+        Sirit::Id one = mod.Constant(floatType, 1.f);
         // Single float in .x
         Sirit::Id x = mod.OpCompositeExtract(floatType, rawVec, 0);
         return mod.OpCompositeConstruct(vec4Type, x, zero, zero, one);
@@ -217,6 +219,8 @@ struct XenosSpirvCompiler {
 
       case Xe::FMT_32_32_FLOAT:
       case Xe::FMT_32_32: {
+        Sirit::Id zero = mod.Constant(floatType, 0.f);
+        Sirit::Id one = mod.Constant(floatType, 1.f);
         // Two floats in .xy
         Sirit::Id x = mod.OpCompositeExtract(floatType, rawVec, 0);
         Sirit::Id y = mod.OpCompositeExtract(floatType, rawVec, 1);
@@ -250,13 +254,16 @@ struct XenosSpirvCompiler {
 
       case Xe::FMT_8: // single channel, UNORM8
       case Xe::FMT_8_A: { // treat as alpha-like single channel
+        Sirit::Id zero = mod.Constant(floatType, 0.f);
+        Sirit::Id one = mod.Constant(floatType, 1.f);
+
         Sirit::Id xFloat = mod.OpCompositeExtract(floatType, rawVec, 0);
         Sirit::Id packed = mod.OpBitcast(uintType, xFloat);
 
         Sirit::Id mask8 = mod.Constant(uintType, 0xFFu);
-        Sirit::Id xi    = mod.OpBitwiseAnd(uintType, packed, mask8);
+        Sirit::Id xi = mod.OpBitwiseAnd(uintType, packed, mask8);
 
-        Sirit::Id xf    = mod.OpConvertUToF(floatType, xi);
+        Sirit::Id xf = mod.OpConvertUToF(floatType, xi);
         Sirit::Id inv255 = mod.Constant(floatType, 1.0f / 255.0f);
         xf = mod.OpFMul(floatType, xf, inv255);
 
@@ -396,7 +403,7 @@ struct XenosSpirvCompiler {
       return it->second;
 
     Sirit::Id var = mod.AddGlobalVariable(vec4PtrInput, spv::StorageClass::Input);
-    mod.Decorate(var, spv::Decoration::Location, slot);
+    mod.Decorate(var, spv::Decoration::Location, nextInputLocation++);
     mod.Name(var, ("v" + std::to_string(slot)).c_str());
     vertexInputs[slot] = var;
     interfaceVars.push_back(var);
@@ -404,8 +411,23 @@ struct XenosSpirvCompiler {
   }
 
   Sirit::Id LoadVertexInput(u32 slot) {
-    Sirit::Id var = GetVertexInputVar(slot);
-    return mod.OpLoad(vec4Type, var);
+    return mod.OpLoad(vec4Type, GetVertexInputVar(slot));
+  }
+
+  Sirit::Id GetOutputVarPS(u32 reg) {
+    auto it = outputs.find(reg);
+    if (it != outputs.end())
+      return it->second;
+
+    Sirit::Id var = mod.AddGlobalVariable(vec4PtrOutput, spv::StorageClass::Output);
+
+    u32 location = (reg == 0) ? 0 : vsExportLocationMap.at(reg); // match VS
+    mod.Decorate(var, spv::Decoration::Location, location);
+    mod.Name(var, ("COLOR" + std::to_string(location)).c_str());
+
+    outputs[reg] = var;
+    interfaceVars.push_back(var);
+    return var;
   }
 
   Sirit::Id GetOutputVarVS(u32 reg) {
@@ -415,32 +437,18 @@ struct XenosSpirvCompiler {
 
     Sirit::Id var{};
     if (reg == 0) {
-      // Position
+        // POSITION is built-in
       var = mod.AddGlobalVariable(vec4PtrOutput, spv::StorageClass::Output);
       mod.Decorate(var, spv::Decoration::BuiltIn, static_cast<u32>(spv::BuiltIn::Position));
       mod.Name(var, "POSITION");
     } else {
-      // Generic output
       var = mod.AddGlobalVariable(vec4PtrOutput, spv::StorageClass::Output);
-      u32 location = reg - 1;
+      u32 location = nextOutputLocation++;
       mod.Decorate(var, spv::Decoration::Location, location);
+      vsExportLocationMap[reg] = location; // track for PS
       mod.Name(var, ("OUT" + std::to_string(location)).c_str());
     }
 
-    outputs[reg] = var;
-    interfaceVars.push_back(var);
-    return var;
-  }
-
-  Sirit::Id GetOutputVarPS(u32 reg) {
-    auto it = outputs.find(reg);
-    if (it != outputs.end())
-      return it->second;
-
-    Sirit::Id var = mod.AddGlobalVariable(vec4PtrOutput, spv::StorageClass::Output);
-    u32 location = static_cast<u32>(outputs.size());
-    mod.Decorate(var, spv::Decoration::Location, location);
-    mod.Name(var, ("COLOR" + std::to_string(location)).c_str());
     outputs[reg] = var;
     interfaceVars.push_back(var);
     return var;
@@ -701,7 +709,7 @@ struct XenosSpirvCompiler {
   }
 
   Sirit::Module mod;
-  ShaderType shaderType;
+  Xe::eShaderType shaderType;
   bool isPixel{false};
   bool registersFinalized{false};
 
@@ -735,6 +743,11 @@ struct XenosSpirvCompiler {
 
   // Vertex inputs (by some "slot" - here we use const_index for simplicity)
   std::unordered_map<u32, Sirit::Id> vertexInputs;
+
+  // Track dense output locations
+  std::unordered_map<u32, u32> vsExportLocationMap; // r# -> location
+  u32 nextInputLocation = 0;
+  u32 nextOutputLocation = 0;
 
   // Outputs (key: "export register index" = r#)
   std::unordered_map<u32, Sirit::Id> outputs;

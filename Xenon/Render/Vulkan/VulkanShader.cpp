@@ -18,7 +18,7 @@ inline EShLanguage ToStage(Render::eShaderType type) {
   switch (type) {
   case Render::eShaderType::Vertex: return EShLangVertex;
   case Render::eShaderType::Fragment: return EShLangFragment;
-  case Render::eShaderType::Compute:  return EShLangCompute;
+  case Render::eShaderType::Compute: return EShLangCompute;
   default: return EShLangCount;
   }
 }
@@ -136,9 +136,12 @@ void Render::VulkanShader::CompileFromSource(eShaderType type, const char *sourc
   glslang::TShader shader(stage);
   shader.setStrings(&source, 1);
 
-  shader.setEnvInput(glslang::EShSourceGlsl, stage, glslang::EShClientVulkan, 100);
+  shader.setEnvInput(glslang::EShSourceGlsl, stage, glslang::EShClientVulkan, 450);
   shader.setEnvClient(glslang::EShClientVulkan, glslang::EShTargetVulkan_1_2);
   shader.setEnvTarget(glslang::EShTargetSpv, glslang::EShTargetSpv_1_5);
+
+  shader.setAutoMapBindings(true);
+  shader.setAutoMapLocations(true);
 
   EShMessages messages = (EShMessages)(EShMsgSpvRules | EShMsgVulkanRules);
   if (!shader.parse(&DefaultResources(), 450, false, messages)) {
@@ -153,7 +156,12 @@ void Render::VulkanShader::CompileFromSource(eShaderType type, const char *sourc
     return;
   }
 
-  std::vector<uint32_t> spirv;
+  if (!program.mapIO()) {
+    LOG_ERROR(Render, "Shader IO map failed: {}", program.getInfoLog());
+    return;
+  }
+
+  std::vector<u32> spirv = {};
   glslang::SpvOptions spvOptions;
   spvOptions.generateDebugInfo = true;
   spvOptions.disableOptimizer = false;
@@ -162,7 +170,7 @@ void Render::VulkanShader::CompileFromSource(eShaderType type, const char *sourc
   glslang::GlslangToSpv(*program.getIntermediate(stage), spirv, &spvOptions);
 
   if (!spirv.empty()) {
-    CompileFromBinary(type, reinterpret_cast<const u8*>(spirv.data()), spirv.size() * sizeof(uint32_t));
+    CompileFromBinary(type, reinterpret_cast<const u8 *>(spirv.data()), spirv.size() * sizeof(uint32_t));
   } else {
     LOG_ERROR(Render, "Failed to generate SPIR-V.");
   }
@@ -223,6 +231,33 @@ void Render::VulkanShader::SetBooleanConstants(const u32 *data) {
 }
 
 bool Render::VulkanShader::Link() {
+  // Vulkan doesn't "link" like GL. We just ensure we have something usable.
+  const bool hasAny =
+      vertexShader != VK_NULL_HANDLE ||
+      fragmentShader != VK_NULL_HANDLE ||
+      computeShader != VK_NULL_HANDLE;
+
+  if (!hasAny) {
+    LOG_ERROR(Render, "VulkanShader::Link(): no stages compiled.");
+    return false;
+  }
+
+  // Enforce valid combos
+  const bool hasGraphicsPair =
+      (vertexShader != VK_NULL_HANDLE) && (fragmentShader != VK_NULL_HANDLE);
+
+  const bool hasComputeOnly =
+      (computeShader != VK_NULL_HANDLE);
+
+  if (!hasGraphicsPair && !hasComputeOnly) {
+    // Vertex-only or fragment-only is probably a mistake
+    // We'll just warn, and continue anyways
+    LOG_WARNING(Render, "VulkanShader::Link(): incomplete stage set (vs={}, fs={}, cs={}).",
+      vertexShader != VK_NULL_HANDLE,
+      fragmentShader != VK_NULL_HANDLE,
+      computeShader != VK_NULL_HANDLE);
+  }
+
   return true;
 }
 

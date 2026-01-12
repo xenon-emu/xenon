@@ -36,7 +36,7 @@
 #define Bool(g, c, x) CopyCustom(g, x, "{}", c.x ? "true" : "false")
 #define BoolPtr(g, c, x) CopyCustom(g, x, "{}", c->x ? "true" : "false")
 
-void Render::GUI::Init(SDL_Window* window, void *context) {
+void Render::GUI::Init(SDL_Window *window, void *context) {
   MICROPROFILE_SCOPEI("[Xe::Render::GUI]", "Init", MP_AUTO);
   // Set our mainWindow handle
   mainWindow = window;
@@ -73,7 +73,7 @@ void Render::GUI::PostInit() {
   ImGuiIO &io = ImGui::GetIO();
 
   ImFontConfig fontConfig;
-  fontConfig.FontDataOwnedByAtlas = false; 
+  fontConfig.FontDataOwnedByAtlas = false;
 
   // It might not be a bad idea to take the Xbox 360 font and convert it to TTF
   robotRegular14 = io.Fonts->AddFontFromMemoryTTF((void*)Roboto_Regular_ttf, Roboto_Regular_ttf_len, 14.0f, &fontConfig);

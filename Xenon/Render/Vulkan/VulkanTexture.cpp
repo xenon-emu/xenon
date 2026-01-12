@@ -115,7 +115,6 @@ bool Render::VulkanTexture::CreateBufferWithData(void *srcData, VkDeviceSize siz
     return false;
   }
 
-  // mapped pointer available in allocationInfo through vmaGetAllocationInfo if needed
   void *mapped = nullptr;
   vmaMapMemory(renderer->allocator, outAlloc, &mapped);
   memcpy(mapped, srcData, (size_t)size);
@@ -140,6 +139,7 @@ void Render::VulkanTexture::CreateTextureHandle(u32 width, u32 height, s32 flags
   imageInfo.mipLevels = 1;
   imageInfo.arrayLayers = 1;
   imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+  imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
   imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
   imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
   imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
