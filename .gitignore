@@ -440,3 +440,4 @@ output.txt
 # Specific to Xenon tooling
 Tools/AST/Deps/ThirdParty/Sirit/*
 .direnv/*
+shader_*.bin*|
