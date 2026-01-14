@@ -1107,20 +1107,98 @@ struct sSLBEntry {
   u64 esidReg;
 };
 
-// Traslation lookaside buffer.
+// Traslation lookaside buffer entry.
+// Cache-line aligned for optimal (64-bit) CPU cache performance.
 // Holds a cache of the recently used PTE's.
-struct TLBEntry {
-  bool V;   // Entry valid.
-  u64 VPN;  // Pre calculated VPN. We do this ahead of time for performance reasons
-            // and because of the possible use of the LVPN.
-  u64 pte0; // Holds the valid bit, as well as the AVPN
-  u64 pte1; // Contains the RPN.
+struct alignas(64) TLBEntry {
+  u64 VPN;      // Pre calculated VPN for fast comparison
+  u64 pte0;     // Holds the valid bit, AVPN, L bit
+  u64 pte1;     // Contains the RPN and LP bit
+  u64 RPN;      // Pre-calculated RPN for fast lookup
+  u32 pageMask; // Pre-calculated page mask based on page size
+  u8  p;        // Page size (log2)
+  u8  L;        // Large page bit
+  u8  LP;       // Large page selector
+  bool V;       // Entry valid
 };
+
+// TLB congruence class - represents one row in the 4-way set associative TLB.
+// Each class contains 4 entries (ways) that can hold translations for the same index.
+struct alignas(64) TLBCongruenceClass {
+  TLBEntry ways[4];     // 4-way set associative
+  u8 lruBits;           // LRU tracking: 6 bits for 4-way pseudo-LRU
+                        // Bit layout: [0:1] = MRU between (0,1), [2:3] = MRU between (2,3), 
+                        // [4:5] = MRU between winners
+  
+  // Get the LRU way index for replacement
+  inline u8 getLRUWay() const {
+    // Pseudo-LRU: Find least recently used way
+    // Check which pair was least recently used, then which entry in that pair
+    if (lruBits & 0x30) { // Pair (2,3) more recently used
+      return (lruBits & 0x03) ? 1 : 0; // Return LRU of pair (0,1)
+    } else {
+      return (lruBits & 0x0C) ? 3 : 2; // Return LRU of pair (2,3)
+    }
+  }
+  
+  // Update LRU bits when accessing a way
+  inline void updateLRU(u8 accessedWay) {
+    switch (accessedWay) {
+    case 0:
+      lruBits |= 0x01;  // Way 0 more recent than 1
+      lruBits &= ~0x30; // Pair (0,1) more recent than (2,3)
+      break;
+    case 1:
+      lruBits &= ~0x01; // Way 1 more recent than 0
+      lruBits &= ~0x30; // Pair (0,1) more recent than (2,3)
+      break;
+    case 2:
+      lruBits |= 0x04;  // Way 2 more recent than 3
+      lruBits |= 0x30;  // Pair (2,3) more recent than (0,1)
+      break;
+    case 3:
+      lruBits &= ~0x04; // Way 3 more recent than 2
+      lruBits |= 0x30;  // Pair (2,3) more recent than (0,1)
+      break;
+    }
+  }
+  
+  // Invalidate a specific way
+  inline void invalidateWay(u8 way) {
+    ways[way].V = false;
+    ways[way].VPN = 0;
+    ways[way].pte0 = 0;
+    ways[way].pte1 = 0;
+    ways[way].RPN = 0;
+  }
+  
+  // Invalidate all ways in this class
+  inline void invalidateAll() {
+    for (u8 i = 0; i < 4; ++i) {
+      invalidateWay(i);
+    }
+    lruBits = 0;
+  }
+};
+
+// PPE Translation Lookaside Buffer.
+// 1024-entry, 4-way set associative, unified (instruction and data).
+// Organized as 256 congruence classes with 4 entries each.
+// Shared by both PPE threads.
 struct TLB_Reg {
-  TLBEntry tlbSet0[256];
-  TLBEntry tlbSet1[256];
-  TLBEntry tlbSet2[256];
-  TLBEntry tlbSet3[256];
+  TLBCongruenceClass classes[256];
+  
+  // Invalidate entire TLB
+  inline void invalidateAll() {
+    for (auto &tlbClass : classes) {
+      tlbClass.invalidateAll();
+    }
+  }
+  
+  // Invalidate a specific congruence class
+  inline void invalidateClass(u8 classIndex) {
+    classes[classIndex].invalidateAll();
+  }
 };
 
 // Xenon Special Purpose Registers

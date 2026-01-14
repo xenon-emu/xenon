@@ -94,6 +94,62 @@ struct PPC_HPTE64 {
   u64 pte1;
 };
 
+// Pre-computed comparison masks for each page size.
+// These are used for VPN comparison during TLB lookup.
+static constexpr u64 TLB_COMPARE_MASK_4KB =   0xFFFFFFFFFFF00000ULL; // VA[0:59]
+static constexpr u64 TLB_COMPARE_MASK_64KB =  0xFFFFFFFFFF000000ULL; // VA[0:55]
+static constexpr u64 TLB_COMPARE_MASK_16MB =  0xFFFFFFFF00000000ULL; // VA[0:47]
+
+// Get comparison mask for a given page size.
+inline u64 mmuGetCompareMask(u8 p) {
+  switch (p) {
+  case MMU_PAGE_SIZE_4KB:  return TLB_COMPARE_MASK_4KB;
+  case MMU_PAGE_SIZE_64KB: return TLB_COMPARE_MASK_64KB;
+  case MMU_PAGE_SIZE_16MB: return TLB_COMPARE_MASK_16MB;
+  default:                 return TLB_COMPARE_MASK_4KB;
+  }
+}
+
+// Compute TLB congruence class index from VA and page size.
+// The TLB is 4-way set associative with 256 congruence classes.
+inline u16 mmuComputeTLBIndex(u64 VA, u8 p) {
+  // TLB indexing formulas from IBM CBE documentation:
+  // 4 KB:  (VA[52:55] xor VA[60:63]) || VA[64:67]
+  // 64 KB: (VA[52:55] xor VA[56:59]) || VA[60:63]
+  // 16 MB: VA[48:55]
+
+  // Extract bit fields (adjusted for 64-bit VA from 80-bit addressing)
+  const u16 bits36_39 = static_cast<u16>((VA >> 24) & 0xF);  // VA[52:55] -> bits 36-39 of 64-bit
+  const u16 bits40_43 = static_cast<u16>((VA >> 20) & 0xF);  // VA[56:59] -> bits 40-43
+  const u16 bits44_47 = static_cast<u16>((VA >> 16) & 0xF);  // VA[60:63] -> bits 44-47
+  const u16 bits48_51 = static_cast<u16>((VA >> 12) & 0xF);  // VA[64:67] -> bits 48-51
+
+  switch (p) {
+  case MMU_PAGE_SIZE_64KB: return ((bits36_39 ^ bits40_43) << 4) | bits44_47;
+  case MMU_PAGE_SIZE_16MB: return (VA >> 24) & 0xFF;
+  default: // 4KB
+    return ((bits36_39 ^ bits44_47) << 4) | bits48_51;
+  }
+}
+
+// Fast TLB entry comparison.
+// Returns true if the entry matches the given VA with correct page attributes.
+inline bool mmuCompareTLBEntry(const TLBEntry &entry, u64 VA, u8 p, bool L, bool LP) {
+  // Entry must be valid
+  if (!entry.V) {
+    return false;
+  }
+
+  // Page size attributes must match
+  if (entry.L != L || (L && entry.LP != LP)) {
+    return false;
+  }
+
+  // Compare VPN using pre-computed mask
+  const u64 mask = mmuGetCompareMask(p);
+  return (entry.VPN & mask) == (VA & mask);
+}
+
 inline bool mmuComparePTE(u64 VA, u64 VPN, u64 pte0, u64 pte1, u8 p, bool L, bool LP, u64 *RPN) {
   // Requirements:
   // PTE[H] = 0 for the primary PTEG, 1 for the secondary PTEG
@@ -131,28 +187,15 @@ inline bool mmuComparePTE(u64 VA, u64 VPN, u64 pte0, u64 pte1, u8 p, bool L, boo
     return false;
   }
 
-  bool match = false;
-
-  // Behave differently for pre-calculated VPN's.
-  u64 compareMask = 0;
-  switch (p) {
-  case MMU_PAGE_SIZE_4KB:   compareMask = 0xFFFFFFFFFFF00000; break; // VA[0:59]
-  case MMU_PAGE_SIZE_64KB:  compareMask = 0xFFFFFFFFFF000000; break; // VA[0:55]
-  case MMU_PAGE_SIZE_16MB:  compareMask = 0xFFFFFFFF00000000; break; // VA[0:47]
+  // Compare using mask
+  const u64 compareMask = mmuGetCompareMask(p);
+  if ((VPN & compareMask) != (VA & compareMask)) {
+    return false;
   }
 
-  const u64 pteVPNAndMask = VPN & compareMask;
-  const u64 vaAndMask = VA & compareMask;
-
-  if (pteVPNAndMask == vaAndMask) { match = true; }
-
-  // Match
-  if (match) {
-    // RPN = PTE[86:114] : PTE[86:115].
-    *RPN = L ? pte1 & PPC_HPTE64_RPN_LP : pte1 & PPC_HPTE64_RPN_NO_LP;
-  }
-
-  return match;
+  // Extract RPN
+  *RPN = L ? (pte1 & PPC_HPTE64_RPN_LP) : (pte1 & PPC_HPTE64_RPN_NO_LP);
+  return true;
 }
 
 // SLB Invalidate All
@@ -167,139 +210,62 @@ void PPCInterpreter::PPCInterpreter_slbia(sPPEState *ppeState) {
 
 // TLB Invalidate Entry Local
 void PPCInterpreter::PPCInterpreter_tlbiel(sPPEState *ppeState) {
-  // The PPU adds two new fields to this instruction, them being LP and IS.
-
   const bool LP = (GPRi(rb) & 0x1000) >> 12;
   const bool invalSelector = (GPRi(rb) & 0x800) >> 11;
   const u8 p = mmuGetPageSize(ppeState, _instr.l10, LP);
 
   if (invalSelector) {
-    // Index to one of the 256 rows of the tlb. Possible entire tlb
-    // invalidation.
-    u8 tlbCongruenceClass = 0;
-    const u64 rb_44_51 = (GPRi(rb) & 0xFF000) >> 12;
+    // Congruence class invalidation: invalidate all 4 ways at the specified index
+    const u8 classIndex = (GPRi(rb) & 0xFF000) >> 12;
+    ppeState->TLB.invalidateClass(classIndex);
 
-    ppeState->TLB.tlbSet0[rb_44_51].V = false;
-    ppeState->TLB.tlbSet0[rb_44_51].pte0 = 0;
-    ppeState->TLB.tlbSet0[rb_44_51].pte1 = 0;
-
-    ppeState->TLB.tlbSet1[rb_44_51].V = false;
-    ppeState->TLB.tlbSet1[rb_44_51].pte0 = 0;
-    ppeState->TLB.tlbSet1[rb_44_51].pte1 = 0;
-
-    ppeState->TLB.tlbSet2[rb_44_51].V = false;
-    ppeState->TLB.tlbSet2[rb_44_51].pte0 = 0;
-    ppeState->TLB.tlbSet2[rb_44_51].pte1 = 0;
-
-    ppeState->TLB.tlbSet3[rb_44_51].V = false;
-    ppeState->TLB.tlbSet3[rb_44_51].pte0 = 0;
-    ppeState->TLB.tlbSet3[rb_44_51].pte1 = 0;
-
-    // Should only invalidate entries for a specific set of addresses.
-    // Invalidate both ERAT's *** BUG *** !!!
+    // Invalidate both ERAT's for the affected address range
     curThread.iERAT.invalidateAll();
     curThread.dERAT.invalidateAll();
 
-    // Invalidate JIT blocks conservatively (full set invalidation).
+    // Invalidate JIT blocks
     if (XeMain::GetCPU()) {
       PPU *ppu = XeMain::GetCPU()->GetPPU(ppeState->ppuID);
       if (ppu && ppu->GetPPUJIT()) {
 #ifdef MMU_DEBUG
-        LOG_DEBUG(Xenon_MMU, "[TLBIEL]: Congruence-class invalidation (class {:#x}). Invalidating all JIT blocks.", rb_44_51);
+        LOG_DEBUG(Xenon_MMU, "[TLBIEL]: Congruence-class invalidation (class {:#x})", classIndex);
 #endif
         ppu->GetPPUJIT()->InvalidateAllBlocks();
       }
     }
   } else {
-    // The TLB is as selective as possible when invalidating TLB entries.The
-    // invalidation match criteria is VPN[38:79 - p], L, LP, and LPID.
-
+    // Selective invalidation: only invalidate entries matching VPN
     const u64 rb = GPRi(rb);
-    u64 rpn = 0;
+    const u64 compareMask = mmuGetCompareMask(p);
+    const u16 tlbIndex = mmuComputeTLBIndex(rb, p);
 
-    u64 compareMask = 0;
-
+    TLBCongruenceClass &tlbClass = ppeState->TLB.classes[tlbIndex];
+    for (u8 way = 0; way < 4; ++way) {
+      TLBEntry &entry = tlbClass.ways[way];
+      if (entry.V && ((entry.VPN & compareMask) == (rb & compareMask))) {
 #ifdef MMU_DEBUG
-    LOG_DEBUG(Xenon_MMU, "[TLBIEL]: Attempting to find entry for RB {:#x}", rb);
-#endif // MMU_DEBUG
-
-    // TODO(bitsh1ft3r): Investigate this behavior. Why do 64kb and 16 mb behave the same?
-    // and why doesn't is work as docs dictate.
-    switch (p) {
-    case MMU_PAGE_SIZE_4KB:   compareMask = 0xFFFFFFFFFFF00000; break;
-    case MMU_PAGE_SIZE_64KB:  compareMask = 0xFFFFFFFFFF000000; break;
-    case MMU_PAGE_SIZE_16MB:  compareMask = 0xFFFFFFFFFF000000; break;
+        LOG_DEBUG(Xenon_MMU, "[TLB]: TLBIEL: Invalidating entry at class {} way {} VPN: {:#x}",
+          tlbIndex, way, entry.VPN);
+#endif
+        tlbClass.invalidateWay(way);
+      }
     }
 
-    for (auto &tlbEntry : ppeState->TLB.tlbSet0) {
-      if (tlbEntry.V && ((tlbEntry.VPN & compareMask) == (rb & compareMask))) {
-#ifdef DEBUG_BUILD
-          LOG_TRACE(Xenon_MMU, "[TLB]: TLBIEL: Invalidating entry with VPN: {:#x}", tlbEntry.VPN);
-#endif
-        tlbEntry.V = false;
-        tlbEntry.VPN = 0;
-        tlbEntry.pte0 = 0;
-        tlbEntry.pte1 = 0;
-      }
-    }
-    for (auto &tlbEntry : ppeState->TLB.tlbSet1) {
-      if (tlbEntry.V && ((tlbEntry.VPN & compareMask) == (rb & compareMask))) {
-#ifdef DEBUG_BUILD
-        LOG_TRACE(Xenon_MMU, "[TLB]: TLBIEL: Invalidating entry with VPN: {:#x}", tlbEntry.VPN);
-#endif
-        tlbEntry.V = false;
-        tlbEntry.VPN = 0;
-        tlbEntry.pte0 = 0;
-        tlbEntry.pte1 = 0;
-      }
-    }
-    for (auto &tlbEntry : ppeState->TLB.tlbSet2) {
-      if (tlbEntry.V && ((tlbEntry.VPN & compareMask) == (rb & compareMask))) {
-#ifdef DEBUG_BUILD
-        LOG_TRACE(Xenon_MMU, "[TLB]: TLBIEL: Invalidating entry with VPN: {:#x}", tlbEntry.VPN);
-#endif
-        tlbEntry.V = false;
-        tlbEntry.VPN = 0;
-        tlbEntry.pte0 = 0;
-        tlbEntry.pte1 = 0;
-      }
-    }
-    for (auto &tlbEntry : ppeState->TLB.tlbSet3) {
-      if (tlbEntry.V && ((tlbEntry.VPN & compareMask) == (rb & compareMask))) {
-#ifdef DEBUG_BUILD
-        LOG_TRACE(Xenon_MMU, "[TLB]: TLBIEL: Invalidating entry with VPN: {:#x}", tlbEntry.VPN);
-#endif
-        tlbEntry.V = false;
-        tlbEntry.VPN = 0;
-        tlbEntry.pte0 = 0;
-        tlbEntry.pte1 = 0;
-      }
-    }
-    // Should only invalidate entries for a specific set of addresses.
-    // Invalidate both ERAT's *** BUG *** !!!
+    // Selective ERAT invalidation
     curThread.iERAT.invalidateAll();
     curThread.dERAT.invalidateAll();
 
-    // Invalidate JIT blocks that map to the page/rango afectado por RB/p
+    // Invalidate JIT blocks for the affected page range
     if (XeMain::GetCPU()) {
       PPU *ppu = XeMain::GetCPU()->GetPPU(ppeState->ppuID);
       if (ppu && ppu->GetPPUJIT()) {
-        // Get page range based on 'p' (p = log2(pageSize))
-        u64 pageSize = (p < 64) ? (1ULL << p) : 0ULL;
-        if (pageSize == 0) {
-          // Fallback: full cache invalidation. (should never happen but for safety).
+        u64 pageSize = 1ULL << p;
+        u64 start = rb & ~(pageSize - 1ULL);
+        u64 end = start + pageSize;
 #ifdef MMU_DEBUG
-          LOG_DEBUG(Xenon_MMU, "[TLBIEL]: Unknown page size (p={}), invalidating all JIT blocks", p);
+        LOG_DEBUG(Xenon_MMU, "[TLBIEL]: Invalidating JIT blocks for page {:#x} (size {:#x})", start, pageSize);
 #endif
-          ppu->GetPPUJIT()->InvalidateAllBlocks();
-        } else {
-          u64 start = rb & ~(pageSize - 1ULL);
-          u64 end = start + pageSize;
-#ifdef MMU_DEBUG
-          LOG_DEBUG(Xenon_MMU, "[TLBIEL]: Invalidating JIT blocks for page {:#x} (size {:#x})", start, pageSize);
-#endif
-          ppu->GetPPUJIT()->InvalidateBlocksForRange(start, end);
-        }
+        ppu->GetPPUJIT()->InvalidateBlocksForRange(start, end);
       }
     }
   }
@@ -317,41 +283,32 @@ void PPCInterpreter::PPCInterpreter_tlbiel(sPPEState *ppeState) {
 // TLB Invalidate Entry
 void PPCInterpreter::PPCInterpreter_tlbie(sPPEState *ppeState) {
   const u64 EA = GPRi(rb);
-  bool LP = (GPRi(rb) & 0x1000) >> 12;
+  const bool LP = (GPRi(rb) & 0x1000) >> 12;
   const u8 p = mmuGetPageSize(ppeState, _instr.l10, LP);
-  // Inverse of log2, as log2 is 2^? (finding ?)
-  // Example: the Log2 of 4096 is 12, because 2^12 is 4096
-  u64 fullPageSize = pow(2, p);
+  const u64 pageSize = 1ULL << p;
+  const u64 pageMask = pageSize - 1;
+
 #ifdef DEBUG_BUILD
   if (Config::log.advanced)
-    LOG_TRACE(Xenon, "tlbie, EA:0x{:X} | PageSize:{} | Full:0x{:X},{} | LP:{}", EA, p, fullPageSize, fullPageSize, LP ? "true" : "false");
+    LOG_TRACE(Xenon, "tlbie, EA:0x{:X} | PageSize:{} | Full:0x{:X} | LP:{}",
+      EA, p, pageSize, LP ? "true" : "false");
 #endif
-  for (u64 i{}; i != fullPageSize; ++i) {
-    curThread.iERAT.invalidateElement(EA+i);
-    curThread.dERAT.invalidateElement(EA+i);
-  }
 
-  // Invalidate JIT blocks that map to the page/rango afectado por RB/p
+  // Invalidate ERAT entries for the entire page (not byte-by-byte)
+  const u64 pageBase = EA & ~pageMask;
+  curThread.iERAT.invalidateElement(pageBase);
+  curThread.dERAT.invalidateElement(pageBase);
+
+  // Invalidate JIT blocks for the affected page
   if (XeMain::GetCPU()) {
     PPU *ppu = XeMain::GetCPU()->GetPPU(ppeState->ppuID);
     if (ppu && ppu->GetPPUJIT()) {
-      // Get page range based on 'p' (p = log2(pageSize))
-      u64 pageSize = (p < 64) ? (1ULL << p) : 0ULL;
-      if (pageSize == 0) {
-        // Fallback: full cache invalidation. (should never happen but for safety).
+      u64 start = EA & ~pageMask;
+      u64 end = start + pageSize;
 #ifdef MMU_DEBUG
-        LOG_DEBUG(Xenon_MMU, "[TLBIE]: Unknown page size (p={}), invalidating all JIT blocks", p);
+      LOG_DEBUG(Xenon_MMU, "[TLBIE]: Invalidating JIT blocks for page {:#x} (size {:#x})", start, pageSize);
 #endif
-        ppu->GetPPUJIT()->InvalidateAllBlocks();
-      }
-      else {
-        u64 start = EA & ~(pageSize - 1ULL);
-        u64 end = start + pageSize;
-#ifdef MMU_DEBUG
-        LOG_DEBUG(Xenon_MMU, "[TLBIE]: Invalidating JIT blocks for page {:#x} (size {:#x})", start, pageSize);
-#endif
-        ppu->GetPPUJIT()->InvalidateBlocksForRange(start, end);
-      }
+      ppu->GetPPUJIT()->InvalidateBlocksForRange(start, end);
     }
   }
 }
@@ -377,78 +334,49 @@ u8 PPCInterpreter::mmuGetPageSize(sPPEState *ppeState, bool L, u8 LP) {
 
   // HID6 16-17 bits select Large Page size 1.
   // HID6 18-19 bits select Large Page size 2.
-  const u8 LB_16_17 = (ppeState->SPR.HID6.LB & 0b1100) >> 2;
-  const u8 LB_18_19 = ppeState->SPR.HID6.LB & 0b11;
-
-  // Final p size.
-  u8 p = 0;
-  // Page size in decimal.
-  u32 pSize = 0;
-
-  // Large page?
-  if (L == 0) {
-    // If L equals 0, the small page size is used, 4Kb in this case.
-    pSize = 4096;
-  } else {
-    // Large Page Selector
-    if (LP == 0) {
-      switch (LB_16_17) {
-      case 0b0000:
-        pSize = 16777216; // 16 Mb page size
-        break;
-      case 0b0001:
-        pSize = 1048576; // 1 Mb page size
-        break;
-      case 0b0010:
-        pSize = 65536; // 64 Kb page size
-        break;
-      }
-    } else if (LP == 1) {
-      switch (LB_18_19) {
-      case 0b0000:
-        pSize = 16777216; // 16 Mb page size
-        break;
-      case 0b0001:
-        pSize = 1048576; // 1 Mb page size
-        break;
-      case 0b0010:
-        pSize = 65536; // 64 Kb page size
-        break;
-      }
-    }
+  if (!L) {
+    return MMU_PAGE_SIZE_4KB;
   }
 
-  // p size is Log(2) of Page Size.
-  p = static_cast<u8>(log2(pSize));
-  return p;
+  // Large page size lookup tables indexed by HID6 LB bits
+  static constexpr u8 lpSize0[4] = { MMU_PAGE_SIZE_16MB, MMU_PAGE_SIZE_1MB, MMU_PAGE_SIZE_64KB, MMU_PAGE_SIZE_4KB };
+  static constexpr u8 lpSize1[4] = { MMU_PAGE_SIZE_16MB, MMU_PAGE_SIZE_1MB, MMU_PAGE_SIZE_64KB, MMU_PAGE_SIZE_4KB };
+
+  const u8 LB = ppeState->SPR.HID6.LB;
+
+  if (LP == 0) {
+    const u8 LB_16_17 = (LB & 0b1100) >> 2;
+    return lpSize0[LB_16_17];
+  } else {
+    const u8 LB_18_19 = LB & 0b11;
+    return lpSize1[LB_18_19];
+  }
 }
 
 // This is done when TLB Reload is in software-controlled mode.
 void PPCInterpreter::mmuAddTlbEntry(sPPEState *ppeState) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUAddTlbEntry", MP_AUTO);
-  // In said mode, software makes use of special registers of the CPU to directly reload the TLB
-  // with PTE's, thus eliminating the need of a hardware page table and tablewalk.
-
-#define MMU_GET_TLB_INDEX_TI(x)   (static_cast<u16>((x & 0xFF0) >> 4))
-#define MMU_GET_TLB_INDEX_TS(x)   (static_cast<u16>(x & 0xF))
-#define MMU_GET_TLB_INDEX_LVPN(x) (static_cast<u64>((x & 0xE00000000000) >> 25))
 
   const u64 tlbIndex = ppeState->SPR.PPE_TLB_Index.hexValue;
   const u64 tlbVpn = ppeState->SPR.PPE_TLB_VPN.hexValue;
   const u64 tlbRpn = ppeState->SPR.PPE_TLB_RPN.hexValue;
 
-  // TLB Index (0 - 255) of current tlb set.
-  const u16 TI = MMU_GET_TLB_INDEX_TI(tlbIndex);
-  // TLB Set.
-  const u16 TS = MMU_GET_TLB_INDEX_TS(tlbIndex);
+  // Extract index and set from PPE_TLB_Index
+  const u8 TI = (tlbIndex >> 4) & 0xFF;  // TLB Index (0-255)
+  const u8 TS = tlbIndex & 0xF;          // TLB Set (encoded as bitmask)
 
-  //  The abbreviated virtual page number (AVPN)[0:56] corresponds to VPN[0:56].
+  // Calculate VPN from AVPN and LVPN
   const u64 AVPN = (tlbVpn & PPC_HPTE64_AVPN) << 16;
-  // LVPN[0:2] corresponds to VPN[57:59].
-  const u64 LVPN = MMU_GET_TLB_INDEX_LVPN(tlbIndex);
-
-  // Our PTE VPN, pre calculated for ease of use.
+  const u64 LVPN = (tlbIndex & 0xE00000000000ULL) >> 25;
   const u64 VPN = AVPN | LVPN;
+
+  // Extract page attributes
+  const bool L = (tlbVpn & PPC_HPTE64_LARGE) >> 2;
+  const bool LP = (tlbRpn & PPC_HPTE64_LP) >> 12;
+  const u8 p = mmuGetPageSize(ppeState, L, LP);
+
+  // Pre-calculate RPN for fast lookup
+  const u64 RPN = L ? (tlbRpn & PPC_HPTE64_RPN_LP) : (tlbRpn & PPC_HPTE64_RPN_NO_LP);
 
 #ifdef DEBUG_BUILD
   if (XeMain::GetCPU()) {
@@ -459,146 +387,86 @@ void PPCInterpreter::mmuAddTlbEntry(sPPEState *ppeState) {
   }
 #endif
 
-  LOG_TRACE(Xenon_MMU, "[TLB]: Adding entry: TLB Set: {:#d}, TLB Index: {:#x}, VPN: {:#x}, PTE VPN: {:#x}, PTE RPN: {:#x}",
-    TS, TI, VPN, tlbVpn, tlbRpn);
+#ifdef MMU_DEBUG
+  LOG_DEBUG(Xenon_MMU, "[TLB]: Adding entry: Class: {:#x}, Set: {:#b}, VPN: {:#x}, RPN: {:#x}",
+    TI, TS, VPN, RPN);
+#endif
 
-  // TLB set to choose from
-  // There are 4 sets of 256 entries each:
+  // Map TS bitmask to way index
+  u8 wayIndex;
   switch (TS) {
-  case 0b1000:
-    ppeState->TLB.tlbSet0[TI].V = true;
-    ppeState->TLB.tlbSet0[TI].VPN = VPN;
-    ppeState->TLB.tlbSet0[TI].pte0 = tlbVpn;
-    ppeState->TLB.tlbSet0[TI].pte1 = tlbRpn;
-    break;
-  case 0b0100:
-    ppeState->TLB.tlbSet1[TI].V = true;
-    ppeState->TLB.tlbSet1[TI].VPN = VPN;
-    ppeState->TLB.tlbSet1[TI].pte0 = tlbVpn;
-    ppeState->TLB.tlbSet1[TI].pte1 = tlbRpn;
-    break;
-  case 0b0010:
-    ppeState->TLB.tlbSet2[TI].V = true;
-    ppeState->TLB.tlbSet2[TI].VPN = VPN;
-    ppeState->TLB.tlbSet2[TI].pte0 = tlbVpn;
-    ppeState->TLB.tlbSet2[TI].pte1 = tlbRpn;
-    break;
-  case 0b0001:
-    ppeState->TLB.tlbSet3[TI].V = true;
-    ppeState->TLB.tlbSet3[TI].VPN = VPN;
-    ppeState->TLB.tlbSet3[TI].pte0 = tlbVpn;
-    ppeState->TLB.tlbSet3[TI].pte1 = tlbRpn;
-    break;
+  case 0b1000: wayIndex = 0; break;
+  case 0b0100: wayIndex = 1; break;
+  case 0b0010: wayIndex = 2; break;
+  case 0b0001: wayIndex = 3; break;
+  default:     wayIndex = 0; break;
   }
+
+  TLBCongruenceClass &tlbClass = ppeState->TLB.classes[TI];
+  TLBEntry &entry = tlbClass.ways[wayIndex];
+
+  entry.V = true;
+  entry.VPN = VPN;
+  entry.pte0 = tlbVpn;
+  entry.pte1 = tlbRpn;
+  entry.RPN = RPN;
+  entry.p = p;
+  entry.L = L;
+  entry.LP = LP;
+  entry.pageMask = (1U << p) - 1;
+
+  // Update LRU
+  tlbClass.updateLRU(wayIndex);
 }
 
 // Translation Lookaside Buffer Search
 bool PPCInterpreter::mmuSearchTlbEntry(sPPEState *ppeState, u64 *RPN, u64 VA, u8 p, bool L, bool LP) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUSearchTlbEntry", MP_AUTO);
-  // Index to choose from the 256 ways of the TLB
-  u16 tlbIndex = 0;
-  // Tlb Set that was least Recently used for replacement.
-  u8 tlbSet = 0;
 
-  // 4 Kb - (VA[52:55] xor VA[60:63]) || VA[64:67]
-  // 64 Kb - (VA[52:55] xor VA[56:59]) || VA[60:63]
-  // 16MB - VA[48:55]
+  const u16 classIndex = mmuComputeTLBIndex(VA, p);
+  TLBCongruenceClass &tlbClass = ppeState->TLB.classes[classIndex];
 
-  // 52-55 bits of 80 VA
-  const u16 bits36_39 = static_cast<u16>(QGET(VA, 36, 39));
-  // 56-59 bits of 80 VA
-  const u16 bits40_43 = static_cast<u16>(QGET(VA, 40, 43));
-  // 60-63 bits of 80 VA
-  const u16 bits44_47 = static_cast<u16>(QGET(VA, 44, 47));
-  // 64-67 bits of 80 VA
-  const u16 bits48_51 = static_cast<u16>(QGET(VA, 48, 51));
-  // 48-55 bits of 80 VA
-  const u16 bits32_39 = static_cast<u16>(QGET(VA, 32, 39));
+  // Search all 4 ways in the congruence class
+  for (u8 way = 0; way < 4; ++way) {
+    const TLBEntry &entry = tlbClass.ways[way];
 
-  switch (p) {
-  case MMU_PAGE_SIZE_64KB:
-    tlbIndex = ((bits36_39 ^ bits40_43) << 4 | bits44_47);
-    break;
-  case MMU_PAGE_SIZE_16MB:
-    tlbIndex = (VA >> 24) & 0xFF;
-    break;
-  default:
-    // p = 12 bits, 4KB
-    tlbIndex = ((bits36_39 ^ bits44_47) << 4 | bits48_51);
-    break;
-  }
-
-  //
-  // Compare each valid entry at specified index in the TLB with the VA.
-  //
-  if (ppeState->TLB.tlbSet0[tlbIndex].V) {
-    if (mmuComparePTE(VA, ppeState->TLB.tlbSet0[tlbIndex].VPN, ppeState->TLB.tlbSet0[tlbIndex].pte0, 
-      ppeState->TLB.tlbSet0[tlbIndex].pte1, p, L, LP, RPN)) {
+    if (mmuCompareTLBEntry(entry, VA, p, L, LP)) {
+      // TLB Hit - return pre-calculated RPN and update LRU
+      *RPN = entry.RPN;
+      tlbClass.updateLRU(way);
       return true;
     }
-  } else {
-    // Entry was invalid, make this set the a candidate for refill.
-    tlbSet = 0b1000;
-  }
-  if (ppeState->TLB.tlbSet1[tlbIndex].V) {
-    if (mmuComparePTE(VA, ppeState->TLB.tlbSet1[tlbIndex].VPN, ppeState->TLB.tlbSet1[tlbIndex].pte0, 
-      ppeState->TLB.tlbSet1[tlbIndex].pte1, p, L, LP, RPN)) {
-      return true;
-    }
-  } else {
-    // Entry was invalid, make this set the a candidate for refill.
-    tlbSet = 0b0100;
-  }
-  if (ppeState->TLB.tlbSet2[tlbIndex].V) {
-    if (mmuComparePTE(VA, ppeState->TLB.tlbSet2[tlbIndex].VPN, ppeState->TLB.tlbSet2[tlbIndex].pte0, 
-      ppeState->TLB.tlbSet2[tlbIndex].pte1, p, L, LP, RPN)) {
-      return true;
-    }
-  } else {
-    // Entry was invalid, make this set the a candidate for refill.
-    tlbSet = 0b0010;
-  }
-  if (ppeState->TLB.tlbSet3[tlbIndex].V) {
-    if (mmuComparePTE(VA, ppeState->TLB.tlbSet3[tlbIndex].VPN, ppeState->TLB.tlbSet3[tlbIndex].pte0,
-      ppeState->TLB.tlbSet3[tlbIndex].pte1, p, L, LP, RPN)) {
-      return true;
-    }
-  } else {
-    // Entry was invalid, make this set the a candidate for refill.
-    tlbSet = 0b0001;
   }
 
-  // If the PPE is running on TLB Software managed mode, then this SPR
-  // is updated every time a Data or Instr Storage Exception occurs. This
-  // ensures that the next time that the tlb software updates via an
-  // interrupt, the index for replacement is not conflictive.
-  // On normal conditions this is done for the LRU index of the TLB.
-
-  // Software management of the TLB. 0 = Hardware, 1 = Software.
-  bool tlbSoftwareManaged = ((ppeState->SPR.LPCR.hexValue & 0x400) >> 10);
+  // TLB Miss - update index hint for software management
+  const bool tlbSoftwareManaged = (ppeState->SPR.LPCR.hexValue & 0x400) >> 10;
 
   if (tlbSoftwareManaged) {
-    u64 tlbIndexHint =
-      curThread.SPR.PPE_TLB_Index_Hint.hexValue;
-    u8 currentTlbSet = tlbIndexHint & 0xF;
-    u8 currentTlbIndex = static_cast<u8>(tlbIndexHint & 0xFF0) >> 4;
-    currentTlbSet = tlbSet;
-    if (currentTlbIndex == 0xFF) {
-      if (currentTlbSet == 8) {
-        currentTlbSet = 1;
-      }
-      else {
-        currentTlbSet = currentTlbSet << 1;
+    // Find an invalid entry or use LRU for replacement hint
+    u8 replacementWay = tlbClass.getLRUWay();
+
+    // Check for invalid entries first (preferred for replacement)
+    for (u8 way = 0; way < 4; ++way) {
+      if (!tlbClass.ways[way].V) {
+        replacementWay = way;
+        break;
       }
     }
 
-    if (currentTlbSet == 0)
-      currentTlbSet = 1;
+    // Convert way to bitmask format for PPE_TLB_Index_Hint
+    u8 wayBitmask;
+    switch (replacementWay) {
+    case 0: wayBitmask = 0b1000; break;
+    case 1: wayBitmask = 0b0100; break;
+    case 2: wayBitmask = 0b0010; break;
+    case 3: wayBitmask = 0b0001; break;
+    default: wayBitmask = 0b0001; break;
+    }
 
-    tlbIndex = tlbIndex << 4;
-    tlbIndexHint = tlbIndex |= currentTlbSet;
-    curThread.SPR.PPE_TLB_Index_Hint.hexValue = tlbIndexHint;
+    u64 hint = (static_cast<u64>(classIndex) << 4) | wayBitmask;
+    curThread.SPR.PPE_TLB_Index_Hint.hexValue = hint;
   }
+
   return false;
 }
 

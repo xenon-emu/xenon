@@ -710,58 +710,6 @@ void PPURegisters(Render::GUI *gui, sPPEState *state) {
       }
       gui->EndNode();
     }
-    if (gui->BeginNode("TLB")) {
-      TLB_Reg &TLB = state->TLB;
-      if (gui->BeginNode("tlbSet0")) {
-        for (u64 i = 0; i != 256; ++i) {
-          TLBEntry &TLBEntry = TLB.tlbSet0[i];
-          if (gui->BeginNode(FMT("[{}]", i))) {
-            Bool(gui, TLBEntry, V);
-            Hex(gui, TLBEntry, pte0);
-            Hex(gui, TLBEntry, pte1);
-            gui->EndNode();
-          }
-        }
-        gui->EndNode();
-      }
-      if (gui->BeginNode("tlbSet1")) {
-        for (u64 i = 0; i != 256; ++i) {
-          TLBEntry &TLBEntry = TLB.tlbSet1[i];
-          if (gui->BeginNode(FMT("[{}]", i))) {
-            Bool(gui, TLBEntry, V);
-            Hex(gui, TLBEntry, pte0);
-            Hex(gui, TLBEntry, pte1);
-            gui->EndNode();
-          }
-        }
-        gui->EndNode();
-      }
-      if (gui->BeginNode("tlbSet2")) {
-        for (u64 i = 0; i != 256; ++i) {
-          TLBEntry &TLBEntry = TLB.tlbSet2[i];
-          if (gui->BeginNode(FMT("[{}]", i))) {
-            Bool(gui, TLBEntry, V);
-            Hex(gui, TLBEntry, pte0);
-            Hex(gui, TLBEntry, pte1);
-            gui->EndNode();
-          }
-        }
-        gui->EndNode();
-      }
-      if (gui->BeginNode("tlbSet3")) {
-        for (u64 i = 0; i != 256; ++i) {
-          TLBEntry &TLBEntry = TLB.tlbSet3[i];
-          if (gui->BeginNode(FMT("[{}]", i))) {
-            Bool(gui, TLBEntry, V);
-            Hex(gui, TLBEntry, pte0);
-            Hex(gui, TLBEntry, pte1);
-            gui->EndNode();
-          }
-        }
-        gui->EndNode();
-      }
-      gui->EndNode();
-    }
     Custom(gui, ppuName, "{}", state->ppuName);
     U8DecPtr(gui, state, currentThread);
   }
