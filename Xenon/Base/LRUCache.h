@@ -4,89 +4,120 @@
 
 #pragma once
 
-#include <list>
-#include <mutex>
-#include <unordered_map>
+#include <atomic>
+#include <cstring>
+
+// Optimized ERAT cache implementation
+// The Xbox 360 ERAT is a 64-entry, 2-way set-associative cache
+// This implementation uses direct array indexing for O(1) lookups
 
 class LRUCache {
 private:
-  size_t capacity;
-  std::list<u64> keys;
-  // Doubly linked list storing keys for LRU tracking
-  std::unordered_map<u64, std::pair<u64, std::list<u64>::iterator>> cache;
-  std::mutex cacheMutex;
+  // Cache entry structure - packed for better cache line utilization
+  struct CacheEntry {
+    u64 key;    // EA page (4KB aligned)
+    u64 value;  // RA page (4KB aligned)
+    bool valid;
+    u8 padding[7]; // Align to 24 bytes
+  };
+
+  // 2-way set-associative cache with 256 sets = 512 total entries
+  // NOTE: On real hardware, the ERAT uses 64 entry sets, but we use 512 here for perf increases.
+  static constexpr size_t NUM_SETS = 256;
+  static constexpr size_t NUM_WAYS = 2;
+  static constexpr u64 INVALID_KEY = ~0ULL;
+
+  // Cache storage - each set has 2 ways
+  CacheEntry entries[NUM_SETS][NUM_WAYS];
+
+  // LRU bit per set: 0 = way0 is LRU, 1 = way1 is LRU
+  u8 lruBits[NUM_SETS];
+
+  // Hash function to compute set index from EA page
+  // Uses bits that vary most in typical address patterns
+  static constexpr size_t getSetIndex(u64 key) {
+    // Use bits 12-16 XOR'd with bits 17-21 for better distribution
+    // (bits 0-11 are always 0 since key is 4KB aligned)
+    return ((key >> 12) ^ (key >> 17)) & (NUM_SETS - 1);
+  }
 
 public:
-  ~LRUCache() {
-    keys.clear();
-    cache.clear();
-    capacity = 0;
+  LRUCache() {
+    invalidateAll();
   }
 
-  void resizeCache(size_t size) {
-    std::lock_guard<std::mutex> lock(cacheMutex);
-    capacity = size;
-    while (keys.size() > capacity) {
-      u64 lru = keys.back();
-      keys.pop_back();
-      cache.erase(lru);
-    }
-  }
+  ~LRUCache() = default;
 
-  const u64 getElement(u64 key) {
-    std::lock_guard<std::mutex> lock(cacheMutex);
-    auto it = cache.find(key);
-    if (it == cache.end()) {
-      return static_cast<u64>(-1);
+  // Fast lookup - returns value or -1 if not found
+  u64 getElement(u64 key) {
+    const size_t setIdx = getSetIndex(key);
+
+    // Check way 0
+    if (entries[setIdx][0].valid && entries[setIdx][0].key == key) {
+      lruBits[setIdx] = 1; // Way 0 was just used, way 1 is now LRU
+      return entries[setIdx][0].value;
     }
 
-    // Move accessed key to front (most recently used)
-    keys.splice(keys.begin(), keys, it->second.second);
+    // Check way 1
+    if (entries[setIdx][1].valid && entries[setIdx][1].key == key) {
+      lruBits[setIdx] = 0; // Way 1 was just used, way 0 is now LRU
+      return entries[setIdx][1].value;
+    }
 
-    return it->second.first;
+    return static_cast<u64>(-1); // Cache miss
   }
 
+  // Insert or update entry
   void putElement(u64 key, u64 value) {
-    std::lock_guard<std::mutex> lock(cacheMutex);
-    if (capacity == 0)
-      return;
-    
-    auto it = cache.find(key);
-    if (it != cache.end()) {
-      // Key exists, move it to front and update value
-      keys.splice(keys.begin(), keys, it->second.second);
-      it->second.first = value;
+    const size_t setIdx = getSetIndex(key);
+
+    // Check if key already exists in either way
+    if (entries[setIdx][0].valid && entries[setIdx][0].key == key) {
+      entries[setIdx][0].value = value;
+      lruBits[setIdx] = 1; // Way 0 just used
       return;
     }
 
-    if (keys.size() >= capacity) {
-      // Evict LRU element
-      u64 lru = keys.back();
-      keys.pop_back();
-      cache.erase(lru);
+    if (entries[setIdx][1].valid && entries[setIdx][1].key == key) {
+      entries[setIdx][1].value = value;
+      lruBits[setIdx] = 0; // Way 1 just used
+      return;
     }
 
-    keys.push_front(key);
-    cache[key] = { value, keys.begin() };
+    // Key not found - insert into LRU way
+    const u8 lruWay = lruBits[setIdx];
+    entries[setIdx][lruWay].key = key;
+    entries[setIdx][lruWay].value = value;
+    entries[setIdx][lruWay].valid = true;
+
+    // Update LRU: the way we just wrote to is now MRU
+    lruBits[setIdx] = lruWay ^ 1;
   }
 
+  // Invalidate a specific entry
   void invalidateElement(u64 key) {
-    std::lock_guard<std::mutex> lock(cacheMutex);
-    auto it = cache.find(key);
-    if (it != cache.end()) {
-      auto listIt = it->second.second;
-      cache.erase(it);
-      keys.erase(listIt);
+    const size_t setIdx = getSetIndex(key);
+
+    if (entries[setIdx][0].valid && entries[setIdx][0].key == key) {
+      entries[setIdx][0].valid = false;
+      entries[setIdx][0].key = INVALID_KEY;
+      return;
+    }
+
+    if (entries[setIdx][1].valid && entries[setIdx][1].key == key) {
+      entries[setIdx][1].valid = false;
+      entries[setIdx][1].key = INVALID_KEY;
     }
   }
 
+  // Invalidate all entries - fast bulk clear
   void invalidateAll() {
-    std::lock_guard<std::mutex> lock(cacheMutex);
-    if (!keys.empty()) {
-      keys.clear();
-    }
-    if (!cache.empty()) {
-      cache.clear();
+    for (size_t i = 0; i < NUM_SETS; ++i) {
+      entries[i][0].valid = false;
+      entries[i][0].key = INVALID_KEY;
+      entries[i][1].valid = false;
+      entries[i][1].key = INVALID_KEY;
+      lruBits[i] = 0;
     }
   }
 };
