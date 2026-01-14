@@ -86,7 +86,7 @@ public:
   // Transfer buffer (inverse, as we're hardware)
   std::queue<u8> uartRxBuffer = {};
   // Mutex, to avoid race conitions
-  Base::FutexMutex uartMutex = {};
+  std::mutex uartMutex = {};
   // Socket Address
   struct sockaddr_in sockAddr = {};
   // Socket Handles

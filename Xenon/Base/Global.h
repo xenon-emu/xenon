@@ -25,7 +25,6 @@
 
 #include "Logging/Log.h"
 #include "Types.h"
-#include "Futex.h"
 
 #ifndef TOOL
 #include "microprofile.h"

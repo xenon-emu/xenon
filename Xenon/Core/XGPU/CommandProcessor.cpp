@@ -663,7 +663,7 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
   case eShaderType::Pixel: {
 #ifndef NO_GFX
     {
-      std::lock_guard<Base::FutexMutex> lock(render->programLinkMutex);
+      std::lock_guard<std::mutex> lock(render->programLinkMutex);
 
       if (shaderType == eShaderType::Pixel)
         render->pendingPixelShaders[crc] = shader;
@@ -680,7 +680,7 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
     LOG_DEBUG(Xenos, "[CP::IM_LOAD] {}Shader CRC: 0x{:08X}", shaderType == eShaderType::Pixel ? "Pixel" : "Vertex", crc);
 
     {
-      std::lock_guard<Base::FutexMutex> qlock(render->renderQueueMutex);
+      std::lock_guard<std::mutex> qlock(render->renderQueueMutex);
       render->renderQueue.push(std::move(cmd));
     }
 #endif
@@ -726,7 +726,7 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuff
   case eShaderType::Pixel: {
 #ifndef NO_GFX
     {
-      std::lock_guard<Base::FutexMutex> lock(render->programLinkMutex);
+      std::lock_guard<std::mutex> lock(render->programLinkMutex);
 
       if (shaderType == eShaderType::Pixel)
         render->pendingPixelShaders[crc] = shader;
@@ -744,7 +744,7 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuff
     LOG_DEBUG(Xenos, "[CP::IM_LOAD_IMMEDIATE] {}Shader CRC: 0x{:08X}", shaderType == eShaderType::Pixel ? "Pixel" : "Vertex", crc);
 
     {
-      std::lock_guard<Base::FutexMutex> qlock(render->renderQueueMutex);
+      std::lock_guard<std::mutex> qlock(render->renderQueueMutex);
       render->renderQueue.push(std::move(cmd));
     }
 #endif
@@ -1083,7 +1083,7 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
       cmd.payload = Render::RenderCommand::CopyResolveCmd{ state };
 
       {
-        std::lock_guard<Base::FutexMutex> lock(render->renderQueueMutex);
+        std::lock_guard<std::mutex> lock(render->renderQueueMutex);
         render->renderQueue.push(cmd);
       }
 #endif
@@ -1114,7 +1114,7 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
     }
 
     {
-      std::lock_guard<Base::FutexMutex> lock(render->renderQueueMutex);
+      std::lock_guard<std::mutex> lock(render->renderQueueMutex);
       render->renderQueue.push(std::move(cmd));
     }
 #endif
@@ -1219,7 +1219,7 @@ bool CommandProcessor::ExecutePacketType3_LOAD_ALU_CONSTANT(RingBuffer* ringBuff
     }
 
     {
-      std::lock_guard<Base::FutexMutex> lock(render->renderQueueMutex);
+      std::lock_guard<std::mutex> lock(render->renderQueueMutex);
       render->renderQueue.push(std::move(cmd));
     }
 #endif
