@@ -260,7 +260,7 @@ private:
   // Block start -> container of page bases it was registered under.
   std::unordered_map<u64, std::vector<u64>> blockPageList = {};
   // Mutex for thread safety.
-  Base::FutexMutex jitCacheMutex;
+  std::mutex jitCacheMutex;
   // Internal helpers for page based indexing.
   void RegisterBlockPages(u64 blockStart, u64 blockSize);
   void UnregisterBlock(u64 blockStart);
