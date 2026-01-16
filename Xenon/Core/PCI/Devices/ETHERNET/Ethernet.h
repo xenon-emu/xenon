@@ -66,31 +66,62 @@ enum XE_ETH_REGISTERS {
   ADDRESS_1 = 0x7A
 };
 
-// Interrupt Status/Mask bits
+// Interrupt Status/Mask bits (from Linux driver)
+// The driver uses mask 0x00010044 and checks status & 0x0000004C in ISR
+// 0x00000004 = TX ring 0 complete
+// 0x00000008 = TX ring 1 complete  
+// 0x00000040 = RX complete
+// 0x00010000 = multicast related
+// Combined check in ISR: 0x0000004C = TX0 | TX1 | RX
 enum XE_ETH_INTERRUPT_BITS {
-  INT_TX_DONE = 0x00000001,       // TX descriptor processed
+  INT_TX_RING0 = 0x00000004,      // TX descriptor ring 0 processed
+  INT_TX_RING1 = 0x00000008,      // TX descriptor ring 1 processed
+  INT_RX_DONE = 0x20000040,       // RX descriptor processed
+  INT_MULTICAST = 0x00010000,     // Multicast related
+  INT_UNK_2 = 0x20000000,     // Unknown, hardware shows it when RX INT triggers
+  
+  // Combined masks used by driver
+  INT_TX_RX_MASK = 0x0000004C,    // Mask for TX0 | TX1 | RX (used in ISR check)
+  INT_DEFAULT_MASK = 0x00010044,  // Default mask: TX0 | RX | MULTICAST
+  
+  // Legacy/compatibility aliases
+  INT_TX_DONE = INT_TX_RING0,     // Alias for compatibility
   INT_TX_ERROR = 0x00000002,      // TX error occurred
-  INT_TX_EMPTY = 0x00000004,      // TX descriptor ring empty
-  INT_RX_DONE = 0x00000010,       // RX descriptor processed
+  INT_TX_EMPTY = 0x00000001,      // TX descriptor ring empty
   INT_RX_ERROR = 0x00000020,      // RX error occurred
-  INT_RX_OVERFLOW = 0x00000040,   // RX buffer overflow
+  INT_RX_OVERFLOW = 0x00000080,   // RX buffer overflow
   INT_LINK_CHANGE = 0x00000100,   // PHY link status changed
   INT_PHY_INT = 0x00000200,       // PHY interrupt
-  INT_ALL = 0x000003FF            // All interrupts
+  INT_ALL = 0x000103FF            // All interrupts
 };
 
-// TX Config Register bits
+// CONFIG_0 Register bits (from Linux driver analysis)
+// Values seen: 0x08558001 (reset), 0x08550001 (normal)
+enum XE_ETH_CONFIG0_BITS {
+  CFG0_ENABLE = 0x00000001,       // Bit 0: Enable
+  CFG0_SOFT_RESET = 0x00008000,   // Bit 15: Soft reset (when combined with enable)
+};
+
+// TX Config Register bits (from Linux driver analysis)
+// Bit 0: TX DMA enable
+// Bit 4: TX enable (when combined with bit 0)
+// Bits 8-11: Ring size
+// The value 0x00001c01 enables TX
 enum XE_ETH_TX_CONFIG_BITS {
-  TX_CFG_ENABLE = 0x80000000,     // TX enabled
-  TX_CFG_DMA_EN = 0x00000001,     // TX DMA enabled
+  TX_CFG_DMA_EN = 0x00000001,     // TX DMA enabled (bit 0)
+  TX_CFG_ENABLE = 0x00000011,     // TX fully enabled (bits 0 and 4)
   TX_CFG_RING_SIZE_MASK = 0x00000F00, // Ring size bits
-  TX_CFG_RING_SIZE_SHIFT = 8
+  TX_CFG_RING_SIZE_SHIFT = 8,
+  TX_CFG_RING_SELECT = 0x00010000 // Select ring 1 vs ring 0
 };
 
-// RX Config Register bits
+// RX Config Register bits (from Linux driver analysis)
+// Bit 0: RX DMA enable
+// Bit 4: RX enable
+// The value 0x00101c11 enables RX
 enum XE_ETH_RX_CONFIG_BITS {
-  RX_CFG_ENABLE = 0x80000000,     // RX enabled
   RX_CFG_DMA_EN = 0x00000001,     // RX DMA enabled
+  RX_CFG_ENABLE = 0x00000011,     // RX fully enabled (bits 0 and 4)
   RX_CFG_PROMISC = 0x00000002,    // Promiscuous mode
   RX_CFG_ALL_MULTI = 0x00000004,  // Accept all multicast
   RX_CFG_BROADCAST = 0x00000008,  // Accept broadcast
@@ -98,54 +129,47 @@ enum XE_ETH_RX_CONFIG_BITS {
   RX_CFG_RING_SIZE_SHIFT = 8
 };
 
-// TX Descriptor structure (hardware format)
-// Each descriptor is 16 bytes
+// TX Descriptor structure (hardware format from Linux driver)
+// Each descriptor is 16 bytes (0x10)
+// Layout:
+//   [0x00] descr[0] = length (for TX: packet length to send)
+//   [0x04] descr[1] = flags/status (bit 31 = owned by HW, 0xc0230000 for valid TX)
+//   [0x08] descr[2] = buffer physical address
+//   [0x0C] descr[3] = length | wrap_bit (bit 31 = wrap/last in ring)
 #pragma pack(push, 1)
 struct XE_TX_DESCRIPTOR {
-  u32 bufferAddress;    // Physical address of packet buffer
-  u32 bufferSize;       // Size of buffer / packet length
-  u32 status;           // Status and control flags
-  u32 reserved;         // Reserved/padding
+  u32 length;         // [0x00] Packet length
+  u32 status;         // [0x04] Status/flags (bit 31 = OWN)
+  u32 bufferAddress;  // [0x08] Physical address of packet buffer
+  u32 lengthWrap;     // [0x0C] Length | wrap bit (bit 31)
 };
 
-// TX Descriptor Status bits
+// TX Descriptor Status bits (descr[1])
 enum XE_TX_DESC_STATUS {
   TX_DESC_OWN = 0x80000000,       // Owned by hardware (1) or software (0)
-  TX_DESC_FIRST = 0x40000000,     // First descriptor of packet
-  TX_DESC_LAST = 0x20000000,      // Last descriptor of packet
-  TX_DESC_INT = 0x10000000,       // Generate interrupt on completion
-  TX_DESC_CRC = 0x08000000,       // Append CRC
-  TX_DESC_PAD = 0x04000000,       // Pad short frames
-  TX_DESC_DONE = 0x00000001,      // Transfer complete
-  TX_DESC_ERROR = 0x00000002,     // Error occurred
-  TX_DESC_RETRY = 0x00000004,     // Retry limit exceeded
-  TX_DESC_COLLISION = 0x00000008, // Collision detected
-  TX_DESC_LEN_MASK = 0x0000FFFF   // Packet length mask (lower 16 bits of bufferSize)
+  TX_DESC_VALID = 0xC0230000,     // Valid TX descriptor (from Linux driver)
+  TX_DESC_DONE = 0x00000000,      // Transfer complete (OWN cleared)
+  TX_DESC_WRAP = 0x80000000,      // Wrap bit in descr[3] (last descriptor in ring)
 };
 
-// RX Descriptor structure (hardware format)
-// Each descriptor is 16 bytes
+// RX Descriptor structure (hardware format from Linux driver)
+// Layout:
+//   [0x00] descr[0] = received length (filled by HW)
+//   [0x04] descr[1] = flags/status (bit 31 = owned by HW, 0xc0000000 for valid RX)
+//   [0x08] descr[2] = buffer physical address
+//   [0x0C] descr[3] = buffer_length | wrap_bit
 struct XE_RX_DESCRIPTOR {
-  u32 bufferAddress;    // Physical address of buffer
-  u32 bufferSize;       // Size of buffer
-  u32 status;           // Status and received length
-  u32 reserved;         // Reserved/padding
+  u32 receivedLength; // [0x00] Received packet length (filled by HW)
+  u32 status;         // [0x04] Status/flags (bit 31 = OWN)
+  u32 bufferAddress;  // [0x08] Physical address of buffer
+  u32 bufferSizeWrap; // [0x0C] Buffer size | wrap bit (bit 31)
 };
 
-// RX Descriptor Status bits
+// RX Descriptor Status bits (descr[1])
 enum XE_RX_DESC_STATUS {
   RX_DESC_OWN = 0x80000000,       // Owned by hardware (1) or software (0)
-  RX_DESC_FIRST = 0x40000000,     // First descriptor of packet
-  RX_DESC_LAST = 0x20000000,      // Last descriptor of packet
-  RX_DESC_INT = 0x10000000,       // Generate interrupt
-  RX_DESC_DONE = 0x00000001,      // Transfer complete
-  RX_DESC_ERROR = 0x00000002,     // Error occurred
-  RX_DESC_CRC_ERR = 0x00000004,   // CRC error
-  RX_DESC_OVERFLOW = 0x00000008,  // Buffer overflow
-  RX_DESC_RUNT = 0x00000010,      // Runt frame (too short)
-  RX_DESC_MULTICAST = 0x00000020, // Multicast frame
-  RX_DESC_BROADCAST = 0x00000040, // Broadcast frame
-  RX_DESC_LEN_MASK = 0x0000FFFF   // Received length mask
+  RX_DESC_VALID = 0xC0000000,     // Valid RX descriptor (from Linux driver)
+  RX_DESC_LEN_MASK = 0x0000FFFF,  // Received length mask in descr[0]
 };
 #pragma pack(pop)
 
@@ -232,6 +256,9 @@ public:
   void SetLinkUp(bool up);
 
 private:
+  // Network bridge initialization
+  void InitializeNetworkBridge();
+  
   // MDIO (PHY) operations
   u32 MdioRead(u32 addr);
   void MdioWrite(u32 val);

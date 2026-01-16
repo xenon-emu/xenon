@@ -136,6 +136,9 @@ void RAM::MemSet(u64 writeAddress, s32 data, u64 size) {
 
 u8 *RAM::GetPointerToAddress(u32 address) {
   const u64 offset = static_cast<u32>(address - RAM_START_ADDR);
+  if (offset == 0x264680) {
+    LOG_DEBUG(Xenon, "HIT");
+  }
   if (offset > ramSize) { return nullptr; }
   return ramData.get() + offset;
 }

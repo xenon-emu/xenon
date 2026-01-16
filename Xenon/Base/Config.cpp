@@ -475,6 +475,46 @@ bool _highlyExperimental::verify_toml(toml::value &value) {
   return true;
 }
 
+void _network::from_toml(const toml::value &value) {
+  enabled = toml::find_or<bool>(value, "Enabled", enabled);
+  backend = toml::find_or<std::string>(value, "Backend", backend);
+  backendConfig = toml::find_or<std::string>(value, "BackendConfig", backendConfig);
+  // Ensure lowercase
+  backend = Base::ToLower(backend);
+}
+void _network::to_toml(toml::value &value) {
+  value.comments().clear();
+  value.comments().push_back("# Network bridging configuration");
+  value.comments().push_back("# Allows the emulated Xbox 360 to communicate with the host network");
+  value["Enabled"].comments().clear();
+  value["Enabled"] = enabled;
+  value["Enabled"].comments().push_back("# Enable network bridging (requires TAP adapter or admin privileges)");
+  value["Backend"].comments().clear();
+  value["Backend"] = backend;
+  value["Backend"].comments().push_back("# Network backend type:");
+  value["Backend"].comments().push_back("# none - Disabled, packets dropped");
+  value["Backend"].comments().push_back("# tap - TAP/TUN virtual network device (recommended)");
+  value["Backend"].comments().push_back("# pcap - Packet capture (requires libpcap/npcap)");
+  value["Backend"].comments().push_back("# socket - Raw socket (requires admin/root)");
+  value["BackendConfig"].comments().clear();
+  value["BackendConfig"] = backendConfig;
+  value["BackendConfig"].comments().push_back("# Backend-specific configuration:");
+  value["BackendConfig"].comments().push_back("# For TAP: device name, GUID, or 'auto' to auto-detect");
+  value["BackendConfig"].comments().push_back("# Windows: Install TAP-Windows (OpenVPN) or WinTun");
+  value["BackendConfig"].comments().push_back("# Linux: Create TAP device with 'sudo ip tuntap add tap0 mode tap'");
+}
+bool _network::verify_toml(toml::value &value) {
+  to_toml(value);
+  cache_value(enabled);
+  cache_value(backend);
+  cache_value(backendConfig);
+  from_toml(value);
+  verify_value(enabled);
+  verify_value(backend);
+  verify_value(backendConfig);
+  return true;
+}
+
 #define verify_section(x, n) if (!x.verify_toml(data[#n])) { LOG_INFO(Config, "Failed to write '{}'! Section '{}' had a bad value", path.filename().string(), #x); return false; }
 #define write_section(x, n) x.to_toml(data[#n])
 #define read_section(x, n) \
@@ -494,6 +534,7 @@ bool verifyConfig(const fs::path &path, toml::value &data) {
   verify_section(debug, Debug);
   verify_section(log, Log);
   verify_section(highlyExperimental, HighlyExperimental);
+  verify_section(network, Network);
   return true;
 }
 
@@ -523,6 +564,7 @@ void loadConfig(const fs::path &path) {
   read_section(debug, Debug);
   read_section(log, Log);
   read_section(highlyExperimental, HighlyExperimental);
+  read_section(network, Network);
 }
 
 void saveConfig(const fs::path &path) {
