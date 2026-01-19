@@ -777,7 +777,7 @@ void Xe::PCIDev::SMC::smcMainThread() {
         // According to sources online, this timer runs at a 1ms frequency.
         // TODO: Verify on hardware.
         // Leaving this on 10ms for now, we're not fast enough for a 1ms timer, and crashes the emulator.
-        if (timerNow >= timerStart + 1ms) {
+        if (timerNow >= timerStart + 5ms) {
           // Update internal timer.
           timerStart = std::chrono::steady_clock::now();
           mutex.lock();

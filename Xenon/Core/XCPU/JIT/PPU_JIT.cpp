@@ -360,9 +360,15 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
 
       // Patches are done using the 32 bit Kernel/Games address space.
       switch (static_cast<u32>(thread.CIA)) {
+      //case 0x818c880c: patchGPR(3, 0xFFFF); break;
+      //case 0x8187be98: patchGPR(3, 0xFFFF); break;
+      //case 0x818910D0: patchGPR(3, 0xFFFF); break;
+      //case 0x81891838: patchGPR(3, 0xFFFF); break;
+        // Set XAM Debug Output Level to Trace
+      case 0x81743B20: patchGPR(10, 4); break;
       case 0x0200C870: patchGPR(5, 0); break;
         // CNicEmac::NicDoTimer trap, 17489
-      case 0x801086a8: patchGPR(10, 2); break;
+      //case 0x801086a8: patchGPR(10, 2); break;
         // RGH 2 17489 in a JRunner Corona XDKBuild
       case 0x0200C7F0: patchGPR(3, 0); break;
         // VdpWriteXDVOUllong. Set r10 to 1. Skips XDVO write loop

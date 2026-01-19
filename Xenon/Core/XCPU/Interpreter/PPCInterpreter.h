@@ -13,7 +13,7 @@
 #include "Core/RootBus/RootBus.h"
 #include "Core/XCPU/PPU/PowerPC.h"
 
-#define ENABLE_INSTRUCTION_PROFILER // Enables instruction profiling code.
+//#define ENABLE_INSTRUCTION_PROFILER // Enables instruction profiling code.
 
 namespace PPCInterpreter {
 

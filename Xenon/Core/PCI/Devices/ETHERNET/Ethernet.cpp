@@ -19,7 +19,7 @@
 #define XE_NET_STATUS_INT 0x0000004C
 
 // Enable debug logging for ethernet operations
-#define ETH_DEBUG
+//#define ETH_DEBUG
 
 Xe::PCIDev::ETHERNET::ETHERNET(const std::string &deviceName, u64 size, PCIBridge *parentPCIBridge, RAM *ram) :
   PCIDevice(deviceName, size), ramPtr(ram), parentBus(parentPCIBridge) {
@@ -54,7 +54,7 @@ Xe::PCIDev::ETHERNET::ETHERNET(const std::string &deviceName, u64 size, PCIBridg
     // Bit 3: Auto-Negotiation Ability
     // Bit 2: Link Status
     // Bit 0: Extended Capability
-    mdioRegisters[phy][1] = 0x796D; // Auto-Neg Complete, Link Up, Extended Caps
+    mdioRegisters[phy][1] = 0x78ED; // Auto-Neg Complete, Link Up, Extended Caps
     
     // Reg 2: PHY Identifier 1 (OUI bits 3-18)
     // Marvell OUI: 0x005043
@@ -163,8 +163,10 @@ void Xe::PCIDev::ETHERNET::Reset() {
   ethPciState = {};
   
   // Reset descriptor indices
-  txHead = 0;
-  txTail = 0;
+  txRing0Head = 0;
+  txRing1Head = 0;
+  txRing0Tail = 0;
+  txRing1Tail = 0;
   rxHead = 0;
   rxTail = 0;
   
@@ -179,7 +181,8 @@ void Xe::PCIDev::ETHERNET::Reset() {
   }
   
   // Disable TX/RX
-  txEnabled = false;
+  txRing0Enabled = false;
+  txRing1Enabled = false;
   rxEnabled = false;
   
   // Re-initialize default values
@@ -201,8 +204,11 @@ void Xe::PCIDev::ETHERNET::Read(u64 readAddress, u8 *data, u64 size) {
 
   switch (offset) {
   case TX_CONFIG:
-    if (txEnabled) {
-      ethPciState.txConfigReg |= TX_CFG_ENABLE;
+    if (txRing0Enabled) {
+      ethPciState.txConfigReg |= TX_CFG_RING0_EN;
+    }
+    if (txRing1Enabled) {
+      ethPciState.txConfigReg |= TX_CFG_RING1_EN;
     }
     memcpy(data, &ethPciState.txConfigReg, size);
 #ifdef ETH_DEBUG
@@ -210,21 +216,17 @@ void Xe::PCIDev::ETHERNET::Read(u64 readAddress, u8 *data, u64 size) {
 #endif
     break;
     
-  case TX_DESCRIPTOR_BASE:
-    memcpy(data, &ethPciState.txDescriptorBaseReg, size);
+  case TX_DESCRIPTOR_BASE: {
+    u8 ringID = (ethPciState.txConfigReg & TX_CFG_RING_SEL) ? 1 : 0;
+    u32 descriptorBase = ringID ? ethPciState.txDescriptor1BaseReg : ethPciState.txDescriptor0BaseReg;
+    memcpy(data, &descriptorBase, size);
 #ifdef ETH_DEBUG
-    LOG_DEBUG(ETH, "[Read] TX_DESCRIPTOR_BASE = 0x{:08X}", ethPciState.txDescriptorBaseReg);
+    LOG_DEBUG(ETH, "[Read] TX_DESCRIPTOR_BASE[RING {:#d}] = {:#x}", descriptorBase, ringID);
 #endif
+  }
     break;
     
-  case TX_DESCRIPTOR_STATUS:
-    // Update status with current head/tail positions
-    ethPciState.txDescriptorStatusReg = (txHead & 0xFFFF) | ((txTail & 0xFFFF) << 16);
-    memcpy(data, &ethPciState.txDescriptorStatusReg, size);
-#ifdef ETH_DEBUG
-    LOG_DEBUG(ETH, "[Read] TX_DESCRIPTOR_STATUS = 0x{:08X} (head={}, tail={})", 
-      ethPciState.txDescriptorStatusReg, txHead, txTail);
-#endif
+  case NEXT_FREE_TX_DESCR:
     break;
     
   case RX_CONFIG:
@@ -246,13 +248,12 @@ void Xe::PCIDev::ETHERNET::Read(u64 readAddress, u8 *data, u64 size) {
     
   case INTERRUPT_STATUS:
     // Return current status - driver reads this to check what caused interrupt
-    // Note: Reading does NOT clear bits (write-1-to-clear behavior)
     memcpy(data, &ethPciState.interruptStatusReg, size);
-    ethPciState.interruptStatusReg = 0;
 #ifdef ETH_DEBUG
     LOG_DEBUG(ETH, "[Read] INTERRUPT_STATUS = 0x{:08X} (mask=0x{:08X})", 
       ethPciState.interruptStatusReg, ethPciState.interruptMaskReg);
 #endif
+    ethPciState.interruptStatusReg = 0;
     break;
     
   case INTERRUPT_MASK:
@@ -378,48 +379,73 @@ void Xe::PCIDev::ETHERNET::Write(u64 writeAddress, const u8 *data, u64 size) {
   memcpy(&val, data, size);
   
   switch (offset) {
-  case TX_CONFIG:
+  case TX_CONFIG: {
     ethPciState.txConfigReg = val;
+
+    u8 ringID = (ethPciState.txConfigReg & TX_CFG_RING_SEL) ? 1 : 0;
+
 #ifdef ETH_DEBUG
     LOG_DEBUG(ETH, "[Write] TX_CONFIG = 0x{:08X}", val);
 #endif
-    
+
     // Check if TX is being enabled (bit 0 = DMA enable, bit 4 = TX enable)
     // Linux driver uses 0x00001c01 to enable TX
-    if ((val & 0x01) && (val & 0x10)) {
-      if (ethPciState.txDescriptorBaseReg == 0) {
+    if (val & TX_CFG_RING0_EN) {
+      if (ethPciState.txDescriptor0BaseReg == 0) {
         LOG_WARNING(ETH, "TX enabled but TX_DESCRIPTOR_BASE is unset!");
       }
-      if (!txEnabled) {
-        txEnabled = true;
-        LOG_DEBUG(ETH, "TX enabled, descriptor base: 0x{:08X}", ethPciState.txDescriptorBaseReg);
+      if (!txRing0Head) {
+        txRing0Enabled = true;
+        LOG_DEBUG(ETH, "TX enabled, descriptor base: 0x{:08X}", ethPciState.txDescriptor0BaseReg);
       }
       // Notify worker thread to process pending TX
       workerCV.notify_one();
-    } else if (txEnabled && !(val & 0x01)) {
-      txEnabled = false;
+    }
+    else if (txRing0Enabled && !(val & 0x01)) {
+      txRing0Enabled = false;
       LOG_DEBUG(ETH, "TX disabled");
     }
+
+    if (val & TX_CFG_RING1_EN) {
+      if (ethPciState.txDescriptor1BaseReg == 0) {
+        LOG_WARNING(ETH, "TX enabled but TX_DESCRIPTOR_BASE is unset!");
+      }
+      if (!txRing1Head) {
+        txRing1Enabled = true;
+        LOG_DEBUG(ETH, "TX enabled, descriptor base: 0x{:08X}", ethPciState.txDescriptor1BaseReg);
+      }
+      // Notify worker thread to process pending TX
+      workerCV.notify_one();
+    }
+    else if (txRing1Enabled && !(val & 0x10)) {
+      txRing1Enabled = false;
+      LOG_DEBUG(ETH, "TX disabled");
+    }
+  }
+    
     break;
     
   case TX_DESCRIPTOR_BASE:
-    ethPciState.txDescriptorBaseReg = val;
+
+    if (!(ethPciState.txConfigReg & TX_CFG_RING_SEL)) {
+      ethPciState.txDescriptor0BaseReg = val;
+    }
+    else {
+      ethPciState.txDescriptor1BaseReg = val;
+    }
+
 #ifdef ETH_DEBUG
     LOG_DEBUG(ETH, "[Write] TX_DESCRIPTOR_BASE = 0x{:08X}", val);
 #endif
     // Don't reset indices here - driver may set base before enabling
     break;
     
-  case TX_DESCRIPTOR_STATUS:
+  case NEXT_FREE_TX_DESCR:
     // Writing to status typically triggers TX processing
     ethPciState.txDescriptorStatusReg = val;
 #ifdef ETH_DEBUG
-    LOG_DEBUG(ETH, "[Write] TX_DESCRIPTOR_STATUS = 0x{:08X}", val);
+    LOG_DEBUG(ETH, "[Write] NEXT_FREE_TX_DESCR = 0x{:08X}", val);
 #endif
-    // Kick the worker to process new descriptors
-    if (txEnabled) {
-      workerCV.notify_one();
-    }
     break;
     
   case RX_CONFIG:
@@ -454,20 +480,13 @@ void Xe::PCIDev::ETHERNET::Write(u64 writeAddress, const u8 *data, u64 size) {
     break;
     
   case INTERRUPT_STATUS:
-    // Writing to interrupt status clears the specified bits (write-1-to-clear)
-    // The Linux driver does: writel(0x00010044, ioaddr + INTERRUPT_STATUS) to clear
     {
       u32 oldStatus = ethPciState.interruptStatusReg;
-      ethPciState.interruptStatusReg &= ~val;
+      //ethPciState.interruptStatusReg = val;
 #ifdef ETH_DEBUG
-      LOG_DEBUG(ETH, "[Write] INTERRUPT_STATUS (W1C) val=0x{:08X}, 0x{:08X} -> 0x{:08X}", 
+      LOG_DEBUG(ETH, "[Write] INTERRUPT_STATUS val=0x{:08X}, 0x{:08X} -> 0x{:08X}", 
         val, oldStatus, ethPciState.interruptStatusReg);
 #endif
-      // Check if we should deassert interrupt
-      // Interrupt line should be low when no masked interrupts are pending
-      if ((ethPciState.interruptStatusReg & ethPciState.interruptMaskReg) == 0) {
-        parentBus->CancelInterrupt(PRIO_ENET);
-      }
     }
     break;
     
@@ -478,13 +497,6 @@ void Xe::PCIDev::ETHERNET::Write(u64 writeAddress, const u8 *data, u64 size) {
 #ifdef ETH_DEBUG
       LOG_DEBUG(ETH, "[Write] INTERRUPT_MASK = 0x{:08X} (was 0x{:08X})", val, oldMask);
 #endif
-      
-      // If mask is being set to 0, the driver is disabling interrupts
-      // (Linux driver does this in ISR before scheduling NAPI)
-      if (val != 0) {
-        // Mask changed - check if we need to fire/cancel interrupt
-        CheckAndFireInterrupt();
-      }
     }
     break;
     
@@ -501,11 +513,14 @@ void Xe::PCIDev::ETHERNET::Write(u64 writeAddress, const u8 *data, u64 size) {
       LOG_DEBUG(ETH, "Soft reset triggered via CONFIG_0");
       // Don't call full Reset() - just reset the TX/RX state
       // The driver expects registers to retain their values
-      txHead = 0;
-      txTail = 0;
+      txRing0Head = 0;
+      txRing1Head = 0;
+      txRing0Tail = 0;
+      txRing1Tail = 0;
       rxHead = 0;
       rxTail = 0;
-      txEnabled = false;
+      txRing0Enabled = false;
+      txRing1Enabled = false;
       rxEnabled = false;
       
       // Clear pending packets
@@ -665,7 +680,7 @@ void Xe::PCIDev::ETHERNET::MdioWrite(u32 val) {
       
       // Reset PHY to default state
       mdioRegisters[phyAddr][0] = 0x1140;
-      mdioRegisters[phyAddr][1] = 0x796D;
+      mdioRegisters[phyAddr][1] = 0x78ED;
       
       LOG_DEBUG(ETH, "PHY {} reset", phyAddr);
     } else {
@@ -692,20 +707,23 @@ void Xe::PCIDev::ETHERNET::MdioWrite(u32 val) {
   }
 
   // Update phyControlReg: preserve upper bits, update data, clear busy
-  ethPciState.phyControlReg = (val & 0xFFFF0000) | writeVal;
-  ethPciState.phyControlReg &= ~0x10; // Clear the busy/status bit
+  //ethPciState.phyControlReg = (val & 0xFFFF0000) | writeVal;
+  //ethPciState.phyControlReg &= ~0x10; // Clear the busy/status bit
   
 #ifdef ETH_DEBUG
   LOG_DEBUG(ETH, "PHY_CONTROL = 0x{:08X}", ethPciState.phyControlReg);
 #endif
 }
 
-bool Xe::PCIDev::ETHERNET::ReadTxDescriptor(u32 index, XE_TX_DESCRIPTOR& desc) {
-  if (ethPciState.txDescriptorBaseReg == 0) {
+bool Xe::PCIDev::ETHERNET::ReadTxDescriptor(bool ring0, u32 index, XE_TX_DESCRIPTOR& desc) {
+  
+  u32 txDescriptorBaseReg = ring0 ? ethPciState.txDescriptor0BaseReg : ethPciState.txDescriptor1BaseReg;
+
+  if (txDescriptorBaseReg == 0) {
     return false;
   }
   
-  u32 descAddr = ethPciState.txDescriptorBaseReg + (index * sizeof(XE_TX_DESCRIPTOR));
+  u32 descAddr = txDescriptorBaseReg + (index * sizeof(XE_TX_DESCRIPTOR));
   u8* ptr = ramPtr->GetPointerToAddress(descAddr);
   
   if (!ptr) {
@@ -718,12 +736,15 @@ bool Xe::PCIDev::ETHERNET::ReadTxDescriptor(u32 index, XE_TX_DESCRIPTOR& desc) {
   return true;
 }
 
-bool Xe::PCIDev::ETHERNET::WriteTxDescriptor(u32 index, const XE_TX_DESCRIPTOR& desc) {
-  if (ethPciState.txDescriptorBaseReg == 0) {
+bool Xe::PCIDev::ETHERNET::WriteTxDescriptor(bool ring0, u32 index, const XE_TX_DESCRIPTOR& desc) {
+
+  u32 txDescriptorBaseReg = ring0 ? ethPciState.txDescriptor0BaseReg : ethPciState.txDescriptor1BaseReg;
+
+  if (txDescriptorBaseReg == 0) {
     return false;
   }
   
-  u32 descAddr = ethPciState.txDescriptorBaseReg + (index * sizeof(XE_TX_DESCRIPTOR));
+  u32 descAddr = txDescriptorBaseReg + (index * sizeof(XE_TX_DESCRIPTOR));
   u8* ptr = ramPtr->GetPointerToAddress(descAddr);
   
   if (!ptr) {
@@ -771,18 +792,23 @@ bool Xe::PCIDev::ETHERNET::WriteRxDescriptor(u32 index, const XE_RX_DESCRIPTOR& 
   return true;
 }
 
-void Xe::PCIDev::ETHERNET::ProcessTxDescriptors() {
-  if (!txEnabled || ethPciState.txDescriptorBaseReg == 0) {
+void Xe::PCIDev::ETHERNET::ProcessTxDescriptors(bool ring0) {
+  bool txEnabled = ring0 ? txRing0Enabled : txRing1Enabled;
+  bool baseRegValid = ring0 ? ethPciState.txDescriptor0BaseReg != 0 : ethPciState.txDescriptor1BaseReg != 0;
+  
+  if (!txEnabled || !baseRegValid) {
     return;
   }
   
+  u8 descriptorCount = ring0 ? NUM_RING0_TX_DESCRIPTORS : NUM_RING1_TX_DESCRIPTORS;
+
   u32 processedCount = 0;
   
-  while (processedCount < NUM_TX_DESCRIPTORS) {
+  while (processedCount < descriptorCount) {
     XE_TX_DESCRIPTOR desc;
-    u32 index = txHead;
+    u32 index = ring0 ? txRing0Head : txRing1Head;
     
-    if (!ReadTxDescriptor(index, desc)) {
+    if (!ReadTxDescriptor(ring0, index, desc)) {
       break;
     }
     
@@ -796,9 +822,9 @@ void Xe::PCIDev::ETHERNET::ProcessTxDescriptors() {
     
     if (packetLen == 0 || packetLen > ETH_MAX_FRAME_SIZE) {
       desc.status &= ~TX_DESC_OWN;
-      WriteTxDescriptor(index, desc);
+      WriteTxDescriptor(ring0, index, desc);
       stats.txErrors++;
-      txHead = (desc.lengthWrap & 0x80000000) ? 0 : ((txHead + 1) % NUM_TX_DESCRIPTORS);
+      (ring0 ? txRing0Head : txRing1Head) = (desc.lengthWrap & 0x80000000) ? 0 : (((ring0 ? txRing0Head : txRing1Head) + 1) % descriptorCount);
       processedCount++;
       continue;
     }
@@ -807,9 +833,9 @@ void Xe::PCIDev::ETHERNET::ProcessTxDescriptors() {
     u8* packetPtr = ramPtr->GetPointerToAddress(desc.bufferAddress);
     if (!packetPtr) {
       desc.status &= ~TX_DESC_OWN;
-      WriteTxDescriptor(index, desc);
+      WriteTxDescriptor(ring0, index, desc);
       stats.txErrors++;
-      txHead = (desc.lengthWrap & 0x80000000) ? 0 : ((txHead + 1) % NUM_TX_DESCRIPTORS);
+      (ring0 ? txRing0Head : txRing1Head) = (desc.lengthWrap & 0x80000000) ? 0 : (((ring0 ? txRing0Head : txRing1Head) + 1) % descriptorCount);
       processedCount++;
       continue;
     }
@@ -821,21 +847,21 @@ void Xe::PCIDev::ETHERNET::ProcessTxDescriptors() {
     
     // Clear OWN bit
     desc.status &= ~TX_DESC_OWN;
-    WriteTxDescriptor(index, desc);
+    WriteTxDescriptor(ring0, index, desc);
     
 #ifdef ETH_DEBUG
     LOG_DEBUG(ETH, "TX: desc={}, len={}, buf=0x{:08X}", index, packetLen, desc.bufferAddress);
 #endif
     
     // Check wrap bit in descr[3]
-    txHead = (desc.lengthWrap & 0x80000000) ? 0 : ((txHead + 1) % NUM_TX_DESCRIPTORS);
+    (ring0 ? txRing0Head : txRing1Head) = (desc.lengthWrap & 0x80000000) ? 0 : (((ring0 ? txRing0Head : txRing1Head) + 1) % descriptorCount);
     processedCount++;
   }
   
   // Raise TX interrupt ONCE after batch processing (not per-packet)
   // This matches real hardware behavior and prevents interrupt storms
   if (processedCount > 0) {
-    RaiseInterrupt(INT_TX_RING0);
+    RaiseInterrupt(ring0 ? INT_TX_RING0: INT_TX_RING1);
   }
 }
 
@@ -915,6 +941,7 @@ void Xe::PCIDev::ETHERNET::ProcessRxDescriptors() {
     
     // Dumps from HW show this.
     desc.receivedLength |= 0x0101 << 16;
+    desc.receivedLength |= 0x00030000;
 
     WriteRxDescriptor(index, desc);
     
@@ -1021,7 +1048,7 @@ void Xe::PCIDev::ETHERNET::HandleRxPacket(const u8* data, u32 len) {
   }
   
   if (!accept) {
-    return;
+    //return;
   }
   
   // Create and queue packet
@@ -1102,11 +1129,6 @@ void Xe::PCIDev::ETHERNET::RaiseInterrupt(u32 bits) {
   CheckAndFireInterrupt();
 }
 
-void Xe::PCIDev::ETHERNET::UpdateInterruptStatus() {
-  // This can be used to compute interrupt status from device state
-  // Currently we set bits directly via RaiseInterrupt
-}
-
 void Xe::PCIDev::ETHERNET::CheckAndFireInterrupt() {
   // Only fire interrupt if:
   // 1. There are pending interrupt status bits
@@ -1121,6 +1143,7 @@ void Xe::PCIDev::ETHERNET::CheckAndFireInterrupt() {
       pending, ethPciState.interruptStatusReg, ethPciState.interruptMaskReg);
 #endif
     parentBus->RouteInterrupt(PRIO_ENET);
+    ethPciState.interruptMaskReg = 0;
   }
 }
 
@@ -1133,9 +1156,9 @@ void Xe::PCIDev::ETHERNET::WorkerThreadLoop() {
     // Wait for work or timeout
     {
       std::unique_lock<std::mutex> lock(workerMutex);
-      workerCV.wait_for(lock, std::chrono::milliseconds(10), [this] {
+      workerCV.wait_for(lock, std::chrono::milliseconds(1), [this] {
         return !workerRunning || !XeRunning ||
-               (txEnabled && txHead != txTail) ||
+               ((txRing0Enabled || txRing1Enabled) ) || //&& txRing0Head != txRing0Tail
                (!pendingRxPackets.empty() && rxEnabled);
       });
     }
@@ -1146,10 +1169,14 @@ void Xe::PCIDev::ETHERNET::WorkerThreadLoop() {
     }
     
     // Process TX queue
-    if (txEnabled) {
-      ProcessTxDescriptors();
+    if (txRing0Enabled) {
+      ProcessTxDescriptors(true);
     }
     
+    if (txRing1Enabled) {
+      ProcessTxDescriptors(false);
+    }
+
     // Process RX queue
     if (rxEnabled) {
       ProcessRxDescriptors();

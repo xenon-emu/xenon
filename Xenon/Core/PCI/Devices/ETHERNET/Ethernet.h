@@ -33,12 +33,10 @@
 #define ETH_MAX_PACKET_SIZE 2048
 
 // Number of TX/RX descriptors (must be power of 2)
-#define NUM_TX_DESCRIPTORS 16
-#define NUM_RX_DESCRIPTORS 16
-
-// Descriptor ring mask
-#define TX_DESC_MASK (NUM_TX_DESCRIPTORS - 1)
-#define RX_DESC_MASK (NUM_RX_DESCRIPTORS - 1)
+// NOTE: Xbox 360 Kernel allocates 64 RX descriptors, linux driver only uses 16
+#define NUM_RING0_TX_DESCRIPTORS 32
+#define NUM_RING1_TX_DESCRIPTORS 8
+#define NUM_RX_DESCRIPTORS 64 
 
 namespace Xe {
 namespace PCIDev {
@@ -46,21 +44,33 @@ namespace PCIDev {
 // Register Set and offsets.
 // Taken from Linux kernel patches for the Xbox 360.
 enum XE_ETH_REGISTERS {
-  TX_CONFIG = 0x00,
-  TX_DESCRIPTOR_BASE = 0x04,
-  TX_DESCRIPTOR_STATUS = 0x0C,
-  RX_CONFIG = 0x10,
-  RX_DESCRIPTOR_BASE = 0x14,
-  INTERRUPT_STATUS = 0x20,
-  INTERRUPT_MASK = 0x24,
-  CONFIG_0 = 0x28,
-  POWER = 0x30,
-  PHY_CONFIG = 0x40,
-  PHY_CONTROL = 0x44,
-  CONFIG_1 = 0x50,
-  RETRY_COUNT = 0x54,
+  TX_CONFIG = 0x00,             // 0x7fea1400 -> 0x00001c01
+  TX_DESCRIPTOR_BASE = 0x04,    // 0x7fea1404 -> Changes (0x002xxxxx)
+                                // 0x7fea1408 -> 0x0
+  NEXT_FREE_TX_DESCR = 0x0C,    // 0x7fea140c -> 0x00264198 (next available TX descriptor?)
+  RX_CONFIG = 0x10,             // 0x7fea1410 -> 0x00101c11
+  RX_DESCRIPTOR_BASE = 0x14,    // 0x7fea1414 -> Changes (0x002xxxxx)
+                                // 0x7fea1418 -> 0x0
+  NEXT_FREE_RX_DESCR = 0x1C,    // 0x7fea141C -> 0x002643e4 (next available RX descriptor?)
+  INTERRUPT_STATUS = 0x20,      // 0x7fea1420 -> 0x20000040
+  INTERRUPT_MASK = 0x24,        // 0x7fea1424 -> 0x00010054
+  CONFIG_0 = 0x28,              // 0x7fea1428 -> 0x04550001
+                                // 0x7fea142C -> 0x71b86ed3
+  POWER = 0x30,                 // 0x7fea1430 -> 0x0
+                                // 0x7fea1434 -> 0x0
+                                // 0x7fea1438 -> 0x0
+                                // 0x7fea143c -> 0x0
+  PHY_CONFIG = 0x40,            // 0x7fea1440 -> 0x04001901
+  PHY_CONTROL = 0x44,           // 0x7fea1444 -> 0x78ed0800
+                                // 0x7fea1448 -> 0x0
+                                // 0x7fea144c -> 0x0
+  CONFIG_1 = 0x50,              // 0x7fea1450 -> 0x00002360
+  RETRY_COUNT = 0x54,           // 0x7fea1454 -> 0x0
+                                // 0x7fea1458 -> 0x0
+                                // 0x7fea145c -> 0x0
+  // Uninteresting: (working ok)
   MULTICAST_FILTER_CONTROL = 0x60,
-  ADDRESS_0 = 0x62,
+  ADDRESS_0 = 0x62,                
   MULTICAST_HASH = 0x68,
   MAX_PACKET_SIZE = 0x78,
   ADDRESS_1 = 0x7A
@@ -108,11 +118,9 @@ enum XE_ETH_CONFIG0_BITS {
 // Bits 8-11: Ring size
 // The value 0x00001c01 enables TX
 enum XE_ETH_TX_CONFIG_BITS {
-  TX_CFG_DMA_EN = 0x00000001,     // TX DMA enabled (bit 0)
-  TX_CFG_ENABLE = 0x00000011,     // TX fully enabled (bits 0 and 4)
-  TX_CFG_RING_SIZE_MASK = 0x00000F00, // Ring size bits
-  TX_CFG_RING_SIZE_SHIFT = 8,
-  TX_CFG_RING_SELECT = 0x00010000 // Select ring 1 vs ring 0
+  TX_CFG_RING0_EN = 0x00000010,     // TX RING 0 Enable
+  TX_CFG_RING1_EN = 0x00000020,     // TX RING 1 Enable
+  TX_CFG_RING_SEL = 0x00010000      // Select ring 1 vs ring 0
 };
 
 // RX Config Register bits (from Linux driver analysis)
@@ -177,7 +185,8 @@ enum XE_RX_DESC_STATUS {
 struct XE_PCI_STATE {
   // Transmission
   u32 txConfigReg = 0;
-  u32 txDescriptorBaseReg = 0;
+  u32 txDescriptor0BaseReg = 0;
+  u32 txDescriptor1BaseReg = 0;
   u32 txDescriptorStatusReg = 0;
 
   // Reception
@@ -265,7 +274,7 @@ private:
   
   // Descriptor ring processing
   void ProcessRxDescriptors();
-  void ProcessTxDescriptors();
+  void ProcessTxDescriptors(bool ring0);
   
   // Packet handling
   void HandleTxPacket(const u8 *data, u32 len);
@@ -273,15 +282,14 @@ private:
   
   // Interrupt management
   void RaiseInterrupt(u32 bits);
-  void UpdateInterruptStatus();
   void CheckAndFireInterrupt();
   
   // Worker thread
   void WorkerThreadLoop();
   
   // Descriptor operations
-  bool ReadTxDescriptor(u32 index, XE_TX_DESCRIPTOR& desc);
-  bool WriteTxDescriptor(u32 index, const XE_TX_DESCRIPTOR& desc);
+  bool ReadTxDescriptor(bool ring0, u32 index, XE_TX_DESCRIPTOR& desc);
+  bool WriteTxDescriptor(bool ring0, u32 index, const XE_TX_DESCRIPTOR& desc);
   bool ReadRxDescriptor(u32 index, XE_RX_DESCRIPTOR& desc);
   bool WriteRxDescriptor(u32 index, const XE_RX_DESCRIPTOR& desc);
   
@@ -301,12 +309,15 @@ private:
   
   // TX/RX state
   std::atomic<bool> rxEnabled{false};
-  std::atomic<bool> txEnabled{false};
+  std::atomic<bool> txRing0Enabled{false};
+  std::atomic<bool> txRing1Enabled{false};
   std::atomic<bool> linkUp{true};
   
   // TX descriptor ring tracking
-  u32 txHead = 0;  // Next descriptor to process (hardware)
-  u32 txTail = 0;  // Next descriptor to be filled (software)
+  u32 txRing0Head = 0;  // Next descriptor to process for RING 0 (hardware)
+  u32 txRing1Head = 0;  // Next descriptor to process for RING 1 (hardware)
+  u32 txRing0Tail = 0;  // Next descriptor to be filled for RING 0 (software)
+  u32 txRing1Tail = 0;  // Next descriptor to be filled for RING 1 (software)
   
   // RX descriptor ring tracking  
   u32 rxHead = 0;  // Next descriptor to process (hardware)

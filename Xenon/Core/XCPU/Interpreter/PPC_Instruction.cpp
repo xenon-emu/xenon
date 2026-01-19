@@ -21,16 +21,16 @@ namespace PPCInterpreter {
   }
 
   void PPCInterpreter_invalid(sPPEState *ppeState) {
-    LOG_CRITICAL(Xenon, "PPC Interpreter: Invalid instruction found! Data: 0x{:X} (opcode, value[s]), address: 0x{:X}",
-      _instr.opcode,
-      curThread.CIA);
+    //LOG_CRITICAL(Xenon, "PPC Interpreter: Invalid instruction found! Data: 0x{:X} (opcode, value[s]), address: 0x{:X}",
+   //   _instr.opcode,
+    //  curThread.CIA);
   }
 
   void PPCInterpreter_known_unimplemented(const char *name, sPPEState *ppeState) {
-    LOG_CRITICAL(Xenon, "PPC Interpreter: {} is not implemented! Data: 0x{:X}, address: 0x{:X}",
-      name,
-      _instr.opcode,
-      curThread.CIA);
+    //LOG_CRITICAL(Xenon, "PPC Interpreter: {} is not implemented! Data: 0x{:X}, address: 0x{:X}",
+    //  name,
+     // _instr.opcode,
+     // curThread.CIA);
   }
 
   void PPCInterpreterJIT_invalid(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
