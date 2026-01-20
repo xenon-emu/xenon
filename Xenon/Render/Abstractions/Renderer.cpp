@@ -97,6 +97,13 @@ void Renderer::CreateHandles() {
   // Create our GUI
   gui = resourceFactory->CreateGUI();
   gui->Init(mainWindow, reinterpret_cast<void *>(GetBackendContext()));
+
+  // Signal that ImGui is initialized
+  {
+    std::lock_guard<std::mutex> lock(initMutex);
+    imguiInitialized = true;
+  }
+  initCV.notify_all();
 }
 
 void Renderer::Shutdown() {
