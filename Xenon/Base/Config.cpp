@@ -493,9 +493,7 @@ void _network::to_toml(toml::value &value) {
   value["Backend"] = backend;
   value["Backend"].comments().push_back("# Network backend type:");
   value["Backend"].comments().push_back("# none - Disabled, packets dropped");
-  value["Backend"].comments().push_back("# tap - TAP/TUN virtual network device (recommended)");
-  value["Backend"].comments().push_back("# pcap - Packet capture (requires libpcap/npcap)");
-  value["Backend"].comments().push_back("# socket - Raw socket (requires admin/root)");
+  value["Backend"].comments().push_back("# tap - TAP/TUN virtual network device");
   value["BackendConfig"].comments().clear();
   value["BackendConfig"] = backendConfig;
   value["BackendConfig"].comments().push_back("# Backend-specific configuration:");

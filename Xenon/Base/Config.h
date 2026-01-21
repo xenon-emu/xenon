@@ -298,11 +298,10 @@ inline struct _highlyExperimental {
 inline struct _network {
   // Enable network bridging
   bool enabled = false;
-  // Network backend type: none, tap, pcap, socket
+  // Network backend type: none, tap
   std::string backend = "none";
   // Backend configuration string
   // For TAP: device name or "auto" (e.g., "tap0", "{GUID}", "auto")
-  // For pcap: interface name
   std::string backendConfig = "auto";
 
   // TOML Conversion
