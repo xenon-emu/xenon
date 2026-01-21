@@ -115,23 +115,8 @@ void PPCInterpreter::ppcExecuteSingleInstruction(sPPEState *ppeState) {
     thread.GPR[11] = 3;
   }
 
-  // Skip media detection in XAM for now.
-  if (static_cast<u32>(thread.CIA) == 0x8175E61C) {
-    //thread.GPR[3] = 0;
-  }
-
-  // Skip media detection in XAM for now.
-  if (static_cast<u32>(thread.CIA) == 0x81743B20) {
-    //thread.GPR[10] = 4;
-  }
-
   // This is just to set a PC breakpoint in any PPU/Thread.
-  if (static_cast<u32>(thread.CIA) == 0x80106988) {
-    LOG_DEBUG(Xenon, "Breakpoint HIT.");
-  }
-
-  // This is just to set a PC breakpoint in any PPU/Thread.
-  if (static_cast<u32>(thread.CIA) == 0x80106998) {
+  if (static_cast<u32>(thread.CIA) == 0x0) {
     LOG_DEBUG(Xenon, "Breakpoint HIT.");
   }
 

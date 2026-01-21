@@ -22,12 +22,6 @@ std::unique_ptr<INetworkBackend> CreateNetworkBackend(BackendType type, const st
     TAPConfig tapConfig = ParseTAPConfig(config);
     return std::make_unique<TAPBackend>(tapConfig);
   }
-  case BackendType::PCAP:
-    LOG_WARNING(ETH, "PCAP backend not yet implemented, falling back to Null");
-    return std::make_unique<NullBackend>();
-  case BackendType::Socket:
-    LOG_WARNING(ETH, "Socket backend not yet implemented, falling back to Null");
-    return std::make_unique<NullBackend>();
   case BackendType::None:
   default:
     return std::make_unique<NullBackend>();
@@ -58,8 +52,7 @@ bool NetworkBridge::Initialize(const BridgeConfig& cfg) {
     return true;
   }
   
-  LOG_INFO(ETH, "Initializing network bridge with {} backend", 
-    BackendTypeToString(config.backendType));
+  LOG_INFO(ETH, "Initializing network bridge with {} backend", BackendTypeToString(config.backendType));
   
   // Create the backend
   backend = CreateNetworkBackend(config.backendType, config.backendConfig);
@@ -77,9 +70,7 @@ bool NetworkBridge::Initialize(const BridgeConfig& cfg) {
   }
   
   // Set up packet receive callback
-  backend->SetPacketCallback([this](const u8* data, u32 length) {
-    OnPacketReceived(data, length);
-  });
+  backend->SetPacketCallback([this](const u8* data, u32 length) { OnPacketReceived(data, length); });
   
   active = true;
   

@@ -105,25 +105,28 @@ enum XE_ETH_INTERRUPT_BITS {
   INT_ALL = 0x000103FF            // All interrupts
 };
 
-// CONFIG_0 Register bits (from Linux driver analysis)
+// CONFIG_0 Register bits (from Linux driver)
 // Values seen: 0x08558001 (reset), 0x08550001 (normal)
 enum XE_ETH_CONFIG0_BITS {
   CFG0_ENABLE = 0x00000001,       // Bit 0: Enable
   CFG0_SOFT_RESET = 0x00008000,   // Bit 15: Soft reset (when combined with enable)
 };
 
-// TX Config Register bits (from Linux driver analysis)
-// Bit 0: TX DMA enable
-// Bit 4: TX enable (when combined with bit 0)
-// Bits 8-11: Ring size
+// TX Config Register bits (from Linux driver)
+// NOTE: Linux kernel only makes use of the TX ring 0, while xboxkrnl uses both TX rings.
+// Bit 0: TX Started?
+// Bit 4: TX enable for RING 0
+// Bit 5: TX enable for RING 1
+// 
 // The value 0x00001c01 enables TX
 enum XE_ETH_TX_CONFIG_BITS {
-  TX_CFG_RING0_EN = 0x00000010,     // TX RING 0 Enable
-  TX_CFG_RING1_EN = 0x00000020,     // TX RING 1 Enable
-  TX_CFG_RING_SEL = 0x00010000      // Select ring 1 vs ring 0
+  TX_CFG_EN = 0x00000001,       // TX Enable
+  TX_CFG_RING0_EN = 0x00000010, // TX RING 0 Enable Transmission
+  TX_CFG_RING1_EN = 0x00000020, // TX RING 1 Enable Transmission
+  TX_CFG_RING_SEL = 0x00010000  // Select ring 1 vs ring 0
 };
 
-// RX Config Register bits (from Linux driver analysis)
+// RX Config Register bits (from Linux driver)
 // Bit 0: RX DMA enable
 // Bit 4: RX enable
 // The value 0x00101c11 enables RX
@@ -222,9 +225,8 @@ struct XE_PCI_STATE {
 
 // Packet buffer structure for pending TX/RX
 struct EthernetPacket {
-  std::vector<u8> data;
-  u32 length = 0;
-  u64 timestamp = 0;
+  std::vector<u8> data; // Packet data buffer
+  u32 length = 0;       // Data lenght
 };
 
 // Ethernet device statistics
@@ -278,11 +280,9 @@ private:
   
   // Packet handling
   void HandleTxPacket(const u8 *data, u32 len);
-  void HandleRxPacket(const u8* data, u32 len);
   
   // Interrupt management
   void RaiseInterrupt(u32 bits);
-  void CheckAndFireInterrupt();
   
   // Worker thread
   void WorkerThreadLoop();
@@ -301,17 +301,22 @@ private:
   // RAM Pointer
   RAM *ramPtr = nullptr;
   
-  // MDIO Registers (32 PHYs x 32 registers)
-  u16 mdioRegisters[32][32] = {};
+  // MDIO Registers - 32 registers
+  // In reality an ethernet controller has around 32 PHY's for the MDIO protocol,
+  // but in reality we only use the first PHY.
+  u16 mdioRegisters[32] = {};
   
   // PCI device state
   XE_PCI_STATE ethPciState = {};
   
   // TX/RX state
-  std::atomic<bool> rxEnabled{false};
-  std::atomic<bool> txRing0Enabled{false};
-  std::atomic<bool> txRing1Enabled{false};
-  std::atomic<bool> linkUp{true};
+  std::atomic<bool> rxEnabled{false};       // RX Enabled
+  std::atomic<bool> txRing0Enabled{false};  // TX Ring 0 Enabled
+  std::atomic<bool> txRing1Enabled{false};  // TX Ring 1 Enabled
+  std::atomic<bool> linkUp{true};           // Link State
+
+  // Used to track interrupt state
+  std::atomic<bool> enableInterrutps{true};
   
   // TX descriptor ring tracking
   u32 txRing0Head = 0;  // Next descriptor to process for RING 0 (hardware)
@@ -325,11 +330,7 @@ private:
   
   // Pending RX packets (received from bridge/external)
   std::queue<EthernetPacket> pendingRxPackets;
-  std::mutex rxQueueMutex;
-  
-  // Pending TX packets (waiting to be sent to bridge)
-  std::queue<EthernetPacket> pendingTxPackets;
-  std::mutex txQueueMutex;
+  std::mutex rxQueueMutex;  // RX Queue mutex
   
   // Statistics
   EthernetStats stats;

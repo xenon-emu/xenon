@@ -4,7 +4,7 @@
 
 //
 // Network Backend Interface
-// Abstract interface for different network backends (TAP, pcap, etc.)
+// Abstract interface for different network backends (TAP, etc...)
 //
 
 #pragma once
@@ -23,8 +23,6 @@ namespace Network {
 enum class BackendType {
   None,       // No networking (packets dropped)
   TAP,        // TAP/TUN virtual network device
-  PCAP,       // Packet capture (libpcap/npcap)
-  Socket      // Raw socket (requires admin/root)
 };
 
 // Packet received callback
@@ -122,20 +120,18 @@ std::unique_ptr<INetworkBackend> CreateNetworkBackend(BackendType type, const st
 
 // Get string name for backend type
 inline std::string BackendTypeToString(BackendType type) {
+  // TODO: Add future backends.
   switch (type) {
   case BackendType::None: return "none";
   case BackendType::TAP: return "tap";
-  case BackendType::PCAP: return "pcap";
-  case BackendType::Socket: return "socket";
   default: return "unknown";
   }
 }
 
 // Parse backend type from string
 inline BackendType StringToBackendType(const std::string& str) {
+  // TODO: Add future backends.
   if (str == "tap" || str == "TAP") return BackendType::TAP;
-  if (str == "pcap" || str == "PCAP") return BackendType::PCAP;
-  if (str == "socket" || str == "Socket") return BackendType::Socket;
   return BackendType::None;
 }
 

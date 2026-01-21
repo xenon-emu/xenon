@@ -25,7 +25,7 @@ namespace Network {
 
 // TAP device configuration
 struct TAPConfig {
-  std::string deviceName;     // Name of the TAP device (e.g., "tap0" on Linux, adapter GUID on Windows)
+  std::string deviceName;     // Name of the TAP device
   std::string ipAddress;      // Optional IP address to configure
   std::string netmask;        // Optional netmask
   u32 mtu = 1500;             // Maximum transmission unit
