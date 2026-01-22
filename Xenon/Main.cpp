@@ -40,15 +40,15 @@ s32 main(s32 argc, char *argv[]) {
   std::this_thread::sleep_for(200ms);
   // Start execution of the emulator
   XeMain::StartCPU();
-  
+#ifndef NO_GFX
   // Wait for ImGui to be initialized
   if (XeMain::renderer.get()) {
     std::unique_lock<std::mutex> lock(XeMain::renderer->initMutex);
-    XeMain::renderer->initCV.wait(lock, []{ 
-        return XeMain::renderer->imguiInitialized; 
+    XeMain::renderer->initCV.wait(lock, []{
+        return XeMain::renderer->imguiInitialized;
     });
   }
-  
+#endif
   // Inf wait until told otherwise
   while (XeRunning) {
 #if MICROPROFILE_ENABLED && !AUTO_FLIP
