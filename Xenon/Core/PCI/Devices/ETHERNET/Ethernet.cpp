@@ -503,17 +503,20 @@ void Xe::PCIDev::ETHERNET::MemSet(u64 writeAddress, s32 data, u64 size) {
 
 // MDIO Read
 u32 Xe::PCIDev::ETHERNET::MdioRead(u32 addr) {
-  // Only do the read if we're told so
-  if ((addr & 0xFF) == 0x50) {
+  // If the busy bit is set, it means that the previous write op was either a write without the write bit set 
+  // (in order to write the address to be read next) or a read operation. In both cases, we need to process 
+  // the read operation now.
+  if ((addr & 0x10) != 0) {
     u8 regNum = static_cast<u8>((addr >> 11) & 0x1F);
     u16 readVal = mdioRegisters[regNum];
 
     DEBUGP("MDIO_READ[REG={}] = {:#04x}", regNum, readVal);
 
     // Place read result in upper 16 bits of phyControlReg
-    // Clear busy bit (bit 4)
     ethPciState.phyControlReg = (static_cast<u32>(readVal) << 16);
-    ethPciState.phyControlReg &= ~0x10; // Clear MDIO busy/status bit
+
+    // Clear MDIO busy bit after any operation
+    ethPciState.phyControlReg &= ~0x10;
     return readVal;
   }
 
@@ -527,12 +530,11 @@ void Xe::PCIDev::ETHERNET::MdioWrite(u32 val) {
 
   DEBUGP("MDIO_WRITE[REG={}] = {:#04x}", regNum, writeVal);
 
-  if ((val & 0xFF) == 0x50) {
-    // This is meant to be a MDIO Read. Just copy over the value (MDIO read address) and return.
-    ethPciState.phyControlReg = val;
-    return;
-  } else if((val & 0xFF) == 0x70){
-    // This is indeed an MDIO Write
+  // This is meant to be a MDIO Read. Just copy over the value (MDIO read address) and return.
+  ethPciState.phyControlReg = val;
+
+  // Check wheter bit 5 is set for write operation
+  if((val & 0x20) != 0) { 
     // Handle special register behaviors
     switch (regNum) {
     case 0: // Control Register
@@ -556,6 +558,9 @@ void Xe::PCIDev::ETHERNET::MdioWrite(u32 val) {
       mdioRegisters[regNum] = writeVal;
       break;
     }
+
+    // Clear MDIO busy bit after any operation
+    ethPciState.phyControlReg &= ~0x10; 
 
     return;
   }
