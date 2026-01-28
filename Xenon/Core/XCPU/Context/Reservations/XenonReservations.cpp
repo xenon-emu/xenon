@@ -18,14 +18,16 @@ bool XenonReservations::Register(PPU_RES *Res) {
   return true;
 }
 
-void XenonReservations::Scan(u64 PhysAddress, bool word) {
+void XenonReservations::Scan(u64 PhysAddress) {
   std::lock_guard lock(reservationLock);
-  // Address must be aligned.
-  PhysAddress &= (word ? ~3 : ~7);
+  // CBE processor's reservation granule is 128 bytes (PPE cache line size).
+  // Reservations are invalidated if any store hits the same 128-byte block.
+  constexpr u64 RESERVATION_GRANULE_MASK = ~u64(127);
+  PhysAddress &= RESERVATION_GRANULE_MASK;
 
   for (int i = 0; i < processors; i++) {
     // NB: order of checks matters!
-    if (reservations[i]->valid && PhysAddress == reservations[i]->reservedAddr) {
+    if (reservations[i]->valid && PhysAddress == (reservations[i]->reservedAddr & RESERVATION_GRANULE_MASK)) {
       reservations[i]->valid = false;
       numReservations--;
     }

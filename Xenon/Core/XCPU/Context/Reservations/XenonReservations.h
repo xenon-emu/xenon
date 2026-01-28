@@ -26,11 +26,11 @@ public:
     std::lock_guard lock(reservationLock);
     numReservations--;
   }
-  void Check(u64 x, bool word) {
+  void Check(u64 x) {
     if (numReservations)
-      Scan(x, word);
+      Scan(x);
   }
-  virtual void Scan(u64 PhysAddress, bool word);
+  virtual void Scan(u64 PhysAddress);
   void LockGuard(std::function<void()> callback) {
     std::lock_guard lock(reservationLock);
     if (callback) {
