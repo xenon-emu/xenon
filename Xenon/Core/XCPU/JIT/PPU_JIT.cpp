@@ -181,38 +181,12 @@ void PPU_JIT::SetupContext(JITBlockBuilder *b) {
 }
 
 // JIT Instruction Prologue
-// * Checks for HALT at current address and calls it if it's enabled and address is a match
-// * Updates instruction pointers (PIA,CIA,NIA) and instruction data
+// * Updates NIA and current instruction data
+// * CIA/PIA removed (set by exception handlers from NIA when needed)
+// * HALT check disabled for performance - use interpreter mode for debugging
 void PPU_JIT::InstrPrologue(JITBlockBuilder *b, u32 instrData) {
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
   x86::Gp temp = newGP64();
-  Label continueLabel = COMP->newLabel();
-
-  // enableHalt
-  COMP->test(b->haltBool, b->haltBool);
-  COMP->je(continueLabel);
-
-  // ppuHaltOn != NULL
-  COMP->mov(temp, b->ppu->scalar(&PPU::ppuHaltOn));
-  COMP->test(temp, temp);
-  COMP->je(continueLabel);
-
-  // ppuHaltOn == curThread.NIA - !guestHalt
-  COMP->cmp(temp, b->threadCtx->scalar(&sPPUThread::NIA));
-  COMP->jne(continueLabel);
-  COMP->cmp(b->ppu->scalar(&PPU::guestHalt).Ptr<u8>(), 0);
-  COMP->jne(continueLabel);
-
-  // Call HALT
-  InvokeNode *out = nullptr;
-  COMP->invoke(&out, imm((void*)callHalt), FuncSignature::build<void>());
-
-  COMP->bind(continueLabel);
-
-  // Update PIA, CIA, NIA and CI.
-  // PIA = CIA:
-  COMP->mov(temp, b->threadCtx->scalar(&sPPUThread::CIA));
-  COMP->mov(b->threadCtx->scalar(&sPPUThread::PIA), temp);
   // CIA = NIA:
   COMP->mov(temp, b->threadCtx->scalar(&sPPUThread::NIA));
   COMP->mov(b->threadCtx->scalar(&sPPUThread::CIA), temp);
@@ -224,6 +198,7 @@ void PPU_JIT::InstrPrologue(JITBlockBuilder *b, u32 instrData) {
   COMP->mov(b->threadCtx->scalar(&sPPUThread::CI).Ptr<u32>(), temp);
 #endif
 }
+
 
 // Instruction Epilogue
 // * Checks for external interrupts and exceptions.
@@ -422,10 +397,10 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
     returnCheck->setArg(0, jitBuilder->ppu->Base());
     returnCheck->setArg(1, jitBuilder->ppeState->Base());
     returnCheck->setRet(0, retVal);
-
+    
     // Test for ocurred exceptions and return if any.
     Label skipRet = compiler.newLabel();
-
+    
     compiler.test(retVal, retVal);  // Check for a positive result.
     compiler.je(skipRet);           // Skip return if no exceptions.
     compiler.ret();                 // Return if exceptions ocurred.

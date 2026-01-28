@@ -1074,7 +1074,7 @@ void PPCInterpreter::MMUWrite(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppe
     return;
 
   // Check if it's reserved
-  cpuContext->xenonRes.Check(EA, (byteCount <= 4 ? true : false));
+  cpuContext->xenonRes.Check(EA);
 
   bool socWrite = false;
 
@@ -1158,7 +1158,7 @@ void PPCInterpreter::MMUMemSet(sPPEState *ppeState,
     return;
 
   // Check if it's reserved
-  xenonContext->xenonRes.Check(EA, (size <= 4 ? true : false));
+  xenonContext->xenonRes.Check(EA);
 
   bool socWrite = false;
 
