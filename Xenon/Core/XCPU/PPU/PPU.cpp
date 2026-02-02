@@ -90,10 +90,6 @@ PPU::PPU(Xe::XCPU::XenonContext *inXenonContext, u64 resetVector, u32 PIR) :
 
     // Set the decrementer as per docs. See CBE Public Registers pdf in Docs
     thread.SPR.DEC = 0x7FFFFFFF;
-
-    // Resize ERATs
-    thread.iERAT.resizeCache(512);
-    thread.dERAT.resizeCache(512);
   }
 
   // Set PVR and PIR

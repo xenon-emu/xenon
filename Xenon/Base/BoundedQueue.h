@@ -150,9 +150,9 @@ private:
   std::array<T, Capacity> m_data;
 
   std::condition_variable_any producer_cv;
-  Base::FutexMutex producer_cv_mutex;
+  std::mutex producer_cv_mutex;
   std::condition_variable_any consumer_cv;
-  Base::FutexMutex consumer_cv_mutex;
+  std::mutex consumer_cv_mutex;
 };
 
 template <typename T, size_t Capacity = detail::DefaultCapacity>
@@ -192,7 +192,7 @@ public:
 
 private:
   SPSCQueue<T, Capacity> spscQueue;
-  Base::FutexMutex writeMutex;
+  std::mutex writeMutex;
 };
 
 template <typename T, size_t Capacity = detail::DefaultCapacity>
@@ -237,8 +237,8 @@ public:
 
 private:
   SPSCQueue<T, Capacity> spscQueue;
-  Base::FutexMutex writeMutex;
-  Base::FutexMutex readMutex;
+  std::mutex writeMutex;
+  std::mutex readMutex;
 };
 
 } // namespace Base

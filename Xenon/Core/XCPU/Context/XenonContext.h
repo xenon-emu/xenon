@@ -100,7 +100,7 @@ namespace Xe::XCPU {
     std::unique_ptr<SOC::SOCPRV_BLOCK> socPRVBlock{};
   private:
     // Mutex for thread safety
-    Base::FutexRecursiveMutex mutex{};
+    std::recursive_mutex mutex{};
     // RootBus pointer
     RootBus *rootBus{};
     // RAM pointer

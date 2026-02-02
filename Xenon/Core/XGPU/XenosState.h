@@ -81,7 +81,7 @@ public:
   }
 
   // Mutex
-  Base::FutexRecursiveMutex mutex{};
+  std::recursive_mutex mutex{};
 
   // RAM Pointer
   RAM *ramPtr = nullptr;

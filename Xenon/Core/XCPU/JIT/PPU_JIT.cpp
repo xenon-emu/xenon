@@ -28,7 +28,7 @@ PPU_JIT::PPU_JIT(PPU *ppu) :
 
 // Destructor
 PPU_JIT::~PPU_JIT() {
-  std::lock_guard<Base::FutexMutex> lock(jitCacheMutex);
+  std::lock_guard<std::mutex> lock(jitCacheMutex);
   for (auto &[hash, block] : jitBlocksCache)
     block.reset();
   jitBlocksCache.clear();
@@ -43,7 +43,7 @@ void PPU_JIT::RegisterBlockPages(u64 blockStart, u64 blockSize) {
   u64 pageCount = (blockSize + pageSize - 1) / pageSize;
   u64 firstPage = blockStart & ~(pageSize - 1ULL);
 
-  std::lock_guard<Base::FutexMutex> lock(jitCacheMutex);
+  std::lock_guard<std::mutex> lock(jitCacheMutex);
   std::vector<u64> pages;
   pages.reserve(static_cast<size_t>(pageCount));
   for (u64 i = 0; i < pageCount; ++i) {
@@ -60,7 +60,7 @@ void PPU_JIT::RegisterBlockPages(u64 blockStart, u64 blockSize) {
 }
 
 void PPU_JIT::UnregisterBlock(u64 blockStart) {
-  std::lock_guard<Base::FutexMutex> lock(jitCacheMutex);
+  std::lock_guard<std::mutex> lock(jitCacheMutex);
   auto it = blockPageList.find(blockStart);
   if (it == blockPageList.end()) { return; }
   for (u64 pageBase : it->second) {
@@ -116,7 +116,7 @@ void PPU_JIT::InvalidateBlocksForRange(u64 startAddr, u64 endAddr) {
 
   std::vector<u64> blocksToInvalidate;
   {
-    std::lock_guard<Base::FutexMutex> lock(jitCacheMutex);
+    std::lock_guard<std::mutex> lock(jitCacheMutex);
     for (u64 page = startPage; page < endPage; page += pageSize) {
       auto pit = pageBlockIndex.find(page);
       if (pit == pageBlockIndex.end()) continue;
@@ -157,7 +157,7 @@ void PPU_JIT::InvalidateBlockAt(u64 blockAddr) {
 }
 
 void PPU_JIT::InvalidateAllBlocks() {
-  std::lock_guard<Base::FutexMutex> lock(jitCacheMutex);
+  std::lock_guard<std::mutex> lock(jitCacheMutex);
 #ifdef JIT_DEBUG
   LOG_DEBUG(Xenon, "[JIT]: Invalidating ALL JIT blocks");
 #endif
@@ -181,38 +181,12 @@ void PPU_JIT::SetupContext(JITBlockBuilder *b) {
 }
 
 // JIT Instruction Prologue
-// * Checks for HALT at current address and calls it if it's enabled and address is a match
-// * Updates instruction pointers (PIA,CIA,NIA) and instruction data
+// * Updates NIA and current instruction data
+// * CIA/PIA removed (set by exception handlers from NIA when needed)
+// * HALT check disabled for performance - use interpreter mode for debugging
 void PPU_JIT::InstrPrologue(JITBlockBuilder *b, u32 instrData) {
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
   x86::Gp temp = newGP64();
-  Label continueLabel = COMP->newLabel();
-
-  // enableHalt
-  COMP->test(b->haltBool, b->haltBool);
-  COMP->je(continueLabel);
-
-  // ppuHaltOn != NULL
-  COMP->mov(temp, b->ppu->scalar(&PPU::ppuHaltOn));
-  COMP->test(temp, temp);
-  COMP->je(continueLabel);
-
-  // ppuHaltOn == curThread.NIA - !guestHalt
-  COMP->cmp(temp, b->threadCtx->scalar(&sPPUThread::NIA));
-  COMP->jne(continueLabel);
-  COMP->cmp(b->ppu->scalar(&PPU::guestHalt).Ptr<u8>(), 0);
-  COMP->jne(continueLabel);
-
-  // Call HALT
-  InvokeNode *out = nullptr;
-  COMP->invoke(&out, imm((void*)callHalt), FuncSignature::build<void>());
-
-  COMP->bind(continueLabel);
-
-  // Update PIA, CIA, NIA and CI.
-  // PIA = CIA:
-  COMP->mov(temp, b->threadCtx->scalar(&sPPUThread::CIA));
-  COMP->mov(b->threadCtx->scalar(&sPPUThread::PIA), temp);
   // CIA = NIA:
   COMP->mov(temp, b->threadCtx->scalar(&sPPUThread::NIA));
   COMP->mov(b->threadCtx->scalar(&sPPUThread::CIA), temp);
@@ -224,6 +198,7 @@ void PPU_JIT::InstrPrologue(JITBlockBuilder *b, u32 instrData) {
   COMP->mov(b->threadCtx->scalar(&sPPUThread::CI).Ptr<u32>(), temp);
 #endif
 }
+
 
 // Instruction Epilogue
 // * Checks for external interrupts and exceptions.
@@ -360,9 +335,11 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
 
       // Patches are done using the 32 bit Kernel/Games address space.
       switch (static_cast<u32>(thread.CIA)) {
+        // Set XAM Debug Output Level to Trace
+      case 0x81743B20: patchGPR(10, 4); break;
       case 0x0200C870: patchGPR(5, 0); break;
         // CNicEmac::NicDoTimer trap, 17489
-      case 0x801086a8: patchGPR(10, 2); break;
+      //case 0x801086a8: patchGPR(10, 2); break;
         // RGH 2 17489 in a JRunner Corona XDKBuild
       case 0x0200C7F0: patchGPR(3, 0); break;
         // VdpWriteXDVOUllong. Set r10 to 1. Skips XDVO write loop
@@ -420,10 +397,10 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
     returnCheck->setArg(0, jitBuilder->ppu->Base());
     returnCheck->setArg(1, jitBuilder->ppeState->Base());
     returnCheck->setRet(0, retVal);
-
+    
     // Test for ocurred exceptions and return if any.
     Label skipRet = compiler.newLabel();
-
+    
     compiler.test(retVal, retVal);  // Check for a positive result.
     compiler.je(skipRet);           // Skip return if no exceptions.
     compiler.ret();                 // Return if exceptions ocurred.
@@ -495,7 +472,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
 
   // Insert block into the block cache.
   {
-    std::lock_guard<Base::FutexMutex> lock(jitCacheMutex);
+    std::lock_guard<std::mutex> lock(jitCacheMutex);
     jitBlocksCache.emplace(blockStartAddress, block);
 
     // Try to link this block to its target

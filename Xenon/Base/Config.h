@@ -292,6 +292,24 @@ inline struct _highlyExperimental {
   bool verify_toml(toml::value &value);
 } highlyExperimental;
 
+//
+// Network
+//
+inline struct _network {
+  // Enable network bridging
+  bool enabled = false;
+  // Network backend type: none, tap
+  std::string backend = "none";
+  // Backend configuration string
+  // For TAP: device name or "auto" (e.g., "tap0", "{GUID}", "auto")
+  std::string backendConfig = "auto";
+
+  // TOML Conversion
+  void to_toml(toml::value &value);
+  void from_toml(const toml::value &value);
+  bool verify_toml(toml::value &value);
+} network;
+
 void loadConfig(const fs::path &path);
 void saveConfig(const fs::path &path);
 

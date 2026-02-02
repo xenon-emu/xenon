@@ -98,7 +98,7 @@ namespace Xe::XGPU {
     }
 
   private:
-    Base::FutexRecursiveMutex mutex{};
+    std::recursive_mutex mutex{};
     // Buffer to store our data.
     u8 *_buffer = nullptr;
     // Current buffer capacity

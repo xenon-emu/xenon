@@ -190,25 +190,68 @@ void PPCInterpreter::PPCInterpreterJIT_addex(sPPEState* ppeState, JITBlockBuilde
   */
 
   // TODO: Overflow Enable.
-  Label end = COMP->newLabel(); // Self explanatory.
+  Label end = COMP->newLabel();
+  Label sfBitMode = COMP->newLabel();
+
+  // Get rA value.
   x86::Gp rATemp = newGP64();
   COMP->mov(rATemp, GPRPtr(instr.ra));
-  x86::Gp xer = newGP32();
+  // Get rB value.
+  x86::Gp rBTemp = newGP64();
+  COMP->mov(rBTemp, GPRPtr(instr.rb));
+
+  // Load XER and get CA bit into carry flag, then clear it.
+  x86::Gp xer = newGP64();
   COMP->mov(xer, SPRPtr(XER));
 #ifdef __LITTLE_ENDIAN__
-  COMP->btr(xer, 29); // Get CA bit of XER and store it in Carry flag.
+  COMP->btr(xer, 29); // Get CA bit of XER and store it in Carry flag, then clear it.
 #else
   COMP->btr(xer, 2);
 #endif // LITTLE_ENDIAN
-  COMP->adc(rATemp, GPRPtr(instr.rb));
-  COMP->jnc(end);
+
+  // Save the carry flag state before checking MSR.
+  x86::Gp carryIn = newGP64();
+  COMP->setc(carryIn.r8());
+
+  // Check for 32bit mode of operation.
+  // Check for MSR[SF]:
+  x86::Gp tempMSR = newGP64(); // MSR is 64 bits wide.
+  COMP->mov(tempMSR, SPRPtr(MSR)); // Get MSR value.
+  COMP->bt(tempMSR, 63); // Check for bit 0(BE)(SF) on MSR.
+  COMP->jc(sfBitMode); // If set, use 64-bit add.
+
+  // Perform 32bit addition to check for carry.
+  // Restore carry flag from saved state.
+  COMP->bt(carryIn, 0);
+  COMP->adc(rATemp.r32(), rBTemp.r32());
+  // Get back the value of rA.
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+  // Check for carry from 32-bit operation.
+  COMP->jnc(sfBitMode);
 #ifdef __LITTLE_ENDIAN__
   COMP->bts(xer, 29); // Set XER[CA] bit.
 #else
   COMP->bts(xer, 2); // Set XER[CA] bit.
 #endif // LITTLE_ENDIAN
+
+  COMP->bind(sfBitMode);
+  // Restore carry flag from saved state for 64-bit operation.
+  COMP->bt(carryIn, 0);
+  // Perform the 64 bit Add with carry.
+  COMP->adc(rATemp, rBTemp);
+  // Check for carry from 64-bit operation.
+  COMP->jnc(end);
+
+#ifdef __LITTLE_ENDIAN__
+  COMP->bts(xer, 29); // Set XER[CA] bit.
+#else
+  COMP->bts(xer, 2); // Set XER[CA] bit.
+#endif // LITTLE_ENDIAN
+
   COMP->bind(end);
+  // Set XER[CA] value.
   COMP->mov(SPRPtr(XER), xer);
+  // Set rD value.
   COMP->mov(GPRPtr(instr.rd), rATemp);
 
   if (instr.rc)
@@ -217,13 +260,15 @@ void PPCInterpreter::PPCInterpreterJIT_addex(sPPEState* ppeState, JITBlockBuilde
 
 // Add to Zero Extended (x'7C00 0194')
 void PPCInterpreter::PPCInterpreterJIT_addzex(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // TODO: Overflow Enable.
   Label end = COMP->newLabel();
+  Label sfBitMode = COMP->newLabel();
 
   // Get rA value
   x86::Gp rATemp = newGP64();
   COMP->mov(rATemp, GPRPtr(instr.ra));
 
-  // Load XER and get CA bit into carry flag
+  // Load XER and get CA bit into carry flag, then clear it.
   x86::Gp xer = newGP64();
   COMP->mov(xer, SPRPtr(XER));
 #ifdef __LITTLE_ENDIAN__
@@ -232,11 +277,39 @@ void PPCInterpreter::PPCInterpreterJIT_addzex(sPPEState *ppeState, JITBlockBuild
   COMP->btr(xer, 2);
 #endif // LITTLE_ENDIAN
 
-  // Perform: rA + CA (add with carry, second operand is 0)
-  COMP->adc(rATemp, imm<u64>(0));
+  // Save the carry flag state before checking MSR.
+  x86::Gp carryIn = newGP64();
+  COMP->setc(carryIn.r8());
 
-  // Check for carry out
+  // Check for 32bit mode of operation.
+  // Check for MSR[SF]:
+  x86::Gp tempMSR = newGP64(); // MSR is 64 bits wide.
+  COMP->mov(tempMSR, SPRPtr(MSR)); // Get MSR value.
+  COMP->bt(tempMSR, 63); // Check for bit 0(BE)(SF) on MSR.
+  COMP->jc(sfBitMode); // If set, use 64-bit add.
+
+  // Perform 32bit addition to check for carry.
+  // Restore carry flag from saved state.
+  COMP->bt(carryIn, 0);
+  COMP->adc(rATemp.r32(), imm<u32>(0));
+  // Get back the value of rA.
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+  // Check for carry from 32-bit operation.
+  COMP->jnc(sfBitMode);
+#ifdef __LITTLE_ENDIAN__
+  COMP->bts(xer, 29); // Set XER[CA] bit.
+#else
+  COMP->bts(xer, 2); // Set XER[CA] bit.
+#endif // LITTLE_ENDIAN
+
+  COMP->bind(sfBitMode);
+  // Restore carry flag from saved state for 64-bit operation.
+  COMP->bt(carryIn, 0);
+  // Perform the 64 bit Add with carry: rA + CA
+  COMP->adc(rATemp, imm<u64>(0));
+  // Check for carry from 64-bit operation.
   COMP->jnc(end);
+
 #ifdef __LITTLE_ENDIAN__
   COMP->bts(xer, 29); // Set XER[CA] bit.
 #else
@@ -244,7 +317,9 @@ void PPCInterpreter::PPCInterpreterJIT_addzex(sPPEState *ppeState, JITBlockBuild
 #endif // LITTLE_ENDIAN
 
   COMP->bind(end);
+  // Set XER[CA] value.
   COMP->mov(SPRPtr(XER), xer);
+  // Set rD value.
   COMP->mov(GPRPtr(instr.rd), rATemp);
 
   if (instr.rc)
@@ -253,13 +328,15 @@ void PPCInterpreter::PPCInterpreterJIT_addzex(sPPEState *ppeState, JITBlockBuild
 
 // Add to Minus One Extended (x'7C00 01D4')
 void PPCInterpreter::PPCInterpreterJIT_addmex(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // TODO: Overflow Enable.
   Label end = COMP->newLabel();
+  Label sfBitMode = COMP->newLabel();
 
   // Get rA value
   x86::Gp rATemp = newGP64();
   COMP->mov(rATemp, GPRPtr(instr.ra));
 
-  // Load XER and get CA bit into carry flag
+  // Load XER and get CA bit into carry flag, then clear it.
   x86::Gp xer = newGP64();
   COMP->mov(xer, SPRPtr(XER));
 #ifdef __LITTLE_ENDIAN__
@@ -268,11 +345,39 @@ void PPCInterpreter::PPCInterpreterJIT_addmex(sPPEState *ppeState, JITBlockBuild
   COMP->btr(xer, 2);
 #endif // LITTLE_ENDIAN
 
-  // Perform: rA + CA + (-1)
-  COMP->adc(rATemp, imm<s64>(-1));
+  // Save the carry flag state before checking MSR.
+  x86::Gp carryIn = newGP64();
+  COMP->setc(carryIn.r8());
 
-  // Check for carry out
+  // Check for 32bit mode of operation.
+  // Check for MSR[SF]:
+  x86::Gp tempMSR = newGP64(); // MSR is 64 bits wide.
+  COMP->mov(tempMSR, SPRPtr(MSR)); // Get MSR value.
+  COMP->bt(tempMSR, 63); // Check for bit 0(BE)(SF) on MSR.
+  COMP->jc(sfBitMode); // If set, use 64-bit add.
+
+  // Perform 32bit addition to check for carry.
+  // Restore carry flag from saved state.
+  COMP->bt(carryIn, 0);
+  COMP->adc(rATemp.r32(), imm<s32>(-1));
+  // Get back the value of rA.
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+  // Check for carry from 32-bit operation.
+  COMP->jnc(sfBitMode);
+#ifdef __LITTLE_ENDIAN__
+  COMP->bts(xer, 29); // Set XER[CA] bit.
+#else
+  COMP->bts(xer, 2); // Set XER[CA] bit.
+#endif // LITTLE_ENDIAN
+
+  COMP->bind(sfBitMode);
+  // Restore carry flag from saved state for 64-bit operation.
+  COMP->bt(carryIn, 0);
+  // Perform the 64 bit Add with carry: rA + CA + (-1)
+  COMP->adc(rATemp, imm<s64>(-1));
+  // Check for carry from 64-bit operation.
   COMP->jnc(end);
+
 #ifdef __LITTLE_ENDIAN__
   COMP->bts(xer, 29); // Set XER[CA] bit.
 #else
@@ -280,7 +385,9 @@ void PPCInterpreter::PPCInterpreterJIT_addmex(sPPEState *ppeState, JITBlockBuild
 #endif // LITTLE_ENDIAN
 
   COMP->bind(end);
+  // Set XER[CA] value.
   COMP->mov(SPRPtr(XER), xer);
+  // Set rD value.
   COMP->mov(GPRPtr(instr.rd), rATemp);
 
   if (instr.rc)
@@ -1228,14 +1335,20 @@ void PPCInterpreter::PPCInterpreterJIT_subfic(sPPEState* ppeState, JITBlockBuild
 
 // Subtract from Extended (x'7C00 0110')
 void PPCInterpreter::PPCInterpreterJIT_subfex(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // TODO: Overflow Enable.
   Label end = COMP->newLabel();
+  Label sfBitMode = COMP->newLabel();
 
   // Get rA value and complement it
   x86::Gp rATemp = newGP64();
   COMP->mov(rATemp, GPRPtr(instr.ra));
   COMP->not_(rATemp);
 
-  // Load XER and get CA bit into carry flag
+  // Get rB value
+  x86::Gp rBTemp = newGP64();
+  COMP->mov(rBTemp, GPRPtr(instr.rb));
+
+  // Load XER and get CA bit into carry flag, then clear it.
   x86::Gp xer = newGP64();
   COMP->mov(xer, SPRPtr(XER));
 #ifdef __LITTLE_ENDIAN__
@@ -1244,11 +1357,40 @@ void PPCInterpreter::PPCInterpreterJIT_subfex(sPPEState *ppeState, JITBlockBuild
   COMP->btr(xer, 2);
 #endif // LITTLE_ENDIAN
 
-  // Perform: ~rA + rB + CA
-  COMP->adc(rATemp, GPRPtr(instr.rb));
+  // Save the carry flag state before checking MSR.
+  x86::Gp carryIn = newGP64();
+  COMP->setc(carryIn.r8());
 
-  // Check for carry out
+  // Check for 32bit mode of operation.
+  // Check for MSR[SF]:
+  x86::Gp tempMSR = newGP64(); // MSR is 64 bits wide.
+  COMP->mov(tempMSR, SPRPtr(MSR)); // Get MSR value.
+  COMP->bt(tempMSR, 63); // Check for bit 0(BE)(SF) on MSR.
+  COMP->jc(sfBitMode); // If set, use 64-bit add.
+
+  // Perform 32bit addition to check for carry.
+  // Restore carry flag from saved state.
+  COMP->bt(carryIn, 0);
+  COMP->adc(rATemp.r32(), rBTemp.r32());
+  // Get back the complemented value of rA.
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+  COMP->not_(rATemp);
+  // Check for carry from 32-bit operation.
+  COMP->jnc(sfBitMode);
+#ifdef __LITTLE_ENDIAN__
+  COMP->bts(xer, 29); // Set XER[CA] bit.
+#else
+  COMP->bts(xer, 2); // Set XER[CA] bit.
+#endif // LITTLE_ENDIAN
+
+  COMP->bind(sfBitMode);
+  // Restore carry flag from saved state for 64-bit operation.
+  COMP->bt(carryIn, 0);
+  // Perform the 64 bit Add with carry: ~rA + rB + CA
+  COMP->adc(rATemp, rBTemp);
+  // Check for carry from 64-bit operation.
   COMP->jnc(end);
+
 #ifdef __LITTLE_ENDIAN__
   COMP->bts(xer, 29); // Set XER[CA] bit.
 #else
@@ -1256,7 +1398,9 @@ void PPCInterpreter::PPCInterpreterJIT_subfex(sPPEState *ppeState, JITBlockBuild
 #endif // LITTLE_ENDIAN
 
   COMP->bind(end);
+  // Set XER[CA] value.
   COMP->mov(SPRPtr(XER), xer);
+  // Set rD value.
   COMP->mov(GPRPtr(instr.rd), rATemp);
 
   if (instr.rc)
@@ -1265,14 +1409,16 @@ void PPCInterpreter::PPCInterpreterJIT_subfex(sPPEState *ppeState, JITBlockBuild
 
 // Subtract from Zero Extended (x'7C00 0190')
 void PPCInterpreter::PPCInterpreterJIT_subfzex(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // TODO: Overflow Enable.
   Label end = COMP->newLabel();
+  Label sfBitMode = COMP->newLabel();
 
   // Get rA value and complement it
   x86::Gp rATemp = newGP64();
   COMP->mov(rATemp, GPRPtr(instr.ra));
   COMP->not_(rATemp);
 
-  // Load XER and get CA bit into carry flag
+  // Load XER and get CA bit into carry flag, then clear it.
   x86::Gp xer = newGP64();
   COMP->mov(xer, SPRPtr(XER));
 #ifdef __LITTLE_ENDIAN__
@@ -1281,11 +1427,40 @@ void PPCInterpreter::PPCInterpreterJIT_subfzex(sPPEState *ppeState, JITBlockBuil
   COMP->btr(xer, 2);
 #endif // LITTLE_ENDIAN
 
-  // Perform: ~rA + CA (add with carry, second operand is 0)
-  COMP->adc(rATemp, imm<u64>(0));
+  // Save the carry flag state before checking MSR.
+  x86::Gp carryIn = newGP64();
+  COMP->setc(carryIn.r8());
 
-  // Check for carry out
+  // Check for 32bit mode of operation.
+  // Check for MSR[SF]:
+  x86::Gp tempMSR = newGP64(); // MSR is 64 bits wide.
+  COMP->mov(tempMSR, SPRPtr(MSR)); // Get MSR value.
+  COMP->bt(tempMSR, 63); // Check for bit 0(BE)(SF) on MSR.
+  COMP->jc(sfBitMode); // If set, use 64-bit add.
+
+  // Perform 32bit addition to check for carry.
+  // Restore carry flag from saved state.
+  COMP->bt(carryIn, 0);
+  COMP->adc(rATemp.r32(), imm<u32>(0));
+  // Get back the complemented value of rA.
+  COMP->mov(rATemp, GPRPtr(instr.ra));
+  COMP->not_(rATemp);
+  // Check for carry from 32-bit operation.
+  COMP->jnc(sfBitMode);
+#ifdef __LITTLE_ENDIAN__
+  COMP->bts(xer, 29); // Set XER[CA] bit.
+#else
+  COMP->bts(xer, 2); // Set XER[CA] bit.
+#endif // LITTLE_ENDIAN
+
+  COMP->bind(sfBitMode);
+  // Restore carry flag from saved state for 64-bit operation.
+  COMP->bt(carryIn, 0);
+  // Perform the 64 bit Add with carry: ~rA + CA
+  COMP->adc(rATemp, imm<u64>(0));
+  // Check for carry from 64-bit operation.
   COMP->jnc(end);
+
 #ifdef __LITTLE_ENDIAN__
   COMP->bts(xer, 29); // Set XER[CA] bit.
 #else
@@ -1293,7 +1468,9 @@ void PPCInterpreter::PPCInterpreterJIT_subfzex(sPPEState *ppeState, JITBlockBuil
 #endif // LITTLE_ENDIAN
 
   COMP->bind(end);
+  // Set XER[CA] value.
   COMP->mov(SPRPtr(XER), xer);
+  // Set rD value.
   COMP->mov(GPRPtr(instr.rd), rATemp);
 
   if (instr.rc)

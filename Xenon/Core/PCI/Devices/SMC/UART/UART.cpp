@@ -20,7 +20,7 @@ void HW_UART_SOCK::uartMainThread() {
     LOG_INFO(SMC, "UART Initialized Successfully!");
   }
   while (uartThreadRunning) {
-    std::unique_lock<Base::FutexMutex> lock(uartMutex);
+    std::unique_lock<std::mutex> lock(uartMutex);
     if (!uartTxBuffer.empty()) {
       char c = uartTxBuffer.front();
       if (socketCreated) {
@@ -47,7 +47,7 @@ void HW_UART_SOCK::uartMainThread() {
 void HW_UART_SOCK::uartReceiveThread() {
   Base::SetCurrentThreadName("[Xe::SMC::UART] Receive");
   while (uartThreadRunning) {
-    std::unique_lock<Base::FutexMutex> lock(uartMutex);
+    std::unique_lock<std::mutex> lock(uartMutex);
     char c = -1;
     u64 bytesReceived = 0;
 #ifdef _WIN32
@@ -151,14 +151,14 @@ void HW_UART_SOCK::Shutdown() {
 }
 
 void HW_UART_SOCK::Write(const u8 data) {
-  std::lock_guard<Base::FutexMutex> lock(uartMutex);
+  std::lock_guard<std::mutex> lock(uartMutex);
   uartTxBuffer.push(data);
   retVal = true;
 }
 
 u8 HW_UART_SOCK::Read() {
   u8 data = 0;
-  std::lock_guard<Base::FutexMutex> lock(uartMutex);
+  std::lock_guard<std::mutex> lock(uartMutex);
   if (!uartRxBuffer.empty()) {
     data = uartRxBuffer.front();
     uartRxBuffer.pop();

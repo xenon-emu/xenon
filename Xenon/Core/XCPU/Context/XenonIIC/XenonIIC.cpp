@@ -7,6 +7,12 @@
   // Debug output enable.
   //#define IIC_DEBUG
 
+#ifndef IIC_DEBUG
+#define DEBUGP(x, ...)
+#else
+#define DEBUGP(x, ...) LOG_DEBUG(Xenon_IIC, x, ##__VA_ARGS__);
+#endif
+
 // Constructor
 Xe::XCPU::XenonIIC::XenonIIC() {
   socINTBlock = std::make_unique<STRIP_UNIQUE(socINTBlock)>();
@@ -32,12 +38,9 @@ void Xe::XCPU::XenonIIC::Write(u64 writeAddress, const u8* data, u64 size) {
   // Write down the data
   memcpy(reinterpret_cast<u8*>(socINTBlock.get()) + offset, &dataIn, size);
 
-#ifdef IIC_DEBUG
   // Print all accesses
-  const u32 threadID = offset / ProcessorBlockSize;
   const auto access = getSOCINTAccess(offset);
-  LOG_DEBUG(Xenon_IIC, "[IIC]: Write to {}, size {:#x}, inData {:#x}", access.c_str(), size, dataIn);
-#endif // IIC_DEBUG
+  DEBUGP("[IIC]: Write to {}, size {:#x}, inData {:#x}", access.c_str(), size, dataIn);
 
   //
   // Process state changes
@@ -170,11 +173,9 @@ void Xe::XCPU::XenonIIC::Read(u64 readAddress, u8* data, u64 size) {
     }
   }
 
-#ifdef IIC_DEBUG
   // Print all accesses
   const auto access = getSOCINTAccess(offset);
-  LOG_DEBUG(Xenon_IIC, "[IIC]: Read to {}, size {:#x}, returning -> {:#x}", access.c_str(), size, dataOut);
-#endif // IIC_DEBUG
+  DEBUGP("[IIC]: Read to {}, size {:#x}, returning -> {:#x}", access.c_str(), size, dataOut);
 
   // Copy the data out
   // Data is in BE format, byteswap it
@@ -194,10 +195,8 @@ void Xe::XCPU::XenonIIC::generateInterrupt(u8 interruptType, u8 cpusToInterrupt)
   // Set a lock
   std::lock_guard lock(iicMutex);
 
-#ifdef IIC_DEBUG
-  LOG_DEBUG(Xenon_IIC, "[IIC]: Generating interrupt {} for threads with mask {:#x}", 
+  DEBUGP("[IIC]: Generating interrupt {} for threads with mask {:#x}", 
     getIntName(static_cast<eXeIntVectors>(interruptType)).c_str(), cpusToInterrupt);
-#endif // IIC_DEBUG
 
   // Create our interrupt packet
   sInterruptPacket intPacket = { interruptType, false};
@@ -264,14 +263,17 @@ bool Xe::XCPU::XenonIIC::hasPendingInterrupts(u8 threadID, bool ignorePendingACK
 
 // Removes the first ACK'd interrupt from the pending queue for a given thread.
 void Xe::XCPU::XenonIIC::removeFirstACKdInterrupt(u8 threadID) {
+  // Bounds check
+  if (threadID >= 6) {
+    return;
+  }
+
   // Set a lock
   std::lock_guard lock(iicMutex);
 
   auto& pq = interruptState[threadID].pendingInterrupts;
   if (pq.empty()) {
-#ifdef IIC_DEBUG
-      LOG_DEBUG(Xenon_IIC, "[IIC]: EOI on thread {} with empty queue", threadID);
-#endif // IIC_DEBUG
+    DEBUGP("[IIC]: EOI on thread {} with empty queue", threadID);
     return;
   }
 
@@ -286,10 +288,8 @@ void Xe::XCPU::XenonIIC::removeFirstACKdInterrupt(u8 threadID) {
     pq.pop();
     if (!removed && pkt.acknowledged) {
       removed = true;
-#ifdef IIC_DEBUG
-        LOG_DEBUG(Xenon_IIC, "[IIC]: Removed ACK'd interrupt {} from thread {}",
+      DEBUGP("[IIC]: Removed ACK'd interrupt {} from thread {}",
           getIntName(static_cast<eXeIntVectors>(pkt.interruptType)).c_str(), threadID);
-#endif // IIC_DEBUG
       continue; // skip this packet
     }
     buffer.emplace_back(pkt);
@@ -300,17 +300,18 @@ void Xe::XCPU::XenonIIC::removeFirstACKdInterrupt(u8 threadID) {
     pq.push(pkt);
   }
 
-#ifdef IIC_DEBUG
-  if (!removed) {
-    LOG_DEBUG(Xenon_IIC, "[IIC]: EOI on thread {} found no ACK'd interrupts to remove", threadID);
-  }
-#endif // IIC_DEBUG
+  if (!removed) { DEBUGP("[IIC]: EOI on thread {} found no ACK'd interrupts to remove", threadID); }
 }
 
 // Acknowledges and returns the highest priority pending interrupt for a given thread.
 // NOTE: If the highest priority interrupt is the same priority as the current task priority, we return and ACK the next
 // higher priority interrupt instead.
 u8 Xe::XCPU::XenonIIC::acknowledgeInterrupt(u8 threadID) {
+  // Bounds check
+  if (threadID >= 6) {
+    return prioNONE;
+  }
+
   // Set a lock
   std::lock_guard lock(iicMutex);
 
@@ -341,12 +342,12 @@ u8 Xe::XCPU::XenonIIC::acknowledgeInterrupt(u8 threadID) {
           const auto pkt = pq.top();
           pq.pop();
           buffer.emplace_back(pkt);
-          if (!pkt.acknowledged && pkt.interruptType > currentPriority) {
+          if (nextHigher == prioNONE && !pkt.acknowledged && pkt.interruptType > currentPriority) {
             nextHigher = pkt.interruptType;
-            break;
+            // Continue draining to preserve all packets
           }
         }
-        // Restore queue contents (including any not yet popped)
+        // Restore all queue contents
         for (const auto& pkt : buffer) { pq.push(pkt); }
 
         targetInterrupt = nextHigher; // may remain prioNONE if none found
@@ -364,9 +365,9 @@ u8 Xe::XCPU::XenonIIC::acknowledgeInterrupt(u8 threadID) {
         const auto pkt = pq.top();
         pq.pop();
         buffer.emplace_back(pkt);
-        if (!pkt.acknowledged && pkt.interruptType > currentPriority) {
+        if (nextHigher == prioNONE && !pkt.acknowledged && pkt.interruptType > currentPriority) {
           nextHigher = pkt.interruptType;
-          break; // first higher-than-currentPriority encountered
+          // Continue draining to preserve all packets
         }
       }
       for (const auto& pkt : buffer) { pq.push(pkt); }
