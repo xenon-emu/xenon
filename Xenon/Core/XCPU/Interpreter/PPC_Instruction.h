@@ -648,22 +648,22 @@ namespace PPCInterpreter {
       switch (ExtractBits(instr, 0, 5)) {
       case 4:
         switch ((ExtractBits(instr, 21, 27) << 4) | (ExtractBits(instr, 30, 31) << 0)) {
-        //case 0b00000000011: handler = GET_HANDLER(lvsl128); break;
-        //case 0b00001000011: handler = GET_HANDLER(lvsr128); break;
-        //case 0b00010000011: handler = GET_HANDLER(lvewx128); break;
-        //case 0b00011000011: handler = GET_HANDLER(lvx128); break;
-        //case 0b00110000011: handler = GET_HANDLER(stvewx128); break;
-        //case 0b00111000011: handler = GET_HANDLER(stvx128); break;
-        //case 0b01011000011: handler = GET_HANDLER(lvxl128); break;
-        //case 0b01111000011: handler = GET_HANDLER(stvxl128); break;
-        //case 0b10000000011: handler = GET_HANDLER(lvlx128); break;
-        //case 0b10001000011: handler = GET_HANDLER(lvrx128); break;
-        //case 0b10100000011: handler = GET_HANDLER(stvlx128); break;
-        //case 0b10101000011: handler = GET_HANDLER(stvrx128); break;
-        //case 0b11000000011: handler = GET_HANDLER(lvlxl128); break;
-        //case 0b11001000011: handler = GET_HANDLER(lvrxl128); break;
-        //case 0b11100000011: handler = GET_HANDLER(stvlxl128); break;
-        //case 0b11101000011: handler = GET_HANDLER(stvrxl128); break;
+        case 0b00000000011: handler = GET_HANDLER(lvsl128); break;
+        case 0b00001000011: handler = GET_HANDLER(lvsr128); break;
+        case 0b00010000011: handler = GET_HANDLER(lvx128); break; // lvewx128 behaves like lvx128
+        case 0b00011000011: handler = GET_HANDLER(lvx128); break;
+        case 0b00110000011: handler = GET_HANDLER(stvewx128); break;
+        case 0b00111000011: handler = GET_HANDLER(stvx128); break;
+        case 0b01011000011: handler = GET_HANDLER(lvx128); break; // lvxl128 behaves like lvx128
+        case 0b01111000011: handler = GET_HANDLER(stvx128); break;  // stvxl128 behaves like stvx128
+        case 0b10000000011: handler = GET_HANDLER(lvlx128); break;
+        case 0b10001000011: handler = GET_HANDLER(lvrx128); break;
+        case 0b10100000011: handler = GET_HANDLER(stvlx128); break;
+        case 0b10101000011: handler = GET_HANDLER(stvrx128); break;
+        case 0b11000000011: handler = GET_HANDLER(lvlx128); break; // lvlxl128 behaves like lvlx128
+        case 0b11001000011: handler = GET_HANDLER(lvrx128); break; // lvrxl128 behaves like lvrx128
+        case 0b11100000011: handler = GET_HANDLER(stvlx128); break;  // stvlxl128 behaves like stvlx128
+        case 0b11101000011: handler = GET_HANDLER(stvrx128); break;  // stvrxl128 behaves like stvrx128
         }
         switch ((ExtractBits(instr, 21, 31) << 0)) {
         //case 0b00000000000: handler = GET_HANDLER(vaddubm); break;
@@ -810,18 +810,18 @@ namespace PPCInterpreter {
         //case 0b101000: handler = GET_HANDLER(vmsumshm); break;
         //case 0b101001: handler = GET_HANDLER(vmsumshs); break;
         case 0b101010: handler = GET_HANDLER(vsel); break;
-        //case 0b101011: handler = GET_HANDLER(vperm); break;
-        //case 0b101100: handler = GET_HANDLER(vsldoi); break;
+        case 0b101011: handler = GET_HANDLER(vperm); break;
+        case 0b101100: handler = GET_HANDLER(vsldoi); break;
         //case 0b101110: handler = GET_HANDLER(vmaddfp); break;
         //case 0b101111: handler = GET_HANDLER(vnmsubfp); break;
         }
         switch ((ExtractBits(instr, 27, 27) << 0)) {
-        //case 0b1: handler = GET_HANDLER(vsldoi128); break;
+        case 0b1: handler = GET_HANDLER(vsldoi128); break;
         }
         break;
       case 5:
         switch ((ExtractBits(instr, 22, 22) << 5) | (ExtractBits(instr, 27, 27) << 0)) {
-        //case 0b000000: handler = GET_HANDLER(vperm128); break;
+        case 0b000000: handler = GET_HANDLER(vperm128); break;
         }
         switch ((ExtractBits(instr, 22, 25) << 2) | (ExtractBits(instr, 27, 27) << 0)) {
         case 0b000001: handler = GET_HANDLER(vaddfp128); break;

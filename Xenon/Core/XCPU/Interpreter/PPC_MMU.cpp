@@ -486,6 +486,21 @@ void PPCInterpreter::mmuReadString(sPPEState *ppeState, u64 stringAddress,
   string[maxLength - 1] = 0;
 }
 
+// Translates a given EA into a RA, and then returns a valid Host Ptr for the given guest EA.
+// NOTE: This is to be used by JIT'ed loads/stores that are known to be directed to RAM, mostly VXU L/S instrs.
+u64 PPCInterpreter::JITTranslateAndGetHostPtr(sPPEState *ppeState, u64 EA, ePPUThreadID thr) {
+  u64 returnedAddr = EA;
+  // Translate the given address
+  if (!MMUTranslateAddress(&returnedAddr, ppeState, false, thr)) {
+    LOG_DEBUG(Xenon, "[JIT MMU]: Address translation failed for EA: {:#x}", EA);
+    return 0;
+  }
+  // Correctly construct the end address
+  bool socRead = false;
+  returnedAddr = mmuContructEndAddressFromSecEngAddr(returnedAddr, &socRead);
+  return reinterpret_cast<u64>(xenonContext->GetRAM()->GetPointerToAddress(returnedAddr));
+}
+
 SECENG_ADDRESS_INFO
 PPCInterpreter::mmuGetSecEngInfoFromAddress(u64 inputAddress) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUGetSecEngInfoFromAddress", MP_AUTO);

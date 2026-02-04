@@ -8,17 +8,6 @@
 
 namespace Base {
 
-union alignas(16) VectorUnit {
-  u64 qword;
-  f64 fp;
-  f32 db;
-  std::array<u32, 2> dword;
-  std::array<s32, 2> dsword;
-  std::array<u16, 4> word;
-  std::array<s16, 4> sword;
-  std::array<u8, 16> bytes;
-};
-
 struct alignas(16) Vector128 {
   union {
     struct {
@@ -50,7 +39,6 @@ struct alignas(16) Vector128 {
     std::array<u16, 8> word;
     std::array<s16, 8> sword;
     std::array<u8, 16> bytes;
-    std::array<VectorUnit, 2> vu;
   };
 
   constexpr friend bool operator==(const Vector128 &a, const Vector128 &b) {

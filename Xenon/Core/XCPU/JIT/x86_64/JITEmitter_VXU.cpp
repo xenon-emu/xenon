@@ -54,6 +54,149 @@
 #define J_VMX128_R_VB128 (instr.VMX128_R.VB128l | (instr.VMX128_R.VB128h << 5))
 
 //
+// Constants
+//
+
+using namespace Base;
+
+// We're using the same constants system used by Xenia, avoiding duplicate code and redundant movs/permutes.
+
+static const Vector128 XMMFFFF = Vector128i(0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu);
+static const Vector128 XMMByteSwapMask = Vector128i(0x00010203u, 0x04050607u, 0x08090A0Bu, 0x0C0D0E0Fu);
+static const Vector128 XMMSwapWordMask = Vector128i(0x03030303u, 0x03030303u, 0x03030303u, 0x03030303u);
+static const Vector128 XMMPermuteByteMask = Vector128b(0x1F);
+static const Vector128 XMMPermuteControl15 = Vector128b(15);
+
+// Table used for Load Vector Shift Left instruction
+static const Vector128 loadVectorShiftLeftTable[16] = {
+    Vector128b(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
+    Vector128b(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16),
+    Vector128b(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17),
+    Vector128b(3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18),
+    Vector128b(4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19),
+    Vector128b(5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20),
+    Vector128b(6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21),
+    Vector128b(7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22),
+    Vector128b(8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23),
+    Vector128b(9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24),
+    Vector128b(10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25),
+    Vector128b(11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26),
+    Vector128b(12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27),
+    Vector128b(13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28),
+    Vector128b(14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29),
+    Vector128b(15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30),
+};
+
+// Table used for Load Vector Shift Right instruction
+static const Vector128 loadVectorShiftRightTable[16] = {
+    Vector128b(16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31),
+    Vector128b(15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30),
+    Vector128b(14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29),
+    Vector128b(13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28),
+    Vector128b(12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27),
+    Vector128b(11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26),
+    Vector128b(10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25),
+    Vector128b(9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24),
+    Vector128b(8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23),
+    Vector128b(7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22),
+    Vector128b(6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21),
+    Vector128b(5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20),
+    Vector128b(4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19),
+    Vector128b(3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18),
+    Vector128b(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17),
+    Vector128b(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16),
+};
+
+// Table used for Vector Shift Double Octet Immediate instruction
+static const Vector128 vsldoiTable[16] = {
+    Vector128b(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
+    Vector128b(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16),
+    Vector128b(2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17),
+    Vector128b(3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18),
+    Vector128b(4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19),
+    Vector128b(5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20),
+    Vector128b(6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21),
+    Vector128b(7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22),
+    Vector128b(8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23),
+    Vector128b(9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24),
+    Vector128b(10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25),
+    Vector128b(11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26),
+    Vector128b(12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27),
+    Vector128b(13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28),
+    Vector128b(14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29),
+    Vector128b(15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30),
+};
+
+// Table used for Store Vector Right Indexed instruction
+// Maps bytes[16-eb..15] to bytes[0..eb-1] for each eb value (0-15)
+// NOTE: These indices account for the fact that XMMByteSwapMask reverses bytes within dwords
+// After byteswap: positions 0-3 have orig[3,2,1,0], 4-7 have orig[7,6,5,4], etc.
+// So "byte[15]" from interpreter (after byteswap) is at x86 position 12
+static const Vector128 stvrxShuffleTable[16] = {
+    Vector128b(0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80), // eb=0 (no store)
+    Vector128b(12,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80),   // eb=1: byte[15]->pos[0]
+    Vector128b(13,12,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80),     // eb=2: byte[14,15]->pos[0,1]
+    Vector128b(14,13,12,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80),       // eb=3: byte[13,14,15]->pos[0,1,2]
+    Vector128b(15,14,13,12,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80),         // eb=4: byte[12..15]->pos[0..3]
+    Vector128b(8,15,14,13,12,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80),            // eb=5: byte[11..15]
+    Vector128b(9,8,15,14,13,12,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80),               // eb=6
+    Vector128b(10,9,8,15,14,13,12,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80),                 // eb=7
+    Vector128b(11,10,9,8,15,14,13,12,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80),                   // eb=8: byte[8..15]->pos[0..7]
+    Vector128b(4,11,10,9,8,15,14,13,12,0x80,0x80,0x80,0x80,0x80,0x80,0x80),                      // eb=9
+    Vector128b(5,4,11,10,9,8,15,14,13,12,0x80,0x80,0x80,0x80,0x80,0x80),                         // eb=10
+    Vector128b(6,5,4,11,10,9,8,15,14,13,12,0x80,0x80,0x80,0x80,0x80),                            // eb=11
+    Vector128b(7,6,5,4,11,10,9,8,15,14,13,12,0x80,0x80,0x80,0x80),                               // eb=12: byte[4..15]->pos[0..11]
+    Vector128b(0,7,6,5,4,11,10,9,8,15,14,13,12,0x80,0x80,0x80),                                  // eb=13
+    Vector128b(1,0,7,6,5,4,11,10,9,8,15,14,13,12,0x80,0x80),                                     // eb=14
+    Vector128b(2,1,0,7,6,5,4,11,10,9,8,15,14,13,12,0x80),                                        // eb=15: byte[1..15]->pos[0..14]
+};
+
+// Blend masks for Store Vector Left Indexed (stvlx)
+// For count bytes to store (1-16), sets first 'count' bytes to 0xFF, rest to 0x00
+// Used with vpblendvb: selects from src where mask is 0xFF
+static const Vector128 stvlxBlendMasks[17] = {
+    Vector128b(0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00), // count=0
+    Vector128b(0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00), // count=1
+    Vector128b(0xFF,0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00), // count=2
+    Vector128b(0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00), // count=3
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00), // count=4
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00), // count=5
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00), // count=6
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00), // count=7
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00), // count=8
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00), // count=9
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00,0x00,0x00), // count=10
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00,0x00), // count=11
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00), // count=12
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00), // count=13
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00), // count=14
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00), // count=15
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF), // count=16
+};
+
+// Blend masks for Store Vector Right Indexed (stvrx)
+// For eb bytes to store (1-15), sets first 'eb' bytes to 0xFF, rest to 0x00
+// Used after shuffle has positioned bytes at start of vector
+static const Vector128 stvrxBlendMasks[16] = {
+    Vector128b(0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00), // eb=0 (no store)
+    Vector128b(0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00), // eb=1
+    Vector128b(0xFF,0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00), // eb=2
+    Vector128b(0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00), // eb=3
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00), // eb=4
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00), // eb=5
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00), // eb=6
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00), // eb=7
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00), // eb=8
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00,0x00,0x00,0x00), // eb=9
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00,0x00,0x00), // eb=10
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00,0x00), // eb=11
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00,0x00), // eb=12
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00,0x00), // eb=13
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00,0x00), // eb=14
+    Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00), // eb=15
+};
+
+//
 // Helpers
 // 
 
@@ -1341,6 +1484,1480 @@ void PPCInterpreter::PPCInterpreterJIT_vsrw128(sPPEState *ppeState, JITBlockBuil
 
   // Store result to vD (VPR[vd])
   COMP->vmovdqa(VPRPtr(J_VMX128_VD128), vD);
+}
+
+// Vector Permute (x'1000 002B')
+void PPCInterpreter::PPCInterpreterJIT_vperm(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vC = newXMM();
+  x86::Xmm vD = newXMM();
+
+  x86::Xmm tmp0 = newXMM();
+  x86::Xmm vAShuffled = newXMM();
+  x86::Xmm vBShuffled = newXMM();
+
+  // Allocate temp GP for loading 64-bit addresses
+  x86::Gp tmpAddr = newGP64();
+
+  // Load operands
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+  COMP->vmovdqa(vC, VPRPtr(instr.vc));
+
+  // Load address of XMMSwapWordMask
+  COMP->mov(tmpAddr, (uintptr_t)&XMMSwapWordMask);
+  COMP->vxorps(tmp0, vC, x86::ptr(tmpAddr));
+
+  // Load address of XMMPermuteByteMask
+  COMP->mov(tmpAddr, (uintptr_t)&XMMPermuteByteMask);
+  COMP->vpand(tmp0, tmp0, x86::ptr(tmpAddr));
+
+  // Shuffle both source operands
+  COMP->vpshufb(vAShuffled, vA, tmp0);
+  COMP->vpshufb(vBShuffled, vB, tmp0);
+
+  // Load address of XMMPermuteControl15
+  COMP->mov(tmpAddr, (uintptr_t)&XMMPermuteControl15);
+  COMP->vpcmpgtb(vD, tmp0, x86::ptr(tmpAddr));
+  // Blend and store result
+  COMP->vpblendvb(vD, vAShuffled, vBShuffled, vD);
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector 128 Permute
+void PPCInterpreter::PPCInterpreterJIT_vperm128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vC = newXMM();
+  x86::Xmm vD = newXMM();
+
+  x86::Xmm tmp0 = newXMM();
+  x86::Xmm vAShuffled = newXMM();
+  x86::Xmm vBShuffled = newXMM();
+
+  // Allocate temp GP for loading 64-bit addresses
+  x86::Gp tmpAddr = newGP64();
+
+  // Load operands
+  COMP->vmovdqa(vA, VPRPtr(J_VMX128_2_VA128));
+  COMP->vmovdqa(vB, VPRPtr(J_VMX128_2_VB128));
+  COMP->vmovdqa(vC, VPRPtr(J_VMX128_2_VC));
+
+  // Load address of XMMSwapWordMask
+  COMP->mov(tmpAddr, (uintptr_t)&XMMSwapWordMask);
+  COMP->vxorps(tmp0, vC, x86::ptr(tmpAddr));
+
+  // Load address of XMMPermuteByteMask
+  COMP->mov(tmpAddr, (uintptr_t)&XMMPermuteByteMask);
+  COMP->vpand(tmp0, tmp0, x86::ptr(tmpAddr));
+
+  // Shuffle both source operands
+  COMP->vpshufb(vAShuffled, vA, tmp0);
+  COMP->vpshufb(vBShuffled, vB, tmp0);
+
+  // Load address of XMMPermuteControl15
+  COMP->mov(tmpAddr, (uintptr_t)&XMMPermuteControl15);
+  COMP->vpcmpgtb(vD, tmp0, x86::ptr(tmpAddr));
+  // Blend and store result
+  COMP->vpblendvb(vD, vAShuffled, vBShuffled, vD);
+  COMP->vmovdqa(VPRPtr(J_VMX128_2_VD128), vD);
+}
+
+// Vector Shift Left Double by Octet Immediate (x'1000 002C')
+void PPCInterpreter::PPCInterpreterJIT_vsldoi(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Xmm tmp0 = newXMM();
+  x86::Xmm vAShuffled = newXMM();
+  x86::Xmm vBShuffled = newXMM();
+  x86::Gp tmpAddr = newGP64();
+  x86::Xmm tableValue = newXMM();
+
+  // Shift amount
+  u8 sh = instr.vc & 0xF;
+
+  // Fast paths
+  if (!sh) {
+    // No shift, just copy vA to vD
+    COMP->vmovdqa(vD, VPRPtr(instr.va));
+    COMP->vmovdqa(VPRPtr(instr.vd), vD);
+    return;
+  }
+  else if (sh == 16) {
+    // Full shift, copy vB to vD
+    COMP->vmovdqa(vD, VPRPtr(instr.vb));
+    COMP->vmovdqa(VPRPtr(instr.vd), vD);
+    return;
+  }
+
+  // Get the shift value from the table
+  COMP->mov(tmpAddr, (uintptr_t)&vsldoiTable[sh]);
+  COMP->vmovdqa(tableValue, x86::ptr(tmpAddr));
+  // Load operands
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+  // Load address of XMMSwapWordMask
+  COMP->mov(tmpAddr, (uintptr_t)&XMMSwapWordMask);
+  COMP->vxorps(tmp0, tableValue, x86::ptr(tmpAddr));
+  // Load address of XMMPermuteByteMask
+  COMP->mov(tmpAddr, (uintptr_t)&XMMPermuteByteMask);
+  COMP->vpand(tmp0, tmp0, x86::ptr(tmpAddr));
+  // Shuffle both source operands
+  COMP->vpshufb(vAShuffled, vA, tmp0);
+  COMP->vpshufb(vBShuffled, vB, tmp0);
+  // Load address of XMMPermuteControl15
+  COMP->mov(tmpAddr, (uintptr_t)&XMMPermuteControl15);
+  COMP->vpcmpgtb(vD, tmp0, x86::ptr(tmpAddr));
+  // Blend and store result
+  COMP->vpblendvb(vD, vAShuffled, vBShuffled, vD);
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector 128 Shift Left Double by Octet Immediate
+void PPCInterpreter::PPCInterpreterJIT_vsldoi128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Xmm tmp0 = newXMM();
+  x86::Xmm vAShuffled = newXMM();
+  x86::Xmm vBShuffled = newXMM();
+  x86::Gp tmpAddr = newGP64();
+  x86::Xmm tableValue = newXMM();
+
+  // Shift amount
+  u8 sh = J_VMX128_5_SH;
+
+  // Fast paths
+  if (!sh) {
+    // No shift, just copy vA to vD
+    COMP->vmovdqa(vD, VPRPtr(J_VMX128_5_VA128));
+    COMP->vmovdqa(VPRPtr(J_VMX128_5_VD128), vD);
+    return;
+  }
+  else if (sh == 16) {
+    // Full shift, copy vB to vD
+    COMP->vmovdqa(vD, VPRPtr(J_VMX128_5_VB128));
+    COMP->vmovdqa(VPRPtr(J_VMX128_5_VD128), vD);
+    return;
+  }
+
+  // Get the shift value from the table
+  COMP->mov(tmpAddr, (uintptr_t)&vsldoiTable[sh]);
+  COMP->vmovdqa(tableValue, x86::ptr(tmpAddr));
+  // Load operands
+  COMP->vmovdqa(vA, VPRPtr(J_VMX128_5_VA128));
+  COMP->vmovdqa(vB, VPRPtr(J_VMX128_5_VB128));
+  // Load address of XMMSwapWordMask
+  COMP->mov(tmpAddr, (uintptr_t)&XMMSwapWordMask);
+  COMP->vxorps(tmp0, tableValue, x86::ptr(tmpAddr));
+  // Load address of XMMPermuteByteMask
+  COMP->mov(tmpAddr, (uintptr_t)&XMMPermuteByteMask);
+  COMP->vpand(tmp0, tmp0, x86::ptr(tmpAddr));
+  // Shuffle both source operands
+  COMP->vpshufb(vAShuffled, vA, tmp0);
+  COMP->vpshufb(vBShuffled, vB, tmp0);
+  // Load address of XMMPermuteControl15
+  COMP->mov(tmpAddr, (uintptr_t)&XMMPermuteControl15);
+  COMP->vpcmpgtb(vD, tmp0, x86::ptr(tmpAddr));
+  // Blend and store result
+  COMP->vpblendvb(vD, vAShuffled, vBShuffled, vD);
+  COMP->vmovdqa(VPRPtr(J_VMX128_5_VD128), vD);
+}
+
+
+//*****************************************************************************
+// Load Vector
+//*****************************************************************************
+
+// NOTE: lvexx instructions behave like lvx.
+
+// Load Vector Indexed (x'7C00 00CE')
+void PPCInterpreter::PPCInterpreterJIT_lvx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Gp EA = newGP64();
+  x86::Xmm vD = newXMM();
+  x86::Gp exceptReg = newGP16();
+  Label endLabel = COMP->newLabel();
+
+  // Get effective address: EA = (rA|0) + rB
+  if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.rb));
+  COMP->and_(EA, imm(~0xF));
+
+  // Get the translated address
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  // Check for exceptions DStor/DSeg and return if found.
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  // Got our translated address, pull the vector onto vD
+  COMP->vmovdqa(vD, x86::ptr(EA));
+  // Byteswap the loaded vector
+  COMP->mov(EA, (uintptr_t)&XMMByteSwapMask);
+  COMP->vpshufb(vD, vD, x86::ptr(EA));
+  // Move it onto destination VPR
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+  COMP->bind(endLabel);
+}
+
+// Load Vector 128 Indexed
+void PPCInterpreter::PPCInterpreterJIT_lvx128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Gp EA = newGP64();
+  x86::Xmm vD = newXMM();
+  x86::Gp exceptReg = newGP16();
+  Label endLabel = COMP->newLabel();
+
+  // Get effective address: EA = (rA|0) + rB
+  if (instr.VMX128_1.RA != 0) { COMP->mov(EA, GPRPtr(instr.VMX128_1.RA)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.VMX128_1.RB));
+  COMP->and_(EA, imm(~0xF));
+
+  // Get the translated address
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  // Check for exceptions DStor/DSeg and return if found.
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  // Got our translated address, pull the vector onto vD
+  COMP->vmovdqa(vD, x86::ptr(EA));
+  // Byteswap the loaded vector
+  COMP->mov(EA, (uintptr_t)&XMMByteSwapMask);
+  COMP->vpshufb(vD, vD, x86::ptr(EA));
+  // Move it onto destination VPR
+  COMP->vmovdqa(VPRPtr(J_VMX128_1_VD128), vD);
+  COMP->bind(endLabel);
+}
+
+// Load Vector Left Indexed (x'7C00 040E')
+void PPCInterpreter::PPCInterpreterJIT_lvlx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Gp EA = newGP64();
+  x86::Gp eb = newGP64();
+  x86::Gp tableAddr = newGP64();
+  x86::Xmm value1 = newXMM();
+  x86::Xmm value2 = newXMM();
+  COMP->vxorps(value2, value2, value2);
+  x86::Xmm control = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Gp exceptReg = newGP16();
+  x86::Xmm tmp0 = newXMM();
+  x86::Xmm vAShuffled = newXMM();
+  x86::Xmm vBShuffled = newXMM();
+  Label endLabel = COMP->newLabel();
+
+
+  // Get effective address: EA = (rA|0) + rB
+  if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.rb));
+  COMP->mov(eb, EA);
+  COMP->and_(eb, imm(0xF));
+  COMP->and_(EA, imm(~0xF));
+
+  // Get the translated address
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  // Check for exceptions DStor/DSeg and return if found.
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  // Got our translated address, pull the vector onto value1
+  COMP->vmovdqa(value1, x86::ptr(EA));
+  // Byteswap the loaded vector
+  COMP->mov(EA, (uintptr_t)&XMMByteSwapMask);
+  COMP->vpshufb(value1, value1, x86::ptr(EA));
+
+  // Load control from vector shift left using eb as source address
+
+  // Each table entry is 16 bytes, so multiply index by 16
+  COMP->shl(eb, imm(4));
+  // Load address of the permutation table
+  COMP->mov(tableAddr, (uintptr_t)&loadVectorShiftLeftTable);
+  // Load the permutation vector from the table: vD = loadVectorShiftLeftTable[EA & 0xF]
+  // Using [tableAddr + EA]
+  COMP->vmovdqa(control, x86::ptr(tableAddr, eb));
+
+  // Permute
+  // Load address of XMMSwapWordMask
+  COMP->mov(tableAddr, (uintptr_t)&XMMSwapWordMask);
+  COMP->vxorps(tmp0, control, x86::ptr(tableAddr));
+
+  // Load address of XMMPermuteByteMask
+  COMP->mov(tableAddr, (uintptr_t)&XMMPermuteByteMask);
+  COMP->vpand(tmp0, tmp0, x86::ptr(tableAddr));
+
+  // Shuffle both source operands
+  COMP->vpshufb(vAShuffled, value1, tmp0);
+  COMP->vpshufb(vBShuffled, value2, tmp0);
+
+  // Load address of XMMPermuteControl15
+  COMP->mov(tableAddr, (uintptr_t)&XMMPermuteControl15);
+  COMP->vpcmpgtb(vD, tmp0, x86::ptr(tableAddr));
+  // Blend and store result
+  COMP->vpblendvb(vD, vAShuffled, vBShuffled, vD);
+
+  // Store result
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+
+  COMP->bind(endLabel);
+}
+
+// Load Vector Left Indexed 128
+void PPCInterpreter::PPCInterpreterJIT_lvlx128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Gp EA = newGP64();
+  x86::Gp eb = newGP64();
+  x86::Gp tableAddr = newGP64();
+  x86::Xmm value1 = newXMM();
+  x86::Xmm value2 = newXMM();
+  COMP->vxorps(value2, value2, value2);
+  x86::Xmm control = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Gp exceptReg = newGP16();
+  x86::Xmm tmp0 = newXMM();
+  x86::Xmm vAShuffled = newXMM();
+  x86::Xmm vBShuffled = newXMM();
+  Label endLabel = COMP->newLabel();
+
+
+  // Get effective address: EA = (rA|0) + rB
+  if (instr.VMX128_1.RA != 0) { COMP->mov(EA, GPRPtr(instr.VMX128_1.RA)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.VMX128_1.RB));
+  COMP->mov(eb, EA);
+  COMP->and_(eb, imm(0xF));
+  COMP->and_(EA, imm(~0xF));
+
+  // Get the translated address
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  // Check for exceptions DStor/DSeg and return if found.
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  // Got our translated address, pull the vector onto value1
+  COMP->vmovdqa(value1, x86::ptr(EA));
+  // Byteswap the loaded vector
+  COMP->mov(EA, (uintptr_t)&XMMByteSwapMask);
+  COMP->vpshufb(value1, value1, x86::ptr(EA));
+
+  // Load control from vector shift left using eb as source address
+
+  // Each table entry is 16 bytes, so multiply index by 16
+  COMP->shl(eb, imm(4));
+  // Load address of the permutation table
+  COMP->mov(tableAddr, (uintptr_t)&loadVectorShiftLeftTable);
+  // Load the permutation vector from the table: vD = loadVectorShiftLeftTable[EA & 0xF]
+  // Using [tableAddr + EA]
+  COMP->vmovdqa(control, x86::ptr(tableAddr, eb));
+
+  // Permute
+  // Load address of XMMSwapWordMask
+  COMP->mov(tableAddr, (uintptr_t)&XMMSwapWordMask);
+  COMP->vxorps(tmp0, control, x86::ptr(tableAddr));
+
+  // Load address of XMMPermuteByteMask
+  COMP->mov(tableAddr, (uintptr_t)&XMMPermuteByteMask);
+  COMP->vpand(tmp0, tmp0, x86::ptr(tableAddr));
+
+  // Shuffle both source operands
+  COMP->vpshufb(vAShuffled, value1, tmp0);
+  COMP->vpshufb(vBShuffled, value2, tmp0);
+
+  // Load address of XMMPermuteControl15
+  COMP->mov(tableAddr, (uintptr_t)&XMMPermuteControl15);
+  COMP->vpcmpgtb(vD, tmp0, x86::ptr(tableAddr));
+  // Blend and store result
+  COMP->vpblendvb(vD, vAShuffled, vBShuffled, vD);
+
+  // Store result
+  COMP->vmovdqa(VPRPtr(J_VMX128_1_VD128), vD);
+
+  COMP->bind(endLabel);
+}
+
+// Load Vector Right Indexed (x'7C00 044E')
+void PPCInterpreter::PPCInterpreterJIT_lvrx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  // EA
+  x86::Gp EA = newGP64();
+  // EB
+  x86::Gp eb = newGP64();
+  // Temp reg for addresses to static tables
+  x86::Gp tableAddr = newGP64();
+  // Regs for Permute
+  x86::Xmm value1 = newXMM();
+  x86::Xmm value2 = newXMM();
+  // Zero out the value2 vector used in the permute
+  COMP->vxorps(value2, value2, value2);
+  x86::Xmm control = newXMM();
+  x86::Xmm operand0 = newXMM();
+  x86::Xmm operand1 = newXMM();
+  x86::Xmm tmp0 = newXMM();
+  // Destination reg
+  x86::Xmm vD = newXMM();
+  // Exception reg
+  x86::Gp exceptReg = newGP16();
+
+  // Labels
+  Label endLabel = COMP->newLabel();
+  Label ebNotZero = COMP->newLabel();
+
+  // Get effective address: EA = (rA|0) + rB
+  if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.rb));
+  COMP->mov(eb, EA);
+  // Extract EB
+  COMP->and_(eb, imm(0xF));
+  // Check if EB = 0, we must clear the dest vector if so and exit.
+  COMP->test(eb, eb);
+  COMP->jnz(ebNotZero);
+  // It's zero, clear it and exit.
+  COMP->vxorps(vD, vD, vD);
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+  COMP->jmp(endLabel);
+  COMP->bind(ebNotZero);
+  // Align EA
+  COMP->and_(EA, imm(~0xF));
+
+  // Get the translated address
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  // Check for exceptions DStor/DSeg and return if found.
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  // Get vector data from memory
+  COMP->vmovdqa(value1, x86::ptr(EA));
+  // Byteswap the data
+  COMP->mov(EA, (uintptr_t)&XMMByteSwapMask);
+  COMP->vpshufb(value1, value1, x86::ptr(EA));
+  // Generate control vec using eb as indec to the LVSL table 
+  COMP->shl(eb, imm(4));
+  COMP->mov(tableAddr, (uintptr_t)&loadVectorShiftLeftTable);
+  COMP->vmovdqa(control, x86::ptr(tableAddr, eb));
+  // Permute using control, zero fileld vec and byteswapped data.
+  COMP->mov(tableAddr, (uintptr_t)&XMMSwapWordMask);
+  COMP->vxorps(tmp0, control, x86::ptr(tableAddr));
+  COMP->mov(tableAddr, (uintptr_t)&XMMPermuteByteMask);
+  COMP->vpand(tmp0, tmp0, x86::ptr(tableAddr));
+  COMP->vpshufb(operand0, value2, tmp0);
+  COMP->vpshufb(operand1, value1, tmp0);
+  COMP->mov(tableAddr, (uintptr_t)&XMMPermuteControl15);
+  COMP->vpcmpgtb(vD, tmp0, x86::ptr(tableAddr));
+  COMP->vpblendvb(vD, operand0, operand1, vD);
+  // Store result
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+  // Exit
+  COMP->bind(endLabel);
+}
+
+// Load Vector 128 Right Indexed
+void PPCInterpreter::PPCInterpreterJIT_lvrx128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  // EA
+  x86::Gp EA = newGP64();
+  // EB
+  x86::Gp eb = newGP64();
+  // Temp reg for addresses to static tables
+  x86::Gp tableAddr = newGP64();
+  // Regs for Permute
+  x86::Xmm value1 = newXMM();
+  x86::Xmm value2 = newXMM();
+  // Zero out the value2 vector used in the permute
+  COMP->vxorps(value2, value2, value2);
+  x86::Xmm control = newXMM();
+  x86::Xmm operand0 = newXMM();
+  x86::Xmm operand1 = newXMM();
+  x86::Xmm tmp0 = newXMM();
+  // Destination reg
+  x86::Xmm vD = newXMM();
+  // Exception reg
+  x86::Gp exceptReg = newGP16();
+
+  // Labels
+  Label endLabel = COMP->newLabel();
+  Label ebNotZero = COMP->newLabel();
+
+  // Get effective address: EA = (rA|0) + rB
+  if (instr.VMX128_1.RA != 0) { COMP->mov(EA, GPRPtr(instr.VMX128_1.RA)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.VMX128_1.RB));
+  COMP->mov(eb, EA);
+  // Extract EB
+  COMP->and_(eb, imm(0xF));
+  // Check if EB = 0, we must clear the dest vector if so and exit.
+  COMP->test(eb, eb);
+  COMP->jnz(ebNotZero);
+  // It's zero, clear it and exit.
+  COMP->vxorps(vD, vD, vD);
+  COMP->vmovdqa(VPRPtr(J_VMX128_1_VD128), vD);
+  COMP->jmp(endLabel);
+  COMP->bind(ebNotZero);
+  // Align EA
+  COMP->and_(EA, imm(~0xF));
+
+  // Get the translated address
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  // Check for exceptions DStor/DSeg and return if found.
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  // Get vector data from memory
+  COMP->vmovdqa(value1, x86::ptr(EA));
+  // Byteswap the data
+  COMP->mov(EA, (uintptr_t)&XMMByteSwapMask);
+  COMP->vpshufb(value1, value1, x86::ptr(EA));
+  // Generate control vec using eb as indec to the LVSL table 
+  COMP->shl(eb, imm(4));
+  COMP->mov(tableAddr, (uintptr_t)&loadVectorShiftLeftTable);
+  COMP->vmovdqa(control, x86::ptr(tableAddr, eb));
+  // Permute using control, zero fileld vec and byteswapped data.
+  COMP->mov(tableAddr, (uintptr_t)&XMMSwapWordMask);
+  COMP->vxorps(tmp0, control, x86::ptr(tableAddr));
+  COMP->mov(tableAddr, (uintptr_t)&XMMPermuteByteMask);
+  COMP->vpand(tmp0, tmp0, x86::ptr(tableAddr));
+  COMP->vpshufb(operand0, value2, tmp0);
+  COMP->vpshufb(operand1, value1, tmp0);
+  COMP->mov(tableAddr, (uintptr_t)&XMMPermuteControl15);
+  COMP->vpcmpgtb(vD, tmp0, x86::ptr(tableAddr));
+  COMP->vpblendvb(vD, operand0, operand1, vD);
+  // Store result
+  COMP->vmovdqa(VPRPtr(J_VMX128_1_VD128), vD);
+  // Exit
+  COMP->bind(endLabel);
+}
+
+// Load Vector for Shift Left (x'1F80 0006')
+void PPCInterpreter::PPCInterpreterJIT_lvsl(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Gp EA = newGP64();
+  x86::Xmm vD = newXMM();
+  x86::Gp tableAddr = newGP64();
+
+  // Get effective address: EA = (rA|0) + rB
+  if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.rb));
+  // Mask EA to low 4 bits to get the shift amount (0..15)
+  COMP->and_(EA, imm(0xF));
+  // Each table entry is 16 bytes, so multiply index by 16
+  COMP->shl(EA, imm(4));
+  // Load address of the permutation table
+  COMP->mov(tableAddr, (uintptr_t)&loadVectorShiftLeftTable);
+  // Load the permutation vector from the table: vD = loadVectorShiftLeftTable[EA & 0xF]
+  // Using [tableAddr + EA]
+  COMP->vmovdqa(vD, x86::ptr(tableAddr, EA));
+  // Store result to vD
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Load Vector 128 for Shift Left
+void PPCInterpreter::PPCInterpreterJIT_lvsl128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Gp EA = newGP64();
+  x86::Xmm vD = newXMM();
+  x86::Gp tableAddr = newGP64();
+
+  // Get effective address: EA = (rA|0) + rB
+  if (instr.VMX128_1.RA != 0) { COMP->mov(EA, GPRPtr(instr.VMX128_1.RA)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.VMX128_1.RB));
+  // Mask EA to low 4 bits to get the shift amount (0..15)
+  COMP->and_(EA, imm(0xF));
+  // Each table entry is 16 bytes, so multiply index by 16
+  COMP->shl(EA, imm(4));
+  // Load address of the permutation table
+  COMP->mov(tableAddr, (uintptr_t)&loadVectorShiftLeftTable);
+  // Load the permutation vector from the table: vD = loadVectorShiftLeftTable[EA & 0xF]
+  // Using [tableAddr + EA]
+  COMP->vmovdqa(vD, x86::ptr(tableAddr, EA));
+  // Store result to vD
+  COMP->vmovdqa(VPRPtr(J_VMX128_1_VD128), vD);
+}
+
+// Load Vector for Shift Right (x'7C00 004C')
+void PPCInterpreter::PPCInterpreterJIT_lvsr(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Gp EA = newGP64();
+  x86::Xmm vD = newXMM();
+  x86::Gp tableAddr = newGP64();
+
+  // Get effective address: EA = (rA|0) + rB
+  if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.rb));
+  // Mask EA to low 4 bits to get the shift amount (0..15)
+  COMP->and_(EA, imm(0xF));
+  // Each table entry is 16 bytes, so multiply index by 16
+  COMP->shl(EA, imm(4));
+  // Load address of the permutation table
+  COMP->mov(tableAddr, (uintptr_t)&loadVectorShiftRightTable);
+  // Load the permutation vector from the table: vD = loadVectorShiftRightTable[EA & 0xF]
+  // Using [tableAddr + EA]
+  COMP->vmovdqa(vD, x86::ptr(tableAddr, EA));
+  // Store result to vD
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Load Vector 128 for Shift Right
+void PPCInterpreter::PPCInterpreterJIT_lvsr128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Gp EA = newGP64();
+  x86::Xmm vD = newXMM();
+  x86::Gp tableAddr = newGP64();
+
+  // Get effective address: EA = (rA|0) + rB
+  if (instr.VMX128_1.RA != 0) { COMP->mov(EA, GPRPtr(instr.VMX128_1.RA)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.VMX128_1.RB));
+  // Mask EA to low 4 bits to get the shift amount (0..15)
+  COMP->and_(EA, imm(0xF));
+  // Each table entry is 16 bytes, so multiply index by 16
+  COMP->shl(EA, imm(4));
+  // Load address of the permutation table
+  COMP->mov(tableAddr, (uintptr_t)&loadVectorShiftRightTable);
+  // Load the permutation vector from the table: vD = loadVectorShiftRightTable[EA & 0xF]
+  // Using [tableAddr + EA]
+  COMP->vmovdqa(vD, x86::ptr(tableAddr, EA));
+  // Store result to vD
+  COMP->vmovdqa(VPRPtr(J_VMX128_1_VD128), vD);
+}
+
+//*****************************************************************************
+// Store Vector
+//*****************************************************************************
+
+// Store Vector Indexed (x'7C00 01CE')
+void PPCInterpreter::PPCInterpreterJIT_stvx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Gp EA = newGP64();
+  x86::Gp tmpAddress = newGP64();
+  x86::Xmm vD = newXMM();
+  Label endLabel = COMP->newLabel();
+
+  // Get effective address: EA = (rA|0) + rB
+  if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.rb));
+  COMP->and_(EA, imm(~0xF));
+
+  // Get the translated address
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  // Check for valid address
+  COMP->test(EA, EA);
+  COMP->jz(endLabel);
+  // Move it onto destination VPR
+  COMP->vmovdqa(vD, VPRPtr(instr.vd));
+  // Byteswap the vector
+  COMP->mov(tmpAddress, (uintptr_t)&XMMByteSwapMask);
+  COMP->vpshufb(vD, vD, x86::ptr(tmpAddress));
+  // Got our translated address, pull the vector onto vD
+  COMP->vmovdqa(x86::ptr(EA), vD);
+  COMP->bind(endLabel);
+}
+
+// Store Vector 128 Indexed 
+void PPCInterpreter::PPCInterpreterJIT_stvx128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Gp EA = newGP64();
+  x86::Gp tmpAddress = newGP64();
+  x86::Xmm vD = newXMM();
+  Label endLabel = COMP->newLabel();
+
+  // Get effective address: EA = (rA|0) + rB
+  if (instr.VMX128_1.RA != 0) { COMP->mov(EA, GPRPtr(instr.VMX128_1.RA)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.VMX128_1.RB));
+  COMP->and_(EA, imm(~0xF));
+
+  // Get the translated address
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+  // Check for valid address
+  COMP->test(EA, EA);
+  COMP->jz(endLabel);
+  // Move it onto destination VPR
+  COMP->vmovdqa(vD, VPRPtr(J_VMX128_1_VD128));
+  // Byteswap the vector
+  COMP->mov(tmpAddress, (uintptr_t)&XMMByteSwapMask);
+  COMP->vpshufb(vD, vD, x86::ptr(tmpAddress));
+  // Got our translated address, pull the vector onto vD
+  COMP->vmovdqa(x86::ptr(EA), vD);
+  COMP->bind(endLabel);
+}
+
+// Store Vector Element Byte Indexed (x'7C00 010E')
+void PPCInterpreter::PPCInterpreterJIT_stvebx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Gp EA = newGP64();
+  x86::Gp element = newGP64();
+  x86::Xmm vS = newXMM();
+  x86::Gp outByte = newGP32();
+  Label endLabel = COMP->newLabel();
+  Label case0 = COMP->newLabel();
+  Label case1 = COMP->newLabel();
+  Label case2 = COMP->newLabel();
+  Label case3 = COMP->newLabel();
+  Label case4 = COMP->newLabel();
+  Label case5 = COMP->newLabel();
+  Label case6 = COMP->newLabel();
+  Label case7 = COMP->newLabel();
+  Label case8 = COMP->newLabel();
+  Label case9 = COMP->newLabel();
+  Label case10 = COMP->newLabel();
+  Label case11 = COMP->newLabel();
+  Label case12 = COMP->newLabel();
+  Label case13 = COMP->newLabel();
+  Label case14 = COMP->newLabel();
+  Label case15 = COMP->newLabel();
+  Label storeLabel = COMP->newLabel();
+
+  // Get effective address: EA = (rA|0) + rB
+  if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.rb));
+  // Calculate element index: element = EA & 0xF
+  COMP->mov(element, EA);
+  COMP->and_(element, imm(0xF));
+
+  // Get the translated address
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  // Check for valid address
+  COMP->test(EA, EA);
+  COMP->jz(endLabel);
+
+  // Load source vector register
+  COMP->vmovdqa(vS, VPRPtr(instr.vd));
+  // Use direct extraction based on element index (0-15)
+  COMP->cmp(element, imm(0));
+  COMP->je(case0);
+  COMP->cmp(element, imm(1));
+  COMP->je(case1);
+  COMP->cmp(element, imm(2));
+  COMP->je(case2);
+  COMP->cmp(element, imm(3));
+  COMP->je(case3);
+  COMP->cmp(element, imm(4));
+  COMP->je(case4);
+  COMP->cmp(element, imm(5));
+  COMP->je(case5);
+  COMP->cmp(element, imm(6));
+  COMP->je(case6);
+  COMP->cmp(element, imm(7));
+  COMP->je(case7);
+  COMP->cmp(element, imm(8));
+  COMP->je(case8);
+  COMP->cmp(element, imm(9));
+  COMP->je(case9);
+  COMP->cmp(element, imm(10));
+  COMP->je(case10);
+  COMP->cmp(element, imm(11));
+  COMP->je(case11);
+  COMP->cmp(element, imm(12));
+  COMP->je(case12);
+  COMP->cmp(element, imm(13));
+  COMP->je(case13);
+  COMP->cmp(element, imm(14));
+  COMP->je(case14);
+  COMP->jmp(case15);
+  // Element 0
+  COMP->bind(case0);
+  COMP->vpextrb(outByte, vS, imm(0));
+  COMP->jmp(storeLabel);
+  // Element 1
+  COMP->bind(case1);
+  COMP->vpextrb(outByte, vS, imm(1));
+  COMP->jmp(storeLabel);
+  // Element 2
+  COMP->bind(case2);
+  COMP->vpextrb(outByte, vS, imm(2));
+  COMP->jmp(storeLabel);
+  // Element 3
+  COMP->bind(case3);
+  COMP->vpextrb(outByte, vS, imm(3));
+  COMP->jmp(storeLabel);
+  // Element 4
+  COMP->bind(case4);
+  COMP->vpextrb(outByte, vS, imm(4));
+  COMP->jmp(storeLabel);
+  // Element 5
+  COMP->bind(case5);
+  COMP->vpextrb(outByte, vS, imm(5));
+  COMP->jmp(storeLabel);
+  // Element 6
+  COMP->bind(case6);
+  COMP->vpextrb(outByte, vS, imm(6));
+  COMP->jmp(storeLabel);
+  // Element 7
+  COMP->bind(case7);
+  COMP->vpextrb(outByte, vS, imm(7));
+  COMP->jmp(storeLabel);
+  // Element 8
+  COMP->bind(case8);
+  COMP->vpextrb(outByte, vS, imm(8));
+  COMP->jmp(storeLabel);
+  // Element 9
+  COMP->bind(case9);
+  COMP->vpextrb(outByte, vS, imm(9));
+  COMP->jmp(storeLabel);
+  // Element 10
+  COMP->bind(case10);
+  COMP->vpextrb(outByte, vS, imm(10));
+  COMP->jmp(storeLabel);
+  // Element 11
+  COMP->bind(case11);
+  COMP->vpextrb(outByte, vS, imm(11));
+  COMP->jmp(storeLabel);
+  // Element 12
+  COMP->bind(case12);
+  COMP->vpextrb(outByte, vS, imm(12));
+  COMP->jmp(storeLabel);
+  // Element 13
+  COMP->bind(case13);
+  COMP->vpextrb(outByte, vS, imm(13));
+  COMP->jmp(storeLabel);
+  // Element 14
+  COMP->bind(case14);
+  COMP->vpextrb(outByte, vS, imm(14));
+  COMP->jmp(storeLabel);
+  // Element 15
+  COMP->bind(case15);
+  COMP->vpextrb(outByte, vS, imm(15));
+  // Store byte directly (no byte swap needed for single byte)
+  COMP->bind(storeLabel);
+  COMP->mov(x86::byte_ptr(EA), outByte.r8());
+
+  COMP->bind(endLabel);
+}
+
+// Store Vector Element Halfword Indexed (x'7C00 014E')
+void PPCInterpreter::PPCInterpreterJIT_stvehx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Gp EA = newGP64();
+  x86::Gp element = newGP64();
+  x86::Xmm vS = newXMM();
+  x86::Gp outWord = newGP32();
+  Label endLabel = COMP->newLabel();
+  Label case0 = COMP->newLabel();
+  Label case1 = COMP->newLabel();
+  Label case2 = COMP->newLabel();
+  Label case3 = COMP->newLabel();
+  Label case4 = COMP->newLabel();
+  Label case5 = COMP->newLabel();
+  Label case6 = COMP->newLabel();
+  Label case7 = COMP->newLabel();
+  Label storeLabel = COMP->newLabel();
+
+  // Get effective address: EA = (rA|0) + rB
+  if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.rb));
+  // Calculate element index before aligning EA: element = (EA >> 1) & 0x7
+  COMP->mov(element, EA);
+  COMP->shr(element, imm(1));
+  COMP->and_(element, imm(0x7));
+  // Align EA to 2-byte boundary
+  COMP->and_(EA, imm(~0x1));
+
+  // Get the translated address
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  // Check for valid address
+  COMP->test(EA, EA);
+  COMP->jz(endLabel);
+
+  // Load source vector register
+  COMP->vmovdqa(vS, VPRPtr(instr.vd));
+  // Use direct extraction based on element index (0-7)
+  COMP->cmp(element, imm(0));
+  COMP->je(case0);
+  COMP->cmp(element, imm(1));
+  COMP->je(case1);
+  COMP->cmp(element, imm(2));
+  COMP->je(case2);
+  COMP->cmp(element, imm(3));
+  COMP->je(case3);
+  COMP->cmp(element, imm(4));
+  COMP->je(case4);
+  COMP->cmp(element, imm(5));
+  COMP->je(case5);
+  COMP->cmp(element, imm(6));
+  COMP->je(case6);
+  COMP->jmp(case7);
+  // Element 0
+  COMP->bind(case0);
+  COMP->vpextrw(outWord, vS, imm(0));
+  COMP->jmp(storeLabel);
+  // Element 1
+  COMP->bind(case1);
+  COMP->vpextrw(outWord, vS, imm(1));
+  COMP->jmp(storeLabel);
+  // Element 2
+  COMP->bind(case2);
+  COMP->vpextrw(outWord, vS, imm(2));
+  COMP->jmp(storeLabel);
+  // Element 3
+  COMP->bind(case3);
+  COMP->vpextrw(outWord, vS, imm(3));
+  COMP->jmp(storeLabel);
+  // Element 4
+  COMP->bind(case4);
+  COMP->vpextrw(outWord, vS, imm(4));
+  COMP->jmp(storeLabel);
+  // Element 5
+  COMP->bind(case5);
+  COMP->vpextrw(outWord, vS, imm(5));
+  COMP->jmp(storeLabel);
+  // Element 6
+  COMP->bind(case6);
+  COMP->vpextrw(outWord, vS, imm(6));
+  COMP->jmp(storeLabel);
+  // Element 7
+  COMP->bind(case7);
+  COMP->vpextrw(outWord, vS, imm(7));
+  // Store with byteswap using movbe (16-bit)
+  COMP->bind(storeLabel);
+  COMP->movbe(x86::word_ptr(EA), outWord.r16());
+
+  COMP->bind(endLabel);
+}
+
+// Store Vector Element Word Indexed (x'7C00 018E')
+void PPCInterpreter::PPCInterpreterJIT_stvewx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Gp EA = newGP64();
+  x86::Gp element = newGP64();
+  x86::Xmm vS = newXMM();
+  x86::Gp outDword = newGP32();
+  Label endLabel = COMP->newLabel();
+  Label case0 = COMP->newLabel();
+  Label case1 = COMP->newLabel();
+  Label case2 = COMP->newLabel();
+  Label case3 = COMP->newLabel();
+  Label storeLabel = COMP->newLabel();
+
+  // Get effective address: EA = (rA|0) + rB
+  if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.rb));
+  // Calculate element index before aligning EA: element = (EA >> 2) & 0x3
+  COMP->mov(element, EA);
+  COMP->shr(element, imm(2));
+  COMP->and_(element, imm(0x3));
+  // Align EA to 4-byte boundary
+  COMP->and_(EA, imm(~0x3));
+
+  // Get the translated address
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  // Check for valid address
+  COMP->test(EA, EA);
+  COMP->jz(endLabel);
+
+  // Load source vector register
+  COMP->vmovdqa(vS, VPRPtr(instr.vd));
+  // Use direct extraction based on element index (0-3)
+  // NOTE: This is faster than using a lookup table, and modern CPU's should handle it very well.
+  COMP->cmp(element, imm(0));
+  COMP->je(case0);
+  COMP->cmp(element, imm(1));
+  COMP->je(case1);
+  COMP->cmp(element, imm(2));
+  COMP->je(case2);
+  COMP->jmp(case3);
+  // Element 0
+  COMP->bind(case0);
+  COMP->vpextrd(outDword, vS, imm(0));
+  COMP->jmp(storeLabel);
+  // Element 1
+  COMP->bind(case1);
+  COMP->vpextrd(outDword, vS, imm(1));
+  COMP->jmp(storeLabel);
+  // Element 2
+  COMP->bind(case2);
+  COMP->vpextrd(outDword, vS, imm(2));
+  COMP->jmp(storeLabel);
+  // Element 3
+  COMP->bind(case3);
+  COMP->vpextrd(outDword, vS, imm(3));
+  // Store with byteswap using movbe
+  COMP->bind(storeLabel);
+  COMP->movbe(x86::dword_ptr(EA), outDword);
+
+  COMP->bind(endLabel);
+}
+
+// Store Vector 128 Element Word Indexed
+void PPCInterpreter::PPCInterpreterJIT_stvewx128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Gp EA = newGP64();
+  x86::Gp element = newGP64();
+  x86::Xmm vS = newXMM();
+  x86::Gp outDword = newGP32();
+  Label endLabel = COMP->newLabel();
+  Label case0 = COMP->newLabel();
+  Label case1 = COMP->newLabel();
+  Label case2 = COMP->newLabel();
+  Label case3 = COMP->newLabel();
+  Label storeLabel = COMP->newLabel();
+
+  // Get effective address: EA = (rA|0) + rB
+  if (instr.VMX128_1.RA != 0) { COMP->mov(EA, GPRPtr(instr.VMX128_1.RA)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.VMX128_1.RB));
+  // Calculate element index before aligning EA: element = (EA >> 2) & 0x3
+  COMP->mov(element, EA);
+  COMP->shr(element, imm(2));
+  COMP->and_(element, imm(0x3));
+  // Align EA to 4-byte boundary
+  COMP->and_(EA, imm(~0x3));
+
+  // Get the translated address
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  // Check for valid address
+  COMP->test(EA, EA);
+  COMP->jz(endLabel);
+
+  // Load source vector register
+  COMP->vmovdqa(vS, VPRPtr(J_VMX128_1_VD128));
+  // Use direct extraction based on element index (0-3)
+  // NOTE: This is faster than using a lookup table, and modern CPU's should handle it very well.
+  COMP->cmp(element, imm(0));
+  COMP->je(case0);
+  COMP->cmp(element, imm(1));
+  COMP->je(case1);
+  COMP->cmp(element, imm(2));
+  COMP->je(case2);
+  COMP->jmp(case3);
+  // Element 0
+  COMP->bind(case0);
+  COMP->vpextrd(outDword, vS, imm(0));
+  COMP->jmp(storeLabel);
+  // Element 1
+  COMP->bind(case1);
+  COMP->vpextrd(outDword, vS, imm(1));
+  COMP->jmp(storeLabel);
+  // Element 2
+  COMP->bind(case2);
+  COMP->vpextrd(outDword, vS, imm(2));
+  COMP->jmp(storeLabel);
+  // Element 3
+  COMP->bind(case3);
+  COMP->vpextrd(outDword, vS, imm(3));
+  // Store with byteswap using movbe
+  COMP->bind(storeLabel);
+  COMP->movbe(x86::dword_ptr(EA), outDword);
+
+  COMP->bind(endLabel);
+}
+
+// Store Vector Left Indexed (x'7C00 050E')
+// Stores the left portion of a vector to memory based on alignment.
+// EA = (rA|0) + rB, eb = EA[60:63]
+// Stores bytes 0..(15-eb) of the byteswapped vector to memory at EA
+void PPCInterpreter::PPCInterpreterJIT_stvlx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Gp EA = newGP64();
+  x86::Gp eb = newGP64();
+  x86::Gp count = newGP64();
+  x86::Gp tmpAddress = newGP64();
+  x86::Xmm vS = newXMM();
+  x86::Xmm vDst = newXMM();
+  x86::Xmm vMask = newXMM();
+  Label endLabel = COMP->newLabel();
+
+  // Get effective address: EA = (rA|0) + rB
+  if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.rb));
+
+  // Extract eb = EA & 0xF (alignment offset)
+  COMP->mov(eb, EA);
+  COMP->and_(eb, imm(0xF));
+
+  // Calculate count = 16 - eb (number of bytes to store)
+  COMP->mov(count, imm(16));
+  COMP->sub(count, eb);
+
+  // If count == 0, nothing to store
+  COMP->test(count, count);
+  COMP->jz(endLabel);
+
+  // Get the translated address
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  // Check for valid address
+  COMP->test(EA, EA);
+  COMP->jz(endLabel);
+
+  // Load source vector and byteswap it
+  COMP->vmovdqa(vS, VPRPtr(instr.vd));
+  COMP->mov(tmpAddress, (uintptr_t)&XMMByteSwapMask);
+  COMP->vpshufb(vS, vS, x86::ptr(tmpAddress));
+
+  // Load current destination memory (unaligned)
+  COMP->vmovdqu(vDst, x86::ptr(EA));
+
+  // Load blend mask from stvlxBlendMasks[count]
+  COMP->mov(tmpAddress, (uintptr_t)&stvlxBlendMasks);
+  COMP->shl(count, imm(4));  // count * 16 (each Vector128 is 16 bytes)
+  COMP->add(tmpAddress, count);
+  COMP->vmovdqa(vMask, x86::ptr(tmpAddress));
+
+  // Blend: result = (vS & mask) | (vDst & ~mask)
+  // vpblendvb selects from vDst where mask bit is 0, from vS where mask bit is 1
+  COMP->vpblendvb(vDst, vDst, vS, vMask);
+
+  // Store result back to memory (unaligned)
+  COMP->vmovdqu(x86::ptr(EA), vDst);
+
+  COMP->bind(endLabel);
+}
+
+// Store Vector 128 Left Indexed
+void PPCInterpreter::PPCInterpreterJIT_stvlx128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Gp EA = newGP64();
+  x86::Gp eb = newGP64();
+  x86::Gp count = newGP64();
+  x86::Gp tmpAddress = newGP64();
+  x86::Xmm vS = newXMM();
+  x86::Xmm vDst = newXMM();
+  x86::Xmm vMask = newXMM();
+  Label endLabel = COMP->newLabel();
+
+  // Get effective address: EA = (rA|0) + rB
+  if (instr.VMX128_1.RA != 0) { COMP->mov(EA, GPRPtr(instr.VMX128_1.RA)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.VMX128_1.RB));
+
+  // Extract eb = EA & 0xF (alignment offset)
+  COMP->mov(eb, EA);
+  COMP->and_(eb, imm(0xF));
+
+  // Calculate count = 16 - eb (number of bytes to store)
+  COMP->mov(count, imm(16));
+  COMP->sub(count, eb);
+
+  // If count == 0, nothing to store
+  COMP->test(count, count);
+  COMP->jz(endLabel);
+
+  // Get the translated address
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  // Check for valid address
+  COMP->test(EA, EA);
+  COMP->jz(endLabel);
+
+  // Load source vector and byteswap it
+  COMP->vmovdqa(vS, VPRPtr(J_VMX128_1_VD128));
+  COMP->mov(tmpAddress, (uintptr_t)&XMMByteSwapMask);
+  COMP->vpshufb(vS, vS, x86::ptr(tmpAddress));
+
+  // Load current destination memory (unaligned)
+  COMP->vmovdqu(vDst, x86::ptr(EA));
+
+  // Load blend mask from stvlxBlendMasks[count]
+  COMP->mov(tmpAddress, (uintptr_t)&stvlxBlendMasks);
+  COMP->shl(count, imm(4));  // count * 16 (each Vector128 is 16 bytes)
+  COMP->add(tmpAddress, count);
+  COMP->vmovdqa(vMask, x86::ptr(tmpAddress));
+
+  // Blend: result = (vS & mask) | (vDst & ~mask)
+  // vpblendvb selects from vDst where mask bit is 0, from vS where mask bit is 1
+  COMP->vpblendvb(vDst, vDst, vS, vMask);
+
+  // Store result back to memory (unaligned)
+  COMP->vmovdqu(x86::ptr(EA), vDst);
+
+  COMP->bind(endLabel);
+}
+
+// Store Vector Right Indexed (x'7C00 054E')
+// Stores the right portion of a vector to memory based on alignment.
+// EA = (rA|0) + rB, eb = EA[60:63], EA &= ~0xF (align to 16-byte boundary)
+// If eb == 0, nothing is stored.
+// Otherwise, stores bytes (16-eb)..(15) of the byteswapped vector to aligned EA
+void PPCInterpreter::PPCInterpreterJIT_stvrx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Gp EA = newGP64();
+  x86::Gp eb = newGP64();
+  x86::Gp tmpAddress = newGP64();
+  x86::Xmm vS = newXMM();
+  x86::Xmm vDst = newXMM();
+  x86::Xmm vMask = newXMM();
+  Label endLabel = COMP->newLabel();
+
+  // Get effective address: EA = (rA|0) + rB
+  if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.rb));
+
+  // Extract eb = EA & 0xF (alignment offset / count of bytes to store)
+  COMP->mov(eb, EA);
+  COMP->and_(eb, imm(0xF));
+
+  // Align EA to 16-byte boundary
+  COMP->and_(EA, imm(~0xF));
+
+  // If eb == 0, nothing to store (return early)
+  COMP->test(eb, eb);
+  COMP->jz(endLabel);
+
+  // Get the translated address (using aligned EA)
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  // Check for valid address
+  COMP->test(EA, EA);
+  COMP->jz(endLabel);
+
+  // Load source vector and byteswap it
+  COMP->vmovdqa(vS, VPRPtr(instr.vd));
+  COMP->mov(tmpAddress, (uintptr_t)&XMMByteSwapMask);
+  COMP->vpshufb(vS, vS, x86::ptr(tmpAddress));
+
+  // Apply shuffle from stvrxShuffleTable[eb] to move bytes[16-eb..15] to bytes[0..eb-1]
+  COMP->mov(tmpAddress, (uintptr_t)&stvrxShuffleTable);
+  COMP->shl(eb, imm(4));  // eb * 16 (each Vector128 is 16 bytes)
+  COMP->add(tmpAddress, eb);
+  COMP->vpshufb(vS, vS, x86::ptr(tmpAddress));
+
+  // Load current destination memory (use unaligned load for safety)
+  COMP->vmovdqu(vDst, x86::ptr(EA));
+
+  // Load blend mask from stvrxBlendMasks[eb] (eb is already multiplied by 16)
+  COMP->mov(tmpAddress, (uintptr_t)&stvrxBlendMasks);
+  COMP->add(tmpAddress, eb);
+  COMP->vmovdqa(vMask, x86::ptr(tmpAddress));
+
+  // Blend: result = (vS & mask) | (vDst & ~mask)
+  // vpblendvb selects from vDst where mask bit is 0, from vS where mask bit is 1
+  COMP->vpblendvb(vDst, vDst, vS, vMask);
+
+  // Store result back to memory (use unaligned store for safety)
+  COMP->vmovdqu(x86::ptr(EA), vDst);
+
+  COMP->bind(endLabel);
+}
+
+// Store Vector 128 Right Indexed
+void PPCInterpreter::PPCInterpreterJIT_stvrx128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Gp EA = newGP64();
+  x86::Gp eb = newGP64();
+  x86::Gp tmpAddress = newGP64();
+  x86::Xmm vS = newXMM();
+  x86::Xmm vDst = newXMM();
+  x86::Xmm vMask = newXMM();
+  Label endLabel = COMP->newLabel();
+
+  // Get effective address: EA = (rA|0) + rB
+  if (instr.VMX128_1.RA != 0) { COMP->mov(EA, GPRPtr(instr.VMX128_1.RA)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.VMX128_1.RB));
+
+  // Extract eb = EA & 0xF (alignment offset / count of bytes to store)
+  COMP->mov(eb, EA);
+  COMP->and_(eb, imm(0xF));
+
+  // Align EA to 16-byte boundary
+  COMP->and_(EA, imm(~0xF));
+
+  // If eb == 0, nothing to store (return early)
+  COMP->test(eb, eb);
+  COMP->jz(endLabel);
+
+  // Get the translated address (using aligned EA)
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  // Check for valid address
+  COMP->test(EA, EA);
+  COMP->jz(endLabel);
+
+  // Load source vector and byteswap it
+  COMP->vmovdqa(vS, VPRPtr(J_VMX128_1_VD128));
+  COMP->mov(tmpAddress, (uintptr_t)&XMMByteSwapMask);
+  COMP->vpshufb(vS, vS, x86::ptr(tmpAddress));
+
+  // Apply shuffle from stvrxShuffleTable[eb] to move bytes[16-eb..15] to bytes[0..eb-1]
+  COMP->mov(tmpAddress, (uintptr_t)&stvrxShuffleTable);
+  COMP->shl(eb, imm(4));  // eb * 16 (each Vector128 is 16 bytes)
+  COMP->add(tmpAddress, eb);
+  COMP->vpshufb(vS, vS, x86::ptr(tmpAddress));
+
+  // Load current destination memory (use unaligned load for safety)
+  COMP->vmovdqu(vDst, x86::ptr(EA));
+
+  // Load blend mask from stvrxBlendMasks[eb] (eb is already multiplied by 16)
+  COMP->mov(tmpAddress, (uintptr_t)&stvrxBlendMasks);
+  COMP->add(tmpAddress, eb);
+  COMP->vmovdqa(vMask, x86::ptr(tmpAddress));
+
+  // Blend: result = (vS & mask) | (vDst & ~mask)
+  // vpblendvb selects from vDst where mask bit is 0, from vS where mask bit is 1
+  COMP->vpblendvb(vDst, vDst, vS, vMask);
+
+  // Store result back to memory (use unaligned store for safety)
+  COMP->vmovdqu(x86::ptr(EA), vDst);
+
+  COMP->bind(endLabel);
 }
 
 //

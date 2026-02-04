@@ -158,6 +158,11 @@ void mmuAddTlbEntry(sPPEState *ppeState);
 bool mmuSearchTlbEntry(sPPEState *ppeState, u64 *RPN, u64 VA, u8 p, bool L, bool LP);
 void mmuReadString(sPPEState *ppeState, u64 stringAddress, char *string, u32 maxLength);
 
+// JIT usage
+// Translates and returns a valid RAM Host Ptr of the specified guest address.
+u64 JITTranslateAndGetHostPtr(sPPEState *ppeState, u64 EA, ePPUThreadID thr = ePPUThread_None);
+
+
 // Security Engine Related
 SECENG_ADDRESS_INFO mmuGetSecEngInfoFromAddress(u64 inputAddress);
 u64 mmuContructEndAddressFromSecEngAddr(u64 inputAddress, bool *socAccess);
