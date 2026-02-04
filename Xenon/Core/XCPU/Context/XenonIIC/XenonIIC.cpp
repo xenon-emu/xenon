@@ -38,9 +38,12 @@ void Xe::XCPU::XenonIIC::Write(u64 writeAddress, const u8* data, u64 size) {
   // Write down the data
   memcpy(reinterpret_cast<u8*>(socINTBlock.get()) + offset, &dataIn, size);
 
+
+#ifdef IIC_DEBUG
   // Print all accesses
   const auto access = getSOCINTAccess(offset);
   DEBUGP("[IIC]: Write to {}, size {:#x}, inData {:#x}", access.c_str(), size, dataIn);
+#endif // IIC_DEBUG
 
   //
   // Process state changes
@@ -173,9 +176,11 @@ void Xe::XCPU::XenonIIC::Read(u64 readAddress, u8* data, u64 size) {
     }
   }
 
+#ifdef IIC_DEBUG
   // Print all accesses
   const auto access = getSOCINTAccess(offset);
   DEBUGP("[IIC]: Read to {}, size {:#x}, returning -> {:#x}", access.c_str(), size, dataOut);
+#endif // IIC_DEBUG
 
   // Copy the data out
   // Data is in BE format, byteswap it
@@ -199,13 +204,13 @@ void Xe::XCPU::XenonIIC::generateInterrupt(u8 interruptType, u8 cpusToInterrupt)
     getIntName(static_cast<eXeIntVectors>(interruptType)).c_str(), cpusToInterrupt);
 
   // Create our interrupt packet
-  sInterruptPacket intPacket = { interruptType, false};
+  sInterruptPacket intPacket = { interruptType, false };
 
   for (u8 threadID = 0; threadID < 6; threadID++) {
     u8 cpuMask = socINTBlock->ProcessorBlock[threadID].LogicalIdentification.AsBITS.LogicalId;
     if ((cpusToInterrupt & cpuMask)) {
-      // Store the interrupt in the interrupt queue
-      interruptState[threadID].pendingInterrupts.push(intPacket);
+      // Insert the interrupt into the sorted set - O(log n)
+      interruptState[threadID].pendingInterrupts.insert(intPacket);
     }
   }
 }
@@ -225,43 +230,34 @@ bool Xe::XCPU::XenonIIC::hasPendingInterrupts(u8 threadID, bool ignorePendingACK
   // Set a lock
   std::lock_guard lock(iicMutex);
 
-  auto& pq = interruptState[threadID].pendingInterrupts;
+  const auto& pendingSet = interruptState[threadID].pendingInterrupts;
 
-  if (pq.empty()) {
-    // No pending interrupts
+  if (pendingSet.empty()) {
     return false;
   }
 
-  // Check for priority
-  const u8 priority = static_cast<u8>(socINTBlock->ProcessorBlock[threadID].InterruptTaskPriority.AsULONGLONG & 0xFF);
+  // Current task priority for this thread
+  const u8 currentPriority = static_cast<u8>(socINTBlock->ProcessorBlock[threadID].InterruptTaskPriority.AsULONGLONG & 0xFF);
 
-  // Ignore ACK packages if any and lower priority interrupts
-  bool foundAcked = false;
-  bool foundMatch = false;
-  u8 type = 0;
-  std::vector<sInterruptPacket> buffer;
-  buffer.reserve(pq.size());
-
-  while (!pq.empty()) {
-    const auto pkt = pq.top();
-    pq.pop();
-    buffer.emplace_back(pkt);
-
-    if (pkt.acknowledged) { foundAcked = true; } 
-    else if (pkt.interruptType > priority) { foundMatch = true; type = pkt.interruptType; }
+  // Iterate through the sorted set - O(n) worst case but typically exits early
+  for (const auto& pkt : pendingSet) {
+    if (pkt.acknowledged) {
+      // Found an ACK'd packet
+      if (!ignorePendingACKd) {
+        return false; // Can't signal while ACK'd packets exist
+      }
+      continue; // Skip ACK'd packets when ignoring
+    }
+    // Non-acknowledged packet found
+    if (pkt.interruptType > currentPriority) {
+      return true; // Found a pending interrupt with higher priority than current
+    }
   }
 
-  for (const auto& pkt : buffer) { pq.push(pkt); }
-
-  // There are ACK'd packets, cant signal an interupt.
-  if (foundAcked && !ignorePendingACKd) {
-    return false;
-  }
-
-  return foundMatch;
+  return false;
 }
 
-// Removes the first ACK'd interrupt from the pending queue for a given thread.
+// Removes the first ACK'd interrupt from the pending set for a given thread.
 void Xe::XCPU::XenonIIC::removeFirstACKdInterrupt(u8 threadID) {
   // Bounds check
   if (threadID >= 6) {
@@ -271,36 +267,23 @@ void Xe::XCPU::XenonIIC::removeFirstACKdInterrupt(u8 threadID) {
   // Set a lock
   std::lock_guard lock(iicMutex);
 
-  auto& pq = interruptState[threadID].pendingInterrupts;
-  if (pq.empty()) {
-    DEBUGP("[IIC]: EOI on thread {} with empty queue", threadID);
+  auto& pendingSet = interruptState[threadID].pendingInterrupts;
+  if (pendingSet.empty()) {
+    DEBUGP("[IIC]: EOI on thread {} with empty set", threadID);
     return;
   }
 
-  // Rebuild the priority queue excluding the first acknowledged packet encountered in order.
-  bool removed = false;
-  std::vector<sInterruptPacket> buffer;
-  buffer.reserve(pq.size());
-
-  // Pop all elements; the top is highest priority due to operator < inversion.
-  while (!pq.empty()) {
-    const auto pkt = pq.top();
-    pq.pop();
-    if (!removed && pkt.acknowledged) {
-      removed = true;
+  // Find and remove the first acknowledged packet - O(n) search, O(log n) erase
+  for (auto it = pendingSet.begin(); it != pendingSet.end(); ++it) {
+    if (it->acknowledged) {
       DEBUGP("[IIC]: Removed ACK'd interrupt {} from thread {}",
-          getIntName(static_cast<eXeIntVectors>(pkt.interruptType)).c_str(), threadID);
-      continue; // skip this packet
+          getIntName(static_cast<eXeIntVectors>(it->interruptType)).c_str(), threadID);
+      pendingSet.erase(it);
+      return;
     }
-    buffer.emplace_back(pkt);
   }
 
-  // Restore the remaining packets back into the priority queue.
-  for (const auto& pkt : buffer) {
-    pq.push(pkt);
-  }
-
-  if (!removed) { DEBUGP("[IIC]: EOI on thread {} found no ACK'd interrupts to remove", threadID); }
+  DEBUGP("[IIC]: EOI on thread {} found no ACK'd interrupts to remove", threadID);
 }
 
 // Acknowledges and returns the highest priority pending interrupt for a given thread.
@@ -315,89 +298,36 @@ u8 Xe::XCPU::XenonIIC::acknowledgeInterrupt(u8 threadID) {
   // Set a lock
   std::lock_guard lock(iicMutex);
 
-  u8 outInterrupt = prioNONE;
+  auto& pendingSet = interruptState[threadID].pendingInterrupts;
 
-  auto& pq = interruptState[threadID].pendingInterrupts;
+  if (pendingSet.empty()) {
+    return prioNONE;
+  }
 
-  if (!pq.empty()) {
-    // Current task priority for this thread
-    const u8 currentPriority = static_cast<u8>(socINTBlock->ProcessorBlock[threadID].InterruptTaskPriority.AsULONGLONG & 0xFF);
+  // Current task priority for this thread
+  const u8 currentPriority = static_cast<u8>(socINTBlock->ProcessorBlock[threadID].InterruptTaskPriority.AsULONGLONG & 0xFF);
 
-    // Get the highest priority interrupt
-    const auto topPacket = pq.top();
-    u8 targetInterrupt = prioNONE;
-
-    if (!topPacket.acknowledged) {
-      if (topPacket.interruptType > currentPriority) {
-        // Top is higher than current priority -> acknowledge it
-        targetInterrupt = topPacket.interruptType;
-      } else if (topPacket.interruptType == currentPriority) {
-        // Special case, top equals current priority -> find next strictly higher than currentPriority
-        // We scan the queue and pick the first matching.
-        std::vector<sInterruptPacket> buffer;
-        buffer.reserve(pq.size());
-
-        u8 nextHigher = prioNONE;
-        while (!pq.empty()) {
-          const auto pkt = pq.top();
-          pq.pop();
-          buffer.emplace_back(pkt);
-          if (nextHigher == prioNONE && !pkt.acknowledged && pkt.interruptType > currentPriority) {
-            nextHigher = pkt.interruptType;
-            // Continue draining to preserve all packets
-          }
-        }
-        // Restore all queue contents
-        for (const auto& pkt : buffer) { pq.push(pkt); }
-
-        targetInterrupt = nextHigher; // may remain prioNONE if none found
-      } else {
-        // Top is lower than currentPriority -> no eligible interrupt
-        targetInterrupt = prioNONE;
-      }
-    } else {
-      // Top already acknowledged; try to find a non-acknowledged packet strictly higher than currentPriority
-      std::vector<sInterruptPacket> buffer;
-      buffer.reserve(pq.size());
-
-      u8 nextHigher = prioNONE;
-      while (!pq.empty()) {
-        const auto pkt = pq.top();
-        pq.pop();
-        buffer.emplace_back(pkt);
-        if (nextHigher == prioNONE && !pkt.acknowledged && pkt.interruptType > currentPriority) {
-          nextHigher = pkt.interruptType;
-          // Continue draining to preserve all packets
-        }
-      }
-      for (const auto& pkt : buffer) { pq.push(pkt); }
-
-      targetInterrupt = nextHigher;
+  // Find the first non-acknowledged interrupt with priority > currentPriority
+  // The set is sorted by interruptType (ascending = highest priority first), then by acknowledged status
+  for (auto it = pendingSet.begin(); it != pendingSet.end(); ++it) {
+    if (it->acknowledged) {
+      continue; // Skip already acknowledged
     }
 
-    // If we found an interrupt to acknowledge, mark exactly one matching packet as acknowledged.
-    if (targetInterrupt != prioNONE) {
-      outInterrupt = targetInterrupt;
+    if (it->interruptType > currentPriority) {
+      // Found an eligible interrupt - mark it as acknowledged (mutable field)
+      it->acknowledged = true;
+      return it->interruptType;
+    }
 
-      bool marked = false;
-      std::vector<sInterruptPacket> buffer;
-      buffer.reserve(pq.size());
-      // Pop all elements; the top is highest priority due to operator < inversion.
-      while (!pq.empty()) {
-        auto pkt = pq.top();
-        pq.pop();
-        if (!marked && !pkt.acknowledged && pkt.interruptType == targetInterrupt) {
-          pkt.acknowledged = true;
-          marked = true;
-        }
-        buffer.emplace_back(pkt);
-      }
-      // Restore the packets back into the priority queue.
-      for (const auto& pkt : buffer) { pq.push(pkt); }
+    // If interruptType == currentPriority, skip to find next higher
+    // If interruptType < currentPriority, no need to continue (sorted order)
+    if (it->interruptType < currentPriority) {
+      break; // No eligible interrupts in remaining items
     }
   }
 
-  return outInterrupt;
+  return prioNONE;
 }
 
 // Returns the name of the register being accessed based on the offset and what block it belongs to.

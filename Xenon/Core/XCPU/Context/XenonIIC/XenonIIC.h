@@ -5,7 +5,7 @@
 #pragma once
 
 #include <mutex>
-#include <queue>
+#include <set>
 
 namespace Xe::XCPU {
 
@@ -220,20 +220,25 @@ namespace Xe::XCPU {
     u64 Reserved12[495]; // 28808
   } SOCINTS_BLOCK, * PSOCINTS_BLOCK;
 
-  // Structure represnting an Interrupt Packet
-    struct sInterruptPacket {
+  // Structure representing an Interrupt Packet
+  struct sInterruptPacket {
     u8 interruptType = prioNONE;
-    bool acknowledged = false;
+    mutable bool acknowledged = false; // mutable to allow modification in set
 
-    // Highest priority comes first
+    // Highest priority comes first (lower interruptType value = higher priority)
+    // Secondary sort by acknowledged status: non-acknowledged before acknowledged
     friend constexpr bool operator<(const sInterruptPacket& lhs, const sInterruptPacket& rhs) noexcept {
-      return lhs.interruptType > rhs.interruptType;
+      if (lhs.interruptType != rhs.interruptType) {
+        return lhs.interruptType < rhs.interruptType; // Lower value = higher priority = comes first
+      }
+      // Same interrupt type: non-acknowledged comes before acknowledged
+      return !lhs.acknowledged && rhs.acknowledged;
     }
   };
 
   // Structure tracking the state of interrupts for each PPU Thread.
   struct sInterruptState {
-    std::priority_queue<sInterruptPacket> pendingInterrupts;
+    std::multiset<sInterruptPacket> pendingInterrupts;
   };
 
   class XenonIIC {
