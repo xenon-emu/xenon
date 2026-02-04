@@ -196,6 +196,15 @@ static const Vector128 stvrxBlendMasks[16] = {
     Vector128b(0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0xFF,0x00), // eb=15
 };
 
+// Shuffle mask for vpkuwum - extracts low 16 bits of each dword into low 64 bits
+// Bytes 1,0 from dword0, 5,4 from dword1, 9,8 from dword2, 13,12 from dword3 -> bytes 0-7
+// Note: bytes are swapped within each pair for big-endian halfword ordering
+// High bytes are zeroed (0x80)
+static const Vector128 vpkuwumShuffleMask = Vector128b(0x01,0x00,0x05,0x04,0x09,0x08,0x0D,0x0C,0x80,0x80,0x80,0x80,0x80,0x80,0x80,0x80);
+
+// Shuffle mask for vpkswss - applies byte swap
+static const Vector128 vpkswssShuffleMask = Vector128b(0x01,0x00,0x03,0x02,0x05,0x04,0x07,0x06, 0x09, 0x08, 0x0B, 0x0A, 0x0D,0x0C,0x0F,0x0E);
+
 //
 // Helpers
 // 
@@ -1678,6 +1687,275 @@ void PPCInterpreter::PPCInterpreterJIT_vsldoi128(sPPEState *ppeState, JITBlockBu
   COMP->vmovdqa(VPRPtr(J_VMX128_5_VD128), vD);
 }
 
+// Vector Pack Unsigned Word Unsigned Modulo (x'1000 004E')
+void PPCInterpreter::PPCInterpreterJIT_vpkuwum(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Gp tmpGp = newGP64();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // Load address of shuffle mask that extracts low 16 bits of each dword
+  COMP->mov(tmpGp, (uintptr_t)&vpkuwumShuffleMask);
+
+  // Shuffle vA: extract low halfwords to low 64 bits
+  COMP->vpshufb(vA, vA, x86::ptr(tmpGp));
+
+  // Shuffle vB: extract low halfwords to low 64 bits  
+  COMP->vpshufb(vB, vB, x86::ptr(tmpGp));
+
+  // Combine: vA has packed halfwords in low 64 bits, vB has packed halfwords in low 64 bits
+  // Use punpcklqdq to combine low 64 bits of both into one register
+  COMP->vpunpcklqdq(vD, vA, vB);
+
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector 128 Pack Unsigned Word Unsigned Modulo
+void PPCInterpreter::PPCInterpreterJIT_vpkuwum128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Gp tmpGp = newGP64();
+
+  COMP->vmovdqa(vA, VPRPtr(J_VMX128_VA128));
+  COMP->vmovdqa(vB, VPRPtr(J_VMX128_VB128));
+
+  // Load address of shuffle mask that extracts low 16 bits of each dword
+  COMP->mov(tmpGp, (uintptr_t)&vpkuwumShuffleMask);
+
+  // Shuffle vA: extract low halfwords to low 64 bits
+  COMP->vpshufb(vA, vA, x86::ptr(tmpGp));
+
+  // Shuffle vB: extract low halfwords to low 64 bits  
+  COMP->vpshufb(vB, vB, x86::ptr(tmpGp));
+
+  // Combine: Use punpcklqdq to combine low 64 bits of both
+  COMP->vpunpcklqdq(vD, vA, vB);
+
+  COMP->vmovdqa(VPRPtr(J_VMX128_VD128), vD);
+}
+
+// Vector Pack Signed Word Signed Saturate (x'1000 01CE')
+void PPCInterpreter::PPCInterpreterJIT_vpkswss(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Gp tmpGp = newGP64();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // vpackssdw: Pack signed dwords to signed words with saturation
+  COMP->vpackssdw(vD, vA, vB);
+
+  // Shuffle to byteswap lanes
+  COMP->mov(tmpGp, (uintptr_t)&vpkswssShuffleMask);
+  COMP->vpshufb(vD, vD, x86::ptr(tmpGp));
+
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector 128 Pack Signed Word Signed Saturate
+void PPCInterpreter::PPCInterpreterJIT_vpkswss128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Gp tmpGp = newGP64();
+
+  COMP->vmovdqa(vA, VPRPtr(J_VMX128_VA128));
+  COMP->vmovdqa(vB, VPRPtr(J_VMX128_VB128));
+
+  // vpackssdw: Pack signed dwords to signed words with saturation
+  COMP->vpackssdw(vD, vA, vB);
+
+  // Shuffle to reorder lanes
+  COMP->mov(tmpGp, (uintptr_t)&vpkswssShuffleMask);
+  COMP->vpshufb(vD, vD, x86::ptr(tmpGp));
+
+  COMP->vmovdqa(VPRPtr(J_VMX128_VD128), vD);
+}
+
+// Vector Subtract Unsigned Halfword Saturate (x'1000 0640')
+void PPCInterpreter::PPCInterpreterJIT_vsubuhs(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // vpsubusw: packed subtract unsigned saturated words (16-bit)
+  // If result would be negative, it saturates to 0
+  COMP->vpsubusw(vD, vA, vB);
+
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+//*****************************************************************************
+// Vector Merge
+//*****************************************************************************
+
+// Vector Merge High Word (x'1000 008C')
+void PPCInterpreter::PPCInterpreterJIT_vmrghw(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // vpunpckldq: Interleave low dwords from vA and vB
+  COMP->vpunpckldq(vD, vA, vB);
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector 128 Merge High Word
+void PPCInterpreter::PPCInterpreterJIT_vmrghw128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  COMP->vmovdqa(vA, VPRPtr(J_VMX128_VA128));
+  COMP->vmovdqa(vB, VPRPtr(J_VMX128_VB128));
+
+  COMP->vpunpckldq(vD, vA, vB);
+
+  COMP->vmovdqa(VPRPtr(J_VMX128_VD128), vD);
+}
+
+// Vector Merge High Halfword (x'1000 004C')
+void PPCInterpreter::PPCInterpreterJIT_vmrghh(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // vpunpcklwd with swapped operands for big-endian
+  COMP->vpunpcklwd(vD, vB, vA);
+
+  // Swap dword pairs: 0<->1 and 2<->3
+  // vpshufd imm8 = 0b10110001 = 0xB1 swaps pairs
+  COMP->vpshufd(vD, vD, imm(0xB1));
+
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Merge High Byte (x'1000 000C')
+void PPCInterpreter::PPCInterpreterJIT_vmrghb(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // vpunpcklbw with swapped operands for big-endian
+  COMP->vpunpcklbw(vD, vB, vA);
+  // Swap dword pairs: 0<->1 and 2<->3
+  // vpshufd imm8 = 0b10110001 = 0xB1 swaps pairs
+  COMP->vpshufd(vD, vD, imm(0xB1));
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Merge Low Word (x'1000 018C')
+void PPCInterpreter::PPCInterpreterJIT_vmrglw(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // vpunpckhdq: Interleave high dwords from vA and vB
+  COMP->vpunpckhdq(vD, vA, vB);
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector 128 Merge Low Word
+void PPCInterpreter::PPCInterpreterJIT_vmrglw128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  COMP->vmovdqa(vA, VPRPtr(J_VMX128_VA128));
+  COMP->vmovdqa(vB, VPRPtr(J_VMX128_VB128));
+
+  COMP->vpunpckhdq(vD, vA, vB);
+
+  COMP->vmovdqa(VPRPtr(J_VMX128_VD128), vD);
+}
+
+// Vector Merge Low Halfword (x'1000 014C')
+void PPCInterpreter::PPCInterpreterJIT_vmrglh(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // vpunpckhwd with swapped operands for big-endian
+  COMP->vpunpckhwd(vD, vB, vA);
+
+  // Swap dword pairs: 0<->1 and 2<->3
+  // vpshufd imm8 = 0b10110001 = 0xB1 swaps pairs
+  COMP->vpshufd(vD, vD, imm(0xB1));
+
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Merge Low Byte (x'1000 010C')
+void PPCInterpreter::PPCInterpreterJIT_vmrglb(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // vpunpckhbw with swapped operands for big-endian
+  COMP->vpunpckhbw(vD, vB, vA);
+  // Swap dword pairs: 0<->1 and 2<->3
+  // vpshufd imm8 = 0b10110001 = 0xB1 swaps pairs
+  COMP->vpshufd(vD, vD, imm(0xB1));
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
 
 //*****************************************************************************
 // Load Vector

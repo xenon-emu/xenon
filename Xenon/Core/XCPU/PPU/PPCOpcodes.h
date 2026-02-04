@@ -815,4 +815,20 @@ extern void PPCInterpreterJIT_stvlx(sPPEState *ppeState, JITBlockBuilder *b, uPP
 extern void PPCInterpreterJIT_stvlx128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_stvrx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_stvrx128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+
+extern void PPCInterpreterJIT_vpkuwum(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vpkuwum128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vpkswss(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vpkswss128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vsubuhs(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+
+// Vector Merge
+extern void PPCInterpreterJIT_vmrghw(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vmrghw128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vmrglw(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vmrglw128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vmrghh(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vmrglh(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vmrghb(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vmrglb(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 }
