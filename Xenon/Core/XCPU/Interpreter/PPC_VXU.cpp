@@ -139,6 +139,121 @@ void PPCInterpreter::PPCInterpreter_vadduhm(sPPEState* ppeState) {
   }
 }
 
+// Vector Add Unsigned Byte Modulo (x'1000 0000')
+void PPCInterpreter::PPCInterpreter_vaddubm(sPPEState *ppeState) {
+  CHECK_VXU;
+
+  for (u8 idx = 0; idx < 16; idx++) {
+    VRi(vd).bytes[idx] = VRi(va).bytes[idx] + VRi(vb).bytes[idx];
+  }
+}
+
+// Vector Add Unsigned Word Modulo (x'1000 0080')
+void PPCInterpreter::PPCInterpreter_vadduwm(sPPEState *ppeState) {
+  CHECK_VXU;
+
+  for (u8 idx = 0; idx < 4; idx++) {
+    VRi(vd).dword[idx] = VRi(va).dword[idx] + VRi(vb).dword[idx];
+  }
+}
+
+// Vector Multiply Odd Unsigned Byte (x'1000 0008')
+void PPCInterpreter::PPCInterpreter_vmuloub(sPPEState *ppeState) {
+  CHECK_VXU;
+
+  // For each internal word slot k, the low byte of word[k] is the odd PPC byte
+  // of the corresponding PPC halfword. Multiplying and storing back into word[k]
+  // produces the correct result since the dword halfword ordering is preserved.
+  for (u8 k = 0; k < 8; k++) {
+    u8 a = static_cast<u8>(VRi(va).word[k]);
+    u8 b = static_cast<u8>(VRi(vb).word[k]);
+    VRi(vd).word[k] = static_cast<u16>(a) * static_cast<u16>(b);
+  }
+}
+
+// Vector Multiply Odd Signed Byte (x'1000 0108')
+void PPCInterpreter::PPCInterpreter_vmulosb(sPPEState *ppeState) {
+  CHECK_VXU;
+
+  for (u8 k = 0; k < 8; k++) {
+    s8 a = static_cast<s8>(static_cast<u8>(VRi(va).word[k]));
+    s8 b = static_cast<s8>(static_cast<u8>(VRi(vb).word[k]));
+    VRi(vd).sword[k] = static_cast<s16>(a) * static_cast<s16>(b);
+  }
+}
+
+// Vector Multiply Odd Unsigned Halfword (x'1000 0048')
+void PPCInterpreter::PPCInterpreter_vmulouh(sPPEState *ppeState) {
+  CHECK_VXU;
+
+  // The low halfword of each dword (= word[2*k]) holds the odd PPC halfword.
+  // static_cast<u16>(dword[k]) extracts exactly this.
+  for (u8 k = 0; k < 4; k++) {
+    u16 a = static_cast<u16>(VRi(va).dword[k]);
+    u16 b = static_cast<u16>(VRi(vb).dword[k]);
+    VRi(vd).dword[k] = static_cast<u32>(a) * static_cast<u32>(b);
+  }
+}
+
+// Vector Pack Unsigned Halfword Unsigned Modulo (x'1000 000E')
+void PPCInterpreter::PPCInterpreter_vpkuhum(sPPEState *ppeState) {
+  CHECK_VXU;
+
+  // The source is VA||VB treated as 16 halfwords. The low byte of each is packed
+  // into VD. Must account for halfword swap within dwords (k^1) and destination
+  // byte position mapping for dword byte-swap.
+  Base::Vector128 result{};
+  for (u8 k = 0; k < 8; k++) {
+    u8 srcWordIdx = k ^ 1; // swap within each pair for dword halfword ordering
+    u8 dstByteIdx = (k / 4) * 4 + (3 - (k % 4)); // dword byte-swap position
+    result.bytes[dstByteIdx] = static_cast<u8>(VRi(va).word[srcWordIdx]);
+  }
+  for (u8 k = 0; k < 8; k++) {
+    u8 srcWordIdx = k ^ 1;
+    u8 dstByteIdx = 8 + (k / 4) * 4 + (3 - (k % 4));
+    result.bytes[dstByteIdx] = static_cast<u8>(VRi(vb).word[srcWordIdx]);
+  }
+  VRi(vd) = result;
+}
+
+// Vector Pack Unsigned Halfword Unsigned Saturate (x'1000 010E')
+void PPCInterpreter::PPCInterpreter_vpkuhus(sPPEState *ppeState) {
+  CHECK_VXU;
+
+  Base::Vector128 result{};
+  for (u8 k = 0; k < 8; k++) {
+    u8 srcWordIdx = k ^ 1;
+    u8 dstByteIdx = (k / 4) * 4 + (3 - (k % 4));
+    u16 val = VRi(va).word[srcWordIdx];
+    result.bytes[dstByteIdx] = (val > 0xFF) ? 0xFF : static_cast<u8>(val);
+  }
+  for (u8 k = 0; k < 8; k++) {
+    u8 srcWordIdx = k ^ 1;
+    u8 dstByteIdx = 8 + (k / 4) * 4 + (3 - (k % 4));
+    u16 val = VRi(vb).word[srcWordIdx];
+    result.bytes[dstByteIdx] = (val > 0xFF) ? 0xFF : static_cast<u8>(val);
+  }
+  VRi(vd) = result;
+}
+
+// Vector Pack Unsigned Word Unsigned Saturate (x'1000 00CE')
+void PPCInterpreter::PPCInterpreter_vpkuwus(sPPEState *ppeState) {
+  CHECK_VXU;
+
+  // Pack dwords to halfwords with unsigned saturation.
+  // Swap destination word pairs within each dword (idx^1).
+  Base::Vector128 result{};
+  for (u8 idx = 0; idx < 4; idx++) {
+    u32 val = VRi(va).dword[idx];
+    result.word[idx ^ 1] = (val > 0xFFFF) ? 0xFFFF : static_cast<u16>(val);
+  }
+  for (u8 idx = 0; idx < 4; idx++) {
+    u32 val = VRi(vb).dword[idx];
+    result.word[4 + (idx ^ 1)] = (val > 0xFFFF) ? 0xFFFF : static_cast<u16>(val);
+  }
+  VRi(vd) = result;
+}
+
 // Vector Add Unsigned Word Saturate (x'1000 0280')
 void PPCInterpreter::PPCInterpreter_vadduws(sPPEState *ppeState) {
   CHECK_VXU;
@@ -622,6 +737,26 @@ void PPCInterpreter::PPCInterpreter_vmsum3fp128(sPPEState* ppeState) {
 
   for (u8 idx = 0; idx < 4; idx++) {
     VR(VMX128_3_VD128).flt[idx] = dotProduct;
+  }
+}
+
+// Vector Maximum Signed Byte (x'1000 0102')
+void PPCInterpreter::PPCInterpreter_vmaxsb(sPPEState *ppeState) {
+  CHECK_VXU;
+
+  for (u8 idx = 0; idx < 16; ++idx) {
+    s8 a = static_cast<s8>(VRi(va).bytes[idx]);
+    s8 b = static_cast<s8>(VRi(vb).bytes[idx]);
+    VRi(vd).bytes[idx] = static_cast<u8>((a > b) ? a : b);
+  }
+}
+
+// Vector Maximum Unsigned Byte (x'1000 0002')
+void PPCInterpreter::PPCInterpreter_vmaxub(sPPEState *ppeState) {
+  CHECK_VXU;
+
+  for (u8 idx = 0; idx < 16; ++idx) {
+    VRi(vd).bytes[idx] = (VRi(va).bytes[idx] > VRi(vb).bytes[idx]) ? VRi(va).bytes[idx] : VRi(vb).bytes[idx];
   }
 }
 

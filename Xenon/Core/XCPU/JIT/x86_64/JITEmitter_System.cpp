@@ -159,9 +159,9 @@ void PPCInterpreter::PPCInterpreterJIT_mfocrf(sPPEState* ppeState, JITBlockBuild
 void PPCInterpreter::PPCInterpreterJIT_sc(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   x86::Gp exReg = newGP16();
   COMP->mov(exReg, EXPtr());
-  COMP->or_(exReg, ppuSystemCallEx);
+  COMP->or_(exReg, imm<u16>(ppuSystemCallEx));
   COMP->mov(EXPtr(), exReg);
-  COMP->mov(b->threadCtx->scalar(&sPPUThread::exHVSysCall).Base(), imm<bool>(instr.lev & 1));
+  COMP->mov(b->threadCtx->scalar(&sPPUThread::exHVSysCall).Ptr(), imm<bool>(instr.lev & 1));
 }
 
 void PPCInterpreter::PPCInterpreterJIT_mftb(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {

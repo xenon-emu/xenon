@@ -45,13 +45,13 @@ D_STUB(slbmfev)
 D_STUB(slbmfee)
 
 // Vector-instructions
-D_STUB(vaddubm)
-D_STUB(vmaxub)
+
+
 D_STUB(vrlb)
 D_STUB(vcmpequb)
 D_STUB(vcmpequb_)
-D_STUB(vmuloub)
-D_STUB(vpkuhum)
+
+
 D_STUB(vmhaddshs)
 D_STUB(vmhraddshs)
 D_STUB(vmladduhm)
@@ -63,15 +63,15 @@ D_STUB(vmsumshm)
 D_STUB(vmsumshs)
 D_STUB(vcmpequh)
 D_STUB(vcmpequh_)
-D_STUB(vmulouh)
+
 D_STUB(vsubfp)
 D_STUB(vpkuwum)
-D_STUB(vadduwm)
+
 D_STUB(vrlw)
-D_STUB(vpkuhus)
-D_STUB(vpkuwus)
-D_STUB(vmaxsb)
-D_STUB(vmulosb)
+
+
+
+
 D_STUB(vpkshus)
 D_STUB(vmulosh)
 D_STUB(vpkswus)
@@ -352,6 +352,14 @@ extern void PPCInterpreter_vaddfp(sPPEState *ppeState);
 extern void PPCInterpreter_vaddfp128(sPPEState *ppeState);
 extern void PPCInterpreter_vaddubs(sPPEState *ppeState);
 extern void PPCInterpreter_vadduhm(sPPEState *ppeState);
+extern void PPCInterpreter_vaddubm(sPPEState *ppeState);
+extern void PPCInterpreter_vadduwm(sPPEState *ppeState);
+extern void PPCInterpreter_vmuloub(sPPEState *ppeState);
+extern void PPCInterpreter_vmulosb(sPPEState *ppeState);
+extern void PPCInterpreter_vmulouh(sPPEState *ppeState);
+extern void PPCInterpreter_vpkuhum(sPPEState *ppeState);
+extern void PPCInterpreter_vpkuhus(sPPEState *ppeState);
+extern void PPCInterpreter_vpkuwus(sPPEState *ppeState);
 extern void PPCInterpreter_vadduws(sPPEState *ppeState);
 extern void PPCInterpreter_vaddshs(sPPEState *ppeState);
 extern void PPCInterpreter_vavguh(sPPEState *ppeState);
@@ -379,6 +387,8 @@ extern void PPCInterpreter_vnor(sPPEState *ppeState);
 extern void PPCInterpreter_vor(sPPEState *ppeState);
 extern void PPCInterpreter_vor128(sPPEState *ppeState);
 extern void PPCInterpreter_vspltw(sPPEState *ppeState);
+extern void PPCInterpreter_vmaxsb(sPPEState *ppeState);
+extern void PPCInterpreter_vmaxub(sPPEState *ppeState);
 extern void PPCInterpreter_vmaxuw(sPPEState *ppeState);
 extern void PPCInterpreter_vmaxsh(sPPEState* ppeState);
 extern void PPCInterpreter_vmaxuh(sPPEState* ppeState);
@@ -606,6 +616,12 @@ extern void PPCInterpreterJIT_cntlzdx(sPPEState *ppeState, JITBlockBuilder *b, u
 extern void PPCInterpreterJIT_cntlzwx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_crand(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_cror(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_crnor(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_crandc(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_crxor(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_crnand(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_creqv(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_crorc(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_dcbst(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_dcbtst(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_dcbf(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
@@ -684,6 +700,8 @@ extern void PPCInterpreterJIT_ld(sPPEState *ppeState, JITBlockBuilder *b, uPPCIn
 extern void PPCInterpreterJIT_ldu(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_ldux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_ldx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_lwarx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_ldarx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 
 extern void PPCInterpreterJIT_stb(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_stbu(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
@@ -698,6 +716,8 @@ extern void PPCInterpreterJIT_std(sPPEState *ppeState, JITBlockBuilder *b, uPPCI
 extern void PPCInterpreterJIT_stdu(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_stdux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_stdx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_stwcx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_stdcx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 
 //
 // FPU JIT emitters
@@ -752,6 +772,23 @@ extern void PPCInterpreterJIT_vmaxfp(sPPEState *ppeState, JITBlockBuilder *b, uP
 extern void PPCInterpreterJIT_vmaxfp128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vminfp(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vminfp128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vmaxsb(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vmaxsh(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vmaxsw(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vmaxub(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vmaxuh(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vmaxuw(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vaddubm(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vadduhm(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vadduwm(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vmuloub(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vmulosb(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vmulouh(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vpkuhum(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vpkuhus(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vpkuhus128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vpkuwus(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vpkuwus128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vrefp(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vrsqrtefp(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vmaddfp(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);

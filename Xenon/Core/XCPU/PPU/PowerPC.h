@@ -1382,6 +1382,10 @@ struct sPPUThread {
   bool exHVSysCall = false;
   // PPU reservations for PPC atomic load/store operations.
   std::unique_ptr<PPU_RES> ppuRes{};
+  
+  // JIT atomic reservation state (for lwarx/stwcx without full reservation system)
+  u64 atomicResHostPtr = 0;   // Host memory pointer from lwarx/ldarx
+  u64 atomicResExpected = 0;  // Expected value (big-endian, ready for cmpxchg)
 };
 
 // The structure of the Xenon CPU differs from that on the CELL/BE in that instead of having one PPE and 8 SPE's

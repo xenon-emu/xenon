@@ -754,6 +754,396 @@ void PPCInterpreter::PPCInterpreterJIT_vminfp128(sPPEState *ppeState, JITBlockBu
   COMP->vmovaps(VPRPtr(J_VMX128_VD128), vD);
 }
 
+// Vector Maximum Signed Byte (x'1000 0102')
+void PPCInterpreter::PPCInterpreterJIT_vmaxsb(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+  COMP->vpmaxsb(vD, vA, vB);
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Maximum Signed Halfword (x'1000 0142')
+void PPCInterpreter::PPCInterpreterJIT_vmaxsh(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+  COMP->vpmaxsw(vD, vA, vB);
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Maximum Signed Word (x'1000 0182')
+void PPCInterpreter::PPCInterpreterJIT_vmaxsw(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+  COMP->vpmaxsd(vD, vA, vB);
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Maximum Unsigned Byte (x'1000 0002')
+void PPCInterpreter::PPCInterpreterJIT_vmaxub(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+  COMP->vpmaxub(vD, vA, vB);
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Maximum Unsigned Halfword (x'1000 0042')
+void PPCInterpreter::PPCInterpreterJIT_vmaxuh(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+  COMP->vpmaxuw(vD, vA, vB);
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Maximum Unsigned Word (x'1000 0082')
+void PPCInterpreter::PPCInterpreterJIT_vmaxuw(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+  COMP->vpmaxud(vD, vA, vB);
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Add Unsigned Byte Modulo (x'1000 0000')
+void PPCInterpreter::PPCInterpreterJIT_vaddubm(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+  COMP->vpaddb(vD, vA, vB);
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Add Unsigned Halfword Modulo (x'1000 0040')
+void PPCInterpreter::PPCInterpreterJIT_vadduhm(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+  COMP->vpaddw(vD, vA, vB);
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Add Unsigned Word Modulo (x'1000 0080')
+void PPCInterpreter::PPCInterpreterJIT_vadduwm(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+  COMP->vpaddd(vD, vA, vB);
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Multiply Odd Unsigned Byte (x'1000 0008')
+void PPCInterpreter::PPCInterpreterJIT_vmuloub(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Xmm vShuf = newXMM();
+  x86::Gp tmpGp = newGP64();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // Shuffle mask to gather odd bytes into positions 0-7
+  static const Vector128 vmuloubShufMask = Vector128b(
+    0x06, 0x04, 0x02, 0x00, 0x0E, 0x0C, 0x0A, 0x08,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
+  COMP->mov(tmpGp, (uintptr_t)&vmuloubShufMask);
+
+  // Gather odd bytes from VA and VB into lower 8 bytes
+  COMP->vpshufb(vA, vA, x86::ptr(tmpGp));
+  COMP->vpshufb(vB, vB, x86::ptr(tmpGp));
+
+  // Zero-extend bytes to words (8 bytes -> 8 words)
+  COMP->vpmovzxbw(vA, vA);
+  COMP->vpmovzxbw(vB, vB);
+
+  // Multiply 16-bit unsigned
+  COMP->vpmullw(vD, vA, vB);
+
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Multiply Odd Signed Byte (x'1000 0108')
+void PPCInterpreter::PPCInterpreterJIT_vmulosb(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Gp tmpGp = newGP64();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // Same shuffle mask as vmuloub
+  static const Vector128 vmulosbShufMask = Vector128b(
+    0x06, 0x04, 0x02, 0x00, 0x0E, 0x0C, 0x0A, 0x08,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
+  COMP->mov(tmpGp, (uintptr_t)&vmulosbShufMask);
+
+  // Gather odd bytes from VA and VB into lower 8 bytes
+  COMP->vpshufb(vA, vA, x86::ptr(tmpGp));
+  COMP->vpshufb(vB, vB, x86::ptr(tmpGp));
+
+  // Sign-extend bytes to words (8 bytes -> 8 words)
+  COMP->vpmovsxbw(vA, vA);
+  COMP->vpmovsxbw(vB, vB);
+
+  // Multiply 16-bit signed
+  COMP->vpmullw(vD, vA, vB);
+
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Multiply Odd Unsigned Halfword (x'1000 0048')
+void PPCInterpreter::PPCInterpreterJIT_vmulouh(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Gp tmpGp = newGP64();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // Shuffle to move odd halfwords (at word positions 0,2,4,6) into low 64 bits
+  // word[0] -> bytes 0,1; word[2] -> bytes 2,3; word[4] -> bytes 4,5; word[6] -> bytes 6,7
+  static const Vector128 vmulouhShufMask = Vector128b(
+    0x05, 0x04, 0x01, 0x00, 0x0D, 0x0C, 0x09, 0x08,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
+  COMP->mov(tmpGp, (uintptr_t)&vmulouhShufMask);
+
+  // Gather odd halfwords into lower 64 bits
+  COMP->vpshufb(vA, vA, x86::ptr(tmpGp));
+  COMP->vpshufb(vB, vB, x86::ptr(tmpGp));
+
+  // Zero-extend halfwords to dwords (4 halfwords -> 4 dwords)
+  COMP->vpmovzxwd(vA, vA);
+  COMP->vpmovzxwd(vB, vB);
+
+  // Multiply 32-bit unsigned (only low 32 bits of each)
+  COMP->vpmulld(vD, vA, vB);
+
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Pack Unsigned Halfword Unsigned Modulo (x'1000 000E')
+void PPCInterpreter::PPCInterpreterJIT_vpkuhum(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Gp tmpGp = newGP64();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // Extract low byte of each halfword into low 8 bytes, high bytes zeroed
+  static const Vector128 vpkuhumShufMask = Vector128b(
+    0x02, 0x00, 0x06, 0x04, 0x0A, 0x08, 0x0E, 0x0C,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
+  COMP->mov(tmpGp, (uintptr_t)&vpkuhumShufMask);
+
+  // Shuffle VA: extract low bytes to low 64 bits
+  COMP->vpshufb(vA, vA, x86::ptr(tmpGp));
+
+  // Shuffle VB: extract low bytes to low 64 bits
+  COMP->vpshufb(vB, vB, x86::ptr(tmpGp));
+
+  // Combine: VA low 64 bits | VB low 64 bits
+  COMP->vpunpcklqdq(vD, vA, vB);
+
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Pack Unsigned Halfword Unsigned Saturate (x'1000 010E')
+void PPCInterpreter::PPCInterpreterJIT_vpkuhus(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Xmm vMask = newXMM();
+  x86::Gp tmpGp = newGP64();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // For unsigned saturation from u16 to u8:
+  // vpminsw treats as signed - won't work for values > 0x7FFF
+  // Use vpminuw to clamp to 0x00FF, then pack with modulo
+  static const Vector128 clampMask = Vector128s(0x00FF);
+  COMP->mov(tmpGp, (uintptr_t)&clampMask);
+  COMP->vmovdqa(vMask, x86::ptr(tmpGp));
+
+  // Clamp to 0x00FF using unsigned min
+  COMP->vpminuw(vA, vA, vMask);
+  COMP->vpminuw(vB, vB, vMask);
+
+  // Now use the same shuffle+combine as vpkuhum since values are already clamped
+  static const Vector128 vpkuhusShufMask = Vector128b(
+    0x02, 0x00, 0x06, 0x04, 0x0A, 0x08, 0x0E, 0x0C,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
+  COMP->mov(tmpGp, (uintptr_t)&vpkuhusShufMask);
+
+  COMP->vpshufb(vA, vA, x86::ptr(tmpGp));
+  COMP->vpshufb(vB, vB, x86::ptr(tmpGp));
+  COMP->vpunpcklqdq(vD, vA, vB);
+
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector 128 Pack Unsigned Halfword Unsigned Saturate
+void PPCInterpreter::PPCInterpreterJIT_vpkuhus128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Xmm vMask = newXMM();
+  x86::Gp tmpGp = newGP64();
+
+  COMP->vmovdqa(vA, VPRPtr(J_VMX128_VA128));
+  COMP->vmovdqa(vB, VPRPtr(J_VMX128_VB128));
+
+  // For unsigned saturation from u16 to u8:
+  // vpminsw treats as signed - won't work for values > 0x7FFF
+  // Use vpminuw to clamp to 0x00FF, then pack with modulo
+  static const Vector128 clampMask = Vector128s(0x00FF);
+  COMP->mov(tmpGp, (uintptr_t)&clampMask);
+  COMP->vmovdqa(vMask, x86::ptr(tmpGp));
+
+  // Clamp to 0x00FF using unsigned min
+  COMP->vpminuw(vA, vA, vMask);
+  COMP->vpminuw(vB, vB, vMask);
+
+  // Now use the same shuffle+combine as vpkuhum since values are already clamped
+  static const Vector128 vpkuhusShufMask = Vector128b(
+    0x02, 0x00, 0x06, 0x04, 0x0A, 0x08, 0x0E, 0x0C,
+    0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80);
+  COMP->mov(tmpGp, (uintptr_t)&vpkuhusShufMask);
+
+  COMP->vpshufb(vA, vA, x86::ptr(tmpGp));
+  COMP->vpshufb(vB, vB, x86::ptr(tmpGp));
+  COMP->vpunpcklqdq(vD, vA, vB);
+
+  COMP->vmovdqa(VPRPtr(J_VMX128_VD128), vD);
+}
+
+// Vector Pack Unsigned Word Unsigned Saturate (x'1000 00CE')
+void PPCInterpreter::PPCInterpreterJIT_vpkuwus(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Xmm vMask = newXMM();
+  x86::Gp tmpGp = newGP64();
+
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+
+  // Clamp unsigned dwords to 0x0000FFFF using unsigned min
+  static const Vector128 clampMask = Vector128i(0x0000FFFF);
+  COMP->mov(tmpGp, (uintptr_t)&clampMask);
+  COMP->vmovdqa(vMask, x86::ptr(tmpGp));
+
+  COMP->vpminud(vA, vA, vMask);
+  COMP->vpminud(vB, vB, vMask);
+
+  // Use the same shuffle approach as vpkuwum since values are now clamped
+  COMP->mov(tmpGp, (uintptr_t)&vpkuwumShuffleMask);
+
+  COMP->vpshufb(vA, vA, x86::ptr(tmpGp));
+  COMP->vpshufb(vB, vB, x86::ptr(tmpGp));
+  COMP->vpunpcklqdq(vD, vA, vB);
+
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector 128 Pack Unsigned Word Unsigned Saturate
+void PPCInterpreter::PPCInterpreterJIT_vpkuwus128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Xmm vMask = newXMM();
+  x86::Gp tmpGp = newGP64();
+
+  COMP->vmovdqa(vA, VPRPtr(J_VMX128_VA128));
+  COMP->vmovdqa(vB, VPRPtr(J_VMX128_VB128));
+
+  // Clamp unsigned dwords to 0x0000FFFF using unsigned min
+  static const Vector128 clampMask = Vector128i(0x0000FFFF);
+  COMP->mov(tmpGp, (uintptr_t)&clampMask);
+  COMP->vmovdqa(vMask, x86::ptr(tmpGp));
+
+  COMP->vpminud(vA, vA, vMask);
+  COMP->vpminud(vB, vB, vMask);
+
+  // Use the same shuffle approach as vpkuwum since values are now clamped
+  COMP->mov(tmpGp, (uintptr_t)&vpkuwumShuffleMask);
+
+  COMP->vpshufb(vA, vA, x86::ptr(tmpGp));
+  COMP->vpshufb(vB, vB, x86::ptr(tmpGp));
+  COMP->vpunpcklqdq(vD, vA, vB);
+
+  COMP->vmovdqa(VPRPtr(J_VMX128_VD128), vD);
+}
+
 // Vector Round to Floating-Point Integer Nearest (x'1000 020A')
 void PPCInterpreter::PPCInterpreterJIT_vrfin(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure VXU is enabled
@@ -1808,10 +2198,6 @@ void PPCInterpreter::PPCInterpreterJIT_vsubuhs(sPPEState *ppeState, JITBlockBuil
 
   COMP->vmovdqa(VPRPtr(instr.vd), vD);
 }
-
-//*****************************************************************************
-// Vector Merge
-//*****************************************************************************
 
 // Vector Merge High Word (x'1000 008C')
 void PPCInterpreter::PPCInterpreterJIT_vmrghw(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
@@ -2958,9 +3344,6 @@ void PPCInterpreter::PPCInterpreterJIT_stvewx128(sPPEState *ppeState, JITBlockBu
 }
 
 // Store Vector Left Indexed (x'7C00 050E')
-// Stores the left portion of a vector to memory based on alignment.
-// EA = (rA|0) + rB, eb = EA[60:63]
-// Stores bytes 0..(15-eb) of the byteswapped vector to memory at EA
 void PPCInterpreter::PPCInterpreterJIT_stvlx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure VXU is enabled
   J_checkVXUEnabled(b);
@@ -3095,10 +3478,6 @@ void PPCInterpreter::PPCInterpreterJIT_stvlx128(sPPEState *ppeState, JITBlockBui
 }
 
 // Store Vector Right Indexed (x'7C00 054E')
-// Stores the right portion of a vector to memory based on alignment.
-// EA = (rA|0) + rB, eb = EA[60:63], EA &= ~0xF (align to 16-byte boundary)
-// If eb == 0, nothing is stored.
-// Otherwise, stores bytes (16-eb)..(15) of the byteswapped vector to aligned EA
 void PPCInterpreter::PPCInterpreterJIT_stvrx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure VXU is enabled
   J_checkVXUEnabled(b);

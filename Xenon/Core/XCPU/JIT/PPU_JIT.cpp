@@ -288,9 +288,9 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
 #endif
       if (instrCount != 0) {
         // We're a few instructions into the block, just end the block on the last instruction and start a new block on
-           // the faulting instruction. It will process the exception accordingly.
-             // We clear the exception condition or else the exception handler will run on the first instruction of last the 
-             // compiled block.
+        // the faulting instruction. It will process the exception accordingly.
+        // We clear the exception condition or else the exception handler will run on the first instruction of last the 
+        // compiled block.
         thread.exceptReg &= ~(ppuInstrStorageEx | ppuInstrSegmentEx);
         break;
       } else {
@@ -387,22 +387,12 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
     }
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
-    // Epilogue, update the time base and check/process pending exceptions.
-    // We return execution if any exception is indeed found.
-    InvokeNode *returnCheck = nullptr;
-    x86::Gp retVal = compiler.newGpb();
-
-    // Call our epilogue.
-    compiler.invoke(&returnCheck, imm((void *)InstrEpilogue), FuncSignature::build<bool, PPU *, sPPEState *>());
-    returnCheck->setArg(0, jitBuilder->ppu->Base());
-    returnCheck->setArg(1, jitBuilder->ppeState->Base());
-    returnCheck->setRet(0, retVal);
-    
-    // Test for ocurred exceptions and return if any.
+    // Test for present exceptions and return if any is found.
     Label skipRet = compiler.newLabel();
-    
-    compiler.test(retVal, retVal);  // Check for a positive result.
-    compiler.je(skipRet);           // Skip return if no exceptions.
+    x86::Gp exceptReg = compiler.newGpw();
+    compiler.mov(exceptReg, jitBuilder->threadCtx->scalar(&sPPUThread::exceptReg));
+    compiler.test(exceptReg, exceptReg);  // Check for a positive result.
+    compiler.jz(skipRet);           // Skip return if no exceptions.
     compiler.ret();                 // Return if exceptions ocurred.
     compiler.bind(skipRet);         // Skip return Tag.
 #endif
@@ -551,6 +541,13 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
       // For Testing and debugging purposes only.
       if (singleBlock)
         break;
+
+      // If the thread was suspended due to CTRL being written, we must end execution on said thread.
+      if (ppeState->currentThread == 0 && !ppeState->SPR.CTRL.TE0) { break; }
+      if (ppeState->currentThread == 1 && !ppeState->SPR.CTRL.TE1) { break; }
+
+      // Process pending exceptions and check for external interrupts.
+      ppu->PPUCheckExceptions();
     } else {
       bool realMode = false;
       realMode = !thread.SPR.MSR.DR || !thread.SPR.MSR.IR;
@@ -623,13 +620,11 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
       }
 
       // If the thread was suspended due to CTRL being written, we must end execution on said thread.
-      if (ppeState->currentThread == 0 && !ppeState->SPR.CTRL.TE0) {
-        break;
-      }
+      if (ppeState->currentThread == 0 && !ppeState->SPR.CTRL.TE0) { break; }
+      if (ppeState->currentThread == 1 && !ppeState->SPR.CTRL.TE1) { break; }
 
-      if (ppeState->currentThread == 1 && !ppeState->SPR.CTRL.TE1) {
-        break;
-      }
+      // Process pending exceptions and check for external interrupts.
+      ppu->PPUCheckExceptions();
     }
   }
 }

@@ -1963,6 +1963,180 @@ void PPCInterpreter::PPCInterpreterJIT_cror(sPPEState *ppeState, JITBlockBuilder
   COMP->mov(CRValPtr(), crData);
 }
 
+// Condition Register NOR
+void PPCInterpreter::PPCInterpreterJIT_crnor(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  u8 shiftCra = 31 - instr.crba;
+  u8 shiftCrb = 31 - instr.crbb;
+  u8 shiftCrd = 31 - instr.crbd;
+
+  Label clearCRD = COMP->newLabel();
+  Label end = COMP->newLabel();
+
+  x86::Gp crData = newGP32();
+
+  COMP->mov(crData, CRValPtr());
+  // NOR: result is 1 only if both bits are 0
+  COMP->bt(crData, imm<u8>(shiftCra));
+  COMP->jc(clearCRD);  // If A is set, result is 0
+  COMP->bt(crData, imm<u8>(shiftCrb));
+  COMP->jc(clearCRD);  // If B is set, result is 0
+  // Both bits are clear, set CRBD
+  COMP->bts(crData, imm<u8>(shiftCrd));
+  COMP->jmp(end);
+  COMP->bind(clearCRD);
+  // At least one bit is set, clear CRBD
+  COMP->btr(crData, imm<u8>(shiftCrd));
+  COMP->bind(end);
+  COMP->mov(CRValPtr(), crData);
+}
+
+// Condition Register AND with Complement
+void PPCInterpreter::PPCInterpreterJIT_crandc(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  u8 shiftCra = 31 - instr.crba;
+  u8 shiftCrb = 31 - instr.crbb;
+  u8 shiftCrd = 31 - instr.crbd;
+
+  Label clearCRD = COMP->newLabel();
+  Label end = COMP->newLabel();
+
+  x86::Gp crData = newGP32();
+
+  COMP->mov(crData, CRValPtr());
+  // ANDC: result is 1 if A is 1 AND B is 0
+  COMP->bt(crData, imm<u8>(shiftCra));
+  COMP->jnc(clearCRD);  // If A is clear, result is 0
+  COMP->bt(crData, imm<u8>(shiftCrb));
+  COMP->jc(clearCRD);   // If B is set, result is 0
+  // A is set and B is clear, set CRBD
+  COMP->bts(crData, imm<u8>(shiftCrd));
+  COMP->jmp(end);
+  COMP->bind(clearCRD);
+  COMP->btr(crData, imm<u8>(shiftCrd));
+  COMP->bind(end);
+  COMP->mov(CRValPtr(), crData);
+}
+
+// Condition Register XOR
+void PPCInterpreter::PPCInterpreterJIT_crxor(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  u8 shiftCra = 31 - instr.crba;
+  u8 shiftCrb = 31 - instr.crbb;
+  u8 shiftCrd = 31 - instr.crbd;
+
+  Label setCRD = COMP->newLabel();
+  Label end = COMP->newLabel();
+
+  x86::Gp crData = newGP32();
+  x86::Gp bitA = newGP32();
+  x86::Gp bitB = newGP32();
+
+  COMP->mov(crData, CRValPtr());
+  // Extract bit A
+  COMP->bt(crData, imm<u8>(shiftCra));
+  COMP->setc(bitA.r8());
+  // Extract bit B
+  COMP->bt(crData, imm<u8>(shiftCrb));
+  COMP->setc(bitB.r8());
+  // XOR the two bits
+  COMP->xor_(bitA, bitB);
+  COMP->test(bitA, bitA);
+  COMP->jnz(setCRD);
+  // Result is 0, clear CRBD
+  COMP->btr(crData, imm<u8>(shiftCrd));
+  COMP->jmp(end);
+  COMP->bind(setCRD);
+  // Result is 1, set CRBD
+  COMP->bts(crData, imm<u8>(shiftCrd));
+  COMP->bind(end);
+  COMP->mov(CRValPtr(), crData);
+}
+
+// Condition Register NAND
+void PPCInterpreter::PPCInterpreterJIT_crnand(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  u8 shiftCra = 31 - instr.crba;
+  u8 shiftCrb = 31 - instr.crbb;
+  u8 shiftCrd = 31 - instr.crbd;
+
+  Label setCRD = COMP->newLabel();
+  Label end = COMP->newLabel();
+
+  x86::Gp crData = newGP32();
+
+  COMP->mov(crData, CRValPtr());
+  // NAND: result is 0 only if both bits are 1
+  COMP->bt(crData, imm<u8>(shiftCra));
+  COMP->jnc(setCRD);  // If A is clear, result is 1
+  COMP->bt(crData, imm<u8>(shiftCrb));
+  COMP->jnc(setCRD);  // If B is clear, result is 1
+  // Both bits are set, clear CRBD
+  COMP->btr(crData, imm<u8>(shiftCrd));
+  COMP->jmp(end);
+  COMP->bind(setCRD);
+  // At least one bit is clear, set CRBD
+  COMP->bts(crData, imm<u8>(shiftCrd));
+  COMP->bind(end);
+  COMP->mov(CRValPtr(), crData);
+}
+
+// Condition Register Equivalent (XNOR)
+void PPCInterpreter::PPCInterpreterJIT_creqv(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  u8 shiftCra = 31 - instr.crba;
+  u8 shiftCrb = 31 - instr.crbb;
+  u8 shiftCrd = 31 - instr.crbd;
+
+  Label setCRD = COMP->newLabel();
+  Label end = COMP->newLabel();
+
+  x86::Gp crData = newGP32();
+  x86::Gp bitA = newGP32();
+  x86::Gp bitB = newGP32();
+
+  COMP->mov(crData, CRValPtr());
+  // Extract bit A
+  COMP->bt(crData, imm<u8>(shiftCra));
+  COMP->setc(bitA.r8());
+  // Extract bit B
+  COMP->bt(crData, imm<u8>(shiftCrb));
+  COMP->setc(bitB.r8());
+  // XNOR: result is 1 if both bits are the same (XOR then invert)
+  COMP->xor_(bitA, bitB);
+  COMP->test(bitA, bitA);
+  COMP->jz(setCRD);
+  // Result is 0 (bits differ), clear CRBD
+  COMP->btr(crData, imm<u8>(shiftCrd));
+  COMP->jmp(end);
+  COMP->bind(setCRD);
+  // Result is 1 (bits same), set CRBD
+  COMP->bts(crData, imm<u8>(shiftCrd));
+  COMP->bind(end);
+  COMP->mov(CRValPtr(), crData);
+}
+
+// Condition Register OR with Complement
+void PPCInterpreter::PPCInterpreterJIT_crorc(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  u8 shiftCra = 31 - instr.crba;
+  u8 shiftCrb = 31 - instr.crbb;
+  u8 shiftCrd = 31 - instr.crbd;
+
+  Label setCRD = COMP->newLabel();
+  Label end = COMP->newLabel();
+
+  x86::Gp crData = newGP32();
+
+  COMP->mov(crData, CRValPtr());
+  // ORC: result is 1 if A is 1 OR B is 0
+  COMP->bt(crData, imm<u8>(shiftCra));
+  COMP->jc(setCRD);   // If A is set, result is 1
+  COMP->bt(crData, imm<u8>(shiftCrb));
+  COMP->jnc(setCRD);  // If B is clear, result is 1
+  // A is clear and B is set, clear CRBD
+  COMP->btr(crData, imm<u8>(shiftCrd));
+  COMP->jmp(end);
+  COMP->bind(setCRD);
+  COMP->bts(crData, imm<u8>(shiftCrd));
+  COMP->bind(end);
+  COMP->mov(CRValPtr(), crData);
+}
+
 // Extend Sign Byte (x'7C00 0774')
 void PPCInterpreter::PPCInterpreterJIT_extsbx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   x86::Gp rSTemp = newGP64();
