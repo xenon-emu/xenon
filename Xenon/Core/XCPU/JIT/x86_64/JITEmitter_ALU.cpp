@@ -2127,7 +2127,7 @@ void PPCInterpreter::PPCInterpreterJIT_crorc(sPPEState *ppeState, JITBlockBuilde
   COMP->bt(crData, imm<u8>(shiftCra));
   COMP->jc(setCRD);   // If A is set, result is 1
   COMP->bt(crData, imm<u8>(shiftCrb));
-  COMP->jnc(setCRD);  // If B is clear, result is 1
+  COMP->jc(setCRD);  // If B is clear, result is 1
   // A is clear and B is set, clear CRBD
   COMP->btr(crData, imm<u8>(shiftCrd));
   COMP->jmp(end);

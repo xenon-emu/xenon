@@ -5504,4 +5504,555 @@ void PPCInterpreter::PPCInterpreterJIT_fnmsubsx(sPPEState* ppeState, JITBlockBui
   }
 }
 
+//
+// FPU Load/Store Instructions
+//
+
+// Load Floating-Point Double (x'C800 0000')
+void PPCInterpreter::PPCInterpreterJIT_lfd(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  Label endLabel = COMP->newLabel();
+  x86::Gp EA = newGP64();
+  x86::Gp data64 = newGP64();
+  x86::Gp exceptReg = newGP16();
+
+  if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, imm<s16>(instr.simm16));
+
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  COMP->mov(data64, x86::qword_ptr(EA));
+  COMP->bswap(data64);
+  COMP->mov(FPRPtr(instr.frd), data64);
+  COMP->bind(endLabel);
+}
+
+// Load Floating-Point Double Indexed (x'7C00 04AE')
+void PPCInterpreter::PPCInterpreterJIT_lfdx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  Label endLabel = COMP->newLabel();
+  x86::Gp EA = newGP64();
+  x86::Gp data64 = newGP64();
+  x86::Gp exceptReg = newGP16();
+
+  if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.rb));
+
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  COMP->mov(data64, x86::qword_ptr(EA));
+  COMP->bswap(data64);
+  COMP->mov(FPRPtr(instr.frd), data64);
+  COMP->bind(endLabel);
+}
+
+// Load Floating-Point Double with Update (x'CC00 0000')
+void PPCInterpreter::PPCInterpreterJIT_lfdu(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  Label endLabel = COMP->newLabel();
+  x86::Gp EA = newGP64();
+  x86::Gp data64 = newGP64();
+  x86::Gp exceptReg = newGP16();
+
+  COMP->mov(EA, GPRPtr(instr.ra));
+  COMP->add(EA, imm<s16>(instr.simm16));
+
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  COMP->mov(data64, x86::qword_ptr(EA));
+  COMP->bswap(data64);
+  COMP->mov(FPRPtr(instr.frd), data64);
+  // Recompute EA from GPRs (host ptr was returned in EA, need original EA for rA update)
+  COMP->mov(EA, GPRPtr(instr.ra));
+  COMP->add(EA, imm<s16>(instr.simm16));
+  COMP->mov(GPRPtr(instr.ra), EA);
+  COMP->bind(endLabel);
+}
+
+// Load Floating-Point Double with Update Indexed
+void PPCInterpreter::PPCInterpreterJIT_lfdux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  Label endLabel = COMP->newLabel();
+  x86::Gp EA = newGP64();
+  x86::Gp origEA = newGP64();
+  x86::Gp data64 = newGP64();
+  x86::Gp exceptReg = newGP16();
+
+  COMP->mov(EA, GPRPtr(instr.ra));
+  COMP->add(EA, GPRPtr(instr.rb));
+  COMP->mov(origEA, EA);
+
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  COMP->mov(data64, x86::qword_ptr(EA));
+  COMP->bswap(data64);
+  COMP->mov(FPRPtr(instr.frd), data64);
+  COMP->mov(GPRPtr(instr.ra), origEA);
+  COMP->bind(endLabel);
+}
+
+// Load Floating-Point Single (x'C000 0000')
+void PPCInterpreter::PPCInterpreterJIT_lfs(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  Label endLabel = COMP->newLabel();
+  x86::Gp EA = newGP64();
+  x86::Gp data32 = newGP32();
+  x86::Xmm tmpXmm = newXMM();
+  x86::Gp exceptReg = newGP16();
+
+  if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, imm<s16>(instr.simm16));
+
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  COMP->mov(data32, x86::dword_ptr(EA));
+  COMP->bswap(data32);
+
+  COMP->vmovd(tmpXmm, data32);
+  COMP->vcvtss2sd(tmpXmm, tmpXmm, tmpXmm);
+  COMP->vmovsd(FPRPtr(instr.frd), tmpXmm);
+  COMP->bind(endLabel);
+}
+
+// Load Floating-Point Single Indexed (x'7C00 042E')
+void PPCInterpreter::PPCInterpreterJIT_lfsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  Label endLabel = COMP->newLabel();
+  x86::Gp EA = newGP64();
+  x86::Gp data32 = newGP32();
+  x86::Xmm tmpXmm = newXMM();
+  x86::Gp exceptReg = newGP16();
+
+  if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.rb));
+
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  COMP->mov(data32, x86::dword_ptr(EA));
+  COMP->bswap(data32);
+
+  COMP->vmovd(tmpXmm, data32);
+  COMP->vcvtss2sd(tmpXmm, tmpXmm, tmpXmm);
+  COMP->vmovsd(FPRPtr(instr.frd), tmpXmm);
+  COMP->bind(endLabel);
+}
+
+// Load Floating-Point Single with Update (x'C400 0000')
+void PPCInterpreter::PPCInterpreterJIT_lfsu(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  Label endLabel = COMP->newLabel();
+  x86::Gp EA = newGP64();
+  x86::Gp data32 = newGP32();
+  x86::Xmm tmpXmm = newXMM();
+  x86::Gp exceptReg = newGP16();
+
+  COMP->mov(EA, GPRPtr(instr.ra));
+  COMP->add(EA, imm<s16>(instr.simm16));
+
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  COMP->mov(data32, x86::dword_ptr(EA));
+  COMP->bswap(data32);
+
+  COMP->vmovd(tmpXmm, data32);
+  COMP->vcvtss2sd(tmpXmm, tmpXmm, tmpXmm);
+  COMP->vmovsd(FPRPtr(instr.frd), tmpXmm);
+  // Update rA with original EA
+  COMP->mov(EA, GPRPtr(instr.ra));
+  COMP->add(EA, imm<s16>(instr.simm16));
+  COMP->mov(GPRPtr(instr.ra), EA);
+  COMP->bind(endLabel);
+}
+
+// Load Floating-Point Single with Update Indexed
+void PPCInterpreter::PPCInterpreterJIT_lfsux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  Label endLabel = COMP->newLabel();
+  x86::Gp EA = newGP64();
+  x86::Gp origEA = newGP64();
+  x86::Gp data32 = newGP32();
+  x86::Xmm tmpXmm = newXMM();
+  x86::Gp exceptReg = newGP16();
+
+  COMP->mov(EA, GPRPtr(instr.ra));
+  COMP->add(EA, GPRPtr(instr.rb));
+  COMP->mov(origEA, EA);
+
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  COMP->mov(data32, x86::dword_ptr(EA));
+  COMP->bswap(data32);
+
+  COMP->vmovd(tmpXmm, data32);
+  COMP->vcvtss2sd(tmpXmm, tmpXmm, tmpXmm);
+  COMP->vmovsd(FPRPtr(instr.frd), tmpXmm);
+  COMP->mov(GPRPtr(instr.ra), origEA);
+  COMP->bind(endLabel);
+}
+
+// Store Floating-Point Double (x'D800 0000')
+void PPCInterpreter::PPCInterpreterJIT_stfd(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  Label endLabel = COMP->newLabel();
+  x86::Gp EA = newGP64();
+  x86::Gp data64 = newGP64();
+  x86::Gp exceptReg = newGP16();
+
+  if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, imm<s16>(instr.simm16));
+
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  COMP->mov(data64, FPRPtr(instr.frs));
+  COMP->bswap(data64);
+  COMP->mov(x86::qword_ptr(EA), data64);
+  COMP->bind(endLabel);
+}
+
+// Store Floating-Point Double Indexed
+void PPCInterpreter::PPCInterpreterJIT_stfdx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  Label endLabel = COMP->newLabel();
+  x86::Gp EA = newGP64();
+  x86::Gp data64 = newGP64();
+  x86::Gp exceptReg = newGP16();
+
+  if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.rb));
+
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  COMP->mov(data64, FPRPtr(instr.frs));
+  COMP->bswap(data64);
+  COMP->mov(x86::qword_ptr(EA), data64);
+  COMP->bind(endLabel);
+}
+
+// Store Floating-Point Double with Update
+void PPCInterpreter::PPCInterpreterJIT_stfdu(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  Label endLabel = COMP->newLabel();
+  x86::Gp EA = newGP64();
+  x86::Gp origEA = newGP64();
+  x86::Gp data64 = newGP64();
+  x86::Gp exceptReg = newGP16();
+
+  COMP->mov(EA, GPRPtr(instr.ra));
+  COMP->add(EA, imm<s16>(instr.simm16));
+  COMP->mov(origEA, EA);
+
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  COMP->mov(data64, FPRPtr(instr.frs));
+  COMP->bswap(data64);
+  COMP->mov(x86::qword_ptr(EA), data64);
+  COMP->mov(GPRPtr(instr.ra), origEA);
+  COMP->bind(endLabel);
+}
+
+// Store Floating-Point Double with Update Indexed
+void PPCInterpreter::PPCInterpreterJIT_stfdux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  Label endLabel = COMP->newLabel();
+  x86::Gp EA = newGP64();
+  x86::Gp origEA = newGP64();
+  x86::Gp data64 = newGP64();
+  x86::Gp exceptReg = newGP16();
+
+  COMP->mov(EA, GPRPtr(instr.ra));
+  COMP->add(EA, GPRPtr(instr.rb));
+  COMP->mov(origEA, EA);
+
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  COMP->mov(data64, FPRPtr(instr.frs));
+  COMP->bswap(data64);
+  COMP->mov(x86::qword_ptr(EA), data64);
+  COMP->mov(GPRPtr(instr.ra), origEA);
+  COMP->bind(endLabel);
+}
+
+// Store Floating-Point Single (x'D000 0000')
+void PPCInterpreter::PPCInterpreterJIT_stfs(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  Label endLabel = COMP->newLabel();
+  x86::Gp EA = newGP64();
+  x86::Xmm tmpXmm = newXMM();
+  x86::Gp data32 = newGP32();
+  x86::Gp exceptReg = newGP16();
+
+  if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, imm<s16>(instr.simm16));
+
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  COMP->vmovsd(tmpXmm, FPRPtr(instr.frs));
+  COMP->vcvtsd2ss(tmpXmm, tmpXmm, tmpXmm);
+  COMP->vmovd(data32, tmpXmm);
+
+  COMP->bswap(data32);
+  COMP->mov(x86::dword_ptr(EA), data32);
+  COMP->bind(endLabel);
+}
+
+// Store Floating-Point Single Indexed (x'7C00 052E')
+void PPCInterpreter::PPCInterpreterJIT_stfsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  Label endLabel = COMP->newLabel();
+  x86::Gp EA = newGP64();
+  x86::Xmm tmpXmm = newXMM();
+  x86::Gp data32 = newGP32();
+  x86::Gp exceptReg = newGP16();
+
+  if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
+  else { COMP->xor_(EA, EA); }
+  COMP->add(EA, GPRPtr(instr.rb));
+
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  COMP->vmovsd(tmpXmm, FPRPtr(instr.frs));
+  COMP->vcvtsd2ss(tmpXmm, tmpXmm, tmpXmm);
+  COMP->vmovd(data32, tmpXmm);
+
+  COMP->bswap(data32);
+  COMP->mov(x86::dword_ptr(EA), data32);
+  COMP->bind(endLabel);
+}
+
+// Store Floating-Point Single with Update (x'D400 0000')
+void PPCInterpreter::PPCInterpreterJIT_stfsu(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  Label endLabel = COMP->newLabel();
+  x86::Gp EA = newGP64();
+  x86::Gp origEA = newGP64();
+  x86::Xmm tmpXmm = newXMM();
+  x86::Gp data32 = newGP32();
+  x86::Gp exceptReg = newGP16();
+
+  COMP->mov(EA, GPRPtr(instr.ra));
+  COMP->add(EA, imm<s16>(instr.simm16));
+  COMP->mov(origEA, EA);
+
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  COMP->vmovsd(tmpXmm, FPRPtr(instr.frs));
+  COMP->vcvtsd2ss(tmpXmm, tmpXmm, tmpXmm);
+  COMP->vmovd(data32, tmpXmm);
+
+  COMP->bswap(data32);
+  COMP->mov(x86::dword_ptr(EA), data32);
+  COMP->mov(GPRPtr(instr.ra), origEA);
+  COMP->bind(endLabel);
+}
+
+// Store Floating-Point Single with Update Indexed
+void PPCInterpreter::PPCInterpreterJIT_stfsux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  Label endLabel = COMP->newLabel();
+  x86::Gp EA = newGP64();
+  x86::Gp origEA = newGP64();
+  x86::Xmm tmpXmm = newXMM();
+  x86::Gp data32 = newGP32();
+  x86::Gp exceptReg = newGP16();
+
+  COMP->mov(EA, GPRPtr(instr.ra));
+  COMP->add(EA, GPRPtr(instr.rb));
+  COMP->mov(origEA, EA);
+
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, EA);
+
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC));
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(endLabel);
+
+  COMP->vmovsd(tmpXmm, FPRPtr(instr.frs));
+  COMP->vcvtsd2ss(tmpXmm, tmpXmm, tmpXmm);
+  COMP->vmovd(data32, tmpXmm);
+
+  COMP->bswap(data32);
+  COMP->mov(x86::dword_ptr(EA), data32);
+  COMP->mov(GPRPtr(instr.ra), origEA);
+  COMP->bind(endLabel);
+}
+
+
 #endif
