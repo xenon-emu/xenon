@@ -800,22 +800,42 @@ void Xe::PCIDev::ODD::scsiReadCapacityCommand() {
   // Set byte count to transfer size.
   atapiState.regs.byteCountLow = sizeof(capacityBuffer) & 0xFF;
   atapiState.regs.byteCountHigh = (sizeof(capacityBuffer) >> 8) & 0xFF;
-  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
+
+  // Check if we are in DMA mode.
+  if (atapiState.regs.features & 1) {
+    atapiState.regs.status = ATA_STATUS_BSY | ATA_STATUS_DRDY; // BSY set, DRQ cleared for DMA
+  } else {
+    atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
+  }
 }
 
 void Xe::PCIDev::ODD::scsiInquiryCommand() {
-  // Init output buffer to correct size
-  atapiState.dataOutBuffer.init(sizeof(XE_ATAPI_INQUIRY_DATA), true);
+  // Get allocation length from CDB (Byte 4)
+  u32 allocLen = atapiState.scsiCBD.AsByte[4];
+
+  // Init output buffer to correct size (allocation length)
+  // We initialize with 'true' to clear the buffer (zero padding)
+  atapiState.dataOutBuffer.init(allocLen, true);
   atapiState.dataOutBuffer.reset();
+
   // Copy our data struct
-  memcpy(atapiState.dataOutBuffer.get(), &atapiState.atapiInquiryData, sizeof(XE_ATAPI_INQUIRY_DATA));
+  // We copy the minimum of the requested length and our data size
+  size_t copySize = std::min((size_t)allocLen, sizeof(XE_ATAPI_INQUIRY_DATA));
+  memcpy(atapiState.dataOutBuffer.get(), &atapiState.atapiInquiryData, copySize);
+
   atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
   atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
+
   // Set byte count to transfer size.
-  constexpr size_t inquirySize = sizeof(XE_ATAPI_INQUIRY_DATA);
-  atapiState.regs.byteCountLow = inquirySize & 0xFF;
-  atapiState.regs.byteCountHigh = (inquirySize >> 8) & 0xFF;
-  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
+  atapiState.regs.byteCountLow = allocLen & 0xFF;
+  atapiState.regs.byteCountHigh = (allocLen >> 8) & 0xFF;
+
+  // Check if we are in DMA mode.
+  if (atapiState.regs.features & 1) {
+    atapiState.regs.status = ATA_STATUS_BSY | ATA_STATUS_DRDY; // BSY set, DRQ cleared for DMA
+  } else {
+    atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
+  }
 }
 
 void Xe::PCIDev::ODD::scsiRead10Command() {
@@ -841,7 +861,13 @@ void Xe::PCIDev::ODD::scsiRead10Command() {
   // Set byte count to transfer size.
   atapiState.regs.byteCountLow = sectorCount & 0xFF;
   atapiState.regs.byteCountHigh = (sectorCount >> 8) & 0xFF;
-  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
+
+  // Check if we are in DMA mode.
+  if (atapiState.regs.features & 1) {
+    atapiState.regs.status = ATA_STATUS_BSY | ATA_STATUS_DRDY; // BSY set, DRQ cleared for DMA
+  } else {
+    atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
+  }
 }
 
 void Xe::PCIDev::ODD::scsiReadTocCommand() {
@@ -906,7 +932,13 @@ void Xe::PCIDev::ODD::scsiReadTocCommand() {
   // Set byte count to transfer size.
   atapiState.regs.byteCountLow = totalSize & 0xFF;
   atapiState.regs.byteCountHigh = (totalSize >> 8) & 0xFF;
-  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
+
+  // Check if we are in DMA mode.
+  if (atapiState.regs.features & 1) {
+    atapiState.regs.status = ATA_STATUS_BSY | ATA_STATUS_DRDY; // BSY set, DRQ cleared for DMA
+  } else {
+    atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
+  }
 }
 
 //
@@ -1096,9 +1128,16 @@ void Xe::PCIDev::ODD::oddThreadLoop() {
     // Check for pending SCSI commands.
     if (atapiState.scsiCommandPending) {
       processSCSICommand();
+
+      // Check if we need to issue an interrupt.
+      // If DMA is active, the interrupt will be issued by the DMA engine.
+      // If DMA is not active, we need to issue the interrupt ourselves.
+      // Note: check for bit 0 of features register (DMA bit)
+      if (!(atapiState.regs.features & 1)) {
+        atapiIssueInterrupt();
+      }
+
       atapiState.scsiCommandPending = false;
-      // Request an Interrupt.
-      atapiIssueInterrupt();
     }
 
     // Sleep for some time.
@@ -1192,7 +1231,12 @@ void Xe::PCIDev::ODD::processSCSICommand() {
     }
     atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
     atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
-    atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
+    // Check if we are in DMA mode.
+    if (atapiState.regs.features & 1) {
+      atapiState.regs.status = ATA_STATUS_BSY | ATA_STATUS_DRDY; // BSY set, DRQ cleared for DMA
+    } else {
+      atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
+    }
     break;
   case SCSIOP_MODE_SENSE10: {
     u8 pageCode = atapiState.scsiCBD.AsByte[2] & 0x3F;
@@ -1239,7 +1283,15 @@ void Xe::PCIDev::ODD::processSCSICommand() {
       atapiState.regs.byteCountLow = transferSize & 0xFF;
       atapiState.regs.byteCountHigh = (transferSize >> 8) & 0xFF;
       
-      atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
+      atapiState.regs.byteCountLow = transferSize & 0xFF;
+      atapiState.regs.byteCountHigh = (transferSize >> 8) & 0xFF;
+      
+      // Check if we are in DMA mode.
+      if (atapiState.regs.features & 1) {
+        atapiState.regs.status = ATA_STATUS_BSY | ATA_STATUS_DRDY; // BSY set, DRQ cleared for DMA
+      } else {
+        atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
+      }
       break;
     }
 
@@ -1249,7 +1301,7 @@ void Xe::PCIDev::ODD::processSCSICommand() {
     atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
     atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
     break;
-  }
+    }
   case SCSIOP_INQUIRY:
     scsiInquiryCommand();
     break;
@@ -1325,7 +1377,13 @@ void Xe::PCIDev::ODD::perform3BAuth() {
   // Set byte count to transfer size.
   atapiState.regs.byteCountLow = sizeof(outPage) & 0xFF;
   atapiState.regs.byteCountHigh = (sizeof(outPage) >> 8) & 0xFF;
-  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
+
+  // Check if we are in DMA mode.
+  if (atapiState.regs.features & 1) {
+    atapiState.regs.status = ATA_STATUS_BSY | ATA_STATUS_DRDY; // BSY set, DRQ cleared for DMA
+  } else {
+    atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
+  }
 }
 
 // Handles the GET EVENT STATUS NOTIFICATION command (0x4A).
@@ -1392,5 +1450,10 @@ void Xe::PCIDev::ODD::scsiGetEventStatusNotificationCommand() {
   atapiState.regs.byteCountLow = transferSize & 0xFF;
   atapiState.regs.byteCountHigh = (transferSize >> 8) & 0xFF;
   
-  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
+  // Check if we are in DMA mode.
+  if (atapiState.regs.features & 1) {
+    atapiState.regs.status = ATA_STATUS_BSY | ATA_STATUS_DRDY; // BSY set, DRQ cleared for DMA
+  } else {
+    atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
+  }
 }
