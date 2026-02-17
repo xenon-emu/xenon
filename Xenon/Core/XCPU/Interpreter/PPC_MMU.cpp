@@ -414,6 +414,56 @@ void PPCInterpreter::mmuAddTlbEntry(sPPEState *ppeState) {
   tlbClass.updateLRU(wayIndex);
 }
 
+// This is done when TLB Reload is in hardware-controlled mode.
+void PPCInterpreter::mmuAddTlbEntryHardware(sPPEState *ppeState, u64 VA,
+                                            u64 pte0, u64 pte1, u8 p, bool L,
+                                            bool LP) {
+  MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUAddTlbEntryHardware",
+                      MP_AUTO);
+
+  const u16 tlbIndex = mmuComputeTLBIndex(VA, p);
+
+  // Pre-calculate RPN for fast lookup
+  const u64 RPN =
+      L ? (pte1 & PPC_HPTE64_RPN_LP) : (pte1 & PPC_HPTE64_RPN_NO_LP);
+
+  // Calculate VPN (masked by page size)
+  const u64 compareMask = mmuGetCompareMask(p);
+  const u64 VPN = VA & compareMask;
+
+  TLBCongruenceClass &tlbClass = ppeState->TLB.classes[tlbIndex];
+
+  // Select victim way
+  // 1. Check for invalid entries
+  u8 wayIndex = tlbClass.getLRUWay();
+  for (u8 way = 0; way < 4; ++way) {
+    if (!tlbClass.ways[way].V) {
+      wayIndex = way;
+      break;
+    }
+  }
+
+  DEBUGP(Xenon_MMU,
+         "[TLB]: Hardware reload: Class: {:#x}, Way: {}, VPN: {:#x}, RPN: "
+         "{:#x}, p: {}",
+         tlbIndex, wayIndex, VPN, RPN, p);
+
+  TLBEntry &entry = tlbClass.ways[wayIndex];
+
+  entry.V = true;
+  entry.VPN = VPN;
+  entry.pte0 = pte0;
+  entry.pte1 = pte1;
+  entry.RPN = RPN;
+  entry.p = p;
+  entry.L = L;
+  entry.LP = LP;
+  entry.pageMask = (1ULL << p) - 1;
+
+  // Update LRU
+  tlbClass.updateLRU(wayIndex);
+}
+
 // Translation Lookaside Buffer Search
 bool PPCInterpreter::mmuSearchTlbEntry(sPPEState *ppeState, u64 *RPN, u64 VA, u8 p, bool L, bool LP) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUSearchTlbEntry", MP_AUTO);
@@ -489,7 +539,7 @@ u64 PPCInterpreter::JITTranslateAndGetHostPtr(sPPEState *ppeState, u64 EA, ePPUT
   if (!MMUTranslateAddress(&returnedAddr, ppeState, false, thr)) {
     DEBUGP(Xenon, "[JIT MMU]: Address translation failed for EA: {:#x}", EA);
     return 0;
-  }
+  } 
   // Correctly construct the end address
   bool socRead = false;
   returnedAddr = mmuContructEndAddressFromSecEngAddr(returnedAddr, &socRead);
@@ -865,6 +915,10 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, sPPEState *ppeState,
             thread.SPR.MSR.DR = msrDR;
             thread.SPR.MSR.IR = msrIR;
 
+            // Update TLB
+            mmuAddTlbEntryHardware(ppeState, VA, pteg0[i].pte0, pteg0[i].pte1,
+                                   p, L, LP);
+
             // Update Referenced and Change Bits if necessary
             if (!((pteg0[i].pte1 & PPC_HPTE64_R) >> 8)) {
               // Referenced
@@ -920,6 +974,10 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, sPPEState *ppeState,
             // Match found. Set relocation back to whatever it was
             thread.SPR.MSR.DR = msrDR;
             thread.SPR.MSR.IR = msrIR;
+
+            // Update TLB
+            mmuAddTlbEntryHardware(ppeState, VA, pteg1[i].pte0, pteg1[i].pte1,
+                                   p, L, LP);
 
             // Update Referenced and Change Bits if necessary
             if (!((pteg1[i].pte1 & PPC_HPTE64_R) >> 8)) {

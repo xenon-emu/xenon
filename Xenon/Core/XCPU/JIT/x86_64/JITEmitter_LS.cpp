@@ -676,26 +676,71 @@ void PPCInterpreter::PPCInterpreterJIT_lwarx(sPPEState *ppeState, JITBlockBuilde
 void PPCInterpreter::PPCInterpreterJIT_stwcx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   Label successLabel = COMP->newLabel();
   Label updateCR = COMP->newLabel();
+  Label failLabel = COMP->newLabel();
   
-  x86::Gp hostPtr = newGP64();      // Host memory pointer
-  x86::Gp storeValue = newGP32();   // Value to store (byteswapped)
-  x86::Gp expectedValue = newGP32();// Expected value for cmpxchg
-  x86::Gp crValue = newGP32();      // CR0 value to set
-  x86::Gp xerValue = newGP32();      // XER value to set
-  
-  COMP->mov(hostPtr, b->threadCtx->scalar(&sPPUThread::atomicResHostPtr));
+  x86::Gp EA = newGP64();           // Effective Address
+  x86::Gp hostPtr = newGP64();      // New Host Pointer
+  x86::Gp resHostPtr = newGP64();   // Stored Reservation Pointer
+  x86::Gp storeValue = newGP32();   // Value to store
+  x86::Gp expectedValue = newGP32();// Expected value for CAS
+  x86::Gp crValue = newGP32();      // CR0 value
+  x86::Gp xerValue = newGP32();     // XER value
+  x86::Gp zero64 = newGP64();       // For clearing reservation
+
+  // Calculate EA
+  if (instr.ra != 0) { 
+    COMP->mov(EA, GPRPtr(instr.ra)); 
+  } else { 
+    COMP->xor_(EA, EA); 
+  }
+  COMP->add(EA, GPRPtr(instr.rb));
+
+  // Translate to Host Pointer
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), 
+               FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, hostPtr);
+
+  // Check for DSI/ISI
+  x86::Gp exceptReg = newGP16();
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC)); // DStor | DSeg
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(failLabel);
+
+  // Load reservation pointer
+  COMP->mov(resHostPtr, b->threadCtx->scalar(&sPPUThread::atomicResHostPtr));
+
+  // Verify address matches reservation
+  COMP->cmp(hostPtr, resHostPtr);
+  COMP->jne(failLabel);
+
+  // Address matches, attempt CAS
   COMP->mov(expectedValue, b->threadCtx->scalar(&sPPUThread::atomicResExpected));
   COMP->mov(storeValue, GPRPtr(instr.rs));
-  COMP->bswap(storeValue.r32());
+  COMP->bswap(storeValue.r32()); // Convert to LE for host memory
+
   COMP->lock();
   COMP->cmpxchg(x86::dword_ptr(hostPtr), storeValue.r32(), expectedValue.r32());
-  COMP->jz(successLabel);
-  // Fail
-  COMP->xor_(crValue, crValue);
-  COMP->jmp(updateCR);
+  COMP->jnz(failLabel); // CAS failed (ZF=0)
+
   // Success
+  COMP->mov(crValue, imm(2)); // EQ bit set
+  COMP->jmp(successLabel);
+
+  // Fail (Address mismatch or CAS failure)
+  COMP->bind(failLabel);
+  COMP->xor_(crValue, crValue); // EQ bit clear
+
   COMP->bind(successLabel);
-  COMP->mov(crValue, imm(2));
+  
+  // Clear reservation (consume it)
+  COMP->xor_(zero64, zero64);
+  COMP->mov(b->threadCtx->scalar(&sPPUThread::atomicResHostPtr), zero64);
+
   COMP->bind(updateCR);
   
   // SO bit (summary overflow)
@@ -737,7 +782,7 @@ void PPCInterpreter::PPCInterpreterJIT_ldarx(sPPEState *ppeState, JITBlockBuilde
   mmuTranslation->setArg(1, EA);
   mmuTranslation->setArg(2, ePPUThread_None);
   mmuTranslation->setRet(0, hostPtr);
-  
+
   COMP->mov(exceptReg, EXPtr());
   COMP->and_(exceptReg, imm<u16>(0xC));
   COMP->test(exceptReg, exceptReg);
@@ -755,26 +800,71 @@ void PPCInterpreter::PPCInterpreterJIT_ldarx(sPPEState *ppeState, JITBlockBuilde
 void PPCInterpreter::PPCInterpreterJIT_stdcx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   Label successLabel = COMP->newLabel();
   Label updateCR = COMP->newLabel();
+  Label failLabel = COMP->newLabel();
   
-  x86::Gp hostPtr = newGP64();
-  x86::Gp storeValue = newGP64();
-  x86::Gp expectedValue = newGP64();
-  x86::Gp crValue = newGP32();
-  x86::Gp xerValue = newGP32();
-  
-  COMP->mov(hostPtr, b->threadCtx->scalar(&sPPUThread::atomicResHostPtr));
+  x86::Gp EA = newGP64();           // Effective Address
+  x86::Gp hostPtr = newGP64();      // New Host Pointer
+  x86::Gp resHostPtr = newGP64();   // Stored Reservation Pointer
+  x86::Gp storeValue = newGP64();   // Value to store
+  x86::Gp expectedValue = newGP64();// Expected value for CAS
+  x86::Gp crValue = newGP32();      // CR0 value
+  x86::Gp xerValue = newGP32();     // XER value
+  x86::Gp zero64 = newGP64();       // For clearing reservation
+
+  // Calculate EA
+  if (instr.ra != 0) { 
+    COMP->mov(EA, GPRPtr(instr.ra)); 
+  } else { 
+    COMP->xor_(EA, EA); 
+  }
+  COMP->add(EA, GPRPtr(instr.rb));
+
+  // Translate to Host Pointer
+  InvokeNode *mmuTranslation = nullptr;
+  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), 
+               FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  mmuTranslation->setArg(0, b->ppeState->Base());
+  mmuTranslation->setArg(1, EA);
+  mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setRet(0, hostPtr);
+
+  // Check for DSI/ISI
+  x86::Gp exceptReg = newGP16();
+  COMP->mov(exceptReg, EXPtr());
+  COMP->and_(exceptReg, imm<u16>(0xC)); // DStor | DSeg
+  COMP->test(exceptReg, exceptReg);
+  COMP->jnz(failLabel);
+
+  // Load reservation pointer
+  COMP->mov(resHostPtr, b->threadCtx->scalar(&sPPUThread::atomicResHostPtr));
+
+  // Verify address matches reservation
+  COMP->cmp(hostPtr, resHostPtr);
+  COMP->jne(failLabel);
+
+  // Address matches, attempt CAS
   COMP->mov(expectedValue, b->threadCtx->scalar(&sPPUThread::atomicResExpected));
   COMP->mov(storeValue, GPRPtr(instr.rs));
-  COMP->bswap(storeValue);
+  COMP->bswap(storeValue); // Convert to LE for host memory
+
   COMP->lock();
   COMP->cmpxchg(x86::qword_ptr(hostPtr), storeValue, expectedValue);
-  COMP->jz(successLabel);
-  // Fail
-  COMP->xor_(crValue, crValue);
-  COMP->jmp(updateCR);
+  COMP->jnz(failLabel); // CAS failed (ZF=0)
+
   // Success
+  COMP->mov(crValue, imm(2)); // EQ bit set
+  COMP->jmp(successLabel);
+
+  // Fail
+  COMP->bind(failLabel);
+  COMP->xor_(crValue, crValue); // EQ bit clear
+
   COMP->bind(successLabel);
-  COMP->mov(crValue, imm(2));
+
+  // Clear reservation (consume it)
+  COMP->xor_(zero64, zero64);
+  COMP->mov(b->threadCtx->scalar(&sPPUThread::atomicResHostPtr), zero64);
+
   COMP->bind(updateCR);
 
   // SO bit (summary overflow)
