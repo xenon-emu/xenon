@@ -54,7 +54,10 @@ Xe::PCIDev::ETHERNET::ETHERNET(const std::string &deviceName, u64 size, PCIBridg
   // Reg 1: Status Register
   mdioRegisters[1] = 0x78ED; // Auto-Neg Complete, Link Up, Extended Caps
   // Reg 2: PHY Identifier 1 (OUI bits 3-18)
-  mdioRegisters[2] = 0x0141; // Marvell OUI MSBs
+  // Marvell OUI MSBs 0x141 for modern console revisions. 0x143 for Xenon.
+  // TODO: some registers appear to be a bit different, possibly older hardware revision, need confirmation.
+  // Funcitonality is still fully present tho.
+  mdioRegisters[2] = (Config::highlyExperimental.consoleRevison == Config::eConsoleRevision::Xenon ? 0x0143 : 0x0141);
   // Reg 3: PHY Identifier 2 (OUI bits 19-24, Model, Revision)
   // 88E1111 Model: 0x0C, Revision: 0x02
   mdioRegisters[3] = 0x0CC2; // 88E1111 Model/Revision
