@@ -47,16 +47,18 @@ public:
   void resize(u32 v) { _pointer += v; }
   void reset(void) { _pointer = 0; }
   bool init(u32 maxLength, bool clear) {
-    if (_data && (maxLength > _size)) {
+    if (_data && (maxLength > _capacity)) {
       _data.reset();
+      _capacity = 0;
       _size = 0;
       reset();
     }
     if (!_data) {
       _data = std::make_unique<STRIP_UNIQUE_ARR(_data)>(maxLength);
+      _capacity = maxLength;
     }
     if (_data) {
-      _size = std::max(_size, maxLength);
+      _size = maxLength; // Always update logical size.
       _pointer = _size; // Empty()
       if (clear)
         memset(_data.get(), 0, maxLength);
@@ -66,8 +68,9 @@ public:
   }
 private:
   std::unique_ptr<u8[]> _data;
-  u32 _size;
-  u32 _pointer;
+  u32 _capacity = 0; // Allocated buffer size.
+  u32 _size = 0;     // Logical transfer size.
+  u32 _pointer = 0;
 };
 
 //
@@ -87,10 +90,11 @@ public:
     hFile = INVALID_HANDLE_VALUE;
   }
 
-  u32 Size() {
-    u32 cb;
-    cb = GetFileSize(hFile, nullptr);
-    return (cb == INVALID_FILE_SIZE) ? 0 : cb;
+  u64 Size() {
+    LARGE_INTEGER fileSize;
+    if (!GetFileSizeEx(hFile, &fileSize))
+      return 0;
+    return static_cast<u64>(fileSize.QuadPart);
   }
 
   bool Read(u64 Offset, u8 *Destination, u32 cu8s) {
@@ -123,11 +127,11 @@ public:
     fd = -1;
   }
 
-  u32 Size() {
+  u64 Size() {
     struct stat st;
     if (fstat(fd, &st) != 0)
       return 0;
-    return static_cast<u32>(st.st_size);
+    return static_cast<u64>(st.st_size);
   }
 
   bool Read(u64 Offset, u8 *Destination, u32 cu8s) {
@@ -674,6 +678,7 @@ private:
   void scsiInquiryCommand();
   void scsiRead10Command();
   void scsiReadTocCommand();
+  void scsiGetEventStatusNotificationCommand();
 
   // Utilities
   

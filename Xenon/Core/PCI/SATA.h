@@ -148,7 +148,7 @@
    Bit 5 (DF - Device Fault) indicates by value 1 that a device fault has been
    detected
 */
-#define ATA_STATUS_DF 0x10
+#define ATA_STATUS_DF 0x20
 /*
    Bit 6 (DRDY - Device Ready) is set to 1 to indicate that the disk drive
    accepts commands. If the DRDY bit is 0, the drive will accept and attempt to

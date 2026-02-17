@@ -10,6 +10,11 @@
 #include "PPCInterpreter.h"
 
 //#define MMU_DEBUG
+#ifndef MMU_DEBUG
+#define DEBUGP(x, ...)
+#else
+#define DEBUGP(x, ...) LOG_DEBUG(Xenon_MMU, x, ##__VA_ARGS__);
+#endif
 
 //
 // Xbox 360 Memory map, info taken from various sources.
@@ -178,12 +183,12 @@ inline bool mmuComparePTE(u64 VA, u64 VPN, u64 pte0, u64 pte1, u8 p, bool L, boo
   }
 
   if (L != pteL) {
-    LOG_DEBUG(Xenon_MMU, "L mismatch: L={}, PTE[L]={}", L, pteL);
+    DEBUGP(Xenon_MMU, "L mismatch: L={}, PTE[L]={}", L, pteL);
     return false;
   }
 
   if (L && LP != pteLP) {
-    LOG_DEBUG(Xenon_MMU, "LP mismatch: LP={}, PTE[LP]={}", LP, pteLP);
+    DEBUGP(Xenon_MMU, "LP mismatch: LP={}, PTE[LP]={}", LP, pteLP);
     return false;
   }
 
@@ -227,9 +232,7 @@ void PPCInterpreter::PPCInterpreter_tlbiel(sPPEState *ppeState) {
     if (XeMain::GetCPU()) {
       PPU *ppu = XeMain::GetCPU()->GetPPU(ppeState->ppuID);
       if (ppu && ppu->GetPPUJIT()) {
-#ifdef MMU_DEBUG
-        LOG_DEBUG(Xenon_MMU, "[TLBIEL]: Congruence-class invalidation (class {:#x})", classIndex);
-#endif
+        DEBUGP(Xenon_MMU, "[TLBIEL]: Congruence-class invalidation (class {:#x})", classIndex);
         ppu->GetPPUJIT()->InvalidateAllBlocks();
       }
     }
@@ -243,10 +246,8 @@ void PPCInterpreter::PPCInterpreter_tlbiel(sPPEState *ppeState) {
     for (u8 way = 0; way < 4; ++way) {
       TLBEntry &entry = tlbClass.ways[way];
       if (entry.V && ((entry.VPN & compareMask) == (rb & compareMask))) {
-#ifdef MMU_DEBUG
-        LOG_DEBUG(Xenon_MMU, "[TLB]: TLBIEL: Invalidating entry at class {} way {} VPN: {:#x}",
+        DEBUGP(Xenon_MMU, "[TLB]: TLBIEL: Invalidating entry at class {} way {} VPN: {:#x}",
           tlbIndex, way, entry.VPN);
-#endif
         tlbClass.invalidateWay(way);
       }
     }
@@ -262,9 +263,7 @@ void PPCInterpreter::PPCInterpreter_tlbiel(sPPEState *ppeState) {
         u64 pageSize = 1ULL << p;
         u64 start = rb & ~(pageSize - 1ULL);
         u64 end = start + pageSize;
-#ifdef MMU_DEBUG
-        LOG_DEBUG(Xenon_MMU, "[TLBIEL]: Invalidating JIT blocks for page {:#x} (size {:#x})", start, pageSize);
-#endif
+        DEBUGP(Xenon_MMU, "[TLBIEL]: Invalidating JIT blocks for page {:#x} (size {:#x})", start, pageSize);
         ppu->GetPPUJIT()->InvalidateBlocksForRange(start, end);
       }
     }
@@ -288,9 +287,9 @@ void PPCInterpreter::PPCInterpreter_tlbie(sPPEState *ppeState) {
   const u64 pageSize = 1ULL << p;
   const u64 pageMask = pageSize - 1;
 
-#ifdef DEBUG_BUILD
+#ifdef DEBUGP
   if (Config::log.advanced)
-    LOG_TRACE(Xenon, "tlbie, EA:0x{:X} | PageSize:{} | Full:0x{:X} | LP:{}",
+    DEBUGP(Xenon, "tlbie, EA:0x{:X} | PageSize:{} | Full:0x{:X} | LP:{}",
       EA, p, pageSize, LP ? "true" : "false");
 #endif
 
@@ -305,9 +304,7 @@ void PPCInterpreter::PPCInterpreter_tlbie(sPPEState *ppeState) {
     if (ppu && ppu->GetPPUJIT()) {
       u64 start = EA & ~pageMask;
       u64 end = start + pageSize;
-#ifdef MMU_DEBUG
-      LOG_DEBUG(Xenon_MMU, "[TLBIE]: Invalidating JIT blocks for page {:#x} (size {:#x})", start, pageSize);
-#endif
+      DEBUGP(Xenon_MMU, "[TLBIE]: Invalidating JIT blocks for page {:#x} (size {:#x})", start, pageSize);
       ppu->GetPPUJIT()->InvalidateBlocksForRange(start, end);
     }
   }
@@ -316,9 +313,9 @@ void PPCInterpreter::PPCInterpreter_tlbie(sPPEState *ppeState) {
 // TLB Synchronize
 void PPCInterpreter::PPCInterpreter_tlbsync(sPPEState *ppeState) {
   // Do nothing
-#ifdef DEBUG_BUILD
+#ifdef DEBUGP
   if (Config::log.advanced)
-    LOG_TRACE(Xenon, "tlbsync");
+    DEBUGP(Xenon, "tlbsync");
 #endif
 }
 
@@ -378,7 +375,7 @@ void PPCInterpreter::mmuAddTlbEntry(sPPEState *ppeState) {
   // Pre-calculate RPN for fast lookup
   const u64 RPN = L ? (tlbRpn & PPC_HPTE64_RPN_LP) : (tlbRpn & PPC_HPTE64_RPN_NO_LP);
 
-#ifdef DEBUG_BUILD
+#ifdef DEBUGP
   if (XeMain::GetCPU()) {
     PPU *ppu = XeMain::GetCPU()->GetPPU(ppeState->ppuID);
     if (ppu && ppu->traceFile) {
@@ -387,10 +384,8 @@ void PPCInterpreter::mmuAddTlbEntry(sPPEState *ppeState) {
   }
 #endif
 
-#ifdef MMU_DEBUG
-  LOG_DEBUG(Xenon_MMU, "[TLB]: Adding entry: Class: {:#x}, Set: {:#b}, VPN: {:#x}, RPN: {:#x}",
+  DEBUGP(Xenon_MMU, "[TLB]: Adding entry: Class: {:#x}, Set: {:#b}, VPN: {:#x}, RPN: {:#x}",
     TI, TS, VPN, RPN);
-#endif
 
   // Map TS bitmask to way index
   u8 wayIndex;
@@ -492,7 +487,7 @@ u64 PPCInterpreter::JITTranslateAndGetHostPtr(sPPEState *ppeState, u64 EA, ePPUT
   u64 returnedAddr = EA;
   // Translate the given address
   if (!MMUTranslateAddress(&returnedAddr, ppeState, false, thr)) {
-    LOG_DEBUG(Xenon, "[JIT MMU]: Address translation failed for EA: {:#x}", EA);
+    DEBUGP(Xenon, "[JIT MMU]: Address translation failed for EA: {:#x}", EA);
     return 0;
   }
   // Correctly construct the end address
@@ -721,16 +716,16 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, sPPEState *ppeState,
     // Search the SLB to get the VSID
     for (auto &slbEntry : thread.SLB) {
       if (slbEntry.V) {
-#ifdef DEBUG_BUILD
+#ifdef DEBUGP
         if (Config::log.advanced)
-          LOG_TRACE(Xenon_MMU, "Checking valid SLB (V:0x{:X},LP:0x{:X},C:0x{:X},L:0x{:X},N:0x{:X},Kp:0x{:X},Ks:0x{:X},VSID:0x{:X},ESID:0x{:X},vsidReg:0x{:X},esidReg:0x{:X})", static_cast<u32>(slbEntry.V), static_cast<u32>(slbEntry.LP), static_cast<u32>(slbEntry.C), static_cast<u32>(slbEntry.L),
+          DEBUGP(Xenon_MMU, "Checking valid SLB (V:0x{:X},LP:0x{:X},C:0x{:X},L:0x{:X},N:0x{:X},Kp:0x{:X},Ks:0x{:X},VSID:0x{:X},ESID:0x{:X},vsidReg:0x{:X},esidReg:0x{:X})", static_cast<u32>(slbEntry.V), static_cast<u32>(slbEntry.LP), static_cast<u32>(slbEntry.C), static_cast<u32>(slbEntry.L),
                                 static_cast<u32>(slbEntry.N), static_cast<u32>(slbEntry.Kp), static_cast<u32>(slbEntry.Ks),
                                 slbEntry.VSID, slbEntry.ESID, slbEntry.vsidReg, slbEntry.esidReg);
 #endif
         if (slbEntry.ESID == ESID) {
-#ifdef DEBUG_BUILD
+#ifdef DEBUGP
           if (Config::log.advanced)
-            LOG_TRACE(Xenon_MMU, "SLB Match");
+            DEBUGP(Xenon_MMU, "SLB Match");
 #endif
           // Entry valid & SLB->ESID = EA->VSID
           currslbEntry = slbEntry;
@@ -1107,7 +1102,7 @@ void PPCInterpreter::MMUWrite(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppe
   }
 
   if (socWrite) {
-#ifdef DEBUG_BUILD
+#ifdef DEBUGP
     if (EA == 0x61010ULL) {
       u64 postCode = *reinterpret_cast<const u64 *>(data);
       std::string poseCodeStr = Xe::XCPU::POSTBUS::GET_POST(postCode);

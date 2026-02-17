@@ -161,8 +161,8 @@ Xe::PCIDev::ODD::ODD(const char* deviceName, u64 size, PCIBridge *parentPCIBridg
   memcpy(&pciConfigSpace.data[0xC0], &data, 4); // SSTATUS_DET_COM_ESTABLISHED.
                                                 // SSTATUS_SPD_GEN1_COM_SPEED.
                                                 // SSTATUS_IPM_INTERFACE_ACTIVE_STATE
-  // SError
-  data = 0x001F0201;
+  // SError - Initialize with no errors (bits are set by hardware when errors occur)
+  data = 0x00000000;
   atapiState.regs.SError = data;
   memcpy(&pciConfigSpace.data[0xC4], &data, 4);
   // SControl
@@ -227,10 +227,14 @@ void Xe::PCIDev::ODD::Read(u64 readAddress, u8 *data, u64 size) {
         size = std::fmin(size, atapiState.dataOutBuffer.count());
         memcpy(&atapiState.regs.data, atapiState.dataOutBuffer.get(), size);
         atapiState.dataOutBuffer.resize(size);
-        atapiState.regs.status &= 0xFFFFFFF7; // Clear DRQ.
-        // Check for a completed read.
+        // Only clear DRQ when the entire transfer is consumed.
         if (atapiState.dataOutBuffer.count() == 0) {
-          atapiState.dataOutBuffer.reset(); // Reset pointer.
+          atapiState.dataOutBuffer.reset();
+          atapiState.regs.status &= ~ATA_STATUS_DRQ; // Clear DRQ.
+          atapiState.regs.status |= ATA_STATUS_DRDY;  // Device ready.
+          // Signal transfer completion.
+          atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO | ATA_INTERRUPT_REASON_CD;
+          atapiIssueInterrupt();
         }
       }
       memcpy(data, &atapiState.regs.data, size);
@@ -461,17 +465,17 @@ void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
     case ATA_REG_SSTATUS:
       memcpy(&atapiState.regs.SStatus, data, size);
       // Write also on PCI config space data
-      memcpy(&pciConfigSpace.data[0xC0], &data, 4);
+      memcpy(&pciConfigSpace.data[0xC0], data, 4);
       return;
     case ATA_REG_SERROR:
       memcpy(&atapiState.regs.SError, data, size);
       // Write also on PCI config space data.
-      memcpy(&pciConfigSpace.data[0xC4], &data, 4);
+      memcpy(&pciConfigSpace.data[0xC4], data, 4);
       return;
     case ATA_REG_SCONTROL:
       memcpy(&atapiState.regs.SControl, data, size);
       // Write also on PCI config space data.
-      memcpy(&pciConfigSpace.data[0xC8], &data, 4);
+      memcpy(&pciConfigSpace.data[0xC8], data, 4);
 #ifdef ODD_DEBUG
       if (atapiState.regs.SControl & 1)
         LOG_DEBUG(ODD, "[SCONTROL]: Resetting SATA link!");
@@ -538,10 +542,10 @@ void Xe::PCIDev::ODD::MemSet(u64 writeAddress, s32 data, u64 size) {
       // command
       if (atapiState.dataInBuffer.size() >= XE_ATAPI_CDB_SIZE &&
           atapiState.regs.command == ATA_COMMAND_PACKET) {
-        // Reset our buffer pointer
+        // Signal pending SCSI command.
+        atapiState.scsiCommandPending = true;
+        // Reset our buffer ptr.
         atapiState.dataInBuffer.reset();
-        // Request an interrupt
-        parentBus->RouteInterrupt(PRIO_SATA_ODD);
       }
       return;
     } break;
@@ -578,18 +582,7 @@ void Xe::PCIDev::ODD::MemSet(u64 writeAddress, s32 data, u64 size) {
         return;
       } break;
       case ATA_COMMAND_IDENTIFY_PACKET_DEVICE: {
-        memset(atapiState.dataOutBuffer.get(), data, size);
-        // Set the transfer size:
-        // bytecount = LBA High << 8 | LBA Mid
-        constexpr size_t dataSize = sizeof(XE_ATAPI_IDENTIFY_DATA);
-        atapiState.regs.lbaLow = 1;
-        atapiState.regs.byteCountLow = dataSize & 0xFF;
-        atapiState.regs.byteCountHigh = (dataSize >> 8) & 0xFF;
-        // Set the drive status
-        atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ | ATA_STATUS_DF;
-
-        // Request an interrupt
-        parentBus->RouteInterrupt(PRIO_SATA_ODD);
+        atapiIdentifyPacketDeviceCommand();
         return;
       } break;
       case ATA_COMMAND_IDENTIFY_DEVICE: {
@@ -747,8 +740,8 @@ void Xe::PCIDev::ODD::atapiIdentifyCommand() {
   atapiState.regs.byteCountLow = 0x14;
   atapiState.regs.byteCountHigh = 0xEB;
 
-  // Set interrupt reason
-  atapiState.regs.interruptReason = ATA_INTERRUPT_REASON_IO;
+  // Set interrupt reason (OR with existing ATAPI signature)
+  atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
 
   // An interrupt must also be requested
   atapiIssueInterrupt();
@@ -772,7 +765,7 @@ void Xe::PCIDev::ODD::atapiIdentifyPacketDeviceCommand() {
   atapiState.regs.byteCountHigh = (dataSize >> 8) & 0xFF;
 
   // Set the drive status
-  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ | ATA_STATUS_DF;
+  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
 
   // Request interrupt
   atapiIssueInterrupt();
@@ -783,11 +776,12 @@ void Xe::PCIDev::ODD::atapiIdentifyPacketDeviceCommand() {
 //
 
 void Xe::PCIDev::ODD::scsiReadCapacityCommand() {
-  // Reset output buffer
+  // Init output buffer to correct size
+  atapiState.dataOutBuffer.init(8, true);
   atapiState.dataOutBuffer.reset();
 
   u8 capacityBuffer[8] = {};
-  u32 imageCapacity = atapiState.mountedODDImage->Size() / ATAPI_CDROM_SECTOR_SIZE;
+  u64 imageCapacity = atapiState.mountedODDImage->Size() / ATAPI_CDROM_SECTOR_SIZE;
   // LBA of this image
   capacityBuffer[0] = imageCapacity >> 24;
   capacityBuffer[1] = imageCapacity >> 16;
@@ -803,17 +797,25 @@ void Xe::PCIDev::ODD::scsiReadCapacityCommand() {
   // Set parameters as expected.
   atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
   atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
-  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
+  // Set byte count to transfer size.
+  atapiState.regs.byteCountLow = sizeof(capacityBuffer) & 0xFF;
+  atapiState.regs.byteCountHigh = (sizeof(capacityBuffer) >> 8) & 0xFF;
+  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
 }
 
 void Xe::PCIDev::ODD::scsiInquiryCommand() {
-  // Reset output buffer
+  // Init output buffer to correct size
+  atapiState.dataOutBuffer.init(sizeof(XE_ATAPI_INQUIRY_DATA), true);
   atapiState.dataOutBuffer.reset();
   // Copy our data struct
   memcpy(atapiState.dataOutBuffer.get(), &atapiState.atapiInquiryData, sizeof(XE_ATAPI_INQUIRY_DATA));
   atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
   atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
-  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
+  // Set byte count to transfer size.
+  constexpr size_t inquirySize = sizeof(XE_ATAPI_INQUIRY_DATA);
+  atapiState.regs.byteCountLow = inquirySize & 0xFF;
+  atapiState.regs.byteCountHigh = (inquirySize >> 8) & 0xFF;
+  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
 }
 
 void Xe::PCIDev::ODD::scsiRead10Command() {
@@ -836,7 +838,10 @@ void Xe::PCIDev::ODD::scsiRead10Command() {
   atapiState.mountedODDImage->Read(readOffset, atapiState.dataOutBuffer.get(), sectorCount);
   atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
   atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
-  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
+  // Set byte count to transfer size.
+  atapiState.regs.byteCountLow = sectorCount & 0xFF;
+  atapiState.regs.byteCountHigh = (sectorCount >> 8) & 0xFF;
+  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
 }
 
 void Xe::PCIDev::ODD::scsiReadTocCommand() {
@@ -847,7 +852,7 @@ void Xe::PCIDev::ODD::scsiReadTocCommand() {
   const u8 firstTrack = 1;
   const u8 lastTrack = 1;
 
-  u32 imageCapacity = atapiState.mountedODDImage->Size() / ATAPI_CDROM_SECTOR_SIZE;
+  u64 imageCapacity = atapiState.mountedODDImage->Size() / ATAPI_CDROM_SECTOR_SIZE;
 
   u8 numDescriptors = (lastTrack - firstTrack + 1) + 1;
 
@@ -898,7 +903,10 @@ void Xe::PCIDev::ODD::scsiReadTocCommand() {
   // Signal status
   atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
   atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
-  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
+  // Set byte count to transfer size.
+  atapiState.regs.byteCountLow = totalSize & 0xFF;
+  atapiState.regs.byteCountHigh = (totalSize >> 8) & 0xFF;
+  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
 }
 
 //
@@ -1073,17 +1081,16 @@ void Xe::PCIDev::ODD::oddThreadLoop() {
       atapiState.regs.dmaStatus = XE_ATA_DMA_INTR; // Signal Interrupt.
       atapiState.regs.SActive = 0x40;
       atapiState.regs.status = ATA_STATUS_DRDY;
-      // Reset I/O data buffers
-      atapiState.dataInBuffer.reset();
-      atapiState.dataOutBuffer.reset();
-      // After completion we must raise an interrupt.
-      atapiIssueInterrupt();
-
       // Check if we should copy the input buffer onto our page data.
       if (copyDataIntoPageData) {
         memcpy(pageData, atapiState.dataInBuffer.get(), sizeof(pageData));
         copyDataIntoPageData = false;
       }
+      // Reset I/O data buffers
+      atapiState.dataInBuffer.reset();
+      atapiState.dataOutBuffer.reset();
+      // After completion we must raise an interrupt.
+      atapiIssueInterrupt();
     }
     
     // Check for pending SCSI commands.
@@ -1185,12 +1192,54 @@ void Xe::PCIDev::ODD::processSCSICommand() {
     }
     atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
     atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
-    atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
+    atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
     break;
-  case SCSIOP_MODE_SENSE10:
-    if (atapiState.scsiCBD.AsByte[2] == 0x3B) {
+  case SCSIOP_MODE_SENSE10: {
+    u8 pageCode = atapiState.scsiCBD.AsByte[2] & 0x3F;
+    if (pageCode == 0x3B) {
       // Page is 3B, get the page data and perform auth.
       perform3BAuth();
+      break;
+    }
+    
+    if (pageCode == 0x2A) {
+      // CD/DVD Capabilities and Mechanical Status Page (0x2A)
+      // Header (8 bytes) + Page Data (20 bytes minimum) = 28 bytes.
+      u8 response[28] = {};
+      u16 allocLen = ((u16)atapiState.scsiCBD.AsByte[7] << 8) | atapiState.scsiCBD.AsByte[8];
+
+      // Mode Parameter Header (10-byte command -> 8 byte header)
+      // Byte 0-1: Mode Data Length (Total - 2) = 26.
+      response[0] = 0x00;
+      response[1] = 26; 
+      // Byte 2: Medium Type (0 = Default)
+      // Byte 3: Device Specific Parameter (0)
+      // Byte 6-7: Block Descriptor Length (0)
+
+      // Page 0x2A Data
+      response[8] = 0x2A; // Page Code
+      response[9] = 0x12; // Page Length (18)
+      // Byte 2: Read Capabilities
+      response[10] = 0x1F; // DVD-ROM, DVD-R, DVD-RAM, CD-R, CD-RW read.
+      // Byte 3: Write Capabilities
+      response[11] = 0x00; // Read-only.
+      
+      // ... (Other fields 0 for now)
+
+      u32 transferSize = std::min((u32)allocLen, (u32)sizeof(response));
+      
+      atapiState.dataOutBuffer.init(transferSize, true);
+      atapiState.dataOutBuffer.reset();
+      memcpy(atapiState.dataOutBuffer.get(), response, transferSize);
+
+      atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
+      atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
+      
+      // Set Byte Count!
+      atapiState.regs.byteCountLow = transferSize & 0xFF;
+      atapiState.regs.byteCountHigh = (transferSize >> 8) & 0xFF;
+      
+      atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
       break;
     }
 
@@ -1198,8 +1247,9 @@ void Xe::PCIDev::ODD::processSCSICommand() {
     LOG_WARNING(ODD, "Unsupported MODE_SENSE Page code {:#x}", atapiState.scsiCBD.AsByte[2]);
     atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
     atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
-    atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
+    atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
     break;
+  }
   case SCSIOP_INQUIRY:
     scsiInquiryCommand();
     break;
@@ -1209,6 +1259,9 @@ void Xe::PCIDev::ODD::processSCSICommand() {
   case SCSIOP_READ_TOC:
     scsiReadTocCommand();
     break;
+  case SCSIOP_EVENT_INFO:
+    scsiGetEventStatusNotificationCommand();
+    break;
   default:
     LOG_ERROR(ODD, "Unknown SCSI Command requested: 0x{:X}", atapiState.scsiCBD.CDB12.OperationCode);
   }
@@ -1217,14 +1270,15 @@ void Xe::PCIDev::ODD::processSCSICommand() {
 // Does a basic setup of registers for an ATAPI command that has no outputs/errors.
 void Xe::PCIDev::ODD::atapiNopCommand() {
   atapiState.regs.error = 0;
-  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF;
+  atapiState.regs.status = ATA_STATUS_DRDY;
   atapiState.regs.interruptReason &= ~7;
   atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_CD | ATA_INTERRUPT_REASON_IO;
 }
 
 // Performs drive authentication using the 0x3B page code.
 void Xe::PCIDev::ODD::perform3BAuth() {
-  // Reset our output buffer
+  // Init our output buffer to correct size
+  atapiState.dataOutBuffer.init(74, true);
   atapiState.dataOutBuffer.reset();
   
   // Get our IV.
@@ -1268,5 +1322,75 @@ void Xe::PCIDev::ODD::perform3BAuth() {
   // Set status as expected.
   atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
   atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
-  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DF | ATA_STATUS_DRQ;
+  // Set byte count to transfer size.
+  atapiState.regs.byteCountLow = sizeof(outPage) & 0xFF;
+  atapiState.regs.byteCountHigh = (sizeof(outPage) >> 8) & 0xFF;
+  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
+}
+
+// Handles the GET EVENT STATUS NOTIFICATION command (0x4A).
+void Xe::PCIDev::ODD::scsiGetEventStatusNotificationCommand() {
+  u8 notificationClassRequest = atapiState.scsiCBD.AsByte[4];
+  u16 allocLen = ((u16)atapiState.scsiCBD.AsByte[7] << 8) | atapiState.scsiCBD.AsByte[8];
+
+  // Response buffer (Event Header + Media Event Descriptor max)
+  // Max size = 4 (header) + 4 (media descriptor) = 8 bytes.
+  u8 response[8] = {};
+  u16 dataLen = 0;
+
+  // We primarily support Media Status Class (0x10 is bit 4)
+  if (notificationClassRequest & 0x10) {
+    // Media Status Requested
+    // Header (4 bytes) + Descriptor (4 bytes) = 8 bytes total.
+    // Length field (2 bytes) = Total - 2 = 6.
+    dataLen = 6; 
+    
+    response[0] = (dataLen >> 8) & 0xFF;
+    response[1] = dataLen & 0xFF;
+    
+    // Header Byte 2:
+    // Bit 7: NEA (0 = Event Available)
+    // Bit 6-4: Notification Class = Media (4 = 100b) -> 0x40.
+    response[2] = 0x40; 
+    response[3] = 0x10; // Supported: Media (Bit 4)
+    
+    // Event Descriptor (Media)
+    // Byte 0: Event Code (0-3).
+    //   0 = No Chg
+    //   1 = Request
+    //   2 = Media
+    response[4] = 0x0; // Event Code: No Change.
+    // Byte 1: Media Status.
+    //   Bit 1: Media Present.
+    //   Bit 0: Door Open.
+    response[5] = 0x02; // Media Present, Door Closed.
+    
+  } else {
+    // No event or unsupported class requested.
+    // Return empty header with NEA=1.
+    // Length = 2 (header only, excluding length field)
+    dataLen = 2;
+    response[0] = (dataLen >> 8) & 0xFF; // 0
+    response[1] = dataLen & 0xFF;        // 2
+    response[2] = 0x80; // NEA=1
+    response[3] = 0x10; // Supported: Media
+  }
+  
+  // Calculate transfer size (min of avail and alloc)
+  u32 totalSize = dataLen + 2;
+  u32 transferSize = std::min((u32)allocLen, totalSize);
+  
+  // Init output buffer to correct size
+  atapiState.dataOutBuffer.init(transferSize, true);
+  atapiState.dataOutBuffer.reset();
+  memcpy(atapiState.dataOutBuffer.get(), response, transferSize);
+
+  atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
+  atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
+  
+  // Set Byte Count!
+  atapiState.regs.byteCountLow = transferSize & 0xFF;
+  atapiState.regs.byteCountHigh = (transferSize >> 8) & 0xFF;
+  
+  atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
 }
