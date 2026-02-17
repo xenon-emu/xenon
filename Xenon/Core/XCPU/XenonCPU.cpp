@@ -125,8 +125,18 @@ namespace Xe::XCPU {
   }
 
   XenonCPU::~XenonCPU() {
-    // First kill timer thread.
+    // First signal timer thread to stop and wait for it to exit.
     timeBaseThreadActive.store(false);
+
+    // Ensure thread is joined before destroying resources it may touch.
+    try {
+      if (timeBaseThread.joinable()) {
+        timeBaseThread.join();
+      }
+    } catch (const std::system_error &e) {
+      LOG_ERROR(Xenon, "Failed to join timeBaseThread: {}", e.what());
+      // Proceed with shutdown; std::terminate would be worse here.
+    }
 
     LOG_INFO(Xenon, "Shutting PPU cores down...");
     ppu0.reset();
