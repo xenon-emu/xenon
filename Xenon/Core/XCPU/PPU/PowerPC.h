@@ -1455,6 +1455,10 @@ enum eExceptionBitmask {
   ppuPerformanceMonitorEx = 0x8000,   // Performance Monitor Exception
 };
 
+constexpr u16 AsyncExceptionMask = ppuSystemResetEx | ppuMachineCheckEx | ppuExternalEx | ppuDecrementerEx;
+constexpr u16 SyncExceptionMask = ppuDataStorageEx | ppuDataSegmentEx | ppuFPUnavailableEx | ppuVXUnavailableEx
+| ppuProgramEx | ppuSystemCallEx | ppuInstrStorageEx | ppuInstrSegmentEx;
+
 // Program Exception types
 enum ePPUProgramExType {
  ppuProgExTypeFPU = 43,   // Floating Point Exception

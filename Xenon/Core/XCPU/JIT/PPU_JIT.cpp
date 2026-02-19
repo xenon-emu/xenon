@@ -500,6 +500,12 @@ u64 PPU_JIT::ExecuteJITBlock(u64 blockStartAddress, bool enableHalt) {
 // Execute a given number of instructions using JIT.
 void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool singleBlock) {
   u32 instrsExecuted = 0;
+  u32 instrCounter = 0;
+
+  // Check for Async (System Reset) exceptions, this must be done here to avoid re-running a block that would 
+  // ultimately suspend the thread until a system reset is issued.
+  if (curThread.exceptReg & ppuSystemResetEx) { ppu->PPUProcessAsyncExceptions(ppeState); }
+
   while (instrsExecuted < numInstrs && active && (XeRunning && !XePaused)) {
     auto &thread = curThread;
 
@@ -522,6 +528,7 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
     // Skip to next block if needed.
     if (skipBlock) {
       instrsExecuted++;
+      instrCounter++;
       thread.NIA += 4;
     }
 
@@ -537,6 +544,7 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
       // Execute our block and increse executed instructions.
       block->codePtr(ppu, ppeState, enableHalt);
       instrsExecuted += block->size / 4;
+      instrCounter += block->size / 4;
 
       // For Testing and debugging purposes only.
       if (singleBlock)
@@ -546,8 +554,8 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
       if (ppeState->currentThread == 0 && !ppeState->SPR.CTRL.TE0) { break; }
       if (ppeState->currentThread == 1 && !ppeState->SPR.CTRL.TE1) { break; }
 
-      // Process pending exceptions and check for external interrupts.
-      ppu->PPUCheckExceptions();
+      // Process pending synchronous exceptions.
+      if (thread.exceptReg & SyncExceptionMask) { ppu->PPUProcessSyncExceptions(ppeState); }
     } else {
       bool realMode = false;
       realMode = !thread.SPR.MSR.DR || !thread.SPR.MSR.IR;
@@ -593,6 +601,7 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
       JITBlock *currentBlock = it->second.get();
       currentBlock->codePtr(ppu, ppeState, enableHalt);
       instrsExecuted += currentBlock->size / 4;
+      instrCounter += currentBlock->size / 4;
 
       // Block linking optimization: follow linked blocks without returning to dispatcher
       // Only do this if we're not in single-block mode and have instructions remaining
@@ -617,14 +626,29 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
         currentBlock = currentBlock->linkedBlock;
         currentBlock->codePtr(ppu, ppeState, enableHalt);
         instrsExecuted += currentBlock->size / 4;
+        instrCounter += currentBlock->size / 4;
       }
 
       // If the thread was suspended due to CTRL being written, we must end execution on said thread.
       if (ppeState->currentThread == 0 && !ppeState->SPR.CTRL.TE0) { break; }
       if (ppeState->currentThread == 1 && !ppeState->SPR.CTRL.TE1) { break; }
 
-      // Process pending exceptions and check for external interrupts.
-      ppu->PPUCheckExceptions();
+      // Process pending synchronous exceptions.
+      if (thread.exceptReg & SyncExceptionMask) { ppu->PPUProcessSyncExceptions(ppeState); }
+    }
+
+    // Process asynchronous exceptions every x amount of instructions.
+    // Avoids to be constantly checking for External exceptions and such.
+    if (instrCounter >= 25) {
+      if (thread.SPR.MSR.EE) {
+        if (ppu->xenonContext->iic.hasPendingInterrupts(thread.SPR.PIR)) {
+          thread.exceptReg |= ppuExternalEx;
+        }
+      }
+      if (thread.exceptReg & AsyncExceptionMask) {
+        ppu->PPUProcessAsyncExceptions(ppeState);
+      }
+      instrCounter = 0;
     }
   }
 }

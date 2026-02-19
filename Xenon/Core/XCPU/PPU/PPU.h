@@ -144,6 +144,12 @@ private:
   // Exceptions
   //
 
+  // Process Synchronous exceptions
+  void PPUProcessSyncExceptions(sPPEState* ppeState);
+
+  // Process Asynchronous exceptions
+  void PPUProcessAsyncExceptions(sPPEState* ppeState);
+
   void PPUSystemResetException(sPPEState* ppeState);
   void PPUInstStorageException(sPPEState* ppeState);
   void PPUDataStorageException(sPPEState* ppeState);

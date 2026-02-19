@@ -351,7 +351,7 @@ void PPU::ThreadStateMachine() {
   } break;
   case eThreadState::Sleeping: {
     // Waiting for an event, do nothing
-    std::this_thread::sleep_for(1ns); // Don't burn the CPU
+    std::this_thread::sleep_for(1ms); // Don't burn the CPU
   } break;
   case eThreadState::Unused: {
     ppuThreadState.store(eThreadState::None);
@@ -896,6 +896,235 @@ bool PPU::Simulate1Bl() {
 
   // All good.
   return true;
+}
+
+//
+// Exception Processing
+//
+
+// Exceptions in the CELL/BE and thus the Xenon, are subdivided onto two main categories:
+// -------------------
+// *** Synchronous ***
+// -------------------
+// * Data Storage
+// * Data Segment
+// * Instruction Storage
+// * Instruction Segment
+// * Alignment
+// * Program
+// * Floating-Point Unavailable
+// * System Call
+// * Trace
+// * VXU Unavailable
+// * Maintenance (instruction-caused)
+// --------------------
+// *** Asynchronous ***
+// --------------------
+// * System Reset
+// * Machine Check
+// * System Error
+// * Decrementer
+// * Hypervisor Decrementer
+// * Thermal Management
+// * Maintenance (system-caused)
+// * External (direct and mediated)
+
+// Aditionally, interrupts are handled in a certain priority:
+// Higer to lower:
+// NOTE: All load/stores handle Unavailable type interrupts
+// * System reset interrupt (highest priority exception)
+// * Machine check interrupt
+// * Instruction-dependent
+// * > Fixed-Point Loads and Stores
+// * > Floating-Point Loads and Stores
+// * > VXU Loads and Stores
+// * > Other Instructions
+// *   > Trap type of program interrupt
+// *   > System call
+// *   > Privileged Instruction type of program interrupt
+// *   > Illegal Instruction type of program interrupt
+// *   > Trace interrupt
+// * > Instruction segment interrupt
+// * > Instruction storage interrupt
+// * Thermal management interrupt
+// * System error interrupt
+// * Maintenance interrupt
+// * External interrupt
+// * Hypervisor decrementer Interrupt
+// * Decrementer Interrupt
+
+// For convenience, we will flag them sepparately and process them acordingly.
+
+// Process Synchronous exceptions
+void PPU::PPUProcessSyncExceptions(sPPEState* ppeState) {
+  sPPUThread& thread = curThread;
+  
+  // We cant process any exception when in HV mode.
+  if (thread.SPR.MSR.HV) { return; }
+
+  // If we are here, it means that exceptions were detected. 
+  // Check by order and process excatly one.
+
+  // NOTE: Already arranged by order of execution.
+  // TODO: Missing Alignment, Trace and Maintenance exceptions.
+
+  // Data Storage Exception (0x300)
+  if (thread.exceptReg & ppuDataStorageEx) {
+    thread.SPR.SRR0 = thread.CIA;
+    thread.SPR.SRR1 = thread.SPR.MSR.hexValue & 0xFFFFFFFF87C0FFFF;
+    thread.SPR.MSR.hexValue &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+    thread.SPR.MSR.hexValue |= 0x9000000000000000;
+    thread.NIA = 0x300;
+    thread.exceptReg &= ~ppuDataStorageEx;
+    return;
+  }
+
+  // Data Segment Exception (0x380)
+  if (thread.exceptReg & ppuDataSegmentEx) {
+    thread.SPR.SRR0 = thread.CIA;
+    thread.SPR.SRR1 = thread.SPR.MSR.hexValue & 0xFFFFFFFF87C0FFFF;
+    thread.SPR.MSR.hexValue &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+    thread.SPR.MSR.hexValue |= 0x9000000000000000;
+    thread.NIA = 0x380;
+    thread.exceptReg &= ~ppuDataSegmentEx;
+    return;
+  }
+
+  // Floating Point Unavailable (0x800)
+  if (thread.exceptReg & ppuFPUnavailableEx) {
+    thread.SPR.SRR0 = thread.CIA;
+    thread.SPR.SRR1 = thread.SPR.MSR.hexValue & 0xFFFFFFFF87C0FFFF;
+    thread.SPR.MSR.hexValue &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+    thread.SPR.MSR.hexValue |= 0x9000000000000000;
+    thread.NIA = 0x800;
+    thread.exceptReg &= ~ppuFPUnavailableEx;
+    return;
+  }
+
+  // VX Unavailable Exception (0xF20)
+  if (thread.exceptReg & ppuVXUnavailableEx) {
+    thread.SPR.SRR0 = thread.CIA; // See Cell Vector SIMD PEM, page 104, table 5.4.
+    thread.SPR.SRR1 = thread.SPR.MSR.hexValue & 0xFFFFFFFF87C0FFFF;
+    thread.SPR.MSR.hexValue &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+    thread.SPR.MSR.hexValue |= 0x9000000000000000;
+    thread.NIA = 0xF20;
+    thread.exceptReg &= ~ppuVXUnavailableEx;
+    return;
+  }
+
+  // Program Exception (0x700)
+  if (thread.exceptReg & ppuProgramEx) {
+    thread.SPR.SRR0 = thread.CIA;
+    thread.SPR.SRR1 = thread.SPR.MSR.hexValue & 0xFFFFFFFF87C0FFFF;
+    thread.SPR.MSR.hexValue &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+    thread.SPR.MSR.hexValue |= 0x9000000000000000;
+    BSET(thread.SPR.SRR1, 64, thread.progExceptionType);
+    thread.NIA = 0x700;
+    thread.exceptReg &= ~ppuProgramEx;
+    return;
+  }
+
+  // System Call (0xC00)
+  if (thread.exceptReg & ppuSystemCallEx) {
+    thread.SPR.SRR0 = thread.NIA;
+    thread.SPR.SRR1 = thread.SPR.MSR.hexValue & 0xFFFFFFFF87C0FFFF;
+    thread.SPR.MSR.hexValue &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+    thread.SPR.MSR.hexValue |= 0x9000000000000000;
+    thread.NIA = 0xC00;
+    thread.exceptReg &= ~ppuSystemCallEx;
+    return;
+  }
+
+  // Instruction Storage Exception (0x400)
+  if (thread.exceptReg & ppuInstrStorageEx) {
+    thread.SPR.SRR0 = thread.CIA;
+    thread.SPR.SRR1 = thread.SPR.MSR.hexValue & 0xFFFFFFFF87C0FFFF;
+    thread.SPR.SRR1 |= 0x40000000;
+    thread.SPR.MSR.hexValue &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+    thread.SPR.MSR.hexValue |= 0x9000000000000000;
+    thread.NIA = 0x400;
+    thread.exceptReg &= ~ppuInstrStorageEx;
+    return;
+  }
+
+  // Instruction Segment Exception (0x480)
+  if (thread.exceptReg & ppuInstrSegmentEx) {
+    thread.SPR.SRR0 = thread.CIA;
+    thread.SPR.SRR1 = thread.SPR.MSR.hexValue & 0xFFFFFFFF87C0FFFF;
+    thread.SPR.MSR.hexValue &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+    thread.SPR.MSR.hexValue |= 0x9000000000000000;
+    thread.NIA = 0x480;
+    thread.exceptReg &= ~ppuInstrSegmentEx;
+    return;
+  }
+}
+
+// Process Asynchronous exceptions
+void PPU::PPUProcessAsyncExceptions(sPPEState* ppeState) {
+  sPPUThread& thread = curThread;
+
+  // NOTE: Already arranged by order of execution.
+  // TODO: Missing System Error, Hypervisor Decrementer, Thermal Management and Maintenance exceptions.
+
+  // System reset Exception (0x100)
+  if (thread.exceptReg & ppuSystemResetEx) {
+    thread.SPR.SRR0 = thread.NIA;
+    thread.SPR.SRR1 = thread.SPR.MSR.hexValue & 0xFFFFFFFF87C0FFFF;
+    thread.SPR.MSR.hexValue &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+    thread.SPR.MSR.hexValue |= 0x9000000000000000;
+    thread.NIA = 0x100;
+    thread.exceptReg &= ~ppuSystemResetEx;
+    return;
+  }
+
+  // Machine Check (0x200)
+  if (thread.exceptReg & ppuMachineCheckEx) {
+    if (thread.SPR.MSR.ME) {
+      // Do a system reset.
+      thread.SPR.SRR0 = thread.NIA;
+      thread.SPR.SRR1 = thread.SPR.MSR.hexValue & 0xFFFFFFFF87C0FFFF;
+      thread.SPR.MSR.hexValue &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+      thread.SPR.MSR.hexValue |= 0x9000000000000000;
+      thread.NIA = 0x100;
+      thread.exceptReg &= ~ppuMachineCheckEx;
+      return;
+    } else {
+      // Checkstop Mode. Hard Fault.
+      LOG_CRITICAL(Xenon, "{}: CHECKSTOP!", ppeState->ppuName);
+      // A checkstop is a full - stop of the processor that requires a System
+      // Reset to recover.
+      XeMain::ShutdownCPU();
+    }
+    return;
+  }
+
+  // We cant process the remaining exceptions when in HV mode.
+  if (thread.SPR.MSR.HV) { return; }
+
+  // These interrupts can be disbaled by means of the EE MSR bit.
+  if (thread.SPR.MSR.EE) {
+    // External Exception (0x500)
+    if (thread.exceptReg & ppuExternalEx) {
+      thread.SPR.SRR0 = thread.NIA;
+      thread.SPR.SRR1 = thread.SPR.MSR.hexValue & 0xFFFFFFFF87C0FFFF;
+      thread.SPR.MSR.hexValue &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+      thread.SPR.MSR.hexValue |= 0x9000000000000000;
+      thread.NIA = 0x500;
+      thread.exceptReg &= ~ppuExternalEx;
+      return;
+    }
+
+    // Decrementer Exception (0x900)
+    if (thread.exceptReg & ppuDecrementerEx) {
+      thread.SPR.SRR0 = thread.NIA;
+      thread.SPR.SRR1 = thread.SPR.MSR.hexValue & 0xFFFFFFFF87C0FFFF;
+      thread.SPR.MSR.hexValue &= 0xFFFFFFFFFFFF10C8; // This clears both IR and DR bits.
+      thread.SPR.MSR.hexValue |= 0x9000000000000000;
+      thread.NIA = 0x900;
+      thread.exceptReg &= ~ppuDecrementerEx;
+      return;
+    }
+  }
 }
 
 //
