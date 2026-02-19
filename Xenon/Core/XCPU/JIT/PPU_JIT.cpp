@@ -295,7 +295,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
         break;
       } else {
         // Manually process the pending exceptions.
-        ppu->PPUCheckExceptions();
+        ppu->PPUProcessSyncExceptions(ppeState);
         // Return from block creation. Next block will be one the handlers for instruction exceptions.
         return nullptr;
       }

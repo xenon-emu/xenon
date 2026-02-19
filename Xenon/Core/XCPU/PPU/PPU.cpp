@@ -958,9 +958,6 @@ bool PPU::Simulate1Bl() {
 // Process Synchronous exceptions
 void PPU::PPUProcessSyncExceptions(sPPEState* ppeState) {
   sPPUThread& thread = curThread;
-  
-  // We cant process any exception when in HV mode.
-  if (thread.SPR.MSR.HV) { return; }
 
   // If we are here, it means that exceptions were detected. 
   // Check by order and process excatly one.
@@ -1097,9 +1094,6 @@ void PPU::PPUProcessAsyncExceptions(sPPEState* ppeState) {
     }
     return;
   }
-
-  // We cant process the remaining exceptions when in HV mode.
-  if (thread.SPR.MSR.HV) { return; }
 
   // These interrupts can be disbaled by means of the EE MSR bit.
   if (thread.SPR.MSR.EE) {
