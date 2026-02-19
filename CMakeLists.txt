@@ -269,7 +269,7 @@ if (APPLE)
 # Add defines specific to Windows
 elseif (WIN32)
   # Synchronization is needed for WaitOnAddress/WakeByAddressSingle
-  target_link_libraries(Xenon PRIVATE ws2_32 synchronization)
+  target_link_libraries(Xenon PRIVATE iphlpapi setupapi ws2_32 synchronization)
   add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
 
   # Disables Warnings
