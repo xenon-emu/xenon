@@ -561,8 +561,6 @@ void Xe::PCIDev::SMC::smcMainThread() {
         smcCoreState.fifoDataBuffer[6] = 0x24;
         smcCoreState.fifoDataBuffer[7] = 0x26;
         smcCoreState.fifoDataBuffer[8] = 0x2C;
-        LOG_WARNING(SMC, "SMC_FIFO_CMD: SMC_QUERY_TEMP_SENS: {:#d}, {:#d}, {:#d}, {:#d}",
-          (0x241b / 255), (0x2FA4 / 255), (0x2C24 / 255), (0x262C / 255));
         break;
       case Xe::PCIDev::SMC_QUERY_TRAY_STATE:
         smcCoreState.fifoDataBuffer[0] = SMC_QUERY_TRAY_STATE;
@@ -787,5 +785,8 @@ void Xe::PCIDev::SMC::smcMainThread() {
         }
       }
     }
+
+    // Sleep for some time.
+    std::this_thread::sleep_for(500ns);
   }
 }

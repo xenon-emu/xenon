@@ -218,6 +218,40 @@ namespace JITOpcodeHashes {
   static constexpr u32 INVALID = "invalid"_j;
 }
 
+// Determine if an instruction (by name hash) can raise synchronous exceptions.
+static bool InstrCanCauseSyncException(u32 opNameHash) {
+  switch (opNameHash) {
+    // These dont cause exceptions:
+  case "mulli"_j: case "subfic"_j: case "cmpli"_j: case "cmpi"_j: case "addic"_j:
+  case "addi"_j: case "addis"_j: case "bc"_j: case "b"_j: case "rlwimix"_j: case "rlwinmx"_j:
+  case "rlwnmx"_j: case "ori"_j: case "oris"_j: case "xori"_j: case "xoris"_j: case "andi"_j:
+  case "andis"_j: case "mcrf"_j: case "bclr"_j: case "rfid"_j: case "crnor"_j: case "crandc"_j:
+  case "isync"_j: case "crxor"_j: case "crnand"_j: case "crand"_j: case "creqv"_j: case "crorc"_j:
+  case "cror"_j: case "bcctr"_j: case "rldiclx"_j: case "rldicrx"_j: case "rldicx"_j:
+  case "rldimix"_j: case "rldclx"_j: case "rldcrx"_j: case "cmp"_j: case "subfcx"_j: case "subfcox"_j:
+  case "mulhdux"_j: case "addcx"_j: case "addcox"_j: case "mulhwux"_j: case "mfocrf"_j: case "slwx"_j:
+  case "cntlzwx"_j: case "sldx"_j: case "andx"_j: case "cmpl"_j: case "subfx"_j: case "subfox"_j:
+  case "dcbst"_j: case "cntlzdx"_j: case "andcx"_j: case "mulhdx"_j: case "mulhwx"_j: case "mfmsr"_j:
+  case "dcbf"_j: case "negx"_j: case "negox"_j: case "norx"_j: case "subfex"_j: case "addex"_j:
+  case "addeox"_j: case "mtocrf"_j: case "mtmsr"_j: case "mtmsrd"_j: case "subfze"_j: case "subfzeo"_j:
+  case "addzex"_j: case "addzeox"_j: case "subfmex"_j: case "subfmeox"_j: case "mulldx"_j: case "mulldox"_j:
+  case "addmex"_j: case "addmeox"_j: case "mullwx"_j: case "mullwox"_j: case "dcbtst"_j: case "addx"_j:
+  case "addox"_j: case "dcbt"_j: case "eqvx"_j: case "tlbiel"_j: case "tlbie"_j: case "eciwx"_j:
+  case "xorx"_j: case "mfspr"_j: case "dst"_j: case "dstst"_j: case "slbmte"_j: case "orcx"_j:
+  case "slbie"_j: case "ecowx"_j: case "orx"_j: case "divdux"_j: case "divduox"_j: case "divwux"_j:
+  case "divwuox"_j: case "mtspr"_j: case "dcbi"_j: case "nandx"_j: case "slbia"_j: case "divdx"_j:
+  case "divdox"_j: case "divwx"_j: case "divwox"_j: case "srwx"_j: case "srdx"_j: case "tlbsync"_j:
+  case "mfsrin"_j: case "mfsr"_j: case "sync"_j: case "srawx"_j: case "sradx"_j: case "dss"_j:
+  case "srawix"_j: case "sradix"_j: case "slbmfev"_j: case "eieio"_j: case "slbmfee"_j: case "extshx"_j:
+  case "extsbx"_j: case "extswx"_j: case "icbi"_j:
+    return false;
+
+  // Everything else can potentially fault:
+  default:
+    return true;
+  }
+}
+
 #undef GPR
 using namespace asmjit;
 // Builds a JIT block starting at the given address.
@@ -386,17 +420,21 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
       }
     }
 
+    // Check if the executed instruction can produce Sync exceptions
+    // Most instructions (System/ALU) don't, saving 3 x86 instructions per PPC instruction.
+    // TODO: See if we can also include VXU/FPU arithmetic ops based on wheter MSR[SF,FP] is set at block build time.
+    if (InstrCanCauseSyncException(opName)) {
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
-    // Test for present exceptions and return if any is found.
-    Label skipRet = compiler.newLabel();
-    x86::Gp exceptReg = compiler.newGpw();
-    compiler.mov(exceptReg, jitBuilder->threadCtx->scalar(&sPPUThread::exceptReg));
-    compiler.test(exceptReg, exceptReg);  // Check for a positive result.
-    compiler.jz(skipRet);           // Skip return if no exceptions.
-    compiler.ret();                 // Return if exceptions ocurred.
-    compiler.bind(skipRet);         // Skip return Tag.
+      // Test for present exceptions and return if any is found.
+      Label skipRet = compiler.newLabel();
+      x86::Gp exceptReg = compiler.newGpw();
+      compiler.mov(exceptReg, jitBuilder->threadCtx->scalar(&sPPUThread::exceptReg));
+      compiler.test(exceptReg, exceptReg);  // Check for a positive result.
+      compiler.jz(skipRet);           // Skip return if no exceptions.
+      compiler.ret();                 // Return if exceptions ocurred.
+      compiler.bind(skipRet);         // Skip return Tag.
 #endif
-
+    }
     // Check if the last instruction was a branch or a jump (rfid). We must end the block if any is found or the block
     // is at the maximum available size.
     instrCount++;
