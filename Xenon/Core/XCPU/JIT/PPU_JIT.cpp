@@ -199,6 +199,36 @@ void PPU_JIT::InstrPrologue(JITBlockBuilder *b, u32 instrData) {
 #endif
 }
 
+// JIT Instruction Prologue (Constant Address)
+// * Uses compile-time known CIA value instead of reading NIA from memory
+// * Used for instructions that may cause sync exceptions or are branches
+void PPU_JIT::InstrPrologueConst(JITBlockBuilder *b, u64 cia, u32 instrData) {
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
+  x86::Gp temp = newGP64();
+  // CIA
+  COMP->mov(temp, cia);
+  COMP->mov(b->threadCtx->scalar(&sPPUThread::CIA), temp);
+  // NIA = CIA + 4
+  COMP->mov(temp, cia + 4);
+  COMP->mov(b->threadCtx->scalar(&sPPUThread::NIA), temp);
+  // CI data
+  COMP->mov(temp, instrData);
+  COMP->mov(b->threadCtx->scalar(&sPPUThread::CI).Ptr<u32>(), temp);
+#endif
+}
+
+// JIT Instruction Prologue (Minimal)
+// * Only writes the CI data. CIA and NIA are not updated. Saves 4 x86 instructions
+// * Used for instructions that cannot cause sync exceptions and are not branches
+void PPU_JIT::InstrPrologueMinimal(JITBlockBuilder *b, u32 instrData) {
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
+  x86::Gp temp = newGP64();
+  // CI data only
+  COMP->mov(temp, instrData);
+  COMP->mov(b->threadCtx->scalar(&sPPUThread::CI).Ptr<u32>(), temp);
+#endif
+}
+
 
 // Instruction Epilogue
 // * Checks for external interrupts and exceptions.
@@ -348,8 +378,21 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
     // The hash is only needed for block termination check, so compute it efficiently
     u32 opName = Base::JoaatStringHash(PPCInterpreter::ppcDecoder.getNameTable()[decodedInstr]);
 
-    // Setup our instruction prologue.
-    InstrPrologue(jitBuilder.get(), opcode);
+    // Check if this instruction is a block-ending branch
+    bool isBranchInstr = (opName == JITOpcodeHashes::B || opName == JITOpcodeHashes::BC ||
+      opName == JITOpcodeHashes::BCLR || opName == JITOpcodeHashes::BCCTR ||
+      opName == JITOpcodeHashes::RFID);
+
+    // Check if this instruction can cause sync exceptions
+    bool canCauseException = InstrCanCauseSyncException(opName);
+
+    // Branch instructions and sync exception-capable instructions need CIA/NIA updated
+    // Safe instructions only need CI data written
+    if (isBranchInstr || canCauseException) {
+      InstrPrologueConst(jitBuilder.get(), thread.CIA, opcode);
+    } else {
+      InstrPrologueMinimal(jitBuilder.get(), opcode);
+    }
 
     // Check for ocurred Instruction access exceptions.
     if (opcode == 0xFFFFFFFF || opcode == 0xCDCDCDCD || opcode == 0x00000000) {
@@ -406,6 +449,12 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
 
       // If the instruction is invalid and we're in hybrid mode, call the interpreter decoder and function lookup.
       if (ppu->currentExecMode == eExecutorMode::Hybrid && invalidInstr) {
+        // Hybrid fallback needs CIA/NIA set for the interpreter
+        // We must only set it once!
+        if (!isBranchInstr && !canCauseException) {
+          InstrPrologueConst(jitBuilder.get(), thread.CIA, opcode);
+        }
+
         auto function = PPCInterpreter::ppcDecoder.decode(opcode);
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
@@ -423,7 +472,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
     // Check if the executed instruction can produce Sync exceptions
     // Most instructions (System/ALU) don't, saving 3 x86 instructions per PPC instruction.
     // TODO: See if we can also include VXU/FPU arithmetic ops based on wheter MSR[SF,FP] is set at block build time.
-    if (InstrCanCauseSyncException(opName)) {
+    if (canCauseException) {
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
       // Test for present exceptions and return if any is found.
       Label skipRet = compiler.newLabel();
@@ -475,6 +524,30 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
   jitBuilder->size = instrCount * 4;
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
+
+  // If the block was not terminated by a branch instruction, NIA may not have been
+  // materialized by the last instruction (if it used InstrPrologueMinimal). Emit a
+  // final NIA write so that the execution resumes at the correct address
+  if (!blockCanLink && instrCount > 0) {
+    // Check if the last instruction was a branch, if so, it already set NIA
+    bool lastWasBranch = false;
+    if (!instrsTemp.empty()) {
+      u32 lastOpcode = instrsTemp.back();
+      u32 lastDecoded = PPCDecode(lastOpcode);
+      u32 lastOpName = Base::JoaatStringHash(PPCInterpreter::ppcDecoder.getNameTable()[lastDecoded]);
+      lastWasBranch = (lastOpName == JITOpcodeHashes::B || lastOpName == JITOpcodeHashes::BC ||
+        lastOpName == JITOpcodeHashes::BCLR || lastOpName == JITOpcodeHashes::BCCTR ||
+        lastOpName == JITOpcodeHashes::RFID);
+    }
+    if (!lastWasBranch) {
+      // Block ended due to maxBlockSize, set final NIA
+      u64 finalNIA = blockStartAddress + instrCount * 4;
+      x86::Gp temp = compiler.newGpq();
+      compiler.mov(temp, finalNIA);
+      compiler.mov(jitBuilder->threadCtx->scalar(&sPPUThread::NIA), temp);
+    }
+  }
+
   // Block end.
   compiler.ret();
   compiler.endFunc();

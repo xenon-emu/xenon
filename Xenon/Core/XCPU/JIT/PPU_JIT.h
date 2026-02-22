@@ -242,6 +242,8 @@ public:
   std::shared_ptr<JITBlock> BuildJITBlock(u64 blockStartAddress, u64 maxBlockSize);
   void SetupContext(JITBlockBuilder *b);
   void InstrPrologue(JITBlockBuilder *b, u32 instrData);
+  void InstrPrologueConst(JITBlockBuilder *b, u64 cia, u32 instrData);
+  void InstrPrologueMinimal(JITBlockBuilder *b, u32 instrData);
 
   // Page based indexing and invalidation methods.
   void InvalidateBlocksForRange(u64 startAddr, u64 endAddr);
