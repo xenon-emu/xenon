@@ -75,12 +75,9 @@ namespace Xe::XCPU {
     // Used for conditional load/store instructions regarding PowerPC atomic operations.
     XenonReservations xenonRes = {};
     // Time Base switch, possibly RTC register, the TB counter only runs if this
-    // value is set.
-    bool timeBaseActive = false;
-
-    // Global timebase tick counter (Increments based on the timeBase frquency)
-    // The timer thread inside XenonCPU will increase this; each PPU reads the counter and applies the delta.
-    std::atomic<u64> timeBaseGlobalCounter{ 0 };
+    // value is set. Atomic because it's written from PPU threads (PRV handler)
+    // and read from the timer thread.
+    std::atomic<bool> timeBaseActive{ false };
 
     //
     // SOC Blocks

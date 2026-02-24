@@ -7,33 +7,7 @@
 #include "Core/XCPU/XenonCPU.h"
 #include "Interpreter/PPCInterpreter.h"
 
-#ifdef _WIN32
-#include <Windows.h>
-
-// Returns the CPU Frequency using Windows QueryPerformanceFrequency/QueryPerformanceCounter routines.
-double calibrateCPUFrequency() {
-  LARGE_INTEGER freq;
-  QueryPerformanceFrequency(&freq);
-
-  LARGE_INTEGER t0, t1;
-  u64 c0, c1;
-
-  QueryPerformanceCounter(&t0);
-  c0 = __rdtsc();
-
-  // Wait ~100 ms
-  Sleep(100); 
-
-  QueryPerformanceCounter(&t1);
-  c1 = __rdtsc();
-
-  double elapsedSec = double(t1.QuadPart - t0.QuadPart) / double(freq.QuadPart);
-  double cycles = double(c1 - c0);
-
-  return cycles / elapsedSec; // Frequency in Hz
-}
-
-#endif // _WIN32
+#include "Base/PrecisionTimer.h"
 
 namespace Xe::XCPU {
 
@@ -286,60 +260,94 @@ namespace Xe::XCPU {
     return nullptr;
   }
 
-  // TimeBase thread for increasing global timer counter.
+  // TimeBase thread for increasing global XCPU Timer counter.
+  // Uses a hybrid sleep+spin approach for accuracy with low CPU usage:
+  // - Sleeps for the bulk of the interval using OS-assisted precision sleep
+  // - Spins for the final ~1µs to hit the target precisely
+  // - Uses elapsed-based tick calculation for accuracy
+  // - Compensates for drift via absolute deadline advancement
   void XenonCPU::timeBaseThreadLoop() {
     Base::SetCurrentThreadName("[Xe] CPU Timer Thread");
 
-#ifdef _WIN32
-    // Get our CPU frequency.
-    double cpuFrequencyInHz = calibrateCPUFrequency();
-    // Target time in Ns we need to wait.
-    const double targetNs = 2500.0;
-    // Convert that to CPU cycles.
-    unsigned long long targetCPUCycles = static_cast<unsigned long long>((targetNs * 1e-9) * cpuFrequencyInHz);
-    unsigned long long startCycle = __rdtsc();
-    unsigned long long nextCycle = startCycle + targetCPUCycles;
+    // Request critical priority for the current thread
+    Base::SetCurrentThreadPriority(Base::ThreadPriority::Critical);
 
-    while (timeBaseThreadActive.load()) {
-      // Wait x cycles.
-      while (__rdtsc() < nextCycle) {}
+    // Xbox 360 timebase frequency: 50 MHz → 20 ns per tick.
+    constexpr u64 NS_PER_TICK = 20ULL;
 
-      // We're waiting for approx 2500 Ns, which represent 125 XenonCPU cycles.
-      if (xenonContext->timeBaseActive) {
-        ppu0->UpdateTimeBase(125);
-        ppu1->UpdateTimeBase(125);
-        ppu2->UpdateTimeBase(125);
+    // Target update interval in nanoseconds.
+    // 100 us = 5000 ticks at 50 MHz. This isn't ideal but should work most of the time due to
+    // it being higher than most OS's timers 50us resolution.
+    constexpr u64 TARGET_INTERVAL_NS = 100'000ULL;
+
+    // Sleep threshold: spin for the final portion to hit the deadline precisely.
+    // Since WaitableTimers on Windows can't reliably achieve sub-500µs precision,
+    // and our target interval is us, we set the spin threshold equal to the
+    // target so the entire interval is handled by the CPU-friendly _mm_pause spin.
+    // The OS sleep only activates if TARGET_INTERVAL is raised above this value.
+    constexpr u64 SPIN_THRESHOLD_NS = TARGET_INTERVAL_NS;
+
+    // Maximum ticks to apply in a single update. Prevents decrementer storms
+    // after system suspend/resume or long stalls.
+    constexpr u64 MAX_TICKS_PER_UPDATE = 50000ULL; // 1ms worth of ticks
+
+    u64 lastUpdateNs = Base::GetMonotonicNanos();
+    u64 nextDeadlineNs = lastUpdateNs + TARGET_INTERVAL_NS;
+
+    while (timeBaseThreadActive.load(std::memory_order_relaxed)) {
+      u64 now = Base::GetMonotonicNanos();
+
+      // Sleep phase: use absolute-deadline sleep for the bulk of the wait.
+      // Absolute sleep eliminates the timing gap between measuring "now" and
+      // entering the kernel sleep — the OS sleeps until the wall-clock deadline
+      // rather than for a computed relative duration.
+      u64 sleepDeadline = nextDeadlineNs - SPIN_THRESHOLD_NS;
+      if (now < sleepDeadline) {
+        Base::PrecisionSleepUntil(sleepDeadline);
       }
-      // Update our start cycle.
-      startCycle = __rdtsc();
-      // Add our target cycles amount.
-      nextCycle = startCycle + targetCPUCycles;
-    }
-#else
-    using clock = std::chrono::high_resolution_clock;
-    auto last = clock::now();
-    auto now = clock::now();
 
-    while (timeBaseThreadActive.load()) {
-      // Sleep a little to avoid burning CPU. We compute elapsed and convert to ticks.
-      // The lower we sleep, the more accurate the timebase will be, but it will also be more CPU intensive.
-      last = now;
-      std::this_thread::sleep_for(std::chrono::microseconds(100));
-      now = clock::now();
-      auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(now - last).count();
-      if (elapsed <= 0) continue;
-      // Xbox 360 timebase = 50 MHz -> period = 20 ns per tick
-      // ticks = elapsed_ns / 20
-      u64 ticks = static_cast<u64>(elapsed) / 20ULL;
-      if (ticks == 0) continue;
-      // Accumulate globally
-      if (xenonContext->timeBaseActive) {
+      // Spin phase: busy-wait for the remaining interval with CPU-friendly hints.
+      // We batch multiple _mm_pause instructions between QPC checks to reduce
+      // measurement overhead. Each QPC call costs ~25-50ns; batching 8 pauses
+      // cuts QPC call frequency by 8x, giving ~4x tighter deadline precision.
+      while ((now = Base::GetMonotonicNanos()) < nextDeadlineNs) {
+        Base::SpinHint();
+        Base::SpinHint();
+        Base::SpinHint();
+        Base::SpinHint();
+        Base::SpinHint();
+        Base::SpinHint();
+        Base::SpinHint();
+        Base::SpinHint();
+      }
+
+      // Calculate elapsed time since last update and convert to ticks.
+      u64 elapsedNs = now - lastUpdateNs;
+      u64 ticks = elapsedNs / NS_PER_TICK;
+
+      // Clamp to prevent storms after long stalls (e.g. system suspend).
+      if (ticks > MAX_TICKS_PER_UPDATE) {
+        ticks = MAX_TICKS_PER_UPDATE;
+      }
+
+      if (ticks > 0 && xenonContext->timeBaseActive.load(std::memory_order_relaxed)) {
         ppu0->UpdateTimeBase(ticks);
         ppu1->UpdateTimeBase(ticks);
         ppu2->UpdateTimeBase(ticks);
       }
+
+      lastUpdateNs = now;
+
+      // Advance deadline by TARGET_INTERVAL_NS (drift compensation).
+      // If we overshot, the next interval will be shorter to catch up.
+      nextDeadlineNs += TARGET_INTERVAL_NS;
+
+      // If we've fallen too far behind (> 1ms), reset the deadline
+      // to avoid a burst of rapid catch-up updates.
+      if (now > nextDeadlineNs + 1'000'000ULL) {
+        nextDeadlineNs = now + TARGET_INTERVAL_NS;
+      }
     }
-#endif // _WIN32
   }
 
 } // Xe::XCPU
