@@ -175,9 +175,6 @@ private:
   // Helpers
   //
  
-  // Returns the number of instructions per second the current
-  // host computer can process.
-  u32 GetIPS();
   // Read next intruction from memory
   bool PPUReadNextInstruction();
   // Checks for pending exceptions

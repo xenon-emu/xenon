@@ -398,61 +398,6 @@ sPPUThread *PPU::GetPPUThread(u8 thrdID) {
   return &ppeState->ppuThread[static_cast<ePPUThreadID>(thrdID)];
 }
 
-// This is the calibration code for the GetIPS() function. It branches to the
-// 0x4 location in memory.
-static constexpr u32 ipsCalibrationCode[] = {
-    0x55726220, //  rlwinm   r18,r11,12,8,16
-    0x723D7825, //  andi.    r29,r17,0x7825
-    0x65723D78, //  oris     r18,r11,0x3D78
-    0x4BFFFFF4  //  b        ipsCalibrationCode
-};
-
-// Performs a test using a loop to check the amount of IPS we're able to
-// execute
-u32 PPU::GetIPS() {
-  // Instr Count: The amount of instructions to execute in order to test
-
-  // Write the calibration code to main memory
-  for (u8 i = 0; i != 4; ++i) {
-    PPCInterpreter::MMUWrite32(ppeState.get(), 4 + (i * 4), ipsCalibrationCode[i]);
-  }
-
-  // Set our NIP to our calibration code address
-  curThread.NIA = 4;
-
-  // Start a timer
-  auto timerStart = std::chrono::steady_clock::now();
-
-  // Instruction count
-  u64 instrCount = 0;
-
-  // Execute the amount of cycles we're requested
-  while (auto timerEnd = std::chrono::steady_clock::now() <= timerStart + 1s) {
-    if (currentExecMode != eExecutorMode::Interpreter) {
-      ppuJIT->ExecuteJITInstrs(4, ppuThreadActive);
-      instrCount += 4;
-      continue;
-    } else {
-      PPUReadNextInstruction();
-      PPCInterpreter::ppcExecuteSingleInstruction(ppeState.get());
-    }
-    instrCount++;
-  }
-
-  // Zero out the memory after execution
-  for (s32 i = 0; i < 4; i++) {
-    PPCInterpreter::MMUWrite32(ppeState.get(), 4 + (i * 4), 0x00000000);
-  }
-
-  // Set the NIP back to default
-  curThread.NIA = 0x100;
-
-  // Reset the registers
-  memset(curThread.GPR, 0, sizeof(curThread.GPR));
-
-  return instrCount;
-}
-
 // Loads a elf binary at a specificed address
 // Returns entrypoint
 #define IS_ELF(ehdr) ((ehdr).e_ident[EI_MAG0] == ELFMAG0 && \
@@ -816,16 +761,19 @@ void PPU::UpdateTimeBase(u64 tbTicks) {
     u32 dec = 0;
     // Update the Time Base.
     ppeState->SPR.TB.hexValue += tbTicks;
-    // Get the decrementer value.
-    dec = curThread.SPR.DEC;
-    newDec = dec - tbTicks;
-    // Update the new decrementer value.
-    curThread.SPR.DEC = newDec;
-    // Check if Previous decrementer measurement is smaller than current and a
-    // decrementer exception is not pending.
-    if (newDec > dec && !(_ex & ppuDecrementerEx)) {
-      // The decrementer must issue an interrupt.
-      _ex |= ppuDecrementerEx;
+    // Update both threads DEC register and check pending exceptions.
+    for (u8 thrd = 0; thrd < 2; ++thrd) {
+      // Get the decrementer value.
+      dec = ppeState->ppuThread[thrd].SPR.DEC;
+      newDec = dec - tbTicks;
+      // Update the new decrementer value.
+      ppeState->ppuThread[thrd].SPR.DEC = newDec;
+      // Check if Previous decrementer measurement is smaller than current and a
+      // decrementer exception is not pending.
+      if (newDec > dec && !(ppeState->ppuThread[thrd].exceptReg & ppuDecrementerEx)) {
+        // The decrementer must issue an interrupt.
+        ppeState->ppuThread[thrd].exceptReg |= ppuDecrementerEx;
+      }
     }
   }
 }
