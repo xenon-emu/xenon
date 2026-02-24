@@ -75,7 +75,7 @@ enum class ATA_TRANSFER_MODE {
   ULTRA_DMA_MODE6 = 0x46,
 };
 
-Xe::PCIDev::HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentPCIBridge, RAM* ram) :
+Xe::PCIDev::HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentPCIBridge, RAM *ram) :
   PCIDevice(deviceName, size) {
 
   // Note:
@@ -157,9 +157,9 @@ Xe::PCIDev::HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentP
   data = ataState.imageAttached ? 0x00000113 : 0;
   ataState.regs.SStatus = data;
   memcpy(&pciConfigSpace.data[0xC0], &data, 4); // SSTATUS_DET_COM_ESTABLISHED.
-                                                // SSTATUS_SPD_GEN1_COM_SPEED.
-                                                // SSTATUS_IPM_INTERFACE_ACTIVE_STATE.
-  // SError
+  // SSTATUS_SPD_GEN1_COM_SPEED.
+  // SSTATUS_IPM_INTERFACE_ACTIVE_STATE.
+// SError
   data = 0x001D0003;
   ataState.regs.SError = data;
   memcpy(&pciConfigSpace.data[0xC4], &data, 4);
@@ -188,6 +188,8 @@ Xe::PCIDev::HDD::~HDD() {
 
 // PCI Read
 void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
+  std::lock_guard lock(ataMutex);
+
   // PCI BAR0 is the Primary Command Block Base Address
   u8 ataCommandReg =
     static_cast<u8>(readAddress - pciConfigSpace.configSpaceHeader.BAR0);
@@ -207,10 +209,10 @@ void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
     switch (ataCommandReg) {
     case ATA_REG_DATA:
       if (!ataState.dataOutBuffer.empty()) {
-        size = std::fmin(size, ataState.dataOutBuffer.count());
+        size = std::min(static_cast<u64>(size), static_cast<u64>(ataState.dataOutBuffer.count()));
         memcpy(&ataState.regs.data, ataState.dataOutBuffer.get(), size);
         ataState.dataOutBuffer.resize(size);
-        ataState.regs.status &= 0xFFFFFFF7; // Clear DRQ.
+        ataState.regs.status &= ~ATA_STATUS_DRQ; // Clear DRQ.
         // Check for a completed read.
         if (ataState.dataOutBuffer.count() == 0) {
           ataState.dataOutBuffer.reset(); // Reset pointer.
@@ -298,6 +300,7 @@ void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
 }
 // PCI Write
 void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
+  std::lock_guard lock(ataMutex);
 
   // PCI BAR0 is the Primary Command Block Base Address
   u8 ataCommandReg =
@@ -379,9 +382,9 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
           (static_cast<u64>(ataState.regs.lbaMiddle) << 8) |
           (static_cast<u64>(ataState.regs.lbaLow));
 
-          u32 sectorCount = (ataState.regs.prevSectorCount << 8) | ataState.regs.sectorCount;
-          LOG_DEBUG(HDD, "[CMD]: [READ DMA EXT] LBA48: {:#x}, sector count {:#x}",
-            offset, sectorCount);
+        u32 sectorCount = (ataState.regs.prevSectorCount << 8) | ataState.regs.sectorCount;
+        LOG_DEBUG(HDD, "[CMD]: [READ DMA EXT] LBA48: {:#x}, sector count {:#x}",
+          offset, sectorCount);
 #endif // HDD_DEBUG
         ataReadDMAExtCommand();
         break;
@@ -394,6 +397,22 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
       case ATA_COMMAND_WRITE_DMA:
         ataWriteDMACommand();
         break;
+      case ATA_COMMAND_WRITE_DMA_EXT: {
+#ifdef HDD_DEBUG
+        u64 offset = (static_cast<u64>(ataState.regs.prevLBAHigh) << 40) |
+          (static_cast<u64>(ataState.regs.prevLBAMiddle) << 32) |
+          (static_cast<u64>(ataState.regs.prevLBALow) << 24) |
+          (static_cast<u64>(ataState.regs.lbaHigh) << 16) |
+          (static_cast<u64>(ataState.regs.lbaMiddle) << 8) |
+          (static_cast<u64>(ataState.regs.lbaLow));
+
+        u32 sectorCount = (ataState.regs.prevSectorCount << 8) | ataState.regs.sectorCount;
+        LOG_DEBUG(HDD, "[CMD]: [WRITE DMA EXT] LBA48: {:#x}, sector count {:#x}",
+          offset, sectorCount);
+#endif // HDD_DEBUG
+        ataWriteDMAExtCommand();
+        break;
+      }
       case ATA_COMMAND_IDENTIFY_DEVICE:
         ataIdentifyDeviceCommand();
         // Request interrupt
@@ -457,7 +476,7 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
 #endif // HDD_DEBUG
           ataState.regs.ataTransferMode = inData;
         }
-        break;
+                                                break;
         default:
           LOG_ERROR(HDD, "[CMD]: Set features {:#x} subcommand unknown.", ataState.regs.features);
           break;
@@ -476,17 +495,17 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
     case ATA_REG_SSTATUS:
       memcpy(&ataState.regs.SStatus, data, size);
       // Write also on PCI config space data
-      memcpy(&pciConfigSpace.data[0xC0], &data, 4);
+      memcpy(&pciConfigSpace.data[0xC0], data, 4);
       break;
     case ATA_REG_SERROR:
       memcpy(&ataState.regs.SError, data, size);
       // Write also on PCI config space data.
-      memcpy(&pciConfigSpace.data[0xC4], &data, 4);
+      memcpy(&pciConfigSpace.data[0xC4], data, 4);
       break;
     case ATA_REG_SCONTROL:
       memcpy(&ataState.regs.SControl, data, size);
       // Write also on PCI config space data.
-      memcpy(&pciConfigSpace.data[0xC8], &data, 4);
+      memcpy(&pciConfigSpace.data[0xC8], data, 4);
 #ifdef HDD_DEBUG
       if (ataState.regs.SControl & 1)
         LOG_DEBUG(HDD, "[SCONTROL]: Resetting SATA link!");
@@ -502,7 +521,7 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
   } else {
     // Control (DMA) registers
     const u8 regOffset = static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR1);
-  
+
     switch (regOffset) {
     case ATA_REG_DMA_COMMAND:
       memcpy(&ataState.regs.dmaCommand, data, size);
@@ -629,9 +648,7 @@ void Xe::PCIDev::HDD::ataReadDMAExtCommand() {
 
   u32 sectorCount = (ataState.regs.prevSectorCount << 8) | ataState.regs.sectorCount;
   // If sector count = 0 then 65 536 logical sectors shall be transfered.
-  if (sectorCount == 0) {
-    sectorCount = 65536;
-  }
+  if (sectorCount == 0) { sectorCount = 65536; }
 
   // Image offset.
   offset = offset * ATA_SECTOR_SIZE;
@@ -651,9 +668,28 @@ void Xe::PCIDev::HDD::ataWriteDMACommand() {
 
   u32 sectorCount = ataState.regs.sectorCount;
   // If sector count = 0 then 256 logical sectors shall be transfered.
-  if (sectorCount == 0) {
-    sectorCount = 256;
-  }
+  if (sectorCount == 0) { sectorCount = 256; }
+
+  // Image offset.
+  offset = offset * ATA_SECTOR_SIZE;
+  // Read count in bytes.
+  sectorCount = sectorCount * ATA_SECTOR_SIZE;
+
+  ataState.mountedHDDImage->Write(offset, ataState.dataInBuffer.get(), sectorCount);
+}
+
+// ATA WRITE DMA EXT (LBA 48 Bit)
+void Xe::PCIDev::HDD::ataWriteDMAExtCommand() {
+  u64 offset = (static_cast<u64>(ataState.regs.prevLBAHigh) << 40) |
+    (static_cast<u64>(ataState.regs.prevLBAMiddle) << 32) |
+    (static_cast<u64>(ataState.regs.prevLBALow) << 24) |
+    (static_cast<u64>(ataState.regs.lbaHigh) << 16) |
+    (static_cast<u64>(ataState.regs.lbaMiddle) << 8) |
+    (static_cast<u64>(ataState.regs.lbaLow));
+
+  u32 sectorCount = (ataState.regs.prevSectorCount << 8) | ataState.regs.sectorCount;
+  // If sector count = 0 then 65 536 logical sectors shall be transfered.
+  if (sectorCount == 0) { sectorCount = 65536; }
 
   // Image offset.
   offset = offset * ATA_SECTOR_SIZE;
@@ -717,13 +753,19 @@ void Xe::PCIDev::HDD::hddThreadLoop() {
     if (!hddThreadRunning)
       break;
     // Check for the DMA active command.
-    if (ataState.regs.dmaCommand & XE_ATA_DMA_ACTIVE) {
-      // Start our DMA operation
-      doDMA();
-      // Change our DMA status after completion.
-      ataState.regs.dmaCommand &= ~1; // Clear active status.
-      ataState.regs.dmaStatus = XE_ATA_DMA_INTR; // Signal Interrupt.
+    {
+      std::lock_guard lock(ataMutex);
+      if (ataState.regs.dmaCommand & XE_ATA_DMA_ACTIVE) {
+        // Start our DMA operation
+        doDMA();
+        // Change our DMA status after completion.
+        ataState.regs.dmaCommand &= ~1; // Clear active status.
+        ataState.regs.dmaStatus = XE_ATA_DMA_INTR; // Signal Interrupt.
+      }
     }
+
+    // Sleep for some time.
+    std::this_thread::sleep_for(50ns);
   }
 
   LOG_INFO(HDD, "Exiting HDD worker thread.");
@@ -755,12 +797,12 @@ void Xe::PCIDev::HDD::doDMA() {
 
     if (readOperation) {
       // Reading from us
-      size = std::fmin(static_cast<u32>(size), ataState.dataOutBuffer.count());
+      size = std::min(size, ataState.dataOutBuffer.count());
       memcpy(bufferInMemory, ataState.dataOutBuffer.get(), size);
       ataState.dataOutBuffer.resize(size);
     } else {
       // Writing to us
-      size = std::fmin(static_cast<u32>(size), ataState.dataInBuffer.count());
+      size = std::min(size, ataState.dataInBuffer.count());
       memcpy(ataState.dataInBuffer.get(), bufferInMemory, size);
       ataState.dataInBuffer.resize(size);
     }
