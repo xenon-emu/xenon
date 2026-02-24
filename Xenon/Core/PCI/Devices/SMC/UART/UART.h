@@ -17,6 +17,7 @@
 #define socketclose close
 #endif // _WIN32
 
+#include <atomic>
 #include <condition_variable>
 #include <thread>
 #include <queue>
@@ -80,13 +81,15 @@ public:
   // UART Receive Thread object
   std::thread uartSecondaryThread;
   // Thread status
-  volatile bool uartThreadRunning = false;
+  std::atomic<bool> uartThreadRunning = false;
   // Receive buffer (inverse, as we're hardware)
   std::queue<u8> uartTxBuffer = {};
   // Transfer buffer (inverse, as we're hardware)
   std::queue<u8> uartRxBuffer = {};
   // Mutex, to avoid race conitions
   std::mutex uartMutex = {};
+  // Condition variable to wake the transfer thread when data is queued
+  std::condition_variable uartTxCV = {};
   // Socket Address
   struct sockaddr_in sockAddr = {};
   // Socket Handles

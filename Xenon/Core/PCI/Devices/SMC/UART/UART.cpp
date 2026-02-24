@@ -21,25 +21,35 @@ void HW_UART_SOCK::uartMainThread() {
   }
   while (uartThreadRunning) {
     std::unique_lock<std::mutex> lock(uartMutex);
-    if (!uartTxBuffer.empty()) {
+    // Wait until there is data to send or the thread is shutting down.
+    // This replaces the busy-wait loop that burned CPU cycles spinning.
+    uartTxCV.wait(lock, [this] {
+      return !uartTxBuffer.empty() || !uartThreadRunning;
+      });
+    // Drain all pending data while we hold the lock
+    while (!uartTxBuffer.empty()) {
       char c = uartTxBuffer.front();
+      uartTxBuffer.pop();
       if (socketCreated) {
         s32 flags = 0;
 #ifndef _WIN32
         flags = MSG_NOSIGNAL;
 #endif // ifndef _WIN32
+        // Release the lock during the blocking send to avoid stalling Write()
+        lock.unlock();
         if (send(sockHandle, &c, 1, flags) <= 0) {
           LOG_WARNING(UART, "Socket send failed: {}", strerror(errno));
+          lock.lock();
           socketCreated = false;
           socketclose(sockHandle);
+          break;
         }
+        lock.lock();
       } else {
         if (c != -1 && c != '\0')
           printf("%c", c);
       }
-      uartTxBuffer.pop();
     }
-    lock.unlock();
   }
 }
 
@@ -47,32 +57,38 @@ void HW_UART_SOCK::uartMainThread() {
 void HW_UART_SOCK::uartReceiveThread() {
   Base::SetCurrentThreadName("[Xe::SMC::UART] Receive");
   while (uartThreadRunning) {
-    std::unique_lock<std::mutex> lock(uartMutex);
     char c = -1;
     u64 bytesReceived = 0;
+    // Receive outside the lock — the socket is only used by this thread for reads
 #ifdef _WIN32
-    u_long mode = 1;
-    ioctlsocket(sockHandle, FIONBIO, &mode);
     bytesReceived = recv(sockHandle, &c, 1, 0);
 #else
     bytesReceived = recv(sockHandle, &c, 1, MSG_DONTWAIT);
     if (bytesReceived == 0) {
       // Peer closed connection
       LOG_INFO(UART, "UART socket closed by peer.");
+      std::lock_guard<std::mutex> lock(uartMutex);
       socketCreated = false;
       socketclose(sockHandle);
       break;
     } else if (bytesReceived < 0 && errno != EWOULDBLOCK && errno != EAGAIN) {
       LOG_WARNING(UART, "UART recv error: {}", strerror(errno));
+      std::lock_guard<std::mutex> lock(uartMutex);
       socketCreated = false;
       socketclose(sockHandle);
       break;
     }
 #endif //ifndef _WIN32
     if (c != -1 && bytesReceived != 0) {
+      std::lock_guard<std::mutex> lock(uartMutex);
       uartRxBuffer.push(c);
     }
-    lock.unlock();
+#ifndef _WIN32
+    // On non-blocking platforms, avoid busy-spinning when no data arrived
+    if (bytesReceived <= 0) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+#endif
   }
 }
 
@@ -100,7 +116,7 @@ void HW_UART_SOCK::Init(void *uartConfig) {
     }
 #endif // ifdef _WIN32
     sockHandle = socket(AF_INET, SOCK_STREAM, 0);
-    int socketConnect = connect(sockHandle, (struct sockaddr*)&sockAddr, sizeof(sockAddr));
+    int socketConnect = connect(sockHandle, (struct sockaddr *)&sockAddr, sizeof(sockAddr));
     if (socketConnect != 0) {
       LOG_CRITICAL(UART, "Failed to connect to socket! See error below.\n{}", Base::GetLastErrorMsg());
       socketCreated = false;
@@ -116,6 +132,13 @@ void HW_UART_SOCK::Init(void *uartConfig) {
         socketCreated = true;
       }
     }
+#ifdef _WIN32
+    // Set socket to non-blocking mode once during init, not every recv() call
+    if (socketCreated) {
+      u_long mode = 1;
+      ioctlsocket(sockHandle, FIONBIO, &mode);
+    }
+#endif // _WIN32
   }
   if (printMode) {
     socketCreated = false;
@@ -123,13 +146,11 @@ void HW_UART_SOCK::Init(void *uartConfig) {
     uartInitialized = true;
     uartPresent = true;
     uartThread = std::thread(&HW_UART_SOCK::uartMainThread, this);
-    uartThread.detach();
   } else {
     uartThreadRunning = socketCreated;
     uartInitialized = socketCreated;
     uartPresent = true;
     uartThread = std::thread(&HW_UART_SOCK::uartMainThread, this);
-    uartThread.detach();
     if (socketCreated) {
       uartSecondaryThread = std::thread(&HW_UART_SOCK::uartReceiveThread, this);
     }
@@ -138,22 +159,33 @@ void HW_UART_SOCK::Init(void *uartConfig) {
 
 void HW_UART_SOCK::Shutdown() {
   uartThreadRunning = false;
-  // Shutdown receive thread
-  if (uartSecondaryThread.joinable())
-    uartSecondaryThread.join();
-  // Shutdown socket
+  // Wake the transfer thread so it can exit
+  uartTxCV.notify_one();
+  // Shutdown socket first to unblock any blocking recv() in the receive thread
   if (socketCreated) {
 #ifdef _WIN32
     shutdown(sockHandle, SD_BOTH);
+#else
+    shutdown(sockHandle, SHUT_RDWR);
 #endif // _WIN32
     socketclose(sockHandle);
+    socketCreated = false;
   }
+  // Join both threads for clean shutdown
+  if (uartThread.joinable())
+    uartThread.join();
+  if (uartSecondaryThread.joinable())
+    uartSecondaryThread.join();
 }
 
 void HW_UART_SOCK::Write(const u8 data) {
-  std::lock_guard<std::mutex> lock(uartMutex);
-  uartTxBuffer.push(data);
-  retVal = true;
+  {
+    std::lock_guard<std::mutex> lock(uartMutex);
+    uartTxBuffer.push(data);
+    retVal = true;
+  }
+  // Notify the transfer thread that data is available
+  uartTxCV.notify_one();
 }
 
 u8 HW_UART_SOCK::Read() {
@@ -171,6 +203,8 @@ u8 HW_UART_SOCK::Read() {
 
 u32 HW_UART_SOCK::ReadStatus() {
   u32 status = 0;
+  // Acquire the mutex to avoid data races when reading queue sizes
+  std::lock_guard<std::mutex> lock(uartMutex);
   status |= uartTxBuffer.size() <= 16 ? UART_STATUS_EMPTY : 0;
   status |= uartRxBuffer.empty() ? 0 : UART_STATUS_DATA_PRES;
   return status;
@@ -287,7 +321,7 @@ u32 HW_UART_VCOM::ReadStatus() {
     ClearCommError(comPortHandle, &comPortError,
       &comPortStat);
     // The queue has any bytes remaining?
-    if (comPortStat.cbInQue > 0)  {
+    if (comPortStat.cbInQue > 0) {
       // Got something to read in the input queue
       status |= UART_STATUS_DATA_PRES;
     } else {
@@ -331,7 +365,7 @@ void HW_UART_NULL::Init(void *uartConfig) {
   uartInitialized = false;
 }
 
-void HW_UART_NULL::Shutdown()
+void HW_UART_NULL::Shutdown() 
 {}
 
 void HW_UART_NULL::Write(const u8 data) {
