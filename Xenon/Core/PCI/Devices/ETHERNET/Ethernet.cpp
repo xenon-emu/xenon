@@ -416,8 +416,14 @@ void Xe::PCIDev::ETHERNET::Write(u64 writeAddress, const u8 *data, u64 size) {
     break;
   case INTERRUPT_STATUS:
     {
-    u32 oldStatus = ethPciState.interruptStatusReg; 
-    DEBUGP("[Write] INTERRUPT_STATUS val={:#08x}, {:#08x} -> {:#08x}", val, oldStatus, ethPciState.interruptStatusReg);
+    u32 oldStatus = ethPciState.interruptStatusReg.load();
+    // Write-to-clear: 
+    // The driver writes bits to acknowledge/clear them.
+    // Me must clear the bits that the driver is acknowledging.
+    ethPciState.interruptStatusReg.fetch_and(~val);
+    // Re-enable interrupts now that the driver has acknowledged.
+    enableInterrutps.store(true);
+    DEBUGP("[Write] INTERRUPT_STATUS ack={:#08x}, {:#08x} -> {:#08x}", val, oldStatus, ethPciState.interruptStatusReg.load());
     }
     break;
   case INTERRUPT_MASK:
@@ -927,19 +933,20 @@ void Xe::PCIDev::ETHERNET::SetLinkUp(bool up) {
 
 // Raise interrupt if enabled by interrupt mask
 void Xe::PCIDev::ETHERNET::RaiseInterrupt(u32 bits) {
+  // Only set status bits for events that are enabled in the interrupt mask.
+  // This prevents stale status bits from accumulating when the mask is 0 (before the driver has initialized).
+  // The linux driver's ISR checks status & 0x4C unconditionally on shared IRQ, on older kernel versions, 
+  // so stale bits would cause premature NAPI scheduling before the RX ring is set up.
+  u32 maskedBits = bits & ethPciState.interruptMaskReg;
+  if (maskedBits == 0) return;
+
   // Set the interrupt status bits atomically
-  ethPciState.interruptStatusReg.fetch_or(bits);
-  
-  // Only fire interrupt if:
-  // 1. There are pending interrupt status bits
-  // 2. Those bits are enabled in the mask
-  // 3. The mask is not zero (driver hasn't disabled interrupts)
+  ethPciState.interruptStatusReg.fetch_or(maskedBits);
 
-  u32 pending = ethPciState.interruptStatusReg.load() & ethPciState.interruptMaskReg;
-
-  if (pending != 0 && ethPciState.interruptMaskReg != 0 && enableInterrutps.load()) {
-    DEBUGP("Firing interrupt: pending={:#08x} (status={:#08x} & mask={:#08x})",
-      pending, ethPciState.interruptStatusReg.load(), ethPciState.interruptMaskReg);
+  // Fire interrupt if enabled
+  if (enableInterrutps.load()) {
+    DEBUGP("Firing interrupt: bits={:#08x} (status={:#08x} & mask={:#08x})",
+      maskedBits, ethPciState.interruptStatusReg.load(), ethPciState.interruptMaskReg);
 
     parentBus->RouteInterrupt(PRIO_ENET);
     // Disable interrupts without clearing the mask.
