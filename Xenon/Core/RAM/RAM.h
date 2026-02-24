@@ -21,10 +21,12 @@ public:
   void Write(u64 writeAddress, const u8 *data, u64 size) override;
   void MemSet(u64 writeAddress, s32 data, u64 size) override;
 
+  // Returns a host pointer to a given address belonging to RAM.
   u8 *GetPointerToAddress(u32 address);
-  u64 GetSize() {
-    return ramSize;
-  }
+  // Returns a pointer to the RAM base in host memory.
+  u8 *GetRamBase() { return ramData.get(); }
+  // Returns current RAM size.
+  u64 GetSize() { return ramSize; }
 private:
   u64 ramSize = 0;
   std::unique_ptr<u8[]> ramData{};

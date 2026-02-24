@@ -11,6 +11,7 @@
 #include "Base/Bitfield.h"
 #include "Base/LRUCache.h"
 #include "Base/Vector128.h"
+#include "Base/FastTranslationCache.h"
 #include "Core/XCPU/Context/Reservations/XenonReservations.h"
 
 
@@ -1373,6 +1374,12 @@ struct sPPUThread {
   // ERAT's (MMU)
   LRUCache iERAT{}; // Instruction effective to real address cache.
   LRUCache dERAT{}; // Data effective to real address cache.
+
+  // Fast EA -> host pointer cache
+  // Direct-mapped, caches the final host pointer for RAM memory.
+  // Completely bypases SecEng decode and RootBus dispatch on hit.
+  FastTranslationCache fastDataCache{};
+
 
   // Exception Register
   u16 exceptReg = 0;

@@ -211,6 +211,8 @@ void PPCInterpreter::PPCInterpreter_slbia(sPPEState *ppeState) {
   // Invalidate both ERAT's
   curThread.iERAT.invalidateAll();
   curThread.dERAT.invalidateAll();
+  // Invalidate fast data translation cache
+  curThread.fastDataCache.invalidateAll();
 }
 
 // TLB Invalidate Entry Local
@@ -227,6 +229,8 @@ void PPCInterpreter::PPCInterpreter_tlbiel(sPPEState *ppeState) {
     // Invalidate both ERAT's for the affected address range
     curThread.iERAT.invalidateAll();
     curThread.dERAT.invalidateAll();
+    // Invalidate fast data translation cache
+    curThread.fastDataCache.invalidateAll();
 
     // Invalidate JIT blocks
     if (XeMain::GetCPU()) {
@@ -255,6 +259,8 @@ void PPCInterpreter::PPCInterpreter_tlbiel(sPPEState *ppeState) {
     // Selective ERAT invalidation
     curThread.iERAT.invalidateAll();
     curThread.dERAT.invalidateAll();
+    // Invalidate fast data translation cache
+    curThread.fastDataCache.invalidateAll();
 
     // Invalidate JIT blocks for the affected page range
     if (XeMain::GetCPU()) {
@@ -534,16 +540,40 @@ void PPCInterpreter::mmuReadString(sPPEState *ppeState, u64 stringAddress,
 // Translates a given EA into a RA, and then returns a valid Host Ptr for the given guest EA.
 // NOTE: This is to be used by JIT'ed loads/stores that are known to be directed to RAM, mostly VXU L/S instrs.
 u64 PPCInterpreter::JITTranslateAndGetHostPtr(sPPEState *ppeState, u64 EA, ePPUThreadID thr) {
+  sPPUThread &thread = ppeState->ppuThread[thr != ePPUThread_None ? thr : curThreadId];
+
+  // Fast data translation cache lookup
+  // TODO: Integrate onto jitted instructions directly
+  u8 *cached = thread.fastDataCache.lookup(EA);
+  if (cached) [[likely]] {
+    return reinterpret_cast<u64>(cached);
+  }
+
+  // Slow path, do a full translation:
   u64 returnedAddr = EA;
+
   // Translate the given address
   if (!MMUTranslateAddress(&returnedAddr, ppeState, false, thr)) {
     DEBUGP(Xenon, "[JIT MMU]: Address translation failed for EA: {:#x}", EA);
     return 0;
   } 
+
   // Correctly construct the end address
   bool socRead = false;
   returnedAddr = mmuContructEndAddressFromSecEngAddr(returnedAddr, &socRead);
-  return reinterpret_cast<u64>(xenonContext->GetRAM()->GetPointerToAddress(returnedAddr));
+
+  u8 *hostPtr = xenonContext->GetRAM()->GetPointerToAddress(returnedAddr);
+
+  // Populate fast data translation cache for RAM accesses
+  if (!socRead && returnedAddr <= PHYS_MEMORY_END && hostPtr) {
+    u8 *hostPage = xenonContext->GetRAM()->GetPointerToAddress(
+      static_cast<u32>(returnedAddr & ~FastTranslationCache::PAGE_MASK));
+    if (hostPage) {
+      thread.fastDataCache.insert(EA, hostPage);
+    }
+  }
+
+  return reinterpret_cast<u64>(hostPtr);
 }
 
 SECENG_ADDRESS_INFO
@@ -1068,6 +1098,14 @@ void PPCInterpreter::MMURead(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppeS
                              u64 EA, u64 byteCount, u8 *outData, ePPUThreadID thr) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMURead", MP_AUTO);
   sPPUThread &thread = ppeState->ppuThread[thr != ePPUThread_None ? thr : curThreadId];
+  
+  // Fast data translation cache lookup
+  u8 *cached = thread.fastDataCache.lookup(EA);
+  if (cached) [[likely]] {
+    memcpy(outData, cached, byteCount);
+    return;
+  }
+  
   const u64 oldEA = EA;
   if (!MMUTranslateAddress(&EA, ppeState, false, thr)) {
     memset(outData, 0, byteCount);
@@ -1136,6 +1174,20 @@ void PPCInterpreter::MMURead(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppeS
 void PPCInterpreter::MMUWrite(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppeState,
                               const u8 *data, u64 EA, u64 byteCount, ePPUThreadID thr) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUWrite", MP_AUTO);
+  
+  // Fast data translation cache write path
+  sPPUThread &threadFast = ppeState->ppuThread[thr != ePPUThread_None ? thr : curThreadId];
+  u8 *cached = threadFast.fastDataCache.lookup(EA);
+  if (cached) [[likely]] {
+    memcpy(cached, data, byteCount);
+    // Check reservations using the physical address
+    // Used by interpreter conditional L/S instrs.
+    RAM *ram = cpuContext->GetRAM();
+    const u32 physAddr = static_cast<u32>(cached - ram->GetRamBase());
+    cpuContext->xenonRes.Check(physAddr);
+    return;
+  }
+  
   const u64 oldEA = EA;
 
   if (!MMUTranslateAddress(&EA, ppeState, true, thr))
