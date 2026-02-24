@@ -1115,6 +1115,15 @@ void PPCInterpreter::MMURead(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppeS
 
   EA = mmuContructEndAddressFromSecEngAddr(EA, &socRead);
 
+  // Populate fast data translation cache for RAM accesses
+  if (!socRead && EA <= PHYS_MEMORY_END) {
+    u8 *hostPage = xenonContext->GetRAM()->GetPointerToAddress(
+      static_cast<u32>(EA & ~FastTranslationCache::PAGE_MASK));
+    if (hostPage) {
+      thread.fastDataCache.insert(oldEA, hostPage);
+    }
+  }
+
   // When the xboxkrnl writes to address 0x7FFFxxxx is writing to the IIC
   // so we use that address here to validate its an soc write
   if (((oldEA & 0x000000007FFF0000ULL) >> 16) == 0x7FFF)
@@ -1176,8 +1185,8 @@ void PPCInterpreter::MMUWrite(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppe
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUWrite", MP_AUTO);
   
   // Fast data translation cache write path
-  sPPUThread &threadFast = ppeState->ppuThread[thr != ePPUThread_None ? thr : curThreadId];
-  u8 *cached = threadFast.fastDataCache.lookup(EA);
+  sPPUThread &thread = ppeState->ppuThread[thr != ePPUThread_None ? thr : curThreadId];
+  u8 *cached = thread.fastDataCache.lookup(EA);
   if (cached) [[likely]] {
     memcpy(cached, data, byteCount);
     // Check reservations using the physical address
@@ -1199,6 +1208,15 @@ void PPCInterpreter::MMUWrite(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppe
   bool socWrite = false;
 
   EA = mmuContructEndAddressFromSecEngAddr(EA, &socWrite);
+
+  // Populate fast data translation cache for RAM accesses
+  if (!socWrite && EA <= PHYS_MEMORY_END) {
+    u8 *hostPage = xenonContext->GetRAM()->GetPointerToAddress(
+      static_cast<u32>(EA & ~FastTranslationCache::PAGE_MASK));
+    if (hostPage) {
+      thread.fastDataCache.insert(oldEA, hostPage);
+    }
+  }
 
   // When the xboxkrnl writes to address 0x7FFFxxxx is writing to the IIC
   // so we use that address here to validate its an soc write
