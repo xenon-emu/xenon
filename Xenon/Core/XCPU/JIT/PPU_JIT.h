@@ -241,7 +241,6 @@ public:
   u64 ExecuteJITBlock(u64 blockStartAddress, bool enableHalt); // returns step count
   std::shared_ptr<JITBlock> BuildJITBlock(u64 blockStartAddress, u64 maxBlockSize);
   void SetupContext(JITBlockBuilder *b);
-  void InstrPrologue(JITBlockBuilder *b, u32 instrData);
   void InstrPrologueConst(JITBlockBuilder *b, u64 cia, u32 instrData);
   void InstrPrologueMinimal(JITBlockBuilder *b, u32 instrData);
 

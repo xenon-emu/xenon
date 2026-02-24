@@ -180,25 +180,6 @@ void PPU_JIT::SetupContext(JITBlockBuilder *b) {
 #endif
 }
 
-// JIT Instruction Prologue
-// * Updates NIA and current instruction data
-// * CIA/PIA removed (set by exception handlers from NIA when needed)
-// * HALT check disabled for performance - use interpreter mode for debugging
-void PPU_JIT::InstrPrologue(JITBlockBuilder *b, u32 instrData) {
-#if defined(ARCH_X86) || defined(ARCH_X86_64)
-  x86::Gp temp = newGP64();
-  // CIA = NIA:
-  COMP->mov(temp, b->threadCtx->scalar(&sPPUThread::NIA));
-  COMP->mov(b->threadCtx->scalar(&sPPUThread::CIA), temp);
-  // NIA +=4:
-  COMP->add(temp, 4);
-  COMP->mov(b->threadCtx->scalar(&sPPUThread::NIA), temp);
-  // CI data.
-  COMP->mov(temp, instrData);
-  COMP->mov(b->threadCtx->scalar(&sPPUThread::CI).Ptr<u32>(), temp);
-#endif
-}
-
 // JIT Instruction Prologue (Constant Address)
 // * Uses compile-time known CIA value instead of reading NIA from memory
 // * Used for instructions that may cause sync exceptions or are branches
