@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <mutex>
 #include <set>
 
@@ -263,6 +264,15 @@ namespace Xe::XCPU {
 
     // Interrupt States for each PPU Thread
     sInterruptState interruptState[6] = {};
+
+    // Lockless fast-path: per-thread atomic flag indicating whether any non-acknowledged
+    // interrupts exist. Checked with acquire semantics in hasPendingInterrupts() to avoid
+    // locking the mutex on every check when no interrupts are pending.
+    std::atomic<u8> pendingBitmask[6] = {};
+
+    // Refreshes the atomic bitmask for a given thread from the actual
+    // pending set. Must be called while holding iicMutex.
+    void refreshPendingBitmask(u8 threadID);
 
     // Mutex for thread safety
     std::recursive_mutex iicMutex;

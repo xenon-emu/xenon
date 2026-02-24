@@ -211,6 +211,8 @@ void Xe::XCPU::XenonIIC::generateInterrupt(u8 interruptType, u8 cpusToInterrupt)
     if ((cpusToInterrupt & cpuMask)) {
       // Insert the interrupt into the sorted set - O(log n)
       interruptState[threadID].pendingInterrupts.insert(intPacket);
+      // Signal the lockless fast-path that this thread has pending interrupts.
+      pendingBitmask[threadID].store(1, std::memory_order_release);
     }
   }
 }
@@ -227,12 +229,19 @@ bool Xe::XCPU::XenonIIC::hasPendingInterrupts(u8 threadID, bool ignorePendingACK
     return false;
   }
 
-  // Set a lock
+  // If the atomic bitmask says no pending interrupts
+  // for this thread, skip acquiring the mutex entirely. This is the common
+  // case and eliminates cross-core mutex contention.
+  if (!pendingBitmask[threadID].load(std::memory_order_acquire)) { return false; }
+
+  // We know there are likely pending interrupts, acquire the lock.
   std::lock_guard lock(iicMutex);
 
   const auto& pendingSet = interruptState[threadID].pendingInterrupts;
 
   if (pendingSet.empty()) {
+    // Bitmask was stale, clear it.
+    pendingBitmask[threadID].store(0, std::memory_order_release);
     return false;
   }
 
@@ -270,6 +279,8 @@ void Xe::XCPU::XenonIIC::removeFirstACKdInterrupt(u8 threadID) {
   auto& pendingSet = interruptState[threadID].pendingInterrupts;
   if (pendingSet.empty()) {
     DEBUGP("[IIC]: EOI on thread {} with empty set", threadID);
+    // Ensure bitmask is clear when set is empty.
+    pendingBitmask[threadID].store(0, std::memory_order_release);
     return;
   }
 
@@ -279,11 +290,27 @@ void Xe::XCPU::XenonIIC::removeFirstACKdInterrupt(u8 threadID) {
       DEBUGP("[IIC]: Removed ACK'd interrupt {} from thread {}",
           getIntName(static_cast<eXeIntVectors>(it->interruptType)).c_str(), threadID);
       pendingSet.erase(it);
+      // Refresh the lockless bitmask after removal.
+      refreshPendingBitmask(threadID);
       return;
     }
   }
 
   DEBUGP("[IIC]: EOI on thread {} found no ACK'd interrupts to remove", threadID);
+}
+
+// Refreshes the atomic bitmask for a given thread.
+// Must be called while holding iicMutex.
+void Xe::XCPU::XenonIIC::refreshPendingBitmask(u8 threadID) {
+  const auto& pendingSet = interruptState[threadID].pendingInterrupts;
+  bool hasPending = false;
+  for (const auto& pkt : pendingSet) {
+    if (!pkt.acknowledged) {
+      hasPending = true;
+      break;
+    }
+  }
+  pendingBitmask[threadID].store(hasPending ? 1 : 0, std::memory_order_release);
 }
 
 // Acknowledges and returns the highest priority pending interrupt for a given thread.
