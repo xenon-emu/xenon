@@ -6,6 +6,7 @@
 #include "Base/Global.h"
 #include "Core/XCPU/XenonCPU.h"
 #include "Core/XCPU/PPU/PPU.h"
+#include "Core/XeMain.h"
 
 #include "PPCInterpreter.h"
 
@@ -27,6 +28,16 @@ bool clearRecords = false;
 // Interpreter Single Instruction Processing.
 void PPCInterpreter::ppcExecuteSingleInstruction(sPPEState *ppeState) {
   sPPUThread &thread = curThread;
+
+  // HW_INIT skip.
+  if (XeMain::GetCPU()->HasHWINITPosted()) {
+    XeMain::GetCPU()->SetHWINITPosted(false);
+    ppuSetCR(ppeState, 0, false, false, true, false);
+    // Return via LR 
+    thread.NIA = XeMain::GetCPU()->GetHWINITReturnAddress() & ~3ULL;
+    LOG_INFO(Xenon, "HwInit intercepted. Returning to {:#x}.", thread.NIA);
+    return;
+  }
 
   // RGH 2 for CB_A 9188 in a JRunner XDKBuild.
   if (thread.CIA == 0x0200C870) {

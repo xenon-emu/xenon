@@ -49,15 +49,6 @@ void PPCInterpreter::PPCInterpreter_bclr(sPPEState *ppeState) {
   const bool ctrOk = ((_instr.bo & 0x4) != 0 ? 1 : 0) | ((curThread.SPR.CTR != 0) ^ ((_instr.bo & 0x2) != 0));
   bool condOk = ((_instr.bo & 0x10) != 0 ? 1 : 0) || (CR_GET(_instr.bi) == ((_instr.bo & 0x8) != 0));
 
-  // CB/SB Hardware Init step skip (hacky)
-  if (XeMain::sfcx && XeMain::sfcx->initSkip1 && XeMain::sfcx->initSkip2) {
-    if (curThread.CIA == XeMain::sfcx->initSkip1)
-      condOk = false;
-
-    if (curThread.CIA == XeMain::sfcx->initSkip2)
-      condOk = true;
-  }
-
   if (ctrOk && condOk) {
     curThread.NIA = curThread.SPR.MSR.SF ? curThread.SPR.LR & ~3 : static_cast<u32>(curThread.SPR.LR & ~3);
     if (_instr.lk) { curThread.SPR.LR = curThread.CIA + 4; }

@@ -5,6 +5,7 @@
 #include "Base/Logging/Log.h"
 
 #include "PostBus.h"
+#include "Core/XeMain.h"
 
 void Xe::XCPU::POSTBUS::POST(u64 postCode) {
   /* 1BL */
@@ -184,6 +185,10 @@ void Xe::XCPU::POSTBUS::POST(u64 postCode) {
       break;
     case 0x2E:
       LOG_XBOX(Xenon_PostBus, "CB > HWINIT - Hardware initialization.");
+      // Signal the PPU executors that HW_INIT has been posted.
+      // NOTE: HW_INIT always runs on PPU0[Thread0].
+      XeMain::GetCPU()->SetHWINITPosted(true);
+      XeMain::GetCPU()->SetHWINITReturnAddress(XeMain::xenonCPU->GetPPU(0)->GetPPUState()->ppuThread[0].SPR.LR);
       break;
     case 0x2F:
       LOG_XBOX(Xenon_PostBus, "CB > RELOCATE - Setup TLB entries, relocate to RAM.");

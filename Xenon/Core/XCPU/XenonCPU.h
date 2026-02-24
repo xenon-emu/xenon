@@ -49,6 +49,11 @@ namespace Xe::XCPU {
     // Returns a pointer to a given PPU.
     PPU *GetPPU(u8 ppuID);
 
+    // HW_INIT skip related methods.
+    bool HasHWINITPosted() { return hwInitPosted; }
+    void SetHWINITPosted(bool hasPosted) { hwInitPosted = hasPosted; }
+    u64 GetHWINITReturnAddress() { return hwInitReturnAddress; }
+    void SetHWINITReturnAddress(u64 address) { hwInitReturnAddress = address; }
   private:
     // Global Xenon CPU Content (shared between PPUs)
     std::unique_ptr<XenonContext> xenonContext;
@@ -58,6 +63,10 @@ namespace Xe::XCPU {
     std::atomic<bool> timeBaseThreadActive{ false };
     // Timer thread loop function.
     void timeBaseThreadLoop();
+
+    // HW_INIT skip variables
+    bool hwInitPosted = false;
+    u64 hwInitReturnAddress = 0;
 
     // Power Processing Units, the effective execution units inside the Xbox 360 CPU.
     std::unique_ptr<PPU> ppu0{};

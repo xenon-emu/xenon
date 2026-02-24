@@ -160,10 +160,6 @@ inline struct _xcpu {
   std::string ramSize = "512MiB";
   // Loads an elf from the ElfBinary path
   bool elfLoader = false;
-  // CB/SB HW_INIT_SKIP
-  bool overrideInitSkip = false;
-  u64 HW_INIT_SKIP_1 = 0;
-  u64 HW_INIT_SKIP_2 = 0;
   // 1BL Simulation
   bool simulate1BL = false;
   // Instruction tests execution
