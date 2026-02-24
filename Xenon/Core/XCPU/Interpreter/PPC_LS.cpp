@@ -398,15 +398,15 @@ void PPCInterpreter::PPCInterpreter_stwcx(sPPEState *ppeState) {
   if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
-  if (curThread.ppuRes->valid) {
+  if (curThread.ppuRes->valid.load(std::memory_order_acquire)) {
     xenonContext->xenonRes.LockGuard([&] {
-      if (curThread.ppuRes->valid) {
-        if (curThread.ppuRes->reservedAddr == RA) {
+      if (curThread.ppuRes->valid.load(std::memory_order_acquire)) {
+        if (curThread.ppuRes->reservedAddr.load(std::memory_order_relaxed) == RA) {
           MMUWrite32(ppeState, EA, static_cast<u32>(GPRi(rs)));
           BSET(CR, 4, CR_BIT_EQ);
         } else {
           xenonContext->xenonRes.Decrement();
-          curThread.ppuRes->valid = false;
+          curThread.ppuRes->valid.store(false, std::memory_order_release);
         }
       }
     });
@@ -507,15 +507,15 @@ void PPCInterpreter::PPCInterpreter_stdcx(sPPEState *ppeState) {
   if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
-  if (curThread.ppuRes->valid) {
+  if (curThread.ppuRes->valid.load(std::memory_order_acquire)) {
     xenonContext->xenonRes.LockGuard([&] {
-      if (curThread.ppuRes->valid) {
-        if (curThread.ppuRes->reservedAddr == RA) {
+      if (curThread.ppuRes->valid.load(std::memory_order_acquire)) {
+        if (curThread.ppuRes->reservedAddr.load(std::memory_order_relaxed) == RA) {
           MMUWrite64(ppeState, EA, GPRi(rd));
           BSET(CR, 4, CR_BIT_EQ);
         } else {
           xenonContext->xenonRes.Decrement();
-          curThread.ppuRes->valid = false;
+          curThread.ppuRes->valid.store(false, std::memory_order_release);
         }
       }
     });
@@ -1256,8 +1256,8 @@ void PPCInterpreter::PPCInterpreter_lwarx(sPPEState *ppeState) {
   if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
-  curThread.ppuRes->valid = true;
-  curThread.ppuRes->reservedAddr = RA;
+  curThread.ppuRes->reservedAddr.store(RA, std::memory_order_relaxed);
+  curThread.ppuRes->valid.store(true, std::memory_order_release);
   xenonContext->xenonRes.Increment();
 
   u32 data = MMURead32(ppeState, EA);
@@ -1441,8 +1441,8 @@ void PPCInterpreter::PPCInterpreter_ldarx(sPPEState *ppeState) {
   if (_ex & ppuDataSegmentEx || _ex & ppuDataStorageEx)
     return;
 
-  curThread.ppuRes->reservedAddr = RA;
-  curThread.ppuRes->valid = true;
+  curThread.ppuRes->reservedAddr.store(RA, std::memory_order_relaxed);
+  curThread.ppuRes->valid.store(true, std::memory_order_release);
   xenonContext->xenonRes.Increment();
 
   const u64 data = MMURead64(ppeState, EA);

@@ -66,9 +66,6 @@ void Render::GUI::Init(SDL_Window *window, void *context) {
   PostInit();
 }
 
-bool RGH2{};
-bool storedPreviousInitSkips{};
-s32 initSkip1{}, initSkip2{};
 void Render::GUI::PostInit() {
   ImGuiIO &io = ImGui::GetIO();
 
@@ -79,11 +76,6 @@ void Render::GUI::PostInit() {
   robotRegular14 = io.Fonts->AddFontFromMemoryTTF((void*)Roboto_Regular_ttf, Roboto_Regular_ttf_len, 14.0f, &fontConfig);
   robotRegular16 = io.Fonts->AddFontFromMemoryTTF((void*)Roboto_Regular_ttf, Roboto_Regular_ttf_len, 16.0f, &fontConfig);
   robotRegular18 = io.Fonts->AddFontFromMemoryTTF((void*)Roboto_Regular_ttf, Roboto_Regular_ttf_len, 18.0f, &fontConfig);
-
-  if (Config::xcpu.HW_INIT_SKIP_1 == 0x3003DC0 && Config::xcpu.HW_INIT_SKIP_2 == 0x3003E54) {
-    storedPreviousInitSkips = true; // If we already have RGH2, ignore
-    RGH2 = true;
-  }
 }
 
 void Render::GUI::Shutdown() {
@@ -614,9 +606,9 @@ void PPUThreadRegisters(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
     if (gui->BeginNode("PPU:Reserve")) {
       PPU_RES *ppuRes = ppuRegisters.ppuRes.get();
       U8HexPtr(gui, ppuRes, ppuID);
-      BoolPtr(gui, ppuRes, valid);
-      // volatile? nah! (Required with std::format on macOS)
-      HexBase(gui, "reservedAddr", static_cast<u64>(ppuRes->reservedAddr));
+      bool validVal = ppuRes->valid.load(std::memory_order_relaxed);
+      gui->TextCopySimple(FMT("valid: {}", validVal));
+      HexBase(gui, "reservedAddr", ppuRes->reservedAddr.load(std::memory_order_relaxed));
       gui->EndNode();
     }
     Hex(gui, ppuRegisters, CIA);
@@ -897,11 +889,6 @@ void XCPUSettings(Render::GUI *gui) {
   gui->Text("SMC");
   gui->Separator();
   SMCSettings(gui);
-  gui->Text("Init");
-  gui->Separator();
-  gui->Toggle("Override Init Skips", &Config::xcpu.overrideInitSkip);
-  gui->InputInt("Init Skip 1", &Config::xcpu.HW_INIT_SKIP_1);
-  gui->InputInt("Init Skip 2", &Config::xcpu.HW_INIT_SKIP_2);
 }
 
 void PathSettings(Render::GUI *gui) {

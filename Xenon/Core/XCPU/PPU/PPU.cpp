@@ -85,7 +85,9 @@ PPU::PPU(Xe::XCPU::XenonContext *inXenonContext, u64 resetVector, u32 PIR) :
   for (u8 thrdID = 0; thrdID < 2; thrdID++) {
     sPPUThread &thread = ppeState->ppuThread[static_cast<ePPUThreadID>(thrdID)];
     thread.ppuRes = std::make_unique<STRIP_UNIQUE(sPPUThread::ppuRes)>();
-    memset(thread.ppuRes.get(), 0, sizeof(PPU_RES));
+    thread.ppuRes->ppuID = 0;
+    thread.ppuRes->valid.store(false, std::memory_order_relaxed);
+    thread.ppuRes->reservedAddr.store(0, std::memory_order_relaxed);
     xenonContext->xenonRes.Register(thread.ppuRes.get());
 
     // Set the decrementer as per docs. See CBE Public Registers pdf in Docs

@@ -12,6 +12,7 @@
 #include "Core/XCPU/PPU/PPCInternal.h"
 #include "Core/XCPU/XenonCPU.h"
 #include "Core/XCPU/PPU/PPU.h"
+#include "Core/XeMain.h"
 #include "PPU_JIT.h"
 
 //
@@ -600,6 +601,16 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
 
   while (instrsExecuted < numInstrs && active && (XeRunning && !XePaused)) {
     auto &thread = curThread;
+
+    // When POST 0x2E HW_INIT fires, hwInitPosted is set and hwReturnAddress.
+    // We make use of that to grab the LR and set it here, thus completly avoiding it.
+    if (XeMain::GetCPU()->HasHWINITPosted()) {
+      XeMain::GetCPU()->SetHWINITPosted(false);
+      PPCInterpreter::ppuSetCR(ppeState, 0, false, false, true, false);
+      thread.NIA = XeMain::GetCPU()->GetHWINITReturnAddress() & ~3ULL;
+      LOG_INFO(Xenon, "[JIT] HwInit intercepted. Returning to {:#x}.", thread.NIA);
+      continue;
+    }
 
     // Quick way of skiping function calls:
     // This *must *be done here simply because of how we handle JIT.
