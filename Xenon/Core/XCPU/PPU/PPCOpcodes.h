@@ -842,6 +842,8 @@ extern void PPCInterpreterJIT_vslw(sPPEState *ppeState, JITBlockBuilder *b, uPPC
 extern void PPCInterpreterJIT_vslw128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vsrw(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vsrw128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vcmpgtfp(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vcmpgtfp128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 
 extern void PPCInterpreterJIT_vperm(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vperm128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
@@ -870,6 +872,8 @@ extern void PPCInterpreterJIT_stvlx128(sPPEState *ppeState, JITBlockBuilder *b, 
 extern void PPCInterpreterJIT_stvrx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_stvrx128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 
+extern void PPCInterpreterJIT_vpkd3d128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vupkd3d128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vpkuwum(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vpkuwum128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vpkswss(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);

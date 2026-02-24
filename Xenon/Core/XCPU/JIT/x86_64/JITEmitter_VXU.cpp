@@ -66,6 +66,20 @@ static const Vector128 XMMByteSwapMask = Vector128i(0x00010203u, 0x04050607u, 0x
 static const Vector128 XMMSwapWordMask = Vector128i(0x03030303u, 0x03030303u, 0x03030303u, 0x03030303u);
 static const Vector128 XMMPermuteByteMask = Vector128b(0x1F);
 static const Vector128 XMMPermuteControl15 = Vector128b(15);
+static const Vector128 XMMOne = Vector128f(1.0f);
+static const Vector128 XMM0001 = Vector128f(0.0f, 0.0f, 0.0f, 1.0f);
+static const Vector128 XMM3301 = Vector128f(3.0f, 3.0f, 0.0f, 1.0f);
+static const Vector128 XMM3333 = Vector128f(3.0f, 3.0f, 3.0f, 3.0f);
+static const Vector128 XMMPackD3DCOLORSat = Vector128i(0x404000FFu);
+static const Vector128 XMMPackD3DCOLOR = Vector128i(0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0x0C000408u);
+static const Vector128 XMMPackSHORT_Min = Vector128i(0x403F8001u);
+static const Vector128 XMMPackSHORT_Max = Vector128i(0x40407FFFu);
+static const Vector128 XMMPackSHORT_2 = Vector128i(0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0x01000504u);
+static const Vector128 XMMUnpackD3DCOLOR = Vector128i(0xFFFFFF0Eu, 0xFFFFFF0Du, 0xFFFFFF0Cu, 0xFFFFFF0Fu);
+static const Vector128 XMMUnpackFLOAT16_2 = Vector128i(0x0D0C0F0Eu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu);
+static const Vector128 XMMUnpackSHORT_2 = Vector128i(0xFFFF0F0Eu, 0xFFFF0D0Cu, 0xFFFFFFFFu, 0xFFFFFFFFu);
+static const Vector128 XMMUnpackSHORT_Overflow = Vector128i(0x403F8000u);
+static const Vector128 XMMQNaN = Vector128i(0x7FC00000u);
 
 // Table used for Load Vector Shift Left instruction
 static const Vector128 loadVectorShiftLeftTable[16] = {
@@ -280,6 +294,74 @@ inline void J_FlushDenormalsToZero(JITBlockBuilder *b, x86::Xmm vec) {
 
 #endif // VXU_FLUSH_DENORMALS_TO_ZERO
 }
+
+// Update CR6 based on comparison result vector
+// CR6 format: all_equal | 0 | none_equal | 0
+inline void J_updateCR6FromCompareResult(JITBlockBuilder *b, x86::Xmm vD) {
+  x86::Gp crValue = newGP32();
+  x86::Gp allEqual = newGP32();
+  x86::Gp noneEqual = newGP32();
+  x86::Gp tmpMask = newGP32();
+  x86::Xmm vAllOnes = newXMM();
+  x86::Xmm vCmpResult = newXMM();
+  Label notAllEqual = COMP->newLabel();
+  Label checkNone = COMP->newLabel();
+
+  // Create all-ones vector for comparison (0xFFFFFFFF in each lane)
+  COMP->mov(tmpMask, 0xFFFFFFFFu);
+  COMP->vmovd(vAllOnes, tmpMask);
+  COMP->vpbroadcastd(vAllOnes, vAllOnes);
+
+  // Check if all elements are 0xFFFFFFFF (all comparisons true)
+  COMP->vpcmpeqd(vCmpResult, vD, vAllOnes);
+  COMP->vmovmskps(tmpMask, vCmpResult);
+  COMP->cmp(tmpMask, imm(0xF)); // All 4 elements equal to 0xFFFFFFFF?
+  COMP->jne(notAllEqual);
+
+  // All elements are 0xFFFFFFFF (all comparisons were true)
+  COMP->mov(allEqual, imm(1));
+  COMP->jmp(checkNone);
+
+  COMP->bind(notAllEqual);
+  COMP->xor_(allEqual, allEqual); // allEqual = 0
+
+  // Check if none are 0xFFFFFFFF (all elements are 0x00000000, no comparisons true)
+  COMP->bind(checkNone);
+  COMP->vmovmskps(tmpMask, vD); // Get sign bits from vD
+  COMP->test(tmpMask, tmpMask); // Any sign bits set?
+  COMP->setz(noneEqual.r8());   // noneEqual = (mask == 0)
+  COMP->movzx(noneEqual, noneEqual.r8());
+
+  // Build CR6 f
+  COMP->xor_(crValue, crValue); // Clear
+  COMP->shl(allEqual, imm(2));  // LT at bit 2 (for bit position 7 final)
+  COMP->shl(noneEqual, imm(0)); // EQ at bit 0 (for bit position 5 final - no shift needed)
+  COMP->or_(crValue, allEqual);
+  COMP->or_(crValue, noneEqual);
+  COMP->shl(crValue, imm(5));
+
+  // Update CR
+  x86::Gp crFull = newGP32();
+  COMP->mov(crFull, CRValPtr());
+  COMP->and_(crFull, imm(~0x000000F0u));
+  COMP->or_(crFull, crValue);
+  COMP->mov(CRValPtr(), crFull);
+}
+
+// Creates a permute mask based on the given selectors and indices for each component.
+constexpr u32 MakePermuteMask(u32 sel_x, u32 x, u32 sel_y, u32 y, u32 sel_z, u32 z, u32 sel_w, u32 w) {
+  return ((x & 0x3) << 0) | (sel_x << 2) | ((y & 0x3) << 8) | (sel_y << 10) |
+    ((z & 0x3) << 16) | (sel_z << 18) | ((w & 0x3) << 24) | (sel_w << 26);
+}
+
+// Identity Permute Mask
+enum PermuteMasks : u32 {
+  IdentityPermuteMask = MakePermuteMask(0, 0, 0, 1, 0, 2, 0, 3)
+};
+
+//
+// Instruction Implementations
+//
 
 // Vector Add Floating Point (x'1000 000A')
 void PPCInterpreter::PPCInterpreterJIT_vaddfp(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
@@ -2341,6 +2423,265 @@ void PPCInterpreter::PPCInterpreterJIT_vmrglb(sPPEState *ppeState, JITBlockBuild
   // vpshufd imm8 = 0b10110001 = 0xB1 swaps pairs
   COMP->vpshufd(vD, vD, imm(0xB1));
   COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector Compare Greater-Than Floating-Point (x'1000 02C6')
+void PPCInterpreter::PPCInterpreterJIT_vcmpgtfp(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  // Load operands
+  COMP->vmovaps(vA, VPRPtr(instr.va));
+  COMP->vmovaps(vB, VPRPtr(instr.vb));
+
+  // Flush denormal inputs to zero (VMX behavior)
+  J_FlushDenormalsToZero(b, vA);
+  J_FlushDenormalsToZero(b, vB);
+
+  // Compare vA > vB (ordered greater-than)
+  // vcmpps with predicate 14 (GT, ordered) returns 0xFFFFFFFF for true, 0x00000000 for false
+  COMP->vcmpps(vD, vA, vB, 14);
+
+  // Store result to vD
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+
+  // Update CR6 if Rc bit is set
+  if (instr.vrc) {
+    J_updateCR6FromCompareResult(b, vD);
+  }
+}
+
+// Vector 128 Compare Greater-Than Floating-Point
+void PPCInterpreter::PPCInterpreterJIT_vcmpgtfp128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  // Load operands
+  COMP->vmovaps(vA, VPRPtr(J_VMX128_R_VA128));
+  COMP->vmovaps(vB, VPRPtr(J_VMX128_R_VB128));
+
+  // Flush denormal inputs to zero (VMX behavior)
+  J_FlushDenormalsToZero(b, vA);
+  J_FlushDenormalsToZero(b, vB);
+
+  // Compare vA > vB (ordered greater-than)
+  // vcmpps with predicate 14 (GT, ordered) returns 0xFFFFFFFF for true, 0x00000000 for false
+  COMP->vcmpps(vD, vA, vB, 14);
+
+  // Store result to vD
+  COMP->vmovdqa(VPRPtr(J_VMX128_R_VD128), vD);
+
+  // Update CR6 if Rc bit is set
+  if (instr.VMX128_R.Rc) {
+    J_updateCR6FromCompareResult(b, vD);
+  }
+}
+
+enum PackType : u16 {
+  // Special types:
+  PACK_TYPE_D3DCOLOR = 0,
+  PACK_TYPE_FLOAT16_2 = 1,
+  PACK_TYPE_SHORT_4 = 2,
+  PACK_TYPE_FLOAT16_4 = 3,
+  PACK_TYPE_SHORT_2 = 4,
+  PACK_TYPE_UINT_2101010 = 5,
+  PACK_TYPE_ULONG_4202020 = 6,
+
+  // Types which use the bitmasks below for configuration:
+  PACK_TYPE_8_IN_16 = 7,
+  PACK_TYPE_16_IN_32 = 8,
+
+  // Used just to get the mode
+  PACK_TYPE_MODE = 0x000F,
+  // Unpack to low or high parts.
+  PACK_TYPE_TO_LO = 0 << 12,
+  PACK_TYPE_TO_HI = 1 << 12,
+
+  // Input/output arithmetic flags:
+  PACK_TYPE_IN_SIGNED = 0 << 13,
+  PACK_TYPE_IN_UNSIGNED = 1 << 13,
+  PACK_TYPE_OUT_SIGNED = 0 << 14,
+  PACK_TYPE_OUT_UNSIGNED = 1 << 14,
+  PACK_TYPE_OUT_UNSATURATE = 0 << 15,
+  PACK_TYPE_OUT_SATURATE = 1 << 15,
+};
+
+// Vector128 Pack D3D Format
+void PPCInterpreter::PPCInterpreterJIT_vpkd3d128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  const u32 regD = instr.VMX128_4.VD128l | (instr.VMX128_4.VD128h << 5);
+  const u32 regB = instr.VMX128_4.VB128l | (instr.VMX128_4.VB128h << 5);
+  const u32 type = instr.VMX128_4.IMM >> 2;
+  u32 pack = instr.VMX128_4.IMM & 0x3;
+  u32 shift = instr.VMX128_4.z;
+
+  x86::Xmm vS = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Xmm tmp = newXMM();
+  x86::Gp tmpAddress = newGP64();
+
+  // Get vS and vD
+  COMP->vmovaps(vS, VPRPtr(regB));
+  COMP->vmovaps(vD, VPRPtr(regD));
+
+  switch (type) {
+  case 0:  // VPACK_D3DCOLOR
+    COMP->mov(tmpAddress, (uintptr_t)&XMM3333);
+    COMP->vmaxps(vS, vS, x86::ptr(tmpAddress));
+    COMP->mov(tmpAddress, (uintptr_t)&XMMPackD3DCOLORSat);
+    COMP->vminps(vS, vS, x86::ptr(tmpAddress));
+    COMP->mov(tmpAddress, (uintptr_t)&XMMPackD3DCOLOR);
+    COMP->vpshufb(vS, vS, x86::ptr(tmpAddress));
+    break;
+  case 1:  // VPACK_NORMSHORT2
+    COMP->mov(tmpAddress, (uintptr_t)&XMMPackSHORT_Min);
+    COMP->vmaxps(vS, vS, x86::ptr(tmpAddress));
+    COMP->mov(tmpAddress, (uintptr_t)&XMMPackSHORT_Max);
+    COMP->vminps(vS, vS, x86::ptr(tmpAddress));
+    // Pack.
+    COMP->mov(tmpAddress, (uintptr_t)&XMMPackSHORT_2);
+    COMP->vpshufb(vS, vS, x86::ptr(tmpAddress));
+    break;
+  case 2:  // VPACK_NORMPACKED32 2_10_10_10 w_z_y_x
+  case 3:  // VPACK_FLOAT16_2 DXGI_FORMAT_R16G16_FLOAT
+  case 4:  // VPACK_NORMSHORT4
+  case 5:  // VPACK_FLOAT16_4 DXGI_FORMAT_R16G16B16A16_FLOAT
+  case 6:  // VPACK_NORMPACKED64 4_20_20_20 w_z_y_x
+  default:
+    LOG_ERROR(Xenon, "VPKD3D128: Unhandled type: {:#x}", type);
+    return;
+  }
+
+  // https://hlssmod.net/he_code/public/pixelwriter.h
+  // Control = prev:0123 | new:4567
+  u32 controlMask = IdentityPermuteMask;
+
+  switch (pack) {
+  case 1:  // VPACK_32
+    // VPACK_32 & shift = 3 puts lower 32 bits in x (leftmost slot).
+    switch (shift) {
+    case 0: controlMask = MakePermuteMask(0, 0, 0, 1, 0, 2, 1, 3); break;
+    case 1: controlMask = MakePermuteMask(0, 0, 0, 1, 1, 3, 0, 3); break;
+    case 2: controlMask = MakePermuteMask(0, 0, 1, 3, 0, 2, 0, 3); break;
+    case 3: controlMask = MakePermuteMask(1, 3, 0, 1, 0, 2, 0, 3); break;
+    default:
+      LOG_ERROR(Xenon, "VPKD3D128: Unhandled shift: {:#x}", shift);
+      return;
+    }
+    break;
+  case 2:  // 64bit
+    switch (shift) {
+    case 0: controlMask = MakePermuteMask(0, 0, 0, 1, 1, 2, 1, 3); break;
+    case 1: controlMask = MakePermuteMask(0, 0, 1, 2, 1, 3, 0, 3); break;
+    case 2: controlMask = MakePermuteMask(1, 2, 1, 3, 0, 2, 0, 3); break;
+    case 3: controlMask = MakePermuteMask(1, 3, 0, 1, 0, 2, 0, 3); break;
+    default:
+      LOG_ERROR(Xenon, "VPKD3D128: Unhandled shift: {:#x}", shift);
+      return;
+    }
+    break;
+  case 3:  // 64bit
+    switch (shift) {
+    case 0: controlMask = MakePermuteMask(0, 0, 0, 1, 1, 2, 1, 3); break;
+    case 1: controlMask = MakePermuteMask(0, 0, 1, 2, 1, 3, 0, 3); break;
+    case 2: controlMask = MakePermuteMask(1, 2, 1, 3, 0, 2, 0, 3); break;
+    case 3: controlMask = MakePermuteMask(0, 0, 0, 1, 0, 2, 1, 2); break;
+    default:
+      LOG_ERROR(Xenon, "VPKD3D128: Unhandled shift: {:#x}", shift);
+      return;
+    }
+    break;
+  default:
+    LOG_ERROR(Xenon, "VPKD3D128: Unhandled pack: {:#x}", pack);
+    return;
+  }
+
+  // Permute
+  // NOTE: This assumes AVX2 is enabled.
+  u32 srcControl =
+    (((controlMask >> 24) & 0x3) << 6) | (((controlMask >> 16) & 0x3) << 4) |
+    (((controlMask >> 8) & 0x3) << 2) | (((controlMask >> 0) & 0x3) << 0);
+
+  u32 blendControl =
+    (((controlMask >> 26) & 0x1) << 3) | (((controlMask >> 18) & 0x1) << 2) |
+    (((controlMask >> 10) & 0x1) << 1) | (((controlMask >> 2) & 0x1) << 0);
+
+  COMP->vmovaps(tmp, vS);
+  COMP->vpshufd(vS, vD, imm(srcControl));
+  COMP->vpshufd(tmp, tmp, imm(srcControl));
+  COMP->vpblendd(vS, vS, tmp, imm(blendControl));
+
+  COMP->vmovaps(VPRPtr(regD), vS);
+}
+
+// Vector128 Unpack D3D Format
+// Unpacks a D3D-specific packed format into floating-point vector components.
+void PPCInterpreter::PPCInterpreterJIT_vupkd3d128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  const u32 vd = instr.VMX128_3.VD128l | (instr.VMX128_3.VD128h << 5);
+  const u32 vb = instr.VMX128_3.VB128l | (instr.VMX128_3.VB128h << 5);
+  const u32 type = instr.VMX128_3.IMM >> 2;
+
+  x86::Gp tmpAddress = newGP64();
+  x86::Xmm vecB = newXMM();
+  x86::Xmm vecD = newXMM();
+  x86::Xmm tmp = newXMM();
+  COMP->vmovaps(vecB, VPRPtr(vb));
+
+  switch (type) {
+  case 0:  // VPACK_D3DCOLOR
+    // Unpack to 000000ZZ,000000YY,000000XX,000000WW
+    COMP->mov(tmpAddress, (uintptr_t)&XMMUnpackD3DCOLOR);
+    COMP->vpshufb(vecD, vecB, x86::ptr(tmpAddress));
+    // Add 1.0f to each.
+    COMP->mov(tmpAddress, (uintptr_t)&XMMOne);
+    COMP->vpor(vecD, vecD, x86::ptr(tmpAddress));
+    break;
+  case 3:  // VPACK_FLOAT16_2 DXGI_FORMAT_R16G16_FLOAT
+    COMP->mov(tmpAddress, (uintptr_t)&XMMUnpackFLOAT16_2);
+    COMP->vpshufb(vecD, vecB, x86::ptr(tmpAddress));
+    COMP->vcvtph2ps(vecD, vecD);
+    COMP->vpshufd(vecD, vecD, 0b10100100);
+    COMP->mov(tmpAddress, (uintptr_t)&XMM0001);
+    COMP->vpor(vecD, vecD, x86::ptr(tmpAddress));
+    break;
+  case 1:  // VPACK_NORMSHORT2
+    // Shuffle bytes.
+    COMP->mov(tmpAddress, (uintptr_t)&XMMUnpackSHORT_2);
+    COMP->vpshufb(vecD, vecB, x86::ptr(tmpAddress));
+    // If negative, make smaller than 3 - sign extend before adding.
+    COMP->vpslld(vecD, vecD, 16);
+    COMP->vpsrad(vecD, vecD, 16);
+    // Add 3,3,0,1.
+    COMP->mov(tmpAddress, (uintptr_t)&XMM3301);
+    COMP->vpaddd(vecD, vecD, x86::ptr(tmpAddress));
+    // Return quiet NaNs in case of negative overflow.
+    // Load overflow comparison value into tmp first
+    COMP->mov(tmpAddress, (uintptr_t)&XMMUnpackSHORT_Overflow);
+    COMP->vmovaps(tmp, x86::ptr(tmpAddress));
+    // Compare for equality using vcmpps with predicate 0 (EQ)
+    COMP->vcmpps(tmp, vecD, tmp, 0); // Predicate 0 = EQ (equal)
+    // Blend with QNaN where overflow detected
+    COMP->mov(tmpAddress, (uintptr_t)&XMMQNaN);
+    COMP->vblendvps(vecD, vecD, x86::ptr(tmpAddress), tmp);
+    break;
+  case 2:  // VPACK_NORMPACKED32 2_10_10_10 w_z_y_x
+  case 4:  // VPACK_NORMSHORT4
+  case 5:  // VPACK_FLOAT16_4 DXGI_FORMAT_R16G16B16A16_FLOAT
+  case 6:  // VPACK_NORMPACKED64 4_20_20_20 w_z_y_x
+  default:
+    LOG_ERROR(Xenon, "VUPKD3D128: Unhandled type: {:#x}", type);
+    return;
+  }
+
+  // Store
+  COMP->vmovaps(VPRPtr(vd), vecD);
 }
 
 //*****************************************************************************
