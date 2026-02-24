@@ -205,6 +205,8 @@ Xe::PCIDev::ODD::ODD(const char* deviceName, u64 size, PCIBridge *parentPCIBridg
 
 // PCI Read
 void Xe::PCIDev::ODD::Read(u64 readAddress, u8 *data, u64 size) {
+  bool shouldInterrupt = false;
+
   // PCI BAR0 is the Primary Command Block Base Address
   u8 atapiCommandReg =
       static_cast<u8>(readAddress - pciConfigSpace.configSpaceHeader.BAR0);
@@ -216,6 +218,9 @@ void Xe::PCIDev::ODD::Read(u64 readAddress, u8 *data, u64 size) {
 #ifdef ODD_DEBUG
   LOG_DEBUG(ODD, "[Read]: Reg {}, address {:#x}", getATAPIRegisterName(readAddress & 0xFF), readAddress);
 #endif // ODD_DEBUG
+
+  {
+  std::lock_guard lock(oddMutex);
 
   // Command Registers
   if (atapiCommandReg < (pciConfigSpace.configSpaceHeader.BAR1 -
@@ -234,7 +239,7 @@ void Xe::PCIDev::ODD::Read(u64 readAddress, u8 *data, u64 size) {
           atapiState.regs.status |= ATA_STATUS_DRDY;  // Device ready.
           // Signal transfer completion.
           atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO | ATA_INTERRUPT_REASON_CD;
-          atapiIssueInterrupt();
+          shouldInterrupt = true;
         }
       }
       memcpy(data, &atapiState.regs.data, size);
@@ -263,27 +268,22 @@ void Xe::PCIDev::ODD::Read(u64 readAddress, u8 *data, u64 size) {
       return;
     case ATAPI_REG_STATUS:
       memcpy(data, &atapiState.regs.status, size);
-      // Cancel any interrupts that may be pending
-      parentBus->CancelInterrupt(PRIO_SATA_ODD);
-      return;
+      break;
     case ATAPI_REG_ALTERNATE_STATUS:
-      // Reading to the alternate status register returns the contents of the Status register,
-      // but it does not clean pending interrupts. Also wastes 100ns
-      std::this_thread::sleep_for(100ns);
       memcpy(data, &atapiState.regs.status, size);
-      return;
+      break;
     case ATA_REG_SSTATUS:
       memcpy(data, &atapiState.regs.SStatus, size);
-      return;
+      break;
     case ATA_REG_SERROR:
       memcpy(data, &atapiState.regs.SError, size);
-      return;
+      break;
     case ATA_REG_SCONTROL:
       memcpy(data, &atapiState.regs.SControl, size);
-      return;
+      break;
     case ATA_REG_SACTIVE:
       memcpy(data, &atapiState.regs.SActive, size);
-      return;
+      break;
     default:
       LOG_ERROR(ODD, "Unknown Command Register Block register being read, command code = 0x{:X}", atapiCommandReg);
       break;
@@ -304,9 +304,21 @@ void Xe::PCIDev::ODD::Read(u64 readAddress, u8 *data, u64 size) {
       break;
     }
   }
+  }
+
+  // Route interrupts outside of lock to avoid lock contention.
+  if (shouldInterrupt) {
+    atapiIssueInterrupt();
+  }
+  // Cancel interrupt must also be outside lock.
+  if (atapiCommandReg == ATAPI_REG_STATUS) {
+    parentBus->CancelInterrupt(PRIO_SATA_ODD);
+  }
 }
 // PCI Write
 void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
+  bool shouldInterrupt = false;
+
   // PCI BAR0 is the Primary Command Block Base Address
   u8 atapiCommandReg =
       static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR0);
@@ -317,6 +329,8 @@ void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
 
   u32 inData = 0;
   memcpy(&inData, data, size);
+
+  std::lock_guard lock(oddMutex);
 
 #ifdef ODD_DEBUG
   LOG_DEBUG(ODD, "[Write]: Reg {}, address {:#x}, data {:#x}, byte count {:#d}", getATAPIRegisterName(writeAddress & 0xFF),
@@ -344,7 +358,7 @@ void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
       if (atapiState.dataInBuffer.size() >= XE_ATAPI_CDB_SIZE &&
           atapiState.regs.command == ATA_COMMAND_PACKET) {
         // Signal pending SCSI command.
-        atapiState.scsiCommandPending = true;
+        atapiState.scsiCommandPending.store(true, std::memory_order_release);
         // Reset our buffer ptr.
         atapiState.dataInBuffer.reset();
       }
@@ -387,11 +401,11 @@ void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
       } break;
       case ATA_COMMAND_IDENTIFY_PACKET_DEVICE: {
         atapiIdentifyPacketDeviceCommand();
-        return;
+        shouldInterrupt = true;
       } break;
       case ATA_COMMAND_IDENTIFY_DEVICE: {
         atapiIdentifyCommand();
-        return;
+        shouldInterrupt = true;
       } break;
       case ATA_COMMAND_SET_FEATURES:
         switch (atapiState.regs.features) {
@@ -449,8 +463,8 @@ void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
           }
           atapiState.regs.ataTransferMode = inData;
           }
-          // Request interrupt
-          atapiIssueInterrupt();
+          // Request interrupt (will be routed outside lock)
+          shouldInterrupt = true;
         }
         break;
       default: {
@@ -511,9 +525,15 @@ void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
       break;
     }
   }
+
+  // Route interrupts outside of lock to avoid lock contention.
+  if (shouldInterrupt) {
+    atapiIssueInterrupt();
+  }
 }
 
 void Xe::PCIDev::ODD::MemSet(u64 writeAddress, s32 data, u64 size) {
+  std::lock_guard lock(oddMutex);
   // PCI BAR0 is the primary command block base address
   u8 atapiCommandReg =
       static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR0);
@@ -742,9 +762,6 @@ void Xe::PCIDev::ODD::atapiIdentifyCommand() {
 
   // Set interrupt reason (OR with existing ATAPI signature)
   atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
-
-  // An interrupt must also be requested
-  atapiIssueInterrupt();
 }
 
 void Xe::PCIDev::ODD::atapiIdentifyPacketDeviceCommand() {
@@ -766,10 +783,7 @@ void Xe::PCIDev::ODD::atapiIdentifyPacketDeviceCommand() {
 
   // Set the drive status
   atapiState.regs.status = ATA_STATUS_DRDY | ATA_STATUS_DRQ;
-
-  // Request interrupt
-  atapiIssueInterrupt();
-}
+ }
 
 //
 // SCSI Commands
@@ -1091,53 +1105,67 @@ std::string Xe::PCIDev::ODD::getATAPIRegisterName(u32 regID) {
 // Worker thread for DMA.
 void Xe::PCIDev::ODD::oddThreadLoop() {
   // Check if we should be running
-  if (!oddThreadRunning)
+  if (!oddThreadRunning.load())
     return;
   LOG_INFO(ODD, "Entered ODD worker thread.");
-  while (oddThreadRunning) {
+  while (oddThreadRunning.load()) {
     // Check if we should exit early
-    oddThreadRunning = XeRunning;
-    if (!oddThreadRunning)
+    oddThreadRunning.store(XeRunning);
+    if (!oddThreadRunning.load())
       break;
-    // Check for the DMA active command, and only start the DMA engine if there's not any 
-    // pending SCSI command for processing. (Avoids race conditions)
-    if (atapiState.regs.dmaCommand & XE_ATA_DMA_ACTIVE
-      && atapiState.scsiCommandPending == false) {
+
+    bool shouldInterruptDMA = false;
+    bool shouldInterruptSCSI = false;
+
+    // DMA and SCSI processing under lock
+    {
+      std::lock_guard lock(oddMutex);
+
+      // Check for the DMA active command, and only start the DMA engine if there's not any 
+      // pending SCSI command for processing. (Avoids race conditions)
+      if (atapiState.regs.dmaCommand & XE_ATA_DMA_ACTIVE
+        && !atapiState.scsiCommandPending.load(std::memory_order_acquire)) {
 #ifdef ODD_DEBUG
-      LOG_INFO(ODD, "Started DMA Operation. Direction : {}",(atapiState.regs.dmaCommand & XE_ATAPI_DMA_WR ? "Out" : "In"));
+        LOG_INFO(ODD, "Started DMA Operation. Direction : {}",(atapiState.regs.dmaCommand & XE_ATAPI_DMA_WR ? "Out" : "In"));
 #endif // ODD_DEBUG
-      // Start our DMA operation
-      doDMA();
-      // Change our DMA status after completion.
-      atapiState.regs.dmaCommand &= ~1; // Clear active status.
-      atapiState.regs.dmaStatus = XE_ATA_DMA_INTR; // Signal Interrupt.
-      atapiState.regs.SActive = 0x40;
-      atapiState.regs.status = ATA_STATUS_DRDY;
-      // Check if we should copy the input buffer onto our page data.
-      if (copyDataIntoPageData) {
-        memcpy(pageData, atapiState.dataInBuffer.get(), sizeof(pageData));
-        copyDataIntoPageData = false;
+        // Start our DMA operation
+        doDMA();
+        // Change our DMA status after completion.
+        atapiState.regs.dmaCommand &= ~1; // Clear active status.
+        atapiState.regs.dmaStatus = XE_ATA_DMA_INTR; // Signal Interrupt.
+        atapiState.regs.SActive = 0x40;
+        atapiState.regs.status = ATA_STATUS_DRDY;
+        // Check if we should copy the input buffer onto our page data.
+        if (copyDataIntoPageData) {
+          memcpy(pageData, atapiState.dataInBuffer.get(), sizeof(pageData));
+          copyDataIntoPageData = false;
+        }
+        // Reset I/O data buffers
+        atapiState.dataInBuffer.reset();
+        atapiState.dataOutBuffer.reset();
+        // After completion we must raise an interrupt.
+        shouldInterruptDMA = true;
       }
-      // Reset I/O data buffers
-      atapiState.dataInBuffer.reset();
-      atapiState.dataOutBuffer.reset();
-      // After completion we must raise an interrupt.
+
+      // Check for pending SCSI commands.
+      if (atapiState.scsiCommandPending.load(std::memory_order_acquire)) {
+        processSCSICommand();
+
+        // Check if we need to issue an interrupt.
+        // If DMA is active, the interrupt will be issued by the DMA engine.
+        // If DMA is not active, we need to issue the interrupt ourselves.
+        // Note: check for bit 0 of features register (DMA bit)
+        if (!(atapiState.regs.features & 1)) {
+          shouldInterruptSCSI = true;
+        }
+
+        atapiState.scsiCommandPending.store(false, std::memory_order_release);
+      }
+    } // end lock scope
+
+    // Route interrupts outside of lock to avoid lock contention.
+    if (shouldInterruptDMA || shouldInterruptSCSI) {
       atapiIssueInterrupt();
-    }
-    
-    // Check for pending SCSI commands.
-    if (atapiState.scsiCommandPending) {
-      processSCSICommand();
-
-      // Check if we need to issue an interrupt.
-      // If DMA is active, the interrupt will be issued by the DMA engine.
-      // If DMA is not active, we need to issue the interrupt ourselves.
-      // Note: check for bit 0 of features register (DMA bit)
-      if (!(atapiState.regs.features & 1)) {
-        atapiIssueInterrupt();
-      }
-
-      atapiState.scsiCommandPending = false;
     }
 
     // Sleep for some time.

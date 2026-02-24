@@ -12,8 +12,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #endif
+#include <atomic>
 #include <cstring>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 
@@ -636,7 +638,7 @@ struct ATAPI_DEV_STATE {
   // Do we have an image?
   bool imageAttached = false;
   // Is there a SCSI command pending for processing?
-  bool scsiCommandPending = false;
+  std::atomic<bool> scsiCommandPending{false};
 };
 
 class ODD : public PCIDevice {
@@ -657,6 +659,10 @@ private:
   // RAM Pointer for DMA ops.
   RAM *ramPtr;
 
+  // Mutex for synchronizing access to atapiState between the worker thread
+  // and PCI Read/Write methods.
+  std::mutex oddMutex;
+
   // ATAPI Device State.
   ATAPI_DEV_STATE atapiState = {};
 
@@ -664,7 +670,7 @@ private:
   std::thread oddWorkerThread;
 
   // Thread running
-  volatile bool oddThreadRunning = false;
+  std::atomic<bool> oddThreadRunning{false};
 
   // Thread loop for processing DMA requests, etc...
   void oddThreadLoop();
