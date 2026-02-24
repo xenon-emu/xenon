@@ -204,44 +204,6 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
     LOG_INFO(SFCX, " * CB_A Version: {:#d}", cbaHeader.buildNumber);
     LOG_INFO(SFCX, " * CB_B Version: {:#d}", cbbHeader.buildNumber);
   }
-
-  if (Config::xcpu.overrideInitSkip) {
-    initSkip1 = Config::xcpu.HW_INIT_SKIP_1;
-    initSkip2 = Config::xcpu.HW_INIT_SKIP_2;
-    LOG_INFO(SFCX, "Manual Hardware Init stage skip addresses set:");
-    LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, initSkip1);
-    LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: 0x{:X}", cbVersion, initSkip2);
-  } else {
-    LOG_INFO(SFCX, "Auto-detecting Hardware Init stage skip addresses:");
-    switch (cbVersion) {
-    // CB_B 6723
-    case 6723:
-      initSkip1 = 0x03009B10;
-      LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, initSkip1);
-      initSkip2 = 0x03009BA4;
-      LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: 0x{:X}", cbVersion, initSkip2);
-      break;
-    // CB_B 6752, 9188, 15432
-    case 6752:
-    case 9188:
-      initSkip1 = 0x03003DC0;
-      LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, initSkip1);
-      initSkip2 = 0x03003E54;
-      LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: 0x{:X}", cbVersion, initSkip2);
-      break;
-    // CB_B 14352
-    case 14352:
-    case 15432:
-      initSkip1 = 0x03003F48;
-      LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, initSkip1);
-      initSkip2 = 0x03003FDC;
-      LOG_INFO(SFCX, " > CB({:#d}): Skip Address 2 set to: 0x{:X}", cbVersion, initSkip2);
-      break;
-    default:
-      LOG_ERROR(SFCX, "Auto detection failed. Unimplemented CB found, version {:#d}. Please report to Xenon Devs.", cbVersion);
-      break;
-    }
-  }
 }
 
 Xe::PCIDev::SFCX::~SFCX() {
@@ -489,46 +451,60 @@ void Xe::PCIDev::SFCX::sfcxMainLoop() {
 
     // Did we got a command?
     if (sfcxState.commandReg != NO_CMD) {
-      // Check the command reg to see what command was issued
-      std::lock_guard lck(mutex);
-      switch (sfcxState.commandReg) {
-      case PHY_PAGE_TO_BUF:
-        sfcxReadPageFromNAND(true);
-        break;
-      case LOG_PAGE_TO_BUF:
-        sfcxReadPageFromNAND(false);
-        break;
-      case DMA_LOG_TO_RAM:
-        sfcxDoDMAfromNAND(false);
-        break;
-      case DMA_PHY_TO_RAM:
-        sfcxDoDMAfromNAND(true);
-        break;
-      case DMA_RAM_TO_PHY:
-        sfcxDoDMAtoNAND();
-        break;
-      case BLOCK_ERASE:
-        sfcxEraseBlock();
-        break;
-      case UNLOCK_CMD_0:
-        LOG_DEBUG(SFCX, "Performing unlock sequence for NAND write.");
-        break;
-      case UNLOCK_CMD_1:
-        break;
-      default:
-        LOG_ERROR(SFCX, "Unrecognized command was issued. 0x{:X}. Issuing interrupt if enabled.", sfcxState.commandReg);
-        break;
+      // Tracks whether we should fire an interrupt after releasing the lock.
+      bool shouldInterrupt = false;
+
+      // Scope the lock to command processing only
+      {
+        std::lock_guard lck(mutex);
+        // Check the command reg to see what command was issued
+        switch (sfcxState.commandReg) {
+        case PHY_PAGE_TO_BUF:
+          sfcxReadPageFromNAND(true);
+          break;
+        case LOG_PAGE_TO_BUF:
+          sfcxReadPageFromNAND(false);
+          break;
+        case DMA_LOG_TO_RAM:
+          sfcxDoDMAfromNAND(false);
+          break;
+        case DMA_PHY_TO_RAM:
+          sfcxDoDMAfromNAND(true);
+          break;
+        case DMA_RAM_TO_PHY:
+          sfcxDoDMAtoNAND();
+          break;
+        case BLOCK_ERASE:
+          sfcxEraseBlock();
+          break;
+        case UNLOCK_CMD_0:
+          LOG_DEBUG(SFCX, "Performing unlock sequence for NAND write.");
+          break;
+        case UNLOCK_CMD_1:
+          break;
+        default:
+          LOG_ERROR(SFCX, "Unrecognized command was issued. 0x{:X}. Issuing interrupt if enabled.", sfcxState.commandReg);
+          break;
+        }
+
+        // Check if interrupt should be generated.
+        shouldInterrupt = (sfcxState.configReg & CONFIG_INT_EN) != 0;
+        if (shouldInterrupt) {
+          sfcxState.statusReg |= STATUS_INT_CP;
+        }
+
+        // Clear Command Register
+        sfcxState.commandReg = NO_CMD;
+
+        // Set Status to Ready again
+        sfcxState.statusReg &= ~STATUS_BUSY;
       }
-      if (sfcxState.configReg & CONFIG_INT_EN) {
+
+      // Route interrupt outside the SFCX mutex to avoid the
+      // SFCX lock -> IIC lock dependency chain.
+      if (shouldInterrupt) {
         parentBus->RouteInterrupt(PRIO_SFCX);
-        sfcxState.statusReg |= STATUS_INT_CP;
       }
-
-      // Clear Command Register
-      sfcxState.commandReg = NO_CMD;
-
-      // Set Status to Ready again
-      sfcxState.statusReg &= ~STATUS_BUSY;
     }
   }
 }

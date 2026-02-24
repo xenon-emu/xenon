@@ -197,8 +197,6 @@ public:
   void ConfigWrite(u64 writeAddress, const u8* data, u64 size) override;
 
   bool hasInitialised = false;
-  // Init skips
-  u64 initSkip1 = 0, initSkip2 = 0;
 private:
   // Secure Flash Controller for Xbox main loop.
   void sfcxMainLoop();
@@ -215,7 +213,7 @@ private:
   // PCI Bridge pointer. Used for Interrupts.
   PCIBridge *parentBus = nullptr;
   // Mutex for thread-safe behavior.
-  std::recursive_mutex mutex;
+  std::mutex mutex;
   // RAM pointer. Used for DMA.
   RAM *mainMemory = nullptr;
   // Read a page from memory to page buffer.
