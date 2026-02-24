@@ -12,6 +12,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #endif
+#include <atomic>
 #include <cstring>
 #include <memory>
 #include <mutex>
@@ -411,7 +412,7 @@ namespace Xe {
 
       // Mutex for synchronizing access to ataState between the worker thread
       // and PCI Read/Write methods.
-      std::recursive_mutex ataMutex;
+      std::mutex ataMutex;
 
       // Device State
       ATA_DEV_STATE ataState = {};
@@ -420,7 +421,7 @@ namespace Xe {
       std::thread hddWorkerThread;
 
       // Thread running
-      volatile bool hddThreadRunning = false;
+      std::atomic<bool> hddThreadRunning{false};
 
       // Thread loop for processing DMA requests, etc...
       void hddThreadLoop();

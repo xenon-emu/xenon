@@ -188,6 +188,16 @@ Xe::PCIDev::HDD::~HDD() {
 
 // PCI Read
 void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
+  // Check for ALT_STATUS sleep first — outside lock
+  u8 ataCommandRegCheck =
+    static_cast<u8>(readAddress - pciConfigSpace.configSpaceHeader.BAR0);
+  if (ataCommandRegCheck == ATA_REG_ALT_STATUS &&
+      ataCommandRegCheck < (pciConfigSpace.configSpaceHeader.BAR1 -
+                            pciConfigSpace.configSpaceHeader.BAR0)) {
+    // ATA spec: wastes 100ns
+    std::this_thread::sleep_for(100ns);
+  }
+
   std::lock_guard lock(ataMutex);
 
   // PCI BAR0 is the Primary Command Block Base Address
@@ -261,8 +271,7 @@ void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
       break;
     case ATA_REG_ALT_STATUS:
       // Reading to the alternate status register returns the contents of the Status register,
-      // but it does not clean pending interrupts. Also wastes 100ns
-      std::this_thread::sleep_for(100ns);
+      // but it does not clean pending interrupts. (Sleep is done before lock acquisition)
       memcpy(data, &ataState.regs.status, size);
       break;
     case ATA_REG_SSTATUS:
@@ -300,6 +309,9 @@ void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
 }
 // PCI Write
 void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
+  bool shouldInterrupt = false;
+
+  {
   std::lock_guard lock(ataMutex);
 
   // PCI BAR0 is the Primary Command Block Base Address
@@ -391,8 +403,8 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
       }
       case ATA_COMMAND_READ_NATIVE_MAX_ADDRESS_EXT:
         ataReadNativeMaxAddressExtCommand();
-        // Request interrupt
-        ataIssueInterrupt();
+        // Request interrupt (routed after lock release)
+        shouldInterrupt = true;
         break;
       case ATA_COMMAND_WRITE_DMA:
         ataWriteDMACommand();
@@ -415,8 +427,8 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
       }
       case ATA_COMMAND_IDENTIFY_DEVICE:
         ataIdentifyDeviceCommand();
-        // Request interrupt
-        ataIssueInterrupt();
+        // Request interrupt (routed after lock release)
+        shouldInterrupt = true;
         break;
       case ATA_COMMAND_SET_FEATURES:
         switch (ataState.regs.features) {
@@ -481,8 +493,8 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
           LOG_ERROR(HDD, "[CMD]: Set features {:#x} subcommand unknown.", ataState.regs.features);
           break;
         }
-        // Request interrupt
-        ataIssueInterrupt();
+        // Request interrupt (routed after lock release)
+        shouldInterrupt = true;
         break;
       default:
         LOG_ERROR(HDD, "Unhandled command received {}", getATACommandName(ataState.regs.command));
@@ -539,6 +551,12 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
       LOG_ERROR(HDD, "Unknown control register {:#x} being written. Byte count = {:#d}", regOffset, size);
       break;
     }
+  }
+  }
+
+  // Route interrupt outside of lock to avoid lock contention.
+  if (shouldInterrupt) {
+    ataIssueInterrupt();
   }
 }
 
@@ -744,14 +762,17 @@ const std::string Xe::PCIDev::HDD::getATACommandName(u32 commandID) {
 // Worker thread for DMA.
 void Xe::PCIDev::HDD::hddThreadLoop() {
   // Check if we should be running
-  if (!hddThreadRunning)
+  if (!hddThreadRunning.load())
     return;
   LOG_INFO(HDD, "Entered HDD worker thread.");
-  while (hddThreadRunning) {
+  while (hddThreadRunning.load()) {
     // Check if we should exit early
-    hddThreadRunning = XeRunning;
-    if (!hddThreadRunning)
+    hddThreadRunning.store(XeRunning);
+    if (!hddThreadRunning.load())
       break;
+
+    bool shouldInterrupt = false;
+
     // Check for the DMA active command.
     {
       std::lock_guard lock(ataMutex);
@@ -761,7 +782,13 @@ void Xe::PCIDev::HDD::hddThreadLoop() {
         // Change our DMA status after completion.
         ataState.regs.dmaCommand &= ~1; // Clear active status.
         ataState.regs.dmaStatus = XE_ATA_DMA_INTR; // Signal Interrupt.
+        shouldInterrupt = true;
       }
+    }
+
+    // Route interrupt OUTSIDE of lock to avoid HDD→IIC lock chain.
+    if (shouldInterrupt) {
+      ataIssueInterrupt();
     }
 
     // Sleep for some time.
@@ -809,8 +836,6 @@ void Xe::PCIDev::HDD::doDMA() {
     if (lastEntry) {
       // Reset the current position
       ataState.dmaState.currentTableOffset = 0;
-      // After completion we must raise an interrupt
-      ataIssueInterrupt();
       return;
     }
   }
