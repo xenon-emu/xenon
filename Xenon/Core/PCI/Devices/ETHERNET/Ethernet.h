@@ -197,7 +197,7 @@ struct XE_PCI_STATE {
   u32 rxDescriptorBaseReg = 0;
 
   // Interrupts
-  u32 interruptStatusReg = 0;
+  std::atomic<u32> interruptStatusReg{ 0 };
   u32 interruptMaskReg = 0;
 
   // Configuration and power
@@ -309,6 +309,9 @@ private:
   // PCI device state
   XE_PCI_STATE ethPciState = {};
   
+  // Mutex protecting ethPciState from concurrent PCI R/W and worker thread access
+  std::mutex stateMutex;
+
   // TX/RX state
   std::atomic<bool> rxEnabled{false};       // RX Enabled
   std::atomic<bool> txRing0Enabled{false};  // TX Ring 0 Enabled
@@ -331,7 +334,10 @@ private:
   // Pending RX packets (received from bridge/external)
   std::queue<EthernetPacket> pendingRxPackets;
   std::mutex rxQueueMutex;  // RX Queue mutex
-  
+
+  // Atomic flag for CV predicate (avoids accessing queue without lock)
+  std::atomic<bool> hasRxPending{ false }; 
+
   // Statistics
   EthernetStats stats;
   

@@ -150,8 +150,25 @@ void Xe::PCIDev::ETHERNET::InitializeNetworkBridge() {
 
 // Reset the emulated ethernet adapter
 void Xe::PCIDev::ETHERNET::Reset() {
-  // Reset all state
-  ethPciState = {};
+  // Reset all state (must be done this way due to atomic member)
+  ethPciState.txConfigReg = 0;
+  ethPciState.txDescriptor0BaseReg = 0;
+  ethPciState.txDescriptor1BaseReg = 0;
+  ethPciState.txDescriptorStatusReg = 0;
+  ethPciState.rxConfigReg = 0;
+  ethPciState.rxDescriptorBaseReg = 0;
+  ethPciState.interruptStatusReg.store(0);
+  ethPciState.interruptMaskReg = 0;
+  ethPciState.config0Reg = 0;
+  ethPciState.powerReg = 0;
+  ethPciState.phyConfigReg = 0;
+  ethPciState.phyControlReg = 0;
+  ethPciState.config1Reg = 0;
+  ethPciState.retryCountReg = 0;
+  ethPciState.multicastFilterControlReg = 0;
+  ethPciState.multicastHashFilter0 = 0;
+  ethPciState.multicastHashFilter1 = 0;
+  memset(ethPciState.macAddress2, 0, sizeof(ethPciState.macAddress2));
   
   // Reset descriptor indices
   txRing0Head = 0;
@@ -165,6 +182,7 @@ void Xe::PCIDev::ETHERNET::Reset() {
   {
     std::lock_guard<std::mutex> lock(rxQueueMutex);
     while (!pendingRxPackets.empty()) pendingRxPackets.pop();
+    hasRxPending.store(false);
   }
   
   // Disable TX/RX
@@ -194,6 +212,8 @@ void Xe::PCIDev::ETHERNET::Reset() {
 void Xe::PCIDev::ETHERNET::Read(u64 readAddress, u8 *data, u64 size) {
   // Register index
   u8 regIdx = readAddress & 0xFF;
+
+  std::lock_guard<std::mutex> lock(stateMutex);
 
   switch (regIdx) {
   case TX_CONFIG:
@@ -232,8 +252,11 @@ void Xe::PCIDev::ETHERNET::Read(u64 readAddress, u8 *data, u64 size) {
     break;
   case INTERRUPT_STATUS:
     // Return current status - driver reads this to check what caused interrupt
-    memcpy(data, &ethPciState.interruptStatusReg, size);
-    DEBUGP("[Read] INTERRUPT_STATUS = {:#08x}",  ethPciState.interruptStatusReg);
+    {
+      u32 status = ethPciState.interruptStatusReg.load();
+      memcpy(data, &status, size);
+      DEBUGP("[Read] INTERRUPT_STATUS = {:#08x}", status);
+    }
     break;
   case INTERRUPT_MASK:
     memcpy(data, &ethPciState.interruptMaskReg, size);
@@ -312,6 +335,8 @@ void Xe::PCIDev::ETHERNET::Write(u64 writeAddress, const u8 *data, u64 size) {
   u32 val = 0;
   memcpy(&val, data, size);
   
+  std::lock_guard<std::mutex> lock(stateMutex);
+
   switch (offset) {
   case TX_CONFIG: {
     ethPciState.txConfigReg = val;
@@ -434,6 +459,7 @@ void Xe::PCIDev::ETHERNET::Write(u64 writeAddress, const u8 *data, u64 size) {
       {
         std::lock_guard<std::mutex> lock(rxQueueMutex);
         while (!pendingRxPackets.empty()) pendingRxPackets.pop();
+        hasRxPending.store(false);
       }
     }
     break;  
@@ -807,6 +833,9 @@ void Xe::PCIDev::ETHERNET::ProcessRxDescriptors() {
     rxHead = (desc.bufferSizeWrap & 0x80000000) ? 0 : ((rxHead + 1) % NUM_RX_DESCRIPTORS);
   }
   
+  // Update the atomic pending flag after processing
+  hasRxPending.store(!pendingRxPackets.empty());
+
   // Raise RX interrupt ONCE after batch processing
   // TODO: Fixed batch sets?
   if (processedCount > 0) {
@@ -853,6 +882,7 @@ void Xe::PCIDev::ETHERNET::EnqueueRxPacket(const u8* data, u32 length) {
     // Limit queue size
     if (pendingRxPackets.size() < 256) {
       pendingRxPackets.push(std::move(packet));
+      hasRxPending.store(true);
       
       // Notify worker thread
       workerCV.notify_one();
@@ -870,6 +900,7 @@ bool Xe::PCIDev::ETHERNET::DequeueRxPacket(EthernetPacket& packet) {
 
   packet = std::move(pendingRxPackets.front());
   pendingRxPackets.pop();
+  hasRxPending.store(!pendingRxPackets.empty());
   return true;
 }
 
@@ -896,19 +927,19 @@ void Xe::PCIDev::ETHERNET::SetLinkUp(bool up) {
 
 // Raise interrupt if enabled by interrupt mask
 void Xe::PCIDev::ETHERNET::RaiseInterrupt(u32 bits) {
-  // Set the interrupt status bits
-  ethPciState.interruptStatusReg |= bits;
+  // Set the interrupt status bits atomically
+  ethPciState.interruptStatusReg.fetch_or(bits);
   
   // Only fire interrupt if:
   // 1. There are pending interrupt status bits
   // 2. Those bits are enabled in the mask
   // 3. The mask is not zero (driver hasn't disabled interrupts)
 
-  u32 pending = ethPciState.interruptStatusReg & ethPciState.interruptMaskReg;
+  u32 pending = ethPciState.interruptStatusReg.load() & ethPciState.interruptMaskReg;
 
   if (pending != 0 && ethPciState.interruptMaskReg != 0 && enableInterrutps.load()) {
     DEBUGP("Firing interrupt: pending={:#08x} (status={:#08x} & mask={:#08x})",
-      pending, ethPciState.interruptStatusReg, ethPciState.interruptMaskReg);
+      pending, ethPciState.interruptStatusReg.load(), ethPciState.interruptMaskReg);
 
     parentBus->RouteInterrupt(PRIO_ENET);
     // Disable interrupts without clearing the mask.
@@ -960,8 +991,8 @@ void Xe::PCIDev::ETHERNET::WorkerThreadLoop() {
     // Wait for work or timeout
     {
       std::unique_lock<std::mutex> lock(workerMutex);
-      workerCV.wait_for(lock, std::chrono::milliseconds(1), [this] {
-        return !workerRunning || !XeRunning || ((txRing0Enabled || txRing1Enabled)) || (!pendingRxPackets.empty() && rxEnabled);
+      workerCV.wait_for(lock, std::chrono::microseconds(500), [this] {
+        return !workerRunning || !XeRunning || txRing0Enabled || txRing1Enabled || (hasRxPending.load() && rxEnabled);
         });
     }
 
