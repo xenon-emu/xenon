@@ -125,6 +125,9 @@ void RAM::Write(u64 writeAddress, const u8 *data, u64 size) {
   memcpy(ramData.get() + offset, data, size);
   if (false)
     LOG_TRACE(Xenon, "Writing {:#08x} bytes to {:#08x}", size, writeAddress);
+
+  // Notify observers about the physical write.
+  if (writeNotifyCallback_) { writeNotifyCallback_(offset, static_cast<u32>(size)); }
 }
 
 void RAM::MemSet(u64 writeAddress, s32 data, u64 size) {
@@ -132,6 +135,9 @@ void RAM::MemSet(u64 writeAddress, s32 data, u64 size) {
   memset(ramData.get() + offset, data, size);
   if (false)
     LOG_TRACE(Xenon, "Setting {:#08x} to {:#02x} for {:#08x} bytes", writeAddress, data, size);
+
+  // Notify observers about the physical write.
+  if (writeNotifyCallback_) { writeNotifyCallback_(offset, static_cast<u32>(size)); }
 }
 
 u8 *RAM::GetPointerToAddress(u32 address) {
