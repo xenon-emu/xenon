@@ -757,8 +757,8 @@ void Xe::PCIDev::SMC::smcMainThread() {
         // This is no longer needed due to mutexes
         mutex.lock();
         smcPCIState.smiIntPendingReg = SMI_INT_PENDING;
-        pciBridge->RouteInterrupt(PRIO_SMM);
         mutex.unlock();
+        pciBridge->RouteInterrupt(PRIO_SMM);
       }
     }
 
@@ -772,16 +772,18 @@ void Xe::PCIDev::SMC::smcMainThread() {
     if (smcPCIState.clockIntEnabledReg == CLCK_INT_ENABLED) {
       // Clock Interrupt Not Taken.
       if (smcPCIState.clockIntStatusReg == CLCK_INT_READY) {
-        // According to sources online, this timer runs at a 1ms frequency.
-        // TODO: Verify on hardware.
-        // Leaving this on 10ms for now, we're not fast enough for a 1ms timer, and crashes the emulator.
-        if (timerNow >= timerStart + 5ms) {
+        // The SMC Clock interrupt is the system timer.
+        // Reversing of the kernel shows that the clock interrupt causes 
+        // the KeTimeStampBundle structure (FILETIME format) to update 10000 units.
+        // 10000 * 100ns intervals -> 1000000ns = 1ms 
+        if (timerNow >= timerStart + 1ms) {
           // Update internal timer.
           timerStart = std::chrono::steady_clock::now();
           mutex.lock();
           smcPCIState.clockIntStatusReg = CLCK_INT_TAKEN;
-          pciBridge->RouteInterrupt(PRIO_CLOCK);
           mutex.unlock();
+          // Route outside the lock to avoid lock contention
+          pciBridge->RouteInterrupt(PRIO_CLOCK);
         }
       }
     }
