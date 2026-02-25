@@ -809,6 +809,7 @@ extern void PPCInterpreterJIT_vpkuwus128(sPPEState *ppeState, JITBlockBuilder *b
 extern void PPCInterpreterJIT_vrefp(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vrsqrtefp(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vmaddfp(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vmaddfp128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vnmsubfp(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vexptefp(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vlogefp(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
@@ -844,11 +845,17 @@ extern void PPCInterpreterJIT_vsrw(sPPEState *ppeState, JITBlockBuilder *b, uPPC
 extern void PPCInterpreterJIT_vsrw128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vcmpgtfp(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vcmpgtfp128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vcfux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vcuxwfp128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vcmpgefp(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vcmpgefp128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 
 extern void PPCInterpreterJIT_vperm(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vperm128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vsldoi(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vsldoi128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vslo(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_vslo128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 
 extern void PPCInterpreterJIT_lvx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_lvx128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);

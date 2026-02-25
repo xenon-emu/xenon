@@ -80,6 +80,8 @@ static const Vector128 XMMUnpackFLOAT16_2 = Vector128i(0x0D0C0F0Eu, 0xFFFFFFFFu,
 static const Vector128 XMMUnpackSHORT_2 = Vector128i(0xFFFF0F0Eu, 0xFFFF0D0Cu, 0xFFFFFFFFu, 0xFFFFFFFFu);
 static const Vector128 XMMUnpackSHORT_Overflow = Vector128i(0x403F8000u);
 static const Vector128 XMMQNaN = Vector128i(0x7FC00000u);
+static const Vector128 XMMInt127 = Vector128i(0x7Fu);
+static const Vector128 XMM2To32 = Vector128f(0x1.0p32f);
 
 // Table used for Load Vector Shift Left instruction
 static const Vector128 loadVectorShiftLeftTable[16] = {
@@ -2159,6 +2161,118 @@ void PPCInterpreter::PPCInterpreterJIT_vsldoi128(sPPEState *ppeState, JITBlockBu
   COMP->vmovdqa(VPRPtr(J_VMX128_5_VD128), vD);
 }
 
+// Vector Shift Left by Octet ('x1000 040C')
+void PPCInterpreter::PPCInterpreterJIT_vslo(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Gp shiftCount = newGP64();
+  x86::Gp tableAddr = newGP64();
+  x86::Xmm vA = newXMM();
+  x86::Xmm vZero = newXMM();
+  x86::Xmm control = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Xmm tmp0 = newXMM();
+  x86::Xmm vAShuffled = newXMM();
+  x86::Xmm vZeroShuffled = newXMM();
+  x86::Gp byteVal = newGP32();
+
+  // Load vA
+  COMP->vmovdqa(vA, VPRPtr(instr.va));
+
+  // Zero-fill vector
+  COMP->vxorps(vZero, vZero, vZero);
+
+  // Extract byte 15 from vB
+  x86::Xmm vB = newXMM();
+  COMP->vmovdqa(vB, VPRPtr(instr.vb));
+  COMP->vpextrb(byteVal, vB, imm(VEC128_BYTE_VMX_TO_AVX(15)));
+
+  // sh = (byte & 0x78) >> 3
+  COMP->and_(byteVal, imm(0x78));
+  COMP->shr(byteVal, imm(3));
+
+  // Load control vector from loadVectorShiftLeftTable[sh]
+  COMP->movzx(shiftCount, byteVal.r8());
+  COMP->shl(shiftCount, imm(4));
+  COMP->mov(tableAddr, (uintptr_t)&loadVectorShiftLeftTable);
+  COMP->vmovdqa(control, x86::ptr(tableAddr, shiftCount));
+
+  // Permute
+  COMP->mov(tableAddr, (uintptr_t)&XMMSwapWordMask);
+  COMP->vxorps(tmp0, control, x86::ptr(tableAddr));
+  COMP->mov(tableAddr, (uintptr_t)&XMMPermuteByteMask);
+  COMP->vpand(tmp0, tmp0, x86::ptr(tableAddr));
+
+  // Shuffle vA and vZero with the permute control
+  COMP->vpshufb(vAShuffled, vA, tmp0);
+  COMP->vpshufb(vZeroShuffled, vZero, tmp0);
+
+  // Select
+  COMP->mov(tableAddr, (uintptr_t)&XMMPermuteControl15);
+  COMP->vpcmpgtb(vD, tmp0, x86::ptr(tableAddr));
+  COMP->vpblendvb(vD, vAShuffled, vZeroShuffled, vD);
+
+  // Store result
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+}
+
+// Vector 128 Shift Left by Octet 
+void PPCInterpreter::PPCInterpreterJIT_vslo128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Gp shiftCount = newGP64();
+  x86::Gp tableAddr = newGP64();
+  x86::Xmm vA = newXMM();
+  x86::Xmm vZero = newXMM();
+  x86::Xmm control = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Xmm tmp0 = newXMM();
+  x86::Xmm vAShuffled = newXMM();
+  x86::Xmm vZeroShuffled = newXMM();
+  x86::Gp byteVal = newGP32();
+
+  // Load vA
+  COMP->vmovdqa(vA, VPRPtr(J_VMX128_VA128));
+
+  // Zero-fill vector
+  COMP->vxorps(vZero, vZero, vZero);
+
+  // Extract byte 15 from vB
+  x86::Xmm vB = newXMM();
+  COMP->vmovdqa(vB, VPRPtr(J_VMX128_VB128));
+  COMP->vpextrb(byteVal, vB, imm(VEC128_BYTE_VMX_TO_AVX(15)));
+
+  // sh = (byte & 0x78) >> 3
+  COMP->and_(byteVal, imm(0x78));
+  COMP->shr(byteVal, imm(3));
+
+  // Load control vector from loadVectorShiftLeftTable[sh]
+  COMP->movzx(shiftCount, byteVal.r8());
+  COMP->shl(shiftCount, imm(4));
+  COMP->mov(tableAddr, (uintptr_t)&loadVectorShiftLeftTable);
+  COMP->vmovdqa(control, x86::ptr(tableAddr, shiftCount));
+
+  // Permute
+  COMP->mov(tableAddr, (uintptr_t)&XMMSwapWordMask);
+  COMP->vxorps(tmp0, control, x86::ptr(tableAddr));
+  COMP->mov(tableAddr, (uintptr_t)&XMMPermuteByteMask);
+  COMP->vpand(tmp0, tmp0, x86::ptr(tableAddr));
+
+  // Shuffle vA and vZero with the permute control
+  COMP->vpshufb(vAShuffled, vA, tmp0);
+  COMP->vpshufb(vZeroShuffled, vZero, tmp0);
+
+  // Select
+  COMP->mov(tableAddr, (uintptr_t)&XMMPermuteControl15);
+  COMP->vpcmpgtb(vD, tmp0, x86::ptr(tableAddr));
+  COMP->vpblendvb(vD, vAShuffled, vZeroShuffled, vD);
+
+  // Store result
+  COMP->vmovdqa(VPRPtr(J_VMX128_VD128), vD);
+}
+
 // Vector Pack Unsigned Word Unsigned Modulo (x'1000 004E')
 void PPCInterpreter::PPCInterpreterJIT_vpkuwum(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure VXU is enabled
@@ -2475,6 +2589,144 @@ void PPCInterpreter::PPCInterpreterJIT_vcmpgtfp128(sPPEState *ppeState, JITBlock
   // Compare vA > vB (ordered greater-than)
   // vcmpps with predicate 14 (GT, ordered) returns 0xFFFFFFFF for true, 0x00000000 for false
   COMP->vcmpps(vD, vA, vB, 14);
+
+  // Store result to vD
+  COMP->vmovdqa(VPRPtr(J_VMX128_R_VD128), vD);
+
+  // Update CR6 if Rc bit is set
+  if (instr.VMX128_R.Rc) {
+    J_updateCR6FromCompareResult(b, vD);
+  }
+}
+
+// Vector Convert from Unsigned Fixed - Point Word (x'1000 030A')
+void PPCInterpreter::PPCInterpreterJIT_vcfux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Xmm tmp0 = newXMM();
+  x86::Xmm tmp1 = newXMM();
+  x86::Gp tempAddr = newGP64();
+  x86::Gp tmp32 = newGP32();
+
+  // Load operands
+  COMP->vmovaps(vB, VPRPtr(instr.vb));
+
+  COMP->mov(tempAddr, (uintptr_t)&XMMInt127);
+  COMP->vpaddd(tmp1, vB, x86::ptr(tempAddr));
+  COMP->vpslld(tmp0, vB, 31 - 8);
+  COMP->vpsrld(tmp0, tmp0, 31);
+  COMP->vpaddd(tmp0, tmp0, tmp1);
+  COMP->vpsrad(tmp0, tmp0, 8);
+  COMP->mov(tempAddr, (uintptr_t)&XMM2To32);
+  COMP->vpaddd(tmp0, tmp0, x86::ptr(tempAddr));
+  COMP->vcvtdq2ps(tmp1, vB);
+  COMP->vblendvps(vD, tmp1, tmp0, vB);
+
+  if (instr.va) {
+    f32 fuimm = std::ldexp(1.0f, -int(instr.va));
+    u32 fuimmBits = std::bit_cast<u32>(fuimm);
+    COMP->mov(tmp32, fuimmBits);
+    COMP->vmovd(tmp0, tmp32);
+    COMP->vbroadcastss(tmp0, tmp0);
+    COMP->vmulps(vD, vD, tmp0);
+  }
+
+  // Store result
+  COMP->vmovaps(VPRPtr(instr.vd), vD);
+}
+
+// Vector 128 Convert from Unsigned Fixed - Point Word
+void PPCInterpreter::PPCInterpreterJIT_vcuxwfp128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+  x86::Xmm tmp0 = newXMM();
+  x86::Xmm tmp1 = newXMM();
+  x86::Gp tempAddr = newGP64();
+  x86::Gp tmp32 = newGP32();
+
+  // Load operands
+  COMP->vmovaps(vB, VPRPtr(J_VMX128_3_VB128));
+
+  COMP->mov(tempAddr, (uintptr_t)&XMMInt127);
+  COMP->vpaddd(tmp1, vB, x86::ptr(tempAddr));
+  COMP->vpslld(tmp0, vB, 31 - 8);
+  COMP->vpsrld(tmp0, tmp0, 31);
+  COMP->vpaddd(tmp0, tmp0, tmp1);
+  COMP->vpsrad(tmp0, tmp0, 8);
+  COMP->mov(tempAddr, (uintptr_t)&XMM2To32);
+  COMP->vpaddd(tmp0, tmp0, x86::ptr(tempAddr));
+  COMP->vcvtdq2ps(tmp1, vB);
+  COMP->vblendvps(vD, tmp1, tmp0, vB);
+
+  if (J_VMX128_3_IMM) {
+    f32 fuimm = std::ldexp(1.0f, -int(J_VMX128_3_IMM));
+    u32 fuimmBits = std::bit_cast<u32>(fuimm);
+    COMP->mov(tmp32, fuimmBits);
+    COMP->vmovd(tmp0, tmp32);
+    COMP->vbroadcastss(tmp0, tmp0);
+    COMP->vmulps(vD, vD, tmp0);
+  }
+
+  // Store result
+  COMP->vmovaps(VPRPtr(J_VMX128_3_VD128), vD);
+}
+
+// Vector Compare Greater-Than-or-Equal-to Floating Point (x'1000 01C6')
+void PPCInterpreter::PPCInterpreterJIT_vcmpgefp(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  // Load operands
+  COMP->vmovaps(vA, VPRPtr(instr.va));
+  COMP->vmovaps(vB, VPRPtr(instr.vb));
+
+  // Flush denormal inputs to zero (VMX behavior)
+  J_FlushDenormalsToZero(b, vA);
+  J_FlushDenormalsToZero(b, vB);
+
+  // Compare vA > vB (ordered greater-or-equal)
+  // vcmpps with predicate 13 (GE, ordered) returns 0xFFFFFFFF for true, 0x00000000 for false
+  COMP->vcmpps(vD, vA, vB, 13);
+
+  // Store result to vD
+  COMP->vmovdqa(VPRPtr(instr.vd), vD);
+
+  // Update CR6 if Rc bit is set
+  if (instr.vrc) {
+    J_updateCR6FromCompareResult(b, vD);
+  }
+}
+
+// Vector 128 Compare Greater-Than-or-Equal-to Floating Point
+void PPCInterpreter::PPCInterpreterJIT_vcmpgefp128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vD = newXMM();
+
+  // Load operands
+  COMP->vmovaps(vA, VPRPtr(J_VMX128_R_VA128));
+  COMP->vmovaps(vB, VPRPtr(J_VMX128_R_VB128));
+
+  // Flush denormal inputs to zero (VMX behavior)
+  J_FlushDenormalsToZero(b, vA);
+  J_FlushDenormalsToZero(b, vB);
+
+  // Compare vA > vB (ordered greater-or-equal)
+  // vcmpps with predicate 13 (GE, ordered) returns 0xFFFFFFFF for true, 0x00000000 for false
+  COMP->vcmpps(vD, vA, vB, 13);
 
   // Store result to vD
   COMP->vmovdqa(VPRPtr(J_VMX128_R_VD128), vD);
@@ -3238,6 +3490,7 @@ void PPCInterpreter::PPCInterpreterJIT_stvx(sPPEState *ppeState, JITBlockBuilder
   mmuTranslation->setArg(0, b->ppeState->Base());
   mmuTranslation->setArg(1, EA);
   mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setArg(3, true);
   mmuTranslation->setRet(0, EA);
 
   // Check for valid address
@@ -3275,6 +3528,7 @@ void PPCInterpreter::PPCInterpreterJIT_stvx128(sPPEState *ppeState, JITBlockBuil
   mmuTranslation->setArg(0, b->ppeState->Base());
   mmuTranslation->setArg(1, EA);
   mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setArg(3, true);
   mmuTranslation->setRet(0, EA);
   // Check for valid address
   COMP->test(EA, EA);
@@ -3331,6 +3585,7 @@ void PPCInterpreter::PPCInterpreterJIT_stvebx(sPPEState *ppeState, JITBlockBuild
   mmuTranslation->setArg(0, b->ppeState->Base());
   mmuTranslation->setArg(1, EA);
   mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setArg(3, true);
   mmuTranslation->setRet(0, EA);
 
   // Check for valid address
@@ -3478,6 +3733,7 @@ void PPCInterpreter::PPCInterpreterJIT_stvehx(sPPEState *ppeState, JITBlockBuild
   mmuTranslation->setArg(0, b->ppeState->Base());
   mmuTranslation->setArg(1, EA);
   mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setArg(3, true);
   mmuTranslation->setRet(0, EA);
 
   // Check for valid address
@@ -3573,6 +3829,7 @@ void PPCInterpreter::PPCInterpreterJIT_stvewx(sPPEState *ppeState, JITBlockBuild
   mmuTranslation->setArg(0, b->ppeState->Base());
   mmuTranslation->setArg(1, EA);
   mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setArg(3, true);
   mmuTranslation->setRet(0, EA);
 
   // Check for valid address
@@ -3645,6 +3902,7 @@ void PPCInterpreter::PPCInterpreterJIT_stvewx128(sPPEState *ppeState, JITBlockBu
   mmuTranslation->setArg(0, b->ppeState->Base());
   mmuTranslation->setArg(1, EA);
   mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setArg(3, true);
   mmuTranslation->setRet(0, EA);
 
   // Check for valid address
@@ -3721,6 +3979,7 @@ void PPCInterpreter::PPCInterpreterJIT_stvlx(sPPEState *ppeState, JITBlockBuilde
   mmuTranslation->setArg(0, b->ppeState->Base());
   mmuTranslation->setArg(1, EA);
   mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setArg(3, true);
   mmuTranslation->setRet(0, EA);
 
   // Check for valid address
@@ -3788,6 +4047,7 @@ void PPCInterpreter::PPCInterpreterJIT_stvlx128(sPPEState *ppeState, JITBlockBui
   mmuTranslation->setArg(0, b->ppeState->Base());
   mmuTranslation->setArg(1, EA);
   mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setArg(3, true);
   mmuTranslation->setRet(0, EA);
 
   // Check for valid address
@@ -3853,6 +4113,7 @@ void PPCInterpreter::PPCInterpreterJIT_stvrx(sPPEState *ppeState, JITBlockBuilde
   mmuTranslation->setArg(0, b->ppeState->Base());
   mmuTranslation->setArg(1, EA);
   mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setArg(3, true);
   mmuTranslation->setRet(0, EA);
 
   // Check for valid address
@@ -3923,6 +4184,7 @@ void PPCInterpreter::PPCInterpreterJIT_stvrx128(sPPEState *ppeState, JITBlockBui
   mmuTranslation->setArg(0, b->ppeState->Base());
   mmuTranslation->setArg(1, EA);
   mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setArg(3, true);
   mmuTranslation->setRet(0, EA);
 
   // Check for valid address
@@ -4063,6 +4325,39 @@ void PPCInterpreter::PPCInterpreterJIT_vmaddfp(sPPEState *ppeState, JITBlockBuil
 
   // Store result to vD
   COMP->vmovaps(VPRPtr(instr.vd), vD);
+}
+
+// Vector 128 Multiply-Add Floating Point
+void PPCInterpreter::PPCInterpreterJIT_vmaddfp128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+
+  // vD = (vA * vC) + vB
+  x86::Xmm vA = newXMM();
+  x86::Xmm vB = newXMM();
+  x86::Xmm vC = newXMM();
+  x86::Xmm vD = newXMM();
+
+  // Load vA, vB, and vC
+  COMP->vmovaps(vA, VPRPtr(J_VMX128_VA128));
+  COMP->vmovaps(vB, VPRPtr(J_VMX128_VB128));
+  COMP->vmovaps(vC, VPRPtr(J_VMX128_VD128));
+
+  // Flush denormal inputs to zero
+  J_FlushDenormalsToZero(b, vA);
+  J_FlushDenormalsToZero(b, vB);
+  J_FlushDenormalsToZero(b, vC);
+
+  // Perform fused multiply-add: vD = (vA * vC) + vB
+  // Using FMA instruction if available (vfmadd231ps), otherwise mul + add
+  COMP->vmulps(vD, vA, vC);
+  COMP->vaddps(vD, vD, vB);
+
+  // Flush denormal result to zero
+  J_FlushDenormalsToZero(b, vD);
+
+  // Store result to vD
+  COMP->vmovaps(VPRPtr(J_VMX128_VD128), vD);
 }
 
 // Vector Negative Multiply-Subtract Floating Point (x'1000 002F')
