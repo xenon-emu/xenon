@@ -290,27 +290,44 @@ void PPU::ThreadStateMachine() {
   case eThreadState::Running: {
     // Check our threads to see if any are running
     u8 state = GetCurrentRunningThreads();
+    // SMT interleave slice size: x instructions per thread per turn. 
+    // Instead of doing 16K each time, we process rach thread a bit, thus behaving more like
+    // real hardware, and avoiding stuff like if one thread is doing heavy processing the other 
+    // might stall for more time.
+
+    // NOTE: This value is completly empiric. Setting it to something lower than 25 instrs isn't safe.
+    static constexpr u64 smtSlice = 100;
+
+    const u64 ttrReg = ppeState->SPR.TTR.hexValue;
     if (currentExecMode == eExecutorMode::Interpreter) {
-      if (!ppuThreadResetting && (state & ePPUThreadBit_Zero)) {
-        // Thread 0 is running, process instructions until we reach TTR timeout.
-        curThreadId = ePPUThread_Zero;
-        PPURunInstructions(ppeState->SPR.TTR.hexValue, ppuHaltOn != 0);
-      }
-      if (!ppuThreadResetting && (state & ePPUThreadBit_One)) {
-        // Thread 1 is running, process instructions until we reach TTR timeout.
-        curThreadId = ePPUThread_One;
-        PPURunInstructions(ppeState->SPR.TTR.hexValue, ppuHaltOn != 0);
+      for (u64 executed = 0; executed < ttrReg && !ppuThreadResetting; executed += smtSlice) {
+        if (state & ePPUThreadBit_Zero) {
+          // Thread 0 slice
+          curThreadId = ePPUThread_Zero;
+          PPURunInstructions(smtSlice, ppuHaltOn != 0);
+        }
+        if (state & ePPUThreadBit_One) {
+          // Thread 1 slice
+          curThreadId = ePPUThread_One;
+          PPURunInstructions(smtSlice, ppuHaltOn != 0);
+        }
+        // Re-read thread state each iteration in case CTRL was updated
+        state = GetCurrentRunningThreads();
       }
     } else {
-      if (!ppuThreadResetting && (state & ePPUThreadBit_Zero)) {
-        // Thread 1 is running, process instructions until we reach TTR timeout.
-        curThreadId = ePPUThread_Zero;
-        ppuJIT->ExecuteJITInstrs(ppeState->SPR.TTR.hexValue, ppuThreadActive, ppuHaltOn != 0);
-      }
-      if (!ppuThreadResetting && (state & ePPUThreadBit_One)) {
-        // Thread 1 is running, process instructions until we reach TTR timeout.
-        curThreadId = ePPUThread_One;
-        ppuJIT->ExecuteJITInstrs(ppeState->SPR.TTR.hexValue, ppuThreadActive, ppuHaltOn != 0);
+      for (u64 executed = 0; executed < ttrReg && !ppuThreadResetting; executed += smtSlice) {
+        if (state & ePPUThreadBit_Zero) {
+          // Thread 0 slice
+          curThreadId = ePPUThread_Zero;
+          ppuJIT->ExecuteJITInstrs(smtSlice, ppuThreadActive, ppuHaltOn != 0);
+        }
+        if (state & ePPUThreadBit_One) {
+          // Thread 1 slice
+          curThreadId = ePPUThread_One;
+          ppuJIT->ExecuteJITInstrs(smtSlice, ppuThreadActive, ppuHaltOn != 0);
+        }
+        // Re-read thread state each iteration in case CTRL was updated
+        state = GetCurrentRunningThreads();
       }
     }
   } break;
