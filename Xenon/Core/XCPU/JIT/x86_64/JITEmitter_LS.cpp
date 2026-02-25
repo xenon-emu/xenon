@@ -702,6 +702,7 @@ void PPCInterpreter::PPCInterpreterJIT_stwcx(sPPEState *ppeState, JITBlockBuilde
   mmuTranslation->setArg(0, b->ppeState->Base());
   mmuTranslation->setArg(1, EA);
   mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setArg(3, true);
   mmuTranslation->setRet(0, hostPtr);
 
   // Check for DSI/ISI
@@ -826,6 +827,7 @@ void PPCInterpreter::PPCInterpreterJIT_stdcx(sPPEState *ppeState, JITBlockBuilde
   mmuTranslation->setArg(0, b->ppeState->Base());
   mmuTranslation->setArg(1, EA);
   mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setArg(3, true);
   mmuTranslation->setRet(0, hostPtr);
 
   // Check for DSI/ISI

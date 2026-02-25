@@ -539,13 +539,21 @@ void PPCInterpreter::mmuReadString(sPPEState *ppeState, u64 stringAddress,
 
 // Translates a given EA into a RA, and then returns a valid Host Ptr for the given guest EA.
 // NOTE: This is to be used by JIT'ed loads/stores that are known to be directed to RAM, mostly VXU L/S instrs.
-u64 PPCInterpreter::JITTranslateAndGetHostPtr(sPPEState *ppeState, u64 EA, ePPUThreadID thr) {
+u64 PPCInterpreter::JITTranslateAndGetHostPtr(sPPEState *ppeState, u64 EA, ePPUThreadID thr, bool write) {
   sPPUThread &thread = ppeState->ppuThread[thr != ePPUThread_None ? thr : curThreadId];
 
   // Fast data translation cache lookup
   // TODO: Integrate onto jitted instructions directly
   u8 *cached = thread.fastDataCache.lookup(EA);
   if (cached) [[likely]] {
+    if (write) {
+      // Notify RAM
+      RAM *ram = PPCInterpreter::xenonContext->GetRAM();
+      const u32 physAddr = static_cast<u32>(cached - ram->GetRamBase());
+      // Notify observers about the write
+      // ByteCount set to 1. It'll be aligned to 4Kb anyways.
+      ram->NotifyWrite(physAddr, static_cast<u32>(1)); 
+    }
     return reinterpret_cast<u64>(cached);
   }
 
@@ -1194,6 +1202,8 @@ void PPCInterpreter::MMUWrite(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppe
     RAM *ram = cpuContext->GetRAM();
     const u32 physAddr = static_cast<u32>(cached - ram->GetRamBase());
     cpuContext->xenonRes.Check(physAddr);
+    // Notify observers
+    ram->NotifyWrite(physAddr, static_cast<u32>(byteCount));
     return;
   }
   

@@ -161,7 +161,7 @@ void mmuReadString(sPPEState *ppeState, u64 stringAddress, char *string, u32 max
 
 // JIT usage
 // Translates and returns a valid RAM Host Ptr of the specified guest address.
-u64 JITTranslateAndGetHostPtr(sPPEState *ppeState, u64 EA, ePPUThreadID thr = ePPUThread_None);
+u64 JITTranslateAndGetHostPtr(sPPEState *ppeState, u64 EA, ePPUThreadID thr = ePPUThread_None, bool write = false);
 
 
 // Security Engine Related

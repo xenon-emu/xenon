@@ -5800,6 +5800,7 @@ void PPCInterpreter::PPCInterpreterJIT_stfd(sPPEState *ppeState, JITBlockBuilder
   mmuTranslation->setArg(0, b->ppeState->Base());
   mmuTranslation->setArg(1, EA);
   mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setArg(3, true);
   mmuTranslation->setRet(0, EA);
 
   COMP->mov(exceptReg, EXPtr());
@@ -5831,6 +5832,7 @@ void PPCInterpreter::PPCInterpreterJIT_stfdx(sPPEState *ppeState, JITBlockBuilde
   mmuTranslation->setArg(0, b->ppeState->Base());
   mmuTranslation->setArg(1, EA);
   mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setArg(3, true);
   mmuTranslation->setRet(0, EA);
 
   COMP->mov(exceptReg, EXPtr());
@@ -5863,6 +5865,7 @@ void PPCInterpreter::PPCInterpreterJIT_stfdu(sPPEState *ppeState, JITBlockBuilde
   mmuTranslation->setArg(0, b->ppeState->Base());
   mmuTranslation->setArg(1, EA);
   mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setArg(3, true);
   mmuTranslation->setRet(0, EA);
 
   COMP->mov(exceptReg, EXPtr());
@@ -5896,6 +5899,7 @@ void PPCInterpreter::PPCInterpreterJIT_stfdux(sPPEState *ppeState, JITBlockBuild
   mmuTranslation->setArg(0, b->ppeState->Base());
   mmuTranslation->setArg(1, EA);
   mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setArg(3, true);
   mmuTranslation->setRet(0, EA);
 
   COMP->mov(exceptReg, EXPtr());
@@ -5929,6 +5933,7 @@ void PPCInterpreter::PPCInterpreterJIT_stfs(sPPEState *ppeState, JITBlockBuilder
   mmuTranslation->setArg(0, b->ppeState->Base());
   mmuTranslation->setArg(1, EA);
   mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setArg(3, true);
   mmuTranslation->setRet(0, EA);
 
   COMP->mov(exceptReg, EXPtr());
@@ -5964,6 +5969,7 @@ void PPCInterpreter::PPCInterpreterJIT_stfsx(sPPEState *ppeState, JITBlockBuilde
   mmuTranslation->setArg(0, b->ppeState->Base());
   mmuTranslation->setArg(1, EA);
   mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setArg(3, true);
   mmuTranslation->setRet(0, EA);
 
   COMP->mov(exceptReg, EXPtr());
@@ -6000,6 +6006,7 @@ void PPCInterpreter::PPCInterpreterJIT_stfsu(sPPEState *ppeState, JITBlockBuilde
   mmuTranslation->setArg(0, b->ppeState->Base());
   mmuTranslation->setArg(1, EA);
   mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setArg(3, true);
   mmuTranslation->setRet(0, EA);
 
   COMP->mov(exceptReg, EXPtr());
@@ -6037,6 +6044,7 @@ void PPCInterpreter::PPCInterpreterJIT_stfsux(sPPEState *ppeState, JITBlockBuild
   mmuTranslation->setArg(0, b->ppeState->Base());
   mmuTranslation->setArg(1, EA);
   mmuTranslation->setArg(2, ePPUThread_None);
+  mmuTranslation->setArg(3, true);
   mmuTranslation->setRet(0, EA);
 
   COMP->mov(exceptReg, EXPtr());
