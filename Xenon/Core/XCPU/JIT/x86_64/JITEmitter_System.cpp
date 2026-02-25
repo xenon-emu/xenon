@@ -114,6 +114,12 @@ void PPCInterpreter::PPCInterpreterJIT_mfspr(sPPEState *ppeState, JITBlockBuilde
   case eXenonSPR::PIR:
     COMP->mov(rSValue, SPRPtr(PIR));
     break;
+  case eXenonSPR::SPR_DBG_1014:
+    COMP->mov(rSValue, SPRPtr(SPR_DBG_1014));
+    break;
+  case eXenonSPR::SPR_DBG_1018:
+    COMP->mov(rSValue, SPRPtr(SPR_DBG_1018));
+    break;
   default:
     LOG_ERROR(Xenon, "{}(Thrd{:#d}) mfspr: Unknown SPR: {:#x}", ppeState->ppuName, static_cast<u8>(curThreadId), sprNum);
     break;

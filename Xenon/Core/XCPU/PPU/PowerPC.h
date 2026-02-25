@@ -1265,8 +1265,10 @@ enum eXenonSPR : u16 {
   HID1 = 1009,  // Hardware Implementation Register 1
   HID4 = 1012,  // Hardware Implementation Register 4
   DABR = 1013,  // Data Address Breakpoint Register
+  SPR_DBG_1014, // Debug SPR used by PIX.
   DABRX = 1015, // Data Address Breakpoint Register Extension
   HID6 = 1017,  // Hardware Implementation Register 6
+  SPR_DBG_1018, // Debug SPR used by PIX.
   BP_VR = 1022, // CBEA-Compliant Processor Version Register - Read Only
   PIR = 1023    // Processor Identification Register - Read Only
 };
@@ -1303,6 +1305,10 @@ struct sPPUThreadSPRs {
   uDABRX DABRX;     // Data Address Beakpoint Register Extension
   uMSR MSR;         // Machine State Register
   PIR_t PIR;        // Processor Identification Register
+
+  // Debug Regs used by PIX
+  u64 SPR_DBG_1014;
+  u64 SPR_DBG_1018;
 };
 
 // Contains the per PPU Core, 'non duplicated' Special Purpose Registers.

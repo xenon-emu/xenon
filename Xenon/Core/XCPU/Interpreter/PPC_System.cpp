@@ -411,6 +411,12 @@ void PPCInterpreter::PPCInterpreter_mfspr(sPPEState *ppeState) {
   case eXenonSPR::PIR:
     GPRi(rs) = curThread.SPR.PIR;
     break;
+  case eXenonSPR::SPR_DBG_1014:
+    GPRi(rs) = curThread.SPR.SPR_DBG_1014;
+    break;
+  case eXenonSPR::SPR_DBG_1018:
+    GPRi(rs) = curThread.SPR.SPR_DBG_1018;
+    break;
   default:
     LOG_ERROR(Xenon, "{}(Thrd{:#d}) mfspr: Unknown SPR: 0x{:X}", ppeState->ppuName, static_cast<u8>(curThreadId), spr);
     break;
@@ -560,6 +566,12 @@ void PPCInterpreter::PPCInterpreter_mtspr(sPPEState *ppeState) {
     break;
   case eXenonSPR::DABRX:
     curThread.SPR.DABRX.hexValue = GPRi(rd);
+    break;
+  case eXenonSPR::SPR_DBG_1014:
+    curThread.SPR.SPR_DBG_1014 = GPRi(rd);
+    break;
+  case eXenonSPR::SPR_DBG_1018:
+    curThread.SPR.SPR_DBG_1018 = GPRi(rd);
     break;
   default:
     LOG_ERROR(Xenon, "{}(Thrd{:#d}) SPR 0x{:X} =0x{:X}", ppeState->ppuName, static_cast<u8>(curThreadId), spr, GPRi(rd));
