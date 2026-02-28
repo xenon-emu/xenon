@@ -9,6 +9,7 @@
 
 #include "XenonSOC.h"
 #include "Base/Types.h"
+#include "Base/PEImageParser.h"
 #include "Core/RAM/RAM.h"
 #include "Core/XCPU/eFuse.h"
 #include "Core/RootBus/RootBus.h"
@@ -50,6 +51,9 @@ namespace Xe::XCPU {
     RAM *GetRAM() { return ram; }
     bool HandleSOCRead(u64 readAddr, u8 *data, size_t byteCount);
     bool HandleSOCWrite(u64 writeAddr, const u8 *data, size_t byteCount);
+
+    // PE Image parser for resolving xboxkrnl ordinals onto relative RAM addresses
+    xboxkrnl::PEImageParser xboxkrnlImageParser;
 
     // Xenon SecureROM
     // Contains the CPU's main startup code known as 1BL.

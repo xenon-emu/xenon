@@ -530,6 +530,14 @@ void Xe::XCPU::POSTBUS::POST(u64 postCode) {
   }
   /* KERNEL */ // Kernel post codes vary according to each system version. Lets rely
                // on the DebugPrints for now.
+
+  else if (postCode == 0x60) {
+    {
+      // INIT_KERNEL, Parse xboxkrnl PE Image Data
+      u8 *imgBasePtr = XeMain::ram->GetPointerToAddress(xboxkrnl::XBOXKRNL_IMAGE_BASE);
+      XeMain::GetCPU()->GetCPUContext()->xboxkrnlImageParser.ParseImageData(imgBasePtr, xboxkrnl::XBOXKRNL_HEADER_SIZE);
+    }
+  }
   else if (postCode >= 0x60 && postCode <= 0x79) {
       /*
     switch (postCode) {

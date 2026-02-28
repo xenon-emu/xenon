@@ -48,6 +48,8 @@ namespace Xe::XCPU {
     XenonIIC *GetIICPointer() { return &xenonContext->iic; }
     // Returns a pointer to a given PPU.
     PPU *GetPPU(u8 ppuID);
+    // Returns a pointer to the cpu context.
+    XenonContext *GetCPUContext() { return xenonContext.get(); }
 
     // HW_INIT skip related methods.
     bool HasHWINITPosted() { return hwInitPosted; }
