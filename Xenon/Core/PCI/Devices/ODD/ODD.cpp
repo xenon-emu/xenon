@@ -10,7 +10,7 @@
 #include <plusaes/plusaes.hpp>
 
 // Enables ODD Debug output
-//#define ODD_DEBUG
+#define ODD_DEBUG
 
 // Describes the ATA transfer modes available to the SET_TRNASFER_MODE subcommand.
 enum class ATA_TRANSFER_MODE {
@@ -471,7 +471,7 @@ void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
         LOG_ERROR(ODD, "Unknown command, command code = 0x{:X}", atapiState.regs.command);
       }  break;
       }
-      return;
+      break;
     case ATAPI_REG_DEVICE_CONTROL: {
       memcpy(&atapiState.regs.deviceControl, data, size);
       return;
