@@ -310,7 +310,7 @@ public:
         }
       }
     } else if (currentTestMode == ePPUTestingMode::JITx86) {
-      ppuJIT->ExecuteJITInstrs(0x100, true, false, true);
+      ppuJIT->ExecuteJITInstrs(0x100, true, ppeState->currentThread, false, true);
     }
 
 

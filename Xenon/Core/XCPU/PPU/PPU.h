@@ -5,6 +5,8 @@
 #pragma once
 
 #include <memory>
+#include <condition_variable>
+#include <mutex>
 
 #include "PowerPC.h"
 #include "Core/XCPU/Context/XenonContext.h"
@@ -38,6 +40,26 @@ enum class ePPUTestingMode : u8 {
  JITx86,      // X86 JIT mode
 };
 
+// Per-guest-thread state that lives on the PPU (host-side scheduling state).
+struct PPUHostThreadState {
+  // Host thread handle
+  std::thread hostThread{};
+  // Thread execution state
+  std::atomic<eThreadState> state{ eThreadState::None };
+  // Previous state before halting (for resume)
+  std::atomic<eThreadState> previousState{ eThreadState::None };
+  // Thread active flag
+  std::atomic<bool> active{ true };
+  // Thread resetting flag
+  std::atomic<bool> resetting{ false };
+  // Amount of instructions to step (debug)
+  u64 stepAmount = 0;
+  // If this is set, then the guest requested us to halt
+  bool guestHalt = false;
+  // Guest thread ID this host thread is responsible for
+  ePPUThreadID guestThreadId = ePPUThread_Zero;
+};
+
 // Power Procesing Unit. Main execution unit inside the PPE's within the Xenon CPU.
 class PPU {
 public:
@@ -56,36 +78,40 @@ public:
   void ContinueFromException();
   void Step(int amount = 1);
 
-  // Thread state machine
-  void ThreadStateMachine();
+  // Thread state machine (per guest thread)
+  void ThreadStateMachine(ePPUThreadID threadId);
 
-  // Thread function
-  void ThreadLoop();
+  // Thread function (per guest thread)
+  void ThreadLoop(ePPUThreadID threadId);
 
   // Returns a pointer to a thread
   sPPUThread *GetPPUThread(u8 thrdID);
 
-  // Runs a specified number of instructions
-  void PPURunInstructions(u64 numInstrs, bool enableHalt = true);
+  // Runs a specified number of instructions on the given guest thread
+  void PPURunInstructions(u64 numInstrs, ePPUThreadID threadId, bool enableHalt = true);
 
-  // Checks if the thread is active
+  // Checks if any thread is active
   bool ThreadActive() {
-    return ppuThreadState == eThreadState::Executing ||
-           ppuThreadState == eThreadState::Running;
+    return hostThreads[0].state == eThreadState::Executing ||
+           hostThreads[0].state == eThreadState::Running ||
+           hostThreads[1].state == eThreadState::Executing ||
+           hostThreads[1].state == eThreadState::Running;
   }
 
-  // Checks if the thread is halted
+  // Checks if any thread is halted
   bool IsHalted() {
-    return ppuThreadState == eThreadState::Halted;
+    return hostThreads[0].state == eThreadState::Halted ||
+           hostThreads[1].state == eThreadState::Halted;
   }
 
-  // Checks if the thread is halted
+  // Checks if halted by guest
   bool IsHaltedByGuest() {
-    return guestHalt && IsHalted();
+    return (hostThreads[0].guestHalt && hostThreads[0].state == eThreadState::Halted) ||
+           (hostThreads[1].guestHalt && hostThreads[1].state == eThreadState::Halted);
   }
 
-  // Returns the thread state
-  eThreadState ThreadState() { return ppuThreadState; }
+  // Returns the thread state for a specific guest thread
+  eThreadState ThreadState(ePPUThreadID id = ePPUThread_Zero) { return hostThreads[static_cast<u8>(id)].state; }
 
   // Get ppeState
   sPPEState *GetPPUState() { return ppeState.get(); }
@@ -104,29 +130,11 @@ public:
 
   eExecutorMode currentExecMode = eExecutorMode::Interpreter;
 private:
-  // Thread handle
-  std::thread ppuThread;
-
-  // PPU running?
-  std::atomic<eThreadState> ppuThreadState = eThreadState::None;
-
-  // Thread active?
-  volatile bool ppuThreadActive = true;
-
-  // Thread resetting?
-  volatile bool ppuThreadResetting = false;
-
-  // PPU thread state before halting
-  std::atomic<eThreadState> ppuThreadPreviousState = eThreadState::None;
+  // Per-guest-thread host thread state (index 0 = Thread0, index 1 = Thread1)
+  PPUHostThreadState hostThreads[2]{};
 
   // If this is set to a non-zero value, it will halt on that address then clear it
   u64 ppuHaltOn = 0;
-
-  // If this is set, then the guest requested us to halt. Opens another option in the debugger
-  bool guestHalt = false;
-
-  // Amount of instructions to step
-  u64 ppuStepAmount = 0;
 
   // Execution threads inside this PPU.
   std::unique_ptr<sPPEState> ppeState;
@@ -175,14 +183,14 @@ private:
   // Helpers
   //
  
-  // Read next intruction from memory
-  bool PPUReadNextInstruction();
+  // Read next intruction from memory (uses explicit thread ID)
+  bool PPUReadNextInstruction(ePPUThreadID threadId);
   // Checks for pending exceptions
-  bool PPUCheckInterrupts();
+  bool PPUCheckInterrupts(ePPUThreadID threadId);
   // Checks for pending exceptions
-  bool PPUCheckExceptions();
-  // Gets the current running threads.
-  u8 GetCurrentRunningThreads();
+  bool PPUCheckExceptions(ePPUThreadID threadId);
+  // Checks if a specific guest thread is enabled via CTRL register.
+  bool IsGuestThreadEnabled(ePPUThreadID threadId);
   // Simulates the behavior of the 1BL inside the Xenon Secure ROM.
   bool Simulate1Bl();
 

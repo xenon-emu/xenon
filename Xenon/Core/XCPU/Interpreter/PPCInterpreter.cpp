@@ -15,6 +15,7 @@ using namespace PPCInterpreter;
 // Forward Declaration
 Xe::XCPU::XenonContext* PPCInterpreter::xenonContext = nullptr;
 PPCInterpreter::PPCDecoder PPCInterpreter::ppcDecoder{};
+thread_local ePPUThreadID PPCInterpreter::tl_curThreadId = ePPUThread_Zero;
 
 #ifdef ENABLE_INSTRUCTION_PROFILER
 #include "Core/XCPU/Interpreter/InstructionProfiler.h"
@@ -127,8 +128,9 @@ void PPCInterpreter::ppcExecuteSingleInstruction(sPPEState *ppeState) {
   }
 
   // This is just to set a PC breakpoint in any PPU/Thread.
-  if (static_cast<u32>(thread.CIA) == 0x0) {
+  if (static_cast<u32>(thread.CIA) == 0x80081764) {
     LOG_DEBUG(Xenon, "Breakpoint HIT.");
+    return;
   }
 
   // This is to set a PPU0[Thread0] breakpoint.

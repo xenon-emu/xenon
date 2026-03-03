@@ -29,51 +29,60 @@ PPU_JIT::PPU_JIT(PPU *ppu) :
 
 // Destructor
 PPU_JIT::~PPU_JIT() {
-  std::lock_guard<std::mutex> lock(jitCacheMutex);
-  for (auto &[hash, block] : jitBlocksCache)
-    block.reset();
-  jitBlocksCache.clear();
-  pageBlockIndex.clear();
-  blockPageList.clear();
+  for (u8 t = 0; t < 2; t++) {
+    auto &cache = threadCaches[t];
+    std::lock_guard<std::mutex> lock(cache.jitCacheMutex);
+    for (auto &[hash, block] : cache.jitBlocksCache)
+      block.reset();
+    cache.jitBlocksCache.clear();
+    cache.pageBlockIndex.clear();
+    cache.blockPageList.clear();
+  }
 }
 
-void PPU_JIT::RegisterBlockPages(u64 blockStart, u64 blockSize) {
+void PPU_JIT::RegisterBlockPages(u64 blockStart, u64 blockSize, ePPUThreadID threadId) {
   constexpr u64 pageSize = 4096ULL;
   if (blockSize == 0) return;
 
   u64 pageCount = (blockSize + pageSize - 1) / pageSize;
   u64 firstPage = blockStart & ~(pageSize - 1ULL);
 
-  std::lock_guard<std::mutex> lock(jitCacheMutex);
+  auto &cache = threadCaches[static_cast<u8>(threadId)];
+  std::lock_guard<std::mutex> lock(cache.jitCacheMutex);
   std::vector<u64> pages;
   pages.reserve(static_cast<size_t>(pageCount));
   for (u64 i = 0; i < pageCount; ++i) {
     u64 pageBase = firstPage + i * pageSize;
-    pageBlockIndex[pageBase].insert(blockStart);
+    cache.pageBlockIndex[pageBase].insert(blockStart);
     pages.push_back(pageBase);
   }
-  blockPageList[blockStart] = std::move(pages);
+  cache.blockPageList[blockStart] = std::move(pages);
 
 #ifdef JIT_DEBUG
-  LOG_DEBUG(Xenon, "[JIT]: Registered block {:#x} size {:#x} -> pages: {:#x}..{:#x}", blockStart, blockSize,
-    firstPage, firstPage + pageCount * pageSize - 1);
+  LOG_DEBUG(Xenon, "[JIT]: Registered block {:#x} size {:#x} -> pages: {:#x}..{:#x} (thread {})", blockStart, blockSize,
+    firstPage, firstPage + pageCount * pageSize - 1, static_cast<u8>(threadId));
 #endif
 }
 
-void PPU_JIT::UnregisterBlock(u64 blockStart) {
-  std::lock_guard<std::mutex> lock(jitCacheMutex);
-  auto it = blockPageList.find(blockStart);
-  if (it == blockPageList.end()) { return; }
+void PPU_JIT::UnregisterBlock(u64 blockStart, ePPUThreadID threadId) {
+  auto &cache = threadCaches[static_cast<u8>(threadId)];
+  std::lock_guard<std::mutex> lock(cache.jitCacheMutex);
+  UnregisterBlockLocked(blockStart, cache);
+}
+
+void PPU_JIT::UnregisterBlockLocked(u64 blockStart, ThreadJITCache &cache) {
+  auto it = cache.blockPageList.find(blockStart);
+  if (it == cache.blockPageList.end()) { return; }
   for (u64 pageBase : it->second) {
-    auto pit = pageBlockIndex.find(pageBase);
-    if (pit != pageBlockIndex.end()) {
+    auto pit = cache.pageBlockIndex.find(pageBase);
+    if (pit != cache.pageBlockIndex.end()) {
       pit->second.erase(blockStart);
       if (pit->second.empty()) {
-        pageBlockIndex.erase(pit);
+        cache.pageBlockIndex.erase(pit);
       }
     }
   }
-  blockPageList.erase(it);
+  cache.blockPageList.erase(it);
 
 #ifdef JIT_DEBUG
   LOG_DEBUG(Xenon, "[JIT]: Unregistered block {:#x} from page index", blockStart);
@@ -81,28 +90,30 @@ void PPU_JIT::UnregisterBlock(u64 blockStart) {
 }
 
 // Try to link a block to its target if the target block exists
-void PPU_JIT::TryLinkBlock(JITBlock *block) {
+void PPU_JIT::TryLinkBlock(JITBlock *block, ePPUThreadID threadId) {
   if (!block || !block->canLink || block->linkTargetAddr == 0) {
     return;
   }
 
+  auto &cache = threadCaches[static_cast<u8>(threadId)];
   // Check if target block exists in cache
-  auto it = jitBlocksCache.find(block->linkTargetAddr);
-  if (it != jitBlocksCache.end() && it->second) {
-    block->linkedBlock = it->second.get();
+  auto it = cache.jitBlocksCache.find(block->linkTargetAddr);
+  if (it != cache.jitBlocksCache.end() && it->second) {
+    block->linkedBlock.store(it->second.get(), std::memory_order_release);
 #ifdef JIT_DEBUG
-    LOG_DEBUG(Xenon, "[JIT]: Linked block {:#x} -> {:#x}", block->ppuAddress, block->linkTargetAddr);
+    LOG_DEBUG(Xenon, "[JIT]: Linked block {:#x} -> {:#x} (thread {})", block->ppuAddress, block->linkTargetAddr, static_cast<u8>(threadId));
 #endif
   }
 }
 
 // Unlink all blocks that link to a specific target address (called when invalidating)
-void PPU_JIT::UnlinkBlocksTo(u64 targetAddr) {
-  for (auto &[addr, block] : jitBlocksCache) {
+void PPU_JIT::UnlinkBlocksTo(u64 targetAddr, ePPUThreadID threadId) {
+  auto &cache = threadCaches[static_cast<u8>(threadId)];
+  for (auto &[addr, block] : cache.jitBlocksCache) {
     if (block && block->linkTargetAddr == targetAddr) {
-      block->linkedBlock = nullptr;
+      block->linkedBlock.store(nullptr, std::memory_order_release);
 #ifdef JIT_DEBUG
-      LOG_DEBUG(Xenon, "[JIT]: Unlinked block {:#x} (target {:#x} invalidated)", addr, targetAddr);
+      LOG_DEBUG(Xenon, "[JIT]: Unlinked block {:#x} (target {:#x} invalidated, thread {})", addr, targetAddr, static_cast<u8>(threadId));
 #endif
     }
   }
@@ -115,41 +126,51 @@ void PPU_JIT::InvalidateBlocksForRange(u64 startAddr, u64 endAddr) {
   u64 startPage = startAddr & ~(pageSize - 1ULL);
   u64 endPage = (endAddr + pageSize - 1) & ~(pageSize - 1ULL);
 
-  std::vector<u64> blocksToInvalidate;
-  {
-    std::lock_guard<std::mutex> lock(jitCacheMutex);
+  // Invalidate across both thread caches
+  for (u8 t = 0; t < 2; t++) {
+    auto &cache = threadCaches[t];
+
+    // Hold the lock for the entire invalidation sequence to prevent the executor
+    // from seeing partially-invalidated entries (shared_ptr reset but not yet erased).
+    std::lock_guard<std::mutex> lock(cache.jitCacheMutex);
+
+    std::vector<u64> blocksToInvalidate;
     for (u64 page = startPage; page < endPage; page += pageSize) {
-      auto pit = pageBlockIndex.find(page);
-      if (pit == pageBlockIndex.end()) continue;
+      auto pit = cache.pageBlockIndex.find(page);
+      if (pit == cache.pageBlockIndex.end()) continue;
       for (u64 blk : pit->second) blocksToInvalidate.push_back(blk);
     }
-  }
 
-  std::sort(blocksToInvalidate.begin(), blocksToInvalidate.end());
-  blocksToInvalidate.erase(std::unique(blocksToInvalidate.begin(), blocksToInvalidate.end()), blocksToInvalidate.end());
+    std::sort(blocksToInvalidate.begin(), blocksToInvalidate.end());
+    blocksToInvalidate.erase(std::unique(blocksToInvalidate.begin(), blocksToInvalidate.end()), blocksToInvalidate.end());
 
-  if (blocksToInvalidate.empty()) {
+    if (blocksToInvalidate.empty()) {
 #ifdef JIT_DEBUG
-    LOG_DEBUG(Xenon, "[JIT]: No JIT blocks to invalidate for range {:#x}-{:#x}", startAddr, endAddr);
+      LOG_DEBUG(Xenon, "[JIT]: No JIT blocks to invalidate for range {:#x}-{:#x} (thread {})", startAddr, endAddr, t);
 #endif
-    return;
-  }
-
-  for (u64 blkAddr : blocksToInvalidate) {
-    // First unlink any blocks that point to this one
-    UnlinkBlocksTo(blkAddr);
-
-    auto it = jitBlocksCache.find(blkAddr);
-    if (it != jitBlocksCache.end()) {
-#ifdef JIT_DEBUG
-      LOG_DEBUG(Xenon, "[JIT]: Invalidating block at {:#x} due to page invalidation range {:#x}-{:#x}", blkAddr, startAddr, endAddr);
-#endif
-      // Release resources
-      it->second.reset();
-      jitBlocksCache.erase(it);
+      continue;
     }
-    // Unregister from page index (will clean mappings)
-    UnregisterBlock(blkAddr);
+
+    for (u64 blkAddr : blocksToInvalidate) {
+      // Unlink any blocks that point to this one (inline, lock already held)
+      for (auto &[addr, block] : cache.jitBlocksCache) {
+        if (block && block->linkTargetAddr == blkAddr) {
+          block->linkedBlock.store(nullptr, std::memory_order_release);
+        }
+      }
+
+      auto it = cache.jitBlocksCache.find(blkAddr);
+      if (it != cache.jitBlocksCache.end()) {
+#ifdef JIT_DEBUG
+        LOG_DEBUG(Xenon, "[JIT]: Invalidating block at {:#x} due to page invalidation range {:#x}-{:#x} (thread {})", blkAddr, startAddr, endAddr, t);
+#endif
+        // Release resources and erase atomically (from the lock's perspective)
+        it->second.reset();
+        cache.jitBlocksCache.erase(it);
+      }
+      // Unregister from page index (lock already held)
+      UnregisterBlockLocked(blkAddr, cache);
+    }
   }
 }
 
@@ -158,26 +179,29 @@ void PPU_JIT::InvalidateBlockAt(u64 blockAddr) {
 }
 
 void PPU_JIT::InvalidateAllBlocks() {
-  std::lock_guard<std::mutex> lock(jitCacheMutex);
+  for (u8 t = 0; t < 2; t++) {
+    auto &cache = threadCaches[t];
+    std::lock_guard<std::mutex> lock(cache.jitCacheMutex);
 #ifdef JIT_DEBUG
-  LOG_DEBUG(Xenon, "[JIT]: Invalidating ALL JIT blocks");
+    LOG_DEBUG(Xenon, "[JIT]: Invalidating ALL JIT blocks (thread {})", t);
 #endif
-  for (auto &p : jitBlocksCache) {
-    p.second.reset();
+    for (auto &p : cache.jitBlocksCache) {
+      p.second.reset();
+    }
+    cache.jitBlocksCache.clear();
+    cache.pageBlockIndex.clear();
+    cache.blockPageList.clear();
   }
-  jitBlocksCache.clear();
-  pageBlockIndex.clear();
-  blockPageList.clear();
 }
 
-// Gets current sPPUThread and uses ppeState to get the current Thread pointer.
-void PPU_JIT::SetupContext(JITBlockBuilder *b) {
+// Gets current sPPUThread using the compile-time known thread ID.
+// Instead of reading ppeState->currentThread at runtime (which races between
+// host threads), we bake the thread offset directly into the JIT code.
+void PPU_JIT::SetupContext(JITBlockBuilder *b, ePPUThreadID threadId) {
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
-  x86::Gp tempR = newGP32();
-  COMP->movzx(tempR, b->ppeState->scalar(&sPPEState::currentThread).Ptr<u8>());
-  COMP->imul(b->threadCtx->Base(), tempR, sizeof(sPPUThread));
-  // Since ppuThread[] base is at offset 0 we just need to add the offset in the array
-  COMP->add(b->threadCtx->Base(), b->ppeState->Base());
+  // Compute the fixed offset for this thread's sPPUThread within sPPEState
+  u64 threadOffset = static_cast<u8>(threadId) * sizeof(sPPUThread);
+  COMP->lea(b->threadCtx->Base(), asmjit::x86::ptr(b->ppeState->Base(), static_cast<s32>(threadOffset)));
 #endif
 }
 
@@ -212,11 +236,10 @@ void PPU_JIT::InstrPrologueMinimal(JITBlockBuilder *b, u32 instrData) {
 }
 
 
-// Instruction Epilogue
-// * Checks for external interrupts and exceptions.
 bool InstrEpilogue(PPU *ppu, sPPEState *ppeState) {
   // Check if exceptions are pending and process them in order.
-  return ppu->PPUCheckExceptions();
+  // Uses ppeState->currentThread which is set by the calling host thread
+  return ppu->PPUCheckExceptions(ppeState->currentThread);
 }
 
 // Pre-computed instruction name hashes for fast comparison during block building
@@ -267,7 +290,9 @@ static bool InstrCanCauseSyncException(u32 opNameHash) {
 #undef GPR
 using namespace asmjit;
 // Builds a JIT block starting at the given address.
-std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxBlockSize) {
+std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxBlockSize, ePPUThreadID threadId) {
+  auto &cache = threadCaches[static_cast<u8>(threadId)];
+
   std::unique_ptr<JITBlockBuilder> jitBuilder = std::make_unique<STRIP_UNIQUE(jitBuilder)>(blockStartAddress, &jitRuntime);
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
@@ -297,7 +322,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
   instrsTemp.reserve(maxBlockSize > 64 ? 64 : static_cast<size_t>(maxBlockSize));
 
   // Setup our block context.
-  SetupContext(jitBuilder.get());
+  SetupContext(jitBuilder.get(), threadId);
 
   //
   // Instruction emitter
@@ -551,47 +576,61 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
   // Set up block linking info
   block->canLink = blockCanLink;
   block->linkTargetAddr = blockLinkTarget;
-  block->linkedBlock = nullptr; // Will be linked later if target exists
+  block->linkedBlock.store(nullptr, std::memory_order_relaxed); // Will be linked later if target exists
 
   // Insert block into the block cache.
   {
-    std::lock_guard<std::mutex> lock(jitCacheMutex);
-    jitBlocksCache.emplace(blockStartAddress, block);
+    std::lock_guard<std::mutex> lock(cache.jitCacheMutex);
+    cache.jitBlocksCache.emplace(blockStartAddress, block);
 
     // Try to link this block to its target
     if (blockCanLink && blockLinkTarget != 0) {
-      TryLinkBlock(block.get());
+      TryLinkBlock(block.get(), threadId);
     }
 
     // Check if any existing blocks want to link to this new block
-    for (auto &[addr, existingBlock] : jitBlocksCache) {
+    for (auto &[addr, existingBlock] : cache.jitBlocksCache) {
       if (existingBlock && existingBlock->canLink &&
         existingBlock->linkTargetAddr == blockStartAddress &&
-        existingBlock->linkedBlock == nullptr) {
-        existingBlock->linkedBlock = block.get();
+        existingBlock->linkedBlock.load(std::memory_order_relaxed) == nullptr) {
+        existingBlock->linkedBlock.store(block.get(), std::memory_order_release);
 #ifdef JIT_DEBUG
-        LOG_DEBUG(Xenon, "[JIT]: Linked existing block {:#x} -> {:#x}", addr, blockStartAddress);
+        LOG_DEBUG(Xenon, "[JIT]: Linked existing block {:#x} -> {:#x} (thread {})", addr, blockStartAddress, static_cast<u8>(threadId));
 #endif
       }
     }
   }
 
   // Register pages used by the block.
-  RegisterBlockPages(blockStartAddress, block->size);
+  RegisterBlockPages(blockStartAddress, block->size, threadId);
 
-  return jitBlocksCache.at(blockStartAddress);
+  return block;
 }
 #define GPR(x) curThread.GPR[x]
 
 // Executes a given JIT block at a designated address.
-u64 PPU_JIT::ExecuteJITBlock(u64 blockStartAddress, bool enableHalt) {
-  auto &block = jitBlocksCache.at(blockStartAddress);
+u64 PPU_JIT::ExecuteJITBlock(u64 blockStartAddress, bool enableHalt, ePPUThreadID threadId) {
+  auto &cache = threadCaches[static_cast<u8>(threadId)];
+  std::shared_ptr<JITBlock> block;
+  {
+    std::lock_guard<std::mutex> lock(cache.jitCacheMutex);
+    auto it = cache.jitBlocksCache.find(blockStartAddress);
+    if (it == cache.jitBlocksCache.end()) {
+      return 0;
+    }
+    block = it->second;
+  }
   block->codePtr(ppu, ppeState, enableHalt);
   return block->size / 4;
 }
 
 // Execute a given number of instructions using JIT.
-void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool singleBlock) {
+void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, ePPUThreadID threadId, bool enableHalt, bool singleBlock) {
+  auto &cache = threadCaches[static_cast<u8>(threadId)];
+  // Ensure the thread-local and legacy currentThread are set for this thread
+  PPCInterpreter::SetCurrentThreadId(threadId);
+  ppeState->currentThread = threadId;
+
   u32 instrsExecuted = 0;
   u32 instrCounter = 0;
 
@@ -622,6 +661,8 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
       // XDK 17.489.0 AudioChipCorder Device Detect bypass. This is not needed for
       // older console revisions
     case 0x801AF580:
+    case 0x80081764:
+    case 0x817ac968:
       skipBlock = true;
       break;
     default:
@@ -637,11 +678,21 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
 
     // Get next block start address.
     u64 blockStartAddress = thread.NIA;
-    // Attempt to find such block in the block cache.
-    auto it = jitBlocksCache.find(blockStartAddress);
-    if (it == jitBlocksCache.end()) {
+
+    // Attempt to find the block in the cache under lock, taking a shared_ptr copy
+    // to prevent the block from being destroyed by a concurrent invalidation.
+    std::shared_ptr<JITBlock> blockRef;
+    {
+      std::lock_guard<std::mutex> lock(cache.jitCacheMutex);
+      auto it = cache.jitBlocksCache.find(blockStartAddress);
+      if (it != cache.jitBlocksCache.end()) {
+        blockRef = it->second;
+      }
+    }
+
+    if (!blockRef) {
       // Block was not found. Attempt to create a new one.
-      auto block = BuildJITBlock(blockStartAddress, numInstrs - instrsExecuted);
+      auto block = BuildJITBlock(blockStartAddress, numInstrs - instrsExecuted, threadId);
       if (!block) { continue; } // Block build attempt failed.
 
       // Execute our block and increse executed instructions.
@@ -654,8 +705,8 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
         break;
 
       // If the thread was suspended due to CTRL being written, we must end execution on said thread.
-      if (ppeState->currentThread == 0 && !ppeState->SPR.CTRL.TE0) { break; }
-      if (ppeState->currentThread == 1 && !ppeState->SPR.CTRL.TE1) { break; }
+      if (threadId == ePPUThread_Zero && !ppeState->SPR.CTRL.TE0) { break; }
+      if (threadId == ePPUThread_One && !ppeState->SPR.CTRL.TE1) { break; }
 
       // Process pending synchronous exceptions.
       if (thread.exceptReg & SyncExceptionMask) { ppu->PPUProcessSyncExceptions(ppeState); }
@@ -664,10 +715,9 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
       realMode = !thread.SPR.MSR.DR || !thread.SPR.MSR.IR;
       if (realMode) { // When in real mode TLB is disabled. Fallback to old approach.
         // We have a match, check for the block hash to see if it hasn't been modified.
-        auto &block = it->second;
         u64 sum = 0;
-        const u64 blockSize = block->size;
-        const u64 blockAddr = block->ppuAddress;
+        const u64 blockSize = blockRef->size;
+        const u64 blockAddr = blockRef->ppuAddress;
 
         // Optimized hash verification - read 64-bits at a time when possible
         if (blockSize % 8 == 0) {
@@ -687,29 +737,40 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
           }
         }
 
-        if (block->hash != sum) {
+        if (blockRef->hash != sum) {
 #ifdef JIT_DEBUG
           LOG_DEBUG(Xenon, "[JIT]: Block hash mismatch for block at address {:#x}", blockStartAddress);
 #endif // JIT_DEBUG
-          // Blocks do not match. Erase it and retry.
-          block.reset();
-          // Clean up page index mapping
-          UnregisterBlock(blockStartAddress);
-          jitBlocksCache.erase(blockStartAddress);
+          // Blocks do not match. Erase it under lock and retry.
+          blockRef.reset(); // Release our local reference first
+          {
+            std::lock_guard<std::mutex> lock(cache.jitCacheMutex);
+            auto eraseIt = cache.jitBlocksCache.find(blockStartAddress);
+            if (eraseIt != cache.jitBlocksCache.end()) {
+              eraseIt->second.reset();
+              cache.jitBlocksCache.erase(eraseIt);
+            }
+            UnregisterBlockLocked(blockStartAddress, cache);
+          }
           continue;
         }
       }
 
-      // Run block as usual.
-      JITBlock *currentBlock = it->second.get();
+      // Run block as usual. blockRef keeps the block alive during execution.
+      JITBlock *currentBlock = blockRef.get();
       currentBlock->codePtr(ppu, ppeState, enableHalt);
       instrsExecuted += currentBlock->size / 4;
       instrCounter += currentBlock->size / 4;
 
       // Block linking optimization: follow linked blocks without returning to dispatcher
       // Only do this if we're not in single-block mode and have instructions remaining
-      while (!singleBlock && currentBlock->linkedBlock != nullptr &&
-        instrsExecuted < numInstrs && (XeRunning && !XePaused)) {
+      while (!singleBlock && instrsExecuted < numInstrs && (XeRunning && !XePaused)) {
+        // Snapshot the linked block pointer to avoid TOCTOU race with InvalidateAllBlocks/UnlinkBlocksTo
+        JITBlock *nextBlock = currentBlock->linkedBlock.load(std::memory_order_acquire);
+        if (!nextBlock) {
+          break;
+        }
+
         // Verify that NIA matches the linked block's address
         // (exception handlers or interrupts may have changed NIA)
         if (thread.NIA != currentBlock->linkTargetAddr) {
@@ -717,24 +778,24 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
         }
 
         // Check thread suspension
-        if (ppeState->currentThread == 0 && !ppeState->SPR.CTRL.TE0) {
+        if (threadId == ePPUThread_Zero && !ppeState->SPR.CTRL.TE0) {
           break;
         }
 
-        if (ppeState->currentThread == 1 && !ppeState->SPR.CTRL.TE1) {
+        if (threadId == ePPUThread_One && !ppeState->SPR.CTRL.TE1) {
           break;
         }
 
         // Execute linked block
-        currentBlock = currentBlock->linkedBlock;
+        currentBlock = nextBlock;
         currentBlock->codePtr(ppu, ppeState, enableHalt);
         instrsExecuted += currentBlock->size / 4;
         instrCounter += currentBlock->size / 4;
       }
 
       // If the thread was suspended due to CTRL being written, we must end execution on said thread.
-      if (ppeState->currentThread == 0 && !ppeState->SPR.CTRL.TE0) { break; }
-      if (ppeState->currentThread == 1 && !ppeState->SPR.CTRL.TE1) { break; }
+      if (threadId == ePPUThread_Zero && !ppeState->SPR.CTRL.TE0) { break; }
+      if (threadId == ePPUThread_One && !ppeState->SPR.CTRL.TE1) { break; }
 
       // Process pending synchronous exceptions.
       if (thread.exceptReg & SyncExceptionMask) { ppu->PPUProcessSyncExceptions(ppeState); }

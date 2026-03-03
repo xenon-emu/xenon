@@ -21,10 +21,17 @@ extern PPCInterpreter::PPCDecoder ppcDecoder;
 
 extern Xe::XCPU::XenonContext *xenonContext;
 
+// Thread-local storage for the current PPU thread ID.
+// Each host thread sets this at its entry point so that the curThreadId
+// macro resolves without racing on the shared ppeState->currentThread field.
+extern thread_local ePPUThreadID tl_curThreadId;
+
+inline void SetCurrentThreadId(ePPUThreadID id) { tl_curThreadId = id; }
+
 //
 //  Helper macros for instructions
 //
-#define curThreadId   ppeState->currentThread
+#define curThreadId   PPCInterpreter::tl_curThreadId
 #define curThread     ppeState->ppuThread[curThreadId]
 #define _previnstr    curThread.PI
 #define _instr        curThread.CI

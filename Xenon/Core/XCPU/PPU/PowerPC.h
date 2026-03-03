@@ -5,7 +5,10 @@
 #pragma once
 
 #include <bit>
+#include <condition_variable>
 #include <memory>
+#include <mutex>
+#include <shared_mutex>
 #include <unordered_map>
 
 #include "Base/Bitfield.h"
@@ -1386,7 +1389,9 @@ struct sPPUThread {
   // Completely bypases SecEng decode and RootBus dispatch on hit.
   FastTranslationCache fastDataCache{};
 
-
+  // Translation Lookaside Buffer
+  TLB_Reg TLB{};
+  
   // Exception Register
   u16 exceptReg = 0;
   // Program Exception Type
@@ -1439,8 +1444,14 @@ struct sPPEState {
   ePPUThreadID currentThread = ePPUThread_Zero;
   // Shared Special Purpose Registers.
   sPPUGlobalSPRs SPR{};
-  // Translation Lookaside Buffer
-  TLB_Reg TLB{};
+
+  // Mutex protecting TLB access (shared for reads, exclusive for writes)
+  mutable std::mutex tlbMutex{};
+  // Mutex protecting shared SPR writes (CTRL, TB, SDR1, HRMOR, etc.)
+  mutable std::mutex sprMutex{};
+  // Condition variable + mutex for thread wake signaling (TE0/TE1 transitions)
+  std::condition_variable_any threadWakeCV{};
+  mutable std::mutex threadWakeMutex{};
   // Current PPU Name, for ease of debugging.
   std::string ppuName{};
   // PPU ID

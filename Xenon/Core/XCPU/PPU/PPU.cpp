@@ -48,7 +48,7 @@ PPU::PPU(Xe::XCPU::XenonContext *inXenonContext, u64 resetVector, u32 PIR) :
   // Set everything as in POR. See CELL-BE Programming Handbook
   //
 
-  if (ppuThreadState.load() == eThreadState::Unused) {
+  if (hostThreads[0].state.load() == eThreadState::Unused) {
     return;
   }
 
@@ -121,32 +121,47 @@ PPU::PPU(Xe::XCPU::XenonContext *inXenonContext, u64 resetVector, u32 PIR) :
   }
   ppeState->ppuThread[ePPUThread_Zero].SPR.PIR = PIR;
   ppeState->ppuThread[ePPUThread_One].SPR.PIR = PIR + 1;
+
+  // Initialize host thread state for both guest threads
+  for (u8 i = 0; i < 2; i++) {
+    hostThreads[i].guestThreadId = static_cast<ePPUThreadID>(i);
+  }
 }
 PPU::~PPU() {
-  // Signal we're quitting
-  ppuThreadState.store(eThreadState::Quiting);
-  ppuThreadActive = false;
-  // Kill the thread
-  if (ppuThread.joinable())
-    ppuThread.join();
+  // Signal we're quitting on both host threads
+  for (u8 i = 0; i < 2; i++) {
+    hostThreads[i].state.store(eThreadState::Quiting);
+    hostThreads[i].active = false;
+  }
+  // Wake any sleeping threads so they can exit
+  ppeState->threadWakeCV.notify_all();
+  // Join both host threads
+  for (u8 i = 0; i < 2; i++) {
+    if (hostThreads[i].hostThread.joinable())
+      hostThreads[i].hostThread.join();
+  }
   ppuJIT.reset();
   ppeState.reset();
 }
 
 void PPU::StartExecution(bool setHRMOR) {
-  // If we want to start halted, then set the state
+  // Determine initial states for both guest threads
+  eThreadState initialState0 = ppeState->ppuID == 0 ? eThreadState::Running : eThreadState::Sleeping;
+  eThreadState initialState1 = eThreadState::Sleeping; // Thread 1 always starts sleeping
+
   if (Config::debug.startHalted) {
-    ppuThreadState.store(eThreadState::Halted);
-    // If we were told to halt on startup, ensure we are able to continue, otherwise it'll deadlock
-    // We have it like this to safeguard against sleeping threads waking themselves after continuing,
-    // thus destroying the stack
-    ppuThreadPreviousState.store(ppeState->ppuID == 0 ? eThreadState::Running : eThreadState::Sleeping);
-    LOG_DEBUG(Xenon, "{} was set to be halted, setting previous state to {}", ppeState->ppuName, ppeState->ppuID == 0 ? "Running" : "Sleeping");
+    for (u8 i = 0; i < 2; i++) {
+      hostThreads[i].state.store(eThreadState::Halted);
+      hostThreads[i].previousState.store(i == 0 ? initialState0 : initialState1);
+    }
+    LOG_DEBUG(Xenon, "{} was set to be halted", ppeState->ppuName);
   }
   else {
-    LOG_DEBUG(Xenon, "{} setting to {}", ppeState->ppuName, ppeState->ppuID == 0 ? "Running" : "Sleeping");
-    ppuThreadState.store(ppeState->ppuID == 0 ? eThreadState::Running : eThreadState::Sleeping);
-    ppuThreadPreviousState.store(ppuThreadState);
+    LOG_DEBUG(Xenon, "{} setting Thread0 to {}, Thread1 to Sleeping", ppeState->ppuName, ppeState->ppuID == 0 ? "Running" : "Sleeping");
+    hostThreads[0].state.store(initialState0);
+    hostThreads[0].previousState.store(initialState0);
+    hostThreads[1].state.store(initialState1);
+    hostThreads[1].previousState.store(initialState1);
   }
 
   // TLB Software reload Mode?
@@ -174,72 +189,101 @@ void PPU::StartExecution(bool setHRMOR) {
     if (Config::xcpu.simulate1BL) { Simulate1Bl(); }
   }
 
-  ppuThread = std::thread(&PPU::ThreadLoop, this);
+  // Launch a host thread for each guest thread
+  for (u8 i = 0; i < 2; i++) {
+    hostThreads[i].hostThread = std::thread(&PPU::ThreadLoop, this, static_cast<ePPUThreadID>(i));
+  }
 }
 
 void PPU::Reset() {
-  // Signal that we are resetting
-  ppuThreadState.store(eThreadState::Resetting);
-  ppuThreadPreviousState.store(eThreadState::None);
-
-  // Tell the thread to reset it
-  ppuThreadResetting = true;
+  // Signal that we are resetting on both host threads
+  for (u8 i = 0; i < 2; i++) {
+    hostThreads[i].state.store(eThreadState::Resetting);
+    hostThreads[i].previousState.store(eThreadState::None);
+    hostThreads[i].resetting = true;
+  }
+  // Wake sleeping threads so they can process the reset
+  ppeState->threadWakeCV.notify_all();
 }
 
 void PPU::Halt(u64 haltOn, bool requestedByGuest, s8 ppuId, ePPUThreadID threadId) {
-  if (haltOn && !guestHalt) {
+  if (haltOn) {
     LOG_DEBUG(Xenon, "Halting PPU{} on address 0x{:X}", ppeState->ppuID, haltOn);
     ppuHaltOn = haltOn;
   }
-  guestHalt = requestedByGuest;
 #ifndef NO_GFX
-  if (guestHalt && XeMain::renderer) {
+  if (requestedByGuest && XeMain::renderer) {
     XeMain::renderer->SetDebuggerActive(ppuId);
   }
 #endif
-  if (ppuThreadPreviousState == eThreadState::None) // If we were told to ignore it, then do so
-    ppuThreadPreviousState.store(ppuThreadState.load());
-  ppuThreadState.store(eThreadState::Halted);
+  // Halt specific thread or all threads
+  for (u8 i = 0; i < 2; i++) {
+    if (threadId != ePPUThread_None && static_cast<ePPUThreadID>(i) != threadId)
+      continue;
+    auto &ht = hostThreads[i];
+    ht.guestHalt = requestedByGuest;
+    if (ht.previousState == eThreadState::None)
+      ht.previousState.store(ht.state.load());
+    ht.state.store(eThreadState::Halted);
+  }
 }
 void PPU::Continue() {
-  if (ppuThreadState.load() == eThreadState::Running)
-    return;
-  if (ppuThreadPreviousState == eThreadState::Running)
-    LOG_DEBUG(Xenon, "Continuing execution on PPU{}", ppeState->ppuID);
-  ppuThreadState.store(ppuThreadPreviousState.load());
-  ppuThreadPreviousState.store(eThreadState::None);
-  guestHalt = false;
+  for (u8 i = 0; i < 2; i++) {
+    auto &ht = hostThreads[i];
+    if (ht.state.load() == eThreadState::Running)
+      continue;
+    if (ht.previousState == eThreadState::Running)
+      LOG_DEBUG(Xenon, "Continuing execution on PPU{} Thread{}", ppeState->ppuID, i);
+    ht.state.store(ht.previousState.load());
+    ht.previousState.store(eThreadState::None);
+    ht.guestHalt = false;
+  }
+  // Wake sleeping threads in case they need to resume
+  ppeState->threadWakeCV.notify_all();
 }
 void PPU::ContinueFromException() {
-  if (ppuThreadState.load() == eThreadState::Running)
-    return;
-  if (ppuThreadPreviousState == eThreadState::Running)
-    LOG_DEBUG(Xenon, "Jumping to exception handler");
-  if (guestHalt) {
-    sPPUThread &thread = ppeState->ppuThread[curThreadId];
-    thread.exceptReg |= ppuProgramEx;
-    thread.progExceptionType = ppuProgExTypeTRAP;
+  for (u8 i = 0; i < 2; i++) {
+    auto &ht = hostThreads[i];
+    if (ht.state.load() == eThreadState::Running)
+      continue;
+    if (ht.previousState == eThreadState::Running)
+      LOG_DEBUG(Xenon, "Jumping to exception handler on PPU{} Thread{}", ppeState->ppuID, i);
+    if (ht.guestHalt) {
+      sPPUThread &thread = ppeState->ppuThread[i];
+      thread.exceptReg |= ppuProgramEx;
+      thread.progExceptionType = ppuProgExTypeTRAP;
+    }
+    ht.state.store(ht.previousState.load());
+    ht.previousState.store(eThreadState::None);
+    ht.guestHalt = false;
   }
-  ppuThreadState.store(ppuThreadPreviousState.load());
-  ppuThreadPreviousState.store(eThreadState::None);
-  guestHalt = false;
+  ppeState->threadWakeCV.notify_all();
 }
 void PPU::Step(int amount) {
-  if (ppuThreadState.load() == eThreadState::Running)
-    return;
-  if (ppuThreadPreviousState == eThreadState::Running)
-    LOG_DEBUG(Xenon, "Continuing PPU{} for {} Instructions", ppeState->ppuID, amount);
-  ppuStepAmount = amount;
+  for (u8 i = 0; i < 2; i++) {
+    auto &ht = hostThreads[i];
+    if (ht.state.load() == eThreadState::Running)
+      continue;
+    if (ht.previousState == eThreadState::Running)
+      LOG_DEBUG(Xenon, "Continuing PPU{} Thread{} for {} Instructions", ppeState->ppuID, i, amount);
+    ht.stepAmount = amount;
+  }
 }
 
-// PPU Entry Point.
-void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
+// PPU Entry Point - now takes explicit thread ID.
+void PPU::PPURunInstructions(u64 numInstrs, ePPUThreadID threadId, bool enableHalt) {
+  PPCInterpreter::SetCurrentThreadId(threadId);
+  // Set the legacy currentThread field for interpreter macro compatibility
+  ppeState->currentThread = threadId;
+
+  PPUHostThreadState &ht = hostThreads[static_cast<u8>(threadId)];
+  sPPUThread &thread = ppeState->ppuThread[threadId];
   // Start Profile
   MICROPROFILE_SCOPEI("[Xe::PPU]", "PPURunInstructions", MP_AUTO);
-  for (size_t instrCount = 0; instrCount < numInstrs && ppuThreadActive; ++instrCount) {
+  for (size_t instrCount = 0; instrCount < numInstrs && ht.active; ++instrCount) {
     // Halt if needed before executing the next instruction
-    if (enableHalt && ppuHaltOn == curThread.NIA) {
-      Halt();
+    if (enableHalt && ppuHaltOn == thread.NIA) {
+      Halt(0, false, 0, threadId);
     }
 
     // Read next instruction
@@ -247,172 +291,141 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
     // Profile read next instruction
     {
       MICROPROFILE_SCOPEI("[Xe::PPU]", "ReadNextInstruction", MP_AUTO);
-      readNextInstr = PPUReadNextInstruction();
+      readNextInstr = PPUReadNextInstruction(threadId);
     }
     if (readNextInstr) {
 #ifdef DEBUG_BUILD
       if (traceFile) {
-        const std::string instrName = PPCInterpreter::PPCInterpreter_getFullName(_instr.opcode);
-        fprintf(traceFile, "%llx: 0x%x %s\n", curThread.CIA, _instr.opcode, instrName.c_str());
+        const std::string instrName = PPCInterpreter::PPCInterpreter_getFullName(thread.CI.opcode);
+        fprintf(traceFile, "%llx: 0x%x %s\n", thread.CIA, thread.CI.opcode, instrName.c_str());
       }
 #endif
       // Start Profile
       MICROPROFILE_SCOPEI("[Xe::PPU]", "ExecuteSingleInstruction", MP_AUTO);
-      // Execute instruction
+      // Execute instruction (interpreter reads curThreadId from ppeState->currentThread)
       PPCInterpreter::ppcExecuteSingleInstruction(ppeState.get());
     }
 
     // Handle pending exceptions
-    PPUCheckExceptions();
+    PPUCheckExceptions(threadId);
 
     // If the thread was suspended due to CTRL being written, we must end execution on said thread.
-    if (ppeState->currentThread == 0 && ppeState->SPR.CTRL.TE0 != true) { break; }
-    if (ppeState->currentThread == 1 && ppeState->SPR.CTRL.TE1 != true) { break; }
+    if (!IsGuestThreadEnabled(threadId)) { break; }
 
     // Break after exec and if it's halted
-    if ((enableHalt && ppuThreadState == eThreadState::Halted) || ppuThreadState == eThreadState::Resetting)
+    if ((enableHalt && ht.state == eThreadState::Halted) || ht.state == eThreadState::Resetting)
       break;
   }
 }
 
-// PPU Thread state machine, handles all execution and codeflow
-void PPU::ThreadStateMachine() {
+// Checks if a specific guest thread is enabled via the CTRL register.
+bool PPU::IsGuestThreadEnabled(ePPUThreadID threadId) {
+  if (threadId == ePPUThread_Zero) return ppeState->SPR.CTRL.TE0;
+  if (threadId == ePPUThread_One) return ppeState->SPR.CTRL.TE1;
+  return false;
+}
+
+// PPU Thread state machine, handles all execution and codeflow for a single guest thread.
+void PPU::ThreadStateMachine(ePPUThreadID threadId) {
+  PPCInterpreter::SetCurrentThreadId(threadId);
+  PPUHostThreadState &ht = hostThreads[static_cast<u8>(threadId)];
   // Check if we should exit or not
-  ppuThreadActive = ppuThreadState.load() != eThreadState::None;
+  ht.active = ht.state.load() != eThreadState::None;
   // Signal a reset if needed
-  if (ppuThreadResetting) {
-    ppuThreadState.store(eThreadState::Resetting);
+  if (ht.resetting) {
+    ht.state.store(eThreadState::Resetting);
   }
-  switch (ppuThreadState) {
+  switch (ht.state) {
   case eThreadState::Executing: {
-    ppuThreadState.store(eThreadState::Running);
+    ht.state.store(eThreadState::Running);
   } break;
   case eThreadState::Running: {
-    // Check our threads to see if any are running
-    u8 state = GetCurrentRunningThreads();
-    // SMT interleave slice size: x instructions per thread per turn. 
-    // Instead of doing 16K each time, we process rach thread a bit, thus behaving more like
-    // real hardware, and avoiding stuff like if one thread is doing heavy processing the other 
-    // might stall for more time.
+    // Check if this guest thread is enabled
+    if (!IsGuestThreadEnabled(threadId)) {
+      // Thread not enabled, go to sleep and wait for wake signal
+      std::unique_lock<std::mutex> lock(ppeState->threadWakeMutex);
+      ppeState->threadWakeCV.wait_for(lock, std::chrono::milliseconds(1), [&]() {
+        return IsGuestThreadEnabled(threadId) || !ht.active || ht.resetting;
+      });
+      break;
+    }
 
-    // NOTE: This value is completly empiric. Setting it to something lower than 25 instrs isn't safe.
-    static constexpr u64 smtSlice = 100;
+    // Set the legacy currentThread for interpreter compatibility
+    ppeState->currentThread = threadId;
 
     const u64 ttrReg = ppeState->SPR.TTR.hexValue;
     if (currentExecMode == eExecutorMode::Interpreter) {
-      for (u64 executed = 0; executed < ttrReg && !ppuThreadResetting; executed += smtSlice) {
-        if (state & ePPUThreadBit_Zero) {
-          // Thread 0 slice
-          curThreadId = ePPUThread_Zero;
-          PPURunInstructions(smtSlice, ppuHaltOn != 0);
-        }
-        if (state & ePPUThreadBit_One) {
-          // Thread 1 slice
-          curThreadId = ePPUThread_One;
-          PPURunInstructions(smtSlice, ppuHaltOn != 0);
-        }
-        // Re-read thread state each iteration in case CTRL was updated
-        state = GetCurrentRunningThreads();
-      }
+      PPURunInstructions(ttrReg, threadId, ppuHaltOn != 0);
     } else {
-      for (u64 executed = 0; executed < ttrReg && !ppuThreadResetting; executed += smtSlice) {
-        if (state & ePPUThreadBit_Zero) {
-          // Thread 0 slice
-          curThreadId = ePPUThread_Zero;
-          ppuJIT->ExecuteJITInstrs(smtSlice, ppuThreadActive, ppuHaltOn != 0);
-        }
-        if (state & ePPUThreadBit_One) {
-          // Thread 1 slice
-          curThreadId = ePPUThread_One;
-          ppuJIT->ExecuteJITInstrs(smtSlice, ppuThreadActive, ppuHaltOn != 0);
-        }
-        // Re-read thread state each iteration in case CTRL was updated
-        state = GetCurrentRunningThreads();
-      }
+      ppuJIT->ExecuteJITInstrs(ttrReg, ht.active, threadId, ppuHaltOn != 0);
     }
   } break;
   case eThreadState::Halted: {
     // Check if we should exit or not
-    ppuThreadActive = ppuThreadState.load() != eThreadState::None;
+    ht.active = ht.state.load() != eThreadState::None;
     // Handle stepping
-    u8 state = GetCurrentRunningThreads();
-    if (currentExecMode == eExecutorMode::Interpreter) {
-      if (state & ePPUThreadBit_Zero) {
-        curThreadId = ePPUThread_Zero;
-        if (ppuStepAmount > 0) {
-          PPURunInstructions(ppuStepAmount, false);
-          ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
+    if (IsGuestThreadEnabled(threadId)) {
+      ppeState->currentThread = threadId;
+      if (ht.stepAmount > 0) {
+        if (currentExecMode == eExecutorMode::Interpreter) {
+          PPURunInstructions(ht.stepAmount, threadId, false);
+        } else {
+          ppuJIT->ExecuteJITInstrs(ht.stepAmount, ht.active, threadId, false);
         }
-      }
-      if (state & ePPUThreadBit_One) {
-        curThreadId = ePPUThread_One;
-        if (ppuStepAmount > 0) {
-          PPURunInstructions(ppuStepAmount, false);
-          ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
-        }
-      }
-    } else {
-      if (state & ePPUThreadBit_Zero) {
-        curThreadId = ePPUThread_Zero;
-        if (ppuStepAmount > 0) {
-          ppuJIT->ExecuteJITInstrs(ppuStepAmount, ppuThreadActive, false);
-          ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
-        }
-      }
-      if (state & ePPUThreadBit_One) {
-        curThreadId = ePPUThread_One;
-        if (ppuStepAmount > 0) {
-          ppuJIT->ExecuteJITInstrs(ppuStepAmount, ppuThreadActive, false);
-          ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
-        }
+        ht.stepAmount = 0;
       }
     }
   } break;
   case eThreadState::Sleeping: {
-    // Waiting for an event, do nothing
-    std::this_thread::sleep_for(1ms); // Don't burn the CPU
+    // Wait for a wake signal (TE bit set, interrupt, or shutdown)
+    std::unique_lock<std::mutex> lock(ppeState->threadWakeMutex);
+    ppeState->threadWakeCV.wait_for(lock, std::chrono::milliseconds(1), [&]() {
+      return IsGuestThreadEnabled(threadId) || !ht.active || ht.resetting;
+    });
   } break;
   case eThreadState::Unused: {
-    ppuThreadState.store(eThreadState::None);
+    ht.state.store(eThreadState::None);
   } break;
   case eThreadState::Resetting: {
     if (ppeState.get())
-      LOG_INFO(Xenon, "PPU{} is resetting!", ppeState->ppuID);
+      LOG_INFO(Xenon, "PPU{} Thread{} is resetting!", ppeState->ppuID, static_cast<u8>(threadId));
     else
-      LOG_INFO(Xenon, "A PPU is in the middle of resetting!");
-    ppuThreadState.store(eThreadState::None);
+      LOG_INFO(Xenon, "A PPU thread is in the middle of resetting!");
+    ht.state.store(eThreadState::None);
   } break;
   case eThreadState::Quiting: {
-    ppuThreadState.store(eThreadState::None);
+    ht.state.store(eThreadState::None);
   } break;
   default: {
 
   } break;
   }
 }
-void PPU::ThreadLoop() {
+
+void PPU::ThreadLoop(ePPUThreadID threadId) {
+  PPUHostThreadState &ht = hostThreads[static_cast<u8>(threadId)];
+  PPCInterpreter::SetCurrentThreadId(threadId);
   // Set thread name
   if (ppeState.get())
-    Base::SetCurrentThreadName("[Xe] " + ppeState->ppuName);
-  while (ppuThreadActive) {
+    Base::SetCurrentThreadName(FMT("[Xe] {}:T{}", ppeState->ppuName, static_cast<u8>(threadId)));
+  while (ht.active) {
     // Start Profile
     MICROPROFILE_SCOPEI("[Xe::PPU]", "ThreadLoop", MP_AUTO);
-    // Run state machine
-    ThreadStateMachine();
+    // Run state machine for this guest thread
+    ThreadStateMachine(threadId);
 
     // If our thread is not active while running, abort early.
-    // We are likely destroying the handle
-    if (!ppuThreadActive)
+    if (!ht.active)
       break;
 
-    if (PPUCheckInterrupts())
+    if (PPUCheckInterrupts(threadId))
       continue;
   }
   // Thread is done executing, just tell it to exit
-  ppuThreadActive = false;
+  ht.active = false;
 }
 
-// Returns a pointer to the specified thread.
+
 sPPUThread *PPU::GetPPUThread(u8 thrdID) {
   return &ppeState->ppuThread[static_cast<ePPUThreadID>(thrdID)];
 }
@@ -433,6 +446,9 @@ u64 PPU::loadElfImage(u8* data, u64 size) {
   // Setup HRMOR for elf binaries
   ppeState->SPR.CTRL.hexValue = 0x800000; // CTRL[TE0] = 1;
   ppeState->SPR.HRMOR.hexValue = 0x0000000000000000;
+  // Set currentThread to Thread0 for elf loading
+  PPCInterpreter::SetCurrentThreadId(ePPUThread_Zero);
+  ppeState->currentThread = ePPUThread_Zero;
 
   // Loaded ELF Header type (elf32/elf64)
   bool elf32 = true; // Assume little endian file
@@ -554,15 +570,16 @@ u64 PPU::loadElfImage(u8* data, u64 size) {
   }
   LOG_INFO(Xenon, "ELF loaded successfully");
 
-  curThread.NIA = entryPoint;
+  ppeState->ppuThread[ePPUThread_Zero].NIA = entryPoint;
 
-  return curThread.NIA;
+  return ppeState->ppuThread[ePPUThread_Zero].NIA;
 }
 
 // Reads the next instruction from memory and advances the NIP accordingly.
-bool PPU::PPUReadNextInstruction() {
-  ePPUThreadID thrId = curThreadId;
-  sPPUThread &thread = ppeState->ppuThread[thrId];
+bool PPU::PPUReadNextInstruction(ePPUThreadID threadId) {
+  PPCInterpreter::SetCurrentThreadId(threadId);
+  ppeState->currentThread = threadId;
+  sPPUThread &thread = ppeState->ppuThread[threadId];
   // Update previous instruction address
   thread.PIA = thread.CIA;
   // Update current instruction address
@@ -571,55 +588,66 @@ bool PPU::PPUReadNextInstruction() {
   thread.NIA += 4;
   thread.instrFetch = true;
   // Fetch the instruction from memory
-  _instr.opcode = PPCInterpreter::MMURead32(ppeState.get(), thread.CIA, thrId);
-  if (_instr.opcode == 0xFFFFFFFF || _instr.opcode == 0xCDCDCDCD) {
-    LOG_CRITICAL(Xenon, "PPU{} returned an invalid opcode found. Data = {:#x}, PIA [{:#x}] -> CIA [{:#x}]. Halting...", 
-      ppeState->ppuID, _instr.opcode, thread.PIA, thread.CIA);
-    Halt();
+  thread.CI.opcode = PPCInterpreter::MMURead32(ppeState.get(), thread.CIA, threadId);
+  if (thread.CI.opcode == 0xFFFFFFFF || thread.CI.opcode == 0xCDCDCDCD) {
+    LOG_CRITICAL(Xenon, "PPU{} Thread{} returned an invalid opcode found. Data = {:#x}, PIA [{:#x}] -> CIA [{:#x}]. Halting...", 
+      ppeState->ppuID, static_cast<u8>(threadId), thread.CI.opcode, thread.PIA, thread.CIA);
+    Halt(0, false, 0, threadId);
     return false;
   }
-  if (_ex & ppuInstrStorageEx || _ex & ppuInstrSegmentEx) {
+  if (thread.exceptReg & ppuInstrStorageEx || thread.exceptReg & ppuInstrSegmentEx) {
     return false;
   }
   thread.instrFetch = false;
   return true;
 }
 
-// Checks for CPU bringup interrupts
-bool PPU::PPUCheckInterrupts() {
+// Checks for CPU bringup interrupts for a specific guest thread
+bool PPU::PPUCheckInterrupts(ePPUThreadID threadId) {
+  PPCInterpreter::SetCurrentThreadId(threadId);
+  PPUHostThreadState &ht = hostThreads[static_cast<u8>(threadId)];
+  sPPUThread &thread = ppeState->ppuThread[threadId];
   // Check if we are allowed to enable thread zero if the thread is sleeping...
   bool WEXT = (ppeState->SPR.TSCR.hexValue & 0x100000) >> 20;
 
+  bool thrdEnabled = static_cast<u8>(threadId) == 0 ? ppeState->SPR.CTRL.TE0 : ppeState->SPR.CTRL.TE1;
+
   // Check for external interrupts that enable execution
-  if (ppuThreadActive && !ppuThreadResetting && (ppuThreadState.load() == eThreadState::Halted 
-    || ppuThreadState.load() == eThreadState::Sleeping) && WEXT) {
+  if (!hostThreads[static_cast<u8>(threadId)].resetting.load() && (hostThreads[static_cast<u8>(threadId)].state.load() == eThreadState::Halted
+    || hostThreads[static_cast<u8>(threadId)].state.load() == eThreadState::Sleeping) && WEXT) {
     // Check for an external interrupt that enables execution.
-    if (!xenonContext->iic.hasPendingInterrupts(curThread.SPR.PIR, true)) {
+    if (!xenonContext->iic.hasPendingInterrupts(thread.SPR.PIR, true) && !thrdEnabled) {
       return true;
     }
 
     // Proceed.
-    LOG_DEBUG(Xenon, "{} was previously halted or sleeping, bringing online", ppeState->ppuName);
-    ppuThreadState.store(eThreadState::Running);
+    LOG_DEBUG(Xenon, "{} Thread{} was previously halted or sleeping, bringing online", ppeState->ppuName, static_cast<u8>(threadId));
+    ht.state.store(eThreadState::Running);
     
-    // Enable thread 0 execution and issue a system reset exception.
-    ppeState->SPR.CTRL.TE0 = 1;
-    ppeState->ppuThread[ePPUThread_Zero].exceptReg |= ppuSystemResetEx;
-
-    sPPUThread &thread = curThread;
+    // Enable the appropriate thread execution and issue a system reset exception.
+    if (threadId == ePPUThread_Zero) {
+      ppeState->SPR.CTRL.TE0 = 1;
+    } else {
+      ppeState->SPR.CTRL.TE1 = 1;
+    }
+    thread.exceptReg |= ppuSystemResetEx;
     thread.SPR.SRR1 = 0x200000; // Set SRR1[42:44] = 100
   }
 
   return false;
 }
 
-// Checks for exceptions and process them in the correct order.
-bool PPU::PPUCheckExceptions() {
-  sPPUThread &thread = curThread;
+// Checks for exceptions and process them in the correct order for a specific guest thread.
+bool PPU::PPUCheckExceptions(ePPUThreadID threadId) {
+  PPCInterpreter::SetCurrentThreadId(threadId);
+  ppeState->currentThread = threadId;
+
+  PPUHostThreadState &ht = hostThreads[static_cast<u8>(threadId)];
+  sPPUThread &thread = ppeState->ppuThread[threadId];
   // Start Profile
   MICROPROFILE_SCOPEI("[Xe::PPU]", "CheckExceptions", MP_AUTO);
   // Check Exceptions pending and process them in order.
-  u16 &exceptions = _ex;
+  u16 &exceptions = thread.exceptReg;
   if (exceptions != ppuNone) {
     // Exceptions are pending, check and process them in order.
 
@@ -654,7 +682,7 @@ bool PPU::PPUCheckExceptions() {
     //
     // A. Program - Illegal Instruction
     if (exceptions & ppuProgramEx && thread.progExceptionType == ppuProgExTypeILL) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Illegal Instruction.", ppeState->ppuName, static_cast<u8>(curThreadId));
+      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Illegal Instruction.", ppeState->ppuName, static_cast<u8>(threadId));
       exceptions &= ~ppuProgramEx;
       return true;
     }
@@ -679,13 +707,13 @@ bool PPU::PPUCheckExceptions() {
     }
     // Alignment
     if (exceptions & ppuAlignmentEx) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Alignment.", ppeState->ppuName, static_cast<u8>(curThreadId));
+      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Alignment.", ppeState->ppuName, static_cast<u8>(threadId));
       exceptions &= ~ppuAlignmentEx;
       return true;
     }
     // D. Trace
     if (exceptions & ppuTraceEx) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Trace.", ppeState->ppuName, static_cast<u8>(curThreadId));
+      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Trace.", ppeState->ppuName, static_cast<u8>(threadId));
       exceptions &= ~ppuTraceEx;
       return true;
     }
@@ -704,7 +732,7 @@ bool PPU::PPUCheckExceptions() {
     }
     // Program - Privileged Instruction
     if (exceptions & ppuProgramEx && thread.progExceptionType == ppuProgExTypePRIV) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Privileged Instruction.", ppeState->ppuName, static_cast<u8>(curThreadId));
+      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Privileged Instruction.", ppeState->ppuName, static_cast<u8>(threadId));
       exceptions &= ~ppuProgramEx;
       return true;
     }
@@ -725,7 +753,7 @@ bool PPU::PPUCheckExceptions() {
     // 4. Program - Imprecise Mode Floating-Point Enabled Exception
     //
     if (exceptions & ppuProgramEx) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Imprecise Mode Floating-Point Enabled Exception.", ppeState->ppuName, static_cast<u8>(curThreadId));
+      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Imprecise Mode Floating-Point Enabled Exception.", ppeState->ppuName, static_cast<u8>(threadId));
       exceptions &= ~ppuProgramEx;
       return true;
     }
@@ -757,7 +785,7 @@ bool PPU::PPUCheckExceptions() {
 
     // Hypervisor Decrementer
     if (exceptions & ppuHypervisorDecrementerEx) {
-      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Hypervisor Decrementer.", ppeState->ppuName, static_cast<u8>(curThreadId));
+      LOG_ERROR(Xenon, "{}(Thrd{:#d}): Unhandled Exception: Hypervisor Decrementer.", ppeState->ppuName, static_cast<u8>(threadId));
       exceptions &= ~ppuHypervisorDecrementerEx;
       return true;
     }
@@ -795,22 +823,6 @@ void PPU::UpdateTimeBase(u64 tbTicks) {
       }
     }
   }
-}
-
-// Returns current executing thread by reading CTRL register
-u8 PPU::GetCurrentRunningThreads() {
-  if (!ppeState)
-    return ePPUThreadBit_None;
-
-  // Extract bits 22-23 in one step and directly map them to thread states
-  u8 ctrlTE = (ppeState->SPR.CTRL.hexValue >> 22) & 0b11;
-  // If the thread state was changed to shut down both threads, set the thread state to sleeping.
-  if (!(ppeState->SPR.CTRL.TE0 || ppeState->SPR.CTRL.TE1)) {
-    ppuThreadState.store(eThreadState::Sleeping);
-  }
-
-  // Directly map ctrlTE to thread states using bit shifting
-  return (ctrlTE & 0b01) * ePPUThreadBit_One | (ctrlTE & 0b10) / 2 * ePPUThreadBit_Zero;
 }
 
 // Does a mostly complete simulation of the 1Bl inside the SROM.

@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <chrono>
 #include <functional>
 #include <memory>
@@ -227,7 +228,7 @@ runtime->release(codePtr);
   // Target address for unconditional branches (0 if conditional or not a branch)
   u64 linkTargetAddr = 0;
   // Cached pointer to the linked block (nullptr if not yet linked or target doesn't exist)
-  JITBlock* linkedBlock = nullptr;
+  std::atomic<JITBlock*> linkedBlock = nullptr;
   // Whether this block ends with an unconditional branch that can be linked
   bool canLink = false;
 };
@@ -237,10 +238,10 @@ public:
   PPU_JIT(PPU *ppu);
   ~PPU_JIT();
 
-  void ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt = true, bool singleBlock = false);
-  u64 ExecuteJITBlock(u64 blockStartAddress, bool enableHalt); // returns step count
-  std::shared_ptr<JITBlock> BuildJITBlock(u64 blockStartAddress, u64 maxBlockSize);
-  void SetupContext(JITBlockBuilder *b);
+  void ExecuteJITInstrs(u64 numInstrs, bool active, ePPUThreadID threadId, bool enableHalt = true, bool singleBlock = false);
+  u64 ExecuteJITBlock(u64 blockStartAddress, bool enableHalt, ePPUThreadID threadId); // returns step count
+  std::shared_ptr<JITBlock> BuildJITBlock(u64 blockStartAddress, u64 maxBlockSize, ePPUThreadID threadId);
+  void SetupContext(JITBlockBuilder *b, ePPUThreadID threadId);
   void InstrPrologueConst(JITBlockBuilder *b, u64 cia, u32 instrData);
   void InstrPrologueMinimal(JITBlockBuilder *b, u32 instrData);
 
@@ -254,19 +255,27 @@ private:
   sPPEState *ppeState = nullptr; // For easier thread access
   asmjit::JitRuntime jitRuntime;
 
-  // Block Cache, contains all created and valid JIT'ed blocks.
-  std::unordered_map<u64, std::shared_ptr<JITBlock>> jitBlocksCache = {};
-  // Page base -> set of block start addresses that cover that page.
-  std::unordered_map<u64, std::unordered_set<u64>> pageBlockIndex = {};
-  // Block start -> container of page bases it was registered under.
-  std::unordered_map<u64, std::vector<u64>> blockPageList = {};
-  // Mutex for thread safety.
-  std::mutex jitCacheMutex;
+  // Per-thread block caches (indexed by ePPUThreadID: 0 or 1).
+  // Each guest thread has its own independent cache to avoid races during
+  // block building and execution.
+  struct ThreadJITCache {
+    // Block Cache, contains all created and valid JIT'ed blocks.
+    std::unordered_map<u64, std::shared_ptr<JITBlock>> jitBlocksCache = {};
+    // Page base -> set of block start addresses that cover that page.
+    std::unordered_map<u64, std::unordered_set<u64>> pageBlockIndex = {};
+    // Block start -> container of page bases it was registered under.
+    std::unordered_map<u64, std::vector<u64>> blockPageList = {};
+    // Mutex for thread safety.
+    std::mutex jitCacheMutex;
+  };
+  ThreadJITCache threadCaches[2];
+
   // Internal helpers for page based indexing.
-  void RegisterBlockPages(u64 blockStart, u64 blockSize);
-  void UnregisterBlock(u64 blockStart);
-  
+  void RegisterBlockPages(u64 blockStart, u64 blockSize, ePPUThreadID threadId);
+  void UnregisterBlock(u64 blockStart, ePPUThreadID threadId);
+  void UnregisterBlockLocked(u64 blockStart, ThreadJITCache &cache);
+
   // Block linking helpers
-  void TryLinkBlock(JITBlock* block);
-  void UnlinkBlocksTo(u64 targetAddr);
+  void TryLinkBlock(JITBlock* block, ePPUThreadID threadId);
+  void UnlinkBlocksTo(u64 targetAddr, ePPUThreadID threadId);
 };

@@ -224,7 +224,7 @@ void PPCInterpreter::PPCInterpreter_tlbiel(sPPEState *ppeState) {
   if (invalSelector) {
     // Congruence class invalidation: invalidate all 4 ways at the specified index
     const u8 classIndex = (GPRi(rb) & 0xFF000) >> 12;
-    ppeState->TLB.invalidateClass(classIndex);
+    curThread.TLB.invalidateClass(classIndex);
 
     // Invalidate both ERAT's for the affected address range
     curThread.iERAT.invalidateAll();
@@ -246,7 +246,7 @@ void PPCInterpreter::PPCInterpreter_tlbiel(sPPEState *ppeState) {
     const u64 compareMask = mmuGetCompareMask(p);
     const u16 tlbIndex = mmuComputeTLBIndex(rb, p);
 
-    TLBCongruenceClass &tlbClass = ppeState->TLB.classes[tlbIndex];
+    TLBCongruenceClass &tlbClass = curThread.TLB.classes[tlbIndex];
     for (u8 way = 0; way < 4; ++way) {
       TLBEntry &entry = tlbClass.ways[way];
       if (entry.V && ((entry.VPN & compareMask) == (rb & compareMask))) {
@@ -403,7 +403,7 @@ void PPCInterpreter::mmuAddTlbEntry(sPPEState *ppeState) {
   default:     wayIndex = 0; break;
   }
 
-  TLBCongruenceClass &tlbClass = ppeState->TLB.classes[TI];
+  TLBCongruenceClass &tlbClass = curThread.TLB.classes[TI];
   TLBEntry &entry = tlbClass.ways[wayIndex];
 
   entry.V = true;
@@ -437,7 +437,7 @@ void PPCInterpreter::mmuAddTlbEntryHardware(sPPEState *ppeState, u64 VA,
   const u64 compareMask = mmuGetCompareMask(p);
   const u64 VPN = VA & compareMask;
 
-  TLBCongruenceClass &tlbClass = ppeState->TLB.classes[tlbIndex];
+  TLBCongruenceClass &tlbClass = curThread.TLB.classes[tlbIndex];
 
   // Select victim way
   // 1. Check for invalid entries
@@ -475,7 +475,7 @@ bool PPCInterpreter::mmuSearchTlbEntry(sPPEState *ppeState, u64 *RPN, u64 VA, u8
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUSearchTlbEntry", MP_AUTO);
 
   const u16 classIndex = mmuComputeTLBIndex(VA, p);
-  TLBCongruenceClass &tlbClass = ppeState->TLB.classes[classIndex];
+  TLBCongruenceClass &tlbClass = curThread.TLB.classes[classIndex];
 
   // Search all 4 ways in the congruence class
   for (u8 way = 0; way < 4; ++way) {
