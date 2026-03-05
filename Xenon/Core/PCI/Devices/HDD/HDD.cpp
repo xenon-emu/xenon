@@ -182,6 +182,8 @@ Xe::PCIDev::HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentP
 Xe::PCIDev::HDD::~HDD() {
   // Terminate thread.
   hddThreadRunning = false;
+  // Notify the DMA worker thread so it can start shutdown.
+  dmaCV.notify_one();
   if (hddWorkerThread.joinable())
     hddWorkerThread.join();
 }
@@ -310,6 +312,7 @@ void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
 // PCI Write
 void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
   bool shouldInterrupt = false;
+  bool shouldWakeDMA = false;
 
   {
   std::lock_guard lock(ataMutex);
@@ -539,6 +542,7 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
       memcpy(&ataState.regs.dmaCommand, data, size);
       if (ataState.regs.dmaCommand & XE_ATAPI_DMA_ACTIVE) {
         ataState.regs.dmaStatus = XE_ATA_DMA_ACTIVE; // Signal DMA active status.
+        shouldWakeDMA = true;
       }
       break;
     case ATA_REG_DMA_STATUS:
@@ -557,6 +561,11 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
   // Route interrupt outside of lock to avoid lock contention.
   if (shouldInterrupt) {
     ataIssueInterrupt();
+  }
+
+  // Wake the DMA worker thread if DMA was activated.
+  if (shouldWakeDMA) {
+    dmaCV.notify_one();
   }
 }
 
@@ -766,16 +775,18 @@ void Xe::PCIDev::HDD::hddThreadLoop() {
     return;
   LOG_INFO(HDD, "Entered HDD worker thread.");
   while (hddThreadRunning.load()) {
-    // Check if we should exit early
-    hddThreadRunning.store(XeRunning);
-    if (!hddThreadRunning.load())
-      break;
-
     bool shouldInterrupt = false;
 
-    // Check for the DMA active command.
     {
-      std::lock_guard lock(ataMutex);
+      std::unique_lock lock(ataMutex);
+      // Wait until DMA is active or we're told to stop.
+      dmaCV.wait(lock, [this] {
+        return (ataState.regs.dmaCommand & XE_ATA_DMA_ACTIVE) || !hddThreadRunning.load();
+      });
+
+      if (!hddThreadRunning.load())
+        break;
+
       if (ataState.regs.dmaCommand & XE_ATA_DMA_ACTIVE) {
         // Start our DMA operation
         doDMA();
@@ -790,9 +801,6 @@ void Xe::PCIDev::HDD::hddThreadLoop() {
     if (shouldInterrupt) {
       ataIssueInterrupt();
     }
-
-    // Sleep for some time.
-    std::this_thread::sleep_for(50ns);
   }
 
   LOG_INFO(HDD, "Exiting HDD worker thread.");

@@ -211,6 +211,8 @@ Xe::PCIDev::SFCX::~SFCX() {
   rawImageData.clear();
   // Terminate thread
   sfcxThreadRunning = false;
+  // Signal the worker thread so its able to start shutdown
+  sfcxCV.notify_one();
   if (sfcxThread.joinable())
     sfcxThread.join();
 }
@@ -313,6 +315,11 @@ void Xe::PCIDev::SFCX::Write(u64 writeAddress, const u8 *data, u64 size) {
 
     // Set command register
     sfcxState.commandReg = command;
+
+    // Notify the SFCX thread if a command was received.
+    if (command != NO_CMD) {
+      sfcxCV.notify_one();
+    }
     break;
   case SFCX_ADDRESS_REG:
     memcpy(&sfcxState.addressReg, data, size);
@@ -449,6 +456,17 @@ void Xe::PCIDev::SFCX::sfcxMainLoop() {
     if (!sfcxThreadRunning)
       break;
 
+    // Wait for a command to arrive
+    {
+      std::unique_lock lck(mutex);
+      sfcxCV.wait_for(lck, std::chrono::milliseconds(100), [this] {
+        return sfcxState.commandReg != NO_CMD || !sfcxThreadRunning;
+      });
+    }
+
+    if (!sfcxThreadRunning)
+      break;
+
     // Did we got a command?
     if (sfcxState.commandReg != NO_CMD) {
       // Tracks whether we should fire an interrupt after releasing the lock.
@@ -505,7 +523,7 @@ void Xe::PCIDev::SFCX::sfcxMainLoop() {
       if (shouldInterrupt) {
         parentBus->RouteInterrupt(PRIO_SFCX);
       }
-    }
+    } 
   }
 }
 

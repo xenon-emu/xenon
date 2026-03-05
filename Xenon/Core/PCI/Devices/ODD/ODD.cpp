@@ -10,7 +10,7 @@
 #include <plusaes/plusaes.hpp>
 
 // Enables ODD Debug output
-#define ODD_DEBUG
+//#define ODD_DEBUG
 
 // Describes the ATA transfer modes available to the SET_TRNASFER_MODE subcommand.
 enum class ATA_TRANSFER_MODE {

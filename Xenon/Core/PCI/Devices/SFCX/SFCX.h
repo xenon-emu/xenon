@@ -7,6 +7,7 @@
 #include <thread>
 #include <fstream>
 #include <filesystem>
+#include <condition_variable>
 
 #include "Core/RAM/RAM.h"
 #include "Core/PCI/Bridge/PCIBridge.h"
@@ -214,6 +215,8 @@ private:
   PCIBridge *parentBus = nullptr;
   // Mutex for thread-safe behavior.
   std::mutex mutex;
+  // Condition variable to wake the SFCX thread when a command arrives.
+  std::condition_variable sfcxCV;
   // RAM pointer. Used for DMA.
   RAM *mainMemory = nullptr;
   // Read a page from memory to page buffer.

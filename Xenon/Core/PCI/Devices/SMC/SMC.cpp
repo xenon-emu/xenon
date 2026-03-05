@@ -125,6 +125,8 @@ Xe::PCIDev::SMC::SMC(const std::string &deviceName, u64 size, PCIBridge *parentP
 Xe::PCIDev::SMC::~SMC() {
   LOG_INFO(SMC, "Shutting SMC down...");
   smcThreadRunning = false;
+  // Notify the SMC worker thread so it's able to start shutdown
+  smcCV.notify_one();
   if (smcThread.joinable())
     smcThread.join();
   smcCoreState.uartHandle->Shutdown();
@@ -136,7 +138,7 @@ Xe::PCIDev::SMC::~SMC() {
 void Xe::PCIDev::SMC::Read(u64 readAddress, u8 *data, u64 size) {
   const u8 regOffset = static_cast<u8>(readAddress);
 
-  mutex.lock();
+  std::lock_guard lock(mutex);
   switch (regOffset) {
   case UART_BYTE_OUT_REG: // UART Data Out Register
     smcPCIState.uartOutReg = smcCoreState.uartHandle->Read();
@@ -183,7 +185,6 @@ void Xe::PCIDev::SMC::Read(u64 readAddress, u8 *data, u64 size) {
     LOG_ERROR(SMC, "Unknown register being read, offset 0x{:X}", static_cast<u16>(regOffset));
     break;
   }
-  mutex.unlock();
 }
 
 // PCI Config Read
@@ -196,126 +197,146 @@ void Xe::PCIDev::SMC::ConfigRead(u64 readAddress, u8 *data, u64 size) {
 void Xe::PCIDev::SMC::Write(u64 writeAddress, const u8 *data, u64 size) {
   const u8 regOffset = static_cast<u8>(writeAddress);
 
-  mutex.lock();
-  switch (regOffset) {
-  case UART_BYTE_IN_REG: // UART Data In Register
-    memcpy(&smcPCIState.uartInReg, data, size);
-    smcCoreState.uartHandle->Write(*data);
-    break;
-  case UART_CONFIG_REG: // UART Config Register
-    memcpy(&smcPCIState.uartConfigReg, data, size);
-    // Check if UART is already initialized.
-    if (smcCoreState.uartHandle->SetupNeeded()) {
+  bool wakeSMC = false;
+  {
+    std::lock_guard lock(mutex);
+    switch (regOffset) {
+    case UART_BYTE_IN_REG: // UART Data In Register
+      memcpy(&smcPCIState.uartInReg, data, size);
+      smcCoreState.uartHandle->Write(*data);
+      break;
+    case UART_CONFIG_REG: // UART Config Register
+      memcpy(&smcPCIState.uartConfigReg, data, size);
+      // Check if UART is already initialized.
+      if (smcCoreState.uartHandle->SetupNeeded()) {
+        u64 tmp = 0;
+        memcpy(&tmp, data, size);
+        // Initialize UART.
+        setupUART(tmp);
+      }
+      break;
+    case SMI_INT_STATUS_REG: // SMI INT Status Register
+      memcpy(&smcPCIState.smiIntPendingReg, data, size);
+      break;
+    case SMI_INT_ACK_REG: // SMI INT ACK Register
+      memcpy(&smcPCIState.smiIntAckReg, data, size);
+      break;
+    case SMI_INT_ENABLED_REG: // SMI INT Enabled Register
+      memcpy(&smcPCIState.smiIntEnabledReg, data, size);
+      break;
+    case CLCK_INT_ENABLED_REG: // Clock INT Enabled Register
+      memcpy(&smcPCIState.clockIntEnabledReg, data, size);
+      break;
+    case CLCK_INT_STATUS_REG: // Clock INT Status Register
+      memcpy(&smcPCIState.clockIntStatusReg, data, size);
+      break;
+    case FIFO_IN_STATUS_REG: // FIFO In Status Register
+      memcpy(&smcPCIState.fifoInStatusReg, data, size);
+      if (smcPCIState.fifoInStatusReg == FIFO_STATUS_READY) { // We're about to receive a message.
+        // Reset our input buffer and buffer pointer.
+        memset(smcCoreState.fifoDataBuffer, 0, sizeof(smcCoreState.fifoDataBuffer));
+        smcCoreState.fifoBufferPos = 0;
+      } else if (smcPCIState.fifoInStatusReg == FIFO_STATUS_BUSY) {
+        // A FIFO command has been fully written, wake the SMC thread.
+        wakeSMC = true;
+      }
+      break;
+    case FIFO_OUT_STATUS_REG: // FIFO Out Status Register
+      memcpy(&smcPCIState.fifoOutStatusReg, data, size);
+      // We're about to send a reply.
+      if (smcPCIState.fifoOutStatusReg == FIFO_STATUS_READY) {
+        // Reset our FIFO buffer pointer.
+        smcCoreState.fifoBufferPos = 0;
+      }
+      break;
+    case FIFO_IN_DATA_REG: // FIFO Data In Register
+      // Copy the data to our input buffer at current position and increse buffer
+      // pointer position.
+      memcpy(&smcCoreState.fifoDataBuffer[smcCoreState.fifoBufferPos], data, size);
+      smcCoreState.fifoBufferPos += 4;
+      break;
+    default:
       u64 tmp = 0;
       memcpy(&tmp, data, size);
-      // Initialize UART.
-      setupUART(tmp);
+      LOG_ERROR(SMC, "Unknown register being written, offset 0x{:X}, data 0x{:X}", 
+          static_cast<u16>(regOffset), tmp);
+      break;
     }
-    break;
-  case SMI_INT_STATUS_REG: // SMI INT Status Register
-    memcpy(&smcPCIState.smiIntPendingReg, data, size);
-    break;
-  case SMI_INT_ACK_REG: // SMI INT ACK Register
-    memcpy(&smcPCIState.smiIntAckReg, data, size);
-    break;
-  case SMI_INT_ENABLED_REG: // SMI INT Enabled Register
-    memcpy(&smcPCIState.smiIntEnabledReg, data, size);
-    break;
-  case CLCK_INT_ENABLED_REG: // Clock INT Enabled Register
-    memcpy(&smcPCIState.clockIntEnabledReg, data, size);
-    break;
-  case CLCK_INT_STATUS_REG: // Clock INT Status Register
-    memcpy(&smcPCIState.clockIntStatusReg, data, size);
-    break;
-  case FIFO_IN_STATUS_REG: // FIFO In Status Register
-    memcpy(&smcPCIState.fifoInStatusReg, data, size);
-    if (smcPCIState.fifoInStatusReg == FIFO_STATUS_READY) { // We're about to receive a message.
-      // Reset our input buffer and buffer pointer.
-      memset(smcCoreState.fifoDataBuffer, 0, sizeof(smcCoreState.fifoDataBuffer));
-      smcCoreState.fifoBufferPos = 0;
-    }
-    break;
-  case FIFO_OUT_STATUS_REG: // FIFO Out Status Register
-    memcpy(&smcPCIState.fifoOutStatusReg, data, size);
-    // We're about to send a reply.
-    if (smcPCIState.fifoOutStatusReg == FIFO_STATUS_READY) {
-      // Reset our FIFO buffer pointer.
-      smcCoreState.fifoBufferPos = 0;
-    }
-    break;
-  case FIFO_IN_DATA_REG: // FIFO Data In Register
-    // Copy the data to our input buffer at current position and increse buffer
-    // pointer position.
-    memcpy(&smcCoreState.fifoDataBuffer[smcCoreState.fifoBufferPos], data, size);
-    smcCoreState.fifoBufferPos += 4;
-    break;
-  default:
-    u64 tmp = 0;
-    memcpy(&tmp, data, size);
-    LOG_ERROR(SMC, "Unknown register being written, offset 0x{:X}, data 0x{:X}", 
-        static_cast<u16>(regOffset), tmp);
-    break;
   }
-  mutex.unlock();
+
+  // Wake the SMC thread outside the lock if a FIFO command was submitted.
+  if (wakeSMC) {
+    smcCV.notify_one();
+  }
 }
 
 // PCI MemSet
 void Xe::PCIDev::SMC::MemSet(u64 writeAddress, s32 data, u64 size) {
   const u8 regOffset = static_cast<u8>(writeAddress);
 
-  mutex.lock();
-  switch (regOffset) {
-  case UART_CONFIG_REG: // UART Config Register
-    memset(&smcPCIState.uartConfigReg, data, size);
-    break;
-  case UART_BYTE_IN_REG: // UART Data In Register
-    memset(&smcPCIState.uartInReg, data, size);
-    break;
-  case SMI_INT_STATUS_REG: // SMI INT Status Register
-    memset(&smcPCIState.smiIntPendingReg, data, size);
-    break;
-  case SMI_INT_ACK_REG: // SMI INT ACK Register
-    memset(&smcPCIState.smiIntAckReg, data, size);
-    break;
-  case SMI_INT_ENABLED_REG: // SMI INT Enabled Register
-    memset(&smcPCIState.smiIntEnabledReg, data, size);
-    break;
-  case CLCK_INT_ENABLED_REG: // Clock INT Enabled Register
-    memset(&smcPCIState.clockIntEnabledReg, data, size);
-    break;
-  case CLCK_INT_STATUS_REG: // Clock INT Status Register
-    memset(&smcPCIState.clockIntStatusReg, data, size);
-    break;
-  case FIFO_IN_STATUS_REG: // FIFO In Status Register
-    memset(&smcPCIState.fifoInStatusReg, data, size);
-    if (smcPCIState.fifoInStatusReg == FIFO_STATUS_READY) { // We're about to receive a message.
-      // Reset our input buffer and buffer pointer.
-      memset(&smcCoreState.fifoDataBuffer, 0, 16);
-      smcCoreState.fifoBufferPos = 0;
+  bool wakeSMC = false;
+  {
+    std::lock_guard lock(mutex);
+    switch (regOffset) {
+    case UART_CONFIG_REG: // UART Config Register
+      memset(&smcPCIState.uartConfigReg, data, size);
+      break;
+    case UART_BYTE_IN_REG: // UART Data In Register
+      memset(&smcPCIState.uartInReg, data, size);
+      break;
+    case SMI_INT_STATUS_REG: // SMI INT Status Register
+      memset(&smcPCIState.smiIntPendingReg, data, size);
+      break;
+    case SMI_INT_ACK_REG: // SMI INT ACK Register
+      memset(&smcPCIState.smiIntAckReg, data, size);
+      break;
+    case SMI_INT_ENABLED_REG: // SMI INT Enabled Register
+      memset(&smcPCIState.smiIntEnabledReg, data, size);
+      break;
+    case CLCK_INT_ENABLED_REG: // Clock INT Enabled Register
+      memset(&smcPCIState.clockIntEnabledReg, data, size);
+      break;
+    case CLCK_INT_STATUS_REG: // Clock INT Status Register
+      memset(&smcPCIState.clockIntStatusReg, data, size);
+      break;
+    case FIFO_IN_STATUS_REG: // FIFO In Status Register
+      memset(&smcPCIState.fifoInStatusReg, data, size);
+      if (smcPCIState.fifoInStatusReg == FIFO_STATUS_READY) { // We're about to receive a message.
+        // Reset our input buffer and buffer pointer.
+        memset(&smcCoreState.fifoDataBuffer, 0, 16);
+        smcCoreState.fifoBufferPos = 0;
+      } else if (smcPCIState.fifoInStatusReg == FIFO_STATUS_BUSY) {
+        // A FIFO command has been fully written, wake the SMC thread.
+        wakeSMC = true;
+      }
+      break;
+    case FIFO_OUT_STATUS_REG: // FIFO Out Status Register
+      memset(&smcPCIState.fifoOutStatusReg, data, size);
+      // We're about to send a reply.
+      if (smcPCIState.fifoOutStatusReg == FIFO_STATUS_READY) {
+        // Reset our FIFO buffer pointer.
+        smcCoreState.fifoBufferPos = 0;
+      }
+      break;
+    case FIFO_IN_DATA_REG: // FIFO Data In Register
+      // Copy the data to our input buffer at current position and increse buffer
+      // pointer position.
+      memset(&smcCoreState.fifoDataBuffer[smcCoreState.fifoBufferPos], data, size);
+      smcCoreState.fifoBufferPos += 4;
+      break;
+    default:
+      u64 tmp = 0;
+      memset(&tmp, data, size);
+      LOG_ERROR(SMC, "Unknown register being written, offset 0x{:X}, data 0x{:X}", 
+          static_cast<u16>(regOffset), tmp);
+      break;
     }
-    break;
-  case FIFO_OUT_STATUS_REG: // FIFO Out Status Register
-    memset(&smcPCIState.fifoOutStatusReg, data, size);
-    // We're about to send a reply.
-    if (smcPCIState.fifoOutStatusReg == FIFO_STATUS_READY) {
-      // Reset our FIFO buffer pointer.
-      smcCoreState.fifoBufferPos = 0;
-    }
-    break;
-  case FIFO_IN_DATA_REG: // FIFO Data In Register
-    // Copy the data to our input buffer at current position and increse buffer
-    // pointer position.
-    memset(&smcCoreState.fifoDataBuffer[smcCoreState.fifoBufferPos], data, size);
-    smcCoreState.fifoBufferPos += 4;
-    break;
-  default:
-    u64 tmp = 0;
-    memset(&tmp, data, size);
-    LOG_ERROR(SMC, "Unknown register being written, offset 0x{:X}, data 0x{:X}", 
-        static_cast<u16>(regOffset), tmp);
-    break;
   }
-  mutex.unlock();
+
+  // Wake the SMC thread outside the lock if a FIFO command was submitted.
+  if (wakeSMC) {
+    smcCV.notify_one();
+  }
 }
 
 // PCI Config Write
@@ -441,6 +462,18 @@ void Xe::PCIDev::SMC::smcMainThread() {
   }
   while (smcThreadRunning) {
     MICROPROFILE_SCOPEI("[Xe::PCI]", "SMC::Loop", MP_AUTO);
+
+    // Wait for either a FIFO command or the 1ms clock tick.
+    {
+      std::unique_lock lock(mutex);
+      smcCV.wait_for(lock, std::chrono::milliseconds(1), [this] {
+        return smcPCIState.fifoInStatusReg == FIFO_STATUS_BUSY || !smcThreadRunning;
+      });
+    }
+
+    if (!smcThreadRunning)
+      break;
+
     // The System Management Controller (SMC) does the following:
     // * Communicates over a FIFO Queue with the kernel to execute commands and
     // provide system info.
@@ -517,7 +550,9 @@ void Xe::PCIDev::SMC::smcMainThread() {
       // Note that the first byte in the response is always Command ID.
       //
       // Data Buffer[0] is our message ID.
-      mutex.lock();
+
+      {
+      std::lock_guard lock(mutex);
       if (false) {
         std::stringstream ss{};
         ss << std::endl;
@@ -682,9 +717,7 @@ void Xe::PCIDev::SMC::smcMainThread() {
         else if (smcCoreState.fifoDataBuffer[1] == 0x04) {
           LOG_INFO(SMC, "[Standby] Requested reboot");
           // Note: Real hardware only respects 0x30, but for automated testing, we will allow anything
-          mutex.unlock();
-          XeMain::Reboot(static_cast<Xe::PCIDev::SMC_PWR_REASON>(smcCoreState.fifoDataBuffer[2]));
-          mutex.lock();
+          // Must release lock before reboot since it may re-enter SMC.
         } else {
           LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD Subtype in SMC_SET_STANDBY: 0x{:02X}",
             static_cast<u16>(smcCoreState.fifoDataBuffer[1]));
@@ -744,7 +777,12 @@ void Xe::PCIDev::SMC::smcMainThread() {
             static_cast<u16>(smcCoreState.fifoDataBuffer[0]));
         break;
       }
-      mutex.unlock();
+      }
+
+      // Handle reboot outside of lock since it may re-enter SMC.
+      if (smcCoreState.fifoDataBuffer[0] == SMC_SET_STANDBY && smcCoreState.fifoDataBuffer[1] == 0x04) {
+        XeMain::Reboot(static_cast<Xe::PCIDev::SMC_PWR_REASON>(smcCoreState.fifoDataBuffer[2]));
+      }
 
       // Set FIFO_OUT_STATUS_REG to FIFO_STATUS_READY, signaling we're ready to
       // transmit a response.
@@ -752,12 +790,11 @@ void Xe::PCIDev::SMC::smcMainThread() {
 
       // If interrupts are active set Int status and issue one.
       if (smcPCIState.smiIntEnabledReg & SMI_INT_ENABLED && noResponse == false) {
-        // Wait a small delay to mimic hardware. This allows code in xboxkrnl.exe such as
-        // KeWaitForSingleObject to correctly setup waiting code.
-        // This is no longer needed due to mutexes
-        mutex.lock();
-        smcPCIState.smiIntPendingReg = SMI_INT_PENDING;
-        mutex.unlock();
+        {
+          std::lock_guard lock(mutex);
+          smcPCIState.smiIntPendingReg = SMI_INT_PENDING;
+        }
+        // Route outside of the lock to avoid contention.
         pciBridge->RouteInterrupt(PRIO_SMM);
       }
     }
@@ -777,18 +814,16 @@ void Xe::PCIDev::SMC::smcMainThread() {
         // the KeTimeStampBundle structure (FILETIME format) to update 10000 units.
         // 10000 * 100ns intervals -> 1000000ns = 1ms 
         if (timerNow >= timerStart + 1ms) {
-          // Update internal timer.
-          timerStart = std::chrono::steady_clock::now();
-          mutex.lock();
-          smcPCIState.clockIntStatusReg = CLCK_INT_TAKEN;
-          mutex.unlock();
+          // Update internal timer
+          timerStart = timerNow;
+          {
+            std::lock_guard lock(mutex);
+            smcPCIState.clockIntStatusReg = CLCK_INT_TAKEN;
+          }
           // Route outside the lock to avoid lock contention
           pciBridge->RouteInterrupt(PRIO_CLOCK);
         }
       }
     }
-
-    // Sleep for some time.
-    std::this_thread::sleep_for(500ns);
   }
 }

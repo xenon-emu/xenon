@@ -257,7 +257,10 @@ public:
   }
 private:
   // Mutex, stops other threads from writing to values without the previous one finishing
-  std::recursive_mutex mutex;
+  std::mutex mutex;
+
+  // Condition variable to wake the SMC thread when a FIFO command arrives.
+  std::condition_variable smcCV;
 
   // Parent PCI Bridge (used for interrupts/communication)
   PCIBridge *pciBridge;
@@ -272,7 +275,7 @@ private:
   std::thread smcThread;
 
   // SMC Thread running state
-  volatile bool smcThreadRunning = true;
+  std::atomic<bool> smcThreadRunning{true};
 
   // UART Thread object
   std::thread uartThread;

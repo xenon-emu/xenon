@@ -18,6 +18,7 @@
 #include <mutex>
 #include <string>
 #include <thread>
+#include <condition_variable>
 
 #include "Core/RAM/RAM.h"
 #include "Core/XCPU/PPU/PPCInternal.h"
@@ -413,6 +414,9 @@ namespace Xe {
       // Mutex for synchronizing access to ataState between the worker thread
       // and PCI Read/Write methods.
       std::mutex ataMutex;
+
+      // Condition variable to wake the worker thread when DMA is activated.
+      std::condition_variable dmaCV;
 
       // Device State
       ATA_DEV_STATE ataState = {};
