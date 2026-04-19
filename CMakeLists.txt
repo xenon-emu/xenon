@@ -167,7 +167,7 @@ if (GFX_ENABLED)
     OUT_VAR XENON_SDL3_TARGET
   )
 
-  xenon_use_dep(VulkanHeaders VulkanHeaders
+  xenon_use_dep(VulkanHeaders Vulkan-Headers
     SYSTEM_TARGET Vulkan::Headers
     BUNDLED_TARGET Vulkan::Headers
     OUT_VAR XENON_VULKAN_HEADERS_TARGET
