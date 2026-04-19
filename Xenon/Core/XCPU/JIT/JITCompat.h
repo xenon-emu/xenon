@@ -153,10 +153,18 @@ template <typename CC, typename Target, typename Signature>
 inline void Invoke(CC *cc, asmjit::InvokeNode *&out, Target &&target, const Signature &signature) {
   cc->invoke(asmjit::Out(out), std::forward<Target>(target), signature);
 }
+template <typename CC, typename Signature>
+inline void AddFuncNode(CC *cc, asmjit::FuncNode *&out, const Signature &signature) {
+  cc->add_func_node(asmjit::Out(out), signature);
+}
 #else
 template <typename CC, typename Target, typename Signature>
 inline void Invoke(CC *cc, asmjit::InvokeNode *&out, Target &&target, const Signature &signature) {
   cc->invoke(&out, std::forward<Target>(target), signature);
+}
+template <typename CC, typename Signature>
+inline void AddFuncNode(CC *cc, asmjit::FuncNode *&out, const Signature &signature) {
+  cc->addFuncNode(&out, signature);
 }
 #endif
 

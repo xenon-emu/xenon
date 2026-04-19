@@ -251,7 +251,7 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
 
   FuncNode *signature = nullptr;
 
-  compiler. ADD_FN_NODE(Out(signature), FuncSignature::build<void, PPU *, sPPEState *, bool>());
+  Xe::JITCompat::AddFuncNode(&compiler, signature, FuncSignature::build<void, PPU *, sPPEState *, bool>());
   Xe::JITCompat::NewGP64(&compiler);
   Xe::JITCompat::SetArg(signature, 0, jitBuilder->ppu->Base());
   Xe::JITCompat::SetArg(signature, 1, jitBuilder->ppeState->Base());
