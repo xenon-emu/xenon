@@ -150,12 +150,10 @@ private:
 using namespace asmjit;
 
 #ifdef XE_ASMJIT_NEW_OUT_API
-  #define ADD_FN_NODE(...) add_func_node(__VA_ARGS__)
   #define SET_AVX set_avx_enabled
   #define CPU_FEAT cpu_features
   #define CODE_SZ code_size
 #else
-  #define ADD_FN_NODE(...) addFuncNode(__VA_ARGS__)
   #define SET_AVX setAvxEnabled
   #define CPU_FEAT cpuFeatures
   #define CODE_SZ codeSize
