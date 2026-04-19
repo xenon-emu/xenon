@@ -108,71 +108,88 @@ endif()
 # Dependency Resoultion
 #
 
-function(xenon_require_system pkg target)
-  if (NOT XENON_USE_SYSTEM_DEPS)
-    message(FATAL_ERROR "XENON_USE_SYSTEM_DEPS=OFF is not supported by this packaging path for ${pkg}")
-  endif()
+function(xenon_use_dep pkg subdir)
+  set(options)
+  set(oneValueArgs SYSTEM_TARGET BUNDLED_TARGET OUT_VAR)
+  cmake_parse_arguments(XUD "${options}" "${oneValueArgs}" "" ${ARGN})
 
-  find_package(${pkg} CONFIG QUIET)
-  if (NOT TARGET ${target})
-    find_package(${pkg} QUIET)
-  endif()
-
-  if (NOT TARGET ${target})
-    if (XENON_ALLOW_BUNDLED_DEPS)
-      message(FATAL_ERROR
-        "Package ${pkg} was not found as system dependency, but this CMake path expects it. "
-        "Either package it properly or add an explicit bundled path for ${pkg}.")
-    else()
-      message(FATAL_ERROR
-        "Required system package ${pkg} not found (expected target ${target}).")
+  if (XENON_USE_SYSTEM_DEPS)
+    find_package(${pkg} CONFIG QUIET)
+    if (XUD_SYSTEM_TARGET AND TARGET ${XUD_SYSTEM_TARGET})
+      set(_resolved_target ${XUD_SYSTEM_TARGET})
     endif()
   endif()
 
-  message(STATUS "Using system ${pkg}: ${target}")
-endfunction()
+  if (NOT _resolved_target AND XENON_ALLOW_BUNDLED_DEPS)
+    message(STATUS "Using bundled ${pkg}")
+    add_subdirectory(${XENON_THIRDPARTY_DIR}/${subdir} ${subdir} EXCLUDE_FROM_ALL)
 
-function(xenon_add_bundled pkg subdir)
-  if (NOT XENON_ALLOW_BUNDLED_DEPS)
-    message(FATAL_ERROR "Bundled dependency ${pkg} requested but XENON_ALLOW_BUNDLED_DEPS=OFF")
+    if (XUD_BUNDLED_TARGET AND TARGET ${XUD_BUNDLED_TARGET})
+      set(_resolved_target ${XUD_BUNDLED_TARGET})
+    elseif (XUD_SYSTEM_TARGET AND TARGET ${XUD_SYSTEM_TARGET})
+      set(_resolved_target ${XUD_SYSTEM_TARGET})
+    endif()
   endif()
 
-  message(STATUS "Using bundled ${pkg}")
-  add_subdirectory(${XENON_THIRDPARTY_DIR}/${subdir} ${subdir} EXCLUDE_FROM_ALL)
+  if (NOT _resolved_target)
+    message(FATAL_ERROR "Failed to resolve dependency ${pkg}")
+  endif()
+
+  if (XUD_OUT_VAR)
+    set(${XUD_OUT_VAR} ${_resolved_target} PARENT_SCOPE)
+  endif()
+
+  message(STATUS "Resolved ${pkg} -> ${_resolved_target}")
 endfunction()
 
-xenon_require_system(fmt fmt::fmt)
-xenon_require_system(asmjit asmjit::asmjit)
-xenon_require_system(toml11 toml11::toml11)
+xenon_use_dep(fmt fmt
+  SYSTEM_TARGET fmt::fmt
+  BUNDLED_TARGET fmt::fmt
+  OUT_VAR XENON_FMT_TARGET
+)
+
+xenon_use_dep(asmjit asmjit
+  SYSTEM_TARGET asmjit::asmjit
+  BUNDLED_TARGET asmjit
+  OUT_VAR XENON_ASMJIT_TARGET
+)
+
+xenon_use_dep(toml11 toml11
+  SYSTEM_TARGET toml11::toml11
+  BUNDLED_TARGET toml11::toml11
+  OUT_VAR XENON_TOML11_TARGET
+)
 
 if (GFX_ENABLED)
-  xenon_require_system(SDL3 SDL3::SDL3)
-  xenon_require_system(VulkanHeaders Vulkan::Headers)
-  xenon_require_system(VulkanMemoryAllocator GPUOpen::VulkanMemoryAllocator)
+  xenon_use_dep(SDL3 SDL3
+    SYSTEM_TARGET SDL3::SDL3
+    BUNDLED_TARGET SDL3::SDL3
+    OUT_VAR XENON_SDL3_TARGET
+  )
 
-  # vk-bootstrap package exports vary a bit, so this covers all bases
-  find_package(vk-bootstrap CONFIG QUIET)
-  if (TARGET vk-bootstrap::vk-bootstrap)
-    set(XENON_VK_BOOTSTRAP_TARGET vk-bootstrap::vk-bootstrap)
-    message(STATUS "Using system vk-bootstrap: vk-bootstrap::vk-bootstrap")
-  elseif (TARGET vk-bootstrap)
-    set(XENON_VK_BOOTSTRAP_TARGET vk-bootstrap)
-    message(STATUS "Using system vk-bootstrap: vk-bootstrap")
-  else()
-    message(FATAL_ERROR "Required system package vk-bootstrap not found")
-  endif()
+  xenon_use_dep(VulkanHeaders VulkanHeaders
+    SYSTEM_TARGET Vulkan::Headers
+    BUNDLED_TARGET Vulkan::Headers
+    OUT_VAR XENON_VULKAN_HEADERS_TARGET
+  )
 
-  # Same reason as vk-bootstrap
-  find_package(glslang CONFIG QUIET)
-  if (TARGET glslang::glslang)
-    set(XENON_GLSLANG_TARGET glslang::glslang)
-    message(STATUS "Using system glslang: glslang::glslang")
-  elseif (TARGET glslang)
-    set(XENON_GLSLANG_TARGET glslang)
-    message(STATUS "Using system glslang: glslang")
-  else()
-    message(FATAL_ERROR "Required system package glslang not found")
-  endif()
+  xenon_use_dep(VulkanMemoryAllocator VulkanMemoryAllocator
+    SYSTEM_TARGET GPUOpen::VulkanMemoryAllocator
+    BUNDLED_TARGET VulkanMemoryAllocator
+    OUT_VAR XENON_VMA_TARGET
+  )
+
+  xenon_use_dep(vk-bootstrap vk-bootstrap
+    SYSTEM_TARGET vk-bootstrap::vk-bootstrap
+    BUNDLED_TARGET vk-bootstrap
+    OUT_VAR XENON_VK_BOOTSTRAP_TARGET
+  )
+
+  xenon_use_dep(glslang glslang
+    SYSTEM_TARGET glslang::glslang
+    BUNDLED_TARGET glslang
+    OUT_VAR XENON_GLSLANG_TARGET
+  )
 endif()
 
 # These will always be static.
@@ -266,9 +283,9 @@ endif()
 #
 
 target_link_libraries(Xenon PRIVATE
-  fmt::fmt
-  toml11::toml11
-  asmjit::asmjit
+  ${XENON_FMT_TARGET}
+  ${XENON_TOML11_TARGET}
+  ${XENON_ASMJIT_TARGET}
 )
 
 if (GFX_ENABLED)
@@ -276,9 +293,9 @@ if (GFX_ENABLED)
     glad
     ${XENON_GLSLANG_TARGET}
     ${XENON_SIRIT_TARGET}
-    SDL3::SDL3
-    Vulkan::Headers
-    GPUOpen::VulkanMemoryAllocator
+    ${XENON_SDL3_TARGET}
+    ${XENON_VULKAN_HEADERS_TARGET}
+    ${XENON_VMA_TARGET}
     ${XENON_VK_BOOTSTRAP_TARGET}
   )
 endif()

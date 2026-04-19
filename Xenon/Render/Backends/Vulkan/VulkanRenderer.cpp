@@ -162,6 +162,7 @@ void VulkanRenderer::BackendStart() {
 
   vkbSwapchain = swapchainRet.value();
   swapchain = vkbSwapchain.swapchain;
+  swapchainExtent = vkbSwapchain.extent;
 
   auto imageViewsRet = vkbSwapchain.get_image_views();
   if (!imageViewsRet) {
@@ -179,8 +180,8 @@ void VulkanRenderer::BackendStart() {
 
   chosenFormat.format = vkbSwapchain.image_format;
 
-  width = vkbSwapchain.extent.width;
-  height = vkbSwapchain.extent.height;
+  width = swapchainExtent.width;
+  height = swapchainExtent.height;
 
   swapchainImageCount = swapchainImageViews.size();
 
@@ -254,8 +255,24 @@ void VulkanRenderer::BackendSDLInit() {
   LOG_INFO(Render, "VulkanRenderer::BackendSDLInit");
 }
 
+void VulkanRenderer::WaitIdle() {
+  if (vkbDevice.device)
+    dispatch.deviceWaitIdle();
+}
+
 void VulkanRenderer::BackendShutdown() {
-  dispatch.deviceWaitIdle();
+  for (auto &g : garbage) {
+    for (auto &b : g.buffers) {
+      if (b.buffer != VK_NULL_HANDLE)
+        vmaDestroyBuffer(allocator, b.buffer, b.allocation);
+    }
+    for (auto p : g.pipelines) {
+      if (p != VK_NULL_HANDLE)
+        dispatch.destroyPipeline(p, nullptr);
+    }
+    g.buffers.clear();
+    g.pipelines.clear();
+  }
 
   DestroyPipelines();
 
@@ -280,6 +297,36 @@ void VulkanRenderer::BackendShutdown() {
     commandPool = VK_NULL_HANDLE;
   }
 
+  if (descPool) {
+    dispatch.destroyDescriptorPool(descPool, nullptr);
+    descPool = VK_NULL_HANDLE;
+    computeSet = VK_NULL_HANDLE;
+    renderSet = VK_NULL_HANDLE;
+  }
+
+  if (computeSetLayout) {
+    dispatch.destroyDescriptorSetLayout(computeSetLayout, nullptr);
+    computeSetLayout = VK_NULL_HANDLE;
+  }
+  if (renderSetLayout) {
+    dispatch.destroyDescriptorSetLayout(renderSetLayout, nullptr);
+    renderSetLayout = VK_NULL_HANDLE;
+  }
+
+  if (fbView) {
+    dispatch.destroyImageView(fbView, nullptr);
+    fbView = VK_NULL_HANDLE;
+  }
+  if (fbSampler) {
+    dispatch.destroySampler(fbSampler, nullptr);
+    fbSampler = VK_NULL_HANDLE;
+  }
+  if (fbImage) {
+    vmaDestroyImage(allocator, fbImage, fbAlloc);
+    fbImage = VK_NULL_HANDLE;
+    fbAlloc = VK_NULL_HANDLE;
+  }
+
   if (!swapchainImageViews.empty())
     vkbSwapchain.destroy_image_views(swapchainImageViews);
   swapchainImageViews.clear();
@@ -288,6 +335,11 @@ void VulkanRenderer::BackendShutdown() {
   if (allocator) {
     vmaDestroyAllocator(allocator);
     allocator = VK_NULL_HANDLE;
+  }
+
+  if (swapchain) {
+    vkb::destroy_swapchain(vkbSwapchain);
+    swapchain = VK_NULL_HANDLE;
   }
 
   vkb::destroy_device(vkbDevice);
@@ -559,7 +611,6 @@ void VulkanRenderer::CreateComputePipeline() {
   VkResult r = dispatch.createPipelineLayout(&pl, nullptr, &computePL);
   if (r != VK_SUCCESS) {
     LOG_ERROR(Render, "vkCreatePipelineLayout(compute) failed: 0x{:x}", (u32)r);
-    dispatch.destroyShaderModule(cs, nullptr);
     return;
   }
 
@@ -576,8 +627,6 @@ void VulkanRenderer::CreateComputePipeline() {
   if (r != VK_SUCCESS) {
     LOG_ERROR(Render, "vkCreateComputePipelines failed: 0x{:x}", (u32)r);
   }
-
-  dispatch.destroyShaderModule(cs, nullptr);
 }
 
 void VulkanRenderer::CreateRenderPipeline() {
@@ -638,8 +687,6 @@ void VulkanRenderer::CreateRenderPipeline() {
   VkResult r = dispatch.createPipelineLayout(&pl, nullptr, &renderPL);
   if (r != VK_SUCCESS) {
     LOG_ERROR(Render, "vkCreatePipelineLayout(render) failed: 0x{:x}", (u32)r);
-    dispatch.destroyShaderModule(vs, nullptr);
-    dispatch.destroyShaderModule(fs, nullptr);
     return;
   }
 
@@ -678,9 +725,6 @@ void VulkanRenderer::CreateRenderPipeline() {
   if (r != VK_SUCCESS) {
     LOG_ERROR(Render, "vkCreateGraphicsPipelines(render) failed: 0x{:x}", (u32)r);
   }
-
-  dispatch.destroyShaderModule(vs, nullptr);
-  dispatch.destroyShaderModule(fs, nullptr);
 }
 
 void VulkanRenderer::DestroyPipelines() {
@@ -801,6 +845,18 @@ void VulkanRenderer::OnSwap(SDL_Window *window) {
 
   dispatch.waitForFences(1, &inFlight[currentFrame], VK_TRUE, UINT64_MAX);
 
+  auto &g = garbage[currentFrame];
+  for (auto& b : g.buffers) {
+    if (b.buffer != VK_NULL_HANDLE)
+      vmaDestroyBuffer(allocator, b.buffer, b.allocation);
+  }
+  for (auto p : g.pipelines) {
+    if (p != VK_NULL_HANDLE)
+      dispatch.destroyPipeline(p, nullptr);
+  }
+  g.buffers.clear();
+  g.pipelines.clear();
+
   u32 imageIndex = 0;
   VkResult r = dispatch.acquireNextImageKHR(
     swapchain, UINT64_MAX,
@@ -851,7 +907,10 @@ void VulkanRenderer::OnSwap(SDL_Window *window) {
   colorAtt.clearValue = clear;
 
   VkRenderingInfo ri{ VK_STRUCTURE_TYPE_RENDERING_INFO };
-  ri.renderArea = { {0,0}, {(u32)width, (u32)height} };
+  ri.renderArea = {
+    {0, 0},
+    {swapchainExtent.width, swapchainExtent.height}
+  };
   ri.layerCount = 1;
   ri.colorAttachmentCount = 1;
   ri.pColorAttachments = &colorAtt;
@@ -868,8 +927,8 @@ void VulkanRenderer::OnSwap(SDL_Window *window) {
   FbConvertPC pc{};
   pc.internalWidth  = (s32)internalWidth;
   pc.internalHeight = (s32)internalHeight;
-  pc.resWidth = (s32)width;
-  pc.resHeight = (s32)height;
+  pc.resWidth = swapchainExtent.width;
+  pc.resHeight = swapchainExtent.height;
 
   dispatch.cmdPushConstants(cmd, computePL, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(FbConvertPC), &pc);
 
@@ -888,12 +947,13 @@ void VulkanRenderer::OnSwap(SDL_Window *window) {
 
   VkRect2D sc{
     { 0, 0 },
-    { (u32)width, (u32)height }
+    { swapchainExtent.width, swapchainExtent.height }
   };
 
   VkViewport vp{
     0.f, 0.f,
-    (float)width, (float)height,
+    (float)swapchainExtent.width,
+    (float)swapchainExtent.height,
     0.f, 1.f
   };
 
@@ -1028,6 +1088,7 @@ void VulkanRenderer::RecreateSwapchain() {
 
   vkbSwapchain = swapchainRet.value();
   swapchain = vkbSwapchain.swapchain;
+  swapchainExtent = vkbSwapchain.extent;
 
   auto imageViewsRet = vkbSwapchain.get_image_views();
   if (!imageViewsRet) {
@@ -1063,6 +1124,7 @@ void VulkanRenderer::RecreateSwapchain() {
     }
   }
 
+  DestroyPipelines();
   CreateFbImage(width, height);
 
   // Recreate pipelines that depend on swapchain format

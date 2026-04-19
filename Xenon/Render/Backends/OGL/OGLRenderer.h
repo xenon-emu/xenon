@@ -37,6 +37,7 @@ public:
   void UpdateClearDepth(f64 depth) override;
   void UpdateViewportFromState(const Xe::XGPU::XenosState *state) override;
   void BackendBindPixelBuffer(Buffer *buffer) override;
+  void WaitIdle() override;
   void Clear() override;
 
   void VertexFetch(const u32 location, const u32 components, bool isFloat, bool isNormalized, const u32 fetchOffset, const u32 fetchStride) override;

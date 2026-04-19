@@ -40,6 +40,10 @@ void DummyRenderer::BackendSDLShutdown() {
   LOG_INFO(Render, "DummyRenderer::BackendSDLShutdown");
 }
 
+void DummyRenderer::WaitIdle() {
+  LOG_INFO(Render, "DummyRenderer::WaitIdle");
+}
+
 void DummyRenderer::BackendResize(s32 x, s32 y) {
   LOG_INFO(Render, "DummyRenderer::BackendResize: {}, {}", x, y);
 }

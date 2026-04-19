@@ -120,6 +120,7 @@ public:
   virtual void UpdateClearDepth(f64 depth) = 0;
   virtual void BackendBindPixelBuffer(Buffer *buffer) = 0;
   virtual void BackendOnUploadBuffer(u32 bufferHash, Buffer *buffer) {}
+  virtual void WaitIdle() {}
   virtual void Clear() = 0;
 
   virtual void UpdateViewportFromState(const Xe::XGPU::XenosState *state) = 0;

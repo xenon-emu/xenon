@@ -156,6 +156,10 @@ void OGLRenderer::BackendSDLShutdown() {
   }
 }
 
+void OGLRenderer::WaitIdle() {
+
+}
+
 void OGLRenderer::BackendResize(s32 x, s32 y) {
   glViewport(0, 0, x, y);
 }

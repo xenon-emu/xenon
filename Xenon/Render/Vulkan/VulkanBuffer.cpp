@@ -40,13 +40,18 @@ void Render::VulkanBuffer::Unbind() {
 }
 
 void Render::VulkanBuffer::DestroyBuffer() {
-  if (buffer != VK_NULL_HANDLE) {
-    vmaDestroyBuffer(renderer->allocator, buffer, allocation);
-    buffer = VK_NULL_HANDLE;
-    allocation = VK_NULL_HANDLE;
-    allocationInfo = {};
-    SetSize(0);
-  }
+  if (!renderer || buffer == VK_NULL_HANDLE)
+    return;
+
+  renderer->garbage[renderer->currentFrame].buffers.push_back({
+    buffer,
+    allocation
+  });
+
+  buffer = VK_NULL_HANDLE;
+  allocation = VK_NULL_HANDLE;
+  allocationInfo = {};
+  SetSize(0);
 }
 
 void *Render::VulkanBuffer::GetBackendHandle() {

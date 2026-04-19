@@ -13,7 +13,7 @@ layout(location = 0) out vec2 o_texture_coord;
 
 void main() {
   o_texture_coord = vec2((gl_VertexIndex << 1) & 2, gl_VertexIndex & 2);
-  gl_Position = vec4(o_texture_coord * 2.0f + vec2(-1.0f), 0.0f, 1.0f);
+  gl_Position = vec4(o_texture_coord * vec2(2.0, -2.0) + vec2(-1.0, 1.0), 0.0, 1.0);
 })glsl";
 
 inline constexpr const char fragmentShaderSource[] = R"glsl(#version 450 core

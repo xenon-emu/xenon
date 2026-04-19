@@ -116,6 +116,10 @@ void Renderer::Shutdown() {
     }
   }
 
+  if (finishedCreation) {
+    WaitIdle(); // Only idle here, do not destroy device yet
+  }
+
   if (gui) {
     gui->Shutdown();
     gui.reset();
