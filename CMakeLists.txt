@@ -185,6 +185,7 @@ if (GFX_ENABLED)
     OUT_VAR XENON_VK_BOOTSTRAP_TARGET
   )
 
+set(ENABLE_OPT OFF CACHE BOOL "" FORCE)
   xenon_use_dep(glslang glslang
     SYSTEM_TARGET glslang::glslang
     BUNDLED_TARGET glslang
