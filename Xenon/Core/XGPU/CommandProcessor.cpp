@@ -627,8 +627,10 @@ std::pair<Microcode::AST::Shader *, std::vector<u32>> LoadShader(eShaderType sha
   std::ofstream f{ shaderPath / (baseString + ".spv"), std::ios::out | std::ios::binary };
   f.write(reinterpret_cast<char *>(spirv.data()), spirv.size() * sizeof(u32));
   f.close();
-#endif
   return { shader, spirv };
+#else
+  return { shader, {} };
+#endif
 }
 
 bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {

@@ -18,7 +18,7 @@ concurrency:
 env:
   BUILD_TYPE: Release
   BUILD_DIR: build
-  XE_ASMJIT_NEW_OUT_API: "OFF"
+  XE_ASMJIT_NEW_OUT_API: "ON"
 
 jobs:
   get-info:
@@ -323,7 +323,7 @@ jobs:
             -DCMAKE_CXX_COMPILER="$(brew --prefix llvm@20)/bin/clang++" \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DXE_ASMJIT_NEW_OUT_API=OFF
+            -DXE_ASMJIT_NEW_OUT_API="${XE_ASMJIT_NEW_OUT_API}"
 
       - name: Build
         run: |
