@@ -1,5 +1,5 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #include "Base/Thread.h"
@@ -78,7 +78,7 @@ XenonCPU::XenonCPU(std::weak_ptr<RootBus> inBus, const std::string blPath, const
 
     // Start timebase timer thread.
     if (!timeBaseThreadActive.load()) {
-      timeBaseThreadActive.store(true);
+      timeBaseThreadActive.store(true, std::memory_order_release);
       timeBaseThread = std::thread(&XenonCPU::timeBaseThreadLoop, this);
     }
   }
@@ -123,7 +123,7 @@ XenonCPU::XenonCPU(std::weak_ptr<RootBus> inBus, const std::string blPath, const
 
 XenonCPU::~XenonCPU() {
   // First signal timer thread to stop and wait for it to exit.
-  timeBaseThreadActive.store(false);
+  timeBaseThreadActive.store(false, std::memory_order_release);
 
   // Ensure thread is joined before destroying resources it may touch.
   try {
@@ -318,7 +318,7 @@ void XenonCPU::timeBaseThreadLoop() {
 
   while (timeBaseThreadActive.load()) {
     // Add a escape hatch for faster shutdown.
-    if (!XeRunning)
+    if (!XeRunning.load(std::memory_order_acquire))
       break;
     // Sleep a little to avoid burning CPU. We compute elapsed and convert to ticks.
     // The lower we sleep, the more accurate the timebase will be, but it will also be more CPU intensive.

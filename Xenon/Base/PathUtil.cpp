@@ -3,9 +3,8 @@
 /***************************************************************/
 
 #include "PathUtil.h"
-#include "Base/Logging/Log.h"
 
-#include <fmt/format.h>
+#include "Base/Logging/Log.h"
 
 #include <unordered_map>
 #include <fstream>
@@ -18,109 +17,194 @@
 #endif // __APPLE__
 
 namespace Base {
+
 namespace FS {
 
-const fs::path GetBinaryDirectory() {
-  fs::path fspath = {};
-#ifdef _WIN32
-  char path[256];
-  GetModuleFileNameA(nullptr, path, sizeof(path));
-  fspath = path;
-#elif __linux__
-  fspath = fs::canonical("/proc/self/exe");
-#elif __APPLE__
-  pid_t pid = getpid();
-  char path[PROC_PIDPATHINFO_MAXSIZE];
-  // While this is fine for a raw executable,
-  // an application bundle is read-only and these files
-  // should instead be placed in Application Support.
-  proc_pidpath(pid, path, sizeof(path));
-  fspath = path;
-#else
-  // Unknown, just return rootdir
-  fspath = fs::current_path() / "Xenon";
-#endif
-  return fs::weakly_canonical(FMT("{}/..", fspath.string()));
+static fs::path GetEnvPath(const char *name) {
+  const char *value = std::getenv(name);
+  return (value && *value) ? fs::path(value) : fs::path{};
 }
 
-static auto UserPaths = [] {
-  auto currentDir = fs::current_path();
-  auto binaryDir = GetBinaryDirectory();
-  bool nixos = false;
 #ifdef _WIN32
-  const char *appdata = std::getenv("APPDATA");
-  if (!appdata) {
-    throw std::runtime_error("APPDATA not set");
+static fs::path GetKnownFolder(REFKNOWNFOLDERID id) {
+  PWSTR wide_path = nullptr;
+  HRESULT hr = SHGetKnownFolderPath(id, KF_FLAG_CREATE, nullptr, &wide_path);
+  if (FAILED(hr) || !wide_path) {
+    throw std::runtime_error("SHGetKnownFolderPath failed");
   }
-  fs::path configDir(appdata);
-#else
-  const char *home = std::getenv("HOME");
-  if (!home) {
-    throw std::runtime_error("HOME not set");
-  }
-  fs::path configDir(fs::path(home) / ".local" / "share");
+
+  fs::path result(wide_path);
+  CoTaskMemFree(wide_path);
+  return result;
+}
 #endif
 
+const fs::path GetBinaryDirectory() {
+  fs::path exe_path;
+
+#ifdef _WIN32
+  wchar_t path[MAX_PATH];
+  DWORD len = GetModuleFileNameW(nullptr, path, MAX_PATH);
+  if (len == 0 || len == MAX_PATH) {
+    throw std::runtime_error("GetModuleFileNameW failed");
+  }
+  exe_path = fs::path(path);
+
+#elif __linux__
+  exe_path = fs::canonical("/proc/self/exe");
+
+#elif __APPLE__
+  pid_t pid = getpid();
+  char path[PROC_PIDPATHINFO_MAXSIZE] = {};
+  int ret = proc_pidpath(pid, path, sizeof(path));
+  if (ret <= 0) {
+    throw std::runtime_error("proc_pidpath failed");
+  }
+  exe_path = fs::path(path);
+
+#else
+  exe_path = fs::current_path() / APP_NAME;
+#endif
+
+  return fs::weakly_canonical(exe_path.parent_path());
+}
+
+static void EnsureDir(const fs::path &p) {
+  std::error_code ec;
+  fs::create_directories(p, ec);
+  if (ec) {
+    throw std::runtime_error(FMT("Failed to create directory '{}': {}",
+      p.string(), ec.message()));
+  }
+}
+
+static auto Paths = [] {
   std::unordered_map<PathType, fs::path> paths{};
 
-  const auto insert_path = [&](PathType xenon_path, const fs::path &new_path, bool create = true) {
-    if (create && !fs::exists(new_path))
-      fs::create_directory(new_path);
-
-    paths.insert_or_assign(xenon_path, new_path);
+  const auto insert_path = [&](PathType type, const fs::path& path, bool create = true) {
+    if (create) {
+      EnsureDir(path);
+    }
+    paths.insert_or_assign(type, path);
   };
 
-  configDir /= "Xenon";
-  insert_path(PathType::BinaryDir, binaryDir, false);
-  insert_path(PathType::RootDir, configDir);
-  insert_path(PathType::ConsoleDir, configDir / CONSOLE_DIR);
-  insert_path(PathType::LogDir, configDir / LOG_DIR);
-  insert_path(PathType::ShaderDir, configDir / SHADER_DIR);
-  fs::create_directory(configDir / SHADER_DIR / "cache");
-  fs::create_directory(configDir / SHADER_DIR / "spirv");
-  fs::create_directory(configDir / SHADER_DIR / "opengl");
-  fs::create_directory(configDir / SHADER_DIR / "vulkan");
+  insert_path(PathType::BinaryDir, GetBinaryDirectory(), false);
+
+#ifdef _WIN32
+  fs::path roaming = GetKnownFolder(FOLDERID_RoamingAppData) / APP_NAME;
+  fs::path local = GetKnownFolder(FOLDERID_LocalAppData) / APP_NAME;
+
+  fs::path configDir = roaming;
+  fs::path dataDir = roaming;
+  fs::path cacheDir  = local / "Cache";
+  fs::path stateDir = local / "State";
+  fs::path logDir = local / "Logs";
+
+#elif defined(__APPLE__)
+  fs::path home = GetEnvPath("HOME");
+  if (home.empty()) {
+    throw std::runtime_error("HOME not set");
+  }
+
+  fs::path appSupport = home / "Library" / "Application Support" / APP_NAME;
+  fs::path cacheDir = home / "Library" / "Caches" / APP_NAME;
+  fs::path logDir = home / "Library" / "Logs" / APP_NAME;
+
+  fs::path configDir = appSupport;
+  fs::path dataDir = appSupport;
+  fs::path stateDir = appSupport / "State";
+#else
+  fs::path home = GetEnvPath("HOME");
+  if (home.empty()) {
+    throw std::runtime_error("HOME not set");
+  }
+
+  fs::path configBase = GetEnvPath("XDG_CONFIG_HOME");
+  fs::path dataBase = GetEnvPath("XDG_DATA_HOME");
+  fs::path cacheBase = GetEnvPath("XDG_CACHE_HOME");
+  fs::path stateBase = GetEnvPath("XDG_STATE_HOME");
+
+  if (configBase.empty()) configBase = home / ".config";
+  if (dataBase.empty()) dataBase = home / ".local" / "share";
+  if (cacheBase.empty()) cacheBase = home / ".cache";
+  if (stateBase.empty()) stateBase = home / ".local" / "state";
+
+  fs::path configDir = configBase / "xenon";
+  fs::path dataDir = dataBase / "xenon";
+  fs::path cacheDir = cacheBase / "xenon";
+  fs::path stateDir = stateBase / "xenon";
+  fs::path logDir = stateDir / LOG_DIR;
+#endif
+
+  insert_path(PathType::UserConfigDir, configDir);
+  insert_path(PathType::UserDataDir, dataDir);
+  insert_path(PathType::UserCacheDir, cacheDir);
+  insert_path(PathType::UserStateDir, stateDir);
+  insert_path(PathType::LogDir, logDir);
+
+  insert_path(PathType::ConsoleDir, dataDir / CONSOLE_DIR);
+
+  insert_path(PathType::ShaderDir, dataDir / SHADER_DIR);
+  insert_path(PathType::ShaderCacheDir, cacheDir / SHADER_DIR);
+  insert_path(PathType::ShaderSpirvDir, dataDir / SHADER_DIR / "spirv");
+  insert_path(PathType::ShaderOpenGLDir, dataDir / SHADER_DIR / "opengl");
+  insert_path(PathType::ShaderVulkanDir, dataDir / SHADER_DIR / "vulkan");
+
   return paths;
 }();
 
 std::string PathToUTF8String(const fs::path &path) {
-  const auto u8_string = path.u8string();
-  return std::string{u8_string.begin(), u8_string.end()};
+#ifdef _WIN32
+  return path.u8string();
+#else
+  return path.string();
+#endif
 }
 
-const fs::path &GetUserPath(PathType xenon_path) {
-  return UserPaths.at(xenon_path);
+const fs::path &GetPath(const PathType pathType) {
+  return Paths.at(pathType);
 }
 
-std::string GetUserPathString(PathType xenon_path) {
-  return PathToUTF8String(GetUserPath(xenon_path));
+std::string GetPathString(const PathType pathType) {
+  return PathToUTF8String(GetPath(pathType));
 }
 
 std::vector<FileInfo> ListFilesFromPath(const fs::path &path) {
   std::vector<FileInfo> fileList;
 
-  fs::path _path = fs::weakly_canonical(path);
+  fs::path canonicalPath = fs::weakly_canonical(path);
 
-  for (auto &entry : fs::directory_iterator{ _path }) {
-    FileInfo fileInfo;
+  for (const auto& entry : fs::directory_iterator{ canonicalPath }) {
+    FileInfo fileInfo{};
+
     if (entry.is_directory()) {
       fileInfo.fileSize = 0;
       fileInfo.fileType = FileType::Directory;
     } else {
-      fileInfo.fileSize = fs::file_size(_path);
+      fileInfo.fileSize = fs::file_size(entry.path());
       fileInfo.fileType = FileType::File;
     }
 
     fileInfo.filePath = entry.path();
     fileInfo.fileName = entry.path().filename();
-    fileList.push_back(fileInfo);
+    fileList.push_back(std::move(fileInfo));
   }
 
-    return fileList;
+  return fileList;
 }
 
-void SetUserPath(PathType xenon_path, const fs::path &new_path) {
-  UserPaths.insert_or_assign(xenon_path, new_path);
+void SetPath(const PathType pathType, const fs::path &newPath) {
+  EnsureDir(newPath);
+  Paths.insert_or_assign(pathType, newPath);
 }
+
+void DumpPaths() {
+  for (const auto &type : kAllPathTypes) {
+    const auto &path = GetPath(type.pathType);
+    LOG_INFO(System, "{:<22}: {}", type.humanName, PathToUTF8String(path));
+  }
+}
+
 } // namespace FS
+
 } // namespace Base

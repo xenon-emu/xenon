@@ -120,7 +120,7 @@ public:
       LOG_WARNING(Log, "Reinitializing logging backend");
       return;
     }
-    const auto logDir = GetUserPath(PathType::LogDir);
+    const auto logDir = GetPath(PathType::LogDir);
     Filter filter;
     //filter.ParseFilterString(Config::getLogFilter());
     instance = std::unique_ptr<Impl, decltype(&Deleter)>(new Impl(logDir / logFile, filter), Deleter);
@@ -387,7 +387,7 @@ void CleanupOldLogs(const std::string_view &logFileBase, const fs::path &logDir,
 
 void Initialize(const std::string_view &logFile) {
   // Create directory vars to so we can use fs::path::stem
-  const fs::path LogDir = GetUserPath(PathType::LogDir);
+  const fs::path LogDir = GetPath(PathType::LogDir);
   const fs::path LogFile = LOG_FILE;
   const fs::path LogFileStem = LogFile.stem();
   const fs::path LogFileName = LogFile.filename();

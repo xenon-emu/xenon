@@ -207,7 +207,7 @@ private:
   // Thread object
   std::thread sfcxThread;
   // Thread running
-  volatile bool sfcxThreadRunning = false;
+  std::atomic<bool> sfcxThreadRunning = false;
   // SFCX State
   SFCX_STATE sfcxState{};
   // I/O File stream.

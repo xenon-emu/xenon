@@ -1,5 +1,5 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 //
@@ -398,7 +398,7 @@ void Xe::PCIDev::ETHERNET::Write(u64 writeAddress, const u8 *data, u64 size) {
       ethPciState.interruptMaskReg = val;
       // Enable interrupts if mask is not zero.
       if (val != 0) {
-        enableInterrutps.store(true);
+        enableInterrutps.store(true, std::memory_order_release);
       }
 
       DEBUGP("[Write] INTERRUPT_MASK = {:#08x} (was {:#08x})", val, oldMask);
@@ -732,7 +732,7 @@ void Xe::PCIDev::ETHERNET::ProcessRxDescriptors() {
       stats.rxDropped++;
       pendingRxPackets.pop();
       // Re enable interrupts, since if we're here, it means that the OS ethernet interrupt handler didn't got triggered.
-      enableInterrutps.store(true);
+      enableInterrutps.store(true, std::memory_order_release);
       // Raise interrupt siganling we're full
       RaiseInterrupt(INT_RX_DONE);
       continue;
@@ -909,7 +909,7 @@ void Xe::PCIDev::ETHERNET::RaiseInterrupt(u32 bits) {
 
     parentBus->RouteInterrupt(PRIO_ENET);
     // Disable interrupts without clearing the mask.
-    enableInterrutps.store(false);
+    enableInterrutps.store(false, std::memory_order_release);
   }
 }
 
@@ -953,17 +953,17 @@ void Xe::PCIDev::ETHERNET::WorkerThreadLoop() {
 
   DEBUGP("Ethernet worker thread started");
 
-  while (workerRunning && XeRunning) {
+  while (workerRunning && XeRunning.load(std::memory_order_acquire)) {
     // Wait for work or timeout
     {
       std::unique_lock<std::mutex> lock(workerMutex);
       workerCV.wait_for(lock, std::chrono::milliseconds(1), [this] {
-        return !workerRunning || !XeRunning || ((txRing0Enabled || txRing1Enabled)) || (!pendingRxPackets.empty() && rxEnabled);
-        });
+        return !workerRunning || !XeRunning.load(std::memory_order_acquire) || ((txRing0Enabled || txRing1Enabled)) || (!pendingRxPackets.empty() && rxEnabled);
+      });
     }
 
     // Check for shutdown
-    if (!workerRunning || !XeRunning) {
+    if (!workerRunning || !XeRunning.load(std::memory_order_acquire)) {
       break;
     }
 

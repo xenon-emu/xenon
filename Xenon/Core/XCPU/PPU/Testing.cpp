@@ -1,5 +1,5 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #include <stdio.h>
@@ -310,7 +310,7 @@ public:
         }
       }
     } else if (currentTestMode == ePPUTestingMode::JITx86) {
-      ppuJIT->ExecuteJITInstrs(0x100, true, false, true);
+      ppuJIT->ExecuteJITInstrs(0x100, false, true);
     }
 
 

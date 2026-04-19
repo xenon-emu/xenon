@@ -1,4 +1,6 @@
-# Copyright 2025 Xenon Emulator Project
+#***************************************************************
+#* Copyright 2026 Xenon Emulator Project. All rights reserved. *
+#***************************************************************
 
 set(BUILD_SHARED_LIBS OFF)
 set(BUILD_TESTING OFF)

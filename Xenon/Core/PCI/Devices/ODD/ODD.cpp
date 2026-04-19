@@ -1,5 +1,5 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #include "ODD.h"
@@ -152,7 +152,7 @@ Xe::PCIDev::ODD::ODD(const char* deviceName, u64 size, PCIBridge *parentPCIBridg
     LOG_INFO(ODD, "No ODD image found - disabling device.");
   }
 
-  oddThreadRunning = atapiState.imageAttached;
+  oddThreadRunning.store(atapiState.imageAttached, std::memory_order_release);
 
   // Set the SCR's at offset 0xC0 (SiS-like)
   // SStatus
@@ -204,7 +204,7 @@ Xe::PCIDev::ODD::ODD(const char* deviceName, u64 size, PCIBridge *parentPCIBridg
 }
 
 Xe::PCIDev::ODD::~ODD() {
-  oddThreadRunning = false;
+  oddThreadRunning.store(false, std::memory_order_release);
   if (oddWorkerThread.joinable())
     oddWorkerThread.join();
 }
@@ -1097,14 +1097,8 @@ std::string Xe::PCIDev::ODD::getATAPIRegisterName(u32 regID) {
 // Worker thread for DMA.
 void Xe::PCIDev::ODD::oddThreadLoop() {
   // Check if we should be running
-  if (!oddThreadRunning)
-    return;
   LOG_INFO(ODD, "Entered ODD worker thread.");
-  while (oddThreadRunning) {
-    // Escape hatch
-    if (XeRunning)
-      break;
-
+  while (oddThreadRunning.load(std::memory_order_acquire)) {
     // Check for the DMA active command, and only start the DMA engine if there's not any
     // pending SCSI command for processing. (Avoids race conditions)
     if (atapiState.regs.dmaCommand & XE_ATA_DMA_ACTIVE

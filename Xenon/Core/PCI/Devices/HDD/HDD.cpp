@@ -150,7 +150,7 @@ Xe::PCIDev::HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentP
     LOG_INFO(HDD, "No HDD image found - disabling device.");
   }
 
-  hddThreadRunning = ataState.imageAttached;
+  hddThreadRunning.store(ataState.imageAttached, std::memory_order_release);
 
   // Set the SCR's at offset 0xC0 (SiS-like).
   // SStatus
@@ -180,8 +180,8 @@ Xe::PCIDev::HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentP
 }
 
 Xe::PCIDev::HDD::~HDD() {
-  // Terminate thread.
-  hddThreadRunning = false;
+  // Terminate thread
+  hddThreadRunning.store(false, std::memory_order_release);
   if (hddWorkerThread.joinable())
     hddWorkerThread.join();
 }
@@ -502,7 +502,7 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
   } else {
     // Control (DMA) registers
     const u8 regOffset = static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR1);
-  
+
     switch (regOffset) {
     case ATA_REG_DMA_COMMAND:
       memcpy(&ataState.regs.dmaCommand, data, size);
@@ -708,14 +708,12 @@ const std::string Xe::PCIDev::HDD::getATACommandName(u32 commandID) {
 // Worker thread for DMA.
 void Xe::PCIDev::HDD::hddThreadLoop() {
   // Check if we should be running
-  if (!hddThreadRunning)
+  if (!hddThreadRunning.load(std::memory_order_acquire))
     return;
+
   LOG_INFO(HDD, "Entered HDD worker thread.");
-  while (hddThreadRunning) {
-    // Check if we should exit early
-    hddThreadRunning = XeRunning;
-    if (!hddThreadRunning)
-      break;
+
+  while (hddThreadRunning.load(std::memory_order_acquire) && XeRunning.load(std::memory_order_acquire)) {
     // Check for the DMA active command.
     if (ataState.regs.dmaCommand & XE_ATA_DMA_ACTIVE) {
       // Start our DMA operation
@@ -725,8 +723,6 @@ void Xe::PCIDev::HDD::hddThreadLoop() {
       ataState.regs.dmaStatus = XE_ATA_DMA_INTR; // Signal Interrupt.
     }
   }
-
-  LOG_INFO(HDD, "Exiting HDD worker thread.");
 }
 
 // Performs the DMA operation until it reaches the end of the PRDT.

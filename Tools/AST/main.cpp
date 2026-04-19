@@ -1,4 +1,6 @@
-// Copyright 2025 Xenon Emulator Project. All rights reserved.
+/***************************************************************/
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
+/***************************************************************/
 
 #include <fstream>
 
@@ -370,7 +372,7 @@ void Clear() {
 
 void HandleEvents() {
   // Process events.
-  while (XeRunning && SDL_PollEvent(&windowEvent)) {
+  while (XeRunning.load(std::memory_order_acquire) && SDL_PollEvent(&windowEvent)) {
     switch (windowEvent.type) {
     case SDL_EVENT_WINDOW_RESIZED:
       if (windowEvent.window.windowID == windowID) {
@@ -379,7 +381,7 @@ void HandleEvents() {
       }
       break;
     case SDL_EVENT_QUIT:
-      XeRunning = false;
+      XeRunning.store(false, std::memory_order_release);
       break;
     case SDL_EVENT_KEY_DOWN:
       if (windowEvent.key.key == SDLK_F11) {
@@ -430,7 +432,7 @@ void CreateVAOAndVBOFromShader(const Xe::Microcode::AST::Shader *vertexShader, u
 
   // If there are no fetches, fall back to a dummy fullscreen triangle
   if (!vertexShader || vertexShader->vertexFetches.empty()) {
-    LOG_WARNING(Xenos, "No vertex fetches in shader — using dummy fullscreen triangle.");
+    LOG_WARNING(Xenos, "No vertex fetches in shader ï¿½ using dummy fullscreen triangle.");
 
     // We still need to bind SOME VBO, because GL_VALIDATE might complain otherwise.
     // Create a tiny 3-vertex buffer of {0,0,0}, {0,0,0}, {0,0,0}, then draw(3).
@@ -565,8 +567,8 @@ s32 main(s32 argc, char *argv[]) {
   //matP[11] = -1.0f;
   //matP[14] = (2.0f * zfar * znear) / (znear - zfar);
 
-  //memcpy(&vsConsts.values[0], matP, sizeof(matP));        // c0–c3
-  //memcpy(&vsConsts.values[16], matMV, sizeof(matMV));     // c4–c7
+  //memcpy(&vsConsts.values[0], matP, sizeof(matP));        // c0-c3
+  //memcpy(&vsConsts.values[16], matMV, sizeof(matMV));     // c4-c7
 
   //memcpy(&vsConsts.values[95 * 4], rows, sizeof(rows));
 
@@ -587,7 +589,7 @@ s32 main(s32 argc, char *argv[]) {
   //u64 combinedHash = (static_cast<u64>(Xe::Microcode::vertexShaderHash) << 32) | Xe::Microcode::pixelShaderHash;
   //auto shader = Xe::Microcode::linkedShaderPrograms[combinedHash];
   //CreateVAOAndVBOFromShader(shader.vertexShader, VAO, VBO);
-  //while (XeRunning) {
+  //while (XeRunning.load(std::memory_order_acquire)) {
   //  HandleEvents();
   //  RenderFrame();
   //}

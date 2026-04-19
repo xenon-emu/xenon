@@ -154,6 +154,8 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
 
   hasInitialised = true;
 
+  sfcxThreadRunning.store(hasInitialised, std::memory_order_release);
+
   // Get CB_A and CB_B headers
   BL_HEADER cbaHeader;
   BL_HEADER cbbHeader;
@@ -248,7 +250,7 @@ Xe::PCIDev::SFCX::~SFCX() {
   // Clear NAND image data
   rawImageData.clear();
   // Terminate thread
-  sfcxThreadRunning = false;
+  sfcxThreadRunning.store(false, std::memory_order_release);
   if (sfcxThread.joinable())
     sfcxThread.join();
 }
@@ -479,14 +481,8 @@ void Xe::PCIDev::SFCX::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
 
 void Xe::PCIDev::SFCX::sfcxMainLoop() {
   Base::SetCurrentThreadName("[Xe] SFCX");
-  sfcxThreadRunning = XeRunning;
-  // Config register should be initialized by now
-  while (sfcxThreadRunning) {
-    // Ensure we haven't shutdown elsewhere.
-    sfcxThreadRunning = XeRunning;
-    if (!sfcxThreadRunning)
-      break;
 
+  while (sfcxThreadRunning.load(std::memory_order_acquire) && XeRunning.load(std::memory_order_acquire)) {
     // Did we got a command?
     if (sfcxState.commandReg != NO_CMD) {
       // Check the command reg to see what command was issued

@@ -54,10 +54,6 @@ extern void CreateRootBus();
 
 extern Xe::XCPU::XenonCPU *GetCPU();
 
-// Main objects
-//  Base path
-inline std::filesystem::path rootDirectory = {};
-
 // Main Emulator objects
 inline std::shared_ptr<RootBus> rootBus{}; // RootBus Object
 inline std::shared_ptr<HostBridge> hostBridge{}; // HostBridge Object
@@ -103,6 +99,3 @@ inline std::unique_ptr<Xe::XCPU::XenonCPU> xenonCPU{};
 inline std::shared_ptr<Xe::Xenos::XGPU> xenos{};
 
 } // namespace XeMain
-
-// Global shutdown handler
-extern s32 globalShutdownHandler();

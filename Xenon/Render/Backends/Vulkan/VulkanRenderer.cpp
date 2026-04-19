@@ -202,8 +202,7 @@ void VulkanRenderer::BackendStart() {
   resourceFactory = std::make_unique<VulkanResourceFactory>(this);
   shaderFactory = resourceFactory->CreateShaderFactory();
   // Uses GLSL code, which isn't valid yet.
-  fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) };
-  shaderPath /= "vulkan";
+  fs::path shaderPath{ Base::FS::GetPath(Base::FS::PathType::ShaderVulkanDir) };
   computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
     { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
   });
@@ -753,6 +752,7 @@ void VulkanRenderer::BackendOnUploadBuffer(u32 bufferHash, Buffer *buffer) {
   if (!b || !s)
     return;
 }
+
 
 void VulkanRenderer::VertexFetch(const u32 location, const u32 components, bool isFloat, bool isNormalized, const u32 fetchOffset, const u32 fetchStride) {
 

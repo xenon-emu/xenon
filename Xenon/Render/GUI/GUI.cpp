@@ -1007,11 +1007,11 @@ void Render::GUI::Render(Texture *texture) {
     if (ImGui::BeginMenu("CPU")) {
       XCPUSettings(this);
       if (Button("Dump FB")) {
-        const auto UserDir = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
+        const auto UserDir = Base::FS::GetPath(Base::FS::PathType::UserDataDir);
         XeMain::xenos->DumpFB(UserDir / "fbmem.bin", XeMain::renderer->pitch);
       }
       if (Button("Dump Memory")) {
-        const auto UserDir = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
+        const auto UserDir = Base::FS::GetPath(Base::FS::PathType::UserDataDir);
         const auto &path = UserDir / "memory.bin";
         std::ofstream f(path, std::ios::out | std::ios::binary | std::ios::trunc);
         if (!f) {

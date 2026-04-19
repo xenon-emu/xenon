@@ -1,5 +1,5 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 //
@@ -111,7 +111,7 @@ bool TAPBackend::Initialize() {
   }
 
   // Start reader thread
-  readerRunning = true;
+  readerRunning.store(true, std::memory_order_release);
   readerThread = std::thread(&TAPBackend::ReaderThreadLoop, this);
 
   ready = true;
@@ -558,7 +558,7 @@ void TAPBackend::ReaderThreadLoop() {
 
   std::vector<u8> buffer(2048);
 
-  while (readerRunning && XeRunning) {
+  while (readerRunning && XeRunning.load(std::memory_order_acquire)) {
     if (tapHandle == INVALID_HANDLE_VALUE) {
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
       continue;
@@ -765,7 +765,7 @@ void TAPBackend::ReaderThreadLoop() {
   pfd.fd = tapFd;
   pfd.events = POLLIN;
 
-  while (readerRunning && XeRunning) {
+  while (readerRunning.load(std::memory_order_acquire) && XeRunning.load(std::memory_order_acquire)) {
     if (tapFd < 0) {
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
       continue;

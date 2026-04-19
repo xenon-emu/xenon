@@ -1,5 +1,5 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #include "Core/XeMain.h"
@@ -31,10 +31,9 @@ void OGLRenderer::BackendStart() {
   // Create the resource factory
   resourceFactory = std::make_unique<OGLResourceFactory>();
   shaderFactory = resourceFactory->CreateShaderFactory();
-  fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) };
+  fs::path shaderPath{ Base::FS::GetPath(Base::FS::PathType::ShaderOpenGLDir) };
   bool gles = GetBackendID() == "GLES"_jLower;
   std::string versionString = FMT("#version {} {}\n", gles ? 310 : 430, gles ? "es" : "core");
-  shaderPath /= "opengl";
   computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
     { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
   });
@@ -143,12 +142,18 @@ void OGLRenderer::BackendSDLInit() {
 }
 
 void OGLRenderer::BackendShutdown() {
-  glDeleteVertexArrays(1, &dummyVAO);
-  glDeleteVertexArrays(1, &VAO);
-  glDeleteBuffers(1, &EBO);
+  if (glDeleteVertexArrays) {
+    glDeleteVertexArrays(1, &dummyVAO);
+    glDeleteVertexArrays(1, &VAO);
+  }
+  if (glDeleteBuffers) {
+    glDeleteBuffers(1, &EBO);
+  }
 }
 void OGLRenderer::BackendSDLShutdown() {
-  SDL_GL_DestroyContext(context);
+  if (context) {
+    SDL_GL_DestroyContext(context);
+  }
 }
 
 void OGLRenderer::BackendResize(s32 x, s32 y) {
@@ -336,8 +341,8 @@ s32 OGLRenderer::GetXenosFlags() {
         eTextureDepth::R32U;
 }
 
-void* OGLRenderer::GetBackendContext() {
-  return reinterpret_cast<void*>(context);
+void *OGLRenderer::GetBackendContext() {
+  return reinterpret_cast<void *>(context);
 }
 
 u32 OGLRenderer::GetBackendID() {

@@ -205,7 +205,7 @@ inline void J_checkVXUEnabled(JITBlockBuilder *b) {
   x86::Gp msrReg = newGP64();
   x86::Gp exceptionReg = newGP16();
 
-  Label vxEnabledLabel = b->compiler->newLabel();
+  Label vxEnabledLabel = newLabel();
 
   // Load MSR
   COMP->mov(msrReg, SPRPtr(MSR));
@@ -267,6 +267,24 @@ inline void J_FlushDenormalsToZero(JITBlockBuilder *b, x86::Vec vec) {
   COMP->vandps(vec, vec, cmpResult);
 
 #endif // VXU_FLUSH_DENORMALS_TO_ZERO
+}
+
+void PPCInterpreter::PPCInterpreterJIT_dss(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+  // We don't really need to do anything here, as it's handling cache. We mostly ignore it
+}
+
+void PPCInterpreter::PPCInterpreterJIT_dst(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+  // We don't really need to do anything here, as it's handling cache. We mostly ignore it
+}
+
+void PPCInterpreter::PPCInterpreterJIT_dstst(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  // Ensure VXU is enabled
+  J_checkVXUEnabled(b);
+  // We don't really need to do anything here, as it's handling cache. We mostly ignore it
 }
 
 // Vector Add Floating Point (x'1000 000A')
@@ -2084,7 +2102,7 @@ void PPCInterpreter::PPCInterpreterJIT_vpkuwum(sPPEState *ppeState, JITBlockBuil
   // Shuffle vA: extract low halfwords to low 64 bits
   COMP->vpshufb(vA, vA, x86::ptr(tmpGp));
 
-  // Shuffle vB: extract low halfwords to low 64 bits  
+  // Shuffle vB: extract low halfwords to low 64 bits
   COMP->vpshufb(vB, vB, x86::ptr(tmpGp));
 
   // Combine: vA has packed halfwords in low 64 bits, vB has packed halfwords in low 64 bits
@@ -2113,7 +2131,7 @@ void PPCInterpreter::PPCInterpreterJIT_vpkuwum128(sPPEState *ppeState, JITBlockB
   // Shuffle vA: extract low halfwords to low 64 bits
   COMP->vpshufb(vA, vA, x86::ptr(tmpGp));
 
-  // Shuffle vB: extract low halfwords to low 64 bits  
+  // Shuffle vB: extract low halfwords to low 64 bits
   COMP->vpshufb(vB, vB, x86::ptr(tmpGp));
 
   // Combine: Use punpcklqdq to combine low 64 bits of both
@@ -2345,7 +2363,7 @@ void PPCInterpreter::PPCInterpreterJIT_lvx(sPPEState *ppeState, JITBlockBuilder 
   x86::Gp EA = newGP64();
   x86::Vec vD = newXMM();
   x86::Gp exceptReg = newGP16();
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
 
   // Get effective address: EA = (rA|0) + rB
   if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
@@ -2355,11 +2373,11 @@ void PPCInterpreter::PPCInterpreterJIT_lvx(sPPEState *ppeState, JITBlockBuilder 
 
   // Get the translated address
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   // Check for exceptions DStor/DSeg and return if found.
   COMP->mov(exceptReg, EXPtr());
@@ -2385,7 +2403,7 @@ void PPCInterpreter::PPCInterpreterJIT_lvx128(sPPEState *ppeState, JITBlockBuild
   x86::Gp EA = newGP64();
   x86::Vec vD = newXMM();
   x86::Gp exceptReg = newGP16();
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
 
   // Get effective address: EA = (rA|0) + rB
   if (instr.VMX128_1.RA != 0) { COMP->mov(EA, GPRPtr(instr.VMX128_1.RA)); }
@@ -2395,11 +2413,11 @@ void PPCInterpreter::PPCInterpreterJIT_lvx128(sPPEState *ppeState, JITBlockBuild
 
   // Get the translated address
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   // Check for exceptions DStor/DSeg and return if found.
   COMP->mov(exceptReg, EXPtr());
@@ -2434,7 +2452,7 @@ void PPCInterpreter::PPCInterpreterJIT_lvlx(sPPEState *ppeState, JITBlockBuilder
   x86::Vec tmp0 = newXMM();
   x86::Vec vAShuffled = newXMM();
   x86::Vec vBShuffled = newXMM();
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
 
 
   // Get effective address: EA = (rA|0) + rB
@@ -2447,11 +2465,11 @@ void PPCInterpreter::PPCInterpreterJIT_lvlx(sPPEState *ppeState, JITBlockBuilder
 
   // Get the translated address
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   // Check for exceptions DStor/DSeg and return if found.
   COMP->mov(exceptReg, EXPtr());
@@ -2517,7 +2535,7 @@ void PPCInterpreter::PPCInterpreterJIT_lvlx128(sPPEState *ppeState, JITBlockBuil
   x86::Vec tmp0 = newXMM();
   x86::Vec vAShuffled = newXMM();
   x86::Vec vBShuffled = newXMM();
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
 
 
   // Get effective address: EA = (rA|0) + rB
@@ -2530,11 +2548,11 @@ void PPCInterpreter::PPCInterpreterJIT_lvlx128(sPPEState *ppeState, JITBlockBuil
 
   // Get the translated address
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   // Check for exceptions DStor/DSeg and return if found.
   COMP->mov(exceptReg, EXPtr());
@@ -2609,8 +2627,8 @@ void PPCInterpreter::PPCInterpreterJIT_lvrx(sPPEState *ppeState, JITBlockBuilder
   x86::Gp exceptReg = newGP16();
 
   // Labels
-  Label endLabel = COMP->newLabel();
-  Label ebNotZero = COMP->newLabel();
+  Label endLabel = newLabel();
+  Label ebNotZero = newLabel();
 
   // Get effective address: EA = (rA|0) + rB
   if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
@@ -2632,11 +2650,11 @@ void PPCInterpreter::PPCInterpreterJIT_lvrx(sPPEState *ppeState, JITBlockBuilder
 
   // Get the translated address
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   // Check for exceptions DStor/DSeg and return if found.
   COMP->mov(exceptReg, EXPtr());
@@ -2649,7 +2667,7 @@ void PPCInterpreter::PPCInterpreterJIT_lvrx(sPPEState *ppeState, JITBlockBuilder
   // Byteswap the data
   COMP->mov(EA, (uintptr_t)&XMMByteSwapMask);
   COMP->vpshufb(value1, value1, x86::ptr(EA));
-  // Generate control vec using eb as indec to the LVSL table 
+  // Generate control vec using eb as indec to the LVSL table
   COMP->shl(eb, imm(4));
   COMP->mov(tableAddr, (uintptr_t)&loadVectorShiftLeftTable);
   COMP->vmovdqa(control, x86::ptr(tableAddr, eb));
@@ -2695,8 +2713,8 @@ void PPCInterpreter::PPCInterpreterJIT_lvrx128(sPPEState *ppeState, JITBlockBuil
   x86::Gp exceptReg = newGP16();
 
   // Labels
-  Label endLabel = COMP->newLabel();
-  Label ebNotZero = COMP->newLabel();
+  Label endLabel = newLabel();
+  Label ebNotZero = newLabel();
 
   // Get effective address: EA = (rA|0) + rB
   if (instr.VMX128_1.RA != 0) { COMP->mov(EA, GPRPtr(instr.VMX128_1.RA)); }
@@ -2718,11 +2736,11 @@ void PPCInterpreter::PPCInterpreterJIT_lvrx128(sPPEState *ppeState, JITBlockBuil
 
   // Get the translated address
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   // Check for exceptions DStor/DSeg and return if found.
   COMP->mov(exceptReg, EXPtr());
@@ -2735,7 +2753,7 @@ void PPCInterpreter::PPCInterpreterJIT_lvrx128(sPPEState *ppeState, JITBlockBuil
   // Byteswap the data
   COMP->mov(EA, (uintptr_t)&XMMByteSwapMask);
   COMP->vpshufb(value1, value1, x86::ptr(EA));
-  // Generate control vec using eb as indec to the LVSL table 
+  // Generate control vec using eb as indec to the LVSL table
   COMP->shl(eb, imm(4));
   COMP->mov(tableAddr, (uintptr_t)&loadVectorShiftLeftTable);
   COMP->vmovdqa(control, x86::ptr(tableAddr, eb));
@@ -2871,7 +2889,7 @@ void PPCInterpreter::PPCInterpreterJIT_stvx(sPPEState *ppeState, JITBlockBuilder
   x86::Gp EA = newGP64();
   x86::Gp tmpAddress = newGP64();
   x86::Vec vD = newXMM();
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
 
   // Get effective address: EA = (rA|0) + rB
   if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
@@ -2881,11 +2899,11 @@ void PPCInterpreter::PPCInterpreterJIT_stvx(sPPEState *ppeState, JITBlockBuilder
 
   // Get the translated address
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   // Check for valid address
   COMP->test(EA, EA);
@@ -2900,7 +2918,7 @@ void PPCInterpreter::PPCInterpreterJIT_stvx(sPPEState *ppeState, JITBlockBuilder
   COMP->bind(endLabel);
 }
 
-// Store Vector 128 Indexed 
+// Store Vector 128 Indexed
 void PPCInterpreter::PPCInterpreterJIT_stvx128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure VXU is enabled
   J_checkVXUEnabled(b);
@@ -2908,7 +2926,7 @@ void PPCInterpreter::PPCInterpreterJIT_stvx128(sPPEState *ppeState, JITBlockBuil
   x86::Gp EA = newGP64();
   x86::Gp tmpAddress = newGP64();
   x86::Vec vD = newXMM();
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
 
   // Get effective address: EA = (rA|0) + rB
   if (instr.VMX128_1.RA != 0) { COMP->mov(EA, GPRPtr(instr.VMX128_1.RA)); }
@@ -2918,11 +2936,11 @@ void PPCInterpreter::PPCInterpreterJIT_stvx128(sPPEState *ppeState, JITBlockBuil
 
   // Get the translated address
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
   // Check for valid address
   COMP->test(EA, EA);
   COMP->jz(endLabel);
@@ -2945,24 +2963,24 @@ void PPCInterpreter::PPCInterpreterJIT_stvebx(sPPEState *ppeState, JITBlockBuild
   x86::Gp element = newGP64();
   x86::Vec vS = newXMM();
   x86::Gp outByte = newGP32();
-  Label endLabel = COMP->newLabel();
-  Label case0 = COMP->newLabel();
-  Label case1 = COMP->newLabel();
-  Label case2 = COMP->newLabel();
-  Label case3 = COMP->newLabel();
-  Label case4 = COMP->newLabel();
-  Label case5 = COMP->newLabel();
-  Label case6 = COMP->newLabel();
-  Label case7 = COMP->newLabel();
-  Label case8 = COMP->newLabel();
-  Label case9 = COMP->newLabel();
-  Label case10 = COMP->newLabel();
-  Label case11 = COMP->newLabel();
-  Label case12 = COMP->newLabel();
-  Label case13 = COMP->newLabel();
-  Label case14 = COMP->newLabel();
-  Label case15 = COMP->newLabel();
-  Label storeLabel = COMP->newLabel();
+  Label endLabel = newLabel();
+  Label case0 = newLabel();
+  Label case1 = newLabel();
+  Label case2 = newLabel();
+  Label case3 = newLabel();
+  Label case4 = newLabel();
+  Label case5 = newLabel();
+  Label case6 = newLabel();
+  Label case7 = newLabel();
+  Label case8 = newLabel();
+  Label case9 = newLabel();
+  Label case10 = newLabel();
+  Label case11 = newLabel();
+  Label case12 = newLabel();
+  Label case13 = newLabel();
+  Label case14 = newLabel();
+  Label case15 = newLabel();
+  Label storeLabel = newLabel();
 
   // Get effective address: EA = (rA|0) + rB
   if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
@@ -2974,11 +2992,11 @@ void PPCInterpreter::PPCInterpreterJIT_stvebx(sPPEState *ppeState, JITBlockBuild
 
   // Get the translated address
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   // Check for valid address
   COMP->test(EA, EA);
@@ -3097,16 +3115,16 @@ void PPCInterpreter::PPCInterpreterJIT_stvehx(sPPEState *ppeState, JITBlockBuild
   x86::Gp element = newGP64();
   x86::Vec vS = newXMM();
   x86::Gp outWord = newGP32();
-  Label endLabel = COMP->newLabel();
-  Label case0 = COMP->newLabel();
-  Label case1 = COMP->newLabel();
-  Label case2 = COMP->newLabel();
-  Label case3 = COMP->newLabel();
-  Label case4 = COMP->newLabel();
-  Label case5 = COMP->newLabel();
-  Label case6 = COMP->newLabel();
-  Label case7 = COMP->newLabel();
-  Label storeLabel = COMP->newLabel();
+  Label endLabel = newLabel();
+  Label case0 = newLabel();
+  Label case1 = newLabel();
+  Label case2 = newLabel();
+  Label case3 = newLabel();
+  Label case4 = newLabel();
+  Label case5 = newLabel();
+  Label case6 = newLabel();
+  Label case7 = newLabel();
+  Label storeLabel = newLabel();
 
   // Get effective address: EA = (rA|0) + rB
   if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
@@ -3121,11 +3139,11 @@ void PPCInterpreter::PPCInterpreterJIT_stvehx(sPPEState *ppeState, JITBlockBuild
 
   // Get the translated address
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   // Check for valid address
   COMP->test(EA, EA);
@@ -3196,12 +3214,12 @@ void PPCInterpreter::PPCInterpreterJIT_stvewx(sPPEState *ppeState, JITBlockBuild
   x86::Gp element = newGP64();
   x86::Vec vS = newXMM();
   x86::Gp outDword = newGP32();
-  Label endLabel = COMP->newLabel();
-  Label case0 = COMP->newLabel();
-  Label case1 = COMP->newLabel();
-  Label case2 = COMP->newLabel();
-  Label case3 = COMP->newLabel();
-  Label storeLabel = COMP->newLabel();
+  Label endLabel = newLabel();
+  Label case0 = newLabel();
+  Label case1 = newLabel();
+  Label case2 = newLabel();
+  Label case3 = newLabel();
+  Label storeLabel = newLabel();
 
   // Get effective address: EA = (rA|0) + rB
   if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
@@ -3216,11 +3234,11 @@ void PPCInterpreter::PPCInterpreterJIT_stvewx(sPPEState *ppeState, JITBlockBuild
 
   // Get the translated address
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   // Check for valid address
   COMP->test(EA, EA);
@@ -3268,12 +3286,12 @@ void PPCInterpreter::PPCInterpreterJIT_stvewx128(sPPEState *ppeState, JITBlockBu
   x86::Gp element = newGP64();
   x86::Vec vS = newXMM();
   x86::Gp outDword = newGP32();
-  Label endLabel = COMP->newLabel();
-  Label case0 = COMP->newLabel();
-  Label case1 = COMP->newLabel();
-  Label case2 = COMP->newLabel();
-  Label case3 = COMP->newLabel();
-  Label storeLabel = COMP->newLabel();
+  Label endLabel = newLabel();
+  Label case0 = newLabel();
+  Label case1 = newLabel();
+  Label case2 = newLabel();
+  Label case3 = newLabel();
+  Label storeLabel = newLabel();
 
   // Get effective address: EA = (rA|0) + rB
   if (instr.VMX128_1.RA != 0) { COMP->mov(EA, GPRPtr(instr.VMX128_1.RA)); }
@@ -3288,11 +3306,11 @@ void PPCInterpreter::PPCInterpreterJIT_stvewx128(sPPEState *ppeState, JITBlockBu
 
   // Get the translated address
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   // Check for valid address
   COMP->test(EA, EA);
@@ -3343,7 +3361,7 @@ void PPCInterpreter::PPCInterpreterJIT_stvlx(sPPEState *ppeState, JITBlockBuilde
   x86::Vec vS = newXMM();
   x86::Vec vDst = newXMM();
   x86::Vec vMask = newXMM();
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
 
   // Get effective address: EA = (rA|0) + rB
   if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
@@ -3364,11 +3382,11 @@ void PPCInterpreter::PPCInterpreterJIT_stvlx(sPPEState *ppeState, JITBlockBuilde
 
   // Get the translated address
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   // Check for valid address
   COMP->test(EA, EA);
@@ -3410,7 +3428,7 @@ void PPCInterpreter::PPCInterpreterJIT_stvlx128(sPPEState *ppeState, JITBlockBui
   x86::Vec vS = newXMM();
   x86::Vec vDst = newXMM();
   x86::Vec vMask = newXMM();
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
 
   // Get effective address: EA = (rA|0) + rB
   if (instr.VMX128_1.RA != 0) { COMP->mov(EA, GPRPtr(instr.VMX128_1.RA)); }
@@ -3431,11 +3449,11 @@ void PPCInterpreter::PPCInterpreterJIT_stvlx128(sPPEState *ppeState, JITBlockBui
 
   // Get the translated address
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   // Check for valid address
   COMP->test(EA, EA);
@@ -3476,7 +3494,7 @@ void PPCInterpreter::PPCInterpreterJIT_stvrx(sPPEState *ppeState, JITBlockBuilde
   x86::Vec vS = newXMM();
   x86::Vec vDst = newXMM();
   x86::Vec vMask = newXMM();
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
 
   // Get effective address: EA = (rA|0) + rB
   if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
@@ -3496,11 +3514,11 @@ void PPCInterpreter::PPCInterpreterJIT_stvrx(sPPEState *ppeState, JITBlockBuilde
 
   // Get the translated address (using aligned EA)
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   // Check for valid address
   COMP->test(EA, EA);
@@ -3546,7 +3564,7 @@ void PPCInterpreter::PPCInterpreterJIT_stvrx128(sPPEState *ppeState, JITBlockBui
   x86::Vec vS = newXMM();
   x86::Vec vDst = newXMM();
   x86::Vec vMask = newXMM();
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
 
   // Get effective address: EA = (rA|0) + rB
   if (instr.VMX128_1.RA != 0) { COMP->mov(EA, GPRPtr(instr.VMX128_1.RA)); }
@@ -3566,11 +3584,11 @@ void PPCInterpreter::PPCInterpreterJIT_stvrx128(sPPEState *ppeState, JITBlockBui
 
   // Get the translated address (using aligned EA)
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   // Check for valid address
   COMP->test(EA, EA);

@@ -80,7 +80,7 @@ union uPPCInstr {
   PPCBitfield<u32, 15, 1> l15; // 15
   ControlField<PPCBitfield<s32, 16, 14>, FixedField<u32, 0, 2>> bt14;
   ControlField<PPCBitfield<s32, 6, 24>, FixedField<u32, 0, 2>> bt24;
-  
+
   // VMX128 Bitfields.
 
   // VD128 = VD128l | (VD128h << 5)
@@ -251,7 +251,7 @@ union uACCR {
 // VXU Register Save
 typedef u32 VRSAVE_t;
 
-// Software Use Special Purpose Register 
+// Software Use Special Purpose Register
 typedef u64 SPRG_t;
 
 // Condition Register
@@ -315,7 +315,7 @@ union uFPSCR {
   PPCBitfield<u32, 16, 1> FL; // Floating-point less than or negative
   PPCBitfield<u32, 17, 1> FG; // Floating-point greater than or positive
   PPCBitfield<u32, 18, 1> FE; // Floating-point equal or zero
-  PPCBitfield<u32, 19, 1> FU; // Floating-point unordered or NaN 
+  PPCBitfield<u32, 19, 1> FU; // Floating-point unordered or NaN
   // Fraction inexact (not sticky)
   PPCBitfield<u32, 14, 1> FI;
   // Fraction rounded (not sticky)
@@ -772,13 +772,13 @@ union uHID0 {
   struct {
     u64 : 32;
     u64 en_attn : 1;              // Enable attention instruction (enable support processor attn instruction)
-    u64 en_syserr : 1;            // Enable system errors 
-    u64 therm_intr_en : 1;        // Master thermal management interrupt enable 
-    u64 qattn_mode : 1;           // Service processor control 
+    u64 en_syserr : 1;            // Enable system errors
+    u64 therm_intr_en : 1;        // Master thermal management interrupt enable
+    u64 qattn_mode : 1;           // Service processor control
     u64 Rsvd_l0 : 1;              // Reserved. Latch bit is implemented
     u64 en_prec_mchk : 1;         // Enable precise machine check
     u64 extr_hsrr : 1;            // Enable extended external interrupt
-    u64 syserr_wakeup : 1;        // Enable system error interrupt to wakeup suspended thread 
+    u64 syserr_wakeup : 1;        // Enable system error interrupt to wakeup suspended thread
     u64 Rsvd_l1 : 1;              // Reserved. Latch bit is implemented
     u64 therm_wakeup : 1;         // Enable thermal management interrupt to wakeup suspended thread
     u64 Rsvd_l2 : 13;             // Reserved. Latch bit is implemented
@@ -802,13 +802,13 @@ union uHID0 {
     u64 Rsvd_l2 : 13;             // Reserved. Latch bit is implemented
     u64 therm_wakeup : 1;         // Enable thermal management interrupt to wakeup suspended thread
     u64 Rsvd_l1 : 1;              // Reserved. Latch bit is implemented
-    u64 syserr_wakeup : 1;        // Enable system error interrupt to wakeup suspended thread 
+    u64 syserr_wakeup : 1;        // Enable system error interrupt to wakeup suspended thread
     u64 extr_hsrr : 1;            // Enable extended external interrupt
     u64 en_prec_mchk : 1;         // Enable precise machine check
     u64 Rsvd_l0 : 1;              // Reserved. Latch bit is implemented
-    u64 qattn_mode : 1;           // Service processor control 
-    u64 therm_intr_en : 1;        // Master thermal management interrupt enable 
-    u64 en_syserr : 1;            // Enable system errors 
+    u64 qattn_mode : 1;           // Service processor control
+    u64 therm_intr_en : 1;        // Master thermal management interrupt enable
+    u64 en_syserr : 1;            // Enable system errors
     u64 en_attn : 1;              // Enable attention instruction (enable support processor attn instruction)
     u64 : 32;
   };
@@ -832,7 +832,7 @@ union uHID1 {
     u64 pu_trace_ctrl3 : 3;     // PPU trace bus [64:95] output control
     u64 pu_trace_ctrl2 : 2;     // PPU trace bus [0:63] output control
     u64 pu_trace_byte_ctrl : 8; // Byte enables for PPU performance monitor bus/global debug bus
-    u64 pu_trace_en : 1;        // Enable PPU performance monitor/debug bus 
+    u64 pu_trace_en : 1;        // Enable PPU performance monitor/debug bus
     u64 Rsvd_l4 : 5;            // Reserved. Latch bit is implemented
     u64 en_i_prefetch : 1;      // Enable instruction prefetch
     u64 Rsvd_l3 : 5;            // Reserved. Latch bit is implemented
@@ -872,7 +872,7 @@ union uHID1 {
     u64 Rsvd_l3 : 5;            // Reserved. Latch bit is implemented
     u64 en_i_prefetch : 1;      // Enable instruction prefetch
     u64 Rsvd_l4 : 5;            // Reserved. Latch bit is implemented
-    u64 pu_trace_en : 1;        // Enable PPU performance monitor/debug bus 
+    u64 pu_trace_en : 1;        // Enable PPU performance monitor/debug bus
     u64 pu_trace_byte_ctrl : 8; // Byte enables for PPU performance monitor bus/global debug bus
     u64 pu_trace_ctrl2 : 2;     // PPU trace bus [0:63] output control
     u64 pu_trace_ctrl3 : 3;     // PPU trace bus [64:95] output control
@@ -1127,9 +1127,9 @@ struct alignas(64) TLBEntry {
 struct alignas(64) TLBCongruenceClass {
   TLBEntry ways[4];     // 4-way set associative
   u8 lruBits;           // LRU tracking: 6 bits for 4-way pseudo-LRU
-                        // Bit layout: [0:1] = MRU between (0,1), [2:3] = MRU between (2,3), 
+                        // Bit layout: [0:1] = MRU between (0,1), [2:3] = MRU between (2,3),
                         // [4:5] = MRU between winners
-  
+
   // Get the LRU way index for replacement
   inline u8 getLRUWay() const {
     // Pseudo-LRU: Find least recently used way
@@ -1140,7 +1140,7 @@ struct alignas(64) TLBCongruenceClass {
       return (lruBits & 0x0C) ? 3 : 2; // Return LRU of pair (2,3)
     }
   }
-  
+
   // Update LRU bits when accessing a way
   inline void updateLRU(u8 accessedWay) {
     switch (accessedWay) {
@@ -1162,7 +1162,7 @@ struct alignas(64) TLBCongruenceClass {
       break;
     }
   }
-  
+
   // Invalidate a specific way
   inline void invalidateWay(u8 way) {
     ways[way].V = false;
@@ -1171,7 +1171,7 @@ struct alignas(64) TLBCongruenceClass {
     ways[way].pte1 = 0;
     ways[way].RPN = 0;
   }
-  
+
   // Invalidate all ways in this class
   inline void invalidateAll() {
     for (u8 i = 0; i < 4; ++i) {
@@ -1187,14 +1187,14 @@ struct alignas(64) TLBCongruenceClass {
 // Shared by both PPE threads.
 struct TLB_Reg {
   TLBCongruenceClass classes[256];
-  
+
   // Invalidate entire TLB
   inline void invalidateAll() {
     for (auto &tlbClass : classes) {
       tlbClass.invalidateAll();
     }
   }
-  
+
   // Invalidate a specific congruence class
   inline void invalidateClass(u8 classIndex) {
     classes[classIndex].invalidateAll();
@@ -1212,8 +1212,8 @@ enum eXenonSPR : u16 {
   DSISR = 18,   // Data Storage Interrupt Status Register
   DAR = 19,     // Data Address Register
   DEC = 22,     // Decrementer Register
-  SDR1 = 25,    // Storage Description Register 1 
-  SRR0 = 26,    // Machine Status Save/Restore Register 0 
+  SDR1 = 25,    // Storage Description Register 1
+  SRR0 = 26,    // Machine Status Save/Restore Register 0
   SRR1 = 27,    // Machine Status Save/Restore Register 1
   CFAR = 28,    // Not described in the manual but used in Linux
   ACCR = 29,    // Address Compare Control Register
@@ -1223,14 +1223,14 @@ enum eXenonSPR : u16 {
   SPRG3RD = 259,  // Software Use Special Purpose Register 3 - Read Only
   TBLRO = 268,  // Time Base Register (Lower 32 bits) - Read Only
   TBURO = 269,  // Time Base Register (Upper 32 bits) - Read Only
-  SPRG0 = 272,  // Software Use Special Purpose Register 0 
-  SPRG1 = 273,  // Software Use Special Purpose Register 1 
-  SPRG2 = 274,  // Software Use Special Purpose Register 2 
-  SPRG3 = 275,  // Software Use Special Purpose Register 3 
+  SPRG0 = 272,  // Software Use Special Purpose Register 0
+  SPRG1 = 273,  // Software Use Special Purpose Register 1
+  SPRG2 = 274,  // Software Use Special Purpose Register 2
+  SPRG3 = 275,  // Software Use Special Purpose Register 3
   TBLWO = 284,  // Time Base Register (Lower 32 bits) - Write Only
   TBUWO = 285,  // Time Base Register (Upper 32 bits) - Write Only
   PVR = 287,    // PPE Processor Version Register
-  HSPRG0 = 304, // Hypervisor Software Use Special Purpose Register 0 
+  HSPRG0 = 304, // Hypervisor Software Use Special Purpose Register 0
   HSPRG1 = 305, // Hypervisor Software Use Special Purpose Register 1
   HDEC = 310,   // Hypervisor Decrementer Register
   RMOR = 312,   // Real Mode Offset Register
@@ -1320,12 +1320,14 @@ struct sPPUGlobalSPRs {
   uPPE_TLB_Index PPE_TLB_Index; // PPE Translation Lookaside Buffer Index Register
   uPPE_TLB_VPN PPE_TLB_VPN;     // PPE Translation Lookaside Buffer Virtual-Page Number Register
   uPPE_TLB_RPN PPE_TLB_RPN;     // PPE Translation Lookaside Buffer Real-Page Number Register
-  uPPE_TLB_RMT PPE_TLB_RMT;     // PPE Translation Lookaside Buffer RMT Register 
+  uPPE_TLB_RMT PPE_TLB_RMT;     // PPE Translation Lookaside Buffer RMT Register
   uHID0 HID0;   // Hardware Implementation Register 0
   uHID1 HID1;   // Hardware Implementation Register 1
   uHID4 HID4;   // Hardware Implementation Register 4
-  uHID6 HID6;   // Hardware Implementation Register 6 
+  uHID6 HID6;   // Hardware Implementation Register 6
 };
+
+constexpr auto SLB_ENTRY_COUNT = 64;
 
 // Basic Execution Thread inside each PPU Core.
 struct sPPUThread {
@@ -1368,7 +1370,7 @@ struct sPPUThread {
   //
 
   // Segment Lookaside Buffer (MMU)
-  sSLBEntry SLB[64]{};
+  sSLBEntry SLB[SLB_ENTRY_COUNT]{};
 
   // ERAT's (MMU)
   LRUCache iERAT{}; // Instruction effective to real address cache.
@@ -1382,7 +1384,7 @@ struct sPPUThread {
   bool exHVSysCall = false;
   // PPU reservations for PPC atomic load/store operations.
   std::unique_ptr<PPU_RES> ppuRes{};
-  
+
   // JIT atomic reservation state (for lwarx/stwcx without full reservation system)
   u64 atomicResHostPtr = 0;   // Host memory pointer from lwarx/ldarx
   u64 atomicResExpected = 0;  // Expected value (big-endian, ready for cmpxchg)
@@ -1412,6 +1414,17 @@ enum ePPUThreadBit : u8 {
   ePPUThreadBit_One
 };
 
+struct InvalidationRequest {
+  u64 start;
+  u64 end;
+  bool full; // for tlbia / global flush
+};
+
+struct JITState {
+  std::vector<InvalidationRequest> pending;
+  bool hasFullFlush = false;
+};
+
 // Power Processor Element (PPE)
 struct sPPEState {
   ~sPPEState() {
@@ -1430,6 +1443,8 @@ struct sPPEState {
   TLB_Reg TLB{};
   // Current PPU Name, for ease of debugging.
   std::string ppuName{};
+  // JIT State
+  JITState jit{};
   // PPU ID
   u8 ppuID = 0;
 };

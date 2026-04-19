@@ -543,7 +543,7 @@ void loadConfig(const fs::path &path) {
   configFile.close();
   std::error_code error;
   if (!fs::exists(path, error) && !valid) {
-    filepaths.correct(Base::FS::GetUserPath(Base::FS::PathType::ConsoleDir));
+    filepaths.correct(Base::FS::GetPath(Base::FS::PathType::ConsoleDir));
     saveConfig(path);
     return;
   }

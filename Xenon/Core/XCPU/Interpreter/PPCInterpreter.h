@@ -46,9 +46,9 @@ extern Xe::XCPU::XenonContext *xenonContext;
 // Check for Enabled FPU.
 #define CHECK_FPU     if (!checkFpuAvailable(ppeState)) { return; }
 // Converts a given number into an integer.
-void ConvertToInteger(sPPEState* ppeState, eFPRoundMode roundingMode);
-void FPCompareOrdered(sPPEState* ppeState, double fra, double frb);
-void FPCompareUnordered(sPPEState* ppeState, double fra, double frb);
+void ConvertToInteger(sPPEState *ppeState, eFPRoundMode roundingMode);
+void FPCompareOrdered(sPPEState *ppeState, double fra, double frb);
+void FPCompareUnordered(sPPEState *ppeState, double fra, double frb);
 //
 // VXU Helpers
 //
@@ -129,7 +129,7 @@ inline void ppuSetCR(sPPEState *ppeState, u32 crField, const T& a, const T& b) {
 }
 
 // // Updates CR1 field based on the contents of FPSCR.
-void ppuSetCR1(sPPEState* ppeState);
+void ppuSetCR1(sPPEState *ppeState);
 
 // Update FPSCR FPCC bits and CR if requested. Default CR to be updated is 1.
 void ppuUpdateFPSCR(sPPEState *ppeState, f64 op0, f64 op1, bool updateCR, u8 CR = 1);
@@ -146,7 +146,7 @@ u32 CRCompS(sPPEState *ppeState, u64 num1, u64 num2);
 // Single instruction execution
 void ppcExecuteSingleInstruction(sPPEState *ppeState);
 
-void ppcInterpreterTrap(sPPEState* ppeState, u32 trapNumber);
+void ppcInterpreterTrap(sPPEState *ppeState, u32 trapNumber);
 
 //
 // MMU

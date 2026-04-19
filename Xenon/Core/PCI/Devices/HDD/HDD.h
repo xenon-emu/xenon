@@ -415,7 +415,7 @@ private:
   std::thread hddWorkerThread;
 
   // Thread running
-  volatile bool hddThreadRunning = false;
+  std::atomic<bool> hddThreadRunning = false;
 
   // Thread loop for processing DMA requests, etc...
   void hddThreadLoop();

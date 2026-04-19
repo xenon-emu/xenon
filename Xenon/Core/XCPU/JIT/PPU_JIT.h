@@ -124,8 +124,14 @@ base(baseReg), offset(offset)
     return asmjit::x86::ptr(base, offset, size);
   }
 
+  template<typename sT>
+  ASMJitPtr<sT> member(sT T::*member) const {
+    u64 off = reinterpret_cast<u64>(&(reinterpret_cast<T*>(0)->*member));
+    return ASMJitPtr<sT>(base, offset + off);
+  }
+
   operator asmjit::x86::Gp() const {
-return base;
+    return base;
   }
 
   u64 Offset() {
@@ -149,9 +155,9 @@ class JITBlock;
 class JITBlockBuilder {
 public:
   JITBlockBuilder(u64 addr, asmjit::JitRuntime *rt) :
-  ppuAddr(addr), runtime(rt)
+    ppuAddr(addr), runtime(rt)
   {
-    code.init(runtime->environment(), runtime->cpuFeatures());
+    code.init(runtime->environment(), runtime->cpu_features());
   }
   ~JITBlockBuilder() {
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
@@ -166,7 +172,7 @@ public:
   u64 size = 0;   // PPC code size in bytes
   std::unordered_map<u64, u32> opcodesDataCache = {};
 
-  asmjit::CodeHolder* Code() {
+  asmjit::CodeHolder *Code() {
     return &code;
   }
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
@@ -204,7 +210,7 @@ runtime->release(codePtr);
     asmjit::CodeHolder *code = builder->Code();
     runtime->add(&fnPtr, code);
     codePtr = reinterpret_cast<decltype(codePtr)>(fnPtr);
-    codeSize = code->codeSize();
+    codeSize = code->code_size();
     return true;
   }
 
@@ -227,7 +233,7 @@ runtime->release(codePtr);
   // Target address for unconditional branches (0 if conditional or not a branch)
   u64 linkTargetAddr = 0;
   // Cached pointer to the linked block (nullptr if not yet linked or target doesn't exist)
-  JITBlock* linkedBlock = nullptr;
+  JITBlock *linkedBlock = nullptr;
   // Whether this block ends with an unconditional branch that can be linked
   bool canLink = false;
 };
@@ -237,17 +243,20 @@ public:
   PPU_JIT(PPU *ppu);
   ~PPU_JIT();
 
-  void ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt = true, bool singleBlock = false);
+  void ExecuteJITInstrs(u64 numInstrs, bool enableHalt = true, bool singleBlock = false);
   u64 ExecuteJITBlock(u64 blockStartAddress, bool enableHalt); // returns step count
   std::shared_ptr<JITBlock> BuildJITBlock(u64 blockStartAddress, u64 maxBlockSize);
   void SetupContext(JITBlockBuilder *b);
+  void EmitAbortCheck(JITBlockBuilder *b);
   void InstrPrologue(JITBlockBuilder *b, u32 instrData);
 
-  // Page based indexing and invalidation methods.
+  // Page based indexing and invalidation methods
+  void ProcessInvalidations(sPPEState *ppeState);
   void InvalidateBlocksForRange(u64 startAddr, u64 endAddr);
   void InvalidateBlockAt(u64 blockAddr);
   void InvalidateAllBlocks();
 
+  std::atomic<bool> abortRequested = false;
 private:
   PPU *ppu = nullptr; // "Linked" PPU
   sPPEState *ppeState = nullptr; // For easier thread access
@@ -264,7 +273,7 @@ private:
   // Internal helpers for page based indexing.
   void RegisterBlockPages(u64 blockStart, u64 blockSize);
   void UnregisterBlock(u64 blockStart);
-  
+
   // Block linking helpers
   void TryLinkBlock(JITBlock* block);
   void UnlinkBlocksTo(u64 targetAddr);

@@ -228,7 +228,7 @@ void HW_UART_VCOM::Init(void *uartConfig) {
   }
 
 #if defined(DEBUG_BUILD) && COM_TEST
-  auto path = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
+  auto path = Base::FS::GetPath(Base::FS::PathType::logDir);
   f.open(path / "UART.txt", std::ios::out | std::ios::binary);
 #endif
 

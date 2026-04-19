@@ -1,5 +1,5 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #pragma once
@@ -146,10 +146,13 @@ public:
   bool IssueCopy(Xe::XGPU::XenosState *state);
 
   Xe::XGPU::XeShader *GetOrCreateShader(u32 vsHash, u32 psHash);
+  Xe::XGPU::XeShader *BindShaderHack(u32 vsHash, u32 psHash);
 
   void OnEvent(const SDL_Event &e);
 
   void Thread();
+
+  bool finishedCreation = false;
 
   // CPU Handles
   RAM *ramPointer{};
@@ -168,7 +171,8 @@ public:
   // Is Fullscreen
   bool fullscreen = false;
   // Thread Running
-  volatile bool threadRunning = true;
+  volatile bool stopRequested = false;
+  std::atomic<bool> threadRunning = true;
 
   // FB Pitch
   u32 pitch = 0;
@@ -214,7 +218,7 @@ public:
   bool imguiInitialized = false;
 private:
   // Thread handle
-  std::thread thread;
+  std::thread renderThread;
 
   // Hack: last-known shader hashes so BindShader can be partial (vs-only or ps-only).
   u32 lastVSHash_ = 0;

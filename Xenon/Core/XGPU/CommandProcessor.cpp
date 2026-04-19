@@ -599,10 +599,10 @@ void VisitAll(const Microcode::AST::ControlFlowGraph *cf, Microcode::AST::Statem
   }
 }
 
-std::pair<Microcode::AST::Shader*, std::vector<u32>> LoadShader(eShaderType shaderType, const std::vector<u32> &data, std::string baseString) {
-  fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "cache" };
+std::pair<Microcode::AST::Shader *, std::vector<u32>> LoadShader(eShaderType shaderType, const std::vector<u32> &data, std::string baseString) {
+  fs::path shaderPath{ Base::FS::GetPath(Base::FS::PathType::ShaderCacheDir) };
   fs::path path{ shaderPath / (baseString + ".spv") };
-  std::vector<u32> spirv{};
+  std::vector<u32> code{};
   // Vali: Temporarily disable cache, emitting isn't 100% yet
   // Plus, I need to figure Shader ptr out
   /*{
@@ -610,20 +610,20 @@ std::pair<Microcode::AST::Shader*, std::vector<u32>> LoadShader(eShaderType shad
     std::error_code error;
     if (fs::exists(path, error) && file.is_open()) {
       u64 fileSize = fs::file_size(path);
-      spirv.resize(fileSize / 4);
-      file.read(reinterpret_cast<char*>(spirv.data()), fileSize);
+      code.resize(fileSize / 4);
+      file.read(reinterpret_cast<char*>(code.data()), fileSize);
       file.close();
-      return spirv;
+      return code;
     }
     file.close();
   }*/
-  Microcode::AST::Shader *shader = Microcode::AST::Shader::DecompileMicroCode(reinterpret_cast<const u8*>(data.data()), data.size() * 4, shaderType);
+  Microcode::AST::Shader *shader = Microcode::AST::Shader::DecompileMicroCode(reinterpret_cast<const u8 *>(data.data()), data.size() * 4, shaderType);
 #ifndef NO_GFX
   Microcode::AST::ShaderCodeWriterSirit writer{ shaderType };
   if (shader) {
     shader->EmitShaderCode(writer);
   }
-  spirv = writer.module.Assemble();
+  std::vector<u32> spirv = writer.module.Assemble();
   std::ofstream f{ shaderPath / (baseString + ".spv"), std::ios::out | std::ios::binary };
   f.write(reinterpret_cast<char *>(spirv.data()), spirv.size() * sizeof(u32));
   f.close();
@@ -650,7 +650,7 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 pa
     value = byteswap_be(value);
   }
 
-  fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "cache" };
+  fs::path shaderPath{ Base::FS::GetPath(Base::FS::PathType::ShaderCacheDir) };
   std::string typeString = shaderType == Xe::eShaderType::Pixel ? "pixel" : "vertex";
   u32 crc = CRC32::CRC32::calc(reinterpret_cast<const u8 *>(data.data()), data.size() * 4);
   std::string baseString = FMT("{}_shader_{:X}", typeString, crc);
@@ -713,7 +713,7 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuff
     value = byteswap_be(value);
   }
 
-  fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "cache" };
+  fs::path shaderPath{ Base::FS::GetPath(Base::FS::PathType::ShaderCacheDir) };
   std::string typeString = shaderType == Xe::eShaderType::Pixel ? "pixel" : "vertex";
   u32 crc = CRC32::CRC32::calc(reinterpret_cast<const u8 *>(data.data()), data.size() * 4);
   std::string baseString = FMT("{}_shader_{:X}", typeString, crc);
@@ -1273,7 +1273,7 @@ bool CommandProcessor::ExecutePacketType3_LOAD_ALU_CONSTANT(RingBuffer *ringBuff
     Render::eBufferUsage::DynamicDraw
   };
 
-  auto &upload = std::get<Render::RenderCommand::UploadBufferCmd>(cmd.payload);
+  auto& upload = std::get<Render::RenderCommand::UploadBufferCmd>(cmd.payload);
   upload.data = std::move(uploadBytes);
 
   {

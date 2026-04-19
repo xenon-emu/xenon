@@ -32,9 +32,9 @@ void PPCInterpreter::PPCInterpreterJIT_b(sPPEState *ppeState, JITBlockBuilder *b
 
 // Branch Conditional
 void PPCInterpreter::PPCInterpreterJIT_bc(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
-  Label fail = COMP->newLabel();
-  Label done = COMP->newLabel();
-  Label use64 = COMP->newLabel();
+  Label fail = newLabel();
+  Label done = newLabel();
+  Label use64 = newLabel();
 
   // If BO[2] == 0 then CTR -= 1
   if ((instr.bo & 0x4) == 0) {
@@ -122,10 +122,10 @@ void PPCInterpreter::PPCInterpreterJIT_bc(sPPEState *ppeState, JITBlockBuilder *
 }
 
 // Branch Conditional to Link Register
-void PPCInterpreter::PPCInterpreterJIT_bclr(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
-  Label condTrue = COMP->newLabel();
-  Label condEnd = COMP->newLabel();
-  Label use64 = COMP->newLabel();
+void PPCInterpreter::PPCInterpreterJIT_bclr(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  Label condTrue = newLabel();
+  Label condEnd = newLabel();
+  Label use64 = newLabel();
 
   // If BO[2] == 0 then CTR -= 1
   if ((instr.bo & 0x4) == 0) {
@@ -144,14 +144,14 @@ void PPCInterpreter::PPCInterpreterJIT_bclr(sPPEState* ppeState, JITBlockBuilder
     COMP->mov(CIA, CIAPtr());
 
     // if (CIA == initSkip1) -> skip branch
-    Label notSkip1 = COMP->newLabel();
+    Label notSkip1 = newLabel();
     COMP->cmp(CIA, imm<u64>(XeMain::sfcx->initSkip1));
     COMP->jne(notSkip1);
     COMP->jmp(condEnd);
     COMP->bind(notSkip1);
 
     // if (CIA == initSkip2) -> force branch
-    Label notSkip2 = COMP->newLabel();
+    Label notSkip2 = newLabel();
     COMP->cmp(CIA, imm<u64>(XeMain::sfcx->initSkip2));
     COMP->jne(notSkip2);
     COMP->jmp(condTrue);
@@ -233,9 +233,9 @@ void PPCInterpreter::PPCInterpreterJIT_bclr(sPPEState* ppeState, JITBlockBuilder
 
 // Branch Conditional to Count Register
 void PPCInterpreter::PPCInterpreterJIT_bcctr(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
-  Label condTrue = COMP->newLabel();
-  Label condEnd = COMP->newLabel();
-  Label use64 = COMP->newLabel();
+  Label condTrue = newLabel();
+  Label condEnd = newLabel();
+  Label use64 = newLabel();
 
   // If BO[4] set (unconditional on CR) -> condition true
   if (instr.bo & 0x10) {

@@ -1,5 +1,5 @@
 #***************************************************************
-#* Copyright 2025 Xenon Emulator Project. All rights reserved. *
+#* Copyright 2026 Xenon Emulator Project. All rights reserved. *
 #***************************************************************
 
 cmake_minimum_required(VERSION 3.22)
@@ -19,7 +19,6 @@ endif()
 set(COMPILER ${CMAKE_CXX_COMPILER_ID})
 message(STATUS "Using ${COMPILER} Version ${CMAKE_CXX_COMPILER_VERSION}")
 
-# Set compiler ID
 if (COMPILER STREQUAL "MSVC")
   set(msvc ON)
 elseif (COMPILER STREQUAL "GNU")
@@ -28,7 +27,6 @@ elseif (COMPILER STREQUAL "Clang")
   set(Clang ON)
 endif()
 
-# Optimizations
 if (NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
   set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
   if (msvc)
@@ -41,23 +39,37 @@ if (MSVC AND Clang)
   add_compile_options(-Wno-unused-command-line-argument)
 endif()
 
+#
 # Options
+#
 option(GFX_ENABLED "Enable graphics" ON)
 option(XENON_USE_SYSTEM_DEPS "Prefer system-installed packages (find_package first)" ON)
 option(XENON_ALLOW_BUNDLED_DEPS "If a package isn't found, fall back to bundled subdirs" ON)
+option(XE_ASMJIT_NEW_OUT_API "New AsmJit API" ON)
 set(XENON_THIRDPARTY_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Deps/ThirdParty" CACHE PATH "Bundled deps root")
 
+#
 # Version
-set(EMULATOR_VERSION_MAJOR "0")
-set(EMULATOR_VERSION_MINOR "0")
-set(EMULATOR_VERSION_PATCH "1")
+#
+set(EMULATOR_VERSION "0.0.1")
+
+string(REPLACE "." ";" EMULATOR_VERSION_LIST "${EMULATOR_VERSION}")
+list(LENGTH EMULATOR_VERSION_LIST EMULATOR_VERSION_LIST_LEN)
+if (NOT EMULATOR_VERSION_LIST_LEN EQUAL 3)
+  message(FATAL_ERROR "EMULATOR_VERSION must be in major.minor.patch format")
+endif()
+
+list(GET EMULATOR_VERSION_LIST 0 EMULATOR_VERSION_MAJOR)
+list(GET EMULATOR_VERSION_LIST 1 EMULATOR_VERSION_MINOR)
+list(GET EMULATOR_VERSION_LIST 2 EMULATOR_VERSION_PATCH)
 
 set_property(SOURCE Xenon/Xenon.rc APPEND PROPERTY COMPILE_DEFINITIONS
   EMULATOR_VERSION_MAJOR=${EMULATOR_VERSION_MAJOR}
   EMULATOR_VERSION_MINOR=${EMULATOR_VERSION_MINOR}
   EMULATOR_VERSION_PATCH=${EMULATOR_VERSION_PATCH}
 )
-add_compile_definitions(APP_VERSION="${EMULATOR_VERSION_MAJOR}.${EMULATOR_VERSION_MINOR}.${EMULATOR_VERSION_PATCH}")
+
+add_compile_definitions(APP_VERSION="${EMULATOR_VERSION}")
 
 # COMMIT_COUNT on Xenon (with Git)
 execute_process(
@@ -92,99 +104,106 @@ elseif (NOT APPLE)
   add_compile_options(-mssse3)
 endif()
 
-# Try system first, else add_subdirectory for the specific dep
-macro(xenon_dep pkg target subdir)
-  set(found_system OFF)
-  if (XENON_USE_SYSTEM_DEPS)
-    # Try config mode first, then module mode
-    find_package(${pkg} CONFIG QUIET)
-    if (NOT TARGET ${target})
-      find_package(${pkg} QUIET)
-    endif()
+#
+# Dependency Resoultion
+#
 
-    if (TARGET ${target})
-      # Check for library or header-only target
-      get_target_property(lib_location ${target} IMPORTED_LOCATION)
-      get_target_property(lib_location_debug ${target} IMPORTED_LOCATION_DEBUG)
-      get_target_property(lib_location_release ${target} IMPORTED_LOCATION_RELEASE)
-      get_target_property(type ${target} TYPE)
+function(xenon_require_system pkg target)
+  if (NOT XENON_USE_SYSTEM_DEPS)
+    message(FATAL_ERROR "XENON_USE_SYSTEM_DEPS=OFF is not supported by this packaging path for ${pkg}")
+  endif()
 
-      if (lib_location OR lib_location_debug OR lib_location_release)
-        message(STATUS "Using system ${pkg} (prebuilt library)")
-        set(found_system ON)
-      elseif (type STREQUAL "STATIC_LIBRARY" OR type STREQUAL "MODULE_LIBRARY")
-        message(STATUS "Using system ${pkg} (build target)")
-        set(found_system ON)
-      elseif (type STREQUAL "INTERFACE_LIBRARY")
-        message(STATUS "Using system ${pkg} (header-only)")
-        set(found_system ON)
-      else()
-        message(WARNING "System ${pkg} found but unusable - falling back to bundled")
-      endif()
+  find_package(${pkg} CONFIG QUIET)
+  if (NOT TARGET ${target})
+    find_package(${pkg} QUIET)
+  endif()
+
+  if (NOT TARGET ${target})
+    if (XENON_ALLOW_BUNDLED_DEPS)
+      message(FATAL_ERROR
+        "Package ${pkg} was not found as system dependency, but this CMake path expects it. "
+        "Either package it properly or add an explicit bundled path for ${pkg}.")
+    else()
+      message(FATAL_ERROR
+        "Required system package ${pkg} not found (expected target ${target}).")
     endif()
   endif()
 
-  if (NOT found_system)
-    if (NOT XENON_ALLOW_BUNDLED_DEPS)
-      message(FATAL_ERROR "Package ${pkg} not found and bundled deps disabled (XENON_ALLOW_BUNDLED_DEPS=OFF).")
-    endif()
+  message(STATUS "Using system ${pkg}: ${target}")
+endfunction()
 
-    if (NOT TARGET ${target})
-      # Per-dep settings
-      if (${pkg} STREQUAL "toml11")
-        set(TOML11_INSTALL OFF CACHE BOOL "" FORCE)
-      elseif (${pkg} STREQUAL "SDL3")
-        set(SDL_DISKAUDIO OFF CACHE BOOL "" FORCE)
-        set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
-        set(SDL_PIPEWIRE OFF CACHE BOOL "" FORCE)
-        set(SDL_SHARED OFF CACHE BOOL "" FORCE)
-        set(SDL_STATIC ON CACHE BOOL "" FORCE)
-      elseif (${pkg} STREQUAL "asmjit")
-        set(ASMJIT_NO_CUSTOM_FLAGS TRUE CACHE BOOL "" FORCE)
-        set(ASMJIT_STATIC TRUE CACHE BOOL "" FORCE)
-      elseif (${pkg} STREQUAL "Vulkan-Headers")
-        # Vulkan-Headers is header-only, need to expose the include directory
-        set(VULKAN_HEADERS_INSTALL OFF CACHE BOOL "" FORCE)
-        add_subdirectory(${subdir})
-        # Ensure include dir is propagated
-        set_target_properties(Vulkan::Headers PROPERTIES
-          INTERFACE_INCLUDE_DIRECTORIES
-          ${CMAKE_CURRENT_SOURCE_DIR}/Deps/ThirdParty/Vulkan-Headers/include
-        )
-        set(found_system ON)
-      elseif (${pkg} STREQUAL "glslang")
-        set(ENABLE_OPT OFF CACHE BOOL "" FORCE)
-        set(BUILD_EXTERNAL OFF CACHE BOOL "" FORCE)
-      endif()
-
-      message(STATUS "Using bundled ${pkg}")
-      add_subdirectory(${XENON_THIRDPARTY_DIR}/${subdir} ${subdir} EXCLUDE_FROM_ALL)
-    endif()
+function(xenon_add_bundled pkg subdir)
+  if (NOT XENON_ALLOW_BUNDLED_DEPS)
+    message(FATAL_ERROR "Bundled dependency ${pkg} requested but XENON_ALLOW_BUNDLED_DEPS=OFF")
   endif()
-endmacro()
 
-xenon_dep(fmt fmt::fmt fmt)
-xenon_dep(asmjit asmjit::asmjit asmjit)
-xenon_dep(toml11 toml11::toml11 toml11)
+  message(STATUS "Using bundled ${pkg}")
+  add_subdirectory(${XENON_THIRDPARTY_DIR}/${subdir} ${subdir} EXCLUDE_FROM_ALL)
+endfunction()
+
+xenon_require_system(fmt fmt::fmt)
+xenon_require_system(asmjit asmjit::asmjit)
+xenon_require_system(toml11 toml11::toml11)
+
 if (GFX_ENABLED)
-  xenon_dep(glad glad glad)
-  xenon_dep(SDL3 SDL3::SDL3 SDL3)
-  xenon_dep(sirit sirit Sirit)
-  xenon_dep(VulkanHeaders Vulkan::Headers Vulkan-Headers)
-  xenon_dep(VulkanMemoryAllocator VulkanMemoryAllocator VulkanMemoryAllocator)
-  xenon_dep(vk-bootstrap vk-bootstrap::vk-bootstrap vk-bootstrap)
-  xenon_dep(glslang glslang glslang)
+  xenon_require_system(SDL3 SDL3::SDL3)
+  xenon_require_system(VulkanHeaders Vulkan::Headers)
+  xenon_require_system(VulkanMemoryAllocator GPUOpen::VulkanMemoryAllocator)
+
+  # vk-bootstrap package exports vary a bit, so this covers all bases
+  find_package(vk-bootstrap CONFIG QUIET)
+  if (TARGET vk-bootstrap::vk-bootstrap)
+    set(XENON_VK_BOOTSTRAP_TARGET vk-bootstrap::vk-bootstrap)
+    message(STATUS "Using system vk-bootstrap: vk-bootstrap::vk-bootstrap")
+  elseif (TARGET vk-bootstrap)
+    set(XENON_VK_BOOTSTRAP_TARGET vk-bootstrap)
+    message(STATUS "Using system vk-bootstrap: vk-bootstrap")
+  else()
+    message(FATAL_ERROR "Required system package vk-bootstrap not found")
+  endif()
+
+  # Same reason as vk-bootstrap
+  find_package(glslang CONFIG QUIET)
+  if (TARGET glslang::glslang)
+    set(XENON_GLSLANG_TARGET glslang::glslang)
+    message(STATUS "Using system glslang: glslang::glslang")
+  elseif (TARGET glslang)
+    set(XENON_GLSLANG_TARGET glslang)
+    message(STATUS "Using system glslang: glslang")
+  else()
+    message(FATAL_ERROR "Required system package glslang not found")
+  endif()
 endif()
 
-# Include Files
+# These will always be static.
+# ImGui is not something you can package easily, and Sirit is a fork.
+# glad is per-settings
+if (GFX_ENABLED)
+  set(ImGuiDir ${XENON_THIRDPARTY_DIR}/ImGui)
+  set(SiritDir ${XENON_THIRDPARTY_DIR}/Sirit)
+  set(gladDir ${XENON_THIRDPARTY_DIR}/glad)
+endif()
+
+set(microprofile_dir ${XENON_THIRDPARTY_DIR}/microprofile)
+set(plusaes_dir ${XENON_THIRDPARTY_DIR}/plusaes)
+
+#
+# Sources
+#
+
 include_directories(Xenon)
+
+if (XE_ASMJIT_NEW_OUT_API)
+  add_compile_definitions(XE_ASMJIT_NEW_OUT_API)
+endif()
 
 file(GLOB_RECURSE Base Xenon/Base/*.cpp Xenon/Base/*.h)
 file(GLOB_RECURSE Core Xenon/Core/*.cpp Xenon/Core/*.h)
+file(GLOB_RECURSE include Xenon/include/*.cpp Xenon/include/*.h)
 
 if (GFX_ENABLED)
   add_compile_definitions(VK_NO_PROTOTYPES)
-  set(ImGuiDir ${XENON_THIRDPARTY_DIR}/ImGui)
+
   set(ImGuiBackends
     ${ImGuiDir}/backends/imgui_impl_opengl3.cpp
     ${ImGuiDir}/backends/imgui_impl_opengl3.h
@@ -193,8 +212,24 @@ if (GFX_ENABLED)
     ${ImGuiDir}/backends/imgui_impl_sdl3.cpp
     ${ImGuiDir}/backends/imgui_impl_sdl3.h
   )
+
   file(GLOB ImGui ${ImGuiDir}/*.cpp ${ImGuiDir}/*.h)
   file(GLOB_RECURSE XenonRender Xenon/Render/*.cpp Xenon/Render/*.h)
+
+  add_subdirectory(${SiritDir} Sirit EXCLUDE_FROM_ALL)
+  add_subdirectory(${gladDir} glad EXCLUDE_FROM_ALL)
+
+  if (TARGET sirit)
+    set(XENON_SIRIT_TARGET sirit)
+  elseif (TARGET Sirit)
+    set(XENON_SIRIT_TARGET Sirit)
+  elseif (TARGET sirit::sirit)
+    set(XENON_SIRIT_TARGET sirit::sirit)
+  else()
+    get_cmake_property(_targets TARGETS)
+    message(FATAL_ERROR "Bundled Sirit target not found. Targets: ${_targets}")
+  endif()
+
   set(Render
     ${ImGuiBackends}
     ${ImGui}
@@ -202,10 +237,7 @@ if (GFX_ENABLED)
   )
 endif()
 
-file(GLOB_RECURSE include Xenon/include/*.cpp Xenon/include/*.h)
-
 add_compile_definitions(MICROPROFILE_USE_CONFIG)
-set(microprofile_dir ${XENON_THIRDPARTY_DIR}/microprofile)
 file(GLOB microprofile ${microprofile_dir}/*.cpp ${microprofile_dir}/*.h)
 
 add_executable(Xenon
@@ -229,44 +261,62 @@ if (NOT CMAKE_BUILD_TYPE STREQUAL "Release")
   add_compile_definitions(DEBUG_BUILD)
 endif()
 
-# Link libraries
-target_link_libraries(Xenon PRIVATE fmt::fmt toml11::toml11 asmjit::asmjit)
+#
+# Linking
+#
+
+target_link_libraries(Xenon PRIVATE
+  fmt::fmt
+  toml11::toml11
+  asmjit::asmjit
+)
+
 if (GFX_ENABLED)
-  target_link_libraries(Xenon PRIVATE glad glslang sirit SDL3::SDL3 VulkanMemoryAllocator vk-bootstrap::vk-bootstrap)
+  target_link_libraries(Xenon PRIVATE
+    glad
+    ${XENON_GLSLANG_TARGET}
+    ${XENON_SIRIT_TARGET}
+    SDL3::SDL3
+    Vulkan::Headers
+    GPUOpen::VulkanMemoryAllocator
+    ${XENON_VK_BOOTSTRAP_TARGET}
+  )
 endif()
 
+if (WIN32)
+  # cryptopp on Windows often needs explicit link, better to be safe than sorry
+  find_package(cryptopp CONFIG QUIET)
+  if (TARGET cryptopp::cryptopp)
+    target_link_libraries(Xenon PRIVATE cryptopp::cryptopp)
+  elseif (TARGET cryptopp)
+    target_link_libraries(Xenon PRIVATE cryptopp)
+  endif()
+endif()
+
+#
 # Includes
+#
+
 target_include_directories(Xenon PRIVATE
   ${microprofile_dir}
+  ${plusaes_dir}/include
   Xenon/include
   Xenon
 )
 if (GFX_ENABLED)
   target_include_directories(Xenon SYSTEM PRIVATE
     ${ImGuiDir}
-    ${VolkDir}
-    ${VkHdrsDir}/include
-    ${VMADir}/include
-    ${XENON_THIRDPARTY_DIR}/glad
-    ${XENON_THIRDPARTY_DIR}/SDL3/include
-    ${XENON_THIRDPARTY_DIR}/glslang/include
-    ${XENON_THIRDPARTY_DIR}/Sirit/include
-    ${XENON_THIRDPARTY_DIR}/vk-bootstrap/src
-    ${XENON_THIRDPARTY_DIR}/Vulkan-Headers/include
-    ${XENON_THIRDPARTY_DIR}/VulkanMemoryAllocator/include
+    ${SiritDir}/include
+    ${gladDir}/include
   )
 endif()
-target_include_directories(Xenon SYSTEM PRIVATE
-  ${XENON_THIRDPARTY_DIR}/fmt/include
-  ${XENON_THIRDPARTY_DIR}/toml11
-  ${XENON_THIRDPARTY_DIR}/asmjit/src
-  ${XENON_THIRDPARTY_DIR}/plusaes/include
-)
 
-# Add defines specific to Apple
+#
+# Platform
+#
+
 if (APPLE)
   add_compile_definitions(SIMPLE_FMT)
-# Add defines specific to Windows
 elseif (WIN32)
   # Synchronization is needed for WaitOnAddress/WakeByAddressSingle
   target_link_libraries(Xenon PRIVATE iphlpapi setupapi ws2_32 synchronization)
@@ -279,8 +329,8 @@ elseif (WIN32)
   target_sources(Xenon PRIVATE Xenon/Xenon.rc)
 endif()
 
-# Specific to MSVC, forces system version so the autodetected 8.1 SDK isn't used
-# Also enables multi-processor (multithreaded) compiling on MSVC
+# This forces system version so the autodetected 8.1 SDK isn't used
+# Also enables multi-processor (multi-threaded) compiling
 if (CMAKE_GENERATOR MATCHES "Visual Studio")
   set(CMAKE_GENERATOR_PLATFORM x64)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP")

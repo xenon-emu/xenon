@@ -1,5 +1,5 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #include "Renderer.h"
@@ -69,10 +69,10 @@ void Renderer::SDLInit() {
 void Renderer::Start(RAM *ram) {
   ramPointer = ram;
   // Should we render?
-  threadRunning = Config::rendering.enable && XeRunning;
+  threadRunning.store(Config::rendering.enable && XeRunning.load(std::memory_order_acquire), std::memory_order_release);
   if (threadRunning) {
     SDLInit();
-    thread = std::thread(&Renderer::Thread, this);
+    renderThread = std::thread(&Renderer::Thread, this);
   }
 }
 
@@ -106,23 +106,46 @@ void Renderer::CreateHandles() {
 }
 
 void Renderer::Shutdown() {
-  threadRunning = false;
-  if (thread.joinable())
-    thread.join();
-  if (gui)
+  threadRunning.store(false, std::memory_order_release);
+
+  if (renderThread.joinable()) {
+    if (std::this_thread::get_id() != renderThread.get_id()) {
+      renderThread.join();
+    } else {
+      renderThread.detach();
+    }
+  }
+
+  if (gui) {
     gui->Shutdown();
-  backbuffer->DestroyTexture();
-  pixelSSBO->DestroyBuffer();
-  shaderFactory->Destroy();
-  shaderFactory.reset();
+    gui.reset();
+  }
+
+  if (backbuffer) {
+    backbuffer->DestroyTexture();
+    backbuffer.reset();
+  }
+
+  if (pixelSSBO) {
+    pixelSSBO->DestroyBuffer();
+    pixelSSBO.reset();
+  }
+
+  if (shaderFactory) {
+    shaderFactory->Destroy();
+    shaderFactory.reset();
+  }
+
   resourceFactory.reset();
-  backbuffer.reset();
-  pixelSSBO.reset();
-  gui.reset();
-  BackendShutdown();
+
+  if (finishedCreation) {
+    BackendShutdown();
+  }
+
   BackendSDLShutdown();
-  SDL_DestroyWindow(mainWindow);
-  SDL_Quit();
+
+  if (mainWindow)
+    SDL_DestroyWindow(mainWindow);
 }
 
 void Renderer::Resize(u32 x, u32 y) {
@@ -184,7 +207,7 @@ void Renderer::OnEvent(const SDL_Event &e) {
       break;
     case SDL_EVENT_QUIT:
       if (Config::rendering.quitOnWindowClosure) {
-        XeRunning = false;
+        XeRunning.store(false, std::memory_order_release);
       }
       break;
     case SDL_EVENT_KEY_DOWN:
@@ -511,13 +534,10 @@ void Renderer::Thread() {
   // Create all handles
   CreateHandles();
 
+  finishedCreation = true;
+
   // Main loop
   while (threadRunning) {
-    threadRunning = Config::rendering.enable && XeRunning;
-    // Exit early if needed
-    if (!threadRunning)
-      break;
-
     // Clear the display
     if (XeMain::xenos)
       Clear();
@@ -562,6 +582,9 @@ void Renderer::Thread() {
     }
 
     for (auto &cmd : frameCommands) {
+      // Escape hatch
+      if (!threadRunning.load(std::memory_order_acquire))
+        break;
       switch (cmd.type) {
         case RenderCommandType::BindShader: {
           auto &c = std::get<RenderCommand::BindShaderCmd>(cmd.payload);
@@ -623,6 +646,9 @@ void Renderer::Thread() {
     }
 
     if (waiting) {
+      // Escape hatch
+      if (!threadRunning.load(std::memory_order_acquire))
+        break;
       waiting = false;
       if (waitTime >= 0x100) {
         std::this_thread::sleep_for(std::chrono::milliseconds(waitTime / 0x100));

@@ -122,8 +122,8 @@ PPU::PPU(Xe::XCPU::XenonContext *inXenonContext, u64 resetVector, u32 PIR) :
 }
 PPU::~PPU() {
   // Signal we're quitting
-  ppuThreadState.store(eThreadState::Quiting);
-  ppuThreadActive = false;
+  ppuThreadState.store(eThreadState::Quiting, std::memory_order_release);
+  ppuThreadActive.store(false, std::memory_order_release);
   // Kill the thread
   if (ppuThread.joinable())
     ppuThread.join();
@@ -140,8 +140,7 @@ void PPU::StartExecution(bool setHRMOR) {
     // thus destroying the stack
     ppuThreadPreviousState.store(ppeState->ppuID == 0 ? eThreadState::Running : eThreadState::Sleeping);
     LOG_DEBUG(Xenon, "{} was set to be halted, setting previous state to {}", ppeState->ppuName, ppeState->ppuID == 0 ? "Running" : "Sleeping");
-  }
-  else {
+  } else {
     LOG_DEBUG(Xenon, "{} setting to {}", ppeState->ppuName, ppeState->ppuID == 0 ? "Running" : "Sleeping");
     ppuThreadState.store(ppeState->ppuID == 0 ? eThreadState::Running : eThreadState::Sleeping);
     ppuThreadPreviousState.store(ppuThreadState);
@@ -172,6 +171,7 @@ void PPU::StartExecution(bool setHRMOR) {
     if (Config::xcpu.simulate1BL) { Simulate1Bl(); }
   }
 
+  ppuThreadActive.store(true, std::memory_order_release);
   ppuThread = std::thread(&PPU::ThreadLoop, this);
 }
 
@@ -200,6 +200,7 @@ void PPU::Halt(u64 haltOn, bool requestedByGuest, s8 ppuId, ePPUThreadID threadI
     ppuThreadPreviousState.store(ppuThreadState.load());
   ppuThreadState.store(eThreadState::Halted);
 }
+
 void PPU::Continue() {
   if (ppuThreadState.load() == eThreadState::Running)
     return;
@@ -209,6 +210,7 @@ void PPU::Continue() {
   ppuThreadPreviousState.store(eThreadState::None);
   guestHalt = false;
 }
+
 void PPU::ContinueFromException() {
   if (ppuThreadState.load() == eThreadState::Running)
     return;
@@ -223,6 +225,7 @@ void PPU::ContinueFromException() {
   ppuThreadPreviousState.store(eThreadState::None);
   guestHalt = false;
 }
+
 void PPU::Step(int amount) {
   if (ppuThreadState.load() == eThreadState::Running)
     return;
@@ -235,14 +238,14 @@ void PPU::Step(int amount) {
 void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
   // Start Profile
   MICROPROFILE_SCOPEI("[Xe::PPU]", "PPURunInstructions", MP_AUTO);
-  for (size_t instrCount = 0; instrCount < numInstrs && ppuThreadActive; ++instrCount) {
+  for (size_t instrCount = 0; instrCount < numInstrs && ppuThreadActive.load(std::memory_order_acquire); ++instrCount) {
     // Halt if needed before executing the next instruction
     if (enableHalt && ppuHaltOn == curThread.NIA) {
       Halt();
     }
 
-    if (!XeRunning) {
-      Halt();
+    if (!XeRunning.load(std::memory_order_acquire) ||  ppuThreadState.load() == eThreadState::Quiting) {
+      ppuThreadActive.store(false, std::memory_order_release);
       break;
     }
 
@@ -281,8 +284,6 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
 
 // PPU Thread state machine, handles all execution and codeflow
 void PPU::ThreadStateMachine() {
-  // Check if we should exit or not
-  ppuThreadActive = ppuThreadState.load() != eThreadState::None;
   // Signal a reset if needed
   if (ppuThreadResetting) {
     ppuThreadState.store(eThreadState::Resetting);
@@ -306,26 +307,19 @@ void PPU::ThreadStateMachine() {
         PPURunInstructions(ppeState->SPR.TTR.hexValue, ppuHaltOn != 0);
       }
     } else {
-      // Escape hatch
-      if (!XeRunning) {
-        Halt();
-        return;
-      }
       if (!ppuThreadResetting && (state & ePPUThreadBit_Zero)) {
         // Thread 1 is running, process instructions until we reach TTR timeout.
         curThreadId = ePPUThread_Zero;
-        ppuJIT->ExecuteJITInstrs(ppeState->SPR.TTR.hexValue, ppuThreadActive, ppuHaltOn != 0);
+        ppuJIT->ExecuteJITInstrs(ppeState->SPR.TTR.hexValue, ppuHaltOn != 0);
       }
       if (!ppuThreadResetting && (state & ePPUThreadBit_One)) {
         // Thread 1 is running, process instructions until we reach TTR timeout.
         curThreadId = ePPUThread_One;
-        ppuJIT->ExecuteJITInstrs(ppeState->SPR.TTR.hexValue, ppuThreadActive, ppuHaltOn != 0);
+        ppuJIT->ExecuteJITInstrs(ppeState->SPR.TTR.hexValue, ppuHaltOn != 0);
       }
     }
   } break;
   case eThreadState::Halted: {
-    // Check if we should exit or not
-    ppuThreadActive = ppuThreadState.load() != eThreadState::None;
     // Handle stepping
     u8 state = GetCurrentRunningThreads();
     if (currentExecMode == eExecutorMode::Interpreter) {
@@ -347,14 +341,14 @@ void PPU::ThreadStateMachine() {
       if (state & ePPUThreadBit_Zero) {
         curThreadId = ePPUThread_Zero;
         if (ppuStepAmount > 0) {
-          ppuJIT->ExecuteJITInstrs(ppuStepAmount, ppuThreadActive, false);
+          ppuJIT->ExecuteJITInstrs(ppuStepAmount, false);
           ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
         }
       }
       if (state & ePPUThreadBit_One) {
         curThreadId = ePPUThread_One;
         if (ppuStepAmount > 0) {
-          ppuJIT->ExecuteJITInstrs(ppuStepAmount, ppuThreadActive, false);
+          ppuJIT->ExecuteJITInstrs(ppuStepAmount, false);
           ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
         }
       }
@@ -374,38 +368,36 @@ void PPU::ThreadStateMachine() {
       LOG_INFO(Xenon, "A PPU is in the middle of resetting!");
     ppuThreadState.store(eThreadState::None);
   } break;
+  //case eThreadState::None:
   case eThreadState::Quiting: {
-    ppuThreadState.store(eThreadState::None);
-  } break;
+    ppuThreadActive.store(false, std::memory_order_release);
+    return;
+  }
   default: {
 
   } break;
   }
 }
 void PPU::ThreadLoop() {
-  // Set thread name
-  if (ppeState.get())
+  if (ppeState)
     Base::SetCurrentThreadName("[Xe] " + ppeState->ppuName);
 
-  while (ppuThreadActive && XeRunning) {
-    // Start Profile
-    MICROPROFILE_SCOPEI("[Xe::PPU]", "ThreadLoop", MP_AUTO);
-
-    // If our thread is not active while running, abort early.
-    // We are likely destroying the handle
-    if (!ppuThreadActive || !XeRunning)
+  while (true) {
+    auto state = ppuThreadState.load(std::memory_order_acquire);
+    if (!ppuThreadActive.load(std::memory_order_acquire) ||
+        !XeRunning.load(std::memory_order_acquire) ||
+        state == eThreadState::Quiting ||
+        state == eThreadState::None) {
       break;
+    }
 
-    // Run state machine
     ThreadStateMachine();
 
-    // Check interrupts
     if (PPUCheckInterrupts())
       continue;
   }
 
-  // Thread is done executing, just tell it to exit
-  ppuThreadActive = false;
+  ppuThreadActive.store(false, std::memory_order_release);
 }
 
 // Returns a pointer to the specified thread.
@@ -444,7 +436,7 @@ u32 PPU::GetIPS() {
   // Execute the amount of cycles we're requested
   while (auto timerEnd = std::chrono::steady_clock::now() <= timerStart + 1s) {
     if (currentExecMode != eExecutorMode::Interpreter) {
-      ppuJIT->ExecuteJITInstrs(4, ppuThreadActive);
+      ppuJIT->ExecuteJITInstrs(4);
       instrCount += 4;
       continue;
     } else {
@@ -971,7 +963,7 @@ bool PPU::Simulate1Bl() {
 // For convenience, we will flag them sepparately and process them acordingly.
 
 // Process Synchronous exceptions
-void PPU::PPUProcessSyncExceptions(sPPEState* ppeState) {
+void PPU::PPUProcessSyncExceptions(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
 
   // If we are here, it means that exceptions were detected. 
@@ -1072,7 +1064,7 @@ void PPU::PPUProcessSyncExceptions(sPPEState* ppeState) {
 }
 
 // Process Asynchronous exceptions
-void PPU::PPUProcessAsyncExceptions(sPPEState* ppeState) {
+void PPU::PPUProcessAsyncExceptions(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
 
   // NOTE: Already arranged by order of execution.
@@ -1143,7 +1135,7 @@ void PPU::PPUProcessAsyncExceptions(sPPEState* ppeState) {
 // Format: Exception name (Reset Vector)
 
 // System reset Exception (0x100)
-void PPU::PPUSystemResetException(sPPEState* ppeState) {
+void PPU::PPUSystemResetException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_INFO(Xenon, "[{}](Thrd{:#d}): System Reset exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.NIA;
@@ -1154,7 +1146,7 @@ void PPU::PPUSystemResetException(sPPEState* ppeState) {
 }
 
 // Data Storage Exception (0x300)
-void PPU::PPUDataStorageException(sPPEState* ppeState) {
+void PPU::PPUDataStorageException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Data Storage exception. EA: 0x{:X}.", ppeState->ppuName, static_cast<s8>(curThreadId), thread.SPR.DAR);
   thread.SPR.SRR0 = thread.CIA;
@@ -1165,7 +1157,7 @@ void PPU::PPUDataStorageException(sPPEState* ppeState) {
 }
 
 // Data Segment Exception (0x380)
-void PPU::PPUDataSegmentException(sPPEState* ppeState) {
+void PPU::PPUDataSegmentException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Data Segment exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA;
@@ -1176,7 +1168,7 @@ void PPU::PPUDataSegmentException(sPPEState* ppeState) {
 }
 
 // Instruction Storage Exception (0x400)
-void PPU::PPUInstStorageException(sPPEState* ppeState) {
+void PPU::PPUInstStorageException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Instruction Storage exception. EA = 0x{:X}", ppeState->ppuName, static_cast<s8>(curThreadId), thread.CIA);
   thread.SPR.SRR0 = thread.CIA;
@@ -1188,7 +1180,7 @@ void PPU::PPUInstStorageException(sPPEState* ppeState) {
 }
 
 // Instruction Segment Exception (0x480)
-void PPU::PPUInstSegmentException(sPPEState* ppeState) {
+void PPU::PPUInstSegmentException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Instruction Segment exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA;
@@ -1199,7 +1191,7 @@ void PPU::PPUInstSegmentException(sPPEState* ppeState) {
 }
 
 // External Exception (0x500)
-void PPU::PPUExternalException(sPPEState* ppeState) {
+void PPU::PPUExternalException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): External exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.NIA;
@@ -1210,7 +1202,7 @@ void PPU::PPUExternalException(sPPEState* ppeState) {
 }
 
 // Program Exception (0x700)
-void PPU::PPUProgramException(sPPEState* ppeState) {
+void PPU::PPUProgramException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Program exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA;
@@ -1222,7 +1214,7 @@ void PPU::PPUProgramException(sPPEState* ppeState) {
 }
 
 // FP Unavailable Exception (0x800)
-void PPU::PPUFPUnavailableException(sPPEState* ppeState) {
+void PPU::PPUFPUnavailableException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): FPU exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA;
@@ -1233,7 +1225,7 @@ void PPU::PPUFPUnavailableException(sPPEState* ppeState) {
 }
 
 // Decrementer Exception (0x900)
-void PPU::PPUDecrementerException(sPPEState* ppeState) {
+void PPU::PPUDecrementerException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Decrementer exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.NIA;
@@ -1244,7 +1236,7 @@ void PPU::PPUDecrementerException(sPPEState* ppeState) {
 }
 
 // System Call Exception (0xC00)
-void PPU::PPUSystemCallException(sPPEState* ppeState) {
+void PPU::PPUSystemCallException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): System Call exception. Syscall ID: 0x{:X}", ppeState->ppuName, static_cast<s8>(curThreadId), GPR(0));
   thread.SPR.SRR0 = thread.NIA;
@@ -1255,7 +1247,7 @@ void PPU::PPUSystemCallException(sPPEState* ppeState) {
 }
 
 // VX Unavailable Exception (0xF20)
-void PPU::PPUVXUnavailableException(sPPEState* ppeState) {
+void PPU::PPUVXUnavailableException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): VXU exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA; // See Cell Vector SIMD PEM, page 104, table 5.4.

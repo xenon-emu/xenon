@@ -1,5 +1,5 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #include "XeMain.h"
@@ -10,11 +10,15 @@ void XeMain::Create() {
   MICROPROFILE_SCOPEI("[Xe::Main]", "Create", MP_AUTO);
   Base::Log::Initialize();
   Base::Log::Start();
-  LOG_INFO(System, "Starting Xenon.");
-  rootDirectory = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
+
+  Base::FS::DumpPaths();
+  LOG_INFO(System, "Starting...");
+
   LoadConfig();
-  Base::Log::Filter logFilter{ Config::log.currentLevel };
+
+  Base::Log::Filter logFilter(Config::log.currentLevel);
   Base::Log::SetGlobalFilter(logFilter);
+
 #ifndef NO_GFX
   switch (Base::JoaatStringHash(Config::rendering.backend)) {
   case "OpenGL"_jLower:
@@ -70,52 +74,66 @@ void XeMain::Create() {
 }
 
 void XeMain::Shutdown() {
-  // Check if we've shutdown, no need to do it twice
-  if (XeShutdownSignaled) {
+  if (Base::gShutdownStarted.exchange(true)) {
     return;
   }
 
-  // Set as already shutdown
-  XeShutdownSignaled = true;
-
   // Set all states to false
   XePaused = false;
-  XeRunning = false;
+  XeRunning.store(false, std::memory_order_release);
 
   // Save config
   SaveConfig();
 
   // Shutdown the XCPU
-  xenonCPU.reset();
-  CPUStarted = false;
+  if (CPUStarted) {
+    xenonCPU.reset();
+    CPUStarted = false;
+  }
 
 #ifndef NO_GFX
   // Stop rendering after the CPU is stopped
-  renderer->Shutdown();
-  renderer.reset();
+  if (renderer) {
+    renderer->Shutdown();
+    renderer.reset();
+  }
 #endif
 
   // Shutdown the RootBus, it owns the HostBus, which contains all PCI devices.
-  rootBus.reset();
+  if (rootBus) {
+    rootBus.reset();
+  }
 
   // Stop the logger
   Base::Log::Stop();
   // Wait a bit for the logger to flush
   std::this_thread::sleep_for(200ms);
+
 #if AUTO_FLIP
   MicroProfileStopAutoFlip();
 #endif
   MicroProfileShutdown();
 
-  XeShutdownFinished = true;
+  Base::gShutdownFinished = true;
 }
 
+static fs::path configPath = {};
+
 void XeMain::SaveConfig() {
-  Config::saveConfig(rootDirectory / "config.toml");
+  if (configPath.empty()) {
+    configPath = (Base::FS::GetPath(Base::FS::PathType::UserConfigDir)) / "config.toml";
+  }
+
+  Config::saveConfig(configPath);
 }
+
 void XeMain::LoadConfig() {
-  LOG_INFO(Xenon, "Loading Config...");
-  Config::loadConfig(rootDirectory / "config.toml");
+  if (configPath.empty()) {
+    configPath = (Base::FS::GetPath(Base::FS::PathType::UserConfigDir)) / "config.toml";
+  }
+
+  LOG_INFO(Xenon, "Loading config...");
+  Config::loadConfig(configPath);
 }
 
 void XeMain::StartCPU() {

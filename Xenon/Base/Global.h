@@ -1,5 +1,5 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #pragma once
@@ -32,17 +32,20 @@
 #endif
 
 // Global running state
-inline volatile bool XeRunning{ true };
-inline std::atomic<bool> XeShutdownSignaled{ false };
-inline std::atomic<bool> XeShutdownFinished{ false };
+inline std::atomic<bool> XeRunning{ true };
 // Global paused state
 inline std::atomic<bool> XePaused{ false };
 
 namespace Xe::XCPU { class XenonCPU; }
 
-// Handles system pause
 namespace Base {
 
+inline std::atomic<bool> gShutdownRequested{ false };
+inline std::atomic<bool> gShutdownStarted{ false };
+inline std::atomic<bool> gShutdownFinished{ false };
+inline std::atomic<bool> gForceExitRequested{ false };
+
+// Handles system pause
 inline void SystemPause() {
   XePaused = true;
 #ifndef TOOL
@@ -53,7 +56,7 @@ inline void SystemPause() {
 #endif
   s32 c = getchar();
   if (c == EOF && errno == EINTR) {
-    // Interrupted by signal � let main loop handle shutdown
+    // Interrupted by signal, let main loop handle shutdown
     return;
   }
 }

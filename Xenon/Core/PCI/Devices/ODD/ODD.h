@@ -665,7 +665,7 @@ private:
   std::thread oddWorkerThread;
 
   // Thread running
-  volatile bool oddThreadRunning = false;
+  std::atomic<bool> oddThreadRunning = false;
 
   // Thread loop for processing DMA requests, etc...
   void oddThreadLoop();

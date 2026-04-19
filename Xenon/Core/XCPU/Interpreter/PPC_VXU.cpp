@@ -62,7 +62,7 @@ void PPCInterpreter::PPCInterpreter_vaddfp(sPPEState *ppeState) {
 }
 
 // Vector128 Add Floating Point
-void PPCInterpreter::PPCInterpreter_vaddfp128(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vaddfp128(sPPEState *ppeState) {
   /*
     do i = 0,127,32
       (vD)i:i+31 <- RndToNearFP32((vA)i:i+31 + fp (vB)i:i+31)
@@ -88,7 +88,7 @@ static inline u8 vecSaturateU8(sPPEState *ppeState, u32 inValue) {
   return static_cast<u8>(inValue);
 }
 
-static inline s16 vecSaturateS16(sPPEState* ppeState, s32 inValue) {
+static inline s16 vecSaturateS16(sPPEState *ppeState, s32 inValue) {
   if (inValue > 32767) {
     // Set SAT bit in VSCR and truncate to 32767.
     curThread.VSCR.SAT = 1;
@@ -101,7 +101,7 @@ static inline s16 vecSaturateS16(sPPEState* ppeState, s32 inValue) {
   return static_cast<s16>(inValue);
 }
 
-static inline s32 vecSaturateS32(sPPEState* ppeState, s64 inValue) {
+static inline s32 vecSaturateS32(sPPEState *ppeState, s64 inValue) {
   if (inValue < INT32_MIN) {
     curThread.VSCR.SAT = 1;
     inValue = INT32_MIN;
@@ -112,7 +112,7 @@ static inline s32 vecSaturateS32(sPPEState* ppeState, s64 inValue) {
   return static_cast<s32>(inValue);
 }
 
-static inline u32 vecSaturateU32(sPPEState* ppeState, u64 inValue) {
+static inline u32 vecSaturateU32(sPPEState *ppeState, u64 inValue) {
   if (inValue > UINT_MAX) {
     // Set SAT bit in VSCR and truncate to 2^32 - 1.
     curThread.VSCR.SAT = 1;
@@ -131,7 +131,7 @@ void PPCInterpreter::PPCInterpreter_vaddubs(sPPEState *ppeState) {
 }
 
 // Vector Add Unsigned Halfword Modulo (0x1000 0040)
-void PPCInterpreter::PPCInterpreter_vadduhm(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vadduhm(sPPEState *ppeState) {
   CHECK_VXU;
 
   for (u8 idx = 0; idx < 8; idx++) {
@@ -265,7 +265,7 @@ void PPCInterpreter::PPCInterpreter_vadduws(sPPEState *ppeState) {
 }
 
 // Vector Add Signed Halfword Saturate(0x1000 0340)
-void PPCInterpreter::PPCInterpreter_vaddshs(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vaddshs(sPPEState *ppeState) {
   CHECK_VXU;
 
   VRi(vd).sword[0] = vecSaturateS16(ppeState, static_cast<u32>(VRi(va).sword[0]) + static_cast<u32>(VRi(vb).sword[0]));
@@ -275,7 +275,7 @@ void PPCInterpreter::PPCInterpreter_vaddshs(sPPEState* ppeState) {
 }
 
 // Vector Average Unsigned Halfword (x'1000 0442')
-void PPCInterpreter::PPCInterpreter_vavguh(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vavguh(sPPEState *ppeState) {
   CHECK_VXU;
 
   for (u8 idx = 0; idx < 8; idx++) {
@@ -294,7 +294,7 @@ void PPCInterpreter::PPCInterpreter_vand(sPPEState *ppeState) {
 }
 
 // Vector128 Logical AND
-void PPCInterpreter::PPCInterpreter_vand128(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vand128(sPPEState *ppeState) {
   CHECK_VXU;
 
   VR(VMX128_VD128).dword[0] = VR(VMX128_VA128).dword[0] & VR(VMX128_VB128).dword[0];
@@ -314,7 +314,7 @@ void PPCInterpreter::PPCInterpreter_vandc(sPPEState *ppeState) {
 }
 
 // Vector128 Logical AND with Complement
-void PPCInterpreter::PPCInterpreter_vandc128(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vandc128(sPPEState *ppeState) {
   CHECK_VXU;
 
   VR(VMX128_VD128).dword[0] = VR(VMX128_VA128).dword[0] & ~VR(VMX128_VB128).dword[0];
@@ -324,7 +324,7 @@ void PPCInterpreter::PPCInterpreter_vandc128(sPPEState* ppeState) {
 }
 
 // Vector Convert to Signed Fixed-Point Word Saturate (x'1000 03CA')
-void PPCInterpreter::PPCInterpreter_vctsxs(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vctsxs(sPPEState *ppeState) {
   CHECK_VXU;
 
   f32 fuimm = static_cast<f32>(std::exp2(static_cast<u32>(_instr.vuimm)));
@@ -335,7 +335,7 @@ void PPCInterpreter::PPCInterpreter_vctsxs(sPPEState* ppeState) {
 }
 
 // Vector Convert to Unsigned Fixed-Point Word Saturate (x'1000 038A')
-void PPCInterpreter::PPCInterpreter_vctuxs(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vctuxs(sPPEState *ppeState) {
   CHECK_VXU;
 
   f32 fuimm = static_cast<f32>(std::exp2(static_cast<u32>(_instr.vuimm)));
@@ -346,7 +346,7 @@ void PPCInterpreter::PPCInterpreter_vctuxs(sPPEState* ppeState) {
 }
 
 // Vector convert from Signed Fixed-Point Word (x'1000 034A')
-void PPCInterpreter::PPCInterpreter_vcfsx(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vcfsx(sPPEState *ppeState) {
   CHECK_VXU;
 
   float fltUimm = std::ldexp(1.0f, -int(_instr.vuimm));
@@ -384,7 +384,7 @@ static u32 vcmpbfpHelper(const f32 fra, const f32 frb) {
 }
 
 // Vector Compare Bounds Floating Point (x'1000 03C6')
-void PPCInterpreter::PPCInterpreter_vcmpbfp(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vcmpbfp(sPPEState *ppeState) {
   CHECK_VXU;
 
   u32 regMask = 0;
@@ -401,7 +401,7 @@ void PPCInterpreter::PPCInterpreter_vcmpbfp(sPPEState* ppeState) {
 }
 
 // Vector128 Compare Bounds Floating Point
-void PPCInterpreter::PPCInterpreter_vcmpbfp128(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vcmpbfp128(sPPEState *ppeState) {
   CHECK_VXU;
 
   u32 regMask = 0;
@@ -539,7 +539,7 @@ void PPCInterpreter::PPCInterpreter_vcmpequw128(sPPEState *ppeState) {
 }
 
 // Vector128 Compare Greater-Than-or-Equal-to Floating-Point
-void PPCInterpreter::PPCInterpreter_vcmpgefp128(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vcmpgefp128(sPPEState *ppeState) {
   CHECK_VXU;
 
   VR(VMX128_R_VD128).dword[0] = ((VR(VMX128_R_VA128).flt[0] >= VR(VMX128_R_VB128).flt[0]) ? 0xFFFFFFFF : 0x00000000);
@@ -725,7 +725,7 @@ void PPCInterpreter::PPCInterpreter_vspltw128(sPPEState *ppeState) {
 }
 
 // Vector128 Multiply Sum 3-way Floating-Point
-void PPCInterpreter::PPCInterpreter_vmsum3fp128(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vmsum3fp128(sPPEState *ppeState) {
   CHECK_VXU;
 
   // Dot product XYZ.
@@ -771,7 +771,7 @@ void PPCInterpreter::PPCInterpreter_vmaxuw(sPPEState *ppeState) {
 }
 
 // Vector Maximum Signed Halfword (x'1000 0142')
-void PPCInterpreter::PPCInterpreter_vmaxsh(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vmaxsh(sPPEState *ppeState) {
   CHECK_VXU;
 
   VRi(vd).word[0] = (VRi(va).sword[0] > VRi(vb).sword[0]) ? VRi(va).sword[0] : VRi(vb).sword[0];
@@ -781,7 +781,7 @@ void PPCInterpreter::PPCInterpreter_vmaxsh(sPPEState* ppeState) {
 }
 
 // Vector Maximum Unsigned Halfword (0x1000 0042)
-void PPCInterpreter::PPCInterpreter_vmaxuh(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vmaxuh(sPPEState *ppeState) {
   CHECK_VXU;
 
   VRi(vd).word[0] = (VRi(va).word[0] > VRi(vb).word[0]) ? VRi(va).word[0] : VRi(vb).word[0];
@@ -801,7 +801,7 @@ void PPCInterpreter::PPCInterpreter_vmaxsw(sPPEState *ppeState) {
 }
 
 // Vector Minimum Signed Halfword (x'1000 0342')
-void PPCInterpreter::PPCInterpreter_vminsh(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vminsh(sPPEState *ppeState) {
   CHECK_VXU;
 
   VRi(vd).sword[0] = (VRi(va).sword[0] < VRi(vb).sword[0]) ? VRi(va).sword[0] : VRi(vb).sword[0];
@@ -811,7 +811,7 @@ void PPCInterpreter::PPCInterpreter_vminsh(sPPEState* ppeState) {
 }
 
 // Vector Minimum Unsigned Halfword (x'1000 0242')
-void PPCInterpreter::PPCInterpreter_vminuh(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vminuh(sPPEState *ppeState) {
   CHECK_VXU;
 
   VRi(vd).word[0] = (VRi(va).word[0] < VRi(vb).word[0]) ? VRi(va).word[0] : VRi(vb).word[0];
@@ -831,7 +831,7 @@ void PPCInterpreter::PPCInterpreter_vminuw(sPPEState *ppeState) {
 }
 
 // Vector Maximum Floating Point (x'1000 040A')
-void PPCInterpreter::PPCInterpreter_vmaxfp(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vmaxfp(sPPEState *ppeState) {
   CHECK_VXU;
 
   VRi(vd).flt[0] = (VRi(va).flt[0] > VRi(vb).flt[0]) ? VRi(va).flt[0] : VRi(vb).flt[0];
@@ -867,7 +867,7 @@ void PPCInterpreter::PPCInterpreter_vmaddcfp128(sPPEState *ppeState) {
 }
 
 // Vector Merge High Byte (x'1000 000C')
-void PPCInterpreter::PPCInterpreter_vmrghb(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vmrghb(sPPEState *ppeState) {
   CHECK_VXU;
 
   VRi(vd).bytes[5] = VRi(va).bytes[0];
@@ -889,7 +889,7 @@ void PPCInterpreter::PPCInterpreter_vmrghb(sPPEState* ppeState) {
 }
 
 // Vector Merge High Halfword (x'1000 004C')
-void PPCInterpreter::PPCInterpreter_vmrghh(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vmrghh(sPPEState *ppeState) {
   CHECK_VXU;
 
   VRi(vd).word[3] = VRi(va).word[0];
@@ -933,7 +933,7 @@ void PPCInterpreter::PPCInterpreter_vmrghw128(sPPEState *ppeState) {
 }
 
 // Vector Merge Low Byte (x'1000 010C')
-void PPCInterpreter::PPCInterpreter_vmrglb(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vmrglb(sPPEState *ppeState) {
   CHECK_VXU;
 
   VRi(vd).bytes[5] = VRi(va).bytes[8];
@@ -955,7 +955,7 @@ void PPCInterpreter::PPCInterpreter_vmrglb(sPPEState* ppeState) {
 }
 
 // Vector Merge Low Halfword (x'1000 014C')
-void PPCInterpreter::PPCInterpreter_vmrglh(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vmrglh(sPPEState *ppeState) {
   CHECK_VXU;
 
   VRi(vd).word[3] = VRi(va).word[4];
@@ -979,7 +979,7 @@ void PPCInterpreter::PPCInterpreter_vmaxfp128(sPPEState *ppeState) {
 }
 
 // Vector Minimum Floating Point (x'1000 044A')
-void PPCInterpreter::PPCInterpreter_vminfp(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vminfp(sPPEState *ppeState) {
   CHECK_VXU;
 
   VRi(vd).flt[0] = (VRi(va).flt[0] < VRi(vb).flt[0]) ? VRi(va).flt[0] : VRi(vb).flt[0];
@@ -1075,7 +1075,7 @@ void PPCInterpreter::PPCInterpreter_vpermwi128(sPPEState *ppeState) {
 }
 
 // Vector Rotate Left Integer Halfword (x'1000 0044')
-void PPCInterpreter::PPCInterpreter_vrlh(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vrlh(sPPEState *ppeState) {
   CHECK_VXU;
 
   for (u8 idx = 0; idx < 8; ++idx) {
@@ -1248,7 +1248,7 @@ void PPCInterpreter::PPCInterpreter_vsel128(sPPEState *ppeState) {
 }
 
 // Vector Shift Left (x'1000 01C4')
-void PPCInterpreter::PPCInterpreter_vsl(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vsl(sPPEState *ppeState) {
   CHECK_VXU;
 
   const u8 sh = VRi(rb).bytes[15] & 0x7;
@@ -1264,7 +1264,7 @@ void PPCInterpreter::PPCInterpreter_vsl(sPPEState* ppeState) {
 }
 
 // Vector Shift Left by Octet (x'1000 040C')
-void PPCInterpreter::PPCInterpreter_vslo(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vslo(sPPEState *ppeState) {
   CHECK_VXU;
 
   // Shift amount in bytes.
@@ -1312,7 +1312,7 @@ void PPCInterpreter::PPCInterpreter_vslb(sPPEState *ppeState) {
 }
 
 // Vector Shift Left Half Word (x'1000 0104')
-void PPCInterpreter::PPCInterpreter_vslh(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vslh(sPPEState *ppeState) {
   CHECK_VXU;
 
   for (u8 idx = 0; idx < 8; idx++) {
@@ -1357,7 +1357,7 @@ void PPCInterpreter::PPCInterpreter_vsr(sPPEState *ppeState) {
 }
 
 // Vector Shift Right Halfword (x'1000 0244')
-void PPCInterpreter::PPCInterpreter_vsrh(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vsrh(sPPEState *ppeState) {
   CHECK_VXU;
 
   for (u8 idx = 0; idx < 8; idx++) {
@@ -1366,7 +1366,7 @@ void PPCInterpreter::PPCInterpreter_vsrh(sPPEState* ppeState) {
 }
 
 // Vector Shift Right Algebraic Halfword (x'1000 0344')
-void PPCInterpreter::PPCInterpreter_vsrah(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vsrah(sPPEState *ppeState) {
   CHECK_VXU;
 
   for (u8 idx = 0; idx < 8; idx++) {
@@ -1585,7 +1585,7 @@ void PPCInterpreter::PPCInterpreter_vspltb(sPPEState *ppeState) {
 }
 
 // Vector Splat Halfword (x'1000 024C')
-void PPCInterpreter::PPCInterpreter_vsplth(sPPEState* ppeState) {
+void PPCInterpreter::PPCInterpreter_vsplth(sPPEState *ppeState) {
   // Need to byteswap becuase of byte endianness.
   Base::Vector128 vec = VRi(vb);
   vec.dword[0] = byteswap_be<u32>(vec.dword[0]);

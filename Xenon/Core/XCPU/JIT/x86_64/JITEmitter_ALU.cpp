@@ -60,8 +60,8 @@ void PPCInterpreter::PPCInterpreterJIT_addx(sPPEState* ppeState, JITBlockBuilder
 // Add Immediate Carrying (x'3000 0000')
 void PPCInterpreter::PPCInterpreterJIT_addic(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   // TODO: Overflow Enable.
-  Label end = COMP->newLabel(); // Self explanatory.
-  Label sfBitMode = COMP->newLabel();
+  Label end = newLabel(); // Self explanatory.
+  Label sfBitMode = newLabel();
 
   // Get rA value.
   x86::Gp rATemp = newGP64();
@@ -124,8 +124,8 @@ void PPCInterpreter::PPCInterpreterJIT_addcx(sPPEState* ppeState, JITBlockBuilde
 
   // TODO: Overflow Enable.
 
-  Label end = COMP->newLabel();
-  Label sfBitMode = COMP->newLabel();
+  Label end = newLabel();
+  Label sfBitMode = newLabel();
 
   // Get rA value.
   x86::Gp rATemp = newGP64();
@@ -190,8 +190,8 @@ void PPCInterpreter::PPCInterpreterJIT_addex(sPPEState* ppeState, JITBlockBuilde
   */
 
   // TODO: Overflow Enable.
-  Label end = COMP->newLabel();
-  Label sfBitMode = COMP->newLabel();
+  Label end = newLabel();
+  Label sfBitMode = newLabel();
 
   // Get rA value.
   x86::Gp rATemp = newGP64();
@@ -261,8 +261,8 @@ void PPCInterpreter::PPCInterpreterJIT_addex(sPPEState* ppeState, JITBlockBuilde
 // Add to Zero Extended (x'7C00 0194')
 void PPCInterpreter::PPCInterpreterJIT_addzex(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // TODO: Overflow Enable.
-  Label end = COMP->newLabel();
-  Label sfBitMode = COMP->newLabel();
+  Label end = newLabel();
+  Label sfBitMode = newLabel();
 
   // Get rA value
   x86::Gp rATemp = newGP64();
@@ -329,8 +329,8 @@ void PPCInterpreter::PPCInterpreterJIT_addzex(sPPEState *ppeState, JITBlockBuild
 // Add to Minus One Extended (x'7C00 01D4')
 void PPCInterpreter::PPCInterpreterJIT_addmex(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // TODO: Overflow Enable.
-  Label end = COMP->newLabel();
-  Label sfBitMode = COMP->newLabel();
+  Label end = newLabel();
+  Label sfBitMode = newLabel();
 
   // Get rA value
   x86::Gp rATemp = newGP64();
@@ -558,9 +558,9 @@ void PPCInterpreter::PPCInterpreterJIT_cmpli(sPPEState* ppeState, JITBlockBuilde
 
 // Divide Double Word (x'7C00 03D2')
 void PPCInterpreter::PPCInterpreterJIT_divdx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
-  Label setZero = COMP->newLabel();
-  Label doDiv = COMP->newLabel();
-  Label end = COMP->newLabel();
+  Label setZero = newLabel();
+  Label doDiv = newLabel();
+  Label end = newLabel();
 
   // Cargar rA (dividendo) y rB (divisor)
   x86::Gp rATemp = newGP64();
@@ -599,9 +599,9 @@ void PPCInterpreter::PPCInterpreterJIT_divdx(sPPEState *ppeState, JITBlockBuilde
 
 // Divide Word (x'7C00 03D6')
 void PPCInterpreter::PPCInterpreterJIT_divwx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
-  Label setZero = COMP->newLabel();
-  Label doDiv = COMP->newLabel();
-  Label end = COMP->newLabel();
+  Label setZero = newLabel();
+  Label doDiv = newLabel();
+  Label end = newLabel();
 
   // Load rA and rB (32-bit values)
   x86::Gp rATemp = newGP32();
@@ -648,9 +648,9 @@ void PPCInterpreter::PPCInterpreterJIT_divwx(sPPEState *ppeState, JITBlockBuilde
 
 // Divide Double Word Unsigned (x'7C00 0392')
 void PPCInterpreter::PPCInterpreterJIT_divdux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
-  Label setZero = COMP->newLabel();
-  Label doDiv = COMP->newLabel();
-  Label end = COMP->newLabel();
+  Label setZero = newLabel();
+  Label doDiv = newLabel();
+  Label end = newLabel();
 
   x86::Gp rATemp = newGP64();
   x86::Gp rBTemp = newGP64();
@@ -680,9 +680,9 @@ void PPCInterpreter::PPCInterpreterJIT_divdux(sPPEState *ppeState, JITBlockBuild
 
 // Divide Word Unsigned (x'7C00 0396')
 void PPCInterpreter::PPCInterpreterJIT_divwux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
-  Label setZero = COMP->newLabel();
-  Label doDiv = COMP->newLabel();
-  Label end = COMP->newLabel();
+  Label setZero = newLabel();
+  Label doDiv = newLabel();
+  Label end = newLabel();
 
   // Load rA and rB (32-bit values)
   x86::Gp rATemp = newGP32();
@@ -720,8 +720,9 @@ void PPCInterpreter::PPCInterpreterJIT_divwux(sPPEState *ppeState, JITBlockBuild
     J_ppuSetCR0(b, result);
 }
 
-// 
+
 void PPCInterpreter::PPCInterpreterJIT_ecowx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+
 }
 
 // Multiply High Word (x'7C00 0096')
@@ -890,7 +891,7 @@ void PPCInterpreter::PPCInterpreterJIT_sldx(sPPEState* ppeState, JITBlockBuilder
   rA <- r & m
   */
 
-  Label end = COMP->newLabel();
+  Label end = newLabel();
   x86::Gp rsTemp = newGP64();
   COMP->xor_(rsTemp, rsTemp);
   x86::Gp n = newGP64();
@@ -923,7 +924,7 @@ void PPCInterpreter::PPCInterpreterJIT_slwx(sPPEState* ppeState, JITBlockBuilder
     rA <- r & m
   */
 
-  Label end = COMP->newLabel();
+  Label end = newLabel();
   x86::Gp rsTemp = newGP64();
   COMP->xor_(rsTemp, rsTemp);
   x86::Gp n = newGP64();
@@ -948,9 +949,9 @@ void PPCInterpreter::PPCInterpreterJIT_slwx(sPPEState* ppeState, JITBlockBuilder
 
 // Shift Right Algebraic Double Word (x'7C00 0634')
 void PPCInterpreter::PPCInterpreterJIT_sradx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
-  Label shiftOver63 = COMP->newLabel();
-  Label setCA = COMP->newLabel();
-  Label end = COMP->newLabel();
+  Label shiftOver63 = newLabel();
+  Label setCA = newLabel();
+  Label end = newLabel();
 
   // Load rS (64-bit value) and rB (shift amount)
   x86::Gp rsTemp = newGP64();
@@ -1021,9 +1022,9 @@ void PPCInterpreter::PPCInterpreterJIT_sradx(sPPEState *ppeState, JITBlockBuilde
 
 // Shift Right Algebraic Word (x'7C00 0630')
 void PPCInterpreter::PPCInterpreterJIT_srawx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
-  Label shiftOver31 = COMP->newLabel();
-  Label setCA = COMP->newLabel();
-  Label end = COMP->newLabel();
+  Label shiftOver31 = newLabel();
+  Label setCA = newLabel();
+  Label end = newLabel();
 
   // Load rS (32-bit value) and rB (shift amount)
   x86::Gp rsTemp = newGP64();
@@ -1098,8 +1099,8 @@ void PPCInterpreter::PPCInterpreterJIT_srawx(sPPEState *ppeState, JITBlockBuilde
 
 // Shift Right Algebraic Word Immediate (x'7C00 0670')
 void PPCInterpreter::PPCInterpreterJIT_srawix(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
-  Label setCA = COMP->newLabel();
-  Label end = COMP->newLabel();
+  Label setCA = newLabel();
+  Label end = newLabel();
 
   u32 sh = instr.sh32;
 
@@ -1165,7 +1166,7 @@ void PPCInterpreter::PPCInterpreterJIT_srdx(sPPEState* ppeState, JITBlockBuilder
     rA <- r & m
   */
 
-  Label end = COMP->newLabel();
+  Label end = newLabel();
   x86::Gp rsTemp = newGP64();
   COMP->xor_(rsTemp, rsTemp);
   x86::Gp n = newGP64();
@@ -1202,8 +1203,8 @@ void PPCInterpreter::PPCInterpreterJIT_subfx(sPPEState *ppeState, JITBlockBuilde
 
 // Subtract from Carrying (x'7C00 0010')
 void PPCInterpreter::PPCInterpreterJIT_subfcx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
-  Label end = COMP->newLabel();
-  Label sfBitMode = COMP->newLabel();
+  Label end = newLabel();
+  Label sfBitMode = newLabel();
 
   // Get rA value and complement it
   x86::Gp rATemp = newGP64();
@@ -1273,8 +1274,8 @@ void PPCInterpreter::PPCInterpreterJIT_subfcx(sPPEState *ppeState, JITBlockBuild
 // Subtract from Immediate Carrying (x'2000 0000')
 void PPCInterpreter::PPCInterpreterJIT_subfic(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   // TODO: Overflow Enable.
-  Label end = COMP->newLabel(); // Self explanatory.
-  Label sfBitMode = COMP->newLabel();
+  Label end = newLabel(); // Self explanatory.
+  Label sfBitMode = newLabel();
 
   // Get rA value.
   x86::Gp rATemp = newGP64();
@@ -1336,8 +1337,8 @@ void PPCInterpreter::PPCInterpreterJIT_subfic(sPPEState* ppeState, JITBlockBuild
 // Subtract from Extended (x'7C00 0110')
 void PPCInterpreter::PPCInterpreterJIT_subfex(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // TODO: Overflow Enable.
-  Label end = COMP->newLabel();
-  Label sfBitMode = COMP->newLabel();
+  Label end = newLabel();
+  Label sfBitMode = newLabel();
 
   // Get rA value and complement it
   x86::Gp rATemp = newGP64();
@@ -1410,8 +1411,8 @@ void PPCInterpreter::PPCInterpreterJIT_subfex(sPPEState *ppeState, JITBlockBuild
 // Subtract from Zero Extended (x'7C00 0190')
 void PPCInterpreter::PPCInterpreterJIT_subfzex(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // TODO: Overflow Enable.
-  Label end = COMP->newLabel();
-  Label sfBitMode = COMP->newLabel();
+  Label end = newLabel();
+  Label sfBitMode = newLabel();
 
   // Get rA value and complement it
   x86::Gp rATemp = newGP64();
@@ -1487,7 +1488,7 @@ void PPCInterpreter::PPCInterpreterJIT_srwx(sPPEState* ppeState, JITBlockBuilder
     else m <- (64)0
     rA <- r & m
   */
-  Label end = COMP->newLabel();
+  Label end = newLabel();
   x86::Gp rsTemp = newGP64();
   COMP->xor_(rsTemp, rsTemp);
   x86::Gp n = newGP64();
@@ -1520,7 +1521,7 @@ void PPCInterpreter::PPCInterpreterJIT_sradix(sPPEState* ppeState, JITBlockBuild
     rA <- (r & m) | (((64)S) & ~m)
     XER[CA] <- S & ((r & ~m) != 0)
   */
-  Label end = COMP->newLabel();
+  Label end = newLabel();
   x86::Gp sh = newGP64();
   COMP->mov(sh, u64(instr.sh64));
   x86::Gp rsTemp = newGP64();
@@ -1914,8 +1915,8 @@ void PPCInterpreter::PPCInterpreterJIT_crand(sPPEState *ppeState, JITBlockBuilde
   // Bit position in CRBD
   u8 shiftCrd = 31 - instr.crbd;
 
-  Label clearCRD = COMP->newLabel();
-  Label end = COMP->newLabel();
+  Label clearCRD = newLabel();
+  Label end = newLabel();
 
   x86::Gp crData = newGP32();
 
@@ -1943,8 +1944,8 @@ void PPCInterpreter::PPCInterpreterJIT_cror(sPPEState *ppeState, JITBlockBuilder
   // Bit position in CRBD
   u8 shiftCrd = 31 - instr.crbd;
 
-  Label setCRD = COMP->newLabel();
-  Label end = COMP->newLabel();
+  Label setCRD = newLabel();
+  Label end = newLabel();
 
   x86::Gp crData = newGP32();
 
@@ -1969,8 +1970,8 @@ void PPCInterpreter::PPCInterpreterJIT_crnor(sPPEState *ppeState, JITBlockBuilde
   u8 shiftCrb = 31 - instr.crbb;
   u8 shiftCrd = 31 - instr.crbd;
 
-  Label clearCRD = COMP->newLabel();
-  Label end = COMP->newLabel();
+  Label clearCRD = newLabel();
+  Label end = newLabel();
 
   x86::Gp crData = newGP32();
 
@@ -1996,8 +1997,8 @@ void PPCInterpreter::PPCInterpreterJIT_crandc(sPPEState *ppeState, JITBlockBuild
   u8 shiftCrb = 31 - instr.crbb;
   u8 shiftCrd = 31 - instr.crbd;
 
-  Label clearCRD = COMP->newLabel();
-  Label end = COMP->newLabel();
+  Label clearCRD = newLabel();
+  Label end = newLabel();
 
   x86::Gp crData = newGP32();
 
@@ -2022,8 +2023,8 @@ void PPCInterpreter::PPCInterpreterJIT_crxor(sPPEState *ppeState, JITBlockBuilde
   u8 shiftCrb = 31 - instr.crbb;
   u8 shiftCrd = 31 - instr.crbd;
 
-  Label setCRD = COMP->newLabel();
-  Label end = COMP->newLabel();
+  Label setCRD = newLabel();
+  Label end = newLabel();
 
   x86::Gp crData = newGP32();
   x86::Gp bitA = newGP32();
@@ -2056,8 +2057,8 @@ void PPCInterpreter::PPCInterpreterJIT_crnand(sPPEState *ppeState, JITBlockBuild
   u8 shiftCrb = 31 - instr.crbb;
   u8 shiftCrd = 31 - instr.crbd;
 
-  Label setCRD = COMP->newLabel();
-  Label end = COMP->newLabel();
+  Label setCRD = newLabel();
+  Label end = newLabel();
 
   x86::Gp crData = newGP32();
 
@@ -2083,8 +2084,8 @@ void PPCInterpreter::PPCInterpreterJIT_creqv(sPPEState *ppeState, JITBlockBuilde
   u8 shiftCrb = 31 - instr.crbb;
   u8 shiftCrd = 31 - instr.crbd;
 
-  Label setCRD = COMP->newLabel();
-  Label end = COMP->newLabel();
+  Label setCRD = newLabel();
+  Label end = newLabel();
 
   x86::Gp crData = newGP32();
   x86::Gp bitA = newGP32();
@@ -2117,8 +2118,8 @@ void PPCInterpreter::PPCInterpreterJIT_crorc(sPPEState *ppeState, JITBlockBuilde
   u8 shiftCrb = 31 - instr.crbb;
   u8 shiftCrd = 31 - instr.crbd;
 
-  Label setCRD = COMP->newLabel();
-  Label end = COMP->newLabel();
+  Label setCRD = newLabel();
+  Label end = newLabel();
 
   x86::Gp crData = newGP32();
 
@@ -2208,7 +2209,7 @@ void PPCInterpreter::PPCInterpreterJIT_mulhwux(sPPEState *ppeState, JITBlockBuil
 
 // Subtract from Minus One Extended (x'7C00 01D0')
 void PPCInterpreter::PPCInterpreterJIT_subfmex(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
-  Label end = COMP->newLabel();
+  Label end = newLabel();
 
   // Get rA value and complement it
   x86::Gp rATemp = newGP64();
