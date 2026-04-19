@@ -250,14 +250,15 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
   jitBuilder->haltBool = Xe::JITCompat::NewGP8(&compiler, "enableHalt");
 
   FuncNode *signature = nullptr;
-  compiler.add_func_node(Out(signature), FuncSignature::build<void, PPU *, sPPEState *, bool>());
+
+  compiler. ADD_FN_NODE(Out(signature), FuncSignature::build<void, PPU *, sPPEState *, bool>());
   Xe::JITCompat::NewGP64(&compiler);
   Xe::JITCompat::SetArg(signature, 0, jitBuilder->ppu->Base());
   Xe::JITCompat::SetArg(signature, 1, jitBuilder->ppeState->Base());
   Xe::JITCompat::SetArg(signature, 2, jitBuilder->haltBool);
 
   // Enable AVX support
-  signature->frame().set_avx_enabled();
+  signature->frame(). SET_AVX();
 #endif
 
   // Temporary container holding all instructions data in the block.
@@ -475,7 +476,8 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
 
   // Create block hash
   u64 hash = 0;
-  for (const auto &instr : instrsTemp) { hash += instr; }
+  for (const auto &instr : instrsTemp)
+    hash += instr;
   block->hash = hash;
 
   // Set up block linking info

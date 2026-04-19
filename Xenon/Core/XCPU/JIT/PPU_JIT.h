@@ -149,6 +149,18 @@ private:
 
 using namespace asmjit;
 
+#ifdef XE_ASMJIT_NEW_OUT_API
+  #define ADD_FN_NODE(...) add_func_node(__VA_ARGS__)
+  #define SET_AVX set_avx_enabled
+  #define CPU_FEAT cpu_features
+  #define CODE_SZ code_size
+#else
+  #define ADD_FN_NODE(...) addFuncNode(__VA_ARGS__)
+  #define SET_AVX setAvxEnabled
+  #define CPU_FEAT cpuFeatures
+  #define CODE_SZ codeSize
+#endif
+
 // Forward declaration
 class JITBlock;
 
@@ -157,7 +169,7 @@ public:
   JITBlockBuilder(u64 addr, asmjit::JitRuntime *rt) :
     ppuAddr(addr), runtime(rt)
   {
-    code.init(runtime->environment(), runtime->cpu_features());
+    code.init(runtime->environment(), runtime-> CPU_FEAT());
   }
   ~JITBlockBuilder() {
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
@@ -201,7 +213,7 @@ public:
   ~JITBlock() {
     // Release (delete) the code pointer allocated by asmjit
     if (codePtr) {
-runtime->release(codePtr);
+      runtime->release(codePtr);
     }
   }
 
@@ -210,7 +222,7 @@ runtime->release(codePtr);
     asmjit::CodeHolder *code = builder->Code();
     runtime->add(&fnPtr, code);
     codePtr = reinterpret_cast<decltype(codePtr)>(fnPtr);
-    codeSize = code->code_size();
+    codeSize = code-> CODE_SZ();
     return true;
   }
 
