@@ -36,7 +36,7 @@ class TAPBackend : public INetworkBackend {
 public:
   explicit TAPBackend(const TAPConfig& config);
   ~TAPBackend() override;
-  
+
   // INetworkBackend interface
   bool Initialize() override;
   void Shutdown() override;
@@ -54,32 +54,32 @@ private:
   // Platform-specific initialization
   bool InitializePlatform();
   void ShutdownPlatform();
-  
+
   // Reader thread
   void ReaderThreadLoop();
-  
+
   // Configuration
   TAPConfig config;
-  
+
   // State
   std::atomic<bool> ready{false};
   std::atomic<bool> linkUp{false};
-  
+
   // Callback
   PacketCallback packetCallback;
   std::mutex callbackMutex;
-  
+
   // Reader thread
   std::thread readerThread;
   std::atomic<bool> readerRunning{false};
-  
+
   // Statistics
   BackendStats stats;
-  
+
   // MAC address (set during init or manually)
   u8 macAddress[6] = {0};
   bool hasMacAddress = false;
-  
+
 #ifdef _WIN32
   // Windows TAP-Windows or WinTap handle
   HANDLE tapHandle = INVALID_HANDLE_VALUE;

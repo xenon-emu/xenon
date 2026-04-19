@@ -33,7 +33,7 @@ enum class ATA_TRANSFER_MODE {
 
 // Data was pulled off of an PLDS DG-16D5S retail ODD.
 const u8 identifyDataBytes[] = {
-  0xC0, 0x85, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 
+  0xC0, 0x85, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x38, 0x44, 0x33, 0x31, 0x42, 0x42, 0x34, 0x32, 0x36, 0x36, 0x32, 0x31,
   0x30, 0x30, 0x48, 0x36, 0x20, 0x4A, 0x20, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x35, 0x31,
   0x32, 0x33, 0x20, 0x20, 0x20, 0x20, 0x4C, 0x50, 0x53, 0x44, 0x20, 0x20, 0x20, 0x20, 0x47, 0x44,
@@ -72,7 +72,7 @@ const u8 atapiInquiryDataBytes[] = { 0x05, 0x80, 0x00, 0x32, 0x5B, 0x00, 0x00, 0
 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x31, 0x35, 0x33, 0x32
 };
 
-Xe::PCIDev::ODD::ODD(const char* deviceName, u64 size, PCIBridge *parentPCIBridge, RAM *ram) 
+Xe::PCIDev::ODD::ODD(const char* deviceName, u64 size, PCIBridge *parentPCIBridge, RAM *ram)
   : PCIDevice(deviceName, size) {
   // Note:
   // The ATA/ATAPI Controller in the Xenon Southbridge contain two BAR's:
@@ -201,6 +201,12 @@ Xe::PCIDev::ODD::ODD(const char* deviceName, u64 size, PCIBridge *parentPCIBridg
 
   // Enter ODD Worker Thread
   oddWorkerThread = std::thread(&Xe::PCIDev::ODD::oddThreadLoop, this);
+}
+
+Xe::PCIDev::ODD::~ODD() {
+  oddThreadRunning = false;
+  if (oddWorkerThread.joinable())
+    oddWorkerThread.join();
 }
 
 // PCI Read
@@ -1095,11 +1101,11 @@ void Xe::PCIDev::ODD::oddThreadLoop() {
     return;
   LOG_INFO(ODD, "Entered ODD worker thread.");
   while (oddThreadRunning) {
-    // Check if we should exit early
-    oddThreadRunning = XeRunning;
-    if (!oddThreadRunning)
+    // Escape hatch
+    if (XeRunning)
       break;
-    // Check for the DMA active command, and only start the DMA engine if there's not any 
+
+    // Check for the DMA active command, and only start the DMA engine if there's not any
     // pending SCSI command for processing. (Avoids race conditions)
     if (atapiState.regs.dmaCommand & XE_ATA_DMA_ACTIVE
       && atapiState.scsiCommandPending == false) {
@@ -1124,7 +1130,7 @@ void Xe::PCIDev::ODD::oddThreadLoop() {
       // After completion we must raise an interrupt.
       atapiIssueInterrupt();
     }
-    
+
     // Check for pending SCSI commands.
     if (atapiState.scsiCommandPending) {
       processSCSICommand();
@@ -1143,8 +1149,6 @@ void Xe::PCIDev::ODD::oddThreadLoop() {
     // Sleep for some time.
     std::this_thread::sleep_for(50ns);
   }
-
-  LOG_INFO(ODD, "Exiting ODD worker thread.");
 }
 
 // Performs the DMA operation until it reaches the end of the PRDT.
@@ -1245,7 +1249,7 @@ void Xe::PCIDev::ODD::processSCSICommand() {
       perform3BAuth();
       break;
     }
-    
+
     if (pageCode == 0x2A) {
       // CD/DVD Capabilities and Mechanical Status Page (0x2A)
       // Header (8 bytes) + Page Data (20 bytes minimum) = 28 bytes.
@@ -1255,7 +1259,7 @@ void Xe::PCIDev::ODD::processSCSICommand() {
       // Mode Parameter Header (10-byte command -> 8 byte header)
       // Byte 0-1: Mode Data Length (Total - 2) = 26.
       response[0] = 0x00;
-      response[1] = 26; 
+      response[1] = 26;
       // Byte 2: Medium Type (0 = Default)
       // Byte 3: Device Specific Parameter (0)
       // Byte 6-7: Block Descriptor Length (0)
@@ -1267,25 +1271,25 @@ void Xe::PCIDev::ODD::processSCSICommand() {
       response[10] = 0x1F; // DVD-ROM, DVD-R, DVD-RAM, CD-R, CD-RW read.
       // Byte 3: Write Capabilities
       response[11] = 0x00; // Read-only.
-      
+
       // ... (Other fields 0 for now)
 
       u32 transferSize = std::min((u32)allocLen, (u32)sizeof(response));
-      
+
       atapiState.dataOutBuffer.init(transferSize, true);
       atapiState.dataOutBuffer.reset();
       memcpy(atapiState.dataOutBuffer.get(), response, transferSize);
 
       atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
       atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
-      
+
       // Set Byte Count!
       atapiState.regs.byteCountLow = transferSize & 0xFF;
       atapiState.regs.byteCountHigh = (transferSize >> 8) & 0xFF;
-      
+
       atapiState.regs.byteCountLow = transferSize & 0xFF;
       atapiState.regs.byteCountHigh = (transferSize >> 8) & 0xFF;
-      
+
       // Check if we are in DMA mode.
       if (atapiState.regs.features & 1) {
         atapiState.regs.status = ATA_STATUS_BSY | ATA_STATUS_DRDY; // BSY set, DRQ cleared for DMA
@@ -1332,7 +1336,7 @@ void Xe::PCIDev::ODD::perform3BAuth() {
   // Init our output buffer to correct size
   atapiState.dataOutBuffer.init(74, true);
   atapiState.dataOutBuffer.reset();
-  
+
   // Get our IV.
   u8 aesCBCIv[16] = {};
   memcpy(&aesCBCIv, &pageData[42], 16);
@@ -1401,17 +1405,17 @@ void Xe::PCIDev::ODD::scsiGetEventStatusNotificationCommand() {
     // Media Status Requested
     // Header (4 bytes) + Descriptor (4 bytes) = 8 bytes total.
     // Length field (2 bytes) = Total - 2 = 6.
-    dataLen = 6; 
-    
+    dataLen = 6;
+
     response[0] = (dataLen >> 8) & 0xFF;
     response[1] = dataLen & 0xFF;
-    
+
     // Header Byte 2:
     // Bit 7: NEA (0 = Event Available)
     // Bit 6-4: Notification Class = Media (4 = 100b) -> 0x40.
-    response[2] = 0x40; 
+    response[2] = 0x40;
     response[3] = 0x10; // Supported: Media (Bit 4)
-    
+
     // Event Descriptor (Media)
     // Byte 0: Event Code (0-3).
     //   0 = No Chg
@@ -1422,7 +1426,7 @@ void Xe::PCIDev::ODD::scsiGetEventStatusNotificationCommand() {
     //   Bit 1: Media Present.
     //   Bit 0: Door Open.
     response[5] = 0x02; // Media Present, Door Closed.
-    
+
   } else {
     // No event or unsupported class requested.
     // Return empty header with NEA=1.
@@ -1433,11 +1437,11 @@ void Xe::PCIDev::ODD::scsiGetEventStatusNotificationCommand() {
     response[2] = 0x80; // NEA=1
     response[3] = 0x10; // Supported: Media
   }
-  
+
   // Calculate transfer size (min of avail and alloc)
   u32 totalSize = dataLen + 2;
   u32 transferSize = std::min((u32)allocLen, totalSize);
-  
+
   // Init output buffer to correct size
   atapiState.dataOutBuffer.init(transferSize, true);
   atapiState.dataOutBuffer.reset();
@@ -1445,11 +1449,11 @@ void Xe::PCIDev::ODD::scsiGetEventStatusNotificationCommand() {
 
   atapiState.regs.interruptReason |= ATA_INTERRUPT_REASON_IO;
   atapiState.regs.interruptReason &= ~ATA_INTERRUPT_REASON_CD;
-  
+
   // Set Byte Count!
   atapiState.regs.byteCountLow = transferSize & 0xFF;
   atapiState.regs.byteCountHigh = (transferSize >> 8) & 0xFF;
-  
+
   // Check if we are in DMA mode.
   if (atapiState.regs.features & 1) {
     atapiState.regs.status = ATA_STATUS_BSY | ATA_STATUS_DRDY; // BSY set, DRQ cleared for DMA

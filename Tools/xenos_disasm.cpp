@@ -163,7 +163,7 @@ struct XpsWriter {
 XpsWriter xps;
 
 void DumpCF(const Xe::instr_cf_t &cf, u32 pc) {
-  LOG_INFO(Core,
+  LOG_INFO(Xenos,
     "CF {:04}: {} addr={} count={}",
     pc,
     Xe::GetCFOpcodeName(
@@ -176,7 +176,7 @@ void DumpALU(const Xe::instr_alu_t &alu) {
   const auto vop = static_cast<Xe::instr_vector_opc_t>(alu.vector_opc);
   const auto sop = static_cast<Xe::instr_scalar_opc_t>(alu.scalar_opc);
 
-  LOG_INFO(Core, "ALU raw: vop={} sop={} vdst={} vmask={:x} sdst={} "
+  LOG_INFO(Xenos, "ALU raw: vop={} sop={} vdst={} vmask={:x} sdst={} "
               "s1(reg={},sel={},swiz={:02x},neg={}) "
               "s2(reg={},sel={},swiz={:02x},neg={}) "
               "s3(reg={},sel={},swiz={:02x},neg={}) export={}",
@@ -192,8 +192,7 @@ void DumpFETCH(const Xe::instr_fetch_t &fetch) {
 
   if (opc == Xe::instr_fetch_opc_t::VTX_FETCH) {
     const auto &v = fetch.vtx;
-    // NOTE: we’re not yet decoding swizzles/format fully here
-    LOG_INFO(Core,
+    LOG_INFO(Xenos,
       "  VTX_FETCH r{} /*.xyzw*/ <- vtx[r{}], const_idx={} format={} stride={} offset={}",
       v.dst_reg,
       v.src_reg,
@@ -203,12 +202,12 @@ void DumpFETCH(const Xe::instr_fetch_t &fetch) {
       v.offset);
   } else if (opc == Xe::instr_fetch_opc_t::TEX_FETCH) {
     const auto &t = fetch.tex;
-    LOG_INFO(Core,
+    LOG_INFO(Xenos,
       "  TEX_FETCH r{} <- tex[r{}] tf={}, dim={}, offs=({}, {}, {})",
       t.dst_reg, t.src_reg, t.const_idx, (u32)t.dimension,
       sext5(t.offset_x), sext5(t.offset_y), sext5(t.offset_z));
   } else {
-    LOG_INFO(Core, "  FETCH opc={}", static_cast<u32>(opc));
+    LOG_INFO(Xenos, "  FETCH opc={}", static_cast<u32>(opc));
   }
 }
 
@@ -359,14 +358,14 @@ s32 ToolMain() {
   {
     std::ifstream f{ path, std::ios::in | std::ios::binary };
     if (!f.is_open()) {
-      LOG_ERROR(Core, "Failed to open '{}'", path);
+      LOG_ERROR(Xenos, "Failed to open '{}'", path);
       return 1;
     }
     f.seekg(0, std::ios::end);
     std::streamsize size = f.tellg();
     f.seekg(0, std::ios::beg);
     if (size < 0) {
-      LOG_ERROR(Core, "Failed to get size for '{}'", path);
+      LOG_ERROR(Xenos, "Failed to get size for '{}'", path);
       return 1;
     }
     data.resize(static_cast<u64>(size));
@@ -374,7 +373,7 @@ s32 ToolMain() {
   }
 
   if (data.size() % 4 != 0) {
-    LOG_ERROR(Core, "Shader size not aligned to dword");
+    LOG_ERROR(Xenos, "Shader size not aligned to dword");
     return 1;
   }
 
@@ -436,14 +435,14 @@ s32 ToolMain() {
       }
       if (shaderCodeOffset == ~0ull) {
         shaderCodeOffset = hdr.offset;
-        LOG_INFO(Core, "Using older SR1-era microcode offset (hdr.offset)");
+        LOG_INFO(Xenos, "Using older SR1-era microcode offset (hdr.offset)");
       }
       if (!InRange(shaderCodeOffset, 12)) {
-        LOG_ERROR(Core, "Invalid microcode offset: 0x{:X}", shaderCodeOffset);
+        LOG_ERROR(Xenos, "Invalid microcode offset: 0x{:X}", shaderCodeOffset);
         return 1;
       }
       u8 *shaderCode = data.data() + shaderCodeOffset;
-      LOG_INFO(Core, "Detected Xenos shader header, skipping {} dwords", (shaderCodeOffset) / 4);
+      LOG_INFO(Xenos, "Detected Xenos shader header, skipping {} dwords", (shaderCodeOffset) / 4);
 
       // Convert remaining shader data into a u32 vector
       words.clear();
@@ -457,9 +456,9 @@ s32 ToolMain() {
     }
   }
 
-  LOG_INFO(Core, "Loaded {} dwords ({} bytes)", words.size(), words.size() * 4);
-  LOG_INFO(Core, "Shader Type: {}", shaderType == Xe::eShaderType::Vertex ? "VS" : "PS");
-  LOG_INFO(Core, "--------------------------------------------------");
+  LOG_INFO(Xenos, "Loaded {} dwords ({} bytes)", words.size(), words.size() * 4);
+  LOG_INFO(Xenos, "Shader Type: {}", shaderType == Xe::eShaderType::Vertex ? "VS" : "PS");
+  LOG_INFO(Xenos, "--------------------------------------------------");
 
   XenosSpirvCompiler compiler(shaderType);
   compiler.InitModule();
@@ -560,7 +559,7 @@ s32 ToolMain() {
   std::ofstream out(path + ".xps");
   out << xps.out.str();
 
-  LOG_INFO(Core, "Wrote SPIR-V to '{}'", outPath);
+  LOG_INFO(Xenos, "Wrote SPIR-V to '{}'", outPath);
 
   return 0;
 }

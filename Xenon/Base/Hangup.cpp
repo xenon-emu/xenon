@@ -63,7 +63,6 @@ s32 globalShutdownHandler() {
   // If we tried to exit gracefully the first time and failed,
   // use fexit to forcefully send a SIGTERM
   if (!hupflag) {
-    printf("\nAttempting to clean shutdown...\n");
     hupflag = 1;
   } else {
     printf("\nUnable to clean shutdown!\n");
@@ -73,15 +72,10 @@ s32 globalShutdownHandler() {
   }
   // Cleanly shutdown without the exit syscall
   XeRunning = false;
+  XeMain::Shutdown(); // Since we wait to ensure shutdown is finished instead of a broad timer, we need to ensure we call it here. (a timer deadlocks the main thread)
   // Give everything a while to shut down. If it still hasn't shutdown, then something hung
-  std::this_thread::sleep_for(15s);
-  if (XeShutdownSignaled) {
-    printf("This was called because after 15s, and a shutdown call, it still hasn't shutdown.\n");
-    printf("Something likely hung. If you have issues, please make a GitHub Issue report with this message in it\n");
-    // We should force exit. We only should call shutdown once, and if we don't, then it hung
-    return Base::exit(-1);
-  } else {
-    XeMain::Shutdown();
+  while (!XeShutdownFinished) {
+    std::this_thread::sleep_for(1ms);
   }
   return 0;
 }

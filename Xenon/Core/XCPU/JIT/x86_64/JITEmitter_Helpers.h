@@ -24,6 +24,26 @@ using namespace asmjit;
 #define newGPptr() b->compiler->newGpz()
 
 //
+// Floating Point Register Pointer Helper
+//
+#define FPRPtr(x) b->threadCtx->array(&sPPUThread::FPR).Ptr(x)
+
+//
+// Allocates a new XMM register for floating-point operations
+//
+#define newXMM() b->compiler->newXmm()
+
+//
+// FPSCR Pointer Helper
+//
+#define FPSCRPtr() b->threadCtx->scalar(&sPPUThread::FPSCR)
+
+//
+// Vector Register Pointer Helper
+//
+#define VPRPtr(x) b->threadCtx->array(&sPPUThread::VR).Ptr(x)
+
+//
 // Pointer Helpers
 //
 
@@ -35,7 +55,7 @@ using namespace asmjit;
 #define CRValPtr() b->threadCtx->scalar(&sPPUThread::CR)
 #define CIAPtr() b->threadCtx->scalar(&sPPUThread::CIA)
 #define NIAPtr() b->threadCtx->scalar(&sPPUThread::NIA)
-#define EXPtr() b->threadCtx->scalar(&sPPUThread::exceptReg) 
+#define EXPtr() b->threadCtx->scalar(&sPPUThread::exceptReg)
 #define LRPtr() SPRPtr(LR)
 
 // XER CA bit position (platform-dependent)

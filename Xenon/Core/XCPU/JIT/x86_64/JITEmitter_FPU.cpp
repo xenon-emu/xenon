@@ -7,24 +7,6 @@
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
 
 //
-// Floating Point Register Pointer Helper
-//
-
-#define FPRPtr(x) b->threadCtx->array(&sPPUThread::FPR).Ptr(x)
-
-//
-// Allocates a new XMM register for floating-point operations
-//
-
-#define newXMM() b->compiler->newXmm()
-
-//
-// FPSCR Pointer Helper
-//
-
-#define FPSCRPtr() b->threadCtx->scalar(&sPPUThread::FPSCR)
-
-//
 // FPSCR bit definitions (in little-endian bit positions)
 // PowerPC FPSCR is big-endian, so bit 0 in BE = bit 31 in LE
 //
@@ -81,7 +63,7 @@ inline void J_resetFPSCRExceptionBits(JITBlockBuilder* b) {
 }
 
 // Helper to check if a value is an SNaN and set FPSCR exception bits if so
-inline void J_checkAndSetSNaN(JITBlockBuilder* b, x86::Xmm value) {
+inline void J_checkAndSetSNaN(JITBlockBuilder* b, x86::Vec value) {
   x86::Gp valueBits = newGP64();
   x86::Gp expBits = newGP64();
   x86::Gp fracBits = newGP64();
@@ -116,7 +98,7 @@ inline void J_checkAndSetSNaN(JITBlockBuilder* b, x86::Xmm value) {
 // Helper to check if a value is an SNaN and return its QNaN conversion in snanQNaN if found
 // Sets snanFlag to 1 if SNaN found, 0 otherwise
 // snanQNaN will contain the SNaN converted to QNaN (bit 51 set)
-inline void J_checkSNaNAndGetQNaN(JITBlockBuilder* b, x86::Xmm value, x86::Gp snanFlag, x86::Gp snanQNaN) {
+inline void J_checkSNaNAndGetQNaN(JITBlockBuilder* b, x86::Vec value, x86::Gp snanFlag, x86::Gp snanQNaN) {
   x86::Gp valueBits = newGP64();
   x86::Gp expBits = newGP64();
   x86::Gp fracBits = newGP64();
@@ -160,7 +142,7 @@ inline void J_checkSNaNAndGetQNaN(JITBlockBuilder* b, x86::Xmm value, x86::Gp sn
 // A QNaN has exp=0x7FF, frac!=0, and bit 51 set
 // Sets qnanFlag to 1 if QNaN found, 0 otherwise
 // qnanValue will contain the QNaN value
-inline void J_checkQNaNAndGetValue(JITBlockBuilder* b, x86::Xmm value, x86::Gp qnanFlag, x86::Gp qnanValue) {
+inline void J_checkQNaNAndGetValue(JITBlockBuilder* b, x86::Vec value, x86::Gp qnanFlag, x86::Gp qnanValue) {
   x86::Gp valueBits = newGP64();
   x86::Gp expBits = newGP64();
   x86::Gp fracBits = newGP64();
@@ -199,7 +181,7 @@ inline void J_checkQNaNAndGetValue(JITBlockBuilder* b, x86::Xmm value, x86::Gp q
 
 // Helper to check if a value is infinity (positive or negative)
 // Sets infFlag to 1 if infinity, 0 otherwise
-inline void J_checkInfinity(JITBlockBuilder* b, x86::Xmm value, x86::Gp infFlag) {
+inline void J_checkInfinity(JITBlockBuilder* b, x86::Vec value, x86::Gp infFlag) {
   x86::Gp valueBits = newGP64();
   x86::Gp expBits = newGP64();
   x86::Gp fracBits = newGP64();
@@ -239,7 +221,7 @@ inline void J_checkInfinity(JITBlockBuilder* b, x86::Xmm value, x86::Gp infFlag)
 // Helper to check if a value is a double-precision denormal (for single-precision ops)
 // A denormal has exponent = 0 and fraction != 0
 // Returns 1 in denormFlag if either input is denormal, 0 otherwise
-inline void J_checkDenormal(JITBlockBuilder* b, x86::Xmm value, x86::Gp denormFlag) {
+inline void J_checkDenormal(JITBlockBuilder* b, x86::Vec value, x86::Gp denormFlag) {
   x86::Gp valueBits = newGP64();
   x86::Gp expBits = newGP64();
   x86::Gp fracBits = newGP64();
@@ -279,7 +261,7 @@ inline void J_checkDenormal(JITBlockBuilder* b, x86::Xmm value, x86::Gp denormFl
 }
 
 // Helper to check for Inf + (-Inf) or Inf - Inf invalid operation
-inline void J_checkInfSubInf(JITBlockBuilder* b, x86::Xmm fra, x86::Xmm frb, x86::Gp vxisiFlag) {
+inline void J_checkInfSubInf(JITBlockBuilder* b, x86::Vec fra, x86::Vec frb, x86::Gp vxisiFlag) {
   x86::Gp aBits = newGP64();
   x86::Gp bBits = newGP64();
   x86::Gp aExp = newGP64();
@@ -338,7 +320,7 @@ inline void J_checkInfSubInf(JITBlockBuilder* b, x86::Xmm fra, x86::Xmm frb, x86
 }
 
 // Helper to check for Inf - Inf (same sign subtraction) invalid operation
-inline void J_checkInfMinusInf(JITBlockBuilder* b, x86::Xmm fra, x86::Xmm frb, x86::Gp vxisiFlag) {
+inline void J_checkInfMinusInf(JITBlockBuilder* b, x86::Vec fra, x86::Vec frb, x86::Gp vxisiFlag) {
   x86::Gp aBits = newGP64();
   x86::Gp bBits = newGP64();
   x86::Gp aExp = newGP64();
@@ -398,7 +380,7 @@ inline void J_checkInfMinusInf(JITBlockBuilder* b, x86::Xmm fra, x86::Xmm frb, x
 }
 
 // Helper to check for Inf * 0 invalid operation
-inline void J_checkInfMulZero(JITBlockBuilder* b, x86::Xmm fra, x86::Xmm frc, x86::Gp vximzFlag) {
+inline void J_checkInfMulZero(JITBlockBuilder* b, x86::Vec fra, x86::Vec frc, x86::Gp vximzFlag) {
   x86::Gp aBits = newGP64();
   x86::Gp cBits = newGP64();
   x86::Gp aExp = newGP64();
@@ -504,7 +486,7 @@ inline void J_ppuSetCR1(JITBlockBuilder* b) {
 }
 
 // Helper to classify a double-precision floating point value and set FPRF
-inline void J_classifyAndSetFPRF(JITBlockBuilder* b, x86::Xmm result) {
+inline void J_classifyAndSetFPRF(JITBlockBuilder* b, x86::Vec result) {
   x86::Gp resultBits = newGP64();
   x86::Gp fprf = newGP32();
   x86::Gp fpscr = newGP32();
@@ -610,7 +592,7 @@ inline void J_classifyAndSetFPRF(JITBlockBuilder* b, x86::Xmm result) {
 }
 
 // Helper to convert double to single and store back as double (for single-precision operations)
-inline void J_roundToSingle(JITBlockBuilder* b, x86::Xmm frd) {
+inline void J_roundToSingle(JITBlockBuilder* b, x86::Vec frd) {
   COMP->vcvtsd2ss(frd, frd, frd);
   COMP->vcvtss2sd(frd, frd, frd);
 }
@@ -621,9 +603,9 @@ void PPCInterpreter::PPCInterpreterJIT_faddx(sPPEState* ppeState, JITBlockBuilde
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frd = newXMM();
 
   // Load frA (64-bit double from FPR[fra])
   // FPR is stored as u64, which represents the double bit pattern
@@ -704,9 +686,9 @@ void PPCInterpreter::PPCInterpreterJIT_faddsx(sPPEState* ppeState, JITBlockBuild
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frd = newXMM();
 
   // Load frA (64-bit double from FPR[fra])
   COMP->vmovsd(fra, FPRPtr(instr.fra));
@@ -894,9 +876,9 @@ void PPCInterpreter::PPCInterpreterJIT_fsubx(sPPEState* ppeState, JITBlockBuilde
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frd = newXMM();
 
   // Load frA (64-bit double from FPR[fra])
   // FPR is stored as u64, which represents the double bit pattern
@@ -975,9 +957,9 @@ void PPCInterpreter::PPCInterpreterJIT_fsubsx(sPPEState* ppeState, JITBlockBuild
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -1155,9 +1137,9 @@ void PPCInterpreter::PPCInterpreterJIT_fmulx(sPPEState* ppeState, JITBlockBuilde
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frc));
@@ -1288,9 +1270,9 @@ void PPCInterpreter::PPCInterpreterJIT_fmulsx(sPPEState* ppeState, JITBlockBuild
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frc = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frc = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frc, FPRPtr(instr.frc));
@@ -1469,9 +1451,9 @@ void PPCInterpreter::PPCInterpreterJIT_fdivx(sPPEState* ppeState, JITBlockBuilde
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -1726,9 +1708,9 @@ void PPCInterpreter::PPCInterpreterJIT_fdivsx(sPPEState* ppeState, JITBlockBuild
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -2032,8 +2014,8 @@ void PPCInterpreter::PPCInterpreterJIT_fsqrtx(sPPEState* ppeState, JITBlockBuild
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm frb = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frd = newXMM();
 
   Label setVxsqrt = b->compiler->newLabel();
 
@@ -2220,8 +2202,8 @@ void PPCInterpreter::PPCInterpreterJIT_fsqrtx(sPPEState* ppeState, JITBlockBuild
 void PPCInterpreter::PPCInterpreterJIT_fcmpu(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -2423,8 +2405,8 @@ void PPCInterpreter::PPCInterpreterJIT_fcmpu(sPPEState* ppeState, JITBlockBuilde
 void PPCInterpreter::PPCInterpreterJIT_fcmpo(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -2848,8 +2830,8 @@ void PPCInterpreter::PPCInterpreterJIT_fselx(sPPEState* ppeState, JITBlockBuilde
 void PPCInterpreter::PPCInterpreterJIT_frspx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  x86::Xmm frb = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(frb, FPRPtr(instr.frb));
 
@@ -2953,7 +2935,7 @@ void PPCInterpreter::PPCInterpreterJIT_frspx(sPPEState* ppeState, JITBlockBuilde
 void PPCInterpreter::PPCInterpreterJIT_fctiwx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  x86::Xmm frb = newXMM();
+  x86::Vec frb = newXMM();
   x86::Gp result = newGP64();
   x86::Gp intResult = newGP32();
   x86::Gp frbBits = newGP64();
@@ -3078,8 +3060,8 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwx(sPPEState* ppeState, JITBlockBuild
   COMP->ldmxcsr(mxcsrSlot);
 
   // Check bounds
-  x86::Xmm maxVal = newXMM();
-  x86::Xmm minVal = newXMM();
+  x86::Vec maxVal = newXMM();
+  x86::Vec minVal = newXMM();
   x86::Gp maxBits = newGP64();
   x86::Gp minBits = newGP64();
 
@@ -3154,7 +3136,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwx(sPPEState* ppeState, JITBlockBuild
 
   // Check for inexact result - compare numerically (handles -0.0 == +0.0)
   {
-    x86::Xmm converted = newXMM();
+    x86::Vec converted = newXMM();
     x86::Gp signedResult = newGP32();
     COMP->mov(signedResult, intResult);
     COMP->vcvtsi2sd(converted, converted, signedResult);
@@ -3204,7 +3186,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwx(sPPEState* ppeState, JITBlockBuild
 void PPCInterpreter::PPCInterpreterJIT_fctiwzx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  x86::Xmm frb = newXMM();
+  x86::Vec frb = newXMM();
   x86::Gp result = newGP64();
   x86::Gp intResult = newGP32();
   x86::Gp frbBits = newGP64();
@@ -3277,8 +3259,8 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwzx(sPPEState* ppeState, JITBlockBuil
   COMP->jnz(handleOverflowPos);
 
   // Check bounds
-  x86::Xmm maxVal = newXMM();
-  x86::Xmm minVal = newXMM();
+  x86::Vec maxVal = newXMM();
+  x86::Vec minVal = newXMM();
   x86::Gp maxBits = newGP64();
   x86::Gp minBits = newGP64();
 
@@ -3347,7 +3329,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwzx(sPPEState* ppeState, JITBlockBuil
 
   // Check for inexact (numeric compare)
   {
-    x86::Xmm converted = newXMM();
+    x86::Vec converted = newXMM();
     x86::Gp signedResult = newGP32();
     COMP->mov(signedResult, intResult);
     COMP->vcvtsi2sd(converted, converted, signedResult);
@@ -3419,7 +3401,7 @@ void PPCInterpreter::PPCInterpreterJIT_fabsx(sPPEState* ppeState, JITBlockBuilde
 void PPCInterpreter::PPCInterpreterJIT_fctidx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  x86::Xmm frb = newXMM();
+  x86::Vec frb = newXMM();
   x86::Gp frbBits = newGP64();
   x86::Gp converted = newGP64();
   x86::Gp result = newGP64();
@@ -3513,8 +3495,8 @@ void PPCInterpreter::PPCInterpreterJIT_fctidx(sPPEState* ppeState, JITBlockBuild
   // Check bounds for overflow
   // Max int64 is 2^63-1 = 9223372036854775807.0 = 0x43DFFFFFFFFFFFFF
   // Min int64 is -2^63 = -9223372036854775808.0 = 0xC3E0000000000000
-  x86::Xmm maxVal = newXMM();
-  x86::Xmm minVal = newXMM();
+  x86::Vec maxVal = newXMM();
+  x86::Vec minVal = newXMM();
   x86::Gp maxBits = newGP64();
   x86::Gp minBits = newGP64();
 
@@ -3654,7 +3636,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctidx(sPPEState* ppeState, JITBlockBuild
     COMP->mov(result, converted);
 
     // Check for inexact: convert back and compare
-    x86::Xmm reconverted = newXMM();
+    x86::Vec reconverted = newXMM();
     COMP->vcvtsi2sd(reconverted, reconverted, converted);
 
     x86::Gp fpscrTmp = newGP32();
@@ -3700,7 +3682,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctidx(sPPEState* ppeState, JITBlockBuild
 void PPCInterpreter::PPCInterpreterJIT_fctidzx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  x86::Xmm frb = newXMM();
+  x86::Vec frb = newXMM();
   x86::Gp frbBits = newGP64();
   x86::Gp converted = newGP64();
   x86::Gp result = newGP64();
@@ -3787,8 +3769,8 @@ void PPCInterpreter::PPCInterpreterJIT_fctidzx(sPPEState* ppeState, JITBlockBuil
   COMP->jnz(handleNegInf);
 
   // Check bounds
-  x86::Xmm maxVal = newXMM();
-  x86::Xmm minVal = newXMM();
+  x86::Vec maxVal = newXMM();
+  x86::Vec minVal = newXMM();
   x86::Gp maxBits = newGP64();
   x86::Gp minBits = newGP64();
 
@@ -3868,7 +3850,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctidzx(sPPEState* ppeState, JITBlockBuil
     COMP->mov(result, converted);
 
     // Check for inexact
-    x86::Xmm reconverted = newXMM();
+    x86::Vec reconverted = newXMM();
     COMP->vcvtsi2sd(reconverted, reconverted, converted);
 
     x86::Gp fpscrTmp = newGP32();
@@ -3913,7 +3895,7 @@ void PPCInterpreter::PPCInterpreterJIT_fcfidx(sPPEState* ppeState, JITBlockBuild
   J_checkFPUEnabled(b);
 
   x86::Gp frbInt = newGP64();
-  x86::Xmm frd = newXMM();
+  x86::Vec frd = newXMM();
 
   // Load frB as signed 64-bit integer (stored as raw bits in FPR)
   COMP->mov(frbInt, FPRPtr(instr.frb));
@@ -3944,10 +3926,10 @@ void PPCInterpreter::PPCInterpreterJIT_fnmaddx(sPPEState* ppeState, JITBlockBuil
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frc = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frc = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -4139,10 +4121,10 @@ void PPCInterpreter::PPCInterpreterJIT_fnmaddsx(sPPEState* ppeState, JITBlockBui
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frc = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frc = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -4348,8 +4330,8 @@ void PPCInterpreter::PPCInterpreterJIT_fsqrtsx(sPPEState* ppeState, JITBlockBuil
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm frb = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(frb, FPRPtr(instr.frb));
 
@@ -4470,8 +4452,8 @@ void PPCInterpreter::PPCInterpreterJIT_fsqrtsx(sPPEState* ppeState, JITBlockBuil
 
   {
     x86::Gp scaleFactor = newGP64();
-    x86::Xmm scaleXmm = newXMM();
-    x86::Xmm tempXmm = newXMM();
+    x86::Vec scaleXmm = newXMM();
+    x86::Vec tempXmm = newXMM();
 
     // Step 1: multiply by 2^512 = 0x5FF0000000000000
     COMP->mov(scaleFactor, 0x5FF0000000000000ull);
@@ -4570,10 +4552,10 @@ void PPCInterpreter::PPCInterpreterJIT_fmaddx(sPPEState* ppeState, JITBlockBuild
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frc = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frc = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -4728,10 +4710,10 @@ void PPCInterpreter::PPCInterpreterJIT_fmsubx(sPPEState* ppeState, JITBlockBuild
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frc = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frc = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -4882,10 +4864,10 @@ void PPCInterpreter::PPCInterpreterJIT_fmsubx(sPPEState* ppeState, JITBlockBuild
 void PPCInterpreter::PPCInterpreterJIT_fmaddsx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frc = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frc = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -5001,10 +4983,10 @@ void PPCInterpreter::PPCInterpreterJIT_fmaddsx(sPPEState* ppeState, JITBlockBuil
 void PPCInterpreter::PPCInterpreterJIT_fmsubsx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frc = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frc = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -5122,10 +5104,10 @@ void PPCInterpreter::PPCInterpreterJIT_fnmsubx(sPPEState* ppeState, JITBlockBuil
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frc = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frc = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -5306,10 +5288,10 @@ void PPCInterpreter::PPCInterpreterJIT_fnmsubsx(sPPEState* ppeState, JITBlockBui
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frc = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frc = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -5644,7 +5626,7 @@ void PPCInterpreter::PPCInterpreterJIT_lfs(sPPEState *ppeState, JITBlockBuilder 
   Label endLabel = COMP->newLabel();
   x86::Gp EA = newGP64();
   x86::Gp data32 = newGP32();
-  x86::Xmm tmpXmm = newXMM();
+  x86::Vec tmpVec = newXMM();
   x86::Gp exceptReg = newGP16();
 
   if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
@@ -5666,9 +5648,9 @@ void PPCInterpreter::PPCInterpreterJIT_lfs(sPPEState *ppeState, JITBlockBuilder 
   COMP->mov(data32, x86::dword_ptr(EA));
   COMP->bswap(data32);
 
-  COMP->vmovd(tmpXmm, data32);
-  COMP->vcvtss2sd(tmpXmm, tmpXmm, tmpXmm);
-  COMP->vmovsd(FPRPtr(instr.frd), tmpXmm);
+  COMP->vmovd(tmpVec, data32);
+  COMP->vcvtss2sd(tmpVec, tmpVec, tmpVec);
+  COMP->vmovsd(FPRPtr(instr.frd), tmpVec);
   COMP->bind(endLabel);
 }
 
@@ -5679,7 +5661,7 @@ void PPCInterpreter::PPCInterpreterJIT_lfsx(sPPEState *ppeState, JITBlockBuilder
   Label endLabel = COMP->newLabel();
   x86::Gp EA = newGP64();
   x86::Gp data32 = newGP32();
-  x86::Xmm tmpXmm = newXMM();
+  x86::Vec tmpVec = newXMM();
   x86::Gp exceptReg = newGP16();
 
   if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
@@ -5701,9 +5683,9 @@ void PPCInterpreter::PPCInterpreterJIT_lfsx(sPPEState *ppeState, JITBlockBuilder
   COMP->mov(data32, x86::dword_ptr(EA));
   COMP->bswap(data32);
 
-  COMP->vmovd(tmpXmm, data32);
-  COMP->vcvtss2sd(tmpXmm, tmpXmm, tmpXmm);
-  COMP->vmovsd(FPRPtr(instr.frd), tmpXmm);
+  COMP->vmovd(tmpVec, data32);
+  COMP->vcvtss2sd(tmpVec, tmpVec, tmpVec);
+  COMP->vmovsd(FPRPtr(instr.frd), tmpVec);
   COMP->bind(endLabel);
 }
 
@@ -5714,7 +5696,7 @@ void PPCInterpreter::PPCInterpreterJIT_lfsu(sPPEState *ppeState, JITBlockBuilder
   Label endLabel = COMP->newLabel();
   x86::Gp EA = newGP64();
   x86::Gp data32 = newGP32();
-  x86::Xmm tmpXmm = newXMM();
+  x86::Vec tmpVec = newXMM();
   x86::Gp exceptReg = newGP16();
 
   COMP->mov(EA, GPRPtr(instr.ra));
@@ -5735,9 +5717,9 @@ void PPCInterpreter::PPCInterpreterJIT_lfsu(sPPEState *ppeState, JITBlockBuilder
   COMP->mov(data32, x86::dword_ptr(EA));
   COMP->bswap(data32);
 
-  COMP->vmovd(tmpXmm, data32);
-  COMP->vcvtss2sd(tmpXmm, tmpXmm, tmpXmm);
-  COMP->vmovsd(FPRPtr(instr.frd), tmpXmm);
+  COMP->vmovd(tmpVec, data32);
+  COMP->vcvtss2sd(tmpVec, tmpVec, tmpVec);
+  COMP->vmovsd(FPRPtr(instr.frd), tmpVec);
   // Update rA with original EA
   COMP->mov(EA, GPRPtr(instr.ra));
   COMP->add(EA, imm<s16>(instr.simm16));
@@ -5753,7 +5735,7 @@ void PPCInterpreter::PPCInterpreterJIT_lfsux(sPPEState *ppeState, JITBlockBuilde
   x86::Gp EA = newGP64();
   x86::Gp origEA = newGP64();
   x86::Gp data32 = newGP32();
-  x86::Xmm tmpXmm = newXMM();
+  x86::Vec tmpVec = newXMM();
   x86::Gp exceptReg = newGP16();
 
   COMP->mov(EA, GPRPtr(instr.ra));
@@ -5775,9 +5757,9 @@ void PPCInterpreter::PPCInterpreterJIT_lfsux(sPPEState *ppeState, JITBlockBuilde
   COMP->mov(data32, x86::dword_ptr(EA));
   COMP->bswap(data32);
 
-  COMP->vmovd(tmpXmm, data32);
-  COMP->vcvtss2sd(tmpXmm, tmpXmm, tmpXmm);
-  COMP->vmovsd(FPRPtr(instr.frd), tmpXmm);
+  COMP->vmovd(tmpVec, data32);
+  COMP->vcvtss2sd(tmpVec, tmpVec, tmpVec);
+  COMP->vmovsd(FPRPtr(instr.frd), tmpVec);
   COMP->mov(GPRPtr(instr.ra), origEA);
   COMP->bind(endLabel);
 }
@@ -5916,7 +5898,7 @@ void PPCInterpreter::PPCInterpreterJIT_stfs(sPPEState *ppeState, JITBlockBuilder
 
   Label endLabel = COMP->newLabel();
   x86::Gp EA = newGP64();
-  x86::Xmm tmpXmm = newXMM();
+  x86::Vec tmpVec = newXMM();
   x86::Gp data32 = newGP32();
   x86::Gp exceptReg = newGP16();
 
@@ -5936,9 +5918,9 @@ void PPCInterpreter::PPCInterpreterJIT_stfs(sPPEState *ppeState, JITBlockBuilder
   COMP->test(exceptReg, exceptReg);
   COMP->jnz(endLabel);
 
-  COMP->vmovsd(tmpXmm, FPRPtr(instr.frs));
-  COMP->vcvtsd2ss(tmpXmm, tmpXmm, tmpXmm);
-  COMP->vmovd(data32, tmpXmm);
+  COMP->vmovsd(tmpVec, FPRPtr(instr.frs));
+  COMP->vcvtsd2ss(tmpVec, tmpVec, tmpVec);
+  COMP->vmovd(data32, tmpVec);
 
   COMP->bswap(data32);
   COMP->mov(x86::dword_ptr(EA), data32);
@@ -5951,7 +5933,7 @@ void PPCInterpreter::PPCInterpreterJIT_stfsx(sPPEState *ppeState, JITBlockBuilde
 
   Label endLabel = COMP->newLabel();
   x86::Gp EA = newGP64();
-  x86::Xmm tmpXmm = newXMM();
+  x86::Vec tmpVec = newXMM();
   x86::Gp data32 = newGP32();
   x86::Gp exceptReg = newGP16();
 
@@ -5971,9 +5953,9 @@ void PPCInterpreter::PPCInterpreterJIT_stfsx(sPPEState *ppeState, JITBlockBuilde
   COMP->test(exceptReg, exceptReg);
   COMP->jnz(endLabel);
 
-  COMP->vmovsd(tmpXmm, FPRPtr(instr.frs));
-  COMP->vcvtsd2ss(tmpXmm, tmpXmm, tmpXmm);
-  COMP->vmovd(data32, tmpXmm);
+  COMP->vmovsd(tmpVec, FPRPtr(instr.frs));
+  COMP->vcvtsd2ss(tmpVec, tmpVec, tmpVec);
+  COMP->vmovd(data32, tmpVec);
 
   COMP->bswap(data32);
   COMP->mov(x86::dword_ptr(EA), data32);
@@ -5987,7 +5969,7 @@ void PPCInterpreter::PPCInterpreterJIT_stfsu(sPPEState *ppeState, JITBlockBuilde
   Label endLabel = COMP->newLabel();
   x86::Gp EA = newGP64();
   x86::Gp origEA = newGP64();
-  x86::Xmm tmpXmm = newXMM();
+  x86::Vec tmpVec = newXMM();
   x86::Gp data32 = newGP32();
   x86::Gp exceptReg = newGP16();
 
@@ -6007,9 +5989,9 @@ void PPCInterpreter::PPCInterpreterJIT_stfsu(sPPEState *ppeState, JITBlockBuilde
   COMP->test(exceptReg, exceptReg);
   COMP->jnz(endLabel);
 
-  COMP->vmovsd(tmpXmm, FPRPtr(instr.frs));
-  COMP->vcvtsd2ss(tmpXmm, tmpXmm, tmpXmm);
-  COMP->vmovd(data32, tmpXmm);
+  COMP->vmovsd(tmpVec, FPRPtr(instr.frs));
+  COMP->vcvtsd2ss(tmpVec, tmpVec, tmpVec);
+  COMP->vmovd(data32, tmpVec);
 
   COMP->bswap(data32);
   COMP->mov(x86::dword_ptr(EA), data32);
@@ -6024,7 +6006,7 @@ void PPCInterpreter::PPCInterpreterJIT_stfsux(sPPEState *ppeState, JITBlockBuild
   Label endLabel = COMP->newLabel();
   x86::Gp EA = newGP64();
   x86::Gp origEA = newGP64();
-  x86::Xmm tmpXmm = newXMM();
+  x86::Vec tmpVec = newXMM();
   x86::Gp data32 = newGP32();
   x86::Gp exceptReg = newGP16();
 
@@ -6044,9 +6026,9 @@ void PPCInterpreter::PPCInterpreterJIT_stfsux(sPPEState *ppeState, JITBlockBuild
   COMP->test(exceptReg, exceptReg);
   COMP->jnz(endLabel);
 
-  COMP->vmovsd(tmpXmm, FPRPtr(instr.frs));
-  COMP->vcvtsd2ss(tmpXmm, tmpXmm, tmpXmm);
-  COMP->vmovd(data32, tmpXmm);
+  COMP->vmovsd(tmpVec, FPRPtr(instr.frs));
+  COMP->vcvtsd2ss(tmpVec, tmpVec, tmpVec);
+  COMP->vmovd(data32, tmpVec);
 
   COMP->bswap(data32);
   COMP->mov(x86::dword_ptr(EA), data32);

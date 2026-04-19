@@ -119,6 +119,7 @@ public:
   virtual void UpdateClearColor(u8 r, u8 b, u8 g, u8 a) = 0;
   virtual void UpdateClearDepth(f64 depth) = 0;
   virtual void BackendBindPixelBuffer(Buffer *buffer) = 0;
+  virtual void BackendOnUploadBuffer(u32 bufferHash, Buffer *buffer) {}
   virtual void Clear() = 0;
 
   virtual void UpdateViewportFromState(const Xe::XGPU::XenosState *state) = 0;
@@ -146,7 +147,7 @@ public:
 
   Xe::XGPU::XeShader *GetOrCreateShader(u32 vsHash, u32 psHash);
 
-  void HandleEvents();
+  void OnEvent(const SDL_Event &e);
 
   void Thread();
 
@@ -173,7 +174,6 @@ public:
   u32 pitch = 0;
   // SDL Window data
   SDL_Window *mainWindow = nullptr;
-  SDL_Event windowEvent = {};
   SDL_WindowID windowID = {};
   // Factories
   std::unique_ptr<ResourceFactory> resourceFactory{};
@@ -215,6 +215,10 @@ public:
 private:
   // Thread handle
   std::thread thread;
+
+  // Hack: last-known shader hashes so BindShader can be partial (vs-only or ps-only).
+  u32 lastVSHash_ = 0;
+  u32 lastPSHash_ = 0;
 
   // GUI handle
   std::unique_ptr<GUI> gui{};

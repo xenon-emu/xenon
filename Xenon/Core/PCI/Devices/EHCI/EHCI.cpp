@@ -32,7 +32,7 @@ void Xe::PCIDev::EHCI::Read(u64 readAddress, u8 *data, u64 size) {
 
   u32 value = 0;
   memcpy(&value, data, size);
-  
+
   switch (offset) {
   // Capability Registers
   case 0x00: // CAPLENGTH (8-bit) + HCIVERSION (16-bit)

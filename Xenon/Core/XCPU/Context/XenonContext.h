@@ -23,7 +23,7 @@ namespace Xe::XCPU {
   // for all three PPE's an their respecting Power Processing Units (PPU's) threads.
   class XenonContext {
   public:
-    XenonContext(RootBus *rootBusPtr, RAM *ramPtr) :
+    XenonContext(std::weak_ptr<RootBus> rootBusPtr, RAM *ramPtr) :
       rootBus(rootBusPtr), ram(ramPtr)
     {
       SROM = std::make_unique<STRIP_UNIQUE_ARR(SROM)>(XE_SECROM_BLOCK_SIZE);
@@ -46,7 +46,7 @@ namespace Xe::XCPU {
       socPRVBlock.reset();
     }
 
-    RootBus *GetRootBus() { return rootBus; }
+    std::shared_ptr<RootBus> GetRootBus() { return rootBus.lock(); }
     RAM *GetRAM() { return ram; }
     bool HandleSOCRead(u64 readAddr, u8 *data, size_t byteCount);
     bool HandleSOCWrite(u64 writeAddr, const u8 *data, size_t byteCount);
@@ -102,7 +102,7 @@ namespace Xe::XCPU {
     // Mutex for thread safety
     std::recursive_mutex mutex{};
     // RootBus pointer
-    RootBus *rootBus{};
+    std::weak_ptr<RootBus> rootBus{};
     // RAM pointer
     RAM *ram{};
 

@@ -280,5 +280,4 @@ void Xe::Xenos::XGPU::xeVSyncWorkerThreadLoop() {
       timerStart = std::chrono::steady_clock::now();
     }
   }
-  LOG_INFO(Xenos, "Exiting VSYNC Worker thread.");
 }

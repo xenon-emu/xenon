@@ -294,6 +294,8 @@ std::shared_ptr<JITBlock> PPU_JIT::BuildJITBlock(u64 blockStartAddress, u64 maxB
         thread.exceptReg &= ~(ppuInstrStorageEx | ppuInstrSegmentEx);
         break;
       } else {
+        thread.SPR.MSR.HV = 0;
+        ppu->PPUProcessSyncExceptions(ppeState);
         // Manually process the pending exceptions.
         ppu->PPUProcessSyncExceptions(ppeState);
         // Return from block creation. Next block will be one the handlers for instruction exceptions.
@@ -502,9 +504,10 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
   u32 instrsExecuted = 0;
   u32 instrCounter = 0;
 
-  // Check for Async (System Reset) exceptions, this must be done here to avoid re-running a block that would 
+  // Check for Async (System Reset) exceptions, this must be done here to avoid re-running a block that would
   // ultimately suspend the thread until a system reset is issued.
-  if (curThread.exceptReg & ppuSystemResetEx) { ppu->PPUProcessAsyncExceptions(ppeState); }
+  if (curThread.exceptReg & ppuSystemResetEx)
+    ppu->PPUProcessAsyncExceptions(ppeState);
 
   while (instrsExecuted < numInstrs && active && (XeRunning && !XePaused)) {
     auto &thread = curThread;
@@ -525,6 +528,10 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
       break;
     }
 
+    // Escape hatch
+    if (!XeRunning)
+      break;
+
     // Skip to next block if needed.
     if (skipBlock) {
       instrsExecuted++;
@@ -539,7 +546,12 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
     if (it == jitBlocksCache.end()) {
       // Block was not found. Attempt to create a new one.
       auto block = BuildJITBlock(blockStartAddress, numInstrs - instrsExecuted);
-      if (!block) { continue; } // Block build attempt failed.
+      if (!block) // Block build attempt failed.
+        continue;
+
+      // Escape hatch
+      if (!XeRunning)
+        break;
 
       // Execute our block and increse executed instructions.
       block->codePtr(ppu, ppeState, enableHalt);
@@ -551,11 +563,14 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
         break;
 
       // If the thread was suspended due to CTRL being written, we must end execution on said thread.
-      if (ppeState->currentThread == 0 && !ppeState->SPR.CTRL.TE0) { break; }
-      if (ppeState->currentThread == 1 && !ppeState->SPR.CTRL.TE1) { break; }
+      if (ppeState->currentThread == 0 && !ppeState->SPR.CTRL.TE0)
+        break;
+      if (ppeState->currentThread == 1 && !ppeState->SPR.CTRL.TE1)
+        break;
 
       // Process pending synchronous exceptions.
-      if (thread.exceptReg & SyncExceptionMask) { ppu->PPUProcessSyncExceptions(ppeState); }
+      if (thread.exceptReg & SyncExceptionMask)
+        ppu->PPUProcessSyncExceptions(ppeState);
     } else {
       bool realMode = false;
       realMode = !thread.SPR.MSR.DR || !thread.SPR.MSR.IR;
@@ -584,6 +599,10 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
           }
         }
 
+        // Escape hatch
+        if (!XeRunning)
+          break;
+
         if (block->hash != sum) {
 #ifdef JIT_DEBUG
           LOG_DEBUG(Xenon, "[JIT]: Block hash mismatch for block at address {:#x}", blockStartAddress);
@@ -597,6 +616,10 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
         }
       }
 
+      // Escape hatch
+      if (!XeRunning)
+        break;
+
       // Run block as usual.
       JITBlock *currentBlock = it->second.get();
       currentBlock->codePtr(ppu, ppeState, enableHalt);
@@ -607,6 +630,10 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
       // Only do this if we're not in single-block mode and have instructions remaining
       while (!singleBlock && currentBlock->linkedBlock != nullptr &&
         instrsExecuted < numInstrs && (XeRunning && !XePaused)) {
+        // Escape hatch
+        if (!XeRunning)
+          break;
+
         // Verify that NIA matches the linked block's address
         // (exception handlers or interrupts may have changed NIA)
         if (thread.NIA != currentBlock->linkTargetAddr) {
@@ -629,12 +656,19 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool active, bool enableHalt, bool
         instrCounter += currentBlock->size / 4;
       }
 
+      // Escape hatch
+      if (!XeRunning)
+        break;
+
       // If the thread was suspended due to CTRL being written, we must end execution on said thread.
-      if (ppeState->currentThread == 0 && !ppeState->SPR.CTRL.TE0) { break; }
-      if (ppeState->currentThread == 1 && !ppeState->SPR.CTRL.TE1) { break; }
+      if (ppeState->currentThread == 0 && !ppeState->SPR.CTRL.TE0)
+        break;
+      if (ppeState->currentThread == 1 && !ppeState->SPR.CTRL.TE1)
+        break;
 
       // Process pending synchronous exceptions.
-      if (thread.exceptReg & SyncExceptionMask) { ppu->PPUProcessSyncExceptions(ppeState); }
+      if (thread.exceptReg & SyncExceptionMask)
+        ppu->PPUProcessSyncExceptions(ppeState);
     }
 
     // Process asynchronous exceptions every x amount of instructions.

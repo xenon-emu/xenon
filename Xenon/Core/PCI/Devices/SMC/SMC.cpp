@@ -123,13 +123,11 @@ Xe::PCIDev::SMC::SMC(const std::string &deviceName, u64 size, PCIBridge *parentP
 
 // Class Destructor.
 Xe::PCIDev::SMC::~SMC() {
-  LOG_INFO(SMC, "Shutting SMC down...");
   smcThreadRunning = false;
   if (smcThread.joinable())
     smcThread.join();
   smcCoreState.uartHandle->Shutdown();
   smcCoreState.uartHandle.reset();
-  LOG_INFO(SMC, "Done!");
 }
 
 // PCI Read
@@ -252,7 +250,7 @@ void Xe::PCIDev::SMC::Write(u64 writeAddress, const u8 *data, u64 size) {
   default:
     u64 tmp = 0;
     memcpy(&tmp, data, size);
-    LOG_ERROR(SMC, "Unknown register being written, offset 0x{:X}, data 0x{:X}", 
+    LOG_ERROR(SMC, "Unknown register being written, offset 0x{:X}, data 0x{:X}",
         static_cast<u16>(regOffset), tmp);
     break;
   }
@@ -311,7 +309,7 @@ void Xe::PCIDev::SMC::MemSet(u64 writeAddress, s32 data, u64 size) {
   default:
     u64 tmp = 0;
     memset(&tmp, data, size);
-    LOG_ERROR(SMC, "Unknown register being written, offset 0x{:X}, data 0x{:X}", 
+    LOG_ERROR(SMC, "Unknown register being written, offset 0x{:X}, data 0x{:X}",
         static_cast<u16>(regOffset), tmp);
     break;
   }
@@ -319,7 +317,7 @@ void Xe::PCIDev::SMC::MemSet(u64 writeAddress, s32 data, u64 size) {
 }
 
 // PCI Config Write
-void Xe::PCIDev::SMC::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {  
+void Xe::PCIDev::SMC::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
   // Check if we're being scanned
   u64 tmp = 0;
   memcpy(&tmp, data, size);
@@ -343,7 +341,7 @@ void Xe::PCIDev::SMC::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
       tmp = 0; // Register not implemented
     }
   }
-  
+
   memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &tmp, size);
 }
 
@@ -398,7 +396,7 @@ void Xe::PCIDev::SMC::smcMainThread() {
   // Timer for measuring elapsed time since last Clock Interrupt.
   std::chrono::steady_clock::time_point timerStart =
       std::chrono::steady_clock::now();
-  
+
   // Fat consoles vs Slims have different initial values for the HANA/ANA
   u32 *hanaState = HANA_State;
   switch (Config::highlyExperimental.consoleRevison) {
@@ -440,6 +438,9 @@ void Xe::PCIDev::SMC::smcMainThread() {
     break;
   }
   while (smcThreadRunning) {
+    // Add a escape hatch for faster shutdown.
+    if (!XeRunning)
+      break;
     MICROPROFILE_SCOPEI("[Xe::PCI]", "SMC::Loop", MP_AUTO);
     // The System Management Controller (SMC) does the following:
     // * Communicates over a FIFO Queue with the kernel to execute commands and
@@ -607,7 +608,7 @@ void Xe::PCIDev::SMC::smcMainThread() {
               smcCoreState.fifoDataBuffer[6] = 0;
               break;
             default:
-              LOG_WARNING(SMC, "[I2C] Reading from I2C at address {:#x}, unimplemented, returning 0.", 
+              LOG_WARNING(SMC, "[I2C] Reading from I2C at address {:#x}, unimplemented, returning 0.",
                 smcCoreState.fifoDataBuffer[6] + (smcCoreState.fifoDataBuffer[3] == 0x8D ? 0x200 : 0x100));
               smcCoreState.fifoDataBuffer[3] = 0;
               smcCoreState.fifoDataBuffer[4] = 0;
@@ -627,7 +628,7 @@ void Xe::PCIDev::SMC::smcMainThread() {
           smcCoreState.fifoDataBuffer[6] = 0;
           break;
         case 0x20: // SMC_I2C_WRITE
-          LOG_WARNING(SMC, "[I2C] Write (STUB). Address = {:#x}, value = {:#x}.", smcCoreState.fifoDataBuffer[6] + 
+          LOG_WARNING(SMC, "[I2C] Write (STUB). Address = {:#x}, value = {:#x}.", smcCoreState.fifoDataBuffer[6] +
             (smcCoreState.fifoDataBuffer[3] == 0x8D ? 0x200 : 0x100), smcCoreState.fifoDataBuffer[7]);
           smcCoreState.fifoDataBuffer[0] = SMC_I2C_READ_WRITE;
           smcCoreState.fifoDataBuffer[1] = 0; // Write Succeeded.
@@ -742,7 +743,7 @@ void Xe::PCIDev::SMC::smcMainThread() {
         LOG_WARNING(SMC, "Unimplemented SMC_FIFO_CMD: SMC_SET_9F_INT");
         break;
       default:
-        LOG_WARNING(SMC, "Unknown SMC_FIFO_CMD: ID = 0x{:X}", 
+        LOG_WARNING(SMC, "Unknown SMC_FIFO_CMD: ID = 0x{:X}",
             static_cast<u16>(smcCoreState.fifoDataBuffer[0]));
         break;
       }
@@ -769,7 +770,7 @@ void Xe::PCIDev::SMC::smcMainThread() {
       std::chrono::steady_clock::now();
 
     // Check for SMC Clock interrupt register.
-    // 
+    //
     // Clock Int Enabled.
     if (smcPCIState.clockIntEnabledReg == CLCK_INT_ENABLED) {
       // Clock Interrupt Not Taken.

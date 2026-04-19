@@ -54,7 +54,7 @@ void XeMain::Create() {
   CreateRootBus();
 
   // Create CPU
-  xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses, ram.get());
+  xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus, Config::filepaths.oneBl, Config::filepaths.fuses, ram.get());
   pciBridge->RegisterIIC(xenonCPU->GetIICPointer());
 
   // Create XGPU
@@ -74,6 +74,7 @@ void XeMain::Shutdown() {
   if (XeShutdownSignaled) {
     return;
   }
+
   // Set as already shutdown
   XeShutdownSignaled = true;
 
@@ -88,19 +89,14 @@ void XeMain::Shutdown() {
   xenonCPU.reset();
   CPUStarted = false;
 
-  // Shutdown the PCI bridges
-  pciBridge.reset();
-
-  // Shutdown the rootbus
-  rootBus.reset();
-  nand.reset();
-  ram.reset();
-
 #ifndef NO_GFX
-  // Delete the renderer
+  // Stop rendering after the CPU is stopped
   renderer->Shutdown();
   renderer.reset();
 #endif
+
+  // Shutdown the RootBus, it owns the HostBus, which contains all PCI devices.
+  rootBus.reset();
 
   // Stop the logger
   Base::Log::Stop();
@@ -110,6 +106,8 @@ void XeMain::Shutdown() {
   MicroProfileStopAutoFlip();
 #endif
   MicroProfileShutdown();
+
+  XeShutdownFinished = true;
 }
 
 void XeMain::SaveConfig() {
@@ -164,7 +162,7 @@ void XeMain::ShutdownCPU() {
   }
   // Reset the CPU
   xenonCPU.reset();
-  xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses, ram.get());
+  xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus, Config::filepaths.oneBl, Config::filepaths.fuses, ram.get());
   // Ensure the IIC pointer in the PCI bridge is correct
   pciBridge->RegisterIIC(xenonCPU->GetIICPointer());
   // Set the CPU as inactive
@@ -197,7 +195,7 @@ void XeMain::ReloadFiles() {
   if (!CPUStarted) {
     // Reset the CPU again to reload 1bl and fuses
     xenonCPU.reset();
-    xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus.get(), Config::filepaths.oneBl, Config::filepaths.fuses, ram.get());
+    xenonCPU = std::make_unique<STRIP_UNIQUE(xenonCPU)>(rootBus, Config::filepaths.oneBl, Config::filepaths.fuses, ram.get());
     // Ensure the IIC pointer in the PCI bridge is correct
     pciBridge->RegisterIIC(xenonCPU->GetIICPointer());
   }

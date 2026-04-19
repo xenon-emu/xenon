@@ -62,6 +62,7 @@ public:
   void UpdateClearDepth(f64 depth) override;
   void UpdateViewportFromState(const Xe::XGPU::XenosState *state) override;
   void BackendBindPixelBuffer(Buffer *buffer) override;
+  void BackendOnUploadBuffer(u32 bufferHash, Buffer *buffer) override;
   void Clear() override;
 
   void VertexFetch(const u32 location, const u32 components, bool isFloat, bool isNormalized, const u32 fetchOffset, const u32 fetchStride) override;
@@ -111,6 +112,7 @@ public:
   VkPresentModeKHR chosenPresentMode{};
   u32 swapchainImageCount = 0;
   std::vector<VkImage> swapchainImages{};
+  std::vector<VkImageLayout> swapchainImageLayouts{};
   std::vector<VkImageView> swapchainImageViews{};
   std::vector<VkFramebuffer> swapchainFramebuffers{};
   VkExtent2D swapchainExtent{ 0, 0 };

@@ -102,29 +102,29 @@ bool TAPBackend::Initialize() {
   if (ready) {
     return true;
   }
-  
+
   LOG_INFO(ETH, "TAP Backend: Initializing device '{}'", config.deviceName);
-  
+
   if (!InitializePlatform()) {
     LOG_ERROR(ETH, "TAP Backend: Failed to initialize platform-specific components");
     return false;
   }
-  
+
   // Start reader thread
   readerRunning = true;
   readerThread = std::thread(&TAPBackend::ReaderThreadLoop, this);
-  
+
   ready = true;
   linkUp = true;
-  
+
   LOG_INFO(ETH, "TAP Backend: Initialized successfully");
-  
+
   if (hasMacAddress) {
     LOG_INFO(ETH, "TAP Backend: MAC Address: {:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X}",
       macAddress[0], macAddress[1], macAddress[2],
       macAddress[3], macAddress[4], macAddress[5]);
   }
-  
+
   return true;
 }
 
@@ -132,21 +132,21 @@ void TAPBackend::Shutdown() {
   if (!ready) {
     return;
   }
-  
+
   LOG_INFO(ETH, "TAP Backend: Shutting down");
-  
+
   // Stop reader thread
   readerRunning = false;
   linkUp = false;
-  
+
   if (readerThread.joinable()) {
     readerThread.join();
   }
-  
+
   ShutdownPlatform();
-  
+
   ready = false;
-  
+
   LOG_INFO(ETH, "TAP Backend: Shutdown complete. TX: {} packets, RX: {} packets",
     stats.txPackets, stats.rxPackets);
 }
@@ -194,30 +194,30 @@ struct TAPDeviceInfo {
 // Find all TAP devices and their info
 static std::vector<TAPDeviceInfo> FindAllTAPDevices() {
   std::vector<TAPDeviceInfo> devices;
-  
+
   HKEY adaptersKey;
   if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, ADAPTER_KEY, 0, KEY_READ, &adaptersKey) != ERROR_SUCCESS) {
     LOG_ERROR(ETH, "TAP Backend: Cannot open network adapters registry key");
     return devices;
   }
-  
+
   for (DWORD i = 0; ; i++) {
     char subkeyName[256];
     DWORD subkeyLen = sizeof(subkeyName);
-    
+
     if (RegEnumKeyExA(adaptersKey, i, subkeyName, &subkeyLen, nullptr, nullptr, nullptr, nullptr) != ERROR_SUCCESS) {
       break;
     }
-    
+
     HKEY adapterKey;
     if (RegOpenKeyExA(adaptersKey, subkeyName, 0, KEY_READ, &adapterKey) != ERROR_SUCCESS) {
       continue;
     }
-    
+
     char componentId[256] = {};
     DWORD componentIdLen = sizeof(componentId);
     DWORD type;
-    
+
     if (RegQueryValueExA(adapterKey, "ComponentId", nullptr, &type,
                          reinterpret_cast<LPBYTE>(componentId), &componentIdLen) == ERROR_SUCCESS) {
       // Check if this is a TAP device
@@ -228,17 +228,17 @@ static std::vector<TAPDeviceInfo> FindAllTAPDevices() {
           break;
         }
       }
-      
+
       if (isTap) {
         char netCfgInstanceId[256] = {};
         DWORD netCfgLen = sizeof(netCfgInstanceId);
-        
+
         if (RegQueryValueExA(adapterKey, "NetCfgInstanceId", nullptr, &type,
                              reinterpret_cast<LPBYTE>(netCfgInstanceId), &netCfgLen) == ERROR_SUCCESS) {
           TAPDeviceInfo info;
           info.guid = netCfgInstanceId;
           info.componentId = componentId;
-          
+
           // Try to get friendly name from Network Connections
           std::string connectionKey = std::string(NETWORK_CONNECTIONS_KEY) + "\\" + netCfgInstanceId + "\\Connection";
           HKEY connKey;
@@ -251,17 +251,17 @@ static std::vector<TAPDeviceInfo> FindAllTAPDevices() {
             }
             RegCloseKey(connKey);
           }
-          
+
           devices.push_back(info);
           LOG_INFO(ETH, "TAP Backend: Found device: GUID={}, Name='{}', Driver={}",
                    info.guid, info.name.empty() ? "(unnamed)" : info.name, info.componentId);
         }
       }
     }
-    
+
     RegCloseKey(adapterKey);
   }
-  
+
   RegCloseKey(adaptersKey);
   return devices;
 }
@@ -269,7 +269,7 @@ static std::vector<TAPDeviceInfo> FindAllTAPDevices() {
 bool TAPBackend::InitializePlatform() {
   // Find all TAP devices first
   auto tapDevices = FindAllTAPDevices();
-  
+
   if (tapDevices.empty()) {
     LOG_ERROR(ETH, "TAP Backend: No compatible TAP devices found on system.");
     LOG_ERROR(ETH, "TAP Backend: Note: WinTun and OpenVPN DCO are NOT compatible.");
@@ -278,17 +278,17 @@ bool TAPBackend::InitializePlatform() {
     LOG_ERROR(ETH, "TAP Backend: Look for: tap-windows-9.24.x-xxxx-Win10.exe");
     return false;
   }
-  
+
   // Select device
   std::string selectedGuid;
   std::string selectedComponentId;
-  
+
   if (config.deviceName.empty() || config.deviceName == "auto") {
     // Auto-select first available
     selectedGuid = tapDevices[0].guid;
     selectedComponentId = tapDevices[0].componentId;
     config.deviceName = selectedGuid;
-    LOG_INFO(ETH, "TAP Backend: Auto-selected device '{}' ({})", 
+    LOG_INFO(ETH, "TAP Backend: Auto-selected device '{}' ({})",
              tapDevices[0].name.empty() ? selectedGuid : tapDevices[0].name,
              tapDevices[0].componentId);
   } else {
@@ -301,7 +301,7 @@ bool TAPBackend::InitializePlatform() {
         break;
       }
     }
-    
+
     if (selectedGuid.empty()) {
       LOG_ERROR(ETH, "TAP Backend: Device '{}' not found. Available devices:", config.deviceName);
       for (const auto& dev : tapDevices) {
@@ -310,20 +310,20 @@ bool TAPBackend::InitializePlatform() {
       return false;
     }
   }
-  
+
   // Determine if this is a classic TAP or WinTun/DCO driver
   // Convert to lowercase for comparison
   std::string componentIdLower = selectedComponentId;
   std::transform(componentIdLower.begin(), componentIdLower.end(), componentIdLower.begin(), ::tolower);
-  
+
   bool isClassicTap = (componentIdLower.find("tap") != std::string::npos);
   bool isWinTun = (componentIdLower.find("wintun") != std::string::npos);
-  bool isDCO = (componentIdLower.find("ovpn-dco") != std::string::npos || 
+  bool isDCO = (componentIdLower.find("ovpn-dco") != std::string::npos ||
                 componentIdLower.find("dco") != std::string::npos);
-  
-  LOG_INFO(ETH, "TAP Backend: Component ID: '{}', isClassicTap={}, isWinTun={}, isDCO={}", 
+
+  LOG_INFO(ETH, "TAP Backend: Component ID: '{}', isClassicTap={}, isWinTun={}, isDCO={}",
            selectedComponentId, isClassicTap, isWinTun, isDCO);
-  
+
   // Try multiple path formats to open the device
   std::vector<std::string> pathFormats = {
     "\\\\.\\Global\\" + selectedGuid + ".tap",
@@ -331,10 +331,10 @@ bool TAPBackend::InitializePlatform() {
     "\\\\.\\tap0901",
     "\\\\.\\tap",
   };
-  
+
   for (const auto& devicePath : pathFormats) {
     LOG_DEBUG(ETH, "TAP Backend: Trying path: {}", devicePath);
-    
+
     tapHandle = CreateFileA(
       devicePath.c_str(),
       GENERIC_READ | GENERIC_WRITE,
@@ -344,20 +344,20 @@ bool TAPBackend::InitializePlatform() {
       FILE_ATTRIBUTE_SYSTEM | FILE_FLAG_OVERLAPPED,
       nullptr
     );
-    
+
     if (tapHandle != INVALID_HANDLE_VALUE) {
       LOG_INFO(ETH, "TAP Backend: Successfully opened device with path: {}", devicePath);
       break;
     }
-    
+
     DWORD error = GetLastError();
     LOG_DEBUG(ETH, "TAP Backend: Path '{}' failed with error {}", devicePath, error);
   }
-  
+
   if (tapHandle == INVALID_HANDLE_VALUE) {
     DWORD error = GetLastError();
     LOG_ERROR(ETH, "TAP Backend: Failed to open TAP device. Last error: {}", error);
-    
+
     switch (error) {
     case ERROR_FILE_NOT_FOUND:
       LOG_ERROR(ETH, "TAP Backend: Device not found. The TAP driver may not be properly installed.");
@@ -375,12 +375,12 @@ bool TAPBackend::InitializePlatform() {
       LOG_ERROR(ETH, "TAP Backend: Unknown error {}.", error);
       break;
     }
-    
+
     return false;
   }
-  
+
   DWORD bytesReturned;
-  
+
   // Get TAP driver version
   ULONG version[3] = {};
   if (DeviceIoControl(tapHandle, TAP_WIN_IOCTL_GET_VERSION, nullptr, 0,
@@ -390,10 +390,10 @@ bool TAPBackend::InitializePlatform() {
                              version, sizeof(version), &bytesReturned, nullptr)) {
     LOG_INFO(ETH, "TAP Backend: Driver version {}.{}.{} (alt IOCTL)", version[0], version[1], version[2]);
   }
-  
+
   // Get MAC address
   bool gotMac = false;
-  if (DeviceIoControl(tapHandle, TAP_WIN_IOCTL_GET_MAC, nullptr, 0, 
+  if (DeviceIoControl(tapHandle, TAP_WIN_IOCTL_GET_MAC, nullptr, 0,
                       macAddress, sizeof(macAddress), &bytesReturned, nullptr)) {
     hasMacAddress = true;
     gotMac = true;
@@ -402,16 +402,16 @@ bool TAPBackend::InitializePlatform() {
     hasMacAddress = true;
     gotMac = true;
   }
-  
+
   if (!gotMac) {
     // Fall back to GetAdaptersInfo
     ULONG adapterInfoSize = 0;
     GetAdaptersInfo(nullptr, &adapterInfoSize);
-    
+
     if (adapterInfoSize > 0) {
       std::vector<u8> buffer(adapterInfoSize);
       PIP_ADAPTER_INFO adapterInfo = reinterpret_cast<PIP_ADAPTER_INFO>(buffer.data());
-      
+
       if (GetAdaptersInfo(adapterInfo, &adapterInfoSize) == NO_ERROR) {
         for (PIP_ADAPTER_INFO adapter = adapterInfo; adapter != nullptr; adapter = adapter->Next) {
           if (strstr(adapter->AdapterName, selectedGuid.c_str()) != nullptr) {
@@ -427,7 +427,7 @@ bool TAPBackend::InitializePlatform() {
       }
     }
   }
-  
+
   if (!gotMac) {
     LOG_INFO(ETH, "TAP Backend: Using generated MAC address");
     macAddress[0] = 0x02;
@@ -438,25 +438,25 @@ bool TAPBackend::InitializePlatform() {
     macAddress[5] = static_cast<u8>(GetTickCount() & 0xFF);
     hasMacAddress = true;
   }
-  
+
   // **CRITICAL**: Set media status to connected
   // Try ALL IOCTL variations regardless of detected driver type
   {
     ULONG mediaStatus = TRUE;
     bool mediaSet = false;
     DWORD lastErr = 0;
-    
+
     DWORD ioctlCodes[] = {
       TAP_WIN_IOCTL_SET_MEDIA_STATUS,
       TAP_WIN_IOCTL_SET_MEDIA_STATUS_ALT,
       CTL_CODE(FILE_DEVICE_UNKNOWN, 0x06, METHOD_BUFFERED, FILE_ANY_ACCESS),
       CTL_CODE(34, 6, METHOD_BUFFERED, FILE_ANY_ACCESS),
     };
-    
+
     for (DWORD ioctl : ioctlCodes) {
       DWORD returned = 0;
-      if (DeviceIoControl(tapHandle, ioctl, 
-                          &mediaStatus, sizeof(mediaStatus), 
+      if (DeviceIoControl(tapHandle, ioctl,
+                          &mediaStatus, sizeof(mediaStatus),
                           &mediaStatus, sizeof(mediaStatus), &returned, nullptr)) {
         mediaSet = true;
         LOG_INFO(ETH, "TAP Backend: Media status CONNECTED (IOCTL=0x{:08X})", ioctl);
@@ -465,7 +465,7 @@ bool TAPBackend::InitializePlatform() {
       lastErr = GetLastError();
       LOG_DEBUG(ETH, "TAP Backend: IOCTL 0x{:08X} failed, error {}", ioctl, lastErr);
     }
-    
+
     if (!mediaSet) {
       LOG_WARNING(ETH, "TAP Backend: Could not set media status (error {})", lastErr);
       if (isWinTun || isDCO) {
@@ -476,20 +476,20 @@ bool TAPBackend::InitializePlatform() {
       }
     }
   }
-  
+
   // Initialize overlapped structures
   memset(&readOverlapped, 0, sizeof(readOverlapped));
   memset(&writeOverlapped, 0, sizeof(writeOverlapped));
   readOverlapped.hEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
   writeOverlapped.hEvent = CreateEvent(nullptr, TRUE, FALSE, nullptr);
-  
+
   if (!readOverlapped.hEvent || !writeOverlapped.hEvent) {
     LOG_ERROR(ETH, "TAP Backend: Failed to create overlapped events");
     CloseHandle(tapHandle);
     tapHandle = INVALID_HANDLE_VALUE;
     return false;
   }
-  
+
   return true;
 }
 
@@ -501,16 +501,16 @@ void TAPBackend::ShutdownPlatform() {
     DeviceIoControl(tapHandle, TAP_WIN_IOCTL_SET_MEDIA_STATUS,
                     &mediaStatus, sizeof(mediaStatus),
                     &mediaStatus, sizeof(mediaStatus), &bytesReturned, nullptr);
-    
+
     CloseHandle(tapHandle);
     tapHandle = INVALID_HANDLE_VALUE;
   }
-  
+
   if (readOverlapped.hEvent) {
     CloseHandle(readOverlapped.hEvent);
     readOverlapped.hEvent = nullptr;
   }
-  
+
   if (writeOverlapped.hEvent) {
     CloseHandle(writeOverlapped.hEvent);
     writeOverlapped.hEvent = nullptr;
@@ -522,15 +522,15 @@ bool TAPBackend::SendPacket(const u8* data, u32 length) {
     stats.txDropped++;
     return false;
   }
-  
+
   if (!data || length == 0 || length > 2048) {
     stats.txErrors++;
     return false;
   }
-  
+
   DWORD bytesWritten = 0;
   ResetEvent(writeOverlapped.hEvent);
-  
+
   if (!WriteFile(tapHandle, data, length, &bytesWritten, &writeOverlapped)) {
     if (GetLastError() == ERROR_IO_PENDING) {
       // Wait for completion (with timeout)
@@ -547,7 +547,7 @@ bool TAPBackend::SendPacket(const u8* data, u32 length) {
       return false;
     }
   }
-  
+
   stats.txPackets++;
   stats.txBytes += bytesWritten;
   return true;
@@ -555,19 +555,19 @@ bool TAPBackend::SendPacket(const u8* data, u32 length) {
 
 void TAPBackend::ReaderThreadLoop() {
   Base::SetCurrentThreadName("[Xe] TAP Reader");
-  
+
   std::vector<u8> buffer(2048);
-  
+
   while (readerRunning && XeRunning) {
     if (tapHandle == INVALID_HANDLE_VALUE) {
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
       continue;
     }
-    
+
     DWORD bytesRead = 0;
     ResetEvent(readOverlapped.hEvent);
-    
-    if (!ReadFile(tapHandle, buffer.data(), static_cast<DWORD>(buffer.size()), 
+
+    if (!ReadFile(tapHandle, buffer.data(), static_cast<DWORD>(buffer.size()),
                   &bytesRead, &readOverlapped)) {
       if (GetLastError() == ERROR_IO_PENDING) {
         // Wait for data or timeout
@@ -586,11 +586,11 @@ void TAPBackend::ReaderThreadLoop() {
         continue;
       }
     }
-    
+
     if (bytesRead > 0) {
       stats.rxPackets++;
       stats.rxBytes += bytesRead;
-      
+
       // Call the callback
       std::lock_guard<std::mutex> lock(callbackMutex);
       if (packetCallback) {
@@ -603,11 +603,11 @@ void TAPBackend::ReaderThreadLoop() {
 std::vector<std::string> ListTAPDevices() {
   std::vector<std::string> devices;
   auto tapDevices = FindAllTAPDevices();
-  
+
   for (const auto& dev : tapDevices) {
     devices.push_back(dev.guid);
   }
-  
+
   return devices;
 }
 
@@ -622,50 +622,50 @@ bool TAPBackend::InitializePlatform() {
     LOG_ERROR(ETH, "TAP Backend: Failed to open /dev/net/tun: {}", strerror(errno));
     return false;
   }
-  
+
   // Configure the interface
   struct ifreq ifr = {};
   ifr.ifr_flags = IFF_TAP | IFF_NO_PI;
-  
+
   if (!config.deviceName.empty() && config.deviceName != "auto") {
     strncpy(ifr.ifr_name, config.deviceName.c_str(), IFNAMSIZ - 1);
   }
-  
+
   if (ioctl(tapFd, TUNSETIFF, &ifr) < 0) {
     LOG_ERROR(ETH, "TAP Backend: Failed to configure TAP device: {}", strerror(errno));
     close(tapFd);
     tapFd = -1;
     return false;
   }
-  
+
   config.deviceName = ifr.ifr_name;
-  
+
   // Set persistent mode if requested
   if (config.persistentMode) {
     if (ioctl(tapFd, TUNSETPERSIST, 1) < 0) {
       LOG_WARNING(ETH, "TAP Backend: Failed to set persistent mode: {}", strerror(errno));
     }
   }
-  
+
   // Get MAC address
   int sock = socket(AF_INET, SOCK_DGRAM, 0);
   if (sock >= 0) {
     memset(&ifr, 0, sizeof(ifr));
     strncpy(ifr.ifr_name, config.deviceName.c_str(), IFNAMSIZ - 1);
-    
+
     if (ioctl(sock, SIOCGIFHWADDR, &ifr) >= 0) {
       memcpy(macAddress, ifr.ifr_hwaddr.sa_data, 6);
       hasMacAddress = true;
     }
     close(sock);
   }
-  
+
   // Set non-blocking mode
   int flags = fcntl(tapFd, F_GETFL, 0);
   fcntl(tapFd, F_SETFL, flags | O_NONBLOCK);
-  
+
   return true;
-  
+
 #elif defined(__APPLE__)
   // macOS uses utun devices
   // Note: utun is point-to-point, not TAP. For true TAP, need tuntaposx kext
@@ -674,42 +674,42 @@ bool TAPBackend::InitializePlatform() {
     LOG_ERROR(ETH, "TAP Backend: Failed to create control socket: {}", strerror(errno));
     return false;
   }
-  
+
   struct ctl_info ctlInfo = {};
   strncpy(ctlInfo.ctl_name, UTUN_CONTROL_NAME, sizeof(ctlInfo.ctl_name));
-  
+
   if (ioctl(tapFd, CTLIOCGINFO, &ctlInfo) < 0) {
     LOG_ERROR(ETH, "TAP Backend: Failed to get utun control info: {}", strerror(errno));
     close(tapFd);
     tapFd = -1;
     return false;
   }
-  
+
   struct sockaddr_ctl sc = {};
   sc.sc_id = ctlInfo.ctl_id;
   sc.sc_len = sizeof(sc);
   sc.sc_family = AF_SYSTEM;
   sc.ss_sysaddr = AF_SYS_CONTROL;
   sc.sc_unit = 0; // Auto-assign unit number
-  
+
   if (connect(tapFd, reinterpret_cast<struct sockaddr*>(&sc), sizeof(sc)) < 0) {
     LOG_ERROR(ETH, "TAP Backend: Failed to connect to utun: {}", strerror(errno));
     close(tapFd);
     tapFd = -1;
     return false;
   }
-  
+
   // Get the device name
   char ifname[IFNAMSIZ];
   socklen_t ifnamelen = sizeof(ifname);
   if (getsockopt(tapFd, SYSPROTO_CONTROL, UTUN_OPT_IFNAME, ifname, &ifnamelen) >= 0) {
     config.deviceName = ifname;
   }
-  
+
   // Set non-blocking
   int flags = fcntl(tapFd, F_GETFL, 0);
   fcntl(tapFd, F_SETFL, flags | O_NONBLOCK);
-  
+
   return true;
 #else
   LOG_ERROR(ETH, "TAP Backend: Platform not supported");
@@ -735,14 +735,14 @@ bool TAPBackend::SendPacket(const u8* data, u32 length) {
     stats.txDropped++;
     return false;
   }
-  
+
   if (!data || length == 0 || length > 2048) {
     stats.txErrors++;
     return false;
   }
-  
+
   ssize_t written = write(tapFd, data, length);
-  
+
   if (written < 0) {
     if (errno == EAGAIN || errno == EWOULDBLOCK) {
       stats.txDropped++;
@@ -751,7 +751,7 @@ bool TAPBackend::SendPacket(const u8* data, u32 length) {
     }
     return false;
   }
-  
+
   stats.txPackets++;
   stats.txBytes += written;
   return true;
@@ -759,40 +759,40 @@ bool TAPBackend::SendPacket(const u8* data, u32 length) {
 
 void TAPBackend::ReaderThreadLoop() {
   Base::SetCurrentThreadName("[Xe] TAP Reader");
-  
+
   std::vector<u8> buffer(2048);
   struct pollfd pfd = {};
   pfd.fd = tapFd;
   pfd.events = POLLIN;
-  
+
   while (readerRunning && XeRunning) {
     if (tapFd < 0) {
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
       continue;
     }
-    
+
     // Poll with timeout
     int ret = poll(&pfd, 1, 100);
-    
+
     if (ret < 0) {
       if (errno != EINTR) {
         stats.rxErrors++;
       }
       continue;
     }
-    
+
     if (ret == 0) {
       // Timeout, no data
       continue;
     }
-    
+
     if (pfd.revents & POLLIN) {
       ssize_t bytesRead = read(tapFd, buffer.data(), buffer.size());
-      
+
       if (bytesRead > 0) {
         stats.rxPackets++;
         stats.rxBytes += bytesRead;
-        
+
         // Call the callback
         std::lock_guard<std::mutex> lock(callbackMutex);
         if (packetCallback) {
@@ -802,7 +802,7 @@ void TAPBackend::ReaderThreadLoop() {
         stats.rxErrors++;
       }
     }
-    
+
     if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) {
       LOG_ERROR(ETH, "TAP Backend: Poll error on TAP device");
       std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -812,7 +812,7 @@ void TAPBackend::ReaderThreadLoop() {
 
 std::vector<std::string> ListTAPDevices() {
   std::vector<std::string> devices;
-  
+
 #ifdef __linux__
   // List TAP devices by checking /sys/class/net/*/tun_flags
   // Or just suggest common names
@@ -822,7 +822,7 @@ std::vector<std::string> ListTAPDevices() {
   devices.push_back("utun0");
   devices.push_back("utun1");
 #endif
-  
+
   return devices;
 }
 
@@ -832,21 +832,21 @@ std::vector<std::string> ListTAPDevices() {
 
 TAPConfig ParseTAPConfig(const std::string& configStr) {
   TAPConfig config;
-  
+
   if (configStr.empty()) {
     config.deviceName = "auto";
     return config;
   }
-  
+
   // Parse format: "deviceName[:ipAddress/netmask]"
   size_t colonPos = configStr.find(':');
-  
+
   if (colonPos == std::string::npos) {
     config.deviceName = configStr;
   } else {
     config.deviceName = configStr.substr(0, colonPos);
     std::string ipPart = configStr.substr(colonPos + 1);
-    
+
     size_t slashPos = ipPart.find('/');
     if (slashPos != std::string::npos) {
       config.ipAddress = ipPart.substr(0, slashPos);
@@ -855,7 +855,7 @@ TAPConfig ParseTAPConfig(const std::string& configStr) {
       config.ipAddress = ipPart;
     }
   }
-  
+
   return config;
 }
 

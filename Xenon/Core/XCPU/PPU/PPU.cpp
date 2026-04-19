@@ -189,6 +189,7 @@ void PPU::Halt(u64 haltOn, bool requestedByGuest, s8 ppuId, ePPUThreadID threadI
     LOG_DEBUG(Xenon, "Halting PPU{} on address 0x{:X}", ppeState->ppuID, haltOn);
     ppuHaltOn = haltOn;
   }
+  LOG_INFO(Xenon, "Halting PPU{}", ppeState->ppuID);
   guestHalt = requestedByGuest;
 #ifndef NO_GFX
   if (guestHalt && XeMain::renderer) {
@@ -238,6 +239,11 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
     // Halt if needed before executing the next instruction
     if (enableHalt && ppuHaltOn == curThread.NIA) {
       Halt();
+    }
+
+    if (!XeRunning) {
+      Halt();
+      break;
     }
 
     // Read next instruction
@@ -300,6 +306,11 @@ void PPU::ThreadStateMachine() {
         PPURunInstructions(ppeState->SPR.TTR.hexValue, ppuHaltOn != 0);
       }
     } else {
+      // Escape hatch
+      if (!XeRunning) {
+        Halt();
+        return;
+      }
       if (!ppuThreadResetting && (state & ePPUThreadBit_Zero)) {
         // Thread 1 is running, process instructions until we reach TTR timeout.
         curThreadId = ePPUThread_Zero;
@@ -375,20 +386,24 @@ void PPU::ThreadLoop() {
   // Set thread name
   if (ppeState.get())
     Base::SetCurrentThreadName("[Xe] " + ppeState->ppuName);
-  while (ppuThreadActive) {
+
+  while (ppuThreadActive && XeRunning) {
     // Start Profile
     MICROPROFILE_SCOPEI("[Xe::PPU]", "ThreadLoop", MP_AUTO);
-    // Run state machine
-    ThreadStateMachine();
 
     // If our thread is not active while running, abort early.
     // We are likely destroying the handle
-    if (!ppuThreadActive)
+    if (!ppuThreadActive || !XeRunning)
       break;
 
+    // Run state machine
+    ThreadStateMachine();
+
+    // Check interrupts
     if (PPUCheckInterrupts())
       continue;
   }
+
   // Thread is done executing, just tell it to exit
   ppuThreadActive = false;
 }

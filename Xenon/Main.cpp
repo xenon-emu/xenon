@@ -55,15 +55,22 @@ s32 main(s32 argc, char *argv[]) {
     MicroProfileFlip(nullptr);
 #endif // MICROPROFILE_ENABLED && !AUTO_FLIP
 #ifndef NO_GFX
-    if (XeMain::renderer.get())
-      XeMain::renderer->HandleEvents();
+    SDL_Event e;
+    while (SDL_WaitEvent(&e)) {
+      if (XeMain::renderer.get())
+        XeMain::renderer->OnEvent(e);
+    }
 #else
     std::this_thread::sleep_for(100ms);
 #endif // !NO_GFX
   }
 
+
   // Shutdown
-  XeMain::Shutdown();
+  if (!XeShutdownFinished) {
+    XeMain::Shutdown();
+  }
+
   // Remove hangup
   if (Base::RemoveHangup() != 0) {
     printf("Failed to remove signal handler. (this is more of a warning, than an issue)\n");

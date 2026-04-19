@@ -48,7 +48,7 @@ struct XenosSpirvCompiler {
     mod.Name(uboVar, "ALUConstsBuffer");
     interfaceVars.push_back(uboVar);
 
-    // Sampler2D type (we’ll assume 2D for TEX_FETCH for now)
+    // Sampler2D type (we'll assume 2D for TEX_FETCH for now)
     Sirit::Id image2D = mod.TypeImage(
       floatType,
       spv::Dim::Dim2D,
@@ -114,12 +114,12 @@ struct XenosSpirvCompiler {
   Sirit::Id GetRegPtr(u32 index) {
     auto it = regVars.find(index);
     if (it == regVars.end()) {
-      LOG_ERROR(Core, "Register r{} used but was never scanned!", index);
+      LOG_ERROR(Xenos, "Register r{} used but was never scanned!", index);
       ::abort();
     }
 
     if (!it->second.value) {  // not yet allocated
-      LOG_ERROR(Core, "Register r{} accessed before AllocateAllRegisters()", index);
+      LOG_ERROR(Xenos, "Register r{} accessed before AllocateAllRegisters()", index);
       ::abort();
     }
 
@@ -386,7 +386,7 @@ struct XenosSpirvCompiler {
         return rawVec;
 
       default:
-        LOG_ERROR(Core, "Unhandled VTX format {}", (u32)fmt);
+        LOG_ERROR(Xenos, "Unhandled VTX format {}", (u32)fmt);
         return rawVec;
     }
   }
@@ -533,7 +533,7 @@ struct XenosSpirvCompiler {
       return mod.OpCompositeConstruct(vec4Type, dot, dot, dot, dot);
     }
     default:
-      LOG_ERROR(Core, "Unimplemented vector opcode {}", static_cast<u32>(vop));
+      LOG_ERROR(Xenos, "Unimplemented vector opcode {}", static_cast<u32>(vop));
       // Return zero to avoid crashing
       {
         Sirit::Id z = mod.Constant(floatType, 0.f);
@@ -575,7 +575,7 @@ struct XenosSpirvCompiler {
         return a; // Return src1 unchanged
 
       default:
-        LOG_ERROR(Core, "Unimplemented SOP {}", (u32)sop);
+        LOG_ERROR(Xenos, "Unimplemented SOP {}", (u32)sop);
         return mod.Constant(floatType, 0.f);
     }
   }

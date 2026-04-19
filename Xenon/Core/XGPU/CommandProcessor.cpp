@@ -98,7 +98,7 @@ void CommandProcessor::CPUpdateRBBase(u32 address) {
 
   cpRingBufferBasePtr = ram->GetPointerToAddress(address);
   LOG_DEBUG(Xenos, "CP: Updating RingBuffer Base Address: 0x{:X}", address);
-  
+
   // Reset CP Read pointer index
   cpReadPtrIndex = 0;
 }
@@ -120,6 +120,10 @@ void CommandProcessor::cpWorkerThreadLoop() {
   while (cpWorkerThreadRunning) {
     u32 writePtrIndex = cpWritePtrIndex.load();
     while (cpWorkerThreadRunning && (cpRingBufferBasePtr == nullptr || cpReadPtrIndex == writePtrIndex)) {
+      // Escape hatch
+      if (!XeRunning || !cpWorkerThreadRunning)
+        break;
+
       // Stall until we're told otherwise
       std::this_thread::sleep_for(10ns);
       writePtrIndex = cpWritePtrIndex.load();
@@ -598,7 +602,7 @@ void VisitAll(const Microcode::AST::ControlFlowGraph *cf, Microcode::AST::Statem
 std::pair<Microcode::AST::Shader*, std::vector<u32>> LoadShader(eShaderType shaderType, const std::vector<u32> &data, std::string baseString) {
   fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) / "cache" };
   fs::path path{ shaderPath / (baseString + ".spv") };
-  std::vector<u32> code{};
+  std::vector<u32> spirv{};
   // Vali: Temporarily disable cache, emitting isn't 100% yet
   // Plus, I need to figure Shader ptr out
   /*{
@@ -606,10 +610,10 @@ std::pair<Microcode::AST::Shader*, std::vector<u32>> LoadShader(eShaderType shad
     std::error_code error;
     if (fs::exists(path, error) && file.is_open()) {
       u64 fileSize = fs::file_size(path);
-      code.resize(fileSize / 4);
-      file.read(reinterpret_cast<char*>(code.data()), fileSize);
+      spirv.resize(fileSize / 4);
+      file.read(reinterpret_cast<char*>(spirv.data()), fileSize);
       file.close();
-      return code;
+      return spirv;
     }
     file.close();
   }*/
@@ -619,12 +623,12 @@ std::pair<Microcode::AST::Shader*, std::vector<u32>> LoadShader(eShaderType shad
   if (shader) {
     shader->EmitShaderCode(writer);
   }
-  code = writer.module.Assemble();
+  spirv = writer.module.Assemble();
   std::ofstream f{ shaderPath / (baseString + ".spv"), std::ios::out | std::ios::binary };
-  f.write(reinterpret_cast<char*>(code.data()), code.size() * 4);
+  f.write(reinterpret_cast<char *>(spirv.data()), spirv.size() * sizeof(u32));
   f.close();
 #endif
-  return { shader, code };
+  return { shader, spirv };
 }
 
 bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
@@ -759,30 +763,52 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuff
 }
 
 bool CommandProcessor::ExecutePacketType3_SET_CONSTANT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
-  // Get base index
   const u32 offsetType = ringBuffer->ReadAndSwap<u32>();
-  // PM4_REG(reg) ((0x4 << 16) | (GSL_HAL_SUBBLOCK_OFFSET(reg)))
+
   u32 index = offsetType & 0x7FF;
   const u32 type = (offsetType >> 16) & 0xFF;
+
   switch (type) {
-  // ALU
-  case 0: index += 0x4000; break;
-  // FETCH
-  case 1: index += 0x4800; break;
-  // BOOL
-  case 2: index += 0x4900; break;
-  // LOOP
-  case 3: index += 0x4908; break;
-  // REGISTER_RAWS
-  case 4: index += 0x2000; break;
-  default: ringBuffer->AdvanceRead((dataCount - 1) * sizeof(u32)); return true; break;
+  case 0: index += 0x4000; break; // ALU
+  case 1: index += 0x4800; break; // FETCH
+  case 2: index += 0x4900; break; // BOOL
+  case 3: index += 0x4908; break; // LOOP
+  case 4: index += 0x2000; break; // REGISTER_RAWS
+  default:
+    ringBuffer->AdvanceRead((dataCount - 1) * sizeof(u32));
+    return true;
   }
 
-  // Write constants
-  for (u32 n = 0; n < dataCount - 1; n++, index++) {
-    const u32 data = ringBuffer->ReadAndSwap<u32>();
-    state->WriteRegister(static_cast<XeRegister>(index), data);
+  const u32 count = (dataCount > 0) ? (dataCount - 1) : 0;
+  if (!count)
+    return true;
+
+  std::vector<u8> uploadBytes;
+  uploadBytes.resize(count * 4);
+
+  for (u32 n = 0; n < count; ++n) {
+    u32 v = ringBuffer->ReadAndSwap<u32>();
+    state->WriteRegister(static_cast<XeRegister>(index + n), v);
+    memcpy(uploadBytes.data() + n * 4, &v, 4);
   }
+
+#ifndef NO_GFX
+  Render::RenderCommand cmd{};
+  cmd.type = Render::RenderCommandType::UploadBuffer;
+  cmd.payload = Render::RenderCommand::UploadBufferCmd{
+    "ALUConsts"_j,
+    {},
+    Render::eBufferType::Storage,
+    Render::eBufferUsage::DynamicDraw
+  };
+  auto &upload = std::get<Render::RenderCommand::UploadBufferCmd>(cmd.payload);
+  upload.data = std::move(uploadBytes);
+
+  {
+    std::lock_guard<std::mutex> lock(render->renderQueueMutex);
+    render->renderQueue.push(std::move(cmd));
+  }
+#endif
 
   return true;
 }
@@ -824,15 +850,40 @@ bool CommandProcessor::ExecutePacketType3_SET_CONSTANT2(RingBuffer *ringBuffer, 
 }
 
 bool CommandProcessor::ExecutePacketType3_SET_SHADER_CONSTANTS(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
-  // Get base index
   const u32 offsetType = ringBuffer->ReadAndSwap<u32>();
   u32 index = offsetType & 0xFFFF;
 
-  // Write constants
-  for (u32 n = 0; n < dataCount - 1; n++, index++) {
-    const u32 data = ringBuffer->ReadAndSwap<u32>();
-    state->WriteRegister(static_cast<XeRegister>(index), data);
+  const u32 count = (dataCount > 0) ? (dataCount - 1) : 0;
+  if (!count)
+    return true;
+
+  std::vector<u8> uploadBytes;
+  uploadBytes.resize(count * 4);
+
+  for (u32 n = 0; n < count; ++n) {
+    u32 v = ringBuffer->ReadAndSwap<u32>();
+    state->WriteRegister(static_cast<XeRegister>(index + n), v);
+    memcpy(uploadBytes.data() + n * 4, &v, 4);
   }
+
+#ifndef NO_GFX
+  Render::RenderCommand cmd{};
+  cmd.type = Render::RenderCommandType::UploadBuffer;
+  cmd.payload = Render::RenderCommand::UploadBufferCmd{
+    "ALUConsts"_j,
+    {},
+    Render::eBufferType::Storage,
+    Render::eBufferUsage::DynamicDraw
+  };
+  auto &upload = std::get<Render::RenderCommand::UploadBufferCmd>(cmd.payload);
+  upload.data = std::move(uploadBytes);
+
+  {
+    std::lock_guard<std::mutex> lock(render->renderQueueMutex);
+    render->renderQueue.push(std::move(cmd));
+  }
+#endif
+
   return true;
 }
 
@@ -1164,66 +1215,73 @@ bool CommandProcessor::ExecutePacketType3_DRAW_INDX_2(RingBuffer *ringBuffer, u3
   return ExecutePacketType3_DRAW(ringBuffer, packetData, dataCount, 0, "PM4_DRAW_INDX_2");
 }
 
-bool CommandProcessor::ExecutePacketType3_LOAD_ALU_CONSTANT(RingBuffer* ringBuffer, u32 packetData, u32 dataCount) {
-  // Load Shader constants from memory.
+bool CommandProcessor::ExecutePacketType3_LOAD_ALU_CONSTANT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
   u32 readAddress = ringBuffer->ReadAndSwap<u32>();
   readAddress &= 0x3FFFFFFF;
-  u32 offsetType = ringBuffer->ReadAndSwap<u32>();
+
+  const u32 offsetType = ringBuffer->ReadAndSwap<u32>();
   u32 index = offsetType & 0x7FF;
+
   u32 sizeInDwords = ringBuffer->ReadAndSwap<u32>();
   sizeInDwords &= 0xFFF;
-  u32 type = (offsetType >> 16) & 0xFF;
+
+  const u32 type = (offsetType >> 16) & 0xFF;
   switch (type) {
-  case 0:  // ALU
-    index += 0x4000;
-    break;
-  case 1:  // FETCH
-    index += 0x4800;
-    break;
-  case 2:  // BOOL
-    index += 0x4900;
-    break;
-  case 3:  // LOOP
-    index += 0x4908;
-    break;
-  case 4:  // REGISTERS
-    index += 0x2000;
-    break;
-  default:
-    LOG_ERROR(Xenos, "[CP] [PT3:LOAD_ALU_CONSTANT]: Unrecognized Constant Type provided.");
+    case 0:  // ALU
+      index += 0x4000;
+      break;
+    case 1:  // FETCH
+      index += 0x4800;
+      break;
+    case 2:  // BOOL
+      index += 0x4900;
+      break;
+    case 3:  // LOOP
+      index += 0x4908;
+      break;
+    case 4:  // REGISTERS
+      index += 0x2000;
+      break;
+    default:
+      LOG_ERROR(Xenos, "[CP][PT3:LOAD_ALU_CONSTANT]: Unrecognized Constant Type {}.", type);
+      return true;  // ignore rather than hard-fail
+  }
+
+  if (!sizeInDwords)
     return true;
+
+  std::vector<u8> uploadBytes;
+  uploadBytes.resize(sizeInDwords * 4);
+
+  for (u32 n = 0; n < sizeInDwords; ++n) {
+    u32 v = 0;
+    u8* src = ram->GetPointerToAddress(readAddress + n * 4);
+    memcpy(&v, src, sizeof(v));
+    v = byteswap_be(v);
+
+    state->WriteRegister(static_cast<XeRegister>(index + n), v);
+    memcpy(uploadBytes.data() + n * 4, &v, 4);
   }
 
-  for (u32 n = 0; n < sizeInDwords; n++, index++) {
-    u32 data = 0;
-    u8 *dataPtr = ram->GetPointerToAddress(readAddress + n * 4);
-    memcpy(&data, dataPtr, sizeof(data));
 #ifndef NO_GFX
-    Render::RenderCommand cmd{};
-    cmd.type = Render::RenderCommandType::UploadBuffer;
+  Render::RenderCommand cmd{};
+  cmd.type = Render::RenderCommandType::UploadBuffer;
+  cmd.payload = Render::RenderCommand::UploadBufferCmd{
+    "ALUConsts"_j,
+    {},
+    Render::eBufferType::Storage,
+    Render::eBufferUsage::DynamicDraw
+  };
 
-    cmd.payload = Render::RenderCommand::UploadBufferCmd{
-      "ALUConsts"_j,
-      {},
-      Render::eBufferType::Storage,
-      Render::eBufferUsage::DynamicDraw
-    };
+  auto &upload = std::get<Render::RenderCommand::UploadBufferCmd>(cmd.payload);
+  upload.data = std::move(uploadBytes);
 
-    auto &upload = std::get<Render::RenderCommand::UploadBufferCmd>(cmd.payload);
-
-    upload.data.resize(sizeInDwords * 4);
-
-    for (u32 i = 0; i < sizeInDwords; ++i) {
-      u32 v = state->ReadRegister(static_cast<XeRegister>(index - sizeInDwords + i));
-      memcpy(upload.data.data() + i * 4, &v, 4);
-    }
-
-    {
-      std::lock_guard<std::mutex> lock(render->renderQueueMutex);
-      render->renderQueue.push(std::move(cmd));
-    }
-#endif
+  {
+    std::lock_guard<std::mutex> lock(render->renderQueueMutex);
+    render->renderQueue.push(std::move(cmd));
   }
+#endif
+
   return true;
 }
 

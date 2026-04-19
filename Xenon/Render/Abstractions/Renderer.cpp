@@ -58,7 +58,7 @@ void Renderer::SDLInit() {
     LOG_ERROR(Render, "Failed to create window: {}", SDL_GetError());
   }
 
-  // Destroy (no longer used) properties  
+  // Destroy (no longer used) properties
   SDL_DestroyProperties(props);
   // Set if we are in fullscreen mode or not
   SDL_SetWindowFullscreen(mainWindow, fullscreen);
@@ -73,7 +73,6 @@ void Renderer::Start(RAM *ram) {
   if (threadRunning) {
     SDLInit();
     thread = std::thread(&Renderer::Thread, this);
-    thread.detach();
   }
 }
 
@@ -107,6 +106,9 @@ void Renderer::CreateHandles() {
 }
 
 void Renderer::Shutdown() {
+  threadRunning = false;
+  if (thread.joinable())
+    thread.join();
   if (gui)
     gui->Shutdown();
   backbuffer->DestroyTexture();
@@ -161,19 +163,23 @@ void Renderer::Resize(u32 x, u32 y) {
   LOG_DEBUG(Render, "Resized window to {}x{}", width, height);
 }
 
-void Renderer::HandleEvents() {
-  const SDL_WindowFlags flag = SDL_GetWindowFlags(mainWindow);
-  if (Config::rendering.pauseOnFocusLoss) {
-    focusLost = flag & SDL_WINDOW_INPUT_FOCUS ? false : true;
+void Renderer::OnEvent(const SDL_Event &e) {
+  // Ensure window exits, otherwise, don't bother with flags
+  if (mainWindow) {
+    const SDL_WindowFlags flag = SDL_GetWindowFlags(mainWindow);
+    if (Config::rendering.pauseOnFocusLoss) {
+      focusLost = flag & SDL_WINDOW_INPUT_FOCUS ? false : true;
+    }
   }
+
   // Process events.
-  while (threadRunning && SDL_PollEvent(&windowEvent)) {
-    ImGui_ImplSDL3_ProcessEvent(&windowEvent);
-    switch (windowEvent.type) {
+  while (threadRunning) {
+    ImGui_ImplSDL3_ProcessEvent(&e);
+    switch (e.type) {
     case SDL_EVENT_WINDOW_RESIZED:
-      if (windowEvent.window.windowID == windowID) {
+      if (e.window.windowID == windowID) {
         LOG_DEBUG(Render, "Resizing window...");
-        Resize(windowEvent.window.data1, windowEvent.window.data2);
+        Resize(e.window.data1, e.window.data2);
       }
       break;
     case SDL_EVENT_QUIT:
@@ -182,10 +188,12 @@ void Renderer::HandleEvents() {
       }
       break;
     case SDL_EVENT_KEY_DOWN:
-      if (windowEvent.key.key == SDLK_F11) {
-        SDL_WindowFlags flag = SDL_GetWindowFlags(mainWindow);
-        bool fullscreenMode = flag & SDL_WINDOW_FULLSCREEN;
-        SDL_SetWindowFullscreen(mainWindow, !fullscreenMode);
+      if (e.key.key == SDLK_F11) {
+        if (mainWindow) {
+          const SDL_WindowFlags flag = SDL_GetWindowFlags(mainWindow);
+          bool fullscreenMode = flag & SDL_WINDOW_FULLSCREEN;
+          SDL_SetWindowFullscreen(mainWindow, !fullscreenMode);
+        }
       }
       break;
     default:
@@ -230,7 +238,7 @@ void Renderer::UpdateConstants(Xe::XGPU::XenosState *state) {
         reinterpret_cast<u8*>(floatConsts.values),
         reinterpret_cast<u8*>(floatConsts.values) + sizeof(floatConsts.values)
       ),
-      eBufferType::Storage,
+      eBufferType::Uniform,
       eBufferUsage::DynamicDraw
     };
 
@@ -248,7 +256,7 @@ void Renderer::UpdateConstants(Xe::XGPU::XenosState *state) {
         reinterpret_cast<u8*>(boolConsts.values),
         reinterpret_cast<u8*>(boolConsts.values) + sizeof(boolConsts.values)
       ),
-      eBufferType::Storage,
+      eBufferType::Uniform,
       eBufferUsage::DynamicDraw
     };
 
@@ -324,7 +332,7 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
         std::lock_guard<std::mutex> lock(renderQueueMutex);
         renderQueue.push(std::move(cmd));
       }
-      LOG_INFO(Xenos, "Uploaded vertex fetch buffer: slot={}, addr=0x{:X}, size={} bytes", fetchSlot, byteAddress, byteSize);
+      //LOG_INFO(Xenos, "Uploaded vertex fetch buffer: slot={}, addr=0x{:X}, size={} bytes", fetchSlot, byteAddress, byteSize);
     }
   }
   // Clear
@@ -571,6 +579,7 @@ void Renderer::Thread() {
           } else {
             buffer->UpdateBuffer(0, c.data.size(), c.data.data());
           }
+          BackendOnUploadBuffer(c.bufferHash, buffer.get());
           break;
         }
 

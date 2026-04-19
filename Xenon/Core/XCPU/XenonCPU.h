@@ -23,7 +23,7 @@ namespace Xe::XCPU {
   // - 768 bits of IBM's eFuse technology.
   class XenonCPU {
   public:
-    XenonCPU(RootBus *inBus, const std::string blPath, const std::string fusesPath, RAM *ramPtr);
+    XenonCPU(std::weak_ptr<RootBus> inBus, const std::string blPath, const std::string fusesPath, RAM *ramPtr);
     ~XenonCPU();
 
     // Starts the CPU at the given reset vector. (Usually address 0x100).
@@ -44,7 +44,7 @@ namespace Xe::XCPU {
     bool IsHalted();
     // Returns true of the halt was due to a 'trap' guest exception.
     bool IsHaltedByGuest();
-    // Returns the IIC pointer from our context.  
+    // Returns the IIC pointer from our context.
     XenonIIC *GetIICPointer() { return &xenonContext->iic; }
     // Returns a pointer to a given PPU.
     PPU *GetPPU(u8 ppuID);
