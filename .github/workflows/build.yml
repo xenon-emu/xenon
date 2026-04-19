@@ -76,7 +76,7 @@ jobs:
     - name: Configure CMake (Clang)
       run: cmake -G Ninja -B ${{env.BUILD_DIR}} -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
                  -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-                 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+                 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DXE_ASMJIT_NEW_OUT_API=OFF
 
     - name: Build
       run: cmake --build ${{env.BUILD_DIR}} --config ${{env.BUILD_TYPE}} --parallel $(nproc)
@@ -131,7 +131,7 @@ jobs:
     - name: Configure CMake (GCC)
       run: cmake -G Ninja -B ${{env.BUILD_DIR}} -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
                  -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++
-                 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+                 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DXE_ASMJIT_NEW_OUT_API=OFF
 
     - name: Build
       run: cmake --build ${{env.BUILD_DIR}} --config ${{env.BUILD_TYPE}} --parallel $(nproc)
@@ -180,7 +180,7 @@ jobs:
     - name: Configure CMake (Clang)
       run: cmake -G Ninja -B "${{env.BUILD_DIR}}" -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
                  -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl
-                 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+                 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DXE_ASMJIT_NEW_OUT_API=OFF
 
     - name: Build
       run: cmake --build "${{env.BUILD_DIR}}" --config ${{env.BUILD_TYPE}} --parallel $env:NUMBER_OF_PROCESSORS
@@ -243,7 +243,7 @@ jobs:
     - name: Configure CMake (GCC)
       run: cmake -G Ninja -B "${{env.BUILD_DIR}}" -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
                  -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++
-                 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+                 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DXE_ASMJIT_NEW_OUT_API=OFF
 
     - name: Build
       run: cmake --build "${{env.BUILD_DIR}}" --config ${{env.BUILD_TYPE}} --parallel
@@ -315,7 +315,7 @@ jobs:
           export PATH="/opt/homebrew/opt/llvm@20/bin:$PATH"
           export CPPFLAGS="-I/opt/homebrew/opt/llvm@20/include"
           export LDFLAGS="-L/opt/homebrew/opt/llvm@20/lib"
-          cmake -G Ninja -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_C_COMPILER=$(brew --prefix llvm@20)/bin/clang -DCMAKE_CXX_COMPILER=$(brew --prefix llvm@20)/bin/clang++ -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          cmake -G Ninja -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_C_COMPILER=$(brew --prefix llvm@20)/bin/clang -DCMAKE_CXX_COMPILER=$(brew --prefix llvm@20)/bin/clang++ -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache -DXE_ASMJIT_NEW_OUT_API=OFF
 
       - name: Build
         run: |
