@@ -157,7 +157,10 @@ static auto Paths = [] {
 
 std::string PathToUTF8String(const fs::path &path) {
 #ifdef _WIN32
-  return path.u8string();
+  // On CXX 20+ u8string returns an std::u8string type, convert that back to std::string and return.
+  std::u8string u8str = path.u8string();
+  std::string utf8(u8str.begin(), u8str.end());
+  return utf8;
 #else
   return path.string();
 #endif
