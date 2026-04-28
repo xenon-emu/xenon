@@ -10,6 +10,8 @@
 #include <fstream>
 #ifdef _WIN32
 #include <Windows.h>
+#include <shlobj.h>
+#include <KnownFolders.h>
 #endif // _WIN32
 #ifdef __APPLE__
 #include <unistd.h>
