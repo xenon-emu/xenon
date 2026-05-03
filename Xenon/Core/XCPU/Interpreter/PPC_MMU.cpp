@@ -56,7 +56,7 @@ inline u16 mmuComputeTLBIndex(u64 VA, u8 p) {
 
 // Fast TLB entry comparison.
 // Returns true if the entry matches the given VA with correct page attributes.
-inline bool mmuCompareTLBEntry(const TLBEntry &entry, u64 VA, u8 p, bool L, bool LP) {
+inline bool mmuCompareTLBEntry(const TLBEntry &entry, u64 VA, u8 p, u8 L, u8 LP) {
   // Entry must be valid
   if (!entry.V) {
     return false;
@@ -72,7 +72,7 @@ inline bool mmuCompareTLBEntry(const TLBEntry &entry, u64 VA, u8 p, bool L, bool
   return (entry.VPN & mask) == (VA & mask);
 }
 
-inline bool mmuComparePTE(u64 VA, u64 VPN, u64 pte0, u64 pte1, u8 p, bool L, bool LP, u64 *RPN) {
+inline bool mmuComparePTE(u64 VA, u64 VPN, u64 pte0, u64 pte1, u8 p, u8 L, u8 LP, u64 *RPN) {
   // Requirements:
   // PTE[H] = 0 for the primary PTEG, 1 for the secondary PTEG
   // PTE[V] = 1
@@ -81,11 +81,11 @@ inline bool mmuComparePTE(u64 VA, u64 VPN, u64 pte0, u64 pte1, u8 p, bool L, boo
   // PTE[LP] = SLBE[LP] whenever PTE[L] = 1
 
   // Valid
-  bool pteV = (pte0 & PPC_HPTE64_VALID);
+  u8 pteV = (pte0 & PPC_HPTE64_VALID);
   // L
-  bool pteL = (pte0 & PPC_HPTE64_LARGE) >> 2;
+  u8 pteL = (pte0 & PPC_HPTE64_LARGE) >> 2;
   // LP
-  bool pteLP = (pte1 & PPC_HPTE64_LP) >> 12;
+  u8 pteLP = (pte1 & PPC_HPTE64_LP) >> 12;
   // AVPN 0:51
   const u64 pteAVPN_0_51 = (pte0 & PPC_HPTE64_AVPN_0_51) << 16;
   // q = minimum(5, 28-p).

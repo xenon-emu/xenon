@@ -142,6 +142,26 @@ function(xenon_use_dep pkg subdir)
   message(STATUS "Resolved ${pkg} -> ${_resolved_target}")
 endfunction()
 
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+
+# AsmJit
+set(ASMJIT_STATIC TRUE CACHE BOOL "" FORCE)
+set(ASMJIT_BUILD_SHARED FALSE CACHE BOOL "" FORCE)
+set(ASMJIT_BUILD_TEST FALSE CACHE BOOL "" FORCE)
+
+# SDL3
+set(SDL_SHARED OFF CACHE BOOL "" FORCE)
+set(SDL_STATIC ON CACHE BOOL "" FORCE)
+set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+set(SDL_TESTS OFF CACHE BOOL "" FORCE)
+set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
+
+# glslang
+set(BUILD_EXTERNAL OFF CACHE BOOL "" FORCE)
+set(ENABLE_GLSLANG_BINARIES OFF CACHE BOOL "" FORCE)
+set(ENABLE_SPVREMAPPER OFF CACHE BOOL "" FORCE)
+set(ENABLE_OPT OFF CACHE BOOL "" FORCE)
+
 xenon_use_dep(fmt fmt
   SYSTEM_TARGET fmt::fmt
   BUNDLED_TARGET fmt::fmt
@@ -166,6 +186,14 @@ if (GFX_ENABLED)
     BUNDLED_TARGET SDL3::SDL3
     OUT_VAR XENON_SDL3_TARGET
   )
+
+  if (TARGET SDL3::SDL3-static)
+    set(XENON_SDL3_TARGET SDL3::SDL3-static)
+  elseif (TARGET SDL3::SDL3)
+    set(XENON_SDL3_TARGET SDL3::SDL3)
+  else()
+    message(FATAL_ERROR "No SDL3 target found")
+  endif()
 
   xenon_use_dep(VulkanHeaders Vulkan-Headers
     SYSTEM_TARGET Vulkan::Headers

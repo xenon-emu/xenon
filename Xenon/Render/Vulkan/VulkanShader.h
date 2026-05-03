@@ -13,7 +13,7 @@
 #ifndef NO_GFX
 
 #include <glslang/Public/ShaderLang.h>
-#include <SPIRV/GlslangToSpv.h>
+#include <GlslangCompat.h>
 
 namespace Render {
 
