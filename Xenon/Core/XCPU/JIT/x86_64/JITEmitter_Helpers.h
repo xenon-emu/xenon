@@ -401,6 +401,19 @@ static constexpr size_t kLRUEntryValidOff = 16;
 static constexpr size_t kLRUEntriesOff = offsetof(LRUCache, entries);
 static constexpr size_t kLRULruBitsOff = offsetof(LRUCache, lruBits);
 
+
+static inline x86::Mem MemBI(const x86::Gp &base, const x86::Gp &index, s32 disp) {
+  return x86::ptr(base, index, 0, disp);
+}
+
+static inline x86::Mem ByteBI(const x86::Gp &base, const x86::Gp &index, s32 disp) {
+  return x86::byte_ptr(base, index, 0, disp);
+}
+
+static inline x86::Mem QwordBI(const x86::Gp &base, const x86::Gp &index, s32 disp) {
+  return x86::qword_ptr(base, index, 0, disp);
+}
+
 static inline void EmitLRUCacheInvalidateAll(JITBlockBuilder *b, const x86::Mem &cacheMem) {
   x86::Gp cacheBase = newGP64();
   x86::Gp entriesBase = newGP64();
@@ -415,27 +428,27 @@ static inline void EmitLRUCacheInvalidateAll(JITBlockBuilder *b, const x86::Mem 
 
   COMP->mov(entriesBase, cacheBase);
   if constexpr (kLRUEntriesOff != 0)
-    COMP->add(entriesBase, imm(static_cast<s32>(kLRUEntriesOff)));
+    COMP->add(entriesBase, imm(static_cast<int32_t>(kLRUEntriesOff)));
 
   COMP->mov(lruBase, cacheBase);
-  COMP->add(lruBase, imm(static_cast<s32>(kLRULruBitsOff)));
+  COMP->add(lruBase, imm(static_cast<int32_t>(kLRULruBitsOff)));
 
   COMP->xor_(i, i);
 
   COMP->bind(loop);
-  COMP->cmp(i, imm(static_cast<s32>(kLRUCacheNumSets)));
+  COMP->cmp(i, imm(static_cast<int32_t>(kLRUCacheNumSets)));
   COMP->jge(done);
 
   COMP->mov(off.r32(), i.r32());
-  COMP->imul(off, imm(static_cast<s32>(kLRUCacheSetSize)));
+  COMP->imul(off, off, imm(static_cast<int32_t>(kLRUCacheSetSize)));
 
-  COMP->mov(x86::byte_ptr(entriesBase, off, kLRUEntryValidOff), 0);
-  COMP->mov(x86::qword_ptr(entriesBase, off, kLRUEntryKeyOff), imm<u64>(kLRUCacheInvalidKey));
+  COMP->mov(ByteBI(entriesBase, off, static_cast<int32_t>(kLRUEntryValidOff)), imm(0));
+  COMP->mov(QwordBI(entriesBase, off, static_cast<int32_t>(kLRUEntryKeyOff)), imm<uint64_t>(kLRUCacheInvalidKey));
 
-  COMP->mov(x86::byte_ptr(entriesBase, off, kLRUCacheEntrySize + kLRUEntryValidOff), 0);
-  COMP->mov(x86::qword_ptr(entriesBase, off, kLRUCacheEntrySize + kLRUEntryKeyOff), imm<u64>(kLRUCacheInvalidKey));
+  COMP->mov(ByteBI(entriesBase, off, static_cast<int32_t>(kLRUCacheEntrySize + kLRUEntryValidOff)), imm(0));
+  COMP->mov(QwordBI(entriesBase, off, static_cast<int32_t>(kLRUCacheEntrySize + kLRUEntryKeyOff)), imm<uint64_t>(kLRUCacheInvalidKey));
 
-  COMP->mov(x86::byte_ptr(lruBase, i), 0);
+  COMP->mov(x86::byte_ptr(lruBase, i.r64(), 0, 0), imm(0));
 
   COMP->inc(i);
   COMP->jmp(loop);
@@ -452,13 +465,14 @@ static inline void EmitLRUCacheInvalidateElement(JITBlockBuilder *b, const x86::
   x86::Gp entryKey = newGP64();
   x86::Gp valid = newGP32();
 
-  Label checkWay1 = newLabel(), done = newLabel();
+  Label checkWay1 = newLabel();
+  Label done = newLabel();
 
   COMP->lea(cacheBase, cacheMem);
 
   COMP->mov(entriesBase, cacheBase);
   if constexpr (kLRUEntriesOff != 0)
-    COMP->add(entriesBase, imm(static_cast<s32>(kLRUEntriesOff)));
+    COMP->add(entriesBase, imm(static_cast<int32_t>(kLRUEntriesOff)));
 
   COMP->mov(setIdx, key);
   COMP->shr(setIdx, 12);
@@ -467,34 +481,35 @@ static inline void EmitLRUCacheInvalidateElement(JITBlockBuilder *b, const x86::
   COMP->shr(tmp, 17);
 
   COMP->xor_(setIdx, tmp);
-  COMP->and_(setIdx, imm<u64>(kLRUCacheNumSets - 1));
+  COMP->and_(setIdx, imm<uint64_t>(kLRUCacheNumSets - 1));
 
   COMP->mov(off.r32(), setIdx.r32());
-  COMP->imul(off, imm(static_cast<s32>(kLRUCacheSetSize)));
+  COMP->imul(off, off, imm(static_cast<int32_t>(kLRUCacheSetSize)));
 
-  COMP->movzx(valid, x86::byte_ptr(entriesBase, off, kLRUEntryValidOff));
+  COMP->movzx(valid, ByteBI(entriesBase, off, static_cast<int32_t>(kLRUEntryValidOff)));
   COMP->test(valid, valid);
   COMP->jz(checkWay1);
 
-  COMP->mov(entryKey, x86::qword_ptr(entriesBase, off, kLRUEntryKeyOff));
+  COMP->mov(entryKey, QwordBI(entriesBase, off, static_cast<int32_t>(kLRUEntryKeyOff)));
   COMP->cmp(entryKey, key);
   COMP->jne(checkWay1);
 
-  COMP->mov(x86::byte_ptr(entriesBase, off, kLRUEntryValidOff), 0);
-  COMP->mov(x86::qword_ptr(entriesBase, off, kLRUEntryKeyOff), imm<u64>(kLRUCacheInvalidKey));
+  COMP->mov(ByteBI(entriesBase, off, static_cast<int32_t>(kLRUEntryValidOff)), imm(0));
+  COMP->mov(QwordBI(entriesBase, off, static_cast<int32_t>(kLRUEntryKeyOff)), imm<uint64_t>(kLRUCacheInvalidKey));
   COMP->jmp(done);
 
   COMP->bind(checkWay1);
-  COMP->movzx(valid, x86::byte_ptr(entriesBase, off, kLRUCacheEntrySize + kLRUEntryValidOff));
+
+  COMP->movzx(valid, ByteBI(entriesBase, off, static_cast<int32_t>(kLRUCacheEntrySize + kLRUEntryValidOff)));
   COMP->test(valid, valid);
   COMP->jz(done);
 
-  COMP->mov(entryKey, x86::qword_ptr(entriesBase, off, kLRUCacheEntrySize + kLRUEntryKeyOff));
+  COMP->mov(entryKey, QwordBI(entriesBase, off, static_cast<int32_t>(kLRUCacheEntrySize + kLRUEntryKeyOff)));
   COMP->cmp(entryKey, key);
   COMP->jne(done);
 
-  COMP->mov(x86::byte_ptr(entriesBase, off, kLRUCacheEntrySize + kLRUEntryValidOff), 0);
-  COMP->mov(x86::qword_ptr(entriesBase, off, kLRUCacheEntrySize + kLRUEntryKeyOff), imm<u64>(kLRUCacheInvalidKey));
+  COMP->mov(ByteBI(entriesBase, off, static_cast<int32_t>(kLRUCacheEntrySize + kLRUEntryValidOff)), imm(0));
+  COMP->mov(QwordBI(entriesBase, off, static_cast<int32_t>(kLRUCacheEntrySize + kLRUEntryKeyOff)), imm<uint64_t>(kLRUCacheInvalidKey));
 
   COMP->bind(done);
 }
