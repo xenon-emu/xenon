@@ -165,7 +165,7 @@ inline struct _xcpu {
   u64 HW_INIT_SKIP_1 = 0;
   u64 HW_INIT_SKIP_2 = 0;
   // 1BL Simulation
-  bool simulate1BL = false;
+  bool simulate1BL = true;
   // Instruction tests execution
   bool runInstrTests = false;
   // Instruction tests mode

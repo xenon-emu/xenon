@@ -8,6 +8,10 @@
 #include <chrono>
 #include <thread>
 
+#include <cryptopp/arc4.h>
+#include <cryptopp/hmac.h>
+#include <cryptopp/sha.h>
+
 #include "Core/XeMain.h"
 #include "Base/Config.h"
 #include "Base/Thread.h"
@@ -853,6 +857,21 @@ u8 PPU::GetCurrentRunningThreads() {
   return (ctrlTE & 0b01) * ePPUThreadBit_One | (ctrlTE & 0b10) / 2 * ePPUThreadBit_Zero;
 }
 
+//
+// 1BL simulation helpers
+//
+
+static void hmacSha1(const u8 *key, u32 keySize, const u8 *data, u32 dataSize, u8 out[20]) {
+  CryptoPP::HMAC<CryptoPP::SHA1> hmac(reinterpret_cast<const CryptoPP::byte*>(key), keySize);
+  hmac.CalculateDigest( reinterpret_cast<CryptoPP::byte*>(out),
+    reinterpret_cast<const CryptoPP::byte*>(data), dataSize);
+}
+
+static void rc4ProcessData(const u8 *key, u32 keySize, const u8 *in, u8 *out, u32 size) {
+  CryptoPP::Weak::ARC4::Decryption rc4( reinterpret_cast<const CryptoPP::byte*>(key), keySize);
+  rc4.ProcessData( reinterpret_cast<CryptoPP::byte*>(out), reinterpret_cast<const CryptoPP::byte*>(in), size);
+}
+
 // Does a mostly complete simulation of the 1Bl inside the SROM.
 // This piece of code, in a nutshell does the following:
 // * Trains the CPU's FSB TX and RX lines.
@@ -864,20 +883,38 @@ u8 PPU::GetCurrentRunningThreads() {
 // * RC4 decrypts CB and verifies it.
 // * Sets up some states and registers and jumps to CB in the Secure ROM.
 bool PPU::Simulate1Bl() {
+  // Helper to read the flash without touching the spare data
+  const auto readNAND = [&](u32 logicalAddr, u8* dest, u32 size) {
+    while (size > 0) {
+      const u32 pageOff = logicalAddr % 0x200;
+      // Get the remaining size if this chunk is smaller than a full 512 byte page 
+      const u32 avail = 0x200 - pageOff;
+      // Calculate the chunk
+      const u32 chunk = (size < avail) ? size : avail;
+      // Read the flash contents 512 bytes at once avoiding spare data
+      PPCInterpreter::MMURead(xenonContext, ppeState.get(), static_cast<u64>(NAND_MEMORY_MAPPED_ADDR) + logicalAddr,
+        chunk, dest);
+      // Update state
+      logicalAddr += chunk;
+      dest += chunk;
+      size -= chunk;
+    }
+    };
+
   LOG_INFO(Xenon, "1BL Simulation started:");
-  // Since we dont actually have a FSB to make use of (nor we need one ofc) we can simply bypass this.
-  
+
   // Zero out Secure RAM:
   LOG_INFO(Xenon, " * Zeroing SRAM.");
-  PPCInterpreter::MMUMemSet(ppeState.get(), 0x10000, 0, 0x10000);
+  memset(xenonContext->SRAM.get(), 0, XE_SRAM_SIZE);
 
   // Verify CB's offset in NAND and fetch its header contents.
   // CB's offset should be stored in the NAND header at location 0x8.
   u32 cbOffset = PPCInterpreter::MMURead32(ppeState.get(), NAND_MEMORY_MAPPED_ADDR + 8);
-  
-  // Verification is nothing but a mere address alignment and a not zero check.
-  if (cbOffset == 0) {
-    LOG_CRITICAL(Xenos, "CB Offset verification failed, returned address is {:#x}.", cbOffset);
+  LOG_INFO(Xenon, " * CB offset from NAND: {:#x}.", cbOffset);
+
+  // Alignment and range verification (mirrors CB_VerifyOffset)
+  if (cbOffset == 0 || (cbOffset & 0xF) != 0 || cbOffset > 0x8000000) {
+    LOG_CRITICAL(Xenon, "1BL: CB offset verification failed ({:#x}). PANIC 0x94.", cbOffset);
     return false;
   }
 
@@ -885,23 +922,122 @@ bool PPU::Simulate1Bl() {
   Xe::PCIDev::BL_HEADER cbHeader = {};
   PPCInterpreter::MMURead(xenonContext, ppeState.get(), NAND_MEMORY_MAPPED_ADDR + cbOffset, 16, reinterpret_cast<u8*>(&cbHeader));
 
-  // Byteswap header data.
+  LOG_INFO(Xenon, " * Fetching CB header from NAND.");
+  
+  // Read the entire CB header into SRAM
+  readNAND(cbOffset, xenonContext->SRAM.get(), 0x140);
+
+  // Get a ptr to the CB key
+  const u8* cbKey = xenonContext->SRAM.get() + 0x10;
+
+  // Swap header data
   cbHeader.entryPoint = byteswap_be(cbHeader.entryPoint);
   cbHeader.length = byteswap_be(cbHeader.length);
 
-  LOG_INFO(Xenon, " * Found CB Header at offset {:#x}, entry point {:#x}, size {:#x}.", cbOffset, cbHeader.entryPoint,
-    cbHeader.length);
+  // Calculate next bootloader offset
+  const u32 nextStageAddress = cbOffset + cbHeader.length;
 
-  // Copy CB data from NAND.
-  LOG_INFO(Xenon, " * Fetching CB data.");
-  std::vector<u8> cbData;
-  for (size_t idx = 0; idx < cbHeader.length; idx++) {
-    cbData.push_back(PPCInterpreter::MMURead8(ppeState.get(), NAND_MEMORY_MAPPED_ADDR + cbOffset + idx));
+  LOG_INFO(Xenon, " * CB header: Magic = {:#06x}, Entry Point = {:#010x}, Size = {:#010x}.", 0, cbHeader.entryPoint, cbHeader.length);
+
+  // Verify CB header fields
+  const u32 cbSizeAligned = (cbHeader.length + 0xF) & 0xFFFFFFF0;
+
+  if (cbHeader.name[0] != 'C' || cbHeader.name[1] != 'B') {
+    LOG_CRITICAL(Xenon, "1BL: CB magic mismatch, magic must be 'CB' [0x4342]. PANIC 0x95.");
+    return false;
+  }
+  if (cbHeader.entryPoint & 0x3) {
+    LOG_CRITICAL(Xenon, "1BL: CB entry point not 4-byte aligned ({:#x}). PANIC 0x95.", cbHeader.entryPoint);
+    return false;
+  }
+  if (cbHeader.entryPoint < 0x264 || cbHeader.entryPoint >= cbHeader.length) {
+    LOG_CRITICAL(Xenon, "1BL: CB entry point {:#x} out of range (size={:#x}). PANIC 0x95.", cbHeader.entryPoint, cbHeader.length);
+    return false;
+  }
+  if ((cbHeader.length - 0x264) > 0xBD9C) {
+    LOG_CRITICAL(Xenon, "1BL: CB size {:#x} out of range. PANIC 0x95.", cbHeader.length);
+    return false;
+  }
+  if (cbSizeAligned >= XE_SRAM_SIZE) {
+    LOG_CRITICAL(Xenon, "1BL: CB aligned size {:#x} exceeds SRAM capacity. PANIC 0x95.", cbSizeAligned);
+    return false;
   }
 
-  // Initialize HMAC key.
+  // Copy the rest of the CB body from NAND to SRAM
+  LOG_INFO(Xenon, " * Copying CB body from NAND to SRAM ({:#x} bytes total).", cbSizeAligned);
+  const u32 bodyLen = cbSizeAligned - 0x140;
+  std::vector<u8> bodyBuf(bodyLen);
+  readNAND(cbOffset + 0x140, bodyBuf.data(), bodyLen);
+  memcpy(xenonContext->SRAM.get() + 0x140, bodyBuf.data(), bodyLen);
 
-  // All good.
+  // Derive RC4 key
+  // The public 1BL RC4 key used on all retail Xbox 360 consoles
+  static const u8 blKey[0x10] = { 0xDD, 0x88, 0xAD, 0x0C, 0x9E, 0xD6, 0x69, 0xE7, 0xB5, 0x67, 0x94, 0xFB, 0x68, 
+    0x56, 0x3E, 0xFA };
+
+  LOG_INFO(Xenon, " * Deriving CB decryption key via HMAC-SHA1.");
+
+  u8 derivedKey[20] = {};
+  hmacSha1(blKey, 0x10, cbKey, 0x10, derivedKey);
+  // Write derived key back into SRAM key slot (offset 0x10, only first 0x10 bytes used)
+  memcpy(xenonContext->SRAM.get() + 0x10, derivedKey, 0x10);
+
+  // POST 0x1B — RC4 decrypt CB body (everything from SRAM+0x20 onward, skipping 0x10 header + 0x10 key)
+  LOG_INFO(Xenon, " * RC4 decrypting CB body ({:#x} bytes).", cbSizeAligned - 0x20);
+  const u32 decLen = cbSizeAligned - 0x20;
+  std::vector<u8> plain(decLen);
+  rc4ProcessData(derivedKey, 0x10, xenonContext->SRAM.get() + 0x20, plain.data(), decLen);
+  memcpy(xenonContext->SRAM.get() + 0x20, plain.data(), decLen);
+
+  // POST 0x1E — set execution state and redirect to CB entry point within SRAM
+  // CB_Jump zeros r0-r26, sets up TLB mapping, then branches into the decrypted CB.
+  const u64 cbSRAMEntry = 0x2000000 + cbHeader.entryPoint;
+  LOG_INFO(Xenon, " * Done, CB entry point {:#x}", static_cast<u64>(cbSRAMEntry));
+
+  auto &thread = ppeState->ppuThread[ePPUThread_Zero];
+
+  // Clear everything inside SRAM
+  memset(xenonContext->SRAM.get() + 0x20, 0, 0x140 - 0x20);
+  memset(xenonContext->SRAM.get() + cbSizeAligned, 0, XE_SRAM_SIZE - cbSizeAligned);
+
+  // Set NIA to CB entry
+  thread.NIA = cbSRAMEntry;
+
+  // Setup TLB, SLB, MSR, and other state
+  // These are per dump of a retail Jasper 1BL
+  for (u32 i = 0; i <= 30; i++) { thread.GPR[i] = 0; }
+
+  // GPR 31 contains the next bootloader's Flash offset
+  thread.GPR[31] = nextStageAddress;
+
+  // MSR
+  thread.SPR.MSR.hexValue = 0x9000000000000020;
+
+  // SLB
+  thread.SLB[0].V = 1;
+  thread.SLB[0].L = 1;
+  thread.SLB[0].vsidReg = 0x100;
+  thread.SLB[0].esidReg = 0x8000000;
+
+  // Shared SPR's
+  ppeState->SPR.LPCR.hexValue = 0x402;
+  ppeState->SPR.TSCR.hexValue = 0x100000;
+  ppeState->SPR.TTR.hexValue = 0x4000;
+  ppeState->SPR.HID1.hexValue = 0x100000000000;
+  ppeState->SPR.HID6.hexValue = 0x1803800000000;
+
+  // TLB
+  ppeState->TLB.classes[0x20].ways[0].V = 1;
+  ppeState->TLB.classes[0x20].ways[0].L = 1;
+  ppeState->TLB.classes[0x20].ways[0].p = 0x10;
+  ppeState->TLB.classes[0x20].ways[0].pageMask = 0xffff;
+  ppeState->TLB.classes[0x20].ways[0].RPN = 0x20000010000;
+  ppeState->TLB.classes[0x20].ways[0].VPN = 0x2000000;
+  ppeState->TLB.classes[0x20].ways[0].pte0 = 0x205;
+  ppeState->TLB.classes[0x20].ways[0].pte1 = 0x200000101b3;
+
+
+  LOG_INFO(Xenon, "1BL Simulation complete. Jumping to CB.");
   return true;
 }
 

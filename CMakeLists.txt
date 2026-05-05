@@ -232,6 +232,7 @@ endif()
 
 set(microprofile_dir ${XENON_THIRDPARTY_DIR}/microprofile)
 set(plusaes_dir ${XENON_THIRDPARTY_DIR}/plusaes)
+set(cryptopp_dir ${XENON_THIRDPARTY_DIR}/cryptopp)
 
 #
 # Sources
@@ -286,6 +287,16 @@ endif()
 add_compile_definitions(MICROPROFILE_USE_CONFIG)
 file(GLOB microprofile ${microprofile_dir}/*.cpp ${microprofile_dir}/*.h)
 
+file(GLOB cryptopp_sources ${cryptopp_dir}/*.cpp)
+list(FILTER cryptopp_sources EXCLUDE REGEX ".*/(bench[0-9]?|cryptest|datatest|dlltest|fipsalgt|fipstest|regtest[0-9]?|test|validat[0-9]+)\\.cpp$")
+
+add_library(cryptopp_xenon STATIC ${cryptopp_sources})
+target_include_directories(cryptopp_xenon PUBLIC ${XENON_THIRDPARTY_DIR})
+target_compile_definitions(cryptopp_xenon PUBLIC
+  CRYPTOPP_DISABLE_ASM
+  CRYPTOPP_ENABLE_NAMESPACE_WEAK=1
+)
+
 add_executable(Xenon
   ${Base}
   ${Core}
@@ -315,6 +326,7 @@ target_link_libraries(Xenon PRIVATE
   ${XENON_FMT_TARGET}
   ${XENON_TOML11_TARGET}
   ${XENON_ASMJIT_TARGET}
+  cryptopp_xenon
 )
 
 if (GFX_ENABLED)
@@ -327,16 +339,6 @@ if (GFX_ENABLED)
     ${XENON_VMA_TARGET}
     ${XENON_VK_BOOTSTRAP_TARGET}
   )
-endif()
-
-if (WIN32)
-  # cryptopp on Windows often needs explicit link, better to be safe than sorry
-  find_package(cryptopp CONFIG QUIET)
-  if (TARGET cryptopp::cryptopp)
-    target_link_libraries(Xenon PRIVATE cryptopp::cryptopp)
-  elseif (TARGET cryptopp)
-    target_link_libraries(Xenon PRIVATE cryptopp)
-  endif()
 endif()
 
 #
