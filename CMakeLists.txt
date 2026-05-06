@@ -105,7 +105,7 @@ elseif (NOT APPLE)
 endif()
 
 #
-# Dependency Resoultion
+# Dependency Resolution
 #
 
 function(xenon_use_dep pkg subdir)
@@ -221,6 +221,95 @@ set(ENABLE_OPT OFF CACHE BOOL "" FORCE)
   )
 endif()
 
+set(cryptopp_dir ${XENON_THIRDPARTY_DIR}/cryptopp)
+set(XENON_CRYPTOPP_TARGET "")
+
+if (XENON_USE_SYSTEM_DEPS)
+  # Different packages/exporters use different names.
+  find_package(cryptopp CONFIG QUIET)
+  find_package(CryptoPP CONFIG QUIET)
+
+  if (TARGET cryptopp::cryptopp)
+    set(XENON_CRYPTOPP_TARGET cryptopp::cryptopp)
+  elseif (TARGET CryptoPP::CryptoPP)
+    set(XENON_CRYPTOPP_TARGET CryptoPP::CryptoPP)
+  elseif (TARGET CryptoPP::cryptopp)
+    set(XENON_CRYPTOPP_TARGET CryptoPP::cryptopp)
+  elseif (TARGET cryptopp-static)
+    set(XENON_CRYPTOPP_TARGET cryptopp-static)
+  elseif (TARGET cryptopp-shared)
+    set(XENON_CRYPTOPP_TARGET cryptopp-shared)
+  else()
+    # Fallback for Nix/pkg-config/non-CMake installs.
+    find_path(CRYPTOPP_INCLUDE_DIR
+      NAMES cryptopp/arc4.h cryptopp/sha.h cryptopp/hmac.h
+    )
+
+    find_library(CRYPTOPP_LIBRARY
+      NAMES cryptopp crypto++ libcryptopp
+    )
+
+    if (CRYPTOPP_INCLUDE_DIR AND CRYPTOPP_LIBRARY)
+      add_library(cryptopp_system UNKNOWN IMPORTED)
+      set_target_properties(cryptopp_system PROPERTIES
+        IMPORTED_LOCATION "${CRYPTOPP_LIBRARY}"
+        INTERFACE_INCLUDE_DIRECTORIES "${CRYPTOPP_INCLUDE_DIR}"
+        INTERFACE_COMPILE_DEFINITIONS "CRYPTOPP_ENABLE_NAMESPACE_WEAK=1"
+      )
+      set(XENON_CRYPTOPP_TARGET cryptopp_system)
+    endif()
+  endif()
+endif()
+
+if (NOT XENON_CRYPTOPP_TARGET AND XENON_ALLOW_BUNDLED_DEPS)
+  message(STATUS "Using bundled Crypto++")
+
+  file(GLOB cryptopp_sources CONFIGURE_DEPENDS "${cryptopp_dir}/*.cpp")
+
+  list(FILTER cryptopp_sources EXCLUDE REGEX ".*/(bench[0-9]?|cryptest|datatest|dlltest|fipsalgt|fipstest|regtest[0-9]?|test|validat[0-9]+|adhoc)\\.cpp$")
+
+  add_library(cryptopp_xenon STATIC ${cryptopp_sources})
+
+  target_include_directories(cryptopp_xenon
+    PUBLIC
+      ${XENON_THIRDPARTY_DIR}
+    PRIVATE
+      ${cryptopp_dir}
+  )
+
+  target_compile_definitions(cryptopp_xenon
+    PUBLIC
+      CRYPTOPP_DISABLE_ASM
+      CRYPTOPP_ENABLE_NAMESPACE_WEAK=1
+  )
+
+  if (MSVC)
+    target_compile_options(cryptopp_xenon PRIVATE /W0)
+  else()
+    target_compile_options(cryptopp_xenon PRIVATE -w)
+  endif()
+
+  if (WIN32 AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_compile_definitions(cryptopp_xenon
+      PUBLIC
+        CRYPTOPP_DISABLE_ASM
+        CRYPTOPP_DISABLE_SSE2
+        CRYPTOPP_DISABLE_SSSE3
+        CRYPTOPP_DISABLE_SSE4
+        CRYPTOPP_DISABLE_AESNI
+        CRYPTOPP_DISABLE_SHA
+        CRYPTOPP_DISABLE_AVX
+        CRYPTOPP_DISABLE_AVX2
+    )
+  endif()
+
+  set(XENON_CRYPTOPP_TARGET cryptopp_xenon)
+endif()
+
+if (NOT XENON_CRYPTOPP_TARGET)
+  message(FATAL_ERROR "Failed to resolve Crypto++")
+endif()
+
 # These will always be static.
 # ImGui is not something you can package easily, and Sirit is a fork.
 # glad is per-settings
@@ -232,7 +321,6 @@ endif()
 
 set(microprofile_dir ${XENON_THIRDPARTY_DIR}/microprofile)
 set(plusaes_dir ${XENON_THIRDPARTY_DIR}/plusaes)
-set(cryptopp_dir ${XENON_THIRDPARTY_DIR}/cryptopp)
 
 #
 # Sources
@@ -287,16 +375,6 @@ endif()
 add_compile_definitions(MICROPROFILE_USE_CONFIG)
 file(GLOB microprofile ${microprofile_dir}/*.cpp ${microprofile_dir}/*.h)
 
-file(GLOB cryptopp_sources ${cryptopp_dir}/*.cpp)
-list(FILTER cryptopp_sources EXCLUDE REGEX ".*/(bench[0-9]?|cryptest|datatest|dlltest|fipsalgt|fipstest|regtest[0-9]?|test|validat[0-9]+)\\.cpp$")
-
-add_library(cryptopp_xenon STATIC ${cryptopp_sources})
-target_include_directories(cryptopp_xenon PUBLIC ${XENON_THIRDPARTY_DIR})
-target_compile_definitions(cryptopp_xenon PUBLIC
-  CRYPTOPP_DISABLE_ASM
-  CRYPTOPP_ENABLE_NAMESPACE_WEAK=1
-)
-
 add_executable(Xenon
   ${Base}
   ${Core}
@@ -326,7 +404,7 @@ target_link_libraries(Xenon PRIVATE
   ${XENON_FMT_TARGET}
   ${XENON_TOML11_TARGET}
   ${XENON_ASMJIT_TARGET}
-  cryptopp_xenon
+  ${XENON_CRYPTOPP_TARGET}
 )
 
 if (GFX_ENABLED)
