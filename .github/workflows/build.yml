@@ -222,7 +222,7 @@ jobs:
       - name: Setup WinLibs
         uses: bwoodsend/setup-winlibs-action@v1
         with:
-          gcc-version: 15.2.0
+          tag: latest
           architecture: x86_64
           threads: posix
           runtime: ucrt
