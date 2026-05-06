@@ -266,7 +266,7 @@ if (NOT XENON_CRYPTOPP_TARGET AND XENON_ALLOW_BUNDLED_DEPS)
 
   file(GLOB cryptopp_sources CONFIGURE_DEPENDS "${cryptopp_dir}/*.cpp")
 
-  list(FILTER cryptopp_sources EXCLUDE REGEX ".*/(bench[0-9]?|cryptest|datatest|dlltest|dll|fipsalgt|fipstest|regtest[0-9]?|test|validat[0-9]+|adhoc)\\.cpp$")
+  list(FILTER cryptopp_sources EXCLUDE REGEX ".*/(bench[0-9]?|cryptest|datatest|dlltest|fipsalgt|fipstest|regtest[0-9]?|test|validat[0-9]+|adhoc)\\.cpp$")
 
   add_library(cryptopp_xenon STATIC ${cryptopp_sources})
 
@@ -448,14 +448,16 @@ endif()
 if (APPLE)
   add_compile_definitions(SIMPLE_FMT)
 elseif (WIN32)
-  # Synchronization is needed for WaitOnAddress/WakeByAddressSingle
-  target_link_libraries(Xenon PRIVATE iphlpapi setupapi ws2_32 synchronization)
-  add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
+  if (MINGW)
+    target_link_libraries(Xenon PRIVATE iphlpapi setupapi ws2_32)
+  else()
+    # Synchronization is needed for WaitOnAddress/WakeByAddressSingle
+    target_link_libraries(Xenon PRIVATE iphlpapi setupapi ws2_32 synchronization)
+  endif()
 
-  # Disables Warnings
+  add_compile_definitions(NOMINMAX WIN32_LEAN_AND_MEAN)
   add_compile_definitions(_WINSOCK_DEPRECATED_NO_WARNINGS _CRT_SECURE_NO_WARNINGS)
 
-  # Add .rc file, for the app icon and executable properties
   target_sources(Xenon PRIVATE Xenon/Xenon.rc)
 endif()
 

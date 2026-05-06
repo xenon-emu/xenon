@@ -12,6 +12,7 @@
 #include <pthread.h>
 #elif defined(_WIN32)
 #include <windows.h>
+#include <processthreadsapi.h>
 #include "StringUtil.h"
 #else
 
@@ -142,15 +143,26 @@ static void AccurateSleep(std::chrono::nanoseconds duration) {
 
 #if defined(_MSC_VER) || defined(__MINGW32__)
 
+using SetThreadDescriptionFn = HRESULT(WINAPI *)(HANDLE, PCWSTR);
+
+static void SetThreadDescriptionCompat(HANDLE thread, const wchar_t *name) {
+  static SetThreadDescriptionFn setThreadDescription =
+    reinterpret_cast<SetThreadDescriptionFn>(GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "SetThreadDescription"));
+
+  if (setThreadDescription) {
+    setThreadDescription(thread, name);
+  }
+}
+
 // Sets the debugger-visible name of the current thread.
 void SetCurrentThreadName(const std::string_view &name) {
-  SetThreadDescription(GetCurrentThread(), UTF8ToUTF16W(name).data());
+  SetThreadDescriptionCompat(GetCurrentThread(), UTF8ToUTF16W(name).data());
 }
 
 void SetThreadName(void *thread, const std::string_view &name) {
-  const char* nchar = name.data();
+  const char *nchar = name.data();
   std::string truncated(nchar, std::min(name.size(), static_cast<size_t>(15)));
-  SetThreadDescription(thread, UTF8ToUTF16W(name).data());
+  SetThreadDescriptionCompat(thread, UTF8ToUTF16W(name).data());
 }
 
 #else // !MSVC_VER, so must be POSIX threads

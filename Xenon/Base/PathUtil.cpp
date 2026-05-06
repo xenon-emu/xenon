@@ -11,7 +11,7 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <shlobj.h>
-#include <KnownFolders.h>
+#include <knownfolders.h>
 #endif // _WIN32
 #ifdef __APPLE__
 #include <unistd.h>
