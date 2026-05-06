@@ -185,13 +185,13 @@ jobs:
       - name: Configure CMake (Clang)
         shell: pwsh
         run: |
-          cmake -G Ninja -S . -B "$env:BUILD_DIR" `
-            -DCMAKE_BUILD_TYPE="$env:BUILD_TYPE" `
-            -DCMAKE_C_COMPILER=clang-cl `
-            -DCMAKE_CXX_COMPILER=clang-cl `
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache `
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
-            -DXE_ASMJIT_NEW_OUT_API="$env:XE_ASMJIT_NEW_OUT_API"
+            cmake -G Ninja -S . -B "$env:BUILD_DIR" `
+              -DCMAKE_BUILD_TYPE="$env:BUILD_TYPE" `
+              -DCMAKE_C_COMPILER=clang `
+              -DCMAKE_CXX_COMPILER=clang++ `
+              -DCMAKE_C_COMPILER_LAUNCHER=ccache `
+              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
+              -DXE_ASMJIT_NEW_OUT_API="$env:XE_ASMJIT_NEW_OUT_API"
 
       - name: Build
         shell: pwsh
