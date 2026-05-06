@@ -386,6 +386,10 @@ add_executable(Xenon
 
 target_precompile_headers(Xenon PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/Xenon/Base/Global.h)
 
+target_compile_definitions(Xenon PRIVATE
+  CRYPTOPP_ENABLE_NAMESPACE_WEAK=1
+)
+
 if (GFX_ENABLED)
   add_compile_definitions(GFX_ENABLED)
 else()

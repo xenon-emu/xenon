@@ -224,7 +224,7 @@ jobs:
           path: artifact/
 
   Windows-GCC:
-    name: Windows (GCC via WinLibs)
+    name: Windows (GCC via WinLibs, CLI)
     runs-on: windows-2025
     needs: get-info
     steps:
@@ -263,6 +263,7 @@ jobs:
             -DCMAKE_CXX_COMPILER=g++ `
             -DCMAKE_C_COMPILER_LAUNCHER=ccache `
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
+            -DGFX_ENABLED=OFF `
             -DXE_ASMJIT_NEW_OUT_API="$env:XE_ASMJIT_NEW_OUT_API"
 
       - name: Build
@@ -273,12 +274,73 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path artifact | Out-Null
-          Copy-Item "$env:BUILD_DIR\Xenon.exe" "artifact\xenon-windows-gcc-x64-$env:BUILD_TYPE.exe"
+          Copy-Item "$env:BUILD_DIR\Xenon.exe" "artifact\xenon-cli-windows-gcc-x64-$env:BUILD_TYPE.exe"
 
       - name: Upload Windows GCC Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Xenon-win64-winlibs-gcc-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
+          name: Xenon-win64-winlibs-gcc-cli-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
+          path: artifact/
+
+  Windows-GCC-Cross:
+    name: Windows (GCC cross-compile)
+    runs-on: ubuntu-24.04
+    needs: get-info
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install MinGW dependencies
+        shell: bash
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            ninja-build cmake ccache \
+            gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 \
+            binutils-mingw-w64-x86-64 \
+            git
+
+      - name: Clean build dir
+        shell: bash
+        run: rm -rf "${BUILD_DIR}"
+
+      - name: Cache C/C++ compilation
+        uses: hendrikmuhs/ccache-action@v1.2.18
+        with:
+          append-timestamp: false
+          key: ${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ runner.arch }}-windows-mingw-cross-gcc-${{ env.BUILD_TYPE }}-asmjit-${{ env.XE_ASMJIT_NEW_OUT_API }}-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake', 'Xenon/**/*.cpp', 'Xenon/**/*.c', 'Xenon/**/*.h', 'Xenon/**/*.hpp', 'Deps/ThirdParty/**/CMakeLists.txt') }}
+
+      - name: Configure CMake (MinGW cross GCC)
+        shell: bash
+        run: |
+          cmake -G Ninja -S . -B "${BUILD_DIR}" \
+            -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+            -DCMAKE_SYSTEM_NAME=Windows \
+            -DCMAKE_SYSTEM_PROCESSOR=x86_64 \
+            -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc \
+            -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++ \
+            -DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DGFX_ENABLED=OFF \
+            -DXE_ASMJIT_NEW_OUT_API="${XE_ASMJIT_NEW_OUT_API}"
+
+      - name: Build
+        shell: bash
+        run: cmake --build "${BUILD_DIR}" --config "${BUILD_TYPE}" --parallel "$(nproc)"
+
+      - name: Prepare Artifact Folder
+        shell: bash
+        run: |
+          mkdir -p artifact
+          cp "${BUILD_DIR}/Xenon.exe" "artifact/xenon-windows-mingw-gcc-x64-${BUILD_TYPE}.exe"
+
+      - name: Upload Windows GCC Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Xenon-win64-mingw-gcc-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
           path: artifact/
 
   linux_nix:
