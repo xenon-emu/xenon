@@ -210,60 +210,60 @@ jobs:
           path: artifact/
 
   Windows-GCC:
-    name: Windows (GCC via MSYS2)
+    name: Windows (GCC via WinLibs)
     runs-on: windows-2025
     needs: get-info
-    defaults:
-      run:
-        shell: msys2 {0}
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
 
-      - uses: msys2/setup-msys2@v2
+      - name: Setup WinLibs
+        uses: bwoodsend/setup-winlibs-action@v1
         with:
-          msystem: UCRT64
-          update: true
-          install: >-
-            git
-            mingw-w64-ucrt-x86_64-gcc
-            mingw-w64-ucrt-x86_64-cmake
-            mingw-w64-ucrt-x86_64-ninja
-            mingw-w64-ucrt-x86_64-ccache
-            make
+          gcc-version: 15.2.0
+          architecture: x86_64
+          threads: posix
+          runtime: ucrt
 
       - name: Clean build dir
-        run: rm -rf "${BUILD_DIR}"
+        shell: pwsh
+        run: |
+          if (Test-Path $env:BUILD_DIR) {
+            Remove-Item $env:BUILD_DIR -Recurse -Force
+          }
 
       - name: Cache C/C++ compilation
         uses: hendrikmuhs/ccache-action@v1.2.18
         env:
-          cache-name: xenon-${{ runner.os }}-amd64-gcc-${{ env.BUILD_TYPE }}-ccache
+          cache-name: xenon-${{ runner.os }}-amd64-winlibs-gcc-${{ env.BUILD_TYPE }}-ccache
         with:
           append-timestamp: false
-          key: xenon-${{ runner.os }}-amd64-gcc-${{ env.BUILD_TYPE }}-asmjit-${{ env.XE_ASMJIT_NEW_OUT_API }}-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h', '**/CMakeLists.txt', '**/*.cmake') }}
+          key: xenon-${{ runner.os }}-amd64-winlibs-gcc-${{ env.BUILD_TYPE }}-asmjit-${{ env.XE_ASMJIT_NEW_OUT_API }}-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h', '**/CMakeLists.txt', '**/*.cmake') }}
 
       - name: Configure CMake (GCC)
+        shell: pwsh
         run: |
-          cmake -G Ninja -S . -B "${BUILD_DIR}" \
-            -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
-            -DCMAKE_C_COMPILER=gcc \
-            -DCMAKE_CXX_COMPILER=g++ \
-            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
-            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DXE_ASMJIT_NEW_OUT_API="${XE_ASMJIT_NEW_OUT_API}"
+          cmake -G Ninja -S . -B "$env:BUILD_DIR" `
+            -DCMAKE_BUILD_TYPE="$env:BUILD_TYPE" `
+            -DCMAKE_C_COMPILER=gcc `
+            -DCMAKE_CXX_COMPILER=g++ `
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache `
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
+            -DXE_ASMJIT_NEW_OUT_API="$env:XE_ASMJIT_NEW_OUT_API"
 
       - name: Build
-        run: cmake --build "${BUILD_DIR}" --config "${BUILD_TYPE}" --parallel
+        shell: pwsh
+        run: cmake --build "$env:BUILD_DIR" --config "$env:BUILD_TYPE" --parallel $env:NUMBER_OF_PROCESSORS
 
       - name: Prepare Artifact Folder
+        shell: pwsh
         run: |
-          mkdir -p artifact
-          cp "${BUILD_DIR}/Xenon.exe" "artifact/xenon-gcc-amd64-${BUILD_TYPE}.exe"
+          New-Item -ItemType Directory -Force -Path artifact | Out-Null
+          Copy-Item "$env:BUILD_DIR\Xenon.exe" "artifact\xenon-gcc-x64-$env:BUILD_TYPE.exe"
 
-      - name: Upload Windows-GCC Artifact
+      - name: Upload Windows GCC Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Xenon-win64-gcc-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
