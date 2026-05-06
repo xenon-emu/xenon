@@ -559,7 +559,7 @@ void TAPBackend::ReaderThreadLoop() {
 
   while (readerRunning && XeRunning.load(std::memory_order_acquire)) {
     if (tapHandle == INVALID_HANDLE_VALUE) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      std::this_thread::sleep_for(100ms);
       continue;
     }
 
@@ -581,7 +581,7 @@ void TAPBackend::ReaderThreadLoop() {
         }
       } else {
         stats.rxErrors++;
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::sleep_for(10ms);
         continue;
       }
     }
@@ -766,7 +766,7 @@ void TAPBackend::ReaderThreadLoop() {
 
   while (readerRunning.load(std::memory_order_acquire) && XeRunning.load(std::memory_order_acquire)) {
     if (tapFd < 0) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      std::this_thread::sleep_for(100ms);
       continue;
     }
 
@@ -804,7 +804,7 @@ void TAPBackend::ReaderThreadLoop() {
 
     if (pfd.revents & (POLLERR | POLLHUP | POLLNVAL)) {
       LOG_ERROR(ETH, "TAP Backend: Poll error on TAP device");
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      std::this_thread::sleep_for(100ms);
     }
   }
 }

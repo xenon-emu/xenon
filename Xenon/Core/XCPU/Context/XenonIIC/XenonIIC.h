@@ -247,8 +247,8 @@ namespace Xe::XCPU {
     ~XenonIIC();
 
     // Read/Write routines
-    void Write(u64 writeAddress, const u8* data, u64 size);
-    void Read(u64 readAddress, u8* data, u64 size);
+    void Write(u64 address, const u8* data, u64 size);
+    void Read(u64 address, u8* data, u64 size);
 
     // Interrupt Generation Routine
     void generateInterrupt(u8 interruptType, u8 cpusToInterrupt);

@@ -889,7 +889,8 @@ void XCPUSettings(Render::GUI *gui) {
   }
   gui->SameLine();
   if (gui->Button("Reboot")) {
-    XeMain::Reboot(static_cast<u32>(XeMain::smcCore->GetPowerOnReason()));
+    if (auto smc = XeMain::smcCore.lock())
+      XeMain::Reboot(static_cast<u32>(smc->GetPowerOnReason()));
   }
   Config::xcpu.ramSize = gui->InputText("RAM Size", Config::xcpu.ramSize);
   gui->Tooltip("Requires an restart of the CPU for things to take effect");
@@ -1007,21 +1008,24 @@ void Render::GUI::Render(Texture *texture) {
     if (ImGui::BeginMenu("CPU")) {
       XCPUSettings(this);
       if (Button("Dump FB")) {
-        const auto UserDir = Base::FS::GetPath(Base::FS::PathType::UserDataDir);
-        XeMain::xenos->DumpFB(UserDir / "fbmem.bin", XeMain::renderer->pitch);
+        if (auto xenos = XeMain::xenos.lock()) {
+          const auto UserDir = Base::FS::GetPath(Base::FS::PathType::UserDataDir);
+          xenos->DumpFB(UserDir / "fbmem.bin", XeMain::renderer->pitch);
+        }
       }
       if (Button("Dump Memory")) {
-        const auto UserDir = Base::FS::GetPath(Base::FS::PathType::UserDataDir);
-        const auto &path = UserDir / "memory.bin";
-        std::ofstream f(path, std::ios::out | std::ios::binary | std::ios::trunc);
-        if (!f) {
-          LOG_ERROR(Xenon, "Failed to open {} for writing", path.filename().string());
-        } else {
-          RAM *ramPtr = XeMain::ram.get();
-          f.write(reinterpret_cast<const char *>(ramPtr->GetPointerToAddress(0)), ramPtr->GetSize());
-          LOG_INFO(Xenon, "RAM dumped to '{}' (size: 0x{:08X})", path.string(), ramPtr->GetSize());
+        if (auto ram = XeMain::ram.lock()) {
+          const auto UserDir = Base::FS::GetPath(Base::FS::PathType::UserDataDir);
+          const auto &path = UserDir / "memory.bin";
+          std::ofstream f(path, std::ios::out | std::ios::binary | std::ios::trunc);
+          if (!f) {
+            LOG_ERROR(Xenon, "Failed to open {} for writing", path.filename().string());
+          } else {
+            f.write(reinterpret_cast<const char *>(ram->GetPointerToAddress(0)), ram->GetSize());
+            LOG_INFO(Xenon, "RAM dumped to '{}' (size: 0x{:08X})", path.string(), ram->GetSize());
+          }
+          f.close();
         }
-        f.close();
       }
       ImGui::EndMenu();
     }

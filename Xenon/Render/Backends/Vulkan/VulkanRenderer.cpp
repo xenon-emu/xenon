@@ -777,7 +777,7 @@ void VulkanRenderer::Clear() {
 
 }
 
-void VulkanRenderer::UpdateViewportFromState(const Xe::XGPU::XenosState *state) {
+void VulkanRenderer::UpdateViewportFromState(std::weak_ptr<Xe::XGPU::XenosState> statePtr) {
 
 }
 

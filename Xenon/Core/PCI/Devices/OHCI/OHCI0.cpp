@@ -4,6 +4,6 @@
 
 #include "OHCI0.h"
 
-Xe::PCIDev::OHCI0::OHCI0(const std::string &deviceName, u64 size) :
-  OHCI(deviceName, size, 0, 4)
+Xe::PCIDev::OHCI0::OHCI0(u64 size)
+  : OHCI(__func__, size, 1, 5)
 {}

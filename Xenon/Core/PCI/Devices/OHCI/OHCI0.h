@@ -7,15 +7,11 @@
 #include "Core/PCI/PCIDevice.h"
 #include "Core/PCI/Devices/OHCI/OHCI.h"
 
-namespace Xe {
-namespace PCIDev {
+namespace Xe::PCIDev {
 
-class OHCI0 : public Xe::PCIDev::OHCI {
+class OHCI0 : public OHCI {
 public:
-  OHCI0(const std::string &deviceName, u64 size);
-
-private:
+  OHCI0(u64 size);
 };
 
-} // namespace PCIDev
-} // namespace Xe
+} // namespace Xe::PCIDev

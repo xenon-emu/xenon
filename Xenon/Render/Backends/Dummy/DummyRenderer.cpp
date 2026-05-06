@@ -68,7 +68,7 @@ void DummyRenderer::Clear() {
   LOG_INFO(Render, "DummyRenderer::Clear");
 }
 
-void DummyRenderer::UpdateViewportFromState(const Xe::XGPU::XenosState *state) {
+void DummyRenderer::UpdateViewportFromState(std::weak_ptr<Xe::XGPU::XenosState> statePtr) {
   LOG_INFO(Render, "DummyRenderer::UpdateViewportFromState");
 }
 

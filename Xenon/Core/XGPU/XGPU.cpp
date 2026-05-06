@@ -17,12 +17,12 @@
 #define XE_DEBUG
 #endif
 
-Xe::Xenos::XGPU::XGPU(Render::Renderer *renderer, RAM *ram, PCIBridge *pciBridge) :
-  render(renderer),
-  ramPtr(ram), parentBus(pciBridge) {
+Xe::Xenos::XGPU::XGPU(Render::Renderer *renderer, std::weak_ptr<RAM> ram, std::weak_ptr<PCIBridge> pciBridge)
+  : render(renderer), ramPtr(ram), parentBus(pciBridge)
+{
   edram = std::make_unique<STRIP_UNIQUE(edram)>();
 
-  xenosState = std::make_unique<STRIP_UNIQUE(xenosState)>(ramPtr, edram.get(), nullptr);
+  xenosState = std::make_unique<STRIP_UNIQUE(xenosState)>(ramPtr, edram);
 
   memset(&xgpuConfigSpace.data, 0xF, sizeof(GENRAL_PCI_DEVICE_CONFIG_SPACE));
 
@@ -30,39 +30,39 @@ Xe::Xenos::XGPU::XGPU(Render::Renderer *renderer, RAM *ram, PCIBridge *pciBridge
   memcpy(xgpuConfigSpace.data, xgpuConfigMap, sizeof(xgpuConfigSpace.data));
 
   u32 consoleRevison;
-  PCI_CONFIG_HDR_REG0 &revision = xgpuConfigSpace.configSpaceHeader.reg0;
-  PCI_CONFIG_HDR_REG2 &gpuRevision = xgpuConfigSpace.configSpaceHeader.reg2;
+  PCI_CONFIG_HDR_REG0 &revision = xgpuConfigSpace.reg0;
+  PCI_CONFIG_HDR_REG2 &gpuRevision = xgpuConfigSpace.reg2;
   revision.vendorID = 0x1414;
   switch (Config::highlyExperimental.consoleRevison) {
-  case Config::eConsoleRevision::Xenon: {
+  case Config::eConsoleRevision::Xenon:
     gpuRevision.revID = 0x02;
     revision.deviceID = 0x5801;
-  } break;
-  case Config::eConsoleRevision::Zephyr: {
+    break;
+  case Config::eConsoleRevision::Zephyr:
     gpuRevision.revID = 0x02;
     revision.deviceID = 0x5821;
-  } break;
-  case Config::eConsoleRevision::Falcon: {
+    break;
+  case Config::eConsoleRevision::Falcon:
     gpuRevision.revID = 0x10;
     revision.deviceID = 0x5821;
-  } break;
-  case Config::eConsoleRevision::Jasper: {
+    break;
+  case Config::eConsoleRevision::Jasper:
     gpuRevision.revID = 0x11;
     revision.deviceID = 0x5831;
-  } break;
-  case Config::eConsoleRevision::Trinity: {
+    break;
+  case Config::eConsoleRevision::Trinity:
     gpuRevision.revID = 0x00;
     revision.deviceID = 0x5841;
-  } break;
+    break;
   case Config::eConsoleRevision::Corona4GB:
-  case Config::eConsoleRevision::Corona: {
+  case Config::eConsoleRevision::Corona:
     gpuRevision.revID = 0x01;
     revision.deviceID = 0x5841;
-  } break;
-  case Config::eConsoleRevision::Winchester: {
+    break;
+  case Config::eConsoleRevision::Winchester:
     gpuRevision.revID = 0x01;
     revision.deviceID = 0x5851;
-  } break;
+    break;
   }
   LOG_INFO(Xenos, "Xenos DeviceID: 0x{:X}", revision.deviceID);
   LOG_INFO(Xenos, "Xenos RevID: 0x{:X}", gpuRevision.revID);
@@ -108,8 +108,9 @@ Xe::Xenos::XGPU::XGPU(Render::Renderer *renderer, RAM *ram, PCIBridge *pciBridge
   } break;
   }
 
-  commandProcessor = std::make_unique<STRIP_UNIQUE(commandProcessor)>(ramPtr, xenosState.get(), render, parentBus);
-  xenosState->commandProcessor = commandProcessor.get(); // CP expects xenosState, xenosState expects CP, this fixes it.
+  commandProcessor = std::make_unique<STRIP_UNIQUE(commandProcessor)>(ramPtr, xenosState, render, parentBus);
+
+  xenosState->AddCommandPointer(commandProcessor);
 
   xeVSyncWorkerThread = std::thread(&XGPU::xeVSyncWorkerThreadLoop, this);
 }
@@ -117,21 +118,23 @@ Xe::Xenos::XGPU::XGPU(Render::Renderer *renderer, RAM *ram, PCIBridge *pciBridge
 Xe::Xenos::XGPU::~XGPU() {
   // Kill VSync Thread
   xeVsyncWorkerThreadRunning = false;
+
   // Wait for things to finish
   if (xeVSyncWorkerThread.joinable()) {
     xeVSyncWorkerThread.join();
   }
+
   // Reset other handles
   commandProcessor.reset();
   xenosState.reset();
   edram.reset();
 }
 
-bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
+bool Xe::Xenos::XGPU::Read(u64 address, u8 *data, u64 size) {
   std::lock_guard lck(mutex);
-  if (IsAddressMappedInBAR(static_cast<u32>(readAddress))) {
+  if (IsAddressMappedInBAR(static_cast<u32>(address))) {
     THROW(size > 4);
-    const u32 regIndex = (readAddress & 0xFFFFF) / 4;
+    const u32 regIndex = (address & 0xFFFFF) / 4;
     const XeRegister reg = static_cast<XeRegister>(regIndex);
     u32 value = xenosState->ReadRegister(reg, size);
     memcpy(data, &value, size);
@@ -142,7 +145,7 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
       && reg != XeRegister::D1MODE_VBLANK_VLINE_STATUS
       && reg != XeRegister::D1MODE_INT_MASK
       && reg != XeRegister::MASTER_INT_SIGNAL)
-      LOG_DEBUG(Xenos, "Read from {} (0x{:X}), index: 0x{:X}, value: 0x{:X}, size: 0x{:X}", Xe::XGPU::GetRegisterNameById(regIndex), readAddress, regIndex, value, size);
+      LOG_DEBUG(Xenos, "Read from {} (0x{:X}), index: 0x{:X}, value: 0x{:X}, size: 0x{:X}", Xe::XGPU::GetRegisterNameById(regIndex), address, regIndex, value, size);
 #endif
     return true;
   }
@@ -150,11 +153,11 @@ bool Xe::Xenos::XGPU::Read(u64 readAddress, u8 *data, u64 size) {
   return false;
 }
 
-bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
+bool Xe::Xenos::XGPU::Write(u64 address, const u8 *data, u64 size) {
   std::lock_guard lck(mutex);
-  if (IsAddressMappedInBAR(static_cast<u32>(writeAddress))) {
+  if (IsAddressMappedInBAR(static_cast<u32>(address))) {
     THROW(size > 4);
-    const u32 regIndex = (writeAddress & 0xFFFFF) / 4;
+    const u32 regIndex = (address & 0xFFFFF) / 4;
     const XeRegister reg = static_cast<XeRegister>(regIndex);
     u32 value = 0;
     memcpy(&value, data, size);
@@ -167,7 +170,7 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
       && reg != XeRegister::D1MODE_INT_MASK
       && reg != XeRegister::MASTER_INT_SIGNAL) {
 
-    LOG_DEBUG(Xenos, "Write to {} (addr: 0x{:X}), index 0x{:X}, data = 0x{:X}", Xe::XGPU::GetRegisterNameById(regIndex), writeAddress, regIndex, value);
+    LOG_DEBUG(Xenos, "Write to {} (addr: 0x{:X}), index 0x{:X}, data = 0x{:X}", Xe::XGPU::GetRegisterNameById(regIndex), address, regIndex, value);
   }
 #endif
     return true;
@@ -176,13 +179,13 @@ bool Xe::Xenos::XGPU::Write(u64 writeAddress, const u8 *data, u64 size) {
   return false;
 }
 
-bool Xe::Xenos::XGPU::MemSet(u64 writeAddress, s32 data, u64 size) {
+bool Xe::Xenos::XGPU::MemSet(u64 address, s32 data, u64 size) {
   std::lock_guard lck(mutex);
-  if (IsAddressMappedInBAR(static_cast<u32>(writeAddress))) {
-    const u32 regIndex = (writeAddress & 0xFFFFF) / 4;
+  if (IsAddressMappedInBAR(static_cast<u32>(address))) {
+    const u32 regIndex = (address & 0xFFFFF) / 4;
 
 #ifdef XE_DEBUG
-    LOG_TRACE(Xenos, "Write to {} (addr: 0x{:X}), index 0x{:X}, data = 0x{:X}", Xe::XGPU::GetRegisterNameById(regIndex), writeAddress, regIndex, data);
+    LOG_TRACE(Xenos, "Write to {} (addr: 0x{:X}), index 0x{:X}, data = 0x{:X}", Xe::XGPU::GetRegisterNameById(regIndex), address, regIndex, data);
 #endif
     const XeRegister reg = static_cast<XeRegister>(regIndex);
 
@@ -193,18 +196,18 @@ bool Xe::Xenos::XGPU::MemSet(u64 writeAddress, s32 data, u64 size) {
   return false;
 }
 
-void Xe::Xenos::XGPU::ConfigRead(u64 readAddress, u8 *data, u64 size) {
+void Xe::Xenos::XGPU::ConfigRead(u64 address, u8 *data, u64 size) {
   std::lock_guard lck(mutex);
-  memcpy(data, &xgpuConfigSpace.data[readAddress & 0xFF], size);
+  memcpy(data, &xgpuConfigSpace.data[address & 0xFF], size);
 }
 
-void Xe::Xenos::XGPU::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
+void Xe::Xenos::XGPU::ConfigWrite(u64 address, const u8 *data, u64 size) {
   std::lock_guard lck(mutex);
   // Check if we're being scanned
   u64 tmp = 0;
   memcpy(&tmp, data, size);
-  if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
-    const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
+  if (static_cast<u8>(address) >= 0x10 && static_cast<u8>(address) < 0x34) {
+    const u32 regOffset = (static_cast<u8>(address) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
       if (tmp == 0xFFFFFFFF) { // PCI BAR Size discovery
         u64 x = 2;
@@ -218,22 +221,22 @@ void Xe::Xenos::XGPU::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
         tmp &= ~0x3;
       }
     }
-    if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address
+    if (static_cast<u8>(address) == 0x30) { // Expansion ROM Base Address
       tmp = 0; // Register not implemented
     }
   }
 
-  memcpy(&xgpuConfigSpace.data[writeAddress & 0xFF], &tmp, size);
+  memcpy(&xgpuConfigSpace.data[address & 0xFF], &tmp, size);
 }
 
 bool Xe::Xenos::XGPU::IsAddressMappedInBAR(u32 address) {
   #define ADDRESS_BOUNDS_CHECK(a, b) (address >= a && address <= (a + b))
-  if (ADDRESS_BOUNDS_CHECK(xgpuConfigSpace.configSpaceHeader.BAR0, XGPU_DEVICE_SIZE) ||
-    ADDRESS_BOUNDS_CHECK(xgpuConfigSpace.configSpaceHeader.BAR1, XGPU_DEVICE_SIZE) ||
-    ADDRESS_BOUNDS_CHECK(xgpuConfigSpace.configSpaceHeader.BAR2, XGPU_DEVICE_SIZE) ||
-    ADDRESS_BOUNDS_CHECK(xgpuConfigSpace.configSpaceHeader.BAR3, XGPU_DEVICE_SIZE) ||
-    ADDRESS_BOUNDS_CHECK(xgpuConfigSpace.configSpaceHeader.BAR4, XGPU_DEVICE_SIZE) ||
-    ADDRESS_BOUNDS_CHECK(xgpuConfigSpace.configSpaceHeader.BAR5, XGPU_DEVICE_SIZE))
+  if (ADDRESS_BOUNDS_CHECK(xgpuConfigSpace.BAR0, XGPU_DEVICE_SIZE) ||
+    ADDRESS_BOUNDS_CHECK(xgpuConfigSpace.BAR1, XGPU_DEVICE_SIZE) ||
+    ADDRESS_BOUNDS_CHECK(xgpuConfigSpace.BAR2, XGPU_DEVICE_SIZE) ||
+    ADDRESS_BOUNDS_CHECK(xgpuConfigSpace.BAR3, XGPU_DEVICE_SIZE) ||
+    ADDRESS_BOUNDS_CHECK(xgpuConfigSpace.BAR4, XGPU_DEVICE_SIZE) ||
+    ADDRESS_BOUNDS_CHECK(xgpuConfigSpace.BAR5, XGPU_DEVICE_SIZE))
   {
     return true;
   }
@@ -242,22 +245,21 @@ bool Xe::Xenos::XGPU::IsAddressMappedInBAR(u32 address) {
 }
 
 void Xe::Xenos::XGPU::DumpFB(const std::filesystem::path &path, s32 pitch) {
-  std::ofstream f(path, std::ios::out | std::ios::binary | std::ios::trunc);
-  if (!f) {
-    LOG_ERROR(Xenos, "Failed to open {} for writing", path.filename().string());
-  } else {
-    f.write(reinterpret_cast<const char *>(ramPtr->GetPointerToAddress(xenosState->fbSurfaceAddress)), pitch);
-    LOG_INFO(Xenos, "Framebuffer dumped to '{}'", path.string());
+  if (auto ram = ramPtr.lock()) {
+    std::ofstream f(path, std::ios::out | std::ios::binary | std::ios::trunc);
+    if (!f) {
+      LOG_ERROR(Xenos, "Failed to open {} for writing", path.filename().string());
+    } else {
+      f.write(reinterpret_cast<const char *>(ram->GetPointerToAddress(xenosState->fbSurfaceAddress)), pitch);
+      LOG_INFO(Xenos, "Framebuffer dumped to '{}'", path.string());
+    }
+    f.close();
   }
-  f.close();
 }
 
 void Xe::Xenos::XGPU::xeVSyncWorkerThreadLoop() {
-  LOG_INFO(Xenos, "Entering VSYNC Worker thread.");
-
   // VSync timer start
-  std::chrono::steady_clock::time_point timerStart =
-    std::chrono::steady_clock::now();
+  std::chrono::steady_clock::time_point timerStart = std::chrono::steady_clock::now();
 
   while (xeVsyncWorkerThreadRunning) {
     // Ensure we haven't shutdown elsewhere
@@ -265,16 +267,17 @@ void Xe::Xenos::XGPU::xeVSyncWorkerThreadLoop() {
     if (!xeVsyncWorkerThreadRunning)
       break;
     // Measure elapsed time since last check.
-    std::chrono::steady_clock::time_point timerNow =
-      std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point timerNow = std::chrono::steady_clock::now();
     // Should be a 60Hz (16.6ms) timer, for testing purposes and because we're currently too slow we're setting up to 1s.
     // This actually controls the frequency in wich the kernel does Back -> Front buffer VdSwap commands, so by changing 
     // this we effectively can control the refresh rate of the emulated console (as long as the system runs fast enough). 
     if (timerNow >= timerStart + 1s && (xenosState.get()->d1modeIntMask & 0x40000011)) {
-      // Set  VBLANK Pending
+      // Set VBLANK Pending
       xenosState.get()->vblankVlineStatus |= 0x11000100; // Hardware dump shows this (byteswapped) value at interrupt time.
       xenosState.get()->d1modeIntMask &= ~0x40000011;
-      parentBus->RouteInterrupt(PRIO_GRAPHICS, 4); // Debugging on hardware shows #2 is the correct CPU ID.
+      // Debugging on hardware shows #2 is the correct CPU ID
+      if (auto bus = parentBus.lock())
+        bus->RouteInterrupt(PRIO_GRAPHICS, 4);
 
       // Update internal timer.
       timerStart = std::chrono::steady_clock::now();

@@ -13,12 +13,12 @@ namespace PCIDev {
 
 class OHCI : public PCIDevice {
 public:
-  OHCI(const std::string &deviceName, u64 size, s32 instance, u32 ports);
-  void Read(u64 readAddress, u8 *data, u64 size) override;
-  void Write(u64 writeAddress, const u8 *data, u64 size) override;
-  void MemSet(u64 writeAddress, s32 data, u64 size) override;
-  void ConfigRead(u64 readAddress, u8 *data, u64 size) override;
-  void ConfigWrite(u64 writeAddress, const u8 *data, u64 size) override;
+  OHCI(const char *deviceName, u64 size, s32 instance, u32 ports);
+  void Read(u64 address, u8 *data, u64 size) override;
+  void Write(u64 address, const u8 *data, u64 size) override;
+  void MemSet(u64 address, s32 data, u64 size) override;
+  void ConfigRead(u64 address, u8 *data, u64 size) override;
+  void ConfigWrite(u64 address, const u8 *data, u64 size) override;
 private:
   s32 instance;
   u32 ports;

@@ -4,6 +4,6 @@
 
 #include "EHCI1.h"
 
-Xe::PCIDev::EHCI1::EHCI1(const std::string &deviceName, u64 size) :
-  EHCI(deviceName, size, 1, 5)
+Xe::PCIDev::EHCI1::EHCI1(u64 size) :
+  EHCI(__func__, size, 1, 5)
 {}

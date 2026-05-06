@@ -75,30 +75,23 @@ enum class ATA_TRANSFER_MODE {
   ULTRA_DMA_MODE6 = 0x46,
 };
 
-Xe::PCIDev::HDD::HDD(const std::string &deviceName, u64 size, PCIBridge *parentPCIBridge, RAM* ram) :
-  PCIDevice(deviceName, size) {
-
+Xe::PCIDev::HDD::HDD(u64 size, std::weak_ptr<PCIBridge> parentPCIBridge, std::weak_ptr<RAM> ram)
+  : PCIDevice(__func__, size), parentBus(parentPCIBridge), ramPtr(ram)
+{
   // Note:
-   // The ATA/ATAPI Controller in the Xenon Southbridge contain two BAR's:
-   // The first is for the Command Block (Regs 0-7) + DevCtrl/AltStatus reg at offset 0xA.
-   // The second is for the BMDMA (Bus Master DMA) block.
+  //  The ATA/ATAPI Controller in the Xenon Southbridge contain two BAR's:
+  //  The first is for the Command Block (Regs 0-7) + DevCtrl/AltStatus reg at offset 0xA.
+  //  The second is for the BMDMA (Bus Master DMA) block.
 
   // Set PCI Properties
-  pciConfigSpace.configSpaceHeader.reg0.hexData = 0x58031414;
-  pciConfigSpace.configSpaceHeader.reg1.hexData = 0x02300006;
-  pciConfigSpace.configSpaceHeader.reg2.hexData = 0x01060000;
-  pciConfigSpace.configSpaceHeader.regD.hexData = 0x00000058; // Capabilites Ptr.
-  pciConfigSpace.configSpaceHeader.regF.hexData = 0x00000100; // Int line, pin.
+  pciConfigSpace.reg0.hexData = 0x58031414;
+  pciConfigSpace.reg1.hexData = 0x02300006;
+  pciConfigSpace.reg2.hexData = 0x01060000;
+  pciConfigSpace.regD.hexData = 0x00000058; // Capabilites Ptr.
+  pciConfigSpace.regF.hexData = 0x00000100; // Int line, pin.
 
-  // Assign our PCI Bridge pointer
-  parentBus = parentPCIBridge;
-
-  // Assign our RAM pointer
-  ramPtr = ram;
-
-  u32 data = 0;
-  // Capabilities at offset 0x58:
-  data = 0x80020001;
+  // Capabilities at offset 0x58
+  u32 data = 0x80020001;
   memcpy(&pciConfigSpace.data[0x58], &data, 4);
   data = 0x00112400;
   memcpy(&pciConfigSpace.data[0x60], &data, 4);
@@ -187,22 +180,22 @@ Xe::PCIDev::HDD::~HDD() {
 }
 
 // PCI Read
-void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
+void Xe::PCIDev::HDD::Read(u64 address, u8 *data, u64 size) {
   // PCI BAR0 is the Primary Command Block Base Address
   u8 ataCommandReg =
-    static_cast<u8>(readAddress - pciConfigSpace.configSpaceHeader.BAR0);
+    static_cast<u8>(address - pciConfigSpace.BAR0);
 
   // PCI BAR1 is the DMA Block Base Address
   u8 ataControlReg =
-    static_cast<u8>(readAddress - pciConfigSpace.configSpaceHeader.BAR1);
+    static_cast<u8>(address - pciConfigSpace.BAR1);
 
 #ifdef HDD_DEBUG
-  LOG_DEBUG(HDD, "[Read]: Address {:#x}, reg offset {:#x}", readAddress, readAddress & 0xFF);
+  LOG_DEBUG(HDD, "[Read]: Address {:#x}, reg offset {:#x}", address, address & 0xFF);
 #endif // HDD_DEBUG
 
   // Command Registers
-  if (ataCommandReg < (pciConfigSpace.configSpaceHeader.BAR1 -
-    pciConfigSpace.configSpaceHeader.BAR0)) {
+  if (ataCommandReg < (pciConfigSpace.BAR1 -
+    pciConfigSpace.BAR0)) {
 
     switch (ataCommandReg) {
     case ATA_REG_DATA:
@@ -297,27 +290,27 @@ void Xe::PCIDev::HDD::Read(u64 readAddress, u8 *data, u64 size) {
   }
 }
 // PCI Write
-void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
+void Xe::PCIDev::HDD::Write(u64 address, const u8 *data, u64 size) {
 
   // PCI BAR0 is the Primary Command Block Base Address
   u8 ataCommandReg =
-    static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR0);
+    static_cast<u8>(address - pciConfigSpace.BAR0);
 
   // PCI BAR1 is the DMA Block Base Address
   u8 ataControlReg =
-    static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR1);
+    static_cast<u8>(address - pciConfigSpace.BAR1);
 
   u32 inData = 0;
   memcpy(&inData, data, size);
 
 #ifdef HDD_DEBUG
-  LOG_DEBUG(HDD, "[Write]: Address {:#x}, reg offset {:#x}, data {:#x}", writeAddress, writeAddress & 0xFF, inData);
+  LOG_DEBUG(HDD, "[Write]: Address {:#x}, reg offset {:#x}, data {:#x}", address, address & 0xFF, inData);
 #endif // HDD_DEBUG
 
   // Command Registers
-  if (ataCommandReg < (pciConfigSpace.configSpaceHeader.BAR1 -
-    pciConfigSpace.configSpaceHeader.BAR0)) {
-    const u8 regOffset = static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR0);
+  if (ataCommandReg < (pciConfigSpace.BAR1 -
+    pciConfigSpace.BAR0)) {
+    const u8 regOffset = static_cast<u8>(address - pciConfigSpace.BAR0);
 
     switch (regOffset) {
     case ATA_REG_DATA:
@@ -334,9 +327,8 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
       ataState.regs.prevLBALow = ataState.regs.lbaLow;
       memcpy(&ataState.regs.lbaLow, data, size);
       // XeLL checks this to see if it has a drive.
-      if (!ataState.imageAttached) {
+      if (!ataState.imageAttached)
         ataState.regs.lbaLow = ataState.regs.prevLBALow;
-      }
       break;
     case ATA_REG_LBA_MED:
       ataState.regs.prevLBAMiddle = ataState.regs.lbaMiddle;
@@ -351,11 +343,9 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
       break;
     case ATA_REG_CMD:
       memcpy(&ataState.regs.command, data, size);
-
 #ifdef HDD_DEBUG
       LOG_DEBUG(HDD, "[CMD]: Received Command {}", getATACommandName(ataState.regs.command));
 #endif // HDD_DEBUG
-
       switch (ataState.regs.command) {
       case ATA_COMMAND_READ_DMA: {
 #ifdef HDD_DEBUG
@@ -367,9 +357,8 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
         LOG_DEBUG(HDD, "[CMD]: [READ DMA] LBA28: {:#x}, sector count {:#x}",
           offset, sectorCount);
 #endif // HDD_DEBUG
-      }
-        ataReadDMACommand();
-        break;
+        ATAReadDMACommand();
+      } break;
       case ATA_COMMAND_READ_DMA_EXT: {
 #ifdef HDD_DEBUG
         u64 offset = (static_cast<u64>(ataState.regs.prevLBAHigh) << 40) |
@@ -383,21 +372,21 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
           LOG_DEBUG(HDD, "[CMD]: [READ DMA EXT] LBA48: {:#x}, sector count {:#x}",
             offset, sectorCount);
 #endif // HDD_DEBUG
-        ataReadDMAExtCommand();
+        ATAReadDMAExtCommand();
         break;
       }
       case ATA_COMMAND_READ_NATIVE_MAX_ADDRESS_EXT:
-        ataReadNativeMaxAddressExtCommand();
+        ATAReadNativeMaxAddressExtCommand();
         // Request interrupt
-        ataIssueInterrupt();
+        ATAIssueInterrupt();
         break;
       case ATA_COMMAND_WRITE_DMA:
-        ataWriteDMACommand();
+        ATAWriteDMACommand();
         break;
       case ATA_COMMAND_IDENTIFY_DEVICE:
-        ataIdentifyDeviceCommand();
+        ATAIdentifyDeviceCommand();
         // Request interrupt
-        ataIssueInterrupt();
+        ATAIssueInterrupt();
         break;
       case ATA_COMMAND_SET_FEATURES:
         switch (ataState.regs.features) {
@@ -456,17 +445,17 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
           }
 #endif // HDD_DEBUG
           ataState.regs.ataTransferMode = inData;
+          break;
         }
-        break;
         default:
           LOG_ERROR(HDD, "[CMD]: Set features {:#x} subcommand unknown.", ataState.regs.features);
           break;
         }
         // Request interrupt
-        ataIssueInterrupt();
+        ATAIssueInterrupt();
         break;
       default:
-        LOG_ERROR(HDD, "Unhandled command received {}", getATACommandName(ataState.regs.command));
+        LOG_ERROR(HDD, "Unhandled command received {}", GetATACommandName(ataState.regs.command));
         break;
       }
       break;
@@ -501,8 +490,8 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
     }
   } else {
     // Control (DMA) registers
-    const u8 regOffset = static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR1);
-
+    const u8 regOffset = static_cast<u8>(address - pciConfigSpace.BAR1);
+ 
     switch (regOffset) {
     case ATA_REG_DMA_COMMAND:
       memcpy(&ataState.regs.dmaCommand, data, size);
@@ -523,22 +512,21 @@ void Xe::PCIDev::HDD::Write(u64 writeAddress, const u8 *data, u64 size) {
   }
 }
 
-void Xe::PCIDev::HDD::MemSet(u64 writeAddress, s32 data, u64 size) {
-  const u32 regOffset = (writeAddress & 0xFF) * 4;
+void Xe::PCIDev::HDD::MemSet(u64 address, s32 data, u64 size) {
+  const u32 regOffset = (address & 0xFF) * 4;
   LOG_ERROR(HDD, "Unknown register! Attempted to MEMSET {:#x}", regOffset);
 }
 
-// Config read.
-void Xe::PCIDev::HDD::ConfigRead(u64 readAddress, u8 *data, u64 size) {
-  memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], size);
+void Xe::PCIDev::HDD::ConfigRead(u64 address, u8 *data, u64 size) {
+  memcpy(data, &pciConfigSpace.data[static_cast<u8>(address)], size);
 }
-// Config write.
-void Xe::PCIDev::HDD::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
+
+void Xe::PCIDev::HDD::ConfigWrite(u64 address, const u8 *data, u64 size) {
   // Check if we're being scanned
   u64 tmp = 0;
   memcpy(&tmp, data, size);
-  if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
-    const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
+  if (static_cast<u8>(address) >= 0x10 && static_cast<u8>(address) < 0x34) {
+    const u32 regOffset = (static_cast<u8>(address) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
       if (tmp == 0xFFFFFFFF) { // PCI BAR Size discovery
         u64 x = 2;
@@ -552,18 +540,18 @@ void Xe::PCIDev::HDD::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
         tmp &= ~0x3;
       }
     }
-    if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address
+    if (static_cast<u8>(address) == 0x30) { // Expansion ROM Base Address
       tmp = 0; // Register not implemented
     }
   }
-  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &tmp, size);
+  memcpy(&pciConfigSpace.data[static_cast<u8>(address)], &tmp, size);
 }
 
 //
 // ATA Commands
 //
 
-void Xe::PCIDev::HDD::ataIdentifyDeviceCommand() {
+void Xe::PCIDev::HDD::ATAIdentifyDeviceCommand() {
   if (!ataState.dataOutBuffer.init(sizeof(ataState.ataIdentifyData), true)) {
     LOG_ERROR(HDD, "Failed to initialize data buffer for IDENTIFY_DEVICE command.");
   }
@@ -583,7 +571,7 @@ void Xe::PCIDev::HDD::ataIdentifyDeviceCommand() {
 }
 
 // ATA READ DMA (LBA 28 Bit)
-void Xe::PCIDev::HDD::ataReadDMACommand() {
+void Xe::PCIDev::HDD::ATAReadDMACommand() {
   u64 offset = (static_cast<u64>(ataState.regs.lbaHigh) << 16) |
     (static_cast<u64>(ataState.regs.lbaMiddle) << 8) |
     (static_cast<u64>(ataState.regs.lbaLow));
@@ -603,7 +591,7 @@ void Xe::PCIDev::HDD::ataReadDMACommand() {
 }
 
 // ATA READ NATIVE MAX ADDRESS EXT (LBA 48 Bit)
-void Xe::PCIDev::HDD::ataReadNativeMaxAddressExtCommand() {
+void Xe::PCIDev::HDD::ATAReadNativeMaxAddressExtCommand() {
   // This command returns the native maximum LBA address of the disk drive.
   u64 lbaMaxAddress = ataState.ataIdentifyData.userAddressableSectors48Bit[0] |
     static_cast<u64>(ataState.ataIdentifyData.userAddressableSectors48Bit[1]) << 32;
@@ -619,7 +607,7 @@ void Xe::PCIDev::HDD::ataReadNativeMaxAddressExtCommand() {
 }
 
 // ATA READ DMA EXT (LBA 48 Bit)
-void Xe::PCIDev::HDD::ataReadDMAExtCommand() {
+void Xe::PCIDev::HDD::ATAReadDMAExtCommand() {
   u64 offset = (static_cast<u64>(ataState.regs.prevLBAHigh) << 40) |
     (static_cast<u64>(ataState.regs.prevLBAMiddle) << 32) |
     (static_cast<u64>(ataState.regs.prevLBALow) << 24) |
@@ -644,7 +632,7 @@ void Xe::PCIDev::HDD::ataReadDMAExtCommand() {
 }
 
 // ATA WRITE DMA (LBA 28 Bit)
-void Xe::PCIDev::HDD::ataWriteDMACommand() {
+void Xe::PCIDev::HDD::ATAWriteDMACommand() {
   u64 offset = (ataState.regs.lbaHigh << 16) |
     (ataState.regs.lbaMiddle << 8) |
     (ataState.regs.lbaLow);
@@ -695,12 +683,12 @@ static const std::unordered_map<u32, const std::string> ataCommandNameMap = {
 };
 
 // Returns the command name as an std::string.
-const std::string Xe::PCIDev::HDD::getATACommandName(u32 commandID) {
+const std::string Xe::PCIDev::HDD::GetATACommandName(u32 commandID) {
   auto it = ataCommandNameMap.find(commandID);
   if (it != ataCommandNameMap.end()) {
     return it->second;
   } else {
-    LOG_ERROR(HDD, "Unknown Command: {:#x}", commandID);
+    LOG_ERROR(HDD, "Unknown Command: 0x{:X}", commandID);
     return "Unknown Command";
   }
 }
@@ -717,7 +705,7 @@ void Xe::PCIDev::HDD::hddThreadLoop() {
     // Check for the DMA active command.
     if (ataState.regs.dmaCommand & XE_ATA_DMA_ACTIVE) {
       // Start our DMA operation
-      doDMA();
+      DoDMA();
       // Change our DMA status after completion.
       ataState.regs.dmaCommand &= ~1; // Clear active status.
       ataState.regs.dmaStatus = XE_ATA_DMA_INTR; // Signal Interrupt.
@@ -726,10 +714,10 @@ void Xe::PCIDev::HDD::hddThreadLoop() {
 }
 
 // Performs the DMA operation until it reaches the end of the PRDT.
-void Xe::PCIDev::HDD::doDMA() {
-  for (;;) {
+void Xe::PCIDev::HDD::DoDMA() {
+  for (std::shared_ptr<RAM> ram = ramPtr.lock(); ram; ram = ramPtr.lock()) {
     // Read the first entry of the table in memory
-    u8 *DMAPointer = ramPtr->GetPointerToAddress(ataState.regs.dmaTableOffset + ataState.dmaState.currentTableOffset);
+    u8 *DMAPointer = ram->GetPointerToAddress(ataState.regs.dmaTableOffset + ataState.dmaState.currentTableOffset);
     // Each entry is 64 bit long
     memcpy(&ataState.dmaState, DMAPointer, 8);
 
@@ -745,9 +733,10 @@ void Xe::PCIDev::HDD::doDMA() {
     // The address in memory to be written to/read from
     u32 bufferAddress = ataState.dmaState.currentPRD.physAddress;
     // Buffer Pointer in main memory
-    u8 *bufferInMemory = ramPtr->GetPointerToAddress(bufferAddress);
+    u8 *bufferInMemory = ram->GetPointerToAddress(bufferAddress);
     // ATA DMA Spec states then the host will write a size of 0 to request 64K of data.
-    if (size == 0) { size = 65536; }
+    if (!size)
+      size = 65536;
 
     if (readOperation) {
       // Reading from us
@@ -760,22 +749,25 @@ void Xe::PCIDev::HDD::doDMA() {
       memcpy(ataState.dataInBuffer.get(), bufferInMemory, size);
       ataState.dataInBuffer.resize(size);
     }
+
     if (lastEntry) {
       // Reset the current position
       ataState.dmaState.currentTableOffset = 0;
       // After completion we must raise an interrupt
-      ataIssueInterrupt();
+      ATAIssueInterrupt();
       return;
     }
   }
 }
 
 // Issues an interrupt to the XCPU.
-void Xe::PCIDev::HDD::ataIssueInterrupt() {
-  if ((ataState.regs.deviceControl & ATA_DEVICE_CONTROL_NIEN) == 0) {
+void Xe::PCIDev::HDD::ATAIssueInterrupt() {
+  if (auto bus = parentBus.lock()) {
+    if ((ataState.regs.deviceControl & ATA_DEVICE_CONTROL_NIEN) == 0) {
 #ifdef HDD_DEBUG
-    LOG_DEBUG(HDD, "Issuing interrupt.");
+      LOG_DEBUG(HDD, "Issuing interrupt.");
 #endif // HDD_DEBUG
-    parentBus->RouteInterrupt(PRIO_SATA_HDD);
+      bus->RouteInterrupt(PRIO_SATA_HDD);
+    }
   }
 }

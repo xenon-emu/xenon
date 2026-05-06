@@ -56,7 +56,7 @@ s32 main(s32 argc, char *argv[]) {
 #endif // MICROPROFILE_ENABLED && !AUTO_FLIP
 #ifndef NO_GFX
     SDL_Event e;
-    while (XeRunning.load(std::memory_order_acquire) && SDL_WaitEvent(&e)) {
+    if (SDL_PollEvent(&e)) {
       if (XeMain::renderer.get())
         XeMain::renderer->OnEvent(e);
     }
@@ -76,7 +76,9 @@ s32 main(s32 argc, char *argv[]) {
     printf("Failed to remove signal handler. (this is more of a warning, than an issue)\n");
   }
 
+#ifndef NO_GFX
   SDL_Quit();
+#endif
 
   return 0;
 }

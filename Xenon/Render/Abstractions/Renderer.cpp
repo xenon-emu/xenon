@@ -66,7 +66,7 @@ void Renderer::SDLInit() {
   windowID = SDL_GetWindowID(mainWindow);
 }
 
-void Renderer::Start(RAM *ram) {
+void Renderer::Start(std::weak_ptr<RAM> ram) {
   ramPointer = ram;
   // Should we render?
   threadRunning.store(Config::rendering.enable && XeRunning.load(std::memory_order_acquire), std::memory_order_release);
@@ -200,99 +200,109 @@ void Renderer::OnEvent(const SDL_Event &e) {
   }
 
   // Process events.
-  while (threadRunning) {
-    ImGui_ImplSDL3_ProcessEvent(&e);
-    switch (e.type) {
-    case SDL_EVENT_WINDOW_RESIZED:
-      if (e.window.windowID == windowID) {
-        LOG_DEBUG(Render, "Resizing window...");
-        Resize(e.window.data1, e.window.data2);
+  ImGui_ImplSDL3_ProcessEvent(&e);
+  switch (e.type) {
+  case SDL_EVENT_WINDOW_RESIZED:
+    if (e.window.windowID == windowID) {
+      LOG_DEBUG(Render, "Resizing window...");
+      Resize(e.window.data1, e.window.data2);
+    }
+    break;
+  case SDL_EVENT_QUIT:
+    if (Config::rendering.quitOnWindowClosure) {
+      XeRunning.store(false, std::memory_order_release);
+    }
+    break;
+  case SDL_EVENT_KEY_DOWN:
+    if (e.key.key == SDLK_F11) {
+      if (mainWindow) {
+        const SDL_WindowFlags flag = SDL_GetWindowFlags(mainWindow);
+        bool fullscreenMode = flag & SDL_WINDOW_FULLSCREEN;
+        SDL_SetWindowFullscreen(mainWindow, !fullscreenMode);
       }
-      break;
-    case SDL_EVENT_QUIT:
-      if (Config::rendering.quitOnWindowClosure) {
-        XeRunning.store(false, std::memory_order_release);
+    }
+    break;
+  default:
+    break;
+  }
+}
+
+void Renderer::UpdateConstants(std::weak_ptr<Xe::XGPU::XenosState> statePtr) {
+  if (auto state = statePtr.lock()) {
+    XeShaderFloatConsts &floatConsts = state->floatConsts;
+    XeShaderBoolConsts &boolConsts = state->boolConsts;
+
+    // Vertex shader constants
+    constexpr u64 FLOAT_CONST_WORDS = sizeof(floatConsts.values) / sizeof(floatConsts.values[0]);
+    u32 *regPtr = reinterpret_cast<u32 *>(state->GetRegisterPointer(XeRegister::SHADER_CONSTANT_000_X));
+    for (u64 i = 0; i != FLOAT_CONST_WORDS; ++i) {
+      u32 word = regPtr[i];
+      f32 f;
+      ::memcpy(&f, &word, sizeof(word));
+      floatConsts.values[i] = f;
+    }
+
+    // Boolean shader constants
+    {
+      // SHADER_CONSTANT_BOOL_000_031 - SHADER_CONSTANT_BOOL_224_255
+      u32 begin = static_cast<u32>(XeRegister::SHADER_CONSTANT_BOOL_000_031);
+      const u64 mask = state->GetDirtyBlock(begin);
+      if (mask & 0xFF) {
+        u32 *ptr = reinterpret_cast<u32 *>(state->GetRegisterPointer(static_cast<XeRegister>(begin)));
+        u32 *dest = &boolConsts.values[begin];
+        std::memcpy(dest, ptr, sizeof(u32) * 8);
       }
-      break;
-    case SDL_EVENT_KEY_DOWN:
-      if (e.key.key == SDLK_F11) {
-        if (mainWindow) {
-          const SDL_WindowFlags flag = SDL_GetWindowFlags(mainWindow);
-          bool fullscreenMode = flag & SDL_WINDOW_FULLSCREEN;
-          SDL_SetWindowFullscreen(mainWindow, !fullscreenMode);
-        }
-      }
-      break;
-    default:
-      break;
+    }
+
+    // Upload float constants
+    {
+      RenderCommand cmd{};
+      cmd.type = RenderCommandType::UploadBuffer;
+      cmd.payload = RenderCommand::UploadBufferCmd{
+        "FloatConsts"_j,
+        std::vector<u8>(
+          reinterpret_cast<u8 *>(floatConsts.values),
+          reinterpret_cast<u8 *>(floatConsts.values) + sizeof(floatConsts.values)
+        ),
+        eBufferType::Uniform,
+        eBufferUsage::DynamicDraw
+      };
+
+      std::lock_guard<std::mutex> lock(renderQueueMutex);
+      renderQueue.push(std::move(cmd));
+    }
+
+    // Upload bool constants
+    {
+      RenderCommand cmd{};
+      cmd.type = RenderCommandType::UploadBuffer;
+      cmd.payload = RenderCommand::UploadBufferCmd{
+        "CommonBoolConsts"_j,
+        std::vector<u8>(
+          reinterpret_cast<u8 *>(boolConsts.values),
+          reinterpret_cast<u8 *>(boolConsts.values) + sizeof(boolConsts.values)
+        ),
+        eBufferType::Uniform,
+        eBufferUsage::DynamicDraw
+      };
+
+      std::lock_guard<std::mutex> lock(renderQueueMutex);
+      renderQueue.push(std::move(cmd));
     }
   }
 }
 
-void Renderer::UpdateConstants(Xe::XGPU::XenosState *state) {
-  XeShaderFloatConsts &floatConsts = state->floatConsts;
-  XeShaderBoolConsts &boolConsts = state->boolConsts;
+bool Renderer::IssueCopy(std::weak_ptr<Xe::XGPU::XenosState> statePtr) {
+  // Get RAM
+  auto ram = ramPointer.lock();
+  if (!ram)
+    return false;
 
-  // Vertex shader constants
-  constexpr u64 FLOAT_CONST_WORDS = sizeof(floatConsts.values) / sizeof(floatConsts.values[0]);
-  u32 *regPtr = reinterpret_cast<u32 *>(state->GetRegisterPointer(XeRegister::SHADER_CONSTANT_000_X));
-  for (u64 i = 0; i != FLOAT_CONST_WORDS; ++i) {
-    u32 word = regPtr[i];
-    f32 f;
-    ::memcpy(&f, &word, sizeof(word));
-    floatConsts.values[i] = f;
-  }
+  // Get XenosState
+  auto state = statePtr.lock();
+  if (!state)
+    return false;
 
-  // Boolean shader constants
-  {
-    // SHADER_CONSTANT_BOOL_000_031 - SHADER_CONSTANT_BOOL_224_255
-    u32 begin = static_cast<u32>(XeRegister::SHADER_CONSTANT_BOOL_000_031);
-    const u64 mask = state->GetDirtyBlock(begin);
-    if (mask & 0xFF) {
-      u32 *ptr = reinterpret_cast<u32 *>(state->GetRegisterPointer(static_cast<XeRegister>(begin)));
-      u32 *dest = &boolConsts.values[begin];
-      std::memcpy(dest, ptr, sizeof(u32) * 8);
-    }
-  }
-
-  // Upload float constants
-  {
-    RenderCommand cmd{};
-    cmd.type = RenderCommandType::UploadBuffer;
-    cmd.payload = RenderCommand::UploadBufferCmd{
-      "FloatConsts"_j,
-      std::vector<u8>(
-        reinterpret_cast<u8*>(floatConsts.values),
-        reinterpret_cast<u8*>(floatConsts.values) + sizeof(floatConsts.values)
-      ),
-      eBufferType::Uniform,
-      eBufferUsage::DynamicDraw
-    };
-
-    std::lock_guard<std::mutex> lock(renderQueueMutex);
-    renderQueue.push(std::move(cmd));
-  }
-
-  // Upload bool constants
-  {
-    RenderCommand cmd{};
-    cmd.type = RenderCommandType::UploadBuffer;
-    cmd.payload = RenderCommand::UploadBufferCmd{
-      "CommonBoolConsts"_j,
-      std::vector<u8>(
-        reinterpret_cast<u8*>(boolConsts.values),
-        reinterpret_cast<u8*>(boolConsts.values) + sizeof(boolConsts.values)
-      ),
-      eBufferType::Uniform,
-      eBufferUsage::DynamicDraw
-    };
-
-    std::lock_guard<std::mutex> lock(renderQueueMutex);
-    renderQueue.push(std::move(cmd));
-  }
-}
-
-bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
   // Which render targets are affected (0-3 = colorRT, 4=depth)
   const u32 copyRT = state->copyControl.copySrcSelect;
   // Should we clear after copy?
@@ -330,7 +340,7 @@ bool Renderer::IssueCopy(Xe::XGPU::XenosState *state) {
       u32 byteAddress = fetchData.BaseAddress << 2;
       u32 byteSize = fetchData.Size << 2;
 
-      u8 *data = ramPointer->GetPointerToAddress(byteAddress);
+      u8 *data = ram->GetPointerToAddress(byteAddress);
       if (!data) {
         LOG_WARNING(Xenos, "VertexFetch: Invalid memory for slot {} (addr=0x{:X})", fetchSlot, byteAddress);
         continue;
@@ -445,85 +455,90 @@ Xe::XGPU::XeShader *Renderer::GetOrCreateShader(u32 vsHash, u32 psHash) {
   if (xeShader.vertexShader) {
     OnBind(); // bind VAO / context-specific stuff
 
-    for (const auto &[fetch_key, location] : xeShader.vertexShader->attributeLocationMap) {
-      const Xe::Microcode::AST::VertexFetch *fetch = nullptr;
-      for (const auto *f : xeShader.vertexShader->vertexFetches) {
-        if (f->fetchSlot   == fetch_key.slot &&
+    if (auto xenos = XeMain::xenos.lock()) {
+      for (const auto &[fetch_key, location] : xeShader.vertexShader->attributeLocationMap) {
+        const Xe::Microcode::AST::VertexFetch *fetch = nullptr;
+        for (const auto *f : xeShader.vertexShader->vertexFetches) {
+          if (f->fetchSlot == fetch_key.slot &&
             f->fetchOffset == fetch_key.offset &&
             f->fetchStride == fetch_key.stride) {
-          fetch = f;
-          break;
-        }
-      }
-      if (!fetch)
-        continue;
-
-      u32 fetchSlot = fetch->fetchSlot;
-      u32 regBase   = static_cast<u32>(XeRegister::SHADER_CONSTANT_FETCH_00_0) + fetchSlot * 2;
-
-      Xe::ShaderConstantFetch fetchData{};
-      for (u32 i = 0; i != 6; ++i)
-        fetchData.rawHex[i] = byteswap_be<u32>(
-          XeMain::xenos->xenosState->ReadRegister(static_cast<XeRegister>(regBase + i))
-        );
-
-      if (fetchData.Vertex[0].Type == Xe::eConstType::Texture) {
-        // Vertex shader texture fetches skipped for now
-        continue;
-      } else if (fetchData.Vertex[0].Type == Xe::eConstType::Vertex) {
-        u32 fetchAddress = fetchData.Vertex[0].BaseAddress << 2;
-        u32 fetchSize    = fetchData.Vertex[0].Size        << 2;
-
-        u8 *data = ramPointer->GetPointerToAddress(fetchAddress);
-        if (!data) {
-          LOG_WARNING(Xenos, "VertexFetch: Invalid memory for slot {} (addr=0x{:X})",
-                      fetchSlot, fetchAddress);
-          continue;
-        }
-
-        const u64 wordCount = fetchSize / 4;
-        std::vector<u32> rawWords(wordCount);
-        memcpy(rawWords.data(), data, wordCount * sizeof(u32));
-
-        std::vector<f32> dataVec;
-        dataVec.resize(wordCount);
-        for (u64 i = 0; i != wordCount; ++i) {
-          dataVec[i] = std::bit_cast<f32, u32>(rawWords[i]);
-        }
-
-        u64 bufferKey = (static_cast<u64>(fetchAddress) << 32) | fetchSize;
-
-        std::shared_ptr<Buffer> buffer = nullptr;
-        auto it = createdBuffers.find(bufferKey);
-        if (it != createdBuffers.end()) {
-          buffer = it->second;
-          if (buffer->GetSize() < fetchSize) {
-            buffer->DestroyBuffer();
-            buffer->CreateBuffer(static_cast<u32>(fetchSize), dataVec.data(),
-                                 Render::eBufferUsage::StaticDraw, Render::eBufferType::Vertex);
-          } else {
-            buffer->UpdateBuffer(0, static_cast<u32>(fetchSize), dataVec.data());
+            fetch = f;
+            break;
           }
-        } else {
-          buffer = resourceFactory->CreateBuffer();
-          buffer->CreateBuffer(static_cast<u32>(fetchSize), dataVec.data(),
-                               Render::eBufferUsage::StaticDraw, Render::eBufferType::Vertex);
-          createdBuffers.insert({ bufferKey, buffer });
         }
+        if (!fetch)
+          continue;
 
-        // Bind the buffer to the current VAO
-        buffer->Bind();
+        u32 fetchSlot = fetch->fetchSlot;
+        u32 regBase = static_cast<u32>(XeRegister::SHADER_CONSTANT_FETCH_00_0) + fetchSlot * 2;
 
-        const u32 components = fetch->GetComponentCount();
-        const u32 offset = fetch->fetchOffset * 4;
-        const u32 stride = fetch->fetchStride * 4;
-        VertexFetch(location, components, fetch->isFloat, fetch->isNormalized, offset, stride);
+        Xe::ShaderConstantFetch fetchData{};
+        for (u32 i = 0; i != 6; ++i)
+          fetchData.rawHex[i] = byteswap_be<u32>(
+            xenos->xenosState->ReadRegister(static_cast<XeRegister>(regBase + i))
+          );
+
+        if (fetchData.Vertex[0].Type == Xe::eConstType::Texture) {
+          // Vertex shader texture fetches skipped for now
+          continue;
+        } else if (fetchData.Vertex[0].Type == Xe::eConstType::Vertex) {
+          u32 fetchAddress = fetchData.Vertex[0].BaseAddress << 2;
+          u32 fetchSize = fetchData.Vertex[0].Size << 2;
+
+          u8 *data = nullptr;
+          if (auto ram = ramPointer.lock()) {
+            data = ram->GetPointerToAddress(fetchAddress);
+            if (!data) {
+              LOG_WARNING(Xenos, "VertexFetch: Invalid memory for slot {} (addr=0x{:X})", fetchSlot, fetchAddress);
+              continue;
+            }
+          } else {
+            break;
+          }
+
+          const u64 wordCount = fetchSize / 4;
+          std::vector<u32> rawWords(wordCount);
+          memcpy(rawWords.data(), data, wordCount * sizeof(u32));
+
+          std::vector<f32> dataVec;
+          dataVec.resize(wordCount);
+          for (u64 i = 0; i != wordCount; ++i) {
+            dataVec[i] = std::bit_cast<f32, u32>(rawWords[i]);
+          }
+
+          u64 bufferKey = (static_cast<u64>(fetchAddress) << 32) | fetchSize;
+
+          std::shared_ptr<Buffer> buffer = nullptr;
+          auto it = createdBuffers.find(bufferKey);
+          if (it != createdBuffers.end()) {
+            buffer = it->second;
+            if (buffer->GetSize() < fetchSize) {
+              buffer->DestroyBuffer();
+              buffer->CreateBuffer(static_cast<u32>(fetchSize), dataVec.data(), Render::eBufferUsage::StaticDraw, Render::eBufferType::Vertex);
+            } else {
+              buffer->UpdateBuffer(0, static_cast<u32>(fetchSize), dataVec.data());
+            }
+          } else {
+            buffer = resourceFactory->CreateBuffer();
+            buffer->CreateBuffer(static_cast<u32>(fetchSize), dataVec.data(), Render::eBufferUsage::StaticDraw, Render::eBufferType::Vertex);
+            createdBuffers.insert({ bufferKey, buffer });
+          }
+
+          // Bind the buffer to the current VAO
+          buffer->Bind();
+
+          const u32 components = fetch->GetComponentCount();
+          const u32 offset = fetch->fetchOffset * 4;
+          const u32 stride = fetch->fetchStride * 4;
+          VertexFetch(location, components, fetch->isFloat, fetch->isNormalized, offset, stride);
+        }
       }
+    } else {
+      return nullptr;
     }
   }
 
-  auto [it, inserted] =
-    linkedShaderPrograms.emplace(combinedHash, std::move(xeShader));
+  auto [it, inserted] = linkedShaderPrograms.emplace(combinedHash, std::move(xeShader));
 
   return &it->second;
 }
@@ -543,35 +558,34 @@ void Renderer::Thread() {
   // Main loop
   while (threadRunning) {
     // Clear the display
-    if (XeMain::xenos)
-      Clear();
+    Clear();
 
-    if (XeMain::xenos && XeMain::xenos->RenderingTo2DFramebuffer()) {
-      if (ramPointer) {
-        fbPointer = ramPointer->GetPointerToAddress(XeMain::xenos->GetSurface());
-        const u32 *ui_fbPointer = reinterpret_cast<const u32 *>(fbPointer);
-        pixelSSBO->UpdateBuffer(0, pitch, ui_fbPointer);
+    if (auto ram = ramPointer.lock(); auto xenos = XeMain::xenos.lock()) {
+      if (xenos->RenderingTo2DFramebuffer()) {
+        if (ram) {
+          fbPointer = ram->GetPointerToAddress(xenos->GetSurface());
+          const u32 *ui_fbPointer = reinterpret_cast<const u32 *>(fbPointer);
+          pixelSSBO->UpdateBuffer(0, pitch, ui_fbPointer);
 
-        if (computeShaderProgram.get()) {
-          computeShaderProgram->Bind();
-          pixelSSBO->Bind();
+          if (computeShaderProgram.get()) {
+            computeShaderProgram->Bind();
+            pixelSSBO->Bind();
 
-          if (XeMain::xenos) {
-            internalWidth = XeMain::xenos->GetWidth();
-            internalHeight = XeMain::xenos->GetHeight();
+            internalWidth = xenos->GetWidth();
+            internalHeight = xenos->GetHeight();
+            computeShaderProgram->SetUniformInt("internalWidth", internalWidth);
+            computeShaderProgram->SetUniformInt("internalHeight", internalHeight);
+            computeShaderProgram->SetUniformInt("resWidth", width);
+            computeShaderProgram->SetUniformInt("resHeight", height);
+            OnCompute();
           }
-          computeShaderProgram->SetUniformInt("internalWidth", internalWidth);
-          computeShaderProgram->SetUniformInt("internalHeight", internalHeight);
-          computeShaderProgram->SetUniformInt("resWidth", width);
-          computeShaderProgram->SetUniformInt("resHeight", height);
-          OnCompute();
-        }
-        if (renderShaderPrograms.get()) {
-          renderShaderPrograms->Bind();
-          backbuffer->Bind();
-          OnBind();
-          backbuffer->Unbind();
-          renderShaderPrograms->Unbind();
+          if (renderShaderPrograms.get()) {
+            renderShaderPrograms->Bind();
+            backbuffer->Bind();
+            OnBind();
+            backbuffer->Unbind();
+            renderShaderPrograms->Unbind();
+          }
         }
       }
     }

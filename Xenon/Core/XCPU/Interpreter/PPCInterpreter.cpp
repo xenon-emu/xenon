@@ -143,8 +143,7 @@ void PPCInterpreter::ppcExecuteSingleInstruction(sPPEState *ppeState) {
   }
 #endif // ENABLE_INSTRUCTION_PROFILER
 
-  instructionHandler function =
-    ppcDecoder.decode(thread.CI.opcode);
+  instructionHandler function = ppcDecoder.decode(thread.CI.opcode);
 
   function(ppeState);
 }

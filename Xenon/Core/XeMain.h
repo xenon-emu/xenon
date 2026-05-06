@@ -48,54 +48,45 @@ extern void ReloadFiles();
 extern void SaveConfig();
 extern void LoadConfig();
 
-extern void CreateBridges();
-extern void CreatePCIDevices(RAM *ram);
-extern void CreateRootBus();
+extern void CreateBusDevices();
+extern void CreateBusTrees();
 
 extern Xe::XCPU::XenonCPU *GetCPU();
 
-// Main Emulator objects
-inline std::shared_ptr<RootBus> rootBus{}; // RootBus Object
-inline std::shared_ptr<HostBridge> hostBridge{}; // HostBridge Object
-inline std::shared_ptr<PCIBridge> pciBridge{}; // PCIBridge Object
+// Main objects
+//  Config path
+inline fs::path configPath = {};
+//  Log Filter
+inline std::unique_ptr<Base::Log::Filter> logFilter = {};
+//  Root bus
+inline std::shared_ptr<RootBus> rootBus{};
+//  Host PCI bus
+inline std::weak_ptr<HostBridge> hostBridge{};
+//  Guest PCI bus
+inline std::weak_ptr<PCIBridge> pciBridge{};
 
 #ifndef NO_GFX
-// Render thread
+//  Rendering context
 inline std::unique_ptr<Render::Renderer> renderer{};
 #endif
-// CPU started flag
+//  RAM Size
+inline std::string ramSizeStr = {};
+inline u64 ramSize = 0;
+//  CPU flag
 inline bool CPUStarted = false;
-
-// PCI Devices
-//  SMC
-inline std::shared_ptr<Xe::PCIDev::SMC> smcCore{};
-//  Ethernet
-inline std::shared_ptr<Xe::PCIDev::ETHERNET> ethernet{};
-//  Audio
-inline std::shared_ptr<Xe::PCIDev::AUDIOCTRLR> audioController{};
-//  OHCI
-inline std::shared_ptr<Xe::PCIDev::OHCI0> ohci0{};
-inline std::shared_ptr<Xe::PCIDev::OHCI1> ohci1{};
-//  EHCI
-inline std::shared_ptr<Xe::PCIDev::EHCI0> ehci0{};
-inline std::shared_ptr<Xe::PCIDev::EHCI1> ehci1{};
-//  Secure Flash Controller for Xbox Device object
-inline std::shared_ptr<Xe::PCIDev::SFCX> sfcx{};
-//  XMA
-inline std::shared_ptr<Xe::PCIDev::XMA> xma{};
-//  ODD (CD-ROM Drive)
-inline std::shared_ptr<Xe::PCIDev::ODD> odd{};
-//  HDD
-inline std::shared_ptr<Xe::PCIDev::HDD> hdd{};
-//  NAND
-inline std::shared_ptr<NAND> nand{};
-//  Random Access Memory (All console RAM, excluding Reserved memory which is mainly PCI Devices)
-inline std::shared_ptr<RAM> ram{};
 
 // Console Handles
 //  Xenon CPU
 inline std::unique_ptr<Xe::XCPU::XenonCPU> xenonCPU{};
 //  Xenos GPU
-inline std::shared_ptr<Xe::Xenos::XGPU> xenos{};
+inline std::weak_ptr<Xe::Xenos::XGPU> xenos{};
+
+// PCI Devices (weak references)
+// SMC
+inline std::weak_ptr<Xe::PCIDev::SMC> smcCore{};
+// SFCX
+inline std::weak_ptr<Xe::PCIDev::SFCX> sfcx{};
+// RAM
+inline std::weak_ptr<RAM> ram{};
 
 } // namespace XeMain

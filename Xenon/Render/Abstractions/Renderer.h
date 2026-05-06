@@ -87,7 +87,7 @@ struct RenderCommand {
   };
 
   struct CopyResolveCmd {
-    Xe::XGPU::XenosState *state;
+    std::weak_ptr<Xe::XGPU::XenosState> state;
   };
 
   using Payload = std::variant<
@@ -123,7 +123,7 @@ public:
   virtual void WaitIdle() {}
   virtual void Clear() = 0;
 
-  virtual void UpdateViewportFromState(const Xe::XGPU::XenosState *state) = 0;
+  virtual void UpdateViewportFromState(std::weak_ptr<Xe::XGPU::XenosState> statePtr) = 0;
   virtual void VertexFetch(const u32 location, const u32 components, bool isFloat, bool isNormalized, const u32 fetchOffset, const u32 fetchStride) = 0;
   virtual void Draw(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params) = 0;
   virtual void DrawIndexed(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params, Xe::XGPU::XeIndexBufferInfo indexBufferInfo) = 0;
@@ -137,14 +137,14 @@ public:
   virtual u32 GetBackendID() = 0;
   void SDLInit();
 
-  void Start(RAM *ram);
+  void Start(std::weak_ptr<RAM> ram);
   void CreateHandles();
   void Shutdown();
   void Resize(u32 x, u32 y);
 
-  void UpdateConstants(Xe::XGPU::XenosState *state);
+  void UpdateConstants(std::weak_ptr<Xe::XGPU::XenosState> statePtr);
 
-  bool IssueCopy(Xe::XGPU::XenosState *state);
+  bool IssueCopy(std::weak_ptr<Xe::XGPU::XenosState> statePtr);
 
   Xe::XGPU::XeShader *GetOrCreateShader(u32 vsHash, u32 psHash);
   Xe::XGPU::XeShader *BindShaderHack(u32 vsHash, u32 psHash);
@@ -156,7 +156,7 @@ public:
   bool finishedCreation = false;
 
   // CPU Handles
-  RAM *ramPointer{};
+  std::weak_ptr<RAM> ramPointer{};
   u8 *fbPointer{};
 
   // Window Resolution

@@ -72,19 +72,20 @@ const u8 atapiInquiryDataBytes[] = { 0x05, 0x80, 0x00, 0x32, 0x5B, 0x00, 0x00, 0
 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x31, 0x35, 0x33, 0x32
 };
 
-Xe::PCIDev::ODD::ODD(const char* deviceName, u64 size, PCIBridge *parentPCIBridge, RAM *ram)
-  : PCIDevice(deviceName, size) {
+Xe::PCIDev::ODD::ODD(u64 size, std::weak_ptr<PCIBridge> parentPCIBridge, std::weak_ptr<RAM> ram)
+  : PCIDevice(__func__, size), parentBus(parentPCIBridge), ramPtr(ram)
+{
   // Note:
   // The ATA/ATAPI Controller in the Xenon Southbridge contain two BAR's:
   // The first is for the Command Block (Regs 0-7) + DevCtrl/AltStatus reg at offset 0xA
   // The second is for the BMDMA (Bus Master DMA) block
 
   // Set PCI Properties
-  pciConfigSpace.configSpaceHeader.reg0.hexData = 0x58021414;
-  pciConfigSpace.configSpaceHeader.reg1.hexData = 0x02300006;
-  pciConfigSpace.configSpaceHeader.reg2.hexData = 0x01060000;
-  pciConfigSpace.configSpaceHeader.regD.hexData = 0x00000058; // Capabilites pointer
-  pciConfigSpace.configSpaceHeader.regF.hexData = 0x00000100; // Int line, pin
+  pciConfigSpace.reg0.hexData = 0x58021414;
+  pciConfigSpace.reg1.hexData = 0x02300006;
+  pciConfigSpace.reg2.hexData = 0x01060000;
+  pciConfigSpace.regD.hexData = 0x00000058; // Capabilites pointer
+  pciConfigSpace.regF.hexData = 0x00000100; // Int line, pin
 
   u32 data = 0;
 
@@ -106,10 +107,6 @@ Xe::PCIDev::ODD::ODD(const char* deviceName, u64 size, PCIBridge *parentPCIBridg
   // Set our PCI device sizes
   pciDevSizes[0] = 0x20; // BAR0
   pciDevSizes[1] = 0x10; // BAR1
-
-  // Assign our PCI bridge and RAM pointers
-  parentBus = parentPCIBridge;
-  ramPtr = ram;
 
   // Initialize our input and output buffers
   atapiState.dataInBuffer.init(ATAPI_CDROM_SECTOR_SIZE, true);
@@ -210,22 +207,22 @@ Xe::PCIDev::ODD::~ODD() {
 }
 
 // PCI Read
-void Xe::PCIDev::ODD::Read(u64 readAddress, u8 *data, u64 size) {
+void Xe::PCIDev::ODD::Read(u64 address, u8 *data, u64 size) {
   // PCI BAR0 is the Primary Command Block Base Address
   u8 atapiCommandReg =
-      static_cast<u8>(readAddress - pciConfigSpace.configSpaceHeader.BAR0);
+      static_cast<u8>(address - pciConfigSpace.BAR0);
 
   // PCI BAR1 is the Primary Control Block Base Address
   u8 atapiControlReg =
-      static_cast<u8>(readAddress - pciConfigSpace.configSpaceHeader.BAR1);
+      static_cast<u8>(address - pciConfigSpace.BAR1);
 
 #ifdef ODD_DEBUG
-  LOG_DEBUG(ODD, "[Read]: Reg {}, address {:#x}", getATAPIRegisterName(readAddress & 0xFF), readAddress);
+  LOG_DEBUG(ODD, "[Read]: Reg {}, address {:#x}", getATAPIRegisterName(address & 0xFF), address);
 #endif // ODD_DEBUG
 
   // Command Registers
-  if (atapiCommandReg < (pciConfigSpace.configSpaceHeader.BAR1 -
-                         pciConfigSpace.configSpaceHeader.BAR0)) {
+  if (atapiCommandReg < (pciConfigSpace.BAR1 -
+                         pciConfigSpace.BAR0)) {
 
     switch (atapiCommandReg) {
     case ATA_REG_DATA:
@@ -270,7 +267,9 @@ void Xe::PCIDev::ODD::Read(u64 readAddress, u8 *data, u64 size) {
     case ATAPI_REG_STATUS:
       memcpy(data, &atapiState.regs.status, size);
       // Cancel any interrupts that may be pending
-      parentBus->CancelInterrupt(PRIO_SATA_ODD);
+      if (auto bus = parentBus.lock()) {
+        bus->CancelInterrupt(PRIO_SATA_ODD);
+      }
       return;
     case ATAPI_REG_ALTERNATE_STATUS:
       // Reading to the alternate status register returns the contents of the Status register,
@@ -312,26 +311,26 @@ void Xe::PCIDev::ODD::Read(u64 readAddress, u8 *data, u64 size) {
   }
 }
 // PCI Write
-void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
+void Xe::PCIDev::ODD::Write(u64 address, const u8 *data, u64 size) {
   // PCI BAR0 is the Primary Command Block Base Address
   u8 atapiCommandReg =
-      static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR0);
+      static_cast<u8>(address - pciConfigSpace.BAR0);
 
   // PCI BAR1 is the Primary Control Block Base Address
   u8 atapiControlReg =
-      static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR1);
+      static_cast<u8>(address - pciConfigSpace.BAR1);
 
   u32 inData = 0;
   memcpy(&inData, data, size);
 
 #ifdef ODD_DEBUG
-  LOG_DEBUG(ODD, "[Write]: Reg {}, address {:#x}, data {:#x}, byte count {:#d}", getATAPIRegisterName(writeAddress & 0xFF),
-    writeAddress, inData, size);
+  LOG_DEBUG(ODD, "[Write]: Reg {}, address {:#x}, data {:#x}, byte count {:#d}", getATAPIRegisterName(address & 0xFF),
+    address, inData, size);
 #endif // ODD_DEBUG
 
   // Command Registers
-  if (atapiCommandReg < (pciConfigSpace.configSpaceHeader.BAR1 -
-                         pciConfigSpace.configSpaceHeader.BAR0)) {
+  if (atapiCommandReg < (pciConfigSpace.BAR1 -
+                         pciConfigSpace.BAR0)) {
 
     switch (atapiCommandReg) {
     case ATAPI_REG_DATA: {
@@ -494,7 +493,7 @@ void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
       u64 tmp = 0;
       memcpy(&tmp, data, size);
       LOG_ERROR(ODD, "Unknown Command Register Block register being written, command reg = 0x{:X}"
-        ", write address = 0x{:X}, data = 0x{:X}", atapiCommandReg, writeAddress, tmp);
+        ", write address = 0x{:X}, data = 0x{:X}", atapiCommandReg, address, tmp);
     } break;
     }
   } else {
@@ -519,18 +518,18 @@ void Xe::PCIDev::ODD::Write(u64 writeAddress, const u8 *data, u64 size) {
   }
 }
 
-void Xe::PCIDev::ODD::MemSet(u64 writeAddress, s32 data, u64 size) {
+void Xe::PCIDev::ODD::MemSet(u64 address, s32 data, u64 size) {
   // PCI BAR0 is the primary command block base address
   u8 atapiCommandReg =
-      static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR0);
+      static_cast<u8>(address - pciConfigSpace.BAR0);
 
   // PCI BAR1 is the primary command block base address
   u8 atapiControlReg =
-      static_cast<u8>(writeAddress - pciConfigSpace.configSpaceHeader.BAR1);
+      static_cast<u8>(address - pciConfigSpace.BAR1);
 
   // Who are we writing to?
-  if (atapiCommandReg < (pciConfigSpace.configSpaceHeader.BAR1 -
-                         pciConfigSpace.configSpaceHeader.BAR0)) {
+  if (atapiCommandReg < (pciConfigSpace.BAR1 -
+                         pciConfigSpace.BAR0)) {
     // Command Registers
     switch (atapiCommandReg) {
     case ATAPI_REG_DATA: {
@@ -607,7 +606,7 @@ void Xe::PCIDev::ODD::MemSet(u64 writeAddress, s32 data, u64 size) {
       u64 tmp = 0;
       memset(&tmp, data, size);
       LOG_ERROR(ODD, "Unknown Command Register Block register being written, command reg = 0x{:X}"
-        ", write address = 0x{:X}, data = 0x{:X}", atapiCommandReg, writeAddress, tmp);
+        ", write address = 0x{:X}, data = 0x{:X}", atapiCommandReg, address, tmp);
       break;
     }
   } else {
@@ -637,8 +636,8 @@ void Xe::PCIDev::ODD::MemSet(u64 writeAddress, s32 data, u64 size) {
 }
 
 // Config read.
-void Xe::PCIDev::ODD::ConfigRead(u64 readAddress, u8 *data, u64 size) {
-  const u8 readReg = static_cast<u8>(readAddress);
+void Xe::PCIDev::ODD::ConfigRead(u64 address, u8 *data, u64 size) {
+  const u8 readReg = static_cast<u8>(address);
   if (readReg >= XE_SIS_SCR_BASE && readReg <= 0xFF) {
     // Read the SATA status and control registers
     switch ((readReg - XE_SIS_SCR_BASE) / 4) {
@@ -662,16 +661,16 @@ void Xe::PCIDev::ODD::ConfigRead(u64 readAddress, u8 *data, u64 size) {
       break;
     }
   }
-  memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], size);
+  memcpy(data, &pciConfigSpace.data[static_cast<u8>(address)], size);
   LOG_DEBUG(ODD, "ConfigRead to reg 0x{:X}", readReg * 4);
 }
 // Config write.
-void Xe::PCIDev::ODD::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
+void Xe::PCIDev::ODD::ConfigWrite(u64 address, const u8 *data, u64 size) {
   // Check if we're being scanned
   u64 tmp = 0;
   memcpy(&tmp, data, size);
-  if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
-    const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
+  if (static_cast<u8>(address) >= 0x10 && static_cast<u8>(address) < 0x34) {
+    const u32 regOffset = (static_cast<u8>(address) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
       if (tmp == 0xFFFFFFFF) { // PCI BAR Size discovery
         u64 x = 2;
@@ -685,12 +684,12 @@ void Xe::PCIDev::ODD::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
         tmp &= ~0x3;
       }
     }
-    if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address
+    if (static_cast<u8>(address) == 0x30) { // Expansion ROM Base Address
       tmp = 0; // Register not implemented
     }
   }
 
-  u8 writeReg = static_cast<u8>(writeAddress);
+  u8 writeReg = static_cast<u8>(address);
   if (writeReg >= XE_SIS_SCR_BASE && writeReg <= 0xFF) {
     // Write to the SATA status and control registers
     switch ((writeReg - XE_SIS_SCR_BASE) / 4) {
@@ -714,7 +713,7 @@ void Xe::PCIDev::ODD::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
       break;
     }
   }
-  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &tmp, size);
+  memcpy(&pciConfigSpace.data[static_cast<u8>(address)], &tmp, size);
   LOG_DEBUG(ODD, "ConfigWrite to reg 0x{:X}, data 0x{:X}", writeReg * 4, tmp);
 }
 
@@ -1147,9 +1146,9 @@ void Xe::PCIDev::ODD::oddThreadLoop() {
 
 // Performs the DMA operation until it reaches the end of the PRDT.
 void Xe::PCIDev::ODD::doDMA() {
-  for (;;) {
+  for (std::shared_ptr<RAM> ram = ramPtr.lock(); ram; ram = ramPtr.lock()) {
     // Read the first entry of the table in memory
-    u8 *DMAPointer = ramPtr->GetPointerToAddress(atapiState.regs.dmaTableOffset +
+    u8 *DMAPointer = ram->GetPointerToAddress(atapiState.regs.dmaTableOffset +
       atapiState.dmaState.currentTableOffset);
     // Each entry is 64 bit long
     memcpy(&atapiState.dmaState, DMAPointer, 8);
@@ -1166,9 +1165,10 @@ void Xe::PCIDev::ODD::doDMA() {
     // The address in memory to be written to/read from
     u32 bufferAddress = atapiState.dmaState.currentPRD.physAddress;
     // Buffer Pointer in main memory
-    u8 *bufferInMemory = ramPtr->GetPointerToAddress(bufferAddress);
+    u8 *bufferInMemory = ram->GetPointerToAddress(bufferAddress);
     // ATA DMA Spec states then the host will write a size of 0 to request 64K of data.
-    if (size == 0) { size = 65536; }
+    if (size == 0)
+      size = 65536;
 
     if (readOperation) {
       // Reading from us
@@ -1181,6 +1181,7 @@ void Xe::PCIDev::ODD::doDMA() {
       memcpy(atapiState.dataInBuffer.get(), bufferInMemory, size);
       atapiState.dataInBuffer.resize(size);
     }
+
     if (lastEntry) {
       // Reset the current position
       atapiState.dmaState.currentTableOffset = 0;
@@ -1195,7 +1196,8 @@ void Xe::PCIDev::ODD::atapiIssueInterrupt() {
 #ifdef ODD_DEBUG
     LOG_DEBUG(ODD, "Issuing interrupt.");
 #endif // ODD_DEBUG
-    parentBus->RouteInterrupt(PRIO_SATA_ODD);
+    if (auto bus = parentBus.lock())
+      bus->RouteInterrupt(PRIO_SATA_ODD);
   }
 }
 

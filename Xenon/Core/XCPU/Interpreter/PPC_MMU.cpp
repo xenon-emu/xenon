@@ -132,8 +132,8 @@ void PPCInterpreter::PPCInterpreter_slbia(sPPEState *ppeState) {
 
 // TLB Invalidate Entry Local
 void PPCInterpreter::PPCInterpreter_tlbiel(sPPEState *ppeState) {
-  const bool LP = (GPRi(rb) & 0x1000) >> 12;
-  const bool invalSelector = (GPRi(rb) & 0x800) >> 11;
+  const u8 LP = (GPRi(rb) & 0x1000) >> 12;
+  const u8 invalSelector = (GPRi(rb) & 0x800) >> 11;
   const u8 p = mmuGetPageSize(ppeState, _instr.l10, LP);
 
   if (invalSelector) {
@@ -199,7 +199,7 @@ void PPCInterpreter::PPCInterpreter_tlbiel(sPPEState *ppeState) {
 // TLB Invalidate Entry
 void PPCInterpreter::PPCInterpreter_tlbie(sPPEState *ppeState) {
   const u64 EA = GPRi(rb);
-  const bool LP = (GPRi(rb) & 0x1000) >> 12;
+  const u8 LP = (GPRi(rb) & 0x1000) >> 12;
   const u8 p = mmuGetPageSize(ppeState, _instr.l10, LP);
   const u64 pageSize = 1ULL << p;
   const u64 pageMask = pageSize - 1;
@@ -237,7 +237,7 @@ void PPCInterpreter::PPCInterpreter_tlbsync(sPPEState *ppeState) {
 }
 
 // Helper function for getting Page Size (p bit).
-u8 PPCInterpreter::mmuGetPageSize(sPPEState *ppeState, bool L, u8 LP) {
+u8 PPCInterpreter::mmuGetPageSize(sPPEState *ppeState, u8 L, u8 LP) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUGetPageSize", MP_AUTO);
 
   // Large page selection works the following way:
@@ -257,7 +257,6 @@ u8 PPCInterpreter::mmuGetPageSize(sPPEState *ppeState, bool L, u8 LP) {
   static constexpr u8 lpSize1[4] = { MMU_PAGE_SIZE_16MB, MMU_PAGE_SIZE_1MB, MMU_PAGE_SIZE_64KB, MMU_PAGE_SIZE_4KB };
 
   const u8 LB = ppeState->SPR.HID6.LB;
-
   if (LP == 0) {
     const u8 LB_16_17 = (LB & 0b1100) >> 2;
     return lpSize0[LB_16_17];
@@ -270,7 +269,6 @@ u8 PPCInterpreter::mmuGetPageSize(sPPEState *ppeState, bool L, u8 LP) {
 // This is done when TLB Reload is in software-controlled mode.
 void PPCInterpreter::mmuAddTlbEntry(sPPEState *ppeState) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUAddTlbEntry", MP_AUTO);
-
   const u64 tlbIndex = ppeState->SPR.PPE_TLB_Index.hexValue;
   const u64 tlbVpn = ppeState->SPR.PPE_TLB_VPN.hexValue;
   const u64 tlbRpn = ppeState->SPR.PPE_TLB_RPN.hexValue;
@@ -307,11 +305,21 @@ void PPCInterpreter::mmuAddTlbEntry(sPPEState *ppeState) {
   // Map TS bitmask to way index
   u8 wayIndex;
   switch (TS) {
-  case 0b1000: wayIndex = 0; break;
-  case 0b0100: wayIndex = 1; break;
-  case 0b0010: wayIndex = 2; break;
-  case 0b0001: wayIndex = 3; break;
-  default:     wayIndex = 0; break;
+  case 0b1000:
+    wayIndex = 0;
+    break;
+  case 0b0100:
+    wayIndex = 1;
+    break;
+  case 0b0010:
+    wayIndex = 2;
+    break;
+  case 0b0001:
+    wayIndex = 3;
+    break;
+  default:
+    wayIndex = 0;
+    break;
   }
 
   TLBCongruenceClass &tlbClass = ppeState->TLB.classes[TI];
@@ -333,16 +341,15 @@ void PPCInterpreter::mmuAddTlbEntry(sPPEState *ppeState) {
 
 // This is done when TLB Reload is in hardware-controlled mode.
 void PPCInterpreter::mmuAddTlbEntryHardware(sPPEState *ppeState, u64 VA,
-                                            u64 pte0, u64 pte1, u8 p, bool L,
-                                            bool LP) {
+                                            u64 pte0, u64 pte1, u8 p, u8 L,
+                                            u8 LP) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUAddTlbEntryHardware",
                       MP_AUTO);
 
   const u16 tlbIndex = mmuComputeTLBIndex(VA, p);
 
   // Pre-calculate RPN for fast lookup
-  const u64 RPN =
-      L ? (pte1 & PPC_HPTE64_RPN_LP) : (pte1 & PPC_HPTE64_RPN_NO_LP);
+  const u64 RPN = L ? (pte1 & PPC_HPTE64_RPN_LP) : (pte1 & PPC_HPTE64_RPN_NO_LP);
 
   // Calculate VPN (masked by page size)
   const u64 compareMask = mmuGetCompareMask(p);
@@ -382,7 +389,7 @@ void PPCInterpreter::mmuAddTlbEntryHardware(sPPEState *ppeState, u64 VA,
 }
 
 // Translation Lookaside Buffer Search
-bool PPCInterpreter::mmuSearchTlbEntry(sPPEState *ppeState, u64 *RPN, u64 VA, u8 p, bool L, bool LP) {
+bool PPCInterpreter::mmuSearchTlbEntry(sPPEState *ppeState, u64 *RPN, u64 VA, u8 p, u8 L, u8 LP) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUSearchTlbEntry", MP_AUTO);
 
   const u16 classIndex = mmuComputeTLBIndex(VA, p);
@@ -418,11 +425,21 @@ bool PPCInterpreter::mmuSearchTlbEntry(sPPEState *ppeState, u64 *RPN, u64 VA, u8
     // Convert way to bitmask format for PPE_TLB_Index_Hint
     u8 wayBitmask;
     switch (replacementWay) {
-    case 0: wayBitmask = 0b1000; break;
-    case 1: wayBitmask = 0b0100; break;
-    case 2: wayBitmask = 0b0010; break;
-    case 3: wayBitmask = 0b0001; break;
-    default: wayBitmask = 0b0001; break;
+    case 0:
+      wayBitmask = 0b1000;
+      break;
+    case 1:
+      wayBitmask = 0b0100;
+      break;
+    case 2:
+      wayBitmask = 0b0010;
+      break;
+    case 3:
+      wayBitmask = 0b0001;
+      break;
+    default:
+      wayBitmask = 0b0001;
+      break;
     }
 
     u64 hint = (static_cast<u64>(classIndex) << 4) | wayBitmask;
@@ -433,8 +450,7 @@ bool PPCInterpreter::mmuSearchTlbEntry(sPPEState *ppeState, u64 *RPN, u64 VA, u8
 }
 
 // Routine to read a string from memory, using a PSTRNG given by the kernel.
-void PPCInterpreter::mmuReadString(sPPEState *ppeState, u64 stringAddress,
-                                   char *string, u32 maxLength) {
+void PPCInterpreter::mmuReadString(sPPEState *ppeState, u64 stringAddress, char *string, u32 maxLength) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUReadString", MP_AUTO);
   u32 strIndex;
   u32 stringBufferAddress = 0;
@@ -451,20 +467,25 @@ void PPCInterpreter::mmuReadString(sPPEState *ppeState, u64 stringAddress,
 // Translates a given EA into a RA, and then returns a valid Host Ptr for the given guest EA.
 // NOTE: This is to be used by JIT'ed loads/stores that are known to be directed to RAM, mostly VXU L/S instrs.
 u64 PPCInterpreter::JITTranslateAndGetHostPtr(sPPEState *ppeState, u64 EA, ePPUThreadID thr) {
-  u64 returnedAddr = EA;
   // Translate the given address
+  u64 returnedAddr = EA;
   if (!MMUTranslateAddress(&returnedAddr, ppeState, false, thr)) {
     DEBUGP(Xenon, "[JIT MMU]: Address translation failed for EA: {:#x}", EA);
     return 0;
   }
+
   // Correctly construct the end address
   bool socRead = false;
   returnedAddr = mmuContructEndAddressFromSecEngAddr(returnedAddr, &socRead);
-  return reinterpret_cast<u64>(xenonContext->GetRAM()->GetPointerToAddress(returnedAddr));
+
+  if (auto ram = xenonContext->GetRAM().lock()) {
+    return reinterpret_cast<u64>(ram->GetPointerToAddress(returnedAddr));
+  }
+
+  return 0;
 }
 
-SECENG_ADDRESS_INFO
-PPCInterpreter::mmuGetSecEngInfoFromAddress(u64 inputAddress) {
+SECENG_ADDRESS_INFO PPCInterpreter::mmuGetSecEngInfoFromAddress(u64 inputAddress) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUGetSecEngInfoFromAddress", MP_AUTO);
   // 0x00000X**_00000000 X = region, ** = key select
   // X = 0 should be Physical
@@ -500,14 +521,11 @@ PPCInterpreter::mmuGetSecEngInfoFromAddress(u64 inputAddress) {
   return addressInfo;
 }
 
-u64 PPCInterpreter::mmuContructEndAddressFromSecEngAddr(u64 inputAddress,
-                                                        bool *socAccess) {
+u64 PPCInterpreter::mmuContructEndAddressFromSecEngAddr(u64 inputAddress, bool *socAccess) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUContructEndAddressFromSecEngAddr", MP_AUTO);
-  SECENG_ADDRESS_INFO inputAddressInfo =
-      mmuGetSecEngInfoFromAddress(inputAddress);
+  auto inputAddressInfo = mmuGetSecEngInfoFromAddress(inputAddress);
 
   u64 outputAddress = 0;
-
   switch (inputAddressInfo.regionType) {
   case SECENG_REGION_PHYS:
     // Low order 32 bits of te address map directly to the physical address. 
@@ -528,12 +546,12 @@ u64 PPCInterpreter::mmuContructEndAddressFromSecEngAddr(u64 inputAddress,
   default:
     break;
   }
+
   return outputAddress;
 }
 
 // Main address translation mechanism used on the XCPU.
-bool PPCInterpreter::MMUTranslateAddress(u64 *EA, sPPEState *ppeState,
-                                         bool memWrite, ePPUThreadID thr) {
+bool PPCInterpreter::MMUTranslateAddress(u64 *EA, sPPEState *ppeState, bool memWrite, ePPUThreadID thr) {
   // Every time the CPU does a load or store, it goes trough the MMU.
   // The MMU decides based on MSR, and some other regs if address translation
   // for Instr/Data is in Real Mode (EA = RA) or in Virtual Mode (Page
@@ -601,8 +619,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, sPPEState *ppeState,
       *EA = RA;
       return true;
     }
-  }
-  else {
+  } else {
     // dERAT
     RA = thread.dERAT.getElement((*EA & ~0xFFF));
     if (RA != -1) {
@@ -981,17 +998,17 @@ bool PPCInterpreter::MMUTranslateAddress(u64 *EA, sPPEState *ppeState,
 }
 
 // MMU Read Routine, used by the CPU
-void PPCInterpreter::MMURead(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppeState,
-                             u64 EA, u64 byteCount, u8 *outData, ePPUThreadID thr) {
+void PPCInterpreter::MMURead(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppeState, u64 EA, u64 byteCount, u8 *outData, ePPUThreadID thr) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMURead", MP_AUTO);
   sPPUThread &thread = ppeState->ppuThread[thr != ePPUThread_None ? thr : curThreadId];
+
   const u64 oldEA = EA;
   if (!MMUTranslateAddress(&EA, ppeState, false, thr)) {
     memset(outData, 0, byteCount);
     return;
   }
-  bool socRead = false;
 
+  bool socRead = false;
   EA = mmuContructEndAddressFromSecEngAddr(EA, &socRead);
 
   // When the xboxkrnl writes to address 0x7FFFxxxx is writing to the IIC
@@ -1017,44 +1034,42 @@ void PPCInterpreter::MMURead(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppeS
 
   // Handle SoC reads
   if (socRead) {
-    // Check if the read is from the SROM
     if (EA >= XE_SROM_ADDR && EA < XE_SROM_ADDR + XE_SROM_SIZE) {
+      // Check if the read is from the SROM
       const u32 sromAddr = static_cast<u32>(EA - XE_SROM_ADDR);
       memcpy(outData, &cpuContext->SROM[sromAddr], byteCount);
       return;
-    }
-    // Check if the read is from SRAM
-    else if (EA >= XE_SRAM_ADDR && EA < XE_SRAM_ADDR + XE_SRAM_SIZE) {
+    } else if (EA >= XE_SRAM_ADDR && EA < XE_SRAM_ADDR + XE_SRAM_SIZE) {
+      // Check if the read is from SRAM
       const u32 sramAddr = static_cast<u32>(EA - XE_SRAM_ADDR);
       memcpy(outData, &cpuContext->SRAM[sramAddr], byteCount);
       return;
-    }
-    // Integrated Interrupt Controller in real mode, used when the HV wants to
-    // start a CPUs IC
-    else if (EA >= XE_SOCINTS_BLOCK_START && EA <= XE_SOCINTS_BLOCK_START + XE_SOCINTS_BLOCK_SIZE) {
+    } else if (EA >= XE_SOCINTS_BLOCK_START && EA <= XE_SOCINTS_BLOCK_START + XE_SOCINTS_BLOCK_SIZE) {
+      // Integrated Interrupt Controller in real mode, used when the HV wants to
+      // start a CPUs IC
+      // 
       // Pass it onto our context INT struct.
       cpuContext->HandleSOCRead(EA, outData, byteCount);
       return;
-    }
-    // Try to handle the SoC read, may belong to one of the CPU SoC blocks.
-    else if (cpuContext->HandleSOCRead(EA, outData, byteCount)) {
+    } else if (cpuContext->HandleSOCRead(EA, outData, byteCount)) {
+      // Try to handle the SoC read, may belong to one of the CPU SoC blocks.
       return;
     }
   }
 
   // External read
-  if (!xenonContext->GetRootBus()->Read(EA, outData, byteCount, socRead) && socRead) {
-    if (Config::log.advanced)
-      LOG_WARNING(Xenon_MMU, "Invalid SoC Read from 0x{:X}", EA);
+  if (auto rootBus = xenonContext->GetRootBus().lock()) {
+    if (!rootBus->Read(EA, outData, byteCount, socRead) && socRead) {
+      if (Config::log.advanced)
+        LOG_WARNING(Xenon_MMU, "Invalid SoC Read from 0x{:X}", EA);
+    }
   }
 }
 
 // MMU Write Routine, used by the CPU
-void PPCInterpreter::MMUWrite(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppeState,
-                              const u8 *data, u64 EA, u64 byteCount, ePPUThreadID thr) {
+void PPCInterpreter::MMUWrite(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppeState, const u8 *data, u64 EA, u64 byteCount, ePPUThreadID thr) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUWrite", MP_AUTO);
   const u64 oldEA = EA;
-
   if (!MMUTranslateAddress(&EA, ppeState, true, thr))
     return;
 
@@ -1062,7 +1077,6 @@ void PPCInterpreter::MMUWrite(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppe
   cpuContext->xenonRes.Check(EA);
 
   bool socWrite = false;
-
   EA = mmuContructEndAddressFromSecEngAddr(EA, &socWrite);
 
   // When the xboxkrnl writes to address 0x7FFFxxxx is writing to the IIC
@@ -1087,55 +1101,50 @@ void PPCInterpreter::MMUWrite(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppe
       }
     }
 #endif
-    // Check if writing to SROM region.
     if (EA >= XE_SROM_ADDR && EA < XE_SROM_ADDR + XE_SROM_SIZE) {
+      // Check if writing to SROM region.
       LOG_ERROR(Xenon_MMU, "Tried to write to XCPU SROM!");
       return;
-    }
-    // Check if writing to internal SRAM.
-    else if (EA >= XE_SRAM_ADDR && EA < XE_SRAM_ADDR + XE_SRAM_SIZE) {
+    } else if (EA >= XE_SRAM_ADDR && EA < XE_SRAM_ADDR + XE_SRAM_SIZE) {
+      // Check if writing to internal SRAM.
       u32 sramAddr = static_cast<u32>(EA - XE_SRAM_ADDR);
       memcpy(&cpuContext->SRAM[sramAddr], data, byteCount);
       return;
-    }
-    // Integrated Interrupt Controller in real mode, used when the HV wants to
-    // start a CPUs IC.
-    else if (EA >= XE_SOCINTS_BLOCK_START && EA <= XE_SOCINTS_BLOCK_START + XE_SOCINTS_BLOCK_SIZE) {
+    } else if (EA >= XE_SOCINTS_BLOCK_START && EA <= XE_SOCINTS_BLOCK_START + XE_SOCINTS_BLOCK_SIZE) {
+      // Integrated Interrupt Controller in real mode, used when the HV wants to
+      // start a CPUs IC.
       cpuContext->HandleSOCWrite(EA, data, byteCount);
       return;
-    }
-    // Try to handle the SoC write, may belong to one of the CPU SoC blocks.
-    else if (cpuContext->HandleSOCWrite(EA, data, byteCount)) {
+    } else if (cpuContext->HandleSOCWrite(EA, data, byteCount)) {
+      // Try to handle the SoC write, may belong to one of the CPU SoC blocks.
       return;
     }
   }
 
   // External write
-  if (!xenonContext->GetRootBus()->Write(EA, data, byteCount, socWrite) && socWrite) {
-    u64 tmp = 0;
-    memcpy(&tmp, data, byteCount);
-    if (Config::log.advanced)
-      LOG_WARNING(Xenon_MMU, "Invalid SoC Write to 0x{:X}", EA);
+  if (auto rootBus = xenonContext->GetRootBus().lock()) {
+    if (!rootBus->Write(EA, data, byteCount, socWrite) && socWrite) {
+      u64 tmp = 0;
+      memcpy(&tmp, data, byteCount);
+      if (Config::log.advanced)
+        LOG_WARNING(Xenon_MMU, "Invalid SoC Write to 0x{:X}", EA);
+    }
   }
 }
 
-void PPCInterpreter::MMUMemCpyFromHost(sPPEState *ppeState,
-                                       u64 EA, const void *source, u64 size, ePPUThreadID thr) {
+void PPCInterpreter::MMUMemCpyFromHost(sPPEState *ppeState, u64 EA, const void *source, u64 size, ePPUThreadID thr) {
   MMUWrite(xenonContext, ppeState, reinterpret_cast<const u8*>(source), EA, size);
 }
 
-void PPCInterpreter::MMUMemCpy(sPPEState *ppeState,
-                               u64 EA, u32 source, u64 size, ePPUThreadID thr) {
+void PPCInterpreter::MMUMemCpy(sPPEState *ppeState, u64 EA, u32 source, u64 size, ePPUThreadID thr) {
   std::unique_ptr<u8[]> data = std::make_unique<STRIP_UNIQUE_ARR(data)>(size);
   MMURead(xenonContext, ppeState, source, size, data.get(), thr);
   MMUWrite(xenonContext, ppeState, data.get(), EA, size, thr);
   data.reset();
 }
 
-void PPCInterpreter::MMUMemSet(sPPEState *ppeState,
-                               u64 EA, s32 data, u64 size, ePPUThreadID thr) {
+void PPCInterpreter::MMUMemSet(sPPEState *ppeState, u64 EA, s32 data, u64 size, ePPUThreadID thr) {
   const u64 oldEA = EA;
-
   if (MMUTranslateAddress(&EA, ppeState, true, thr) == false)
     return;
 
@@ -1146,28 +1155,27 @@ void PPCInterpreter::MMUMemSet(sPPEState *ppeState,
   xenonContext->xenonRes.Check(EA);
 
   bool socWrite = false;
-
   EA = mmuContructEndAddressFromSecEngAddr(EA, &socWrite);
+
   // When the xboxkrnl writes to address 0x7FFFxxxx is writing to the IIC
   // so we use that address here to validate its an soc write
   if (((oldEA & 0x000000007FFFF0000ULL) >> 16) == 0x7FFF)
     socWrite = true;
+
   if (socWrite) {
     switch (EA) {
     default: {
-      // Check if writing to bootloader section
       if (EA >= XE_SROM_ADDR && EA < XE_SROM_ADDR + XE_SROM_SIZE) {
+        // Check if writing to bootloader section
         LOG_ERROR(Xenon_MMU, "Tried to write to XCPU SROM!");
         return;
-      }
-      // Check if writing to internal SRAM
-      else if (EA >= XE_SRAM_ADDR && EA < XE_SRAM_ADDR + XE_SRAM_SIZE) {
+      } else if (EA >= XE_SRAM_ADDR && EA < XE_SRAM_ADDR + XE_SRAM_SIZE) {
+        // Check if writing to internal SRAM
         const u32 sramAddr = static_cast<u32>(EA - XE_SRAM_ADDR);
         memset(&xenonContext->SRAM[sramAddr], data, size);
         return;
-      }
-      // Check if writing to Security Engine Config Block
-      else if (EA >= XE_SOCSECENG_BLOCK_START && EA < XE_SOCSECENG_BLOCK_START + XE_SOCSECENG_BLOCK_SIZE) {
+      } else if (EA >= XE_SOCSECENG_BLOCK_START && EA < XE_SOCSECENG_BLOCK_START + XE_SOCSECENG_BLOCK_SIZE) {
+        // Check if writing to Security Engine Config Block
         const u32 secEngOffset = static_cast<u32>(EA - XE_SOCSECENG_BLOCK_START);
         memset(reinterpret_cast<u8*>(xenonContext->socSecEngBlock.get()) + secEngOffset, 0, size);
         return;
@@ -1177,11 +1185,15 @@ void PPCInterpreter::MMUMemSet(sPPEState *ppeState,
   }
 
   // External MemSet
-  xenonContext->GetRootBus()->MemSet(EA, data, size);
+  if (auto rootBus = xenonContext->GetRootBus().lock())
+    rootBus->MemSet(EA, data, size);
 }
 
-u8* PPCInterpreter::MMUGetPointerFromRAM(u64 EA) {
-  return xenonContext->GetRAM()->GetPointerToAddress(EA);
+u8 *PPCInterpreter::MMUGetPointerFromRAM(u64 EA) {
+  if (auto ram = xenonContext->GetRAM().lock())
+    return ram->GetPointerToAddress(EA);
+  else
+    return nullptr;
 }
 
 // Reads 1 byte of memory
@@ -1190,38 +1202,45 @@ u8 PPCInterpreter::MMURead8(sPPEState *ppeState, u64 EA, ePPUThreadID thr) {
   MMURead(xenonContext, ppeState, EA, sizeof(data), reinterpret_cast<u8*>(&data), thr);
   return data;
 }
+
 // Reads 2 bytes of memory
 u16 PPCInterpreter::MMURead16(sPPEState *ppeState, u64 EA, ePPUThreadID thr) {
   u16 data = 0;
   MMURead(xenonContext, ppeState, EA, sizeof(data), reinterpret_cast<u8*>(&data), thr);
   return byteswap_be<u16>(data);
 }
+
 // Reads 4 bytes of memory
 u32 PPCInterpreter::MMURead32(sPPEState *ppeState, u64 EA, ePPUThreadID thr) {
   u32 data = 0;
   MMURead(xenonContext, ppeState, EA, sizeof(data), reinterpret_cast<u8*>(&data), thr);
   return byteswap_be<u32>(data);
 }
+
 // Reads 8 bytes of memory
 u64 PPCInterpreter::MMURead64(sPPEState *ppeState, u64 EA, ePPUThreadID thr) {
   u64 data = 0;
   MMURead(xenonContext, ppeState, EA, sizeof(data), reinterpret_cast<u8*>(&data), thr);
   return byteswap_be<u64>(data);
 }
+
 // Writes 1 byte to memory
 void PPCInterpreter::MMUWrite8(sPPEState *ppeState, u64 EA, u8 data, ePPUThreadID thr) {
   MMUWrite(xenonContext, ppeState, reinterpret_cast<const u8*>(&data), EA, sizeof(data), thr);
 }
+
 // Writes 2 bytes to memory
 void PPCInterpreter::MMUWrite16(sPPEState *ppeState, u64 EA, u16 data, ePPUThreadID thr) {
   const u16 dataBS = byteswap_be<u16>(data);
   MMUWrite(xenonContext, ppeState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data), thr);
 }
+
 // Writes 4 bytes to memory
 void PPCInterpreter::MMUWrite32(sPPEState *ppeState, u64 EA, u32 data, ePPUThreadID thr) {
   const u32 dataBS = byteswap_be<u32>(data);
   MMUWrite(xenonContext, ppeState, reinterpret_cast<const u8*>(&dataBS), EA, sizeof(data), thr);
 }
+
 // Writes 8 bytes to memory
 void PPCInterpreter::MMUWrite64(sPPEState *ppeState, u64 EA, u64 data, ePPUThreadID thr) {
   const u64 dataBS = byteswap_be<u64>(data);

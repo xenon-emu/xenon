@@ -86,35 +86,38 @@ public:
   PCIBridge();
   ~PCIBridge();
 
-  // Checks wheter the current address belongs to the PCI bridge via
-  // the BAR's
-  bool IsAddressMappedinBAR(u32 address);
+  void AddPCIDevice(std::unique_ptr<PCIDevice> device);
+  void ResetPCIDevice(std::unique_ptr<PCIDevice> device);
 
-  void AddPCIDevice(std::shared_ptr<PCIDevice> device);
-
-  void ResetPCIDevice(std::shared_ptr<PCIDevice> device);
-
-  bool Read(u64 readAddress, u8 *data, u64 size);
+  bool Read(u64 address, u8 *data, u64 size);
   bool Write(u64 writeAddress, const u8 *data, u64 size);
   bool MemSet(u64 writeAddress, s32 data, u64 size);
 
-  bool ConfigRead(u64 readAddress, u8 *data, u64 size);
+  // Configuration Space R/W
+  bool ConfigRead(u64 address, u8 *data, u64 size);
   bool ConfigWrite(u64 writeAddress, const u8 *data, u64 size);
 
   void RegisterIIC(Xe::XCPU::XenonIIC *xenonIICPtr);
-
   bool RouteInterrupt(u8 prio, u8 targetCPU = 0xFF);
   void CancelInterrupt(u8 prio);
 
+  // Checks wheter the current address belongs to the PCI bridge via
+  // the BAR registers
+  bool IsAddressMappedinBAR(u32 address);
+
+  template <typename T>
+  std::weak_ptr<T> GetDevice(u32 hash) {
+    return std::dynamic_pointer_cast<T>(connectedPCIDevices[hash]);
+  }
 private:
   // IIC Pointer used for interrupts
-  Xe::XCPU::XenonIIC *xenonIIC;
+  Xe::XCPU::XenonIIC *xenonIIC = nullptr;
 
   // Connected device pointers
-  std::unordered_map<std::string, std::shared_ptr<PCIDevice>> connectedPCIDevices;
+  std::unordered_map<u32, std::shared_ptr<PCIDevice>> connectedPCIDevices = {};
 
   // Current bridge config
   PCI_PCI_BRIDGE_CONFIG_SPACE pciBridgeConfig = {};
   PCI_BRIDGE_STATE pciBridgeState = {};
-  u8 pciBridgeConfigSpace[256];
+  u8 pciBridgeConfigSpace[256] = {};
 };

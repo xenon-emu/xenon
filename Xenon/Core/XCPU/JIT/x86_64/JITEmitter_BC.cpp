@@ -139,20 +139,20 @@ void PPCInterpreter::PPCInterpreterJIT_bclr(sPPEState *ppeState, JITBlockBuilder
   // If SFCX is present and both skips are set:
   // - If CIA == initSkip1 -> force condition false
   // - If CIA == initSkip2 -> force condition true
-  if (XeMain::sfcx && XeMain::sfcx->initSkip1 && XeMain::sfcx->initSkip2) {
+  if (auto sfcx = XeMain::sfcx.lock(); sfcx->initSkip1 && sfcx->initSkip2) {
     x86::Gp CIA = newGP64();
     COMP->mov(CIA, CIAPtr());
 
     // if (CIA == initSkip1) -> skip branch
     Label notSkip1 = newLabel();
-    COMP->cmp(CIA, imm<u64>(XeMain::sfcx->initSkip1));
+    COMP->cmp(CIA, imm<u64>(sfcx->initSkip1));
     COMP->jne(notSkip1);
     COMP->jmp(condEnd);
     COMP->bind(notSkip1);
 
     // if (CIA == initSkip2) -> force branch
     Label notSkip2 = newLabel();
-    COMP->cmp(CIA, imm<u64>(XeMain::sfcx->initSkip2));
+    COMP->cmp(CIA, imm<u64>(sfcx->initSkip2));
     COMP->jne(notSkip2);
     COMP->jmp(condTrue);
     COMP->bind(notSkip2);
@@ -166,8 +166,7 @@ void PPCInterpreter::PPCInterpreterJIT_bclr(sPPEState *ppeState, JITBlockBuilder
     if (instr.bo & 0x2) {
       // BO[1] == 1 -> branch when CTR == 0
       COMP->jne(condEnd);
-    }
-    else {
+    } else {
       // BO[1] == 0 -> branch when CTR != 0
       COMP->je(condEnd);
     }
@@ -188,8 +187,7 @@ void PPCInterpreter::PPCInterpreterJIT_bclr(sPPEState *ppeState, JITBlockBuilder
       // Expect CR bit == 1
       COMP->test(tmp, tmp);
       COMP->je(condEnd);
-    }
-    else {
+    } else {
       // Expect CR bit == 0
       COMP->test(tmp, tmp);
       COMP->jne(condEnd);

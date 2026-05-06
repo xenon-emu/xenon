@@ -46,25 +46,25 @@ PCIBridge::PCIBridge() {
     i++;
   }
 
-  pciBridgeConfig.configSpaceHeader.reg0.hexData = pciBridgeConfigMap[0];
-  pciBridgeConfig.configSpaceHeader.reg1.hexData = pciBridgeConfigMap[1];
-  pciBridgeConfig.configSpaceHeader.reg2.hexData = pciBridgeConfigMap[2];
-  pciBridgeConfig.configSpaceHeader.reg3.hexData = pciBridgeConfigMap[3];
-  pciBridgeConfig.configSpaceHeader.BAR0 = pciBridgeConfigMap[4];
-  pciBridgeConfig.configSpaceHeader.BAR1 = pciBridgeConfigMap[5];
-  pciBridgeConfig.configSpaceHeader.reg6.hexData = pciBridgeConfigMap[6];
-  pciBridgeConfig.configSpaceHeader.reg7.hexData = pciBridgeConfigMap[7];
-  pciBridgeConfig.configSpaceHeader.reg8.hexData = pciBridgeConfigMap[8];
-  pciBridgeConfig.configSpaceHeader.reg9.hexData = pciBridgeConfigMap[9];
-  pciBridgeConfig.configSpaceHeader.prefetchableBaseUpper32Bits =
+  pciBridgeConfig.reg0.hexData = pciBridgeConfigMap[0];
+  pciBridgeConfig.reg1.hexData = pciBridgeConfigMap[1];
+  pciBridgeConfig.reg2.hexData = pciBridgeConfigMap[2];
+  pciBridgeConfig.reg3.hexData = pciBridgeConfigMap[3];
+  pciBridgeConfig.BAR0 = pciBridgeConfigMap[4];
+  pciBridgeConfig.BAR1 = pciBridgeConfigMap[5];
+  pciBridgeConfig.reg6.hexData = pciBridgeConfigMap[6];
+  pciBridgeConfig.reg7.hexData = pciBridgeConfigMap[7];
+  pciBridgeConfig.reg8.hexData = pciBridgeConfigMap[8];
+  pciBridgeConfig.reg9.hexData = pciBridgeConfigMap[9];
+  pciBridgeConfig.prefetchableBaseUpper32Bits =
       pciBridgeConfigMap[0xA];
-  pciBridgeConfig.configSpaceHeader.prefetchableLimitUpper32Bits =
+  pciBridgeConfig.prefetchableLimitUpper32Bits =
       pciBridgeConfigMap[0xB];
-  pciBridgeConfig.configSpaceHeader.regC.hexData = pciBridgeConfigMap[0xC];
-  pciBridgeConfig.configSpaceHeader.regD.hexData = pciBridgeConfigMap[0xD];
-  pciBridgeConfig.configSpaceHeader.expansionROMBaseAddress =
+  pciBridgeConfig.regC.hexData = pciBridgeConfigMap[0xC];
+  pciBridgeConfig.regD.hexData = pciBridgeConfigMap[0xD];
+  pciBridgeConfig.expansionROMBaseAddress =
       pciBridgeConfigMap[0xE];
-  pciBridgeConfig.configSpaceHeader.regF.hexData = pciBridgeConfigMap[0xF];
+  pciBridgeConfig.regF.hexData = pciBridgeConfigMap[0xF];
 
   // PCI Bridge Config regs
   pciBridgeState.REG_EA00000C = 0x7CFF; // Software writes here to enable interrupts (Bus IRQL)
@@ -72,26 +72,27 @@ PCIBridge::PCIBridge() {
   // Set Revision based on system config.
   switch (Config::highlyExperimental.consoleRevison) {
   case Config::eConsoleRevision::Xenon:
-    pciBridgeConfig.configSpaceHeader.reg2.revID = 0x2;
+    pciBridgeConfig.reg2.revID = 0x2;
     break;
   case Config::eConsoleRevision::Zephyr:
   case Config::eConsoleRevision::Falcon:
   case Config::eConsoleRevision::Jasper:
   case Config::eConsoleRevision::Trinity:
-    pciBridgeConfig.configSpaceHeader.reg2.revID = 0x60;
+    pciBridgeConfig.reg2.revID = 0x60;
     break;
   case Config::eConsoleRevision::Corona:
   case Config::eConsoleRevision::Corona4GB:
   case Config::eConsoleRevision::Winchester:
-    pciBridgeConfig.configSpaceHeader.reg2.revID = 0x90;
+    pciBridgeConfig.reg2.revID = 0x90;
     break;
   }
 }
 
 PCIBridge::~PCIBridge() {
-  for (auto &[name, dev] : connectedPCIDevices) {
-    dev.reset();
+  for (auto &[name, device] : connectedPCIDevices) {
+    device.reset();
   }
+
   connectedPCIDevices.clear();
 }
 
@@ -282,51 +283,44 @@ void PCIBridge::CancelInterrupt(u8 prio) {
   }
 }
 
-bool PCIBridge::IsAddressMappedinBAR(u32 address) {
-  u32 bar0 = pciBridgeConfig.configSpaceHeader.BAR0;
-  u32 bar1 = pciBridgeConfig.configSpaceHeader.BAR1;
-
-  if ((address >= bar0 && address < (bar0 + PCI_BRIDGE_SIZE)) ||
-      (address >= bar1 && address < (bar1 + PCI_BRIDGE_SIZE))) {
-    return true;
-  }
-
-  return false;
-}
-
-void PCIBridge::AddPCIDevice(std::shared_ptr<PCIDevice> device) {
+void PCIBridge::AddPCIDevice(std::unique_ptr<PCIDevice> device) {
   if (!device.get()) {
     LOG_CRITICAL(PCIBridge, "Failed to attach a device!");
     return;
   }
 
-  LOG_INFO(PCIBridge, "Attached: {}", device->GetDeviceName());
-
-  connectedPCIDevices.insert({ device->GetDeviceName(), device });
+  u32 hash = device->GetHash();
+  std::string deviceName = device->GetDeviceName();
+  if (auto it = connectedPCIDevices.find(hash); it == connectedPCIDevices.end()) {
+    LOG_INFO(PCIBridge, "Attached {}", deviceName);
+    connectedPCIDevices.insert({ hash, std::move(device) });
+  } else {
+    LOG_CRITICAL(PCIBridge, "Failed to attach device! '{}' already exists.", deviceName);
+  }
 }
 
-void PCIBridge::ResetPCIDevice(std::shared_ptr<PCIDevice> device) {
+void PCIBridge::ResetPCIDevice(std::unique_ptr<PCIDevice> device) {
   if (!device.get()) {
     LOG_CRITICAL(PCIBridge, "Failed to reset a device!");
     return;
   }
 
-  std::string name = device->GetDeviceName();
-  if (auto it = connectedPCIDevices.find(name); it != connectedPCIDevices.end()) {
-    LOG_INFO(PCIBridge, "Resetting device: {}", it->first);
+  u32 hash = device->GetHash();
+  std::string deviceName = device->GetDeviceName();
+  if (auto it = connectedPCIDevices.find(hash); it != connectedPCIDevices.end()) {
+    LOG_INFO(PCIBridge, "Resetting device: {}", deviceName);
     it->second.reset();
     connectedPCIDevices.erase(it);
-    connectedPCIDevices.insert({ device->GetDeviceName(), device });
+    connectedPCIDevices.insert({ hash, std::move(device) });
   } else {
-    LOG_CRITICAL(PCIBridge, "Failed to reset device! '{}' never existed.", it->first);
+    LOG_CRITICAL(PCIBridge, "Failed to reset device! '{}' never existed.", deviceName);
   }
 }
 
-bool PCIBridge::Read(u64 readAddress, u8 *data, u64 size) {
+bool PCIBridge::Read(u64 address, u8 *data, u64 size) {
   // Reading to our own space?
-  if (readAddress >= PCI_BRIDGE_BASE_ADDRESS &&
-      readAddress <= PCI_BRIDGE_BASE_END_ADDRESS) {
-    switch (readAddress) {
+  if (address >= PCI_BRIDGE_BASE_ADDRESS && address <= PCI_BRIDGE_BASE_END_ADDRESS) {
+    switch (address) {
     case 0xEA000000:
       memcpy(data, &pciBridgeState.REG_EA000000, size);
       break;
@@ -373,17 +367,17 @@ bool PCIBridge::Read(u64 readAddress, u8 *data, u64 size) {
       memcpy(data, &pciBridgeState.PRIO_REG_SFCX.hexData, size);
       break;
     default:
-      LOG_ERROR(PCIBridge, "Unknown reg being read: 0x{:X}", readAddress);
+      LOG_ERROR(PCIBridge, "Unknown register read at 0x{:X}", address);
       break;
     }
     return true;
   }
 
-  // Try writing to one of the attached devices.
+  // Try writing to one of the attached devices
   for (auto &[name, dev] : connectedPCIDevices) {
-    if (dev->IsAddressMappedInBAR(static_cast<u32>(readAddress))) {
+    if (dev->IsAddressMappedInBAR(static_cast<u32>(address))) {
       // Hit
-      dev->Read(readAddress, data, size);
+      dev->Read(address, data, size);
       return true;
     }
   }
@@ -391,7 +385,7 @@ bool PCIBridge::Read(u64 readAddress, u8 *data, u64 size) {
   return false;
 }
 
-bool PCIBridge::Write(u64 writeAddress, const u8 *data, u64 size) {
+bool PCIBridge::Write(u64 address, const u8 *data, u64 size) {
   u64 tmp{};
   memcpy(&tmp, data, sizeof(tmp) > size ? size : sizeof(tmp));
   bool enabled = (tmp & 0x00800000) >> 20;
@@ -400,9 +394,8 @@ bool PCIBridge::Write(u64 writeAddress, const u8 *data, u64 size) {
   u8 cpuIRQ = (tmp & 0x0000003F) << 2;
 
   // Writing to our own space?
-  if (writeAddress >= PCI_BRIDGE_BASE_ADDRESS &&
-      writeAddress <= PCI_BRIDGE_BASE_END_ADDRESS) {
-    switch (writeAddress) {
+  if (address >= PCI_BRIDGE_BASE_ADDRESS && address <= PCI_BRIDGE_BASE_END_ADDRESS) {
+    switch (address) {
     case 0xEA000000:
       memcpy(&pciBridgeState.REG_EA000000, data, sizeof(pciBridgeState.REG_EA000000) > size ? size : sizeof(pciBridgeState.REG_EA000000));
       break;
@@ -509,24 +502,24 @@ bool PCIBridge::Write(u64 writeAddress, const u8 *data, u64 size) {
       pciBridgeState.PRIO_REG_SFCX.cpuIRQ = cpuIRQ;
       break;
     default:
-      LOG_ERROR(PCIBridge, "Unknown reg being written: 0x{:X}, 0x{:X}", writeAddress, tmp);
+      LOG_ERROR(PCIBridge, "Unknown register write to 0x{:X} with '0x{:X}'", address, tmp);
       break;
     }
     return true;
   }
 
   // Try writing to one of the attached devices.
-  for (auto &[name, dev] : connectedPCIDevices) {
-    if (dev->IsAddressMappedInBAR(static_cast<u32>(writeAddress))) {
+  for (auto &[name, device] : connectedPCIDevices) {
+    if (device->IsAddressMappedInBAR(static_cast<u32>(address))) {
       // Hit
-      dev->Write(writeAddress, data, size);
+      device->Write(address, data, size);
       return true;
     }
   }
   return false;
 }
 
-bool PCIBridge::MemSet(u64 writeAddress, s32 data, u64 size) {
+bool PCIBridge::MemSet(u64 address, s32 data, u64 size) {
   u64 tmp{};
   memset(&tmp, data, sizeof(tmp) > size ? size : sizeof(tmp));
   bool enabled = (tmp & 0x00800000) >> 20;
@@ -535,9 +528,8 @@ bool PCIBridge::MemSet(u64 writeAddress, s32 data, u64 size) {
   u8 cpuIRQ = (tmp & 0x0000003F) << 2;
 
   // Writing to our own space?
-  if (writeAddress >= PCI_BRIDGE_BASE_ADDRESS &&
-      writeAddress <= PCI_BRIDGE_BASE_END_ADDRESS) {
-    switch (writeAddress) {
+  if (address >= PCI_BRIDGE_BASE_ADDRESS && address <= PCI_BRIDGE_BASE_END_ADDRESS) {
+    switch (address) {
     case 0xEA000000:
       memset(&pciBridgeState.REG_EA000000, data, sizeof(pciBridgeState.REG_EA000000) > size ? size : sizeof(pciBridgeState.REG_EA000000));
       break;
@@ -644,164 +636,149 @@ bool PCIBridge::MemSet(u64 writeAddress, s32 data, u64 size) {
       pciBridgeState.PRIO_REG_SFCX.cpuIRQ = cpuIRQ;
       break;
     default:
-      LOG_ERROR(PCIBridge, "Unknown reg being written: 0x{:X}, 0x{:X}", writeAddress, tmp);
+      LOG_ERROR(PCIBridge, "Unknown register write of {} bytes at 0x{:X} with '0x{:X}'", size, address, tmp);
       break;
     }
     return true;
   }
 
   // Try writing to one of the attached devices
-  for (auto &[name, dev] : connectedPCIDevices) {
-    if (dev->IsAddressMappedInBAR(static_cast<u32>(writeAddress))) {
+  for (auto &[name, device] : connectedPCIDevices) {
+    if (device->IsAddressMappedInBAR(static_cast<u32>(address))) {
       // Hit
-      dev->MemSet(writeAddress, data, size);
+      device->MemSet(address, data, size);
       return true;
     }
   }
   return false;
 }
 
-bool PCIBridge::ConfigRead(u64 readAddress, u8 *data, u64 size) {
-  PCIE_CONFIG_ADDR configAddr = {};
-  configAddr.hexData = static_cast<u32>(readAddress);
+u32 DeviceNumberToHash(u32 deviceNumber, u32 funcNumber) {
+  u32 deviceHash = 0;
 
-  if (configAddr.busNum == 0 && configAddr.devNum == 0) {
+  switch (deviceNumber) {
+  case XMA_DEV_NUM:
+    deviceHash = "XMA"_j;
+    break;
+  case CDROM_DEV_NUM:
+    deviceHash = "ODD"_j;
+    break;
+  case HDD_DEV_NUM:
+    deviceHash = "HDD"_j;
+    break;
+  case OHCI0_DEV_NUM:
+    if (funcNumber == 0) {
+      deviceHash = "OHCI0"_j;
+    } else {
+      deviceHash = "EHCI0"_j;
+    }
+    break;
+  case OHCI1_DEV_NUM:
+    if (funcNumber == 0) {
+      deviceHash = "OHCI1"_j;
+    } else {
+      deviceHash = "EHCI1"_j;
+    }
+    break;
+  case FAST_ETH_DEV_NUM:
+    deviceHash = "ETHERNET"_j;
+    break;
+  case SFC_DEV_NUM:
+    deviceHash = "SFCX"_j;
+    break;
+  case AUDIO_CTRLR_DEV_NUM:
+    deviceHash = "AUDIOCTRLR"_j;
+    break;
+  case SMC_DEV_NUM:
+    deviceHash = "SMC"_j;
+    break;
+  case _5841_DEV_NUM:
+    deviceHash = "5841"_j;
+    break;
+  default:
+    deviceHash = 0;
+    break;
+  }
+  return deviceHash;
+}
+
+bool PCIBridge::ConfigRead(u64 address, u8 *data, u64 size) {
+  PCIE_CONFIG_ADDR configAddress = { static_cast<u32>(address) };
+  if (configAddress.busNumber == 0 && configAddress.deviceNumber == 0) {
     // Reading from our own config space!
-    memcpy(data, &pciBridgeConfig.data[configAddr.regOffset], size);
+    memcpy(data, &pciBridgeConfig.data[configAddress.regOffset], size);
     return true;
   }
 
-  // Current device name
-  std::string currentDevName = {};
-
-  switch (configAddr.devNum) {
-  case XMA_DEV_NUM:
-    currentDevName = "XMA";
-    break;
-  case CDROM_DEV_NUM:
-    currentDevName = "CDROM";
-    break;
-  case HDD_DEV_NUM:
-    currentDevName = "HDD";
-    break;
-  case OHCI0_DEV_NUM:
-    if (configAddr.functNum == 0) {
-      currentDevName = "OHCI0";
-    } else if (configAddr.functNum == 1) {
-      currentDevName = "EHCI0";
-    }
-    break;
-  case OHCI1_DEV_NUM:
-    if (configAddr.functNum == 0) {
-      currentDevName = "OHCI1";
-    } else if (configAddr.functNum == 1) {
-      currentDevName = "EHCI1";
-    }
-    break;
-  case FAST_ETH_DEV_NUM:
-    currentDevName = "ETHERNET";
-    break;
-  case SFC_DEV_NUM:
-    currentDevName = "SFCX";
-    break;
-  case AUDIO_CTRLR_DEV_NUM:
-    currentDevName = "AUDIOCTRLR";
-    break;
-  case SMC_DEV_NUM:
-    currentDevName = "SMC";
-    break;
-  case _5841_DEV_NUM:
-    currentDevName = "5841";
-    break;
-  default:
-    LOG_ERROR(PCIBridge, "Config Space Read: Unknown device accessed: Dev 0x{:X}, Reg 0x{:X}",
-        configAddr.devNum, configAddr.regOffset);
+  // Get current device
+  u32 deviceHash = DeviceNumberToHash(configAddress.deviceNumber, configAddress.funcNumber);
+  if (!deviceHash) {
+    LOG_ERROR(PCIBridge, "Config read to unknown device '0x{:X}' at register 0x{:X}", configAddress.deviceNumber, configAddress.regOffset);
     return true;
   }
 
-  for (auto &[name, dev] : connectedPCIDevices) {
-    if (name == currentDevName) {
-      // Hit!
-      LOG_TRACE(PCIBridge, "Config read, device: {} offset = 0x{:X}", name, configAddr.regOffset);
-      dev->ConfigRead(readAddress, data, size);
+  for (auto &[hash, device] : connectedPCIDevices) {
+    if (hash == deviceHash) {
+      LOG_TRACE(PCIBridge, "Config read to {} at 0x{:X}", device->GetDeviceName(), configAddress.regOffset);
+      device->ConfigRead(address, data, size);
       return true;
     }
   }
 
-  LOG_ERROR(PCIBridge, "Read to unimplemented device: {}", currentDevName);
+  if (deviceHash == "5841"_j)
+    LOG_ERROR(PCIBridge, "Config read from unimplemented device '5841'");
+  else
+    LOG_ERROR(PCIBridge, "Config read from unimplemented device '0x{:X}'", deviceHash);
+
   memset(data, 0xFF, size);
+
   return false;
 }
 
-bool PCIBridge::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
-  PCIE_CONFIG_ADDR configAddr = {};
-  configAddr.hexData = static_cast<u32>(writeAddress);
-
-  if (configAddr.busNum == 0 && configAddr.devNum == 0) {
+bool PCIBridge::ConfigWrite(u64 address, const u8 *data, u64 size) {
+  PCIE_CONFIG_ADDR configAddress = { static_cast<u32>(address) };
+  if (configAddress.busNumber == 0 && configAddress.deviceNumber == 0) {
     // Writing to our own config space!
-    memcpy(&pciBridgeConfig.data[configAddr.regOffset], data, size);
+    memcpy(&pciBridgeConfig.data[configAddress.regOffset], data, size);
     return true;
   }
 
-  // Current device name
-  std::string currentDevName = {};
-
-  switch (configAddr.devNum) {
-  case XMA_DEV_NUM:
-    currentDevName = "XMA";
-    break;
-  case CDROM_DEV_NUM:
-    currentDevName = "CDROM";
-    break;
-  case HDD_DEV_NUM:
-    currentDevName = "HDD";
-    break;
-  case OHCI0_DEV_NUM:
-    if (configAddr.functNum == 0) {
-      currentDevName = "OHCI0";
-    } else if (configAddr.functNum == 1) {
-      currentDevName = "EHCI0";
-    }
-    break;
-  case OHCI1_DEV_NUM:
-    if (configAddr.functNum == 0) {
-      currentDevName = "OHCI1";
-    } else if (configAddr.functNum == 1) {
-      currentDevName = "EHCI1";
-    }
-    break;
-  case FAST_ETH_DEV_NUM:
-    currentDevName = "ETHERNET";
-    break;
-  case SFC_DEV_NUM:
-    currentDevName = "SFCX";
-    break;
-  case AUDIO_CTRLR_DEV_NUM:
-    currentDevName = "AUDIOCTRLR";
-    break;
-  case SMC_DEV_NUM:
-    currentDevName = "SMC";
-    break;
-  case _5841_DEV_NUM:
-    currentDevName = "5841";
-    break;
-  default:
+  // Get current device
+  u32 deviceHash = DeviceNumberToHash(configAddress.deviceNumber, configAddress.funcNumber);
+  if (!deviceHash) {
     u64 value = 0;
     memcpy(&value, data, size);
-    LOG_ERROR(PCIBridge, "Config Space Write: Unknown device accessed: Dev 0x{:X} Func 0x{:X}"
-        "Reg 0x{:X} data = 0x{:X}", configAddr.devNum, configAddr.functNum, configAddr.regOffset, value);
+    LOG_ERROR(PCIBridge, "Config write to unknown device '0x{:X},0x{:X}' at register 0x{:X} with value 0x{:X}",
+      configAddress.deviceNumber, configAddress.funcNumber, configAddress.regOffset, value
+    );
     return true;
   }
 
-  for (auto &[name, dev] : connectedPCIDevices) {
-    if (name == currentDevName) {
-      // Hit!
-      LOG_TRACE(PCIBridge, "Config write to '{}+0x{:X}'", name, configAddr.regOffset);
-      dev->ConfigWrite(writeAddress, data, size);
+  for (auto &[hash, device] : connectedPCIDevices) {
+    if (hash == deviceHash) {
+      LOG_TRACE(PCIBridge, "Config write to '{}+0x{:X}'", device->GetDeviceName(), configAddress.regOffset);
+      device->ConfigWrite(address, data, size);
       return true;
     }
   }
 
-  LOG_ERROR(PCIBridge, "Config write to unimplemented device '{}'", currentDevName);
+  if (deviceHash == "5841"_j)
+    LOG_ERROR(PCIBridge, "Config write to unimplemented device '5841'");
+  else
+    LOG_ERROR(PCIBridge, "Config write to unimplemented device '0x{:X}'", deviceHash);
+
+  return false;
+}
+
+bool PCIBridge::IsAddressMappedinBAR(u32 address) {
+  u32 bar0 = pciBridgeConfig.BAR0;
+  u32 bar1 = pciBridgeConfig.BAR1;
+
+  if ((address >= bar0 && address < (bar0 + PCI_BRIDGE_SIZE)) ||
+      (address >= bar1 && address < (bar1 + PCI_BRIDGE_SIZE))
+  ) {
+    return true;
+  }
+
   return false;
 }

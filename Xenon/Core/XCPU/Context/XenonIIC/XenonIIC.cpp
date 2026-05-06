@@ -24,11 +24,11 @@ Xe::XCPU::XenonIIC::~XenonIIC() {
 }
 
 // Write routine
-void Xe::XCPU::XenonIIC::Write(u64 writeAddress, const u8* data, u64 size) {
+void Xe::XCPU::XenonIIC::Write(u64 address, const u8* data, u64 size) {
   // Set a lock
   std::lock_guard lock(iicMutex);
   // Offset to our structure
-  u32 offset = static_cast<u32>(writeAddress & 0x7FFF);
+  u32 offset = static_cast<u32>(address & 0x7FFF);
 
   // Data is in BE format, byteswap it.
   u64 dataIn = 0;
@@ -111,11 +111,11 @@ void Xe::XCPU::XenonIIC::Write(u64 writeAddress, const u8* data, u64 size) {
 }
 
 // Read routine
-void Xe::XCPU::XenonIIC::Read(u64 readAddress, u8* data, u64 size) {
+void Xe::XCPU::XenonIIC::Read(u64 address, u8* data, u64 size) {
   // Set a lock
   std::lock_guard lock(iicMutex);
   // Offset to our structure
-  u32 offset = static_cast<u32>(readAddress & 0x7FFF);
+  u32 offset = static_cast<u32>(address & 0x7FFF);
   // Read the data from our structure
   u64 dataOut = 0;
   memcpy(&dataOut, reinterpret_cast<u8*>(socINTBlock.get()) + offset, size);

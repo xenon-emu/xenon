@@ -153,10 +153,10 @@ void ppcInterpreterTrap(sPPEState *ppeState, u32 trapNumber);
 //
 
 bool MMUTranslateAddress(u64 *EA, sPPEState *ppeState, bool memWrite, ePPUThreadID thr = ePPUThread_None);
-u8 mmuGetPageSize(sPPEState *ppeState, bool L, u8 LP);
+u8 mmuGetPageSize(sPPEState *ppeState, u8 L, u8 LP);
 void mmuAddTlbEntry(sPPEState *ppeState);
-void mmuAddTlbEntryHardware(sPPEState *ppeState, u64 VA, u64 pte0, u64 pte1, u8 p, bool L, bool LP);
-bool mmuSearchTlbEntry(sPPEState *ppeState, u64 *RPN, u64 VA, u8 p, bool L, bool LP);
+void mmuAddTlbEntryHardware(sPPEState *ppeState, u64 VA, u64 pte0, u64 pte1, u8 p, u8 L, u8 LP);
+bool mmuSearchTlbEntry(sPPEState *ppeState, u64 *RPN, u64 VA, u8 p, u8 L, u8 LP);
 void mmuReadString(sPPEState *ppeState, u64 stringAddress, char *string, u32 maxLength);
 
 // JIT usage

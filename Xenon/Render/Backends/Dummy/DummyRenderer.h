@@ -27,7 +27,7 @@ public:
   void WaitIdle() override;
   void Clear() override;
 
-  void UpdateViewportFromState(const Xe::XGPU::XenosState *state) override;
+  void UpdateViewportFromState(std::weak_ptr<Xe::XGPU::XenosState> statePtr) override;
   void BackendBindPixelBuffer(Buffer *buffer) override;
   void VertexFetch(const u32 location, const u32 components, bool isFloat, bool isNormalized, const u32 fetchOffset, const u32 fetchStride) override;
   void Draw(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams params) override;

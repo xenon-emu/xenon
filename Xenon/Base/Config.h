@@ -310,7 +310,7 @@ inline struct _network {
   bool verify_toml(toml::value &value);
 } network;
 
-void loadConfig(const fs::path &path);
-void saveConfig(const fs::path &path);
+void LoadConfig(const fs::path &path);
+void SaveConfig(const fs::path &path);
 
 } // namespace Config

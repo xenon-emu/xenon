@@ -119,7 +119,7 @@ bool XenonContext::HandleSecRNGRead(u64 readAddr, u8 *data, size_t byteCount) {
   u64 dataOut = 0;
   u16 offset = readAddr - XE_SOCSECRNG_BLOCK_START;
   if (readAddr == 0x26008) {
-    std::random_device randomDevice;  // Seed for the random number engine
+    std::random_device randomDevice; // Seed for the random number engine
     std::default_random_engine generator(randomDevice());
     std::uniform_int_distribution<u64> distribution(0, UINT64_MAX);
 
@@ -215,6 +215,7 @@ bool XenonContext::HandlePRVRead(u64 readAddr, u8 *data, size_t byteCount) {
   LOG_TRACE(Xenon, "SoC PRV Read at address 0x{:X}, data 0x{:X}.", readAddr, dataOut);
   return true;
 }
+
 // Pervasive logic Write
 bool XenonContext::HandlePRVWrite(u64 writeAddr, const u8 *data, size_t byteCount) {
   std::lock_guard lock(mutex);
@@ -254,4 +255,5 @@ bool XenonContext::HandlePRVWrite(u64 writeAddr, const u8 *data, size_t byteCoun
   LOG_TRACE(Xenon, "SoC PRV Write at address 0x{:X}, data 0x{:X}.", writeAddr, dataIn);
   return true;
 }
-}
+
+} // namespace Xe::XCPU

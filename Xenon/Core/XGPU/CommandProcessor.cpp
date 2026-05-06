@@ -27,13 +27,9 @@
 
 namespace Xe::XGPU {
 
-CommandProcessor::CommandProcessor(RAM *ramPtr, XenosState *statePtr, Render::Renderer *renderer, PCIBridge *pciBridge) :
-  ram(ramPtr),
-  state(statePtr),
-#ifndef NO_GFX
-  render(renderer),
-#endif
-  parentBus(pciBridge) {
+CommandProcessor::CommandProcessor(std::weak_ptr<RAM> ram, std::weak_ptr<XenosState> state, Render::Renderer *renderer, std::weak_ptr<PCIBridge> pciBridge)
+  : ramPtr(ram), statePtr(state), render(renderer), parentBus(pciBridge)
+{
   cpWorkerThread = std::thread(&CommandProcessor::cpWorkerThreadLoop, this);
 
   // According to free60/libxenon, these are the correct uCode sizes
@@ -96,11 +92,13 @@ void CommandProcessor::CPUpdateRBBase(u32 address) {
   if (!address)
     return;
 
-  cpRingBufferBasePtr = ram->GetPointerToAddress(address);
-  LOG_DEBUG(Xenos, "CP: Updating RingBuffer Base Address: 0x{:X}", address);
+  if (auto ram = ramPtr.lock()) {
+    cpRingBufferBasePtr = ram->GetPointerToAddress(address);
+    LOG_DEBUG(Xenos, "CP: Updating RingBuffer Base Address: 0x{:X}", address);
 
-  // Reset CP Read pointer index
-  cpReadPtrIndex = 0;
+    // Reset CP Read pointer index
+    cpReadPtrIndex = 0;
+  }
 }
 
 void CommandProcessor::CPUpdateRBSize(size_t newSize) {
@@ -153,39 +151,45 @@ u32 CommandProcessor::cpExecutePrimaryBuffer(u32 readIndex, u32 writeIndex) {
       assert(true);
       break;
     }
+
     // Shutdown if we were told to
     cpWorkerThreadRunning = XeRunning;
     if (!cpWorkerThreadRunning)
       break;
   } while (cpRingBufer.readCount() && cpWorkerThreadRunning);
 
-  return writeIndex; // Set Read and Write index equal, signaling buffer processed.
+  // Set Read and Write index equal, signaling buffer processed
+  return writeIndex;
 }
 
 void CommandProcessor::cpExecuteIndirectBuffer(u32 bufferPtr, u32 bufferSize) {
   // Create the ring buffer instance for the indirect buffer.
-  RingBuffer ringBufer(ram->GetPointerToAddress(bufferPtr), bufferSize * sizeof(u32));
+  if (auto ram = ramPtr.lock()) {
+    RingBuffer ringBufer(ram->GetPointerToAddress(bufferPtr), bufferSize * sizeof(u32));
 
-  // Set write offset.
-  ringBufer.setWriteOffset(bufferSize * sizeof(u32));
+    // Set write offset
+    ringBufer.setWriteOffset(bufferSize * sizeof(u32));
 
-  do {
-    if (!ExecutePacket(&ringBufer) && cpWorkerThreadRunning) {
-      // TODO(bitsh1ft3r): Check whether this should be a fatal crash.
-      LOG_ERROR(Xenos, "CP[IndirectRingBuffer]: Failed to execute a packet.");
-      assert(true);
-      break;
-    }
-    // Shutdown if we were told to
-    cpWorkerThreadRunning = XeRunning;
-    if (!cpWorkerThreadRunning)
-      break;
-  } while (ringBufer.readCount() && cpWorkerThreadRunning);
-  return;
+    do {
+      if (!ExecutePacket(&ringBufer) && cpWorkerThreadRunning) {
+        // TODO(bitsh1ft3r): Check whether this should be a fatal crash.
+        LOG_ERROR(Xenos, "CP[IndirectRingBuffer]: Failed to execute a packet.");
+        assert(true);
+        break;
+      }
+
+      // Shutdown if we were told to
+      cpWorkerThreadRunning = XeRunning;
+      if (!cpWorkerThreadRunning)
+        break;
+    } while (ringBufer.readCount() && cpWorkerThreadRunning);
+  }
 }
 
 void CommandProcessor::CPSetSQProgramCntl(u32 value) {
-  state->programCntl = value;
+  if (auto state = statePtr.lock()) {
+    state->programCntl = value;
+  }
 }
 
 // Executes a single packet from the ringbuffer.
@@ -210,17 +214,20 @@ bool CommandProcessor::ExecutePacket(RingBuffer *ringBuffer) {
   LOG_DEBUG(Xenos, "Executing packet type {} (0x{:X})", static_cast<u32>(packetType), packetData);
 #endif
 
-  // Execute packet based on type.
+  // Execute packet based on type
   switch (packetType) {
-  case Xe::XGPU::CPPacketType0: return ExecutePacketType0(ringBuffer, packetData);
-  case Xe::XGPU::CPPacketType1: return ExecutePacketType1(ringBuffer, packetData);
-  case Xe::XGPU::CPPacketType2: return ExecutePacketType2(ringBuffer, packetData);
-  case Xe::XGPU::CPPacketType3: return ExecutePacketType3(ringBuffer, packetData);
+  case Xe::XGPU::CPPacketType0:
+    return ExecutePacketType0(ringBuffer, packetData);
+  case Xe::XGPU::CPPacketType1:
+    return ExecutePacketType1(ringBuffer, packetData);
+  case Xe::XGPU::CPPacketType2:
+    return ExecutePacketType2(ringBuffer, packetData);
+  case Xe::XGPU::CPPacketType3:
+    return ExecutePacketType3(ringBuffer, packetData);
   default:
-    // This should never happen.
+    // This should never happen
     LOG_ERROR(Xenos, "CP[PrimaryBuffer]: found packet with unknown type!");
     return false;
-    break;
   }
 }
 
@@ -239,37 +246,54 @@ bool CommandProcessor::ExecutePacketType0(RingBuffer *ringBuffer, u32 packetData
   // Tells wheter the write is to one or multiple regs starting at specified register at base index.
   const u32 singleRegWrite = (packetData >> 15) & 0x1;
 
+  bool shutdownDueToInvalidData = false;
+
   for (u64 idx = 0; cpWorkerThreadRunning && idx < regCount; idx++) {
     // Shutdown if we were told to
     cpWorkerThreadRunning = XeRunning;
-    if (!cpWorkerThreadRunning)
+    if (!cpWorkerThreadRunning) {
+      shutdownDueToInvalidData = false;
       break;
-    // Get the data to be written to the (internal) Register.
-    u32 registerData = ringBuffer->Read<u32>();
-    // Target register index.
-    u32 targetRegIndex = singleRegWrite ? baseIndex : baseIndex + idx;
-    //LOG_DEBUG(Xenos, "CP[ExecutePacketType0]: Writing to {} (0x{:X}), data 0x{:X}", Xe::XGPU::GetRegisterNameById(targetRegIndex), targetRegIndex, registerData);
-    state->WriteRegister(static_cast<XeRegister>(targetRegIndex), registerData);
+    }
+
+    if (auto state = statePtr.lock()) {
+      // Get the data to be written to the (internal) Register.
+      u32 registerData = ringBuffer->Read<u32>();
+      // Target register index.
+      u32 targetRegIndex = singleRegWrite ? baseIndex : baseIndex + idx;
+      //LOG_DEBUG(Xenos, "CP[ExecutePacketType0]: Writing to {} (0x{:X}), data 0x{:X}", Xe::XGPU::GetRegisterNameById(targetRegIndex), targetRegIndex, registerData);
+      state->WriteRegister(static_cast<XeRegister>(targetRegIndex), registerData);
+    } else {
+      shutdownDueToInvalidData = true;
+      break;
+    }
   }
 
-  return true;
+  return !shutdownDueToInvalidData;
 }
 
 // Executes a packet type 1. Description is in CPPacketType enum.
 bool CommandProcessor::ExecutePacketType1(Xe::XGPU::RingBuffer *ringBuffer, u32 packetData) {
-  // Get both registers index.
-  const u32 regIndex0 = packetData & 0x7FF;
-  const u32 regIndex1 = (packetData >> 11) & 0x7FF;
-  // Get both registers data.
-  const u32 reg0Data = ringBuffer->Read<u32>();
-  const u32 reg1Data = ringBuffer->Read<u32>();
-  // Do the write.
-  LOG_TRACE(Xenos, "CP[ExecutePacketType1]: Writing register at index 0x{:X}, data 0x{:X}", regIndex0, reg0Data);
-  LOG_TRACE(Xenos, "CP[ExecutePacketType1]: Writing register at index 0x{:X}, data 0x{:X}", regIndex1, reg1Data);
-  // Write registers.
-  state->WriteRegister(static_cast<XeRegister>(regIndex0), reg0Data);
-  state->WriteRegister(static_cast<XeRegister>(regIndex1), reg1Data);
-  return true;
+  if (auto state = statePtr.lock()) {
+    // Get both registers index
+    const u32 regIndex0 = packetData & 0x7FF;
+    const u32 regIndex1 = (packetData >> 11) & 0x7FF;
+
+    // Get both registers data
+    const u32 reg0Data = ringBuffer->Read<u32>();
+    const u32 reg1Data = ringBuffer->Read<u32>();
+
+    // Do the write
+    LOG_TRACE(Xenos, "CP[ExecutePacketType1]: Writing register at index 0x{:X}, data 0x{:X}", regIndex0, reg0Data);
+    LOG_TRACE(Xenos, "CP[ExecutePacketType1]: Writing register at index 0x{:X}, data 0x{:X}", regIndex1, reg1Data);
+
+    // Write registers
+    state->WriteRegister(static_cast<XeRegister>(regIndex0), reg0Data);
+    state->WriteRegister(static_cast<XeRegister>(regIndex1), reg1Data);
+    return true;
+  } else {
+    return false;
+  }
 }
 
 // Executes a packet type 2. Description is in CPPacketType enum.
@@ -402,118 +426,131 @@ bool CommandProcessor::ExecutePacketType3_NOP(RingBuffer *ringBuffer, u32 packet
 }
 
 bool CommandProcessor::ExecutePacketType3_REG_RMW(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
-  const u32 rmwInfo = ringBuffer->ReadAndSwap<u32>();
-  const u32 andMask = ringBuffer->ReadAndSwap<u32>();
-  const u32 orMask = ringBuffer->ReadAndSwap<u32>();
+  if (auto state = statePtr.lock()) {
+    const u32 rmwInfo = ringBuffer->ReadAndSwap<u32>();
+    const u32 andMask = ringBuffer->ReadAndSwap<u32>();
+    const u32 orMask = ringBuffer->ReadAndSwap<u32>();
 
-  const u32 regAddr = (rmwInfo & 0x1FFF);
-  u32 value = state->ReadRawRegister(regAddr);
-  const u32 oldValue = value;
+    const u32 regAddr = (rmwInfo & 0x1FFF);
+    u32 value = state->ReadRawRegister(regAddr);
+    const u32 oldValue = value;
 
-  // OR value (with reg or immediate value)
-  if ((rmwInfo >> 30) & 0x1) {
-    // | reg
-    const u32 orValue = state->ReadRawRegister(orMask & 0x1FFF);
-    value |= orValue;
+    // OR value (with reg or immediate value)
+    if ((rmwInfo >> 30) & 0x1) {
+      // | reg
+      const u32 orValue = state->ReadRawRegister(orMask & 0x1FFF);
+      value |= orValue;
+    } else {
+      // | imm
+      value |= orMask;
+    }
+
+    // AND value (with reg or immediate value)
+    if ((rmwInfo >> 31) & 0x1) {
+      // & reg
+      const u32 andValue = state->ReadRawRegister(andMask & 0x1FFF);
+      value &= andValue;
+    } else {
+      // & imm
+      value &= andMask;
+    }
+
+    // Write the value back
+    state->WriteRawRegister(regAddr, value);
+
+    return true;
   } else {
-    // | imm
-    value |= orMask;
+    return false;
   }
-
-  // AND value (with reg or immediate value)
-  if ((rmwInfo >> 31) & 0x1) {
-    // & reg
-    const u32 andValue = state->ReadRawRegister(andMask & 0x1FFF);
-    value &= andValue;
-  } else {
-    // & imm
-    value &= andMask;
-  }
-
-  // Write the value back
-  state->WriteRawRegister(regAddr, value);
-  return true;
 }
 
 bool CommandProcessor::ExecutePacketType3_EVENT_WRITE(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
-  // Generates an event that creates a write to memory when completed
-  const u32 initiator = ringBuffer->ReadAndSwap<u32>();
+  if (auto state = statePtr.lock()) {
+    // Generates an event that creates a write to memory when completed
+    const u32 initiator = ringBuffer->ReadAndSwap<u32>();
 
-  // Writeback
-  state->vgtDrawInitiator.hexValue = initiator & 0x3F;
+    // Writeback
+    state->vgtDrawInitiator.hexValue = initiator & 0x3F;
 
-  if (dataCount == 1) {
-    // Unknown what should be done here
+    if (dataCount == 1) {
+      // Unknown what should be done here
+    } else {
+      LOG_ERROR(Xenos, "CP[EP3] | EVENT_WRITE: Invalid type!");
+      ringBuffer->AdvanceRead((dataCount - 1) * sizeof(u32));
+    }
+
+    return true;
   } else {
-    LOG_ERROR(Xenos, "CP[EP3] | EVENT_WRITE: Invalid type!");
-    ringBuffer->AdvanceRead((dataCount - 1) * sizeof(u32));
+    return false;
   }
-
-  return true;
 }
 
 
 bool CommandProcessor::ExecutePacketType3_COND_WRITE(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
-  // Determines how long to wait for, and what to wait for
-  const u32 waitInfo = ringBuffer->ReadAndSwap<u32>();
-  const XeRegister pollReg = static_cast<XeRegister>(ringBuffer->ReadAndSwap<u32>());
-  const u32 ref = ringBuffer->ReadAndSwap<u32>();
-  const u32 mask = ringBuffer->ReadAndSwap<u32>();
-  // Write data
-  const XeRegister writeReg = static_cast<XeRegister>(ringBuffer->ReadAndSwap<u32>());
-  u32 writeData = ringBuffer->ReadAndSwap<u32>();
+  if (auto ram = ramPtr.lock(); auto state = statePtr.lock()) {
+    // Determines how long to wait for, and what to wait for
+    const u32 waitInfo = ringBuffer->ReadAndSwap<u32>();
+    const XeRegister pollReg = static_cast<XeRegister>(ringBuffer->ReadAndSwap<u32>());
+    const u32 ref = ringBuffer->ReadAndSwap<u32>();
+    const u32 mask = ringBuffer->ReadAndSwap<u32>();
+    // Write data
+    const XeRegister writeReg = static_cast<XeRegister>(ringBuffer->ReadAndSwap<u32>());
+    u32 writeData = ringBuffer->ReadAndSwap<u32>();
 
-  u32 value = 0;
-  if (waitInfo & 0x10) {
-    // Memory.
-    auto endianness = static_cast<eEndian>(static_cast<u32>(pollReg) & 0x3);
-    u8 *addrPtr = ram->GetPointerToAddress(static_cast<u32>(pollReg) & ~0x3);
-    memcpy(&value, addrPtr, sizeof(value));
-    value = xeEndianSwap(value, endianness);
-  } else {
-    value = state->ReadRegister(pollReg);
-  }
-  bool matched = false;
-  switch (waitInfo & 0x7) {
-  case 0: // Never
-    matched = false;
-    break;
-  case 1: // Less than reference
-    matched = (value & mask) < ref;
-    break;
-  case 2: // Less than or equal to reference
-    matched = (value & mask) <= ref;
-    break;
-  case 3: // Equal to reference
-    matched = (value & mask) == ref;
-    break;
-  case 4: // Not equal to reference
-    matched = (value & mask) != ref;
-    break;
-  case 5: // Greater than or equal to reference
-    matched = (value & mask) >= ref;
-    break;
-  case 6: // Greater than reference
-    matched = (value & mask) > ref;
-    break;
-  case 7: // Always
-    matched = true;
-    break;
-  }
-
-  if (matched) {
-    // Write.
-    if (waitInfo & 0x100) { // Memory
-      auto endianness = static_cast<eEndian>(static_cast<u32>(writeReg) & 0x3);
-      u8 *addrPtr = ram->GetPointerToAddress(static_cast<u32>(writeReg) & ~0x3);
-      writeData = xeEndianSwap(writeData, endianness);
-      memcpy(addrPtr, &writeData, sizeof(writeData));
-    } else { // Register
-      state->WriteRegister(writeReg, writeData);
+    u32 value = 0;
+    if (waitInfo & 0x10) {
+      // Memory.
+      auto endianness = static_cast<eEndian>(static_cast<u32>(pollReg) & 0x3);
+      u8 *addrPtr = ram->GetPointerToAddress(static_cast<u32>(pollReg) & ~0x3);
+      memcpy(&value, addrPtr, sizeof(value));
+      value = xeEndianSwap(value, endianness);
+    } else {
+      value = state->ReadRegister(pollReg);
     }
-  }
+    bool matched = false;
+    switch (waitInfo & 0x7) {
+    case 0: // Never
+      matched = false;
+      break;
+    case 1: // Less than reference
+      matched = (value & mask) < ref;
+      break;
+    case 2: // Less than or equal to reference
+      matched = (value & mask) <= ref;
+      break;
+    case 3: // Equal to reference
+      matched = (value & mask) == ref;
+      break;
+    case 4: // Not equal to reference
+      matched = (value & mask) != ref;
+      break;
+    case 5: // Greater than or equal to reference
+      matched = (value & mask) >= ref;
+      break;
+    case 6: // Greater than reference
+      matched = (value & mask) > ref;
+      break;
+    case 7: // Always
+      matched = true;
+      break;
+    }
 
-  return true;
+    if (matched) {
+      // Write.
+      if (waitInfo & 0x100) { // Memory
+        auto endianness = static_cast<eEndian>(static_cast<u32>(writeReg) & 0x3);
+        u8 *addrPtr = ram->GetPointerToAddress(static_cast<u32>(writeReg) & ~0x3);
+        writeData = xeEndianSwap(writeData, endianness);
+        memcpy(addrPtr, &writeData, sizeof(writeData));
+      } else { // Register
+        state->WriteRegister(writeReg, writeData);
+      }
+    }
+
+    return true;
+  } else {
+    return false;
+  }
 }
 
 bool CommandProcessor::ExecutePacketType3_INVALIDATE_STATE(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
@@ -634,70 +671,74 @@ std::pair<Microcode::AST::Shader *, std::vector<u32>> LoadShader(eShaderType sha
 }
 
 bool CommandProcessor::ExecutePacketType3_IM_LOAD(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
-  // Load sequencer instruction memory (pointer-based)
-  const u32 addrType = ringBuffer->ReadAndSwap<u32>();
-  const eShaderType shaderType = static_cast<eShaderType>(addrType & 0x3);
-  const u32 addr = addrType & ~0x3;
-  const u32 startSize = ringBuffer->ReadAndSwap<u32>();
-  const u32 start = startSize >> 16;
-  const u64 size = (startSize & 0xFFFF) * 4;
-  u8 *addrPtr = ram->GetPointerToAddress(addr);
-  LOG_DEBUG(Xenos, "[CP::IM_LOAD] Shader Address: 0x{:X} | Shader Size: 0x{:X} (0x{:X}, 0x{:X})", addr, startSize, start, size);
+  if (auto ram = ramPtr.lock()) {
+    // Load sequencer instruction memory (pointer-based)
+    const u32 addrType = ringBuffer->ReadAndSwap<u32>();
+    const eShaderType shaderType = static_cast<eShaderType>(addrType & 0x3);
+    const u32 addr = addrType & ~0x3;
+    const u32 startSize = ringBuffer->ReadAndSwap<u32>();
+    const u32 start = startSize >> 16;
+    const u64 size = (startSize & 0xFFFF) * 4;
+    u8 *addrPtr = ram->GetPointerToAddress(addr);
+    LOG_DEBUG(Xenos, "[CP::IM_LOAD] Shader Address: 0x{:X} | Shader Size: 0x{:X} (0x{:X}, 0x{:X})", addr, startSize, start, size);
 
-  std::vector<u32> data{};
-  u32 dwordCount = size / 4;
-  data.resize(dwordCount);
-  memcpy(data.data(), addrPtr, size);
-  for (u32 &value : data) {
-    value = byteswap_be(value);
-  }
+    std::vector<u32> data{};
+    u32 dwordCount = size / 4;
+    data.resize(dwordCount);
+    memcpy(data.data(), addrPtr, size);
+    for (u32 &value : data) {
+      value = byteswap_be(value);
+    }
 
-  fs::path shaderPath{ Base::FS::GetPath(Base::FS::PathType::ShaderCacheDir) };
-  std::string typeString = shaderType == Xe::eShaderType::Pixel ? "pixel" : "vertex";
-  u32 crc = CRC32::CRC32::calc(reinterpret_cast<const u8 *>(data.data()), data.size() * 4);
-  std::string baseString = FMT("{}_shader_{:X}", typeString, crc);
-  {
-    std::ofstream f{ shaderPath / (baseString + ".bin"), std::ios::out | std::ios::binary };
-    f.write(reinterpret_cast<char *>(data.data()), data.size() * 4);
-    f.close();
-  }
+    fs::path shaderPath{ Base::FS::GetPath(Base::FS::PathType::ShaderCacheDir) };
+    std::string typeString = shaderType == Xe::eShaderType::Pixel ? "pixel" : "vertex";
+    u32 crc = CRC32::CRC32::calc(reinterpret_cast<const u8 *>(data.data()), data.size() * 4);
+    std::string baseString = FMT("{}_shader_{:X}", typeString, crc);
+    {
+      std::ofstream f{ shaderPath / (baseString + ".bin"), std::ios::out | std::ios::binary };
+      f.write(reinterpret_cast<char *>(data.data()), data.size() * 4);
+      f.close();
+    }
 
-  std::pair<Microcode::AST::Shader *, std::vector<u32>> shader = LoadShader(shaderType, data, baseString);
+    std::pair<Microcode::AST::Shader *, std::vector<u32>> shader = LoadShader(shaderType, data, baseString);
 
-  switch (shaderType) {
-  case eShaderType::Vertex:
-  case eShaderType::Pixel: {
+    switch (shaderType) {
+    case eShaderType::Vertex:
+    case eShaderType::Pixel: {
 #ifndef NO_GFX
-    {
-      std::lock_guard<std::mutex> lock(render->programLinkMutex);
+      {
+        std::lock_guard<std::mutex> lock(render->programLinkMutex);
 
-      if (shaderType == eShaderType::Pixel)
-        render->pendingPixelShaders[crc] = shader;
-      else
-        render->pendingVertexShaders[crc] = shader;
-    }
+        if (shaderType == eShaderType::Pixel)
+          render->pendingPixelShaders[crc] = shader;
+        else
+          render->pendingVertexShaders[crc] = shader;
+      }
 
-    Render::RenderCommand cmd{};
-    cmd.type = Render::RenderCommandType::BindShader;
-    cmd.payload = Render::RenderCommand::BindShaderCmd{
-      .vsHash = (shaderType == eShaderType::Vertex ? crc : 0),
-      .psHash = (shaderType == eShaderType::Pixel  ? crc : 0)
-    };
-    LOG_DEBUG(Xenos, "[CP::IM_LOAD] {}Shader CRC: 0x{:08X}", shaderType == eShaderType::Pixel ? "Pixel" : "Vertex", crc);
+      Render::RenderCommand cmd{};
+      cmd.type = Render::RenderCommandType::BindShader;
+      cmd.payload = Render::RenderCommand::BindShaderCmd{
+        .vsHash = (shaderType == eShaderType::Vertex ? crc : 0),
+        .psHash = (shaderType == eShaderType::Pixel ? crc : 0)
+      };
+      LOG_DEBUG(Xenos, "[CP::IM_LOAD] {}Shader CRC: 0x{:08X}", shaderType == eShaderType::Pixel ? "Pixel" : "Vertex", crc);
 
-    {
-      std::lock_guard<std::mutex> qlock(render->renderQueueMutex);
-      render->renderQueue.push(std::move(cmd));
-    }
+      {
+        std::lock_guard<std::mutex> qlock(render->renderQueueMutex);
+        render->renderQueue.push(std::move(cmd));
+      }
 #endif
-  } break;
-  case eShaderType::Unknown:
-  default: {
-    LOG_WARNING(Xenos, "[CP::IM_LOAD] Unknown shader type '{}'", static_cast<u32>(shaderType));
-  } break;
-  }
+    } break;
+    case eShaderType::Unknown:
+    default: {
+      LOG_WARNING(Xenos, "[CP::IM_LOAD] Unknown shader type '{}'", static_cast<u32>(shaderType));
+    } break;
+    }
 
-  return true;
+    return true;
+  } else {
+    return false;
+  }
 }
 
 bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
@@ -765,54 +806,72 @@ bool CommandProcessor::ExecutePacketType3_IM_LOAD_IMMEDIATE(RingBuffer *ringBuff
 }
 
 bool CommandProcessor::ExecutePacketType3_SET_CONSTANT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
-  const u32 offsetType = ringBuffer->ReadAndSwap<u32>();
+  if (auto state = statePtr.lock()) {
+    const u32 offsetType = ringBuffer->ReadAndSwap<u32>();
 
-  u32 index = offsetType & 0x7FF;
-  const u32 type = (offsetType >> 16) & 0xFF;
-
-  switch (type) {
-  case 0: index += 0x4000; break; // ALU
-  case 1: index += 0x4800; break; // FETCH
-  case 2: index += 0x4900; break; // BOOL
-  case 3: index += 0x4908; break; // LOOP
-  case 4: index += 0x2000; break; // REGISTER_RAWS
-  default:
+    u32 index = offsetType & 0x7FF;
+    const u32 type = (offsetType >> 16) & 0xFF;
+    switch (type) {
+    // ALU
+    case 0:
+    index += 0x4000;
+    break;
+  // FETCH
+    case 1:
+    index += 0x4800;
+    break;
+  // BOOL
+    case 2:
+    index += 0x4900;
+    break;
+  // LOOP
+    case 3:
+    index += 0x4908;
+    break;
+  // REGISTER_RAWS
+    case 4:
+    index += 0x2000;
+    break;
+    default:
     ringBuffer->AdvanceRead((dataCount - 1) * sizeof(u32));
     return true;
-  }
+    }
 
-  const u32 count = (dataCount > 0) ? (dataCount - 1) : 0;
-  if (!count)
-    return true;
+    const u32 count = (dataCount > 0) ? (dataCount - 1) : 0;
+    if (!count)
+      return true;
 
-  std::vector<u8> uploadBytes;
-  uploadBytes.resize(count * 4);
+    std::vector<u8> uploadBytes;
+    uploadBytes.resize(count * 4);
 
-  for (u32 n = 0; n < count; ++n) {
-    u32 v = ringBuffer->ReadAndSwap<u32>();
-    state->WriteRegister(static_cast<XeRegister>(index + n), v);
-    memcpy(uploadBytes.data() + n * 4, &v, 4);
-  }
+    for (u32 n = 0; n < count; ++n) {
+      u32 v = ringBuffer->ReadAndSwap<u32>();
+      state->WriteRegister(static_cast<XeRegister>(index + n), v);
+      memcpy(uploadBytes.data() + n * 4, &v, 4);
+    }
 
 #ifndef NO_GFX
-  Render::RenderCommand cmd{};
-  cmd.type = Render::RenderCommandType::UploadBuffer;
-  cmd.payload = Render::RenderCommand::UploadBufferCmd{
-    "ALUConsts"_j,
-    {},
-    Render::eBufferType::Storage,
-    Render::eBufferUsage::DynamicDraw
-  };
-  auto &upload = std::get<Render::RenderCommand::UploadBufferCmd>(cmd.payload);
-  upload.data = std::move(uploadBytes);
+    Render::RenderCommand cmd{};
+    cmd.type = Render::RenderCommandType::UploadBuffer;
+    cmd.payload = Render::RenderCommand::UploadBufferCmd{
+      "ALUConsts"_j,
+      {},
+      Render::eBufferType::Storage,
+      Render::eBufferUsage::DynamicDraw
+    };
+    auto &upload = std::get<Render::RenderCommand::UploadBufferCmd>(cmd.payload);
+    upload.data = std::move(uploadBytes);
 
-  {
-    std::lock_guard<std::mutex> lock(render->renderQueueMutex);
-    render->renderQueue.push(std::move(cmd));
-  }
+    {
+      std::lock_guard<std::mutex> lock(render->renderQueueMutex);
+      render->renderQueue.push(std::move(cmd));
+    }
 #endif
 
-  return true;
+    return true;
+  } else {
+    return false;
+  }
 }
 
 bool CommandProcessor::ExecutePacketType3_INDIRECT_BUFFER(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
@@ -829,191 +888,217 @@ bool CommandProcessor::ExecutePacketType3_INDIRECT_BUFFER(RingBuffer *ringBuffer
 }
 
 bool CommandProcessor::ExecutePacketType3_INTERRUPT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
-  // CPU(s) to interrupt
-  const u32 cpuMask = ringBuffer->ReadAndSwap<u32>();
-  LOG_DEBUG(Xenos, "[CP]: Executing Packet3 XPS INTERRUPT. CPU Mask {:#x}", cpuMask);
-  std::this_thread::sleep_for(100ms);
-  parentBus->RouteInterrupt(PRIO_XPS, cpuMask);
-  return true;
+  if (auto bus = parentBus.lock()) {
+    // CPU(s) to interrupt
+    const u32 cpuMask = ringBuffer->ReadAndSwap<u32>();
+    LOG_DEBUG(Xenos, "[CP]: Executing Packet3 XPS INTERRUPT. CPU Mask {:#x}", cpuMask);
+    std::this_thread::sleep_for(100ms);
+    bus->RouteInterrupt(PRIO_XPS, cpuMask);
+    return true;
+  } else {
+    return false;
+  }
 }
 
 bool CommandProcessor::ExecutePacketType3_SET_CONSTANT2(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
-  // Get base index
-  const u32 offsetType = ringBuffer->ReadAndSwap<u32>();
-  u32 index = offsetType & 0xFFFF;
+  if (auto state = statePtr.lock()) {
+    // Get base index
+    const u32 offsetType = ringBuffer->ReadAndSwap<u32>();
+    u32 index = offsetType & 0xFFFF;
 
-  // Write constants
-  for (u32 n = 0; n < dataCount - 1; n++, index++) {
-    const u32 data = ringBuffer->ReadAndSwap<u32>();
-    state->WriteRegister(static_cast<XeRegister>(index), data);
+    // Write constants
+    for (u32 n = 0; n < dataCount - 1; n++, index++) {
+      const u32 data = ringBuffer->ReadAndSwap<u32>();
+      state->WriteRegister(static_cast<XeRegister>(index), data);
+    }
+
+    return true;
+  } else {
+    return false;
   }
-
-  return true;
 }
 
 bool CommandProcessor::ExecutePacketType3_SET_SHADER_CONSTANTS(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
-  const u32 offsetType = ringBuffer->ReadAndSwap<u32>();
-  u32 index = offsetType & 0xFFFF;
+  if (auto state = statePtr.lock()) {
+    // Get base index
+    const u32 offsetType = ringBuffer->ReadAndSwap<u32>();
+    u32 index = offsetType & 0xFFFF;
 
-  const u32 count = (dataCount > 0) ? (dataCount - 1) : 0;
-  if (!count)
-    return true;
+    const u32 count = (dataCount > 0) ? (dataCount - 1) : 0;
+    if (!count)
+      return true;
 
-  std::vector<u8> uploadBytes;
-  uploadBytes.resize(count * 4);
+    std::vector<u8> uploadBytes;
+    uploadBytes.resize(count * 4);
 
-  for (u32 n = 0; n < count; ++n) {
-    u32 v = ringBuffer->ReadAndSwap<u32>();
-    state->WriteRegister(static_cast<XeRegister>(index + n), v);
-    memcpy(uploadBytes.data() + n * 4, &v, 4);
-  }
+    for (u32 n = 0; n < count; ++n) {
+      u32 v = ringBuffer->ReadAndSwap<u32>();
+      state->WriteRegister(static_cast<XeRegister>(index + n), v);
+      memcpy(uploadBytes.data() + n * 4, &v, 4);
+    }
 
 #ifndef NO_GFX
-  Render::RenderCommand cmd{};
-  cmd.type = Render::RenderCommandType::UploadBuffer;
-  cmd.payload = Render::RenderCommand::UploadBufferCmd{
-    "ALUConsts"_j,
-    {},
-    Render::eBufferType::Storage,
-    Render::eBufferUsage::DynamicDraw
-  };
-  auto &upload = std::get<Render::RenderCommand::UploadBufferCmd>(cmd.payload);
-  upload.data = std::move(uploadBytes);
+    Render::RenderCommand cmd{};
+    cmd.type = Render::RenderCommandType::UploadBuffer;
+    cmd.payload = Render::RenderCommand::UploadBufferCmd{
+      "ALUConsts"_j,
+      {},
+      Render::eBufferType::Storage,
+      Render::eBufferUsage::DynamicDraw
+    };
+    auto &upload = std::get<Render::RenderCommand::UploadBufferCmd>(cmd.payload);
+    upload.data = std::move(uploadBytes);
 
-  {
-    std::lock_guard<std::mutex> lock(render->renderQueueMutex);
-    render->renderQueue.push(std::move(cmd));
-  }
+    {
+      std::lock_guard<std::mutex> lock(render->renderQueueMutex);
+      render->renderQueue.push(std::move(cmd));
+    }
 #endif
 
-  return true;
+    return true;
+  } else {
+    return false;
+  }
 }
 
 bool CommandProcessor::ExecutePacketType3_EVENT_WRITE_SHD(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
-  // Generates a VS|PS_done event
-  const u32 initiator = ringBuffer->ReadAndSwap<u32>();
-  u32 address = ringBuffer->ReadAndSwap<u32>();
-  const u32 value = ringBuffer->ReadAndSwap<u32>();
+  if (auto ram = ramPtr.lock(); auto state = statePtr.lock()) {
+    // Generates a VS|PS_done event
+    const u32 initiator = ringBuffer->ReadAndSwap<u32>();
+    u32 address = ringBuffer->ReadAndSwap<u32>();
+    const u32 value = ringBuffer->ReadAndSwap<u32>();
 
-  // Writeback
-  state->vgtDrawInitiator.hexValue = initiator & 0x3F;
+    // Writeback
+    state->vgtDrawInitiator.hexValue = initiator & 0x3F;
 
-  u32 writeValue = 0;
-  if ((initiator >> 31) & 0x1) {
+    u32 writeValue = 0;
+    if ((initiator >> 31) & 0x1) {
 #ifndef NO_GFX
-    writeValue = render->swapCount;
+      writeValue = render->swapCount;
 #else
-    writeValue = value;
+      writeValue = value;
 #endif
+    } else {
+      writeValue = value;
+    }
+
+    auto endianness = static_cast<eEndian>(address & 0x3);
+    address &= ~0x3;
+    writeValue = xeEndianSwap(writeValue, endianness);
+
+    LOG_DEBUG(Xenos, "[CP][PT3](EVENT_WRITE_SHD): Writing value {:#x} to address {:#x}", writeValue, address);
+
+    u8 *addrPtr = ram->GetPointerToAddress(address);
+    memcpy(addrPtr, &writeValue, sizeof(writeValue));
+
+    return true;
   } else {
-    writeValue = value;
+    return false;
   }
-
-  auto endianness = static_cast<eEndian>(address & 0x3);
-  address &= ~0x3;
-  writeValue = xeEndianSwap(writeValue, endianness);
-
-  LOG_DEBUG(Xenos, "[CP][PT3](EVENT_WRITE_SHD): Writing value {:#x} to address {:#x}", writeValue, address);
-
-  u8 *addrPtr = ram->GetPointerToAddress(address);
-  memcpy(addrPtr, &writeValue, sizeof(writeValue));
-
-  return true;
 }
 
 bool CommandProcessor::ExecutePacketType3_WAIT_REG_MEM(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
-  // Determines how long to wait for, and what to wait for
-  const u32 waitInfo = ringBuffer->ReadAndSwap<u32>();
-  const u32 pollReg = ringBuffer->ReadAndSwap<u32>();
-  const u32 ref = ringBuffer->ReadAndSwap<u32>();
-  const u32 mask = ringBuffer->ReadAndSwap<u32>();
-  // Time to live
-  const u32 wait = ringBuffer->ReadAndSwap<u32>();
+  if (auto ram = ramPtr.lock(); auto state = statePtr.lock()) {
+    // Determines how long to wait for, and what to wait for
+    const u32 waitInfo = ringBuffer->ReadAndSwap<u32>();
+    const u32 pollReg = ringBuffer->ReadAndSwap<u32>();
+    const u32 ref = ringBuffer->ReadAndSwap<u32>();
+    const u32 mask = ringBuffer->ReadAndSwap<u32>();
+    // Time to live
+    const u32 wait = ringBuffer->ReadAndSwap<u32>();
 
-  const bool isMemory = (waitInfo & 0x10) != 0;
+    const bool isMemory = (waitInfo & 0x10) != 0;
 
-  bool matched = false;
-  do {
-    u32 value = 0;
-    if (isMemory) {
-      u32 addr = pollReg & ~0x3;
-      u8 *addrPtr = ram->GetPointerToAddress(addr);
-      memcpy(&value, addrPtr, sizeof(value));
-      value = xeEndianSwap(value, static_cast<eEndian>(pollReg & 0x3));
-    } else {
-      value = state->ReadRegister(static_cast<XeRegister>(pollReg));
-      if (static_cast<XeRegister>(pollReg) == XeRegister::COHER_STATUS_HOST) {
-        auto statusHost = state->coherencyStatusHost;
-        const u32 baseHost = state->coherencyBaseHost;
-        const u32 sizeHost = state->coherencySizeHost;
-
-        if (statusHost.status) {
-          const char* action = "N/A";
-          if (statusHost.vcActionEnable && statusHost.tcActionEnable) { action = "VC | TC"; } 
-          else if (statusHost.tcActionEnable) { action = "TC"; } 
-          else if (statusHost.vcActionEnable) { action = "VC"; }
-
-          LOG_DEBUG(Xenos, "[CP]: Making {:#x} -> {:#x} coherent, performed action = {}", baseHost, baseHost + sizeHost, action);
-          state->coherencyStatusHost.hexValue = 0;
-        }
-
-        value = state->ReadRegister(static_cast<XeRegister>(pollReg));
-      }
-    }
-    switch (waitInfo & 0x7) {
-    case 0: // Never
-      matched = false;
-      break;
-    case 1: // Less than reference
-      matched = (value & mask) < ref;
-      break;
-    case 2: // Less than or equal to reference
-      matched = (value & mask) <= ref;
-      break;
-    case 3: // Equal to reference
-      matched = (value & mask) == ref;
-      break;
-    case 4: // Not equal to reference
-      matched = (value & mask) != ref;
-      break;
-    case 5: // Greater than or equal to reference
-      matched = (value & mask) >= ref;
-      break;
-    case 6: // Greater than reference
-      matched = (value & mask) > ref;
-      break;
-    case 7: // Always
-      matched = true;
-      break;
-    }
-
-    if (!matched) {
-#ifndef NO_GFX
-      render->waiting = true;
-      render->waitTime = wait;
-#endif
-      if (wait >= 0x100) {
-        // Wait
-        std::this_thread::sleep_for(std::chrono::milliseconds(wait / 0x100));
+    bool matched = false;
+    do {
+      u32 value = 0;
+      if (isMemory) {
+        u32 addr = pollReg & ~0x3;
+        u8 *addrPtr = ram->GetPointerToAddress(addr);
+        memcpy(&value, addrPtr, sizeof(value));
+        value = xeEndianSwap(value, static_cast<eEndian>(pollReg & 0x3));
       } else {
-        // Yield
-        std::this_thread::yield();
+        value = state->ReadRegister(static_cast<XeRegister>(pollReg));
+        if (static_cast<XeRegister>(pollReg) == XeRegister::COHER_STATUS_HOST) {
+          auto statusHost = state->coherencyStatusHost;
+          const u32 baseHost = state->coherencyBaseHost;
+          const u32 sizeHost = state->coherencySizeHost;
+
+          if (statusHost.status) {
+            const char *action = "N/A";
+            if (statusHost.vcActionEnable && statusHost.tcActionEnable) {
+              action = "VC | TC";
+            } else if (statusHost.tcActionEnable) {
+              action = "TC";
+            } else if (statusHost.vcActionEnable) {
+              action = "VC";
+            }
+
+            LOG_DEBUG(Xenos, "[CP]: Making {:#x} -> {:#x} coherent, performed action = {}", baseHost, baseHost + sizeHost, action);
+            state->coherencyStatusHost.hexValue = 0;
+          }
+
+          value = state->ReadRegister(static_cast<XeRegister>(pollReg));
+        }
       }
-    }
-  } while (!matched);
-  return true;
+      switch (waitInfo & 0x7) {
+      case 0: // Never
+        matched = false;
+        break;
+      case 1: // Less than reference
+        matched = (value & mask) < ref;
+        break;
+      case 2: // Less than or equal to reference
+        matched = (value & mask) <= ref;
+        break;
+      case 3: // Equal to reference
+        matched = (value & mask) == ref;
+        break;
+      case 4: // Not equal to reference
+        matched = (value & mask) != ref;
+        break;
+      case 5: // Greater than or equal to reference
+        matched = (value & mask) >= ref;
+        break;
+      case 6: // Greater than reference
+        matched = (value & mask) > ref;
+        break;
+      case 7: // Always
+        matched = true;
+        break;
+      }
+
+      if (!matched) {
+#ifndef NO_GFX
+        render->waiting = true;
+        render->waitTime = wait;
+#endif
+        if (wait >= 0x100) {
+          // Wait
+          std::this_thread::sleep_for(std::chrono::milliseconds(wait / 0x100));
+        } else {
+          // Yield
+          std::this_thread::yield();
+        }
+      }
+    } while (!matched);
+
+    return true;
+  } else {
+    return false;
+  }
 }
 
 bool CommandProcessor::ExecutePacketType3_SET_BIN_MASK(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
-  const uint64_t maskHigh = ringBuffer->ReadAndSwap<u32>();
-  const uint64_t maskLow = ringBuffer->ReadAndSwap<u32>();
+  const u64 maskHigh = ringBuffer->ReadAndSwap<u32>();
+  const u64 maskLow = ringBuffer->ReadAndSwap<u32>();
   binMask = (maskHigh << 32) | maskLow;
   return true;
 }
 
 bool CommandProcessor::ExecutePacketType3_SET_BIN_SELECT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
-  const uint64_t selectHigh = ringBuffer->ReadAndSwap<u32>();
-  const uint64_t selectlow = ringBuffer->ReadAndSwap<u32>();
+  const u64 selectHigh = ringBuffer->ReadAndSwap<u32>();
+  const u64 selectlow = ringBuffer->ReadAndSwap<u32>();
   binSelect = (selectHigh << 32) | selectlow;
   return true;
 }
@@ -1049,145 +1134,147 @@ bool CommandProcessor::ExecutePacketType3_DRAW(RingBuffer *ringBuffer, u32 packe
     return false;
   }
 
-  // Get our VGT register data
-  state->vgtDrawInitiator.hexValue = ringBuffer->ReadAndSwap<u32>();
-  dataCount--;
-
-  bool isIndexedDraw = false;
-  bool drawOk = true;
-
-  // Our Index Buffer info for indexed draws
-  XeIndexBufferInfo indexBufferInfo;
-
-  switch (state->vgtDrawInitiator.sourceSelect) {
-  case eSourceSelect::xeDMA: {
-    // Indexed draw
-    isIndexedDraw = true;
-
-    // Read VGT_DMA_BASE from data
-    // Sanity check
-    if (!dataCount) {
-      LOG_ERROR(Xenos, "[CP, PT3]: DRAW failed, not enough data for VGT_DMA_BASE.");
-      return false; // Failed
-    }
-
-    // Write the VGT_DMA_BASE register
-    state->vgtDMABase = ringBuffer->ReadAndSwap<u32>();
+  if (auto ram = ramPtr.lock(); auto state = statePtr.lock()) {
+    // Get our VGT register data
+    state->vgtDrawInitiator.hexValue = ringBuffer->ReadAndSwap<u32>();
     dataCount--;
 
-    // Sanity check, again
-    if (!dataCount) {
-      LOG_ERROR(Xenos, "[CP, PT3]: DRAW failed, not enough data for VGT_DMA_SIZE.");
-      return false; // Failed
+    bool isIndexedDraw = false;
+    bool drawOk = true;
+
+    // Our Index Buffer info for indexed draws
+    XeIndexBufferInfo indexBufferInfo;
+
+    switch (state->vgtDrawInitiator.sourceSelect) {
+    case eSourceSelect::xeDMA: {
+      // Indexed draw
+      isIndexedDraw = true;
+
+      // Read VGT_DMA_BASE from data
+      // Sanity check
+      if (!dataCount) {
+        LOG_ERROR(Xenos, "[CP, PT3]: DRAW failed, not enough data for VGT_DMA_BASE.");
+        return false; // Failed
+      }
+
+      // Write the VGT_DMA_BASE register
+      state->vgtDMABase = ringBuffer->ReadAndSwap<u32>();
+      dataCount--;
+
+      // Sanity check, again
+      if (!dataCount) {
+        LOG_ERROR(Xenos, "[CP, PT3]: DRAW failed, not enough data for VGT_DMA_SIZE.");
+        return false; // Failed
+      }
+
+      // Write the VGT_DMA_SIZE register
+      state->vgtDMASize.hexValue = ringBuffer->ReadAndSwap<u32>();
+      dataCount--;
+
+      // Get our index size from VGT_DRAW_INITIATOR size in bytes.
+      u32 indexSizeInBytes = state->vgtDrawInitiator.indexSize == eIndexFormat::xeInt16 ? sizeof(u16) : sizeof(u32);
+
+      // The base address must already be word-aligned according to the R6xx documentation.
+      indexBufferInfo.guestBase = state->vgtDMABase & ~(indexSizeInBytes - 1);
+      indexBufferInfo.elements = ram->GetPointerToAddress(indexBufferInfo.guestBase);
+      indexBufferInfo.endianness = state->vgtDMASize.swapMode;
+      indexBufferInfo.indexFormat = state->vgtDrawInitiator.indexSize;
+      indexBufferInfo.length = state->vgtDMASize.numWords * indexSizeInBytes;
+      indexBufferInfo.count = state->vgtDrawInitiator.numIndices;
+    } break;
+    case eSourceSelect::xeImmediate: {
+      // TODO(bitshift3r): Do VGT_IMMED_DATA if any ocurrences are to be found.
+      LOG_ERROR(Xenos, "[CP, PT3]{}: Is using immediate vertex indices, which are currently unsupported. "
+        "Please submit an issue in Xenon github.", opCodeName);
+      drawOk = false;
+    } break;
+    case eSourceSelect::xeAutoIndex: {
+      // Auto draw.
+      indexBufferInfo.guestBase = 0;
+      indexBufferInfo.length = 0;
+    } break;
+    default:
+      // Unhandled or invalid source selection.
+      drawOk = false;
+      LOG_ERROR(Xenos, "[CP, PT3]: DRAW failed, invalid source select.");
+      break;
     }
 
-    // Write the VGT_DMA_SIZE register
-    state->vgtDMASize.hexValue = ringBuffer->ReadAndSwap<u32>();
-    dataCount--;
+    // Skip to the next command, if there are immediate indexes that we don't support yet.
+    ringBuffer->AdvanceRead(dataCount * sizeof(u32));
 
-    // Get our index size from VGT_DRAW_INITIATOR size in bytes.
-    u32 indexSizeInBytes = state->vgtDrawInitiator.indexSize == eIndexFormat::xeInt16 ? sizeof(u16) : sizeof(u32);
-
-    // The base address must already be word-aligned according to the R6xx documentation.
-    indexBufferInfo.guestBase = state->vgtDMABase & ~(indexSizeInBytes - 1);
-    indexBufferInfo.elements = ram->GetPointerToAddress(indexBufferInfo.guestBase);
-    indexBufferInfo.endianness = state->vgtDMASize.swapMode;
-    indexBufferInfo.indexFormat = state->vgtDrawInitiator.indexSize;
-    indexBufferInfo.length = state->vgtDMASize.numWords * indexSizeInBytes;
-    indexBufferInfo.count = state->vgtDrawInitiator.numIndices;
-  } break;
-  case eSourceSelect::xeImmediate: {
-    // TODO(bitshift3r): Do VGT_IMMED_DATA if any ocurrences are to be found.
-    LOG_ERROR(Xenos, "[CP, PT3]{}: Is using immediate vertex indices, which are currently unsupported. "
-      "Please submit an issue in Xenon github.", opCodeName);
-    drawOk = false;
-  } break;
-  case eSourceSelect::xeAutoIndex: {
-    // Auto draw.
-    indexBufferInfo.guestBase = 0;
-    indexBufferInfo.length = 0;
-  } break;
-  default: {
-    // Unhandled or invalid source selection.
-    drawOk = false;
-    LOG_ERROR(Xenos, "[CP, PT3]: DRAW failed, invalid source select.");
-  } break;
-  }
-
-  // Skip to the next command, if there are immediate indexes that we don't support yet.
-  ringBuffer->AdvanceRead(dataCount * sizeof(u32));
-
-  const eModeControl modeControl = state->modeControl.edramMode;
-  if (drawOk) {
-    // Get surface info
-    const u32 surfacePitch = state->surfaceInfo.surfacePitch;
-    bool hasRT = surfacePitch != 0;
-    if (!hasRT) {
-      return true;
-    }
-    // Get surface MSAA
-    const eMSAASamples surfaceMSAA = state->surfaceInfo.msaaSamples;
-    // Check the state of things
-    if (modeControl == eModeControl::xeCopy) {
-      // Copy to eDRAM, and clear if needed
+    const eModeControl modeControl = state->modeControl.edramMode;
+    if (drawOk) {
+      // Get surface info
+      const u32 surfacePitch = state->surfaceInfo.surfacePitch;
+      bool hasRT = surfacePitch != 0;
+      if (!hasRT) {
+        return true;
+      }
+      // Get surface MSAA
+      const eMSAASamples surfaceMSAA = state->surfaceInfo.msaaSamples;
+      // Check the state of things
+      if (modeControl == eModeControl::xeCopy) {
+        // Copy to eDRAM, and clear if needed
 #ifndef NO_GFX
+        Render::RenderCommand cmd{};
+        cmd.type = Render::RenderCommandType::CopyResolve;
+        cmd.payload = Render::RenderCommand::CopyResolveCmd{ statePtr };
+
+        {
+          std::lock_guard<std::mutex> lock(render->renderQueueMutex);
+          render->renderQueue.push(cmd);
+        }
+#endif
+        return true;
+      }
+
+      XeDrawParams params = {};
+      params.state = state;
+      params.indexBufferInfo = indexBufferInfo;
+      params.vgtDrawInitiator = state->vgtDrawInitiator;
+      params.maxVertexIndex = state->maxVertexIndex;
+      params.minVertexIndex = state->minVertexIndex;
+      params.indexOffset = state->indexOffset;
+      params.multiPrimitiveIndexBufferResetIndex = state->multiPrimitiveIndexBufferResetIndex;
+      params.currentBinIdMin = state->currentBinIdMin;
+
+#ifndef NO_GFX
+      // Queue off to the Renderer
       Render::RenderCommand cmd{};
-      cmd.type = Render::RenderCommandType::CopyResolve;
-      cmd.payload = Render::RenderCommand::CopyResolveCmd{ state };
+      cmd.type = isIndexedDraw ? Render::RenderCommandType::DrawIndexed : Render::RenderCommandType::Draw;
+
+      if (isIndexedDraw) {
+        cmd.payload = Render::RenderCommand::DrawIndexedCmd{ params, indexBufferInfo };
+      } else {
+        cmd.payload = Render::RenderCommand::DrawCmd{ params };
+      }
 
       {
         std::lock_guard<std::mutex> lock(render->renderQueueMutex);
-        render->renderQueue.push(cmd);
+        render->renderQueue.push(std::move(cmd));
       }
 #endif
-      return true;
-    }
-
-    XeDrawParams params = {};
-    params.state = state;
-    params.indexBufferInfo = indexBufferInfo;
-    params.vgtDrawInitiator = state->vgtDrawInitiator;
-    params.maxVertexIndex = state->maxVertexIndex;
-    params.minVertexIndex = state->minVertexIndex;
-    params.indexOffset = state->indexOffset;
-    params.multiPrimitiveIndexBufferResetIndex = state->multiPrimitiveIndexBufferResetIndex;
-    params.currentBinIdMin = state->currentBinIdMin;
-
 #ifndef NO_GFX
-    // Queue off to the Renderer
-    Render::RenderCommand cmd{};
-    cmd.type = isIndexedDraw
-      ? Render::RenderCommandType::DrawIndexed
-      : Render::RenderCommandType::Draw;
-
-    if (isIndexedDraw) {
-      cmd.payload = Render::RenderCommand::DrawIndexedCmd{ params, indexBufferInfo };
-    } else {
-      cmd.payload = Render::RenderCommand::DrawCmd{ params };
-    }
-
-    {
-      std::lock_guard<std::mutex> lock(render->renderQueueMutex);
-      render->renderQueue.push(std::move(cmd));
-    }
-#endif
-#ifndef NO_GFX
-    LOG_DEBUG(Xenos, "[CP] Draw {}: PrimType {}, IndexCount {}",
-      isIndexedDraw ? "Indexed" : "Auto",
-      (u32)state->vgtDrawInitiator.primitiveType,
-      state->vgtDrawInitiator.numIndices);
+      LOG_DEBUG(Xenos, "[CP] Draw {}: PrimType {}, IndexCount {}",
+        isIndexedDraw ? "Indexed" : "Auto",
+        (u32)state->vgtDrawInitiator.primitiveType,
+        state->vgtDrawInitiator.numIndices);
 #else
-    LOG_DEBUG(Xenos, "[CP] Draw {}: PrimType {}, IndexCount {}",
-      isIndexedDraw ? "Indexed" : "Auto",
-      (u32)state->vgtDrawInitiator.primitiveType,
-      state->vgtDrawInitiator.numIndices);
+      LOG_DEBUG(Xenos, "[CP] Draw {}: PrimType {}, IndexCount {}",
+        isIndexedDraw ? "Indexed" : "Auto",
+        (u32)state->vgtDrawInitiator.primitiveType,
+        state->vgtDrawInitiator.numIndices);
 #endif
-    state->ClearDirtyState();
-  } else {
-    LOG_ERROR(Xenos, "[CP] Invalid draw");
-  }
+      state->ClearDirtyState();
+    } else {
+      LOG_ERROR(Xenos, "[CP] Invalid draw");
+    }
 
-  return drawOk;
+    return drawOk;
+  } else {
+    return false;
+  }
 }
 
 bool CommandProcessor::ExecutePacketType3_DRAW_INDX(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
@@ -1218,73 +1305,78 @@ bool CommandProcessor::ExecutePacketType3_DRAW_INDX_2(RingBuffer *ringBuffer, u3
 }
 
 bool CommandProcessor::ExecutePacketType3_LOAD_ALU_CONSTANT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount) {
-  u32 readAddress = ringBuffer->ReadAndSwap<u32>();
-  readAddress &= 0x3FFFFFFF;
+  if (auto ram = ramPtr.lock(); auto state = statePtr.lock()) {
+    // Load Shader constants from memory
+    u32 readAddress = ringBuffer->ReadAndSwap<u32>();
+    readAddress &= 0x3FFFFFFF;
 
-  const u32 offsetType = ringBuffer->ReadAndSwap<u32>();
-  u32 index = offsetType & 0x7FF;
+    const u32 offsetType = ringBuffer->ReadAndSwap<u32>();
+    u32 index = offsetType & 0x7FF;
 
-  u32 sizeInDwords = ringBuffer->ReadAndSwap<u32>();
-  sizeInDwords &= 0xFFF;
+    u32 sizeInDwords = ringBuffer->ReadAndSwap<u32>();
+    sizeInDwords &= 0xFFF;
 
-  const u32 type = (offsetType >> 16) & 0xFF;
-  switch (type) {
-    case 0:  // ALU
-      index += 0x4000;
-      break;
-    case 1:  // FETCH
-      index += 0x4800;
-      break;
-    case 2:  // BOOL
-      index += 0x4900;
-      break;
-    case 3:  // LOOP
-      index += 0x4908;
-      break;
-    case 4:  // REGISTERS
-      index += 0x2000;
-      break;
-    default:
-      LOG_ERROR(Xenos, "[CP][PT3:LOAD_ALU_CONSTANT]: Unrecognized Constant Type {}.", type);
-      return true;  // ignore rather than hard-fail
-  }
+    const u32 type = (offsetType >> 16) & 0xFF;
+    switch (type) {
+      case 0:  // ALU
+        index += 0x4000;
+        break;
+      case 1:  // FETCH
+        index += 0x4800;
+        break;
+      case 2:  // BOOL
+        index += 0x4900;
+        break;
+      case 3:  // LOOP
+        index += 0x4908;
+        break;
+      case 4:  // REGISTERS
+        index += 0x2000;
+        break;
+      default:
+        LOG_ERROR(Xenos, "[CP][PT3:LOAD_ALU_CONSTANT]: Unrecognized Constant Type {}.", type);
+        return true;  // ignore rather than hard-fail
+    }
 
-  if (!sizeInDwords)
-    return true;
+    if (!sizeInDwords)
+      return true;
 
-  std::vector<u8> uploadBytes;
-  uploadBytes.resize(sizeInDwords * 4);
+    std::vector<u8> uploadBytes;
+    uploadBytes.resize(sizeInDwords * 4);
 
-  for (u32 n = 0; n < sizeInDwords; ++n) {
-    u32 v = 0;
-    u8* src = ram->GetPointerToAddress(readAddress + n * 4);
-    memcpy(&v, src, sizeof(v));
-    v = byteswap_be(v);
+    for (u32 n = 0; n < sizeInDwords; ++n) {
+      u32 v = 0;
+      u8* src = ram->GetPointerToAddress(readAddress + n * 4);
+      memcpy(&v, src, sizeof(v));
+      v = byteswap_be(v);
 
-    state->WriteRegister(static_cast<XeRegister>(index + n), v);
-    memcpy(uploadBytes.data() + n * 4, &v, 4);
-  }
+      state->WriteRegister(static_cast<XeRegister>(index + n), v);
+      memcpy(uploadBytes.data() + n * 4, &v, 4);
+    }
 
 #ifndef NO_GFX
-  Render::RenderCommand cmd{};
-  cmd.type = Render::RenderCommandType::UploadBuffer;
-  cmd.payload = Render::RenderCommand::UploadBufferCmd{
-    "ALUConsts"_j,
-    {},
-    Render::eBufferType::Storage,
-    Render::eBufferUsage::DynamicDraw
-  };
+    Render::RenderCommand cmd{};
+    cmd.type = Render::RenderCommandType::UploadBuffer;
+    cmd.payload = Render::RenderCommand::UploadBufferCmd{
+      "ALUConsts"_j,
+      {},
+      Render::eBufferType::Storage,
+      Render::eBufferUsage::DynamicDraw
+    };
 
-  auto& upload = std::get<Render::RenderCommand::UploadBufferCmd>(cmd.payload);
-  upload.data = std::move(uploadBytes);
+    auto &upload = std::get<Render::RenderCommand::UploadBufferCmd>(cmd.payload);
+    upload.data = std::move(uploadBytes);
 
-  {
-    std::lock_guard<std::mutex> lock(render->renderQueueMutex);
-    render->renderQueue.push(std::move(cmd));
-  }
+    {
+      std::lock_guard<std::mutex> lock(render->renderQueueMutex);
+      render->renderQueue.push(std::move(cmd));
+    }
 #endif
 
-  return true;
+    return true;
+  } else {
+    return false;
+  }
 }
 
 } // namespace Xe::XGPU

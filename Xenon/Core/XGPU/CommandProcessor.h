@@ -73,7 +73,7 @@ struct XeShader {
 #endif
 
 struct XeDrawParams {
-  XenosState *state = nullptr;
+  std::weak_ptr<XenosState> state = {};
   XeIndexBufferInfo indexBufferInfo = {};
   VGT_DRAW_INITIATOR_REG vgtDrawInitiator = {};
   u32 maxVertexIndex = 0;
@@ -85,7 +85,7 @@ struct XeDrawParams {
 
 class CommandProcessor {
 public:
-  CommandProcessor(RAM *ramPtr, XenosState *statePtr, Render::Renderer *renderer, PCIBridge *pciBridge);
+  CommandProcessor(std::weak_ptr<RAM> ramPtr, std::weak_ptr<XenosState> statePtr, Render::Renderer *renderer, std::weak_ptr<PCIBridge> pciBridge);
   ~CommandProcessor();
 
   // Methods for R/W of the CP/PFP uCode data
@@ -106,19 +106,19 @@ public:
 
 private:
   // PCI Bridge pointer. Used for interrupts
-  PCIBridge *parentBus{};
+  std::weak_ptr<PCIBridge> parentBus = {};
 
   // RAM Poiner, for DMA ops and RingBuffer access
-  RAM *ram{};
+  std::weak_ptr<RAM> ramPtr = {};
 
   // Render handle
-  Render::Renderer *render;
+  Render::Renderer *render = nullptr;
 
   // Xenos State, contains register data
-  XenosState *state{};
+  std::weak_ptr<XenosState> statePtr = {};
 
   // Worker thread
-  std::thread cpWorkerThread;
+  std::thread cpWorkerThread = {};
 
   // Worker thread running
   volatile bool cpWorkerThreadRunning = true;
@@ -139,12 +139,12 @@ private:
   u32 cpMEuCodeReadAddress = 0;
   // CP Microcode Engine data & size
   u32 cpMEuCodeSize = 0;
-  std::unordered_map<u32, u32> cpMEuCodeData;
+  std::unordered_map<u32, u32> cpMEuCodeData = {};
   // CP PreFetch Parser data & size
   u32 cpPFPuCodeSize = 0;
-  std::unordered_map<u32, u32> cpPFPuCodeData;
+  std::unordered_map<u32, u32> cpPFPuCodeData = {};
   // CP ME for PM4_ME_INIT data
-  std::vector<u32> cpME_PM4_ME_INIT_Data;
+  std::vector<u32> cpME_PM4_ME_INIT_Data = {};
 
   // Basically, the driver sets the CP write base to an address in memory where
   // the RingBuffer is located, and after it stores a Read Pointer to the location
@@ -210,4 +210,5 @@ private:
   bool ExecutePacketType3_DRAW_INDX_2(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
   bool ExecutePacketType3_LOAD_ALU_CONSTANT(RingBuffer *ringBuffer, u32 packetData, u32 dataCount);
 };
-}
+
+} // namespace Xe::XGPU

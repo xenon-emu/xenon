@@ -11,15 +11,17 @@
 #include "Core/XGPU/XGPU.h"
 
 /*
-        PCI Configuration Space at Address 0xD0000000
-        Bus0
-        - Dev0  PCI-PCI Bridge    0xD0000000
-        - Dev1  HostBridge        0xD0008000
+  PCI Configuration Space at address 0xD0000000
+  Bus0
+    - Dev0  PCI-PCI Bridge    0xD0000000
+    - Dev1  HostBridge        0xD0008000
 */
 
 #define HOST_BRIDGE_SIZE 0x1FFFFFF // Maybe??
 
-// Host Bridge regs, these control interrupts/etc
+// Host Bridge Registers
+//  These control interrupts,
+//  and some other misc things.
 struct HOSTBRIDGE_REGS {
   u32 REG_E0020000;
   u32 REG_E0020004;
@@ -42,7 +44,7 @@ struct BIU_REGS {
   u32 REG_E1020000;
   u32 REG_E1020004;
   u32 REG_E1020008;
-  u32 ramSize;
+  u32 RAMSize;
   u32 REG_E1040074;
   u32 REG_E1040078;
 };
@@ -52,41 +54,37 @@ public:
   HostBridge(u64 ramSize);
   ~HostBridge();
 
-  // Xbox GPU Register
-  void RegisterXGPU(std::shared_ptr<Xe::Xenos::XGPU> xgpu);
+  std::weak_ptr<Xe::Xenos::XGPU> RegisterXGPU(std::unique_ptr<Xe::Xenos::XGPU> xgpu);
+  std::weak_ptr<PCIBridge> RegisterPCIBridge(std::unique_ptr<PCIBridge> bridge);
 
-  // PCI Bridge Register
-  void RegisterPCIBridge(std::shared_ptr<PCIBridge> bridge);
+  bool Read(u64 address, u8 *data, u64 size);
+  bool Write(u64 address, const u8 *data, u64 size);
+  bool MemSet(u64 address, s32 data, u64 size);
 
-  // Read
-  bool Read(u64 readAddress, u8 *data, u64 size);
+  // Configuration Space R/W
+  bool ConfigRead(u64 address, u8 *data, u64 size);
+  bool ConfigWrite(u64 address, const u8 *data, u64 size);
 
-  // Write
-  bool Write(u64 writeAddress, const u8 *data, u64 size);
-
-  // MemSet
-  bool MemSet(u64 writeAddress, s32 data, u64 size);
-
-  // Configuration Read
-  bool ConfigRead(u64 readAddress, u8 *data, u64 size);
-
-  // Configuration Write
-  bool ConfigWrite(u64 writeAddress, const u8 *data, u64 size);
-
+  std::weak_ptr<PCIBridge> GetPCIBridge() {
+    return pciBridge;
+  }
+  std::weak_ptr<Xe::Xenos::XGPU> GetXGPU() {
+    return xGPU;
+  }
 private:
-  std::mutex mutex{};
-
-  GENRAL_PCI_DEVICE_CONFIG_SPACE hostBridgeConfigSpace{};
-
+  // Pointer to the registered PCI Bridge
+  std::shared_ptr<PCIBridge> pciBridge{};
   // Pointer to the registered XCGPU
   std::shared_ptr<Xe::Xenos::XGPU> xGPU{};
 
-  // Pointer to the registered PCI Bridge
-  std::shared_ptr<PCIBridge> pciBridge{};
+  // Access mutex
+  std::mutex mutex{};
 
   // Helpers
-  bool isAddressMappedinBAR(u32 address);
+  bool IsAddressMappedinBAR(u32 address);
 
+  // Host bridge context
+  GENRAL_PCI_DEVICE_CONFIG_SPACE hostBridgeConfigSpace{};
   HOSTBRIDGE_REGS hostBridgeRegs{};
   BIU_REGS biuRegs{};
 };

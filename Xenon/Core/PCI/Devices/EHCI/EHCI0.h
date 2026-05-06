@@ -12,7 +12,7 @@ namespace PCIDev {
   
 class EHCI0 : public EHCI {
 public:
-  EHCI0(const std::string &deviceName, u64 size);
+  EHCI0(u64 size);
 
 private:
 };

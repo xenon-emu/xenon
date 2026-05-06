@@ -59,13 +59,9 @@
 #define CLCK_INT_TAKEN 0x3
 
 // Class Constructor.
-Xe::PCIDev::SMC::SMC(const std::string &deviceName, u64 size, PCIBridge *parentPCIBridge) :
-  PCIDevice(deviceName, size) {
-  LOG_INFO(SMC, "Core: Initializing...");
-
-  // Assign our parent PCI Bus pointer
-  pciBridge = parentPCIBridge;
-
+Xe::PCIDev::SMC::SMC(u64 size, std::weak_ptr<PCIBridge> parentPCIBridge)
+  : PCIDevice(__func__, size), pciBridge(parentPCIBridge)
+{
   // Assign our core sate, this is already filled with config data regarding
   // AVPACK, PWRON Reason and TrayState
   smcCoreState.currentUARTSystem = Base::JoaatStringHash(Config::smc.uartSystem);
@@ -131,8 +127,8 @@ Xe::PCIDev::SMC::~SMC() {
 }
 
 // PCI Read
-void Xe::PCIDev::SMC::Read(u64 readAddress, u8 *data, u64 size) {
-  const u8 regOffset = static_cast<u8>(readAddress);
+void Xe::PCIDev::SMC::Read(u64 address, u8 *data, u64 size) {
+  const u8 regOffset = static_cast<u8>(address);
 
   mutex.lock();
   switch (regOffset) {
@@ -185,14 +181,14 @@ void Xe::PCIDev::SMC::Read(u64 readAddress, u8 *data, u64 size) {
 }
 
 // PCI Config Read
-void Xe::PCIDev::SMC::ConfigRead(u64 readAddress, u8 *data, u64 size) {
-  LOG_INFO(SMC, "ConfigRead: Address = 0x{:X}, size = 0x{:X}.", readAddress, size);
-  memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], size);
+void Xe::PCIDev::SMC::ConfigRead(u64 address, u8 *data, u64 size) {
+  LOG_INFO(SMC, "ConfigRead: Address = 0x{:X}, size = 0x{:X}.", address, size);
+  memcpy(data, &pciConfigSpace.data[static_cast<u8>(address)], size);
 }
 
 // PCI Write
-void Xe::PCIDev::SMC::Write(u64 writeAddress, const u8 *data, u64 size) {
-  const u8 regOffset = static_cast<u8>(writeAddress);
+void Xe::PCIDev::SMC::Write(u64 address, const u8 *data, u64 size) {
+  const u8 regOffset = static_cast<u8>(address);
 
   mutex.lock();
   switch (regOffset) {
@@ -258,8 +254,8 @@ void Xe::PCIDev::SMC::Write(u64 writeAddress, const u8 *data, u64 size) {
 }
 
 // PCI MemSet
-void Xe::PCIDev::SMC::MemSet(u64 writeAddress, s32 data, u64 size) {
-  const u8 regOffset = static_cast<u8>(writeAddress);
+void Xe::PCIDev::SMC::MemSet(u64 address, s32 data, u64 size) {
+  const u8 regOffset = static_cast<u8>(address);
 
   mutex.lock();
   switch (regOffset) {
@@ -317,13 +313,13 @@ void Xe::PCIDev::SMC::MemSet(u64 writeAddress, s32 data, u64 size) {
 }
 
 // PCI Config Write
-void Xe::PCIDev::SMC::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
+void Xe::PCIDev::SMC::ConfigWrite(u64 address, const u8 *data, u64 size) {  
   // Check if we're being scanned
   u64 tmp = 0;
   memcpy(&tmp, data, size);
-  LOG_DEBUG(SMC, "ConfigWrite: Address = 0x{:X}, Data = 0x{:X}, size = 0x{:X}.", writeAddress, tmp, size);
-  if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
-    const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
+  LOG_DEBUG(SMC, "ConfigWrite: Address = 0x{:X}, Data = 0x{:X}, size = 0x{:X}.", address, tmp, size);
+  if (static_cast<u8>(address) >= 0x10 && static_cast<u8>(address) < 0x34) {
+    const u32 regOffset = (static_cast<u8>(address) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
       if (tmp == 0xFFFFFFFF) { // PCI BAR Size discovery
         u64 x = 2;
@@ -337,12 +333,12 @@ void Xe::PCIDev::SMC::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
         tmp &= ~0x3;
       }
     }
-    if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address
+    if (static_cast<u8>(address) == 0x30) { // Expansion ROM Base Address
       tmp = 0; // Register not implemented
     }
   }
 
-  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &tmp, size);
+  memcpy(&pciConfigSpace.data[static_cast<u8>(address)], &tmp, size);
 }
 
 // Setups the UART Communication at a given configuration.
@@ -394,8 +390,7 @@ void Xe::PCIDev::SMC::smcMainThread() {
   smcPCIState.fifoInStatusReg = FIFO_STATUS_READY;
 
   // Timer for measuring elapsed time since last Clock Interrupt.
-  std::chrono::steady_clock::time_point timerStart =
-      std::chrono::steady_clock::now();
+  std::chrono::steady_clock::time_point timerStart = std::chrono::steady_clock::now();
 
   // Fat consoles vs Slims have different initial values for the HANA/ANA
   u32 *hanaState = HANA_State;
@@ -413,6 +408,7 @@ void Xe::PCIDev::SMC::smcMainThread() {
     hanaState = HANA_State;
     break;
   }
+
   switch (Config::highlyExperimental.consoleRevison) {
   case Config::eConsoleRevision::Xenon:
     reinterpret_cast<u8*>(hanaState)[0xFE] = 0x01;
@@ -437,6 +433,7 @@ void Xe::PCIDev::SMC::smcMainThread() {
     reinterpret_cast<u8*>(hanaState)[0xFE] = 0x23;
     break;
   }
+
   while (smcThreadRunning) {
     // Add a escape hatch for faster shutdown.
     if (!XeRunning)
@@ -760,14 +757,14 @@ void Xe::PCIDev::SMC::smcMainThread() {
         // This is no longer needed due to mutexes
         mutex.lock();
         smcPCIState.smiIntPendingReg = SMI_INT_PENDING;
-        pciBridge->RouteInterrupt(PRIO_SMM);
+        if (auto bridge = pciBridge.lock())
+          bridge->RouteInterrupt(PRIO_SMM);
         mutex.unlock();
       }
     }
 
     // Measure elapsed time.
-    std::chrono::steady_clock::time_point timerNow =
-      std::chrono::steady_clock::now();
+    std::chrono::steady_clock::time_point timerNow = std::chrono::steady_clock::now();
 
     // Check for SMC Clock interrupt register.
     //
@@ -782,8 +779,10 @@ void Xe::PCIDev::SMC::smcMainThread() {
           // Update internal timer.
           timerStart = std::chrono::steady_clock::now();
           mutex.lock();
-          smcPCIState.clockIntStatusReg = CLCK_INT_TAKEN;
-          pciBridge->RouteInterrupt(PRIO_CLOCK);
+          if (auto bridge = pciBridge.lock()) {
+            smcPCIState.clockIntStatusReg = CLCK_INT_TAKEN;
+            bridge->RouteInterrupt(PRIO_CLOCK);
+          }
           mutex.unlock();
         }
       }

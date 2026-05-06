@@ -8,9 +8,8 @@
 #include "XenosState.h"
 #include "XenosRegisters.h"
 
-Xe::XGPU::XenosState::XenosState(RAM *ram, EDRAM *edramPtr, CommandProcessor *commandProcessorPtr) :
-  ramPtr(ram), edram(edramPtr),
-  commandProcessor(commandProcessorPtr),
+Xe::XGPU::XenosState::XenosState(std::weak_ptr<RAM> ram, std::weak_ptr<EDRAM> edram) :
+  ramPtr(ram), edramPtr(edram),
 #ifndef TOOL
   internalWidth(Config::xgpu.internal.width),
   internalHeight(Config::xgpu.internal.height)
@@ -31,14 +30,18 @@ Xe::XGPU::XenosState::~XenosState() {
 u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
   // Set a lock
   std::lock_guard lck(mutex);
+
   // Define register values
   u32 regIndex = addr / 4;
   XeRegister reg = static_cast<XeRegister>(regIndex);
+
   // Read value
   u32 tmp = 0;
   memcpy(&tmp, &Regs[addr], sizeof(tmp));
+
   // Swap value
   u32 value = byteswap_be(tmp);
+
   // Switch for properly return the requested amount of data
   switch (size) {
   case 2:
@@ -50,6 +53,7 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
   default:
     break;
   }
+
   switch (reg) {
   // VdpHasWarmBooted expects this to be 0x10, otherwise, it waits until the GPU has intialised
   case XeRegister::CONFIG_CNTL:
@@ -74,16 +78,20 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
       configControl = 0x10000000;
     }
     break;
-  case XeRegister::CP_ME_RAM_DATA:
-    value = commandProcessor->CPReadMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypeME);
+  case XeRegister::CP_ME_RAM_DATA: {
+    if (auto cmdProc = commandProcessor.lock())
+      value = cmdProc->CPReadMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypeME);
     break;
-    // Gets past VdInitializeEngines+0x58
+  }
+  // Gets past VdInitializeEngines+0x58
   case XeRegister::RBBM_DEBUG:
     value = rbbmDebug;
     break;
-  case XeRegister::CP_PFP_UCODE_DATA:
-    value = commandProcessor->CPReadMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypePFP);
+  case XeRegister::CP_PFP_UCODE_DATA: {
+    if (auto cmdProc = commandProcessor.lock())
+      value = cmdProc->CPReadMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypePFP);
     break;
+  }
   case XeRegister::SCRATCH_REG0:
   case XeRegister::SCRATCH_REG1:
   case XeRegister::SCRATCH_REG2:
@@ -95,7 +103,8 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
     // Write the initial value
     const u32 scratchRegIndex = regIndex - static_cast<u32>(XeRegister::SCRATCH_REG0);
     value = scratch[scratchRegIndex];
-  } break;
+    break;
+  }
   case XeRegister::WAIT_UNTIL:
     value = waitUntil;
     break;
@@ -170,7 +179,8 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
     bool in_vblank = frame_position < vblank_duration_us;
     vblankStatus = in_vblank ? 0xFFFF : 0x0000;
     value = vblankStatus;
-  } break;
+    break;
+  }
   case XeRegister::D1MODE_VBLANK_VLINE_STATUS:
     value = vblankVlineStatus;
     break;
@@ -367,35 +377,48 @@ u32 Xe::XGPU::XenosState::ReadRawRegister(u32 addr, u32 size) {
   case XeRegister::RB_COPY_MASK:
     value = copyMask;
     break;
-  case XeRegister::RB_SIDEBAND_BUSY:
+  case XeRegister::RB_SIDEBAND_BUSY: {
     // Checks if the EDRAM is currently busy doing work.
-    value = edram->isEdramBusy() ? 1 : 0;
+    if (auto edram = edramPtr.lock())
+      value = edram->isEdramBusy() ? 1 : 0;
     break;
-  case XeRegister::RB_SIDEBAND_DATA:
-    value = edram->ReadReg();
+  }
+  case XeRegister::RB_SIDEBAND_DATA: {
+    if (auto edram = edramPtr.lock())
+      value = edram->ReadReg();
     break;
-  case XeRegister::RB_AZ0_BC_CRC: // CRC's for EDRAM.
-    value = edram->ReadCRC_AZ0_BC();
+  }
+  case XeRegister::RB_AZ0_BC_CRC: {
+    // CRC's for EDRAM.
+    if (auto edram = edramPtr.lock())
+      value = edram->ReadCRC_AZ0_BC();
     break;
-  case XeRegister::RB_AZ1_BC_CRC:
-    value = edram->ReadCRC_AZ1_BC();
+  }
+  case XeRegister::RB_AZ1_BC_CRC: {
+    if (auto edram = edramPtr.lock())
+      value = edram->ReadCRC_AZ1_BC();
     break;
+  }
   default:
     break;
   }
+
   return value;
 }
 
 void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
   // Set a lock
   std::lock_guard lck(mutex);
+
   // Define register values
   u32 regIndex = addr / 4;
   XeRegister reg = static_cast<XeRegister>(regIndex);
+
   // Swap value
   u32 tmp = value;
   value = byteswap_be(value);
   bool useSwapped = true;
+
   switch (reg) {
   // VdpHasWarmBooted expects this to be 0x10, otherwise, it waits until the GPU has intialised
   case XeRegister::CONFIG_CNTL:
@@ -408,44 +431,60 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
   case XeRegister::RBBM_SOFT_RESET:
     rbbmSoftReset = value;
     break;
-  case XeRegister::CP_RB_BASE:
-    commandProcessor->CPUpdateRBBase(value);
+  case XeRegister::CP_RB_BASE: {
+    if (auto cmdProc = commandProcessor.lock())
+      cmdProc->CPUpdateRBBase(value);
     break;
-  case XeRegister::CP_RB_CNTL:
-    commandProcessor->CPUpdateRBSize(value);
+  }
+  case XeRegister::CP_RB_CNTL: {
+    if (auto cmdProc = commandProcessor.lock())
+      cmdProc->CPUpdateRBSize(value);
     break;
-  case XeRegister::CP_RB_WPTR:
-    commandProcessor->CPUpdateRBWritePointer(value);
+  }
+  case XeRegister::CP_RB_WPTR: {
+    if (auto cmdProc = commandProcessor.lock())
+      cmdProc->CPUpdateRBWritePointer(value);
     break;
+  }
   case XeRegister::SCRATCH_UMSK:
     scratchMask = value;
     break;
   case XeRegister::SCRATCH_ADDR:
     scratchAddr = value;
     break;
-  case XeRegister::CP_ME_RAM_WADDR:
+  case XeRegister::CP_ME_RAM_WADDR: {
     // Software is writing CP Microcode Engine uCode write address.
-    commandProcessor->CPSetMEMicrocodeWriteAddress(value);
+    if (auto cmdProc = commandProcessor.lock())
+      cmdProc->CPSetMEMicrocodeWriteAddress(value);
     break;
-  case XeRegister::CP_ME_RAM_RADDR:
+  }
+  case XeRegister::CP_ME_RAM_RADDR: {
     // Software is writing CP Microcode Engine uCode read address.
-    commandProcessor->CPSetMEMicrocodeReadAddress(value);
+    if (auto cmdProc = commandProcessor.lock())
+      cmdProc->CPSetMEMicrocodeReadAddress(value);
     break;
-  case XeRegister::CP_ME_RAM_DATA:
+  }
+  case XeRegister::CP_ME_RAM_DATA: {
     // Software is writing CP Microcode Engine uCode data.
-    commandProcessor->CPWriteMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypeME, value);
+    if (auto cmdProc = commandProcessor.lock())
+      cmdProc->CPWriteMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypeME, value);
     break;
+  }
   case XeRegister::RBBM_DEBUG:
     rbbmDebug = value;
     break;
-  case XeRegister::CP_PFP_UCODE_ADDR:
+  case XeRegister::CP_PFP_UCODE_ADDR: {
     // Software is writing CP PFP uCode data address.
-    commandProcessor->CPSetPFPMicrocodeAddress(value);
+    if (auto cmdProc = commandProcessor.lock())
+      cmdProc->CPSetPFPMicrocodeAddress(value);
     break;
-  case XeRegister::CP_PFP_UCODE_DATA:
+  }
+  case XeRegister::CP_PFP_UCODE_DATA: {
     // Software is writing CP PFP uCode data.
-    commandProcessor->CPWriteMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypePFP, value);
+    if (auto cmdProc = commandProcessor.lock())
+      cmdProc->CPWriteMicrocodeData(Xe::XGPU::eCPMicrocodeType::uCodeTypePFP, value);
     break;
+  }
   case XeRegister::SCRATCH_REG0:
   case XeRegister::SCRATCH_REG1:
   case XeRegister::SCRATCH_REG2:
@@ -454,21 +493,24 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
   case XeRegister::SCRATCH_REG5:
   case XeRegister::SCRATCH_REG6:
   case XeRegister::SCRATCH_REG7: {
-    useSwapped = false;
-    // Write the initial value
-    const u32 scratchRegIndex = regIndex - static_cast<u32>(XeRegister::SCRATCH_REG0);
-    scratch[scratchRegIndex] = tmp;
-    // Check if writing is enabled
-    if ((1 << scratchRegIndex) & scratchMask) {
-      // Writeback
-      const u32 memAddr = scratchAddr + (scratchRegIndex * 4);
+    if (auto ram = ramPtr.lock()) {
+      useSwapped = false;
+      // Write the initial value
+      const u32 scratchRegIndex = regIndex - static_cast<u32>(XeRegister::SCRATCH_REG0);
+      scratch[scratchRegIndex] = tmp;
+      // Check if writing is enabled
+      if ((1 << scratchRegIndex) & scratchMask) {
+        // Writeback
+        const u32 memAddr = scratchAddr + (scratchRegIndex * 4);
 #ifdef XE_DEBUG
-      LOG_DEBUG(Xenos, "[CP] Scratch {} was accessed, writing back to 0x{:X} with 0x{:X}", scratchRegIndex, memAddr, tmp);
+        LOG_DEBUG(Xenos, "[CP] Scratch {} was accessed, writing back to 0x{:X} with 0x{:X}", scratchRegIndex, memAddr, tmp);
 #endif
-      u8 *memPtr = ramPtr->GetPointerToAddress(memAddr);
-      memcpy(memPtr, &scratch[scratchRegIndex], sizeof(scratch[scratchRegIndex]));
+        u8 *memPtr = ram->GetPointerToAddress(memAddr);
+        memcpy(memPtr, &scratch[scratchRegIndex], sizeof(scratch[scratchRegIndex]));
+      }
     }
-  } break;
+    break;
+  }
   case XeRegister::MH_STATUS:
     mhStatus = value;
     if (!(mhStatus & 0x2000000)) {
@@ -631,9 +673,11 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
   case XeRegister::PA_CL_VPORT_ZOFFSET:
     viewportZOffset = value;
     break;
-  case XeRegister::SQ_PROGRAM_CNTL:
-    commandProcessor->CPSetSQProgramCntl(value);
+  case XeRegister::SQ_PROGRAM_CNTL: {
+    if (auto cmdProc = commandProcessor.lock())
+      cmdProc->CPSetSQProgramCntl(value);
     break;
+  }
   case XeRegister::VGT_MAX_VTX_INDX:
     maxVertexIndex = value;
     break;
@@ -716,29 +760,37 @@ void Xe::XGPU::XenosState::WriteRawRegister(u32 addr, u32 value) {
   case XeRegister::RB_COPY_MASK:
     copyMask = value;
     break;
-  case XeRegister::RB_SIDEBAND_RD_ADDR:
+  case XeRegister::RB_SIDEBAND_RD_ADDR: {
     // Software is writing the address (index) of the edram reg it wants to write.
-    edram->SetRWRegIndex(Xe::XGPU::eRegIndexType::readIndex, value);
+    if (auto edram = edramPtr.lock())
+      edram->SetRWRegIndex(Xe::XGPU::eRegIndexType::readIndex, value);
     break;
-  case XeRegister::RB_SIDEBAND_WR_ADDR:
+  }
+  case XeRegister::RB_SIDEBAND_WR_ADDR: {
     // Software is writing the address (index) of the edram reg it wants to read.
-    edram->SetRWRegIndex(Xe::XGPU::eRegIndexType::writeIndex, value);
+    if (auto edram = edramPtr.lock())
+      edram->SetRWRegIndex(Xe::XGPU::eRegIndexType::writeIndex, value);
     break;
-  case XeRegister::RB_SIDEBAND_DATA:
+  }
+  case XeRegister::RB_SIDEBAND_DATA: {
     useSwapped = false;
     // Software is writing the data of the edram reg previously specified.
-    edram->WriteReg(tmp); // NOTE: We want data to not be byteswapped.
+    if (auto edram = edramPtr.lock())
+      edram->WriteReg(tmp); // NOTE: We want data to not be byteswapped.
     break;
+  }
   default:
     // Do nothing here, just continue to write
     break;
   }
+
   // Write to register array
   if (useSwapped) {
     memcpy(&Regs[addr], &value, sizeof(value));
   } else {
     memcpy(&Regs[addr], &tmp, sizeof(tmp));
   }
+
   // Set dirty state
   const u64 mask = 1ull << (addr % BitCount);
   RegMask[(addr / 4) / BitCount] |= mask;

@@ -31,16 +31,16 @@ namespace Xenos {
 
 class XGPU {
 public:
-  XGPU(Render::Renderer *renderer, RAM *ram, PCIBridge *pciBridge);
+  XGPU(Render::Renderer *renderer, std::weak_ptr<RAM> ram, std::weak_ptr<PCIBridge> pciBridge);
   ~XGPU();
 
   // Memory Read/Write methods.
-  bool Read(u64 readAddress, u8 *data, u64 size);
-  bool Write(u64 writeAddress, const u8 *data, u64 size);
-  bool MemSet(u64 writeAddress, s32 data, u64 size);
+  bool Read(u64 address, u8 *data, u64 size);
+  bool Write(u64 address, const u8 *data, u64 size);
+  bool MemSet(u64 address, s32 data, u64 size);
 
-  void ConfigRead(u64 readAddress, u8 *data, u64 size);
-  void ConfigWrite(u64 writeAddress, const u8 *data, u64 size);
+  void ConfigRead(u64 address, u8 *data, u64 size);
+  void ConfigWrite(u64 address, const u8 *data, u64 size);
 
   bool IsAddressMappedInBAR(u32 address);
 
@@ -61,10 +61,10 @@ public:
   }
 
   // GPU State
-  std::unique_ptr<Xe::XGPU::XenosState> xenosState = {};
+  std::shared_ptr<Xe::XGPU::XenosState> xenosState = {};
 private:
   // PCI Bridge pointer. Used for Interrupts.
-  PCIBridge *parentBus = nullptr;
+  std::weak_ptr<PCIBridge> parentBus = {};
   // Mutex handle
   std::recursive_mutex mutex = {};
   // XGPU Config Space Data at address 0xD0010000.
@@ -73,16 +73,16 @@ private:
   u32 pciDevSizes[6] = {};
 
   // RAM Pointer
-  RAM *ramPtr = nullptr;
+  std::weak_ptr<RAM> ramPtr = {};
 
   // Render handle
   Render::Renderer *render = nullptr;
 
   // EDRAM
-  std::unique_ptr<Xe::XGPU::EDRAM> edram = {};
+  std::shared_ptr<Xe::XGPU::EDRAM> edram = {};
 
   // Command Processor
-  std::unique_ptr<Xe::XGPU::CommandProcessor> commandProcessor = {};
+  std::shared_ptr<Xe::XGPU::CommandProcessor> commandProcessor = {};
 
   // Vertical Sync Worker thread
   std::thread xeVSyncWorkerThread;

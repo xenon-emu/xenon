@@ -238,16 +238,15 @@ struct SMC_CORE_STATE {
 // SMC Core Object.
 class SMC : public PCIDevice {
 public:
-  SMC(const std::string &deviceName, u64 size,
-    PCIBridge *parentPCIBridge);
+  SMC(u64 size, std::weak_ptr<PCIBridge> parentPCIBridge);
   ~SMC();
 
   // Read/Write functions
-  void Read(u64 readAddress, u8 *data, u64 size) override;
-  void Write(u64 writeAddress, const u8 *data, u64 size) override;
-  void MemSet(u64 writeAddress, s32 data, u64 size) override;
-  void ConfigRead(u64 readAddress, u8* data, u64 size) override;
-  void ConfigWrite(u64 writeAddress, const u8* data, u64 size) override;
+  void Read(u64 address, u8 *data, u64 size) override;
+  void Write(u64 address, const u8 *data, u64 size) override;
+  void MemSet(u64 address, s32 data, u64 size) override;
+  void ConfigRead(u64 address, u8* data, u64 size) override;
+  void ConfigWrite(u64 address, const u8* data, u64 size) override;
 
   void SetPowerOnReason(const SMC_PWR_REASON &reason) {
     smcCoreState.currPowerOnReason = reason;
@@ -260,7 +259,7 @@ private:
   std::recursive_mutex mutex;
 
   // Parent PCI Bridge (used for interrupts/communication)
-  PCIBridge *pciBridge;
+  std::weak_ptr<PCIBridge> pciBridge;
 
   // SMC PCI State, tracking all communication with the system
   SMC_PCI_STATE smcPCIState;

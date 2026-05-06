@@ -23,7 +23,7 @@ namespace Xe::XCPU {
 // - 768 bits of IBM's eFuse technology.
 class XenonCPU {
 public:
-  XenonCPU(std::weak_ptr<RootBus> inBus, const std::string blPath, const std::string fusesPath, RAM *ramPtr);
+  XenonCPU(std::weak_ptr<RootBus> inBus, const std::string blPath, const std::string fusesPath, std::weak_ptr<RAM> ramPtr);
   ~XenonCPU();
 
   // Starts the CPU at the given reset vector. (Usually address 0x100).
@@ -68,4 +68,4 @@ private:
   std::unique_ptr<PPU> ppu2{};
 };
 
-} // Xe::XCPU
+} // namespace Xe::XCPU

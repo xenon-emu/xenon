@@ -35,7 +35,7 @@ public:
   void UpdateViewport(s32 x, s32 y, u32 width, u32 height) override;
   void UpdateClearColor(u8 r, u8 b, u8 g, u8 a) override;
   void UpdateClearDepth(f64 depth) override;
-  void UpdateViewportFromState(const Xe::XGPU::XenosState *state) override;
+  void UpdateViewportFromState(std::weak_ptr<Xe::XGPU::XenosState> statePtr) override;
   void BackendBindPixelBuffer(Buffer *buffer) override;
   void WaitIdle() override;
   void Clear() override;

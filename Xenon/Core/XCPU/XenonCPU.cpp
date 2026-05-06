@@ -11,7 +11,7 @@
 #include <Windows.h>
 
 // Returns the CPU Frequency using Windows QueryPerformanceFrequency/QueryPerformanceCounter routines.
-double calibrateCPUFrequency() {
+f64 CalibrateCPUFrequency() {
   LARGE_INTEGER freq;
   QueryPerformanceFrequency(&freq);
 
@@ -27,8 +27,8 @@ double calibrateCPUFrequency() {
   QueryPerformanceCounter(&t1);
   c1 = __rdtsc();
 
-  double elapsedSec = double(t1.QuadPart - t0.QuadPart) / double(freq.QuadPart);
-  double cycles = double(c1 - c0);
+  f64 elapsedSec = f64(t1.QuadPart - t0.QuadPart) / f64(freq.QuadPart);
+  f64 cycles = f64(c1 - c0);
 
   return cycles / elapsedSec; // Frequency in Hz
 }
@@ -37,11 +37,10 @@ double calibrateCPUFrequency() {
 
 namespace Xe::XCPU {
 
-XenonCPU::XenonCPU(std::weak_ptr<RootBus> inBus, const std::string blPath, const std::string fusesPath, RAM *ramPtr) {
+XenonCPU::XenonCPU(std::weak_ptr<RootBus> inBus, const std::string blPath, const std::string fusesPath, std::weak_ptr<RAM> ramPtr) {
   // Initilize Xenon Context
   xenonContext = std::make_unique<STRIP_UNIQUE(xenonContext)>(inBus, ramPtr);
 
-  // Set SROM to 0.
   memset(xenonContext->SROM.get(), 0, XE_SROM_SIZE);
 
   // Populate FuseSet
@@ -253,6 +252,7 @@ bool XenonCPU::IsHalted() {
   if (ppu2.get() && ppu2->IsHalted()) {
     return true;
   }
+
   return false;
 }
 
@@ -266,6 +266,7 @@ bool XenonCPU::IsHaltedByGuest() {
   if (ppu2.get() && ppu2->IsHaltedByGuest()) {
     return true;
   }
+
   return false;
 }
 
@@ -288,19 +289,20 @@ void XenonCPU::timeBaseThreadLoop() {
 
 #ifdef _WIN32
   // Get our CPU frequency.
-  double cpuFrequencyInHz = calibrateCPUFrequency();
+  f64 cpuFrequencyInHz = CalibrateCPUFrequency();
   // Target time in Ns we need to wait.
-  const double targetNs = 2500.0;
+  const f64 targetNs = 2500.0;
   // Convert that to CPU cycles.
-  unsigned long long targetCPUCycles = static_cast<unsigned long long>((targetNs * 1e-9) * cpuFrequencyInHz);
-  unsigned long long startCycle = __rdtsc();
-  unsigned long long nextCycle = startCycle + targetCPUCycles;
+  u64 targetCPUCycles = static_cast<u64>((targetNs * 1e-9) * cpuFrequencyInHz);
+  u64 startCycle = __rdtsc();
+  u64 nextCycle = startCycle + targetCPUCycles;
 
   while (timeBaseThreadActive.load()) {
     // Wait x cycles.
-    while (__rdtsc() < nextCycle) {}
+    while (__rdtsc() < nextCycle)
+    {}
 
-    // We're waiting for approx 2500 Ns, which represent 125 XenonCPU cycles.
+// We're waiting for approx 2500 Ns, which represent 125 XenonCPU cycles.
     if (xenonContext->timeBaseActive) {
       ppu0->UpdateTimeBase(125);
       ppu1->UpdateTimeBase(125);
@@ -343,4 +345,4 @@ void XenonCPU::timeBaseThreadLoop() {
 #endif // _WIN32
 }
 
-} // Xe::XCPU
+} // namespace Xe::XCPU

@@ -33,13 +33,16 @@ class CommandProcessor;
 class XenosState {
 public:
   XenosState() = default;
-  XenosState(RAM *ram, EDRAM *edramPtr, CommandProcessor *commandProcessorPtr);
+  XenosState(std::weak_ptr<RAM> ram, std::weak_ptr<EDRAM> edramPtr);
 
   ~XenosState();
 
   void WriteRawRegister(u32 addr, u32 value);
-
   u32 ReadRawRegister(u32 addr, u32 size = sizeof(u32));
+
+  void AddCommandPointer(std::shared_ptr<CommandProcessor> commandProcessorPtr) {
+    commandProcessor = commandProcessorPtr;
+  }
 
   void WriteRegister(XeRegister reg, u32 value) {
     std::lock_guard lck(mutex);
@@ -53,7 +56,7 @@ public:
     return ReadRawRegister(static_cast<u32>(reg) * 4, size);
   }
 
-  u8* GetRegisterPointer(XeRegister reg) {
+  u8 *GetRegisterPointer(XeRegister reg) {
     std::lock_guard lck(mutex);
     return &Regs[static_cast<u32>(reg) * 4];
   }
@@ -81,13 +84,13 @@ public:
   }
 
   // Mutex
-  std::recursive_mutex mutex{};
+  std::recursive_mutex mutex = {};
 
   // RAM Pointer
-  RAM *ramPtr = nullptr;
+  std::weak_ptr<RAM> ramPtr = {};
 
   // CP Pointer
-  CommandProcessor *commandProcessor = nullptr;
+  std::weak_ptr<CommandProcessor> commandProcessor = {};
 
   // Primary surface
   u32 fbSurfaceAddress = XE_FB_BASE;
@@ -184,7 +187,7 @@ public:
   COHER_STATUS_HOST_REG coherencyStatusHost = {};
 
   // EDRAM
-  EDRAM *edram = nullptr;
+  std::weak_ptr<EDRAM> edramPtr = {};
   u32 edramTiming = 0;
   u32 edramInfo = 0;
 

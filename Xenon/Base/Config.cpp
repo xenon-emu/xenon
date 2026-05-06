@@ -520,7 +520,8 @@ bool _network::verify_toml(toml::value &value) {
     const toml::value &x ## _ = data.at(#n); \
     x.from_toml(x ## _); \
   }
-bool verifyConfig(const fs::path &path, toml::value &data) {
+
+bool VerifyConfig(const fs::path &path, toml::value &data) {
 #ifndef NO_GFX
   verify_section(rendering, Rendering);
   verify_section(imgui, ImGui);
@@ -536,7 +537,7 @@ bool verifyConfig(const fs::path &path, toml::value &data) {
   return true;
 }
 
-void loadConfig(const fs::path &path) {
+void LoadConfig(const fs::path &path) {
   // If the configuration file does not exist, create it and return.
   std::ifstream configFile{ path };
   bool valid = configFile.is_open() && configFile.good();
@@ -544,7 +545,7 @@ void loadConfig(const fs::path &path) {
   std::error_code error;
   if (!fs::exists(path, error) && !valid) {
     filepaths.correct(Base::FS::GetPath(Base::FS::PathType::ConsoleDir));
-    saveConfig(path);
+    SaveConfig(path);
     return;
   }
 
@@ -565,7 +566,7 @@ void loadConfig(const fs::path &path) {
   read_section(network, Network);
 }
 
-void saveConfig(const fs::path &path) {
+void SaveConfig(const fs::path &path) {
   std::ifstream configFile{ path };
   bool valid = configFile.is_open() && configFile.good();
   configFile.close();
@@ -589,7 +590,7 @@ void saveConfig(const fs::path &path) {
   // If it wasn't valid, write before
   if (!valid) {
     // Write to toml, then verify contents
-    if (!verifyConfig(newPath, data)) {
+    if (!VerifyConfig(newPath, data)) {
       return;
     }
   }
@@ -608,7 +609,7 @@ void saveConfig(const fs::path &path) {
   // If it is, just ensure there is a backup config
   if (valid) {
     // Write to toml, then verify contents
-    if (!verifyConfig(newPath, data)) {
+    if (!VerifyConfig(newPath, data)) {
       return;
     }
   }
