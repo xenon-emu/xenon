@@ -266,7 +266,7 @@ if (NOT XENON_CRYPTOPP_TARGET AND XENON_ALLOW_BUNDLED_DEPS)
 
   file(GLOB cryptopp_sources CONFIGURE_DEPENDS "${cryptopp_dir}/*.cpp")
 
-  list(FILTER cryptopp_sources EXCLUDE REGEX ".*/(bench[0-9]?|cryptest|datatest|dlltest|fipsalgt|fipstest|regtest[0-9]?|test|validat[0-9]+|adhoc)\\.cpp$")
+  list(FILTER cryptopp_sources EXCLUDE REGEX ".*/(bench[0-9]?|cryptest|datatest|dlltest|dll|fipsalgt|fipstest|regtest[0-9]?|test|validat[0-9]+|adhoc)\\.cpp$")
 
   add_library(cryptopp_xenon STATIC ${cryptopp_sources})
 

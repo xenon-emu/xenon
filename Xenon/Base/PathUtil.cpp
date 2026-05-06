@@ -9,7 +9,7 @@
 #include <unordered_map>
 #include <fstream>
 #ifdef _WIN32
-#include <Windows.h>
+#include <windows.h>
 #include <shlobj.h>
 #include <KnownFolders.h>
 #endif // _WIN32

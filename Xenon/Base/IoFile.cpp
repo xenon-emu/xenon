@@ -17,7 +17,7 @@
 
 #include <io.h>
 #include <share.h>
-#include <Windows.h>
+#include <windows.h>
 #else
 #include <unistd.h>
 #endif

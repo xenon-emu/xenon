@@ -324,7 +324,6 @@ jobs:
             -DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-            -DGFX_ENABLED=OFF \
             -DXE_ASMJIT_NEW_OUT_API="${XE_ASMJIT_NEW_OUT_API}"
 
       - name: Build

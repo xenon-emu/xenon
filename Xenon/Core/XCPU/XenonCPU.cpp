@@ -8,7 +8,7 @@
 #include "Interpreter/PPCInterpreter.h"
 
 #ifdef _WIN32
-#include <Windows.h>
+#include <windows.h>
 
 // Returns the CPU Frequency using Windows QueryPerformanceFrequency/QueryPerformanceCounter routines.
 f64 CalibrateCPUFrequency() {

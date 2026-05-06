@@ -640,7 +640,7 @@ bool Xe::PCIDev::ETHERNET::ReadRxDescriptor(u32 index, XE_RX_DESCRIPTOR &desc) {
 
 // Write an RX descriptor to memory
 bool Xe::PCIDev::ETHERNET::WriteRxDescriptor(u32 index, const XE_RX_DESCRIPTOR &desc) {
-  if (!ethPciState.rxDescriptorBaseReg == 0)
+  if (!ethPciState.rxDescriptorBaseReg)
     return false;
 
   if (auto ram = ramPtr.lock()) {

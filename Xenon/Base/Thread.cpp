@@ -11,7 +11,7 @@
 #include <mach/mach_time.h>
 #include <pthread.h>
 #elif defined(_WIN32)
-#include <Windows.h>
+#include <windows.h>
 #include "StringUtil.h"
 #else
 

@@ -8,7 +8,7 @@
   #include <signal.h>
   #include <pthread.h>
 #elif defined(_WIN32)
-  #include <Windows.h>
+  #include <windows.h>
 #endif
 
 namespace Base {
