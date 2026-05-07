@@ -249,10 +249,7 @@ void PPCInterpreter::PPCInterpreterJIT_tlbie(sPPEState *ppeState, JITBlockBuilde
   // pageSize = 1ULL << p
   COMP->and_(p, imm<u32>(63));
   COMP->mov(pageSize, imm<u64>(1));
-  x86::Gp shift = newGP32();
-  COMP->mov(shift.r32(), p.r32());
-  COMP->mov(x86::ecx, shift.r32());
-  COMP->shl(pageSize, x86::cl);
+  COMP->shl(pageSize, p.r8());
 
   // pageMask = pageSize - 1
   COMP->mov(pageMask, pageSize);
@@ -393,10 +390,7 @@ void PPCInterpreter::PPCInterpreterJIT_tlbiel(sPPEState *ppeState, JITBlockBuild
     // pageSize = 1 << p
     COMP->and_(p, imm<u32>(63));
     COMP->mov(pageSize, imm<u64>(1));
-    x86::Gp shift = newGP32();
-    COMP->mov(shift.r32(), p.r32());
-    COMP->mov(x86::ecx, shift.r32());
-    COMP->shl(pageSize, x86::cl);
+    COMP->shl(pageSize, p.r8());
 
     COMP->mov(pageMask, pageSize);
     COMP->dec(pageMask);
