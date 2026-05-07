@@ -235,14 +235,14 @@ bool XenonContext::HandlePRVWrite(u64 writeAddr, const u8 *data, size_t byteCoun
   case 0x611A0ULL:
     if (socPRVBlock.get()->TimebaseControl.AsBITS.TimebaseEnable) {
       // TimeBase Enabled
-      timeBaseActive = true;
+      timeBase.SetEnabled(true);
     } else {
       // TimeBase Disabled
-      timeBaseActive = false;
+      timeBase.SetEnabled(false);
     }
     // TimeBase Control
-    LOG_WARNING(Xenon, "SoC PRV: TimeBase Control being set 0x{:X}, enabled: {}, divider: 0x{:X}.",
-      dataIn, timeBaseActive, socPRVBlock.get()->TimebaseControl.AsBITS.TimebaseDivider);
+    LOG_TRACE(Xenon, "SoC PRV: TimeBase Control being set 0x{:X}, enabled: {}, divider: 0x{:X}.",
+      dataIn, timeBase.IsEnabled(), socPRVBlock.get()->TimebaseControl.AsBITS.TimebaseDivider);
     break;
   case 0x61188ULL:
     // CPU VID Register

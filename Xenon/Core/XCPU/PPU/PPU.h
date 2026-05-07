@@ -91,6 +91,8 @@ public:
   sPPEState *GetPPUState() { return ppeState.get(); }
   // Get ppuJIT
   PPU_JIT *GetPPUJIT() { return ppuJIT.get(); }
+  // Get CPU Context
+  Xe::XCPU::XenonContext *GetCPUContext() { return xenonContext; }
 
   // Updates the current PPU's time base and decrementer based on
   // the amount of tb ticks given.

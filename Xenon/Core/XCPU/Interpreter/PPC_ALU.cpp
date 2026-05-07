@@ -848,10 +848,10 @@ void PPCInterpreter::PPCInterpreter_mftb(sPPEState *ppeState) {
 
   switch (spr) {
   case TBLRO:
-    GPRi(rd) = ppeState->SPR.TB.hexValue;
+    GPRi(rd) = xenonContext->timeBase.ReadTB();
     break;
   case TBURO:
-    GPRi(rd) = ppeState->SPR.TB.TBU;
+    GPRi(rd) = ((xenonContext->timeBase.ReadTB() >> 32) & 0xFFFFFFFF);
     break;
 
   default:

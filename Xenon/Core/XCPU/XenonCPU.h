@@ -53,15 +53,6 @@ private:
   // Global Xenon CPU Content (shared between PPUs)
   std::unique_ptr<XenonContext> xenonContext;
 
-  // TimeBase frequency timer
-  std::chrono::high_resolution_clock::time_point timeBaseUpdate{};
-
-  // High resolution timer thread for accumulating timebase ticks.
-  std::thread timeBaseThread{};
-  std::atomic<bool> timeBaseThreadActive{ false };
-  // Timer thread loop function.
-  void timeBaseThreadLoop();
-
   // Power Processing Units, the effective execution units inside the Xbox 360 CPU.
   std::unique_ptr<PPU> ppu0{};
   std::unique_ptr<PPU> ppu1{};

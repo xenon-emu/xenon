@@ -3,8 +3,39 @@
 /***************************************************************/
 
 #include "JITEmitter_Helpers.h"
+#include "Core/XCPU/PPU/PPU.h"
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
+
+// Timebase trampolines
+u64 LoadTimeBase(PPU* ppuState) {
+  return ppuState->GetCPUContext()->timeBase.ReadTB();
+}
+
+u32 LoadDec(PPU* ppuState) {
+  return ppuState->GetCPUContext()->timeBase.ReadDEC(ppuState->GetPPUState()->ppuThread[ppuState->GetPPUState()->
+    currentThread].SPR.PIR);
+}
+
+void WriteTimeBaseLower(PPU* ppuState, u32 timeBaseLower) {
+  ppuState->GetCPUContext()->timeBase.WriteTBL(timeBaseLower);
+}
+
+void WriteTimeBaseUpper(PPU* ppuState, u32 timeBaseUpper) {
+  ppuState->GetCPUContext()->timeBase.WriteTBU(timeBaseUpper);
+}
+
+void WriteDEC(PPU* ppuState, u32 newDec) {
+  ppuState->GetCPUContext()->timeBase.WriteDEC(ppuState->GetPPUState()->ppuThread[ppuState->GetPPUState()->
+    currentThread].SPR.PIR, newDec);
+}
+
+void WriteHDEC(PPU* ppuState, u32 newHDec) {
+  ppuState->GetCPUContext()->timeBase.WriteHDEC(ppuState->GetPPUState()->ppuThread[ppuState->GetPPUState()->
+    currentThread].SPR.PIR, newHDec);
+}
+
+
 void PPCInterpreter::PPCInterpreterJIT_mfspr(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   u32 sprNum = instr.spr;
   sprNum = ((sprNum & 0x1F) << 5) | ((sprNum >> 5) & 0x1F);
@@ -29,8 +60,12 @@ void PPCInterpreter::PPCInterpreterJIT_mfspr(sPPEState *ppeState, JITBlockBuilde
     COMP->mov(rSValue, SPRPtr(DAR));
     break;
   case eXenonSPR::DEC:
-    COMP->mov(rSValue, SPRPtr(DEC));
-    break;
+  {
+    InvokeNode* invokeNode = nullptr;
+    Xe::JITCompat::Invoke(b->compiler, invokeNode, reinterpret_cast<void*>(LoadDec), asmjit::FuncSignature::build<u32, PPU*>());
+    Xe::JITCompat::SetArg(invokeNode, 0, b->ppu->Base());
+    Xe::JITCompat::SetRet(invokeNode, 0, rSValue);
+  } break;
   case eXenonSPR::SDR1:
     COMP->mov(rSValue, SharedSPRPtr(SDR1));
     break;
@@ -50,13 +85,22 @@ void PPCInterpreter::PPCInterpreterJIT_mfspr(sPPEState *ppeState, JITBlockBuilde
     COMP->mov(rSValue, SPRPtr(VRSAVE));
     break;
   case eXenonSPR::TBLRO:
-    COMP->mov(rSValue, 0x00000000FFFFFFFF);
-    COMP->and_(rSValue, SharedSPRPtr(TB));
-    break;
+  {
+    InvokeNode* invokeNode = nullptr;
+    Xe::JITCompat::Invoke(b->compiler, invokeNode, reinterpret_cast<void*>(LoadTimeBase), asmjit::FuncSignature::build<u64, PPU*>());
+    Xe::JITCompat::SetArg(invokeNode, 0, b->ppu->Base());
+    Xe::JITCompat::SetRet(invokeNode, 0, rSValue);
+    COMP->and_(rSValue, 0x00000000FFFFFFFF);
+  } break;
   case eXenonSPR::TBURO:
-    COMP->mov(rSValue, 0xFFFFFFFF00000000);
-    COMP->and_(rSValue, SharedSPRPtr(TB));
-    break;
+  {
+    InvokeNode* invokeNode = nullptr;
+    Xe::JITCompat::Invoke(b->compiler, invokeNode, reinterpret_cast<void*>(LoadTimeBase), asmjit::FuncSignature::build<u64, PPU*>());
+    Xe::JITCompat::SetArg(invokeNode, 0, b->ppu->Base());
+    Xe::JITCompat::SetRet(invokeNode, 0, rSValue);
+    COMP->shl(rSValue, 32);
+    COMP->and_(rSValue, 0xFFFFFFFF);
+  } break;
   case eXenonSPR::SPRG0:
     COMP->mov(rSValue, SPRPtr(SPRG0));
     break;
@@ -148,8 +192,12 @@ void PPCInterpreter::PPCInterpreterJIT_mtspr(sPPEState *ppeState, JITBlockBuilde
     COMP->mov(SPRPtr(DAR), value);
     break;
   case eXenonSPR::DEC:
-    COMP->mov(SPRPtr(DEC), value.r32());
-    break;
+  {
+    InvokeNode* invokeNode = nullptr;
+    Xe::JITCompat::Invoke(b->compiler, invokeNode, reinterpret_cast<void*>(WriteDEC), asmjit::FuncSignature::build<void, PPU*, u32>());
+    Xe::JITCompat::SetArg(invokeNode, 0, b->ppu->Base());
+    Xe::JITCompat::SetArg(invokeNode, 1, value.r32());
+  } break;
   case eXenonSPR::SDR1:
     COMP->mov(SharedSPRPtr(SDR1), value);
     break;
@@ -178,19 +226,19 @@ void PPCInterpreter::PPCInterpreterJIT_mtspr(sPPEState *ppeState, JITBlockBuilde
     COMP->mov(SPRPtr(SPRG3), value);
     break;
   case eXenonSPR::TBLWO:
-    COMP->mov(SharedSPRPtr(TB), value.r32());
-    break;
-  case eXenonSPR::TBUWO: {
-    x86::Gp tb = newGP64();
-    COMP->mov(tb, SharedSPRPtr(TB));
-    COMP->and_(tb, imm<u64>(0x00000000FFFFFFFFull));
-    x86::Gp hi = newGP64();
-    COMP->mov(hi, value);
-    COMP->shl(hi, 32);
-    COMP->or_(tb, hi);
-    COMP->mov(SharedSPRPtr(TB), tb);
-    break;
-  }
+  {
+    InvokeNode* invokeNode = nullptr;
+    Xe::JITCompat::Invoke(b->compiler, invokeNode, reinterpret_cast<void*>(WriteTimeBaseLower), asmjit::FuncSignature::build<void, PPU*, u32>());
+    Xe::JITCompat::SetArg(invokeNode, 0, b->ppu->Base());
+    Xe::JITCompat::SetArg(invokeNode, 1, value.r32());
+  } break;
+  case eXenonSPR::TBUWO:
+  {
+    InvokeNode* invokeNode = nullptr;
+    Xe::JITCompat::Invoke(b->compiler, invokeNode, reinterpret_cast<void*>(WriteTimeBaseUpper), asmjit::FuncSignature::build<void, PPU*, u32>());
+    Xe::JITCompat::SetArg(invokeNode, 0, b->ppu->Base());
+    Xe::JITCompat::SetArg(invokeNode, 1, value.r32());
+  } break;
   case eXenonSPR::HSPRG0:
     COMP->mov(SPRPtr(HSPRG0), value);
     break;
@@ -198,8 +246,12 @@ void PPCInterpreter::PPCInterpreterJIT_mtspr(sPPEState *ppeState, JITBlockBuilde
     COMP->mov(SPRPtr(HSPRG1), value);
     break;
   case eXenonSPR::HDEC:
-    COMP->mov(SharedSPRPtr(HDEC), value.r32());
-    break;
+  {
+    InvokeNode* invokeNode = nullptr;
+    Xe::JITCompat::Invoke(b->compiler, invokeNode, reinterpret_cast<void*>(WriteHDEC), asmjit::FuncSignature::build<void, PPU*, u32>());
+    Xe::JITCompat::SetArg(invokeNode, 0, b->ppu->Base());
+    Xe::JITCompat::SetArg(invokeNode, 1, value.r32());
+  } break;
   case eXenonSPR::RMOR:
     COMP->mov(SharedSPRPtr(RMOR), value);
     break;
@@ -312,8 +364,13 @@ void PPCInterpreter::PPCInterpreterJIT_sc(sPPEState *ppeState, JITBlockBuilder *
 void PPCInterpreter::PPCInterpreterJIT_mftb(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   const u32 spr = (instr.spr >> 5) | ((instr.spr & 0x1f) << 5);
   x86::Gp tbData = newGP64();
-  COMP->mov(tbData, SharedSPRPtr(TB));
 
+  InvokeNode* invokeNode = nullptr;
+  Xe::JITCompat::Invoke(b->compiler, invokeNode, reinterpret_cast<void*>(LoadTimeBase), asmjit::FuncSignature::build<u64, PPU*>());
+  Xe::JITCompat::SetArg(invokeNode, 0, b->ppu->Base());
+  Xe::JITCompat::SetRet(invokeNode, 0, tbData);
+
+  // TBLRO: Reads the full timebase
   if (spr == TBLRO) {
     COMP->mov(GPRPtr(instr.rd), tbData);
   } else { // TBURO

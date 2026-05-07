@@ -14,7 +14,7 @@
 #include "Core/RootBus/RootBus.h"
 #include "Core/XCPU/Context/XenonIIC/XenonIIC.h"
 #include "Core/XCPU/Context/Reservations/XenonReservations.h"
-
+#include "Core/XCPU/Context/TimeBase/XenonTimeBase.h"
 
 namespace Xe::XCPU {
 
@@ -74,9 +74,9 @@ public:
 
   // Used for conditional load/store instructions regarding PowerPC atomic operations.
   XenonReservations xenonRes = {};
-  // Time Base switch, possibly RTC register, the TB counter only runs if this
-  // value is set.
-  bool timeBaseActive = false;
+
+  // Time Base logic, tracks time and updates lazily when read.
+  XenonTimeBase timeBase = {};
 
   // Global timebase tick counter (Increments based on the timeBase frquency)
   // The timer thread inside XenonCPU will increase this; each PPU reads the counter and applies the delta.
