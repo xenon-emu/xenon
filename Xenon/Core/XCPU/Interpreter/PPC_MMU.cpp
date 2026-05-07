@@ -1058,10 +1058,11 @@ void PPCInterpreter::MMURead(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppeS
   }
 
   // External read
-  if (auto rootBus = xenonContext->GetRootBus().lock()) {
-    if (!rootBus->Read(EA, outData, byteCount, socRead) && socRead) {
-      if (Config::log.advanced)
+  if (auto rootBus = cpuContext->GetRootBus().lock()) {
+    if (!rootBus->Read(EA, outData, byteCount, socRead)) {
+      if (socRead && Config::log.advanced) {
         LOG_WARNING(Xenon_MMU, "Invalid SoC Read from 0x{:X}", EA);
+      }
     }
   }
 }
@@ -1122,12 +1123,11 @@ void PPCInterpreter::MMUWrite(Xe::XCPU::XenonContext *cpuContext, sPPEState *ppe
   }
 
   // External write
-  if (auto rootBus = xenonContext->GetRootBus().lock()) {
-    if (!rootBus->Write(EA, data, byteCount, socWrite) && socWrite) {
-      u64 tmp = 0;
-      memcpy(&tmp, data, byteCount);
-      if (Config::log.advanced)
+  if (auto rootBus = cpuContext->GetRootBus().lock()) {
+    if (!rootBus->Write(EA, data, byteCount, socWrite)) {
+      if (socWrite && Config::log.advanced) {
         LOG_WARNING(Xenon_MMU, "Invalid SoC Write to 0x{:X}", EA);
+      }
     }
   }
 }

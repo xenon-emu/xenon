@@ -87,13 +87,13 @@ bool RootBus::Read(u64 address, u8 *data, u64 size, bool soc) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "RootBus::Read", MP_AUTO);
 
   // Fast path, most reads go to RAM, so check there first.
-  if (auto ram = ramDevice.lock()) {
-    if (!soc && address < PHYS_MEMORY_END) {
+  if (!soc && address < PHYS_MEMORY_END) {
+    if (auto ram = ramDevice.lock()) {
       ram->Read(address, data, size);
       return true;
+    } else {
+      return false;
     }
-  } else {
-    return false;
   }
 
   // SFCX
@@ -156,13 +156,13 @@ bool RootBus::MemSet(u64 address, s32 data, u64 size) {
 bool RootBus::Write(u64 address, const u8 *data, u64 size, bool soc) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "RootBus::Write", MP_AUTO);
 
-  if (auto ram = ramDevice.lock()) {
-    if (!soc && address < 0x3FFFFFFF) {
+  if (!soc && address < PHYS_MEMORY_END) {
+    if (auto ram = ramDevice.lock()) {
       ram->Write(address, data, size);
       return true;
+    } else {
+      return false;
     }
-  } else {
-    return false;
   }
 
   // SFCX
@@ -177,8 +177,7 @@ bool RootBus::Write(u64 address, const u8 *data, u64 size, bool soc) {
   }
 
   // PCI Configuration Write?
-  if (address >= PCI_CONFIG_REGION_ADDRESS &&
-      address <= PCI_CONFIG_REGION_ADDRESS + PCI_CONFIG_REGION_SIZE) {
+  if (address >= PCI_CONFIG_REGION_ADDRESS && address <= PCI_CONFIG_REGION_ADDRESS + PCI_CONFIG_REGION_SIZE) {
     ConfigWrite(address, data, size);
     return true;
   }
