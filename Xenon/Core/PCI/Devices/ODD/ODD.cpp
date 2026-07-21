@@ -201,6 +201,10 @@ Xe::PCIDev::ODD::ODD(u64 size, std::weak_ptr<PCIBridge> parentPCIBridge, std::we
 }
 
 Xe::PCIDev::ODD::~ODD() {
+  if (!RetireAndWait()) {
+    LOG_CRITICAL(ODD, "Timed out waiting for in-flight accesses to drain during destruction!");
+  }
+
   oddThreadRunning.store(false, std::memory_order_release);
   if (oddWorkerThread.joinable())
     oddWorkerThread.join();
@@ -208,6 +212,12 @@ Xe::PCIDev::ODD::~ODD() {
 
 // PCI Read
 void Xe::PCIDev::ODD::Read(u64 address, u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    memset(data, 0xFF, size);
+    return;
+  }
+
   // PCI BAR0 is the Primary Command Block Base Address
   u8 atapiCommandReg =
       static_cast<u8>(address - pciConfigSpace.BAR0);
@@ -312,6 +322,11 @@ void Xe::PCIDev::ODD::Read(u64 address, u8 *data, u64 size) {
 }
 // PCI Write
 void Xe::PCIDev::ODD::Write(u64 address, const u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
+
   // PCI BAR0 is the Primary Command Block Base Address
   u8 atapiCommandReg =
       static_cast<u8>(address - pciConfigSpace.BAR0);
@@ -519,6 +534,11 @@ void Xe::PCIDev::ODD::Write(u64 address, const u8 *data, u64 size) {
 }
 
 void Xe::PCIDev::ODD::MemSet(u64 address, s32 data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
+
   // PCI BAR0 is the primary command block base address
   u8 atapiCommandReg =
       static_cast<u8>(address - pciConfigSpace.BAR0);
@@ -637,6 +657,11 @@ void Xe::PCIDev::ODD::MemSet(u64 address, s32 data, u64 size) {
 
 // Config read.
 void Xe::PCIDev::ODD::ConfigRead(u64 address, u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    memset(data, 0xFF, size);
+    return;
+  }
   const u8 readReg = static_cast<u8>(address);
   if (readReg >= XE_SIS_SCR_BASE && readReg <= 0xFF) {
     // Read the SATA status and control registers
@@ -666,6 +691,10 @@ void Xe::PCIDev::ODD::ConfigRead(u64 address, u8 *data, u64 size) {
 }
 // Config write.
 void Xe::PCIDev::ODD::ConfigWrite(u64 address, const u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
   // Check if we're being scanned
   u64 tmp = 0;
   memcpy(&tmp, data, size);
@@ -1147,6 +1176,14 @@ void Xe::PCIDev::ODD::oddThreadLoop() {
 // Performs the DMA operation until it reaches the end of the PRDT.
 void Xe::PCIDev::ODD::doDMA() {
   for (std::shared_ptr<RAM> ram = ramPtr.lock(); ram; ram = ramPtr.lock()) {
+    // Held for this iteration's multi-step DMA below, since it
+    // dereferences raw pointers into RAM's backing buffer across two
+    // memcpy calls.
+    auto ramLease = ram->GetLease();
+    if (!ramLease) {
+      break;
+    }
+
     // Read the first entry of the table in memory
     u8 *DMAPointer = ram->GetPointerToAddress(atapiState.regs.dmaTableOffset +
       atapiState.dmaState.currentTableOffset);

@@ -250,6 +250,10 @@ Xe::PCIDev::SFCX::SFCX(u64 size, const std::string &nandLoadPath, std::weak_ptr<
 }
 
 Xe::PCIDev::SFCX::~SFCX() {
+  if (!RetireAndWait()) {
+    LOG_CRITICAL(SFCX, "Timed out waiting for in-flight accesses to drain during destruction!");
+  }
+
   // Clear NAND image data
   rawImageData.clear();
   // Terminate thread
@@ -259,6 +263,12 @@ Xe::PCIDev::SFCX::~SFCX() {
 }
 
 void Xe::PCIDev::SFCX::Read(u64 address, u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    memset(data, 0xFF, size);
+    return;
+  }
+
   // Set a lock on registers
   std::lock_guard lck(mutex);
 
@@ -302,11 +312,21 @@ void Xe::PCIDev::SFCX::Read(u64 address, u8 *data, u64 size) {
 }
 
 void Xe::PCIDev::SFCX::ConfigRead(u64 address, u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    memset(data, 0xFF, size);
+    return;
+  }
   const u8 offset = address & 0xFF;
   memcpy(data, &pciConfigSpace.data[offset], size);
 }
 
 void Xe::PCIDev::SFCX::Write(u64 address, const u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
+
   // Set a lock on registers
   std::lock_guard lck(mutex);
 
@@ -379,6 +399,11 @@ void Xe::PCIDev::SFCX::Write(u64 address, const u8 *data, u64 size) {
   }
 }
 void Xe::PCIDev::SFCX::MemSet(u64 address, s32 data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
+
   // Set a lock on registers
   std::lock_guard lck(mutex);
 
@@ -449,6 +474,10 @@ void Xe::PCIDev::SFCX::MemSetRaw(u64 address, s32 data, u64 size) {
 }
 
 void Xe::PCIDev::SFCX::ConfigWrite(u64 address, const u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
   const u8 offset = address & 0xFF;
 
   // Check if we're being scanned
@@ -589,6 +618,13 @@ void Xe::PCIDev::SFCX::sfcxEraseBlock() {
 
 void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND(bool physical) {
   if (auto ram = mainMemory.lock()) {
+    // Held for the whole multi-page DMA below, since it dereferences raw
+    // pointers into RAM's backing buffer across many memcpy calls.
+    auto ramLease = ram->GetLease();
+    if (!ramLease) {
+      return;
+    }
+
     u32 physAddr = sfcxState.addressReg;
     // Calculate Physical address offset for starting page
     physAddr = 1 ? ((physAddr / sfcxState.pageSize) * sfcxState.pageSizePhys) + physAddr % sfcxState.pageSize : physAddr;
@@ -641,6 +677,13 @@ void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND(bool physical) {
 
 void Xe::PCIDev::SFCX::sfcxDoDMAtoNAND() {
   if (auto ram = mainMemory.lock()) {
+    // Held for the whole multi-page DMA below, since it dereferences raw
+    // pointers into RAM's backing buffer across many memcpy calls.
+    auto ramLease = ram->GetLease();
+    if (!ramLease) {
+      return;
+    }
+
     // Physical address when doing DMA
     u32 physAddr = sfcxState.addressReg;
     // Calculate Physical address offset for starting page

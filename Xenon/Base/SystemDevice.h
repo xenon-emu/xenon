@@ -7,6 +7,7 @@
 #include <string>
 
 #include "Base/Hash.h"
+#include "Base/LifetimeGuard.h"
 #include "Base/Types.h"
 
 class SystemDevice {
@@ -55,7 +56,26 @@ public:
   u64 GetStartAddress() {
     return startAddress;
   }
+
+  // Acquire a lease guarding this device against concurrent teardown/
+  // replacement (RootBus::ResetDevice). See Base::LifetimeGuard.
+  Base::LifetimeGuard::Lease GetLease() {
+    return lifetimeGuard.TryAcquire();
+  }
+
+  // Teardown-path helpers, used by RootBus::ResetDevice and this device's
+  // own destructor/Reset()/Resize() before mutating shared state.
+  bool RetireAndWait(u32 timeoutMs = 250) {
+    return lifetimeGuard.RetireAndWait(timeoutMs);
+  }
+  void Reopen() {
+    lifetimeGuard.Reopen();
+  }
 private:
+  // Guards Read/Write/MemSet against destruction/replacement/resize racing
+  // an in-flight call from another thread.
+  Base::LifetimeGuard lifetimeGuard{};
+
   u64 hash = 0;
   const char *name = "";
   u64 startAddress = 0, endAddress = 0;

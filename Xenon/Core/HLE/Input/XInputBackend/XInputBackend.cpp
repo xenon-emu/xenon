@@ -205,11 +205,11 @@ bool XInputBackend::Setup() {
 
   // Set pointers
   moduleHandle = moduleHndl;
-  XInputGetCapabilitiesPtr = xinputGetCapabilities;
-  XInputGetStatePtr = xinputGetState;
-  XInputGetKeystrokePtr = xinputGetKeystroke;
-  XInputSetStatePtr = xinputSetState;
-  XInputEnablePtr = xinputEnable;
+  XInputGetCapabilitiesPtr = reinterpret_cast<void *>(xinputGetCapabilities);
+  XInputGetStatePtr = reinterpret_cast<void *>(xinputGetState);
+  XInputGetKeystrokePtr = reinterpret_cast<void *>(xinputGetKeystroke);
+  XInputSetStatePtr = reinterpret_cast<void *>(xinputSetState);
+  XInputEnablePtr = reinterpret_cast<void *>(xinputEnable);
 
   // Library was present and all the required modules are here, great!
 

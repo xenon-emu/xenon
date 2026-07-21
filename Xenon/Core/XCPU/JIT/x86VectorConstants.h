@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "Base/Arch.h"
 #include "Base/Vector128.h"
 
 #include <algorithm>
@@ -14,10 +15,12 @@
 #include <cstring>
 #include <type_traits>
 
+#if defined(ARCH_X86_64) || defined(ARCH_X86)
 #if defined(_MSC_VER)
 #include <intrin.h>
 #endif
 #include <immintrin.h>
+#endif
 
 #define XE_XMM_CONST_ALIGN alignas(16)
 
@@ -116,6 +119,7 @@ static T RotateLeftValue(T value, u32 shift) {
 //
 // Emulated instructions, meant to be used when no easy replacements exist for tricky HIR/PPC opcodes
 //
+#if defined(ARCH_X86_64) || defined(ARCH_X86)
 
 extern __m128i EmulateShlV128(void *, __m128i src1, u8 src2);
 
@@ -152,5 +156,7 @@ extern __m128 EmulateLog2Vec(void *, __m128 src);
 extern __m128i EmulatePack8_IN_16_UN_UN_SAT(void *, __m128i src1, __m128i src2);
 
 extern __m128i EmulatePack8_IN_16_UN_UN(void *, __m128i src1, __m128i src2);
+
+#endif // ARCH_X86_64 || ARCH_X86
 
 }  // namespace Xe::XCPU::JIT

@@ -71,6 +71,10 @@ HostBridge::HostBridge(u64 ramSize) {
 }
 
 HostBridge::~HostBridge() {
+  if (!lifetimeGuard.RetireAndWait()) {
+    LOG_CRITICAL(HostBridge, "Timed out waiting for in-flight accesses to drain during destruction!");
+  }
+
   xGPU.reset();
   pciBridge.reset();
 }
@@ -89,7 +93,10 @@ std::weak_ptr<PCIBridge> HostBridge::RegisterPCIBridge(std::unique_ptr<PCIBridge
 
 bool HostBridge::Read(u64 address, u8 *data, u64 size) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "HostBridge::Read", MP_AUTO);
-  std::lock_guard lck(mutex);
+  auto lease = lifetimeGuard.TryAcquire();
+  if (!lease) {
+    return false;
+  }
 
   // Reading from host bridge registers?
   if (IsAddressMappedinBAR(static_cast<u32>(address))) {
@@ -143,7 +150,10 @@ bool HostBridge::Read(u64 address, u8 *data, u64 size) {
 
 bool HostBridge::Write(u64 address, const u8 *data, u64 size) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "HostBridge::Write", MP_AUTO);
-  std::lock_guard lck(mutex);
+  auto lease = lifetimeGuard.TryAcquire();
+  if (!lease) {
+    return false;
+  }
 
   // If we are not UART, send it to log
   if (false) {
@@ -251,7 +261,10 @@ bool HostBridge::Write(u64 address, const u8 *data, u64 size) {
 
 bool HostBridge::MemSet(u64 address, s32 data, u64 size) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "HostBridge::MemSet", MP_AUTO);
-  std::lock_guard lck(mutex);
+  auto lease = lifetimeGuard.TryAcquire();
+  if (!lease) {
+    return false;
+  }
 
   // Writing to host bridge registers?
   if (IsAddressMappedinBAR(static_cast<u32>(address))) {
@@ -350,7 +363,10 @@ bool HostBridge::MemSet(u64 address, s32 data, u64 size) {
 
 bool HostBridge::ConfigRead(u64 address, u8 *data, u64 size) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "HostBridge::ConfigRead", MP_AUTO);
-  std::lock_guard lck(mutex);
+  auto lease = lifetimeGuard.TryAcquire();
+  if (!lease) {
+    return false;
+  }
 
   PCIE_CONFIG_ADDR configAddress = {};
   configAddress.hexData = static_cast<u32>(address);
@@ -380,7 +396,10 @@ bool HostBridge::ConfigRead(u64 address, u8 *data, u64 size) {
 
 bool HostBridge::ConfigWrite(u64 address, const u8 *data, u64 size) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "HostBridge::ConfigWrite", MP_AUTO);
-  std::lock_guard lck(mutex);
+  auto lease = lifetimeGuard.TryAcquire();
+  if (!lease) {
+    return false;
+  }
 
   PCIE_CONFIG_ADDR configAddress = { static_cast<u32>(address) };
   if (configAddress.busNumber == 0) {

@@ -6,6 +6,7 @@
 
 #include <unordered_map>
 
+#include "Base/LifetimeGuard.h"
 #include "Base/SystemDevice.h"
 #include "Core/PCI/Bridge/HostBridge.h"
 
@@ -38,15 +39,24 @@ public:
   std::weak_ptr<T> GetDevice(u32 hash) {
     return std::dynamic_pointer_cast<T>(connectedDevices[hash]);
   }
+
+  // Acquire a lease guarding this bus against concurrent teardown. See
+  // Base::LifetimeGuard for the contract.
+  Base::LifetimeGuard::Lease GetLease() {
+    return lifetimeGuard.TryAcquire();
+  }
 private:
+  // Guards against destruction racing an in-flight Read/Write/MemSet/
+  // ConfigRead/ConfigWrite from another thread.
+  Base::LifetimeGuard lifetimeGuard{};
+
   std::shared_ptr<HostBridge> hostBridge = {};
 
   u32 deviceCount = 0;
   std::unordered_map<u32, std::shared_ptr<SystemDevice>> connectedDevices = {};
 
-  // Direct device pointers for both RAM and SFCX
-  std::weak_ptr<SystemDevice> ramDevice = {};
-  std::weak_ptr<SystemDevice> sfcxDevice = {};
+  std::shared_ptr<SystemDevice> ramDevice = {};
+  std::shared_ptr<SystemDevice> sfcxDevice = {};
 
   std::unique_ptr<u8> biuData{ std::make_unique<STRIP_UNIQUE(biuData)>(0x10000) };
 };

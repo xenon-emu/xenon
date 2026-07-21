@@ -99,6 +99,10 @@ Xe::PCIDev::ETHERNET::ETHERNET(u64 size, std::weak_ptr<PCIBridge> parentPCIBridg
 
 // Class Destructor
 Xe::PCIDev::ETHERNET::~ETHERNET() {
+  if (!RetireAndWait()) {
+    LOG_CRITICAL(ETH, "Timed out waiting for in-flight accesses to drain during destruction!");
+  }
+
   // Stop worker thread
   workerRunning = false;
   workerCV.notify_all();
@@ -189,6 +193,12 @@ void Xe::PCIDev::ETHERNET::Reset() {
 
 // PCI Read
 void Xe::PCIDev::ETHERNET::Read(u64 address, u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    memset(data, 0xFF, size);
+    return;
+  }
+
   // Register index
   u8 regIdx = address & 0xFF;
 
@@ -304,6 +314,11 @@ void Xe::PCIDev::ETHERNET::Read(u64 address, u8 *data, u64 size) {
 
 // PCI Write
 void Xe::PCIDev::ETHERNET::Write(u64 address, const u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
+
   u8 offset = address & 0xFF;
 
   u32 val = 0;
@@ -581,14 +596,19 @@ bool Xe::PCIDev::ETHERNET::ReadTxDescriptor(bool ring0, u32 index, XE_TX_DESCRIP
     return false;
 
   if (auto ram = ramPtr.lock()) {
+    auto ramLease = ram->GetLease();
+    if (!ramLease) {
+      return false;
+    }
+
     u32 descAddr = txDescriptorBaseReg + (index * sizeof(XE_TX_DESCRIPTOR));
     u8 *ptr = ram->GetPointerToAddress(descAddr);
-  
+
     if (!ptr) {
       LOG_ERROR(ETH, "Failed to get pointer to TX descriptor at {:#08x}", descAddr);
       return false;
     }
-  
+
     memcpy(&desc, ptr, sizeof(XE_TX_DESCRIPTOR));
     return true;
   } else {
@@ -602,14 +622,19 @@ bool Xe::PCIDev::ETHERNET::WriteTxDescriptor(bool ring0, u32 index, const XE_TX_
     return false;
 
   if (auto ram = ramPtr.lock()) {
+    auto ramLease = ram->GetLease();
+    if (!ramLease) {
+      return false;
+    }
+
     u32 descAddr = txDescriptorBaseReg + (index * sizeof(XE_TX_DESCRIPTOR));
     u8 *ptr = ram->GetPointerToAddress(descAddr);
-  
+
     if (!ptr) {
       LOG_ERROR(ETH, "Failed to get pointer to TX descriptor at {:#08x}", descAddr);
       return false;
     }
-  
+
     memcpy(ptr, &desc, sizeof(XE_TX_DESCRIPTOR));
     return true;
   } else {
@@ -623,6 +648,11 @@ bool Xe::PCIDev::ETHERNET::ReadRxDescriptor(u32 index, XE_RX_DESCRIPTOR &desc) {
     return false;
 
   if (auto ram = ramPtr.lock()) {
+    auto ramLease = ram->GetLease();
+    if (!ramLease) {
+      return false;
+    }
+
     u32 descAddr = ethPciState.rxDescriptorBaseReg + (index * sizeof(XE_RX_DESCRIPTOR));
     u8 *ptr = ram->GetPointerToAddress(descAddr);
 
@@ -644,6 +674,11 @@ bool Xe::PCIDev::ETHERNET::WriteRxDescriptor(u32 index, const XE_RX_DESCRIPTOR &
     return false;
 
   if (auto ram = ramPtr.lock()) {
+    auto ramLease = ram->GetLease();
+    if (!ramLease) {
+      return false;
+    }
+
     u32 descAddr = ethPciState.rxDescriptorBaseReg + (index * sizeof(XE_RX_DESCRIPTOR));
     u8 *ptr = ram->GetPointerToAddress(descAddr);
     if (!ptr) {
@@ -698,6 +733,11 @@ void Xe::PCIDev::ETHERNET::ProcessTxDescriptors(bool ring0) {
 
     // Get packet data (descr[2] = address)
     if (auto ram = ramPtr.lock()) {
+      auto ramLease = ram->GetLease();
+      if (!ramLease) {
+        break;
+      }
+
       u8 *packetPtr = ram->GetPointerToAddress(desc.bufferAddress);
       if (!packetPtr) {
         desc.status &= ~TX_DESC_OWN;
@@ -778,6 +818,11 @@ void Xe::PCIDev::ETHERNET::ProcessRxDescriptors() {
 
     // Get buffer address from descr[2]
     if (auto ram = ramPtr.lock()) {
+      auto ramLease = ram->GetLease();
+      if (!ramLease) {
+        break;
+      }
+
       u8 *bufferPtr = ram->GetPointerToAddress(desc.bufferAddress);
       if (!bufferPtr) {
         LOG_ERROR(ETH, "RX descriptor {} has invalid buffer address: {:#08x}",
@@ -950,11 +995,20 @@ void Xe::PCIDev::ETHERNET::RaiseInterrupt(u32 bits) {
 
 // PCI Config Read
 void Xe::PCIDev::ETHERNET::ConfigRead(u64 address, u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    memset(data, 0xFF, size);
+    return;
+  }
   memcpy(data, &pciConfigSpace.data[static_cast<u8>(address)], size);
 }
 
 // PCI Config Write
 void Xe::PCIDev::ETHERNET::ConfigWrite(u64 address, const u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
   // Check if we're being scanned for BAR size
   u64 tmp = 0;
   memcpy(&tmp, data, size);

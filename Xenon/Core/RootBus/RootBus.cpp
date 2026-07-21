@@ -19,6 +19,13 @@ RootBus::RootBus() {
 }
 
 RootBus::~RootBus() {
+  if (!lifetimeGuard.RetireAndWait()) {
+    LOG_CRITICAL(RootBus, "Timed out waiting for in-flight accesses to drain during destruction!");
+  }
+
+  ramDevice.reset();
+  sfcxDevice.reset();
+
   for (auto &[name, device] : connectedDevices) {
     device.reset();
   }
@@ -69,6 +76,9 @@ void RootBus::ResetDevice(std::unique_ptr<SystemDevice> device) {
   u32 hash = device->GetHash();
   if (auto it = connectedDevices.find(hash); it != connectedDevices.end()) {
     LOG_INFO(RootBus, "Resetting device: {}", it->second->GetDeviceName());
+    if (!it->second->RetireAndWait()) {
+      LOG_CRITICAL(RootBus, "Timed out waiting for in-flight accesses to drain while resetting '{}'!", it->second->GetDeviceName());
+    }
     it->second.reset();
     connectedDevices.erase(it);
     connectedDevices.insert({ hash, std::move(device) });
@@ -85,11 +95,16 @@ void RootBus::ResetDevice(std::unique_ptr<SystemDevice> device) {
 
 bool RootBus::Read(u64 address, u8 *data, u64 size, bool soc) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "RootBus::Read", MP_AUTO);
+  auto lease = lifetimeGuard.TryAcquire();
+  if (!lease) {
+    memset(data, 0xFF, size);
+    return false;
+  }
 
   // Fast path, most reads go to RAM, so check there first.
   if (!soc && address < PHYS_MEMORY_END) {
-    if (auto ram = ramDevice.lock()) {
-      ram->Read(address, data, size);
+    if (ramDevice) {
+      ramDevice->Read(address, data, size);
       return true;
     } else {
       return false;
@@ -97,14 +112,12 @@ bool RootBus::Read(u64 address, u8 *data, u64 size, bool soc) {
   }
 
   // SFCX
-  if (auto sfcx = sfcxDevice.lock()) {
-    if (address >= sfcx->GetStartAddress() && address <= sfcx->GetEndAddress()) {
+  if (sfcxDevice) {
+    if (address >= sfcxDevice->GetStartAddress() && address <= sfcxDevice->GetEndAddress()) {
       // Hit
-      sfcx->Read(address, data, size);
+      sfcxDevice->Read(address, data, size);
       return true;
     }
-  } else {
-    return false;
   }
 
   // Configuration Read?
@@ -129,6 +142,11 @@ bool RootBus::Read(u64 address, u8 *data, u64 size, bool soc) {
 
 bool RootBus::MemSet(u64 address, s32 data, u64 size) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "RootBus::MemSet", MP_AUTO);
+  auto lease = lifetimeGuard.TryAcquire();
+  if (!lease) {
+    return false;
+  }
+
   for (auto &[name, dev] : connectedDevices) {
     if (address >= dev->GetStartAddress() && address <= dev->GetEndAddress()) {
       // Hit
@@ -155,10 +173,14 @@ bool RootBus::MemSet(u64 address, s32 data, u64 size) {
 
 bool RootBus::Write(u64 address, const u8 *data, u64 size, bool soc) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "RootBus::Write", MP_AUTO);
+  auto lease = lifetimeGuard.TryAcquire();
+  if (!lease) {
+    return false;
+  }
 
   if (!soc && address < PHYS_MEMORY_END) {
-    if (auto ram = ramDevice.lock()) {
-      ram->Write(address, data, size);
+    if (ramDevice) {
+      ramDevice->Write(address, data, size);
       return true;
     } else {
       return false;
@@ -166,14 +188,12 @@ bool RootBus::Write(u64 address, const u8 *data, u64 size, bool soc) {
   }
 
   // SFCX
-  if (auto sfcx = sfcxDevice.lock()) {
-    if (address >= sfcx->GetStartAddress() && address <= sfcx->GetEndAddress()) {
+  if (sfcxDevice) {
+    if (address >= sfcxDevice->GetStartAddress() && address <= sfcxDevice->GetEndAddress()) {
       // Hit
-      sfcx->Write(address, data, size);
+      sfcxDevice->Write(address, data, size);
       return true;
     }
-  } else {
-    return false;
   }
 
   // PCI Configuration Write?
@@ -197,9 +217,18 @@ bool RootBus::Write(u64 address, const u8 *data, u64 size, bool soc) {
 //
 
 bool RootBus::ConfigRead(u64 address, u8 *data, u64 size) {
+  auto lease = lifetimeGuard.TryAcquire();
+  if (!lease) {
+    memset(data, 0xFF, size);
+    return false;
+  }
   return hostBridge->ConfigRead(address, data, size);
 }
 
 bool RootBus::ConfigWrite(u64 address, const u8 *data, u64 size) {
+  auto lease = lifetimeGuard.TryAcquire();
+  if (!lease) {
+    return false;
+  }
   return hostBridge->ConfigWrite(address, data, size);
 }

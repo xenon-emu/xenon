@@ -8,6 +8,7 @@
 #include <string>
 
 #include "Base/Hash.h"
+#include "Base/LifetimeGuard.h"
 
 #include "Core/PCI/PCIe.h"
 
@@ -67,11 +68,30 @@ public:
     return PCI_CONFIG_HDR_REG1_COMMAND_REG{ pciConfigSpace.reg1.command }.memorySpace == 1;
   }
 
+  // Acquire a lease guarding this device against concurrent teardown/
+  // replacement (PCIBridge::ResetPCIDevice). See Base::LifetimeGuard.
+  Base::LifetimeGuard::Lease GetLease() {
+    return lifetimeGuard.TryAcquire();
+  }
+
+  // Teardown-path helpers, used by PCIBridge::ResetPCIDevice and this
+  // device's own destructor before replacing/destroying it.
+  bool RetireAndWait(u32 timeoutMs = 250) {
+    return lifetimeGuard.RetireAndWait(timeoutMs);
+  }
+  void Reopen() {
+    lifetimeGuard.Reopen();
+  }
+
   // Configuration Space.
   union GENRAL_PCI_DEVICE_CONFIG_SPACE pciConfigSpace = {};
   // PCI Device Size, using when determining PCI device size of each BAR in Linux
   u32 pciDevSizes[6] = {};
 private:
+  // Guards Read/Write/MemSet/ConfigRead/ConfigWrite against destruction/
+  // replacement racing an in-flight call from another thread.
+  Base::LifetimeGuard lifetimeGuard{};
+
   const char *name = "";
   u64 hash = 0, size = 0;
 };

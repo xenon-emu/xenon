@@ -119,6 +119,10 @@ Xe::PCIDev::SMC::SMC(u64 size, std::weak_ptr<PCIBridge> parentPCIBridge)
 
 // Class Destructor.
 Xe::PCIDev::SMC::~SMC() {
+  if (!RetireAndWait()) {
+    LOG_CRITICAL(SMC, "Timed out waiting for in-flight accesses to drain during destruction!");
+  }
+
   smcThreadRunning = false;
   if (smcThread.joinable())
     smcThread.join();
@@ -128,6 +132,11 @@ Xe::PCIDev::SMC::~SMC() {
 
 // PCI Read
 void Xe::PCIDev::SMC::Read(u64 address, u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    memset(data, 0xFF, size);
+    return;
+  }
   const u8 regOffset = static_cast<u8>(address);
 
   mutex.lock();
@@ -182,12 +191,21 @@ void Xe::PCIDev::SMC::Read(u64 address, u8 *data, u64 size) {
 
 // PCI Config Read
 void Xe::PCIDev::SMC::ConfigRead(u64 address, u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    memset(data, 0xFF, size);
+    return;
+  }
   LOG_INFO(SMC, "ConfigRead: Address = 0x{:X}, size = 0x{:X}.", address, size);
   memcpy(data, &pciConfigSpace.data[static_cast<u8>(address)], size);
 }
 
 // PCI Write
 void Xe::PCIDev::SMC::Write(u64 address, const u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
   const u8 regOffset = static_cast<u8>(address);
 
   mutex.lock();
@@ -255,6 +273,10 @@ void Xe::PCIDev::SMC::Write(u64 address, const u8 *data, u64 size) {
 
 // PCI MemSet
 void Xe::PCIDev::SMC::MemSet(u64 address, s32 data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
   const u8 regOffset = static_cast<u8>(address);
 
   mutex.lock();
@@ -313,7 +335,11 @@ void Xe::PCIDev::SMC::MemSet(u64 address, s32 data, u64 size) {
 }
 
 // PCI Config Write
-void Xe::PCIDev::SMC::ConfigWrite(u64 address, const u8 *data, u64 size) {  
+void Xe::PCIDev::SMC::ConfigWrite(u64 address, const u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
   // Check if we're being scanned
   u64 tmp = 0;
   memcpy(&tmp, data, size);

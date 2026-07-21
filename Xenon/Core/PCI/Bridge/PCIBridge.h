@@ -7,6 +7,8 @@
 #include <cstring>
 #include <unordered_map>
 
+#include "Base/LifetimeGuard.h"
+
 #include "Core/PCI/PCIDevice.h"
 
 #include "Core/PCI/PCIe.h"
@@ -109,7 +111,17 @@ public:
   std::weak_ptr<T> GetDevice(u32 hash) {
     return std::dynamic_pointer_cast<T>(connectedPCIDevices[hash]);
   }
+
+  // Acquire a lease guarding this bridge against concurrent teardown. See
+  // Base::LifetimeGuard for the contract.
+  Base::LifetimeGuard::Lease GetLease() {
+    return lifetimeGuard.TryAcquire();
+  }
 private:
+  // Guards against destruction/mutation racing an in-flight Read/Write/
+  // ConfigRead/ConfigWrite from another thread.
+  Base::LifetimeGuard lifetimeGuard{};
+
   // IIC Pointer used for interrupts
   Xe::XCPU::XenonIIC *xenonIIC = nullptr;
 

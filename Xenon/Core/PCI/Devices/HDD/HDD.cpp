@@ -173,6 +173,10 @@ Xe::PCIDev::HDD::HDD(u64 size, std::weak_ptr<PCIBridge> parentPCIBridge, std::we
 }
 
 Xe::PCIDev::HDD::~HDD() {
+  if (!RetireAndWait()) {
+    LOG_CRITICAL(HDD, "Timed out waiting for in-flight accesses to drain during destruction!");
+  }
+
   // Terminate thread
   hddThreadRunning.store(false, std::memory_order_release);
   if (hddWorkerThread.joinable())
@@ -181,6 +185,12 @@ Xe::PCIDev::HDD::~HDD() {
 
 // PCI Read
 void Xe::PCIDev::HDD::Read(u64 address, u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    memset(data, 0xFF, size);
+    return;
+  }
+
   // PCI BAR0 is the Primary Command Block Base Address
   u8 ataCommandReg =
     static_cast<u8>(address - pciConfigSpace.BAR0);
@@ -291,6 +301,10 @@ void Xe::PCIDev::HDD::Read(u64 address, u8 *data, u64 size) {
 }
 // PCI Write
 void Xe::PCIDev::HDD::Write(u64 address, const u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
 
   // PCI BAR0 is the Primary Command Block Base Address
   u8 ataCommandReg =
@@ -513,15 +527,28 @@ void Xe::PCIDev::HDD::Write(u64 address, const u8 *data, u64 size) {
 }
 
 void Xe::PCIDev::HDD::MemSet(u64 address, s32 data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
   const u32 regOffset = (address & 0xFF) * 4;
   LOG_ERROR(HDD, "Unknown register! Attempted to MEMSET {:#x}", regOffset);
 }
 
 void Xe::PCIDev::HDD::ConfigRead(u64 address, u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    memset(data, 0xFF, size);
+    return;
+  }
   memcpy(data, &pciConfigSpace.data[static_cast<u8>(address)], size);
 }
 
 void Xe::PCIDev::HDD::ConfigWrite(u64 address, const u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
   // Check if we're being scanned
   u64 tmp = 0;
   memcpy(&tmp, data, size);
@@ -716,6 +743,14 @@ void Xe::PCIDev::HDD::hddThreadLoop() {
 // Performs the DMA operation until it reaches the end of the PRDT.
 void Xe::PCIDev::HDD::DoDMA() {
   for (std::shared_ptr<RAM> ram = ramPtr.lock(); ram; ram = ramPtr.lock()) {
+    // Held for this iteration's multi-step DMA below, since it
+    // dereferences raw pointers into RAM's backing buffer across two
+    // memcpy calls.
+    auto ramLease = ram->GetLease();
+    if (!ramLease) {
+      break;
+    }
+
     // Read the first entry of the table in memory
     u8 *DMAPointer = ram->GetPointerToAddress(ataState.regs.dmaTableOffset + ataState.dmaState.currentTableOffset);
     // Each entry is 64 bit long

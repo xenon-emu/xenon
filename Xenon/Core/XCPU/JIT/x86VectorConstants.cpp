@@ -221,6 +221,8 @@ XE_XMM_CONST_ALIGN const Vector128 vpkuwumShuffleMask = Vector128b(0x01, 0x00, 0
 // Shuffle mask for vpkswss - applies byte swap
 XE_XMM_CONST_ALIGN const Vector128 vpkswssShuffleMask = Vector128b(0x01, 0x00, 0x03, 0x02, 0x05, 0x04, 0x07, 0x06, 0x09, 0x08, 0x0B, 0x0A, 0x0D, 0x0C, 0x0F, 0x0E);
 
+#if defined(ARCH_X86_64) || defined(ARCH_X86)
+
 __m128i EmulateShlV128(void *, __m128i src1, u8 src2) {
   // Almost all instances are shamt = 1, but non-constant.
   // shamt is [0,7]
@@ -405,5 +407,7 @@ template __m128i EmulateVectorRotateLeft<uint8_t>(void *, __m128i, __m128i);
 template __m128i EmulateVectorRotateLeft<uint16_t>(void *, __m128i, __m128i);
 template __m128i EmulateVectorAverage<uint32_t>(void *, __m128i, __m128i);
 template __m128i EmulateVectorAverage<int32_t>(void *, __m128i, __m128i);
+
+#endif // ARCH_X86_64 || ARCH_X86
 
 }  // namespace Xe::XCPU::JIT

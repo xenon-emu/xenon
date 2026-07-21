@@ -89,6 +89,10 @@ PCIBridge::PCIBridge() {
 }
 
 PCIBridge::~PCIBridge() {
+  if (!lifetimeGuard.RetireAndWait()) {
+    LOG_CRITICAL(PCIBridge, "Timed out waiting for in-flight accesses to drain during destruction!");
+  }
+
   for (auto &[name, device] : connectedPCIDevices) {
     device.reset();
   }
@@ -309,6 +313,9 @@ void PCIBridge::ResetPCIDevice(std::unique_ptr<PCIDevice> device) {
   std::string deviceName = device->GetDeviceName();
   if (auto it = connectedPCIDevices.find(hash); it != connectedPCIDevices.end()) {
     LOG_INFO(PCIBridge, "Resetting device: {}", deviceName);
+    if (!it->second->RetireAndWait()) {
+      LOG_CRITICAL(PCIBridge, "Timed out waiting for in-flight accesses to drain while resetting '{}'!", deviceName);
+    }
     it->second.reset();
     connectedPCIDevices.erase(it);
     connectedPCIDevices.insert({ hash, std::move(device) });
@@ -318,6 +325,12 @@ void PCIBridge::ResetPCIDevice(std::unique_ptr<PCIDevice> device) {
 }
 
 bool PCIBridge::Read(u64 address, u8 *data, u64 size) {
+  auto lease = lifetimeGuard.TryAcquire();
+  if (!lease) {
+    memset(data, 0xFF, size);
+    return false;
+  }
+
   // Reading to our own space?
   if (address >= PCI_BRIDGE_BASE_ADDRESS && address <= PCI_BRIDGE_BASE_END_ADDRESS) {
     switch (address) {
@@ -386,6 +399,11 @@ bool PCIBridge::Read(u64 address, u8 *data, u64 size) {
 }
 
 bool PCIBridge::Write(u64 address, const u8 *data, u64 size) {
+  auto lease = lifetimeGuard.TryAcquire();
+  if (!lease) {
+    return false;
+  }
+
   u64 tmp{};
   memcpy(&tmp, data, sizeof(tmp) > size ? size : sizeof(tmp));
   bool enabled = (tmp & 0x00800000) >> 20;
@@ -520,6 +538,11 @@ bool PCIBridge::Write(u64 address, const u8 *data, u64 size) {
 }
 
 bool PCIBridge::MemSet(u64 address, s32 data, u64 size) {
+  auto lease = lifetimeGuard.TryAcquire();
+  if (!lease) {
+    return false;
+  }
+
   u64 tmp{};
   memset(&tmp, data, sizeof(tmp) > size ? size : sizeof(tmp));
   bool enabled = (tmp & 0x00800000) >> 20;
@@ -703,6 +726,12 @@ u32 DeviceNumberToHash(u32 deviceNumber, u32 funcNumber) {
 }
 
 bool PCIBridge::ConfigRead(u64 address, u8 *data, u64 size) {
+  auto lease = lifetimeGuard.TryAcquire();
+  if (!lease) {
+    memset(data, 0xFF, size);
+    return false;
+  }
+
   PCIE_CONFIG_ADDR configAddress = { static_cast<u32>(address) };
   if (configAddress.busNumber == 0 && configAddress.deviceNumber == 0) {
     // Reading from our own config space!
@@ -736,6 +765,11 @@ bool PCIBridge::ConfigRead(u64 address, u8 *data, u64 size) {
 }
 
 bool PCIBridge::ConfigWrite(u64 address, const u8 *data, u64 size) {
+  auto lease = lifetimeGuard.TryAcquire();
+  if (!lease) {
+    return false;
+  }
+
   PCIE_CONFIG_ADDR configAddress = { static_cast<u32>(address) };
   if (configAddress.busNumber == 0 && configAddress.deviceNumber == 0) {
     // Writing to our own config space!

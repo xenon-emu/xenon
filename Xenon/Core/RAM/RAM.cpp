@@ -22,16 +22,25 @@ RAM::RAM(u64 startAddress, u64 size, bool isSOCDevice)
 }
 
 RAM::~RAM() {
+  if (!RetireAndWait()) {
+    LOG_CRITICAL(System, "[RAM]: Timed out waiting for in-flight accesses to drain during destruction!");
+  }
   ramData.reset();
 }
 
 void RAM::Reset() {
+  if (!RetireAndWait()) {
+    LOG_CRITICAL(System, "[RAM]: Timed out waiting for in-flight accesses to drain before reset!");
+  }
+
   if (!ramData.get()) {
     ramData = std::make_unique<STRIP_UNIQUE_ARR(ramData)>(ramSize);
     memset(ramData.get(), 0xCD, ramSize);
   } else {
     memset(ramData.get(), 0xCD, ramSize);
   }
+
+  Reopen();
 }
 
 u64 RAM::ParseRamSize(std::string size) {
@@ -114,13 +123,24 @@ u64 RAM::ParseRamSize(std::string size) {
 }
 
 void RAM::Resize(u64 size) {
+  if (!RetireAndWait()) {
+    LOG_CRITICAL(System, "[RAM]: Timed out waiting for in-flight accesses to drain before resize!");
+  }
+
   ramSize = size;
   if (!ramData.get()) {
     ramData = std::make_unique<STRIP_UNIQUE_ARR(ramData)>(ramSize);
   }
+
+  Reopen();
 }
 
 void RAM::Read(u64 address, u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    memset(data, 0xFF, size);
+    return;
+  }
   const u64 offset = static_cast<u32>(address - RAM_START_ADDR);
   memcpy(data, ramData.get() + offset, size);
   if (false)
@@ -128,6 +148,10 @@ void RAM::Read(u64 address, u8 *data, u64 size) {
 }
 
 void RAM::Write(u64 address, const u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
   const u32 offset = static_cast<u32>(address - RAM_START_ADDR);
   memcpy(ramData.get() + offset, data, size);
   if (false)
@@ -135,6 +159,10 @@ void RAM::Write(u64 address, const u8 *data, u64 size) {
 }
 
 void RAM::MemSet(u64 address, s32 data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
   const u32 offset = static_cast<u32>(address - RAM_START_ADDR);
   memset(ramData.get() + offset, data, size);
   if (false)

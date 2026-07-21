@@ -4,6 +4,8 @@
 
 #pragma once
 
+#include "Base/LifetimeGuard.h"
+
 #include "Core/PCI/PCIe.h"
 
 #include "Core/PCI/Bridge/PCIBridge.h"
@@ -71,13 +73,25 @@ public:
   std::weak_ptr<Xe::Xenos::XGPU> GetXGPU() {
     return xGPU;
   }
+
+  // Acquire a lease guarding this bridge against concurrent teardown. See
+  // Base::LifetimeGuard for the contract.
+  Base::LifetimeGuard::Lease GetLease() {
+    return lifetimeGuard.TryAcquire();
+  }
 private:
   // Pointer to the registered PCI Bridge
   std::shared_ptr<PCIBridge> pciBridge{};
   // Pointer to the registered XCGPU
   std::shared_ptr<Xe::Xenos::XGPU> xGPU{};
 
-  // Access mutex
+  // Guards against destruction racing an in-flight Read/Write/ConfigRead/
+  // ConfigWrite from another thread.
+  Base::LifetimeGuard lifetimeGuard{};
+
+  // Access mutex. Only guards RegisterXGPU/RegisterPCIBridge mutation of
+  // the shared_ptr members now; the dispatch entry points use the lease
+  // above instead of holding this for their whole body.
   std::mutex mutex{};
 
   // Helpers
