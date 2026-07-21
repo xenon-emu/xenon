@@ -16,8 +16,11 @@
 #include "Arch.h"
 
 // Vali0004: Helper macro to make me sane when doing RAII
-#define STRIP_UNIQUE(x) std::remove_pointer_t<decltype(x.get())>
-#define STRIP_UNIQUE_ARR(x) std::remove_pointer_t<decltype(x.get())>[]
+#define STRIP_UNIQUE(x) std::type_identity_t<std::remove_pointer_t<decltype((x).get())>>
+#define STRIP_WEAK(x) STRIP_UNIQUE(x.lock())
+
+#define STRIP_UNIQUE_ARR(x) std::type_identity_t<std::remove_pointer_t<decltype((x).get())>>[]
+#define STRIP_WEAK_ARR(x) STRIP_UNIQUE_ARR(x.lock())
 
 // Compile time macros to get endianess
 #ifdef _MSC_VER

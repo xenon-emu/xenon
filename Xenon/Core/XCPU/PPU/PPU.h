@@ -1,5 +1,5 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #pragma once
@@ -12,6 +12,7 @@
 #include "Core/XCPU/MMU/XenonMMU.h"
 
 class PPU_JIT;
+namespace Xe::XCPU::JIT { class PPCTranslator; }
 
 // Describes the execution backends available for the PPU.
 enum class eExecutorMode : u8 {
@@ -91,6 +92,8 @@ public:
   sPPEState *GetPPUState() { return ppeState.get(); }
   // Get ppuJIT
   PPU_JIT *GetPPUJIT() { return ppuJIT.get(); }
+  // Get CPU Context
+  Xe::XCPU::XenonContext *GetCPUContext() { return xenonContext; }
 
   // Updates the current PPU's time base and decrementer based on
   // the amount of tb ticks given.
@@ -111,7 +114,7 @@ private:
   std::atomic<eThreadState> ppuThreadState = eThreadState::None;
 
   // Thread active?
-  volatile bool ppuThreadActive = true;
+  std::atomic<bool> ppuThreadActive = true;
 
   // Thread resetting?
   volatile bool ppuThreadResetting = false;
@@ -145,22 +148,22 @@ private:
   //
 
   // Process Synchronous exceptions
-  void PPUProcessSyncExceptions(sPPEState* ppeState);
+  void PPUProcessSyncExceptions(sPPEState *ppeState);
 
   // Process Asynchronous exceptions
-  void PPUProcessAsyncExceptions(sPPEState* ppeState);
+  void PPUProcessAsyncExceptions(sPPEState *ppeState);
 
-  void PPUSystemResetException(sPPEState* ppeState);
-  void PPUInstStorageException(sPPEState* ppeState);
-  void PPUDataStorageException(sPPEState* ppeState);
-  void PPUDataSegmentException(sPPEState* ppeState);
-  void PPUInstSegmentException(sPPEState* ppeState);
-  void PPUSystemCallException(sPPEState* ppeState);
-  void PPUDecrementerException(sPPEState* ppeState);
-  void PPUProgramException(sPPEState* ppeState);
-  void PPUExternalException(sPPEState* ppeState);
-  void PPUFPUnavailableException(sPPEState* ppeState);
-  void PPUVXUnavailableException(sPPEState* ppeState);
+  void PPUSystemResetException(sPPEState *ppeState);
+  void PPUInstStorageException(sPPEState *ppeState);
+  void PPUDataStorageException(sPPEState *ppeState);
+  void PPUDataSegmentException(sPPEState *ppeState);
+  void PPUInstSegmentException(sPPEState *ppeState);
+  void PPUSystemCallException(sPPEState *ppeState);
+  void PPUDecrementerException(sPPEState *ppeState);
+  void PPUProgramException(sPPEState *ppeState);
+  void PPUExternalException(sPPEState *ppeState);
+  void PPUFPUnavailableException(sPPEState *ppeState);
+  void PPUVXUnavailableException(sPPEState *ppeState);
 
   //
   // JIT
@@ -168,13 +171,14 @@ private:
 
   std::unique_ptr<PPU_JIT> ppuJIT;
   friend class PPU_JIT;
+  friend class Xe::XCPU::JIT::PPCTranslator;
   // Function call epilogue.
   friend bool InstrEpilogue(PPU *ppu, sPPEState *ppeState);
 
   //
   // Helpers
   //
- 
+
   // Returns the number of instructions per second the current
   // host computer can process.
   u32 GetIPS();
@@ -192,7 +196,7 @@ private:
   //
   // Testing Utilities
   //
-  
+
   // Runs instruction tests on the desired backend.
-  bool RunInstructionTests(sPPEState* ppeState, PPU_JIT* ppuJITPtr, ePPUTestingMode testMode);
+  bool RunInstructionTests(sPPEState *ppeState, PPU_JIT* ppuJITPtr, ePPUTestingMode testMode);
 };

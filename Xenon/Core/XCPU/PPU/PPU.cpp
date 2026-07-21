@@ -8,6 +8,10 @@
 #include <chrono>
 #include <thread>
 
+#include <cryptopp/arc4.h>
+#include <cryptopp/hmac.h>
+#include <cryptopp/sha.h>
+
 #include "Core/XeMain.h"
 #include "Base/Config.h"
 #include "Base/Thread.h"
@@ -122,8 +126,8 @@ PPU::PPU(Xe::XCPU::XenonContext *inXenonContext, u64 resetVector, u32 PIR) :
 }
 PPU::~PPU() {
   // Signal we're quitting
-  ppuThreadState.store(eThreadState::Quiting);
-  ppuThreadActive = false;
+  ppuThreadState.store(eThreadState::Quiting, std::memory_order_release);
+  ppuThreadActive.store(false, std::memory_order_release);
   // Kill the thread
   if (ppuThread.joinable())
     ppuThread.join();
@@ -140,8 +144,7 @@ void PPU::StartExecution(bool setHRMOR) {
     // thus destroying the stack
     ppuThreadPreviousState.store(ppeState->ppuID == 0 ? eThreadState::Running : eThreadState::Sleeping);
     LOG_DEBUG(Xenon, "{} was set to be halted, setting previous state to {}", ppeState->ppuName, ppeState->ppuID == 0 ? "Running" : "Sleeping");
-  }
-  else {
+  } else {
     LOG_DEBUG(Xenon, "{} setting to {}", ppeState->ppuName, ppeState->ppuID == 0 ? "Running" : "Sleeping");
     ppuThreadState.store(ppeState->ppuID == 0 ? eThreadState::Running : eThreadState::Sleeping);
     ppuThreadPreviousState.store(ppuThreadState);
@@ -172,6 +175,7 @@ void PPU::StartExecution(bool setHRMOR) {
     if (Config::xcpu.simulate1BL) { Simulate1Bl(); }
   }
 
+  ppuThreadActive.store(true, std::memory_order_release);
   ppuThread = std::thread(&PPU::ThreadLoop, this);
 }
 
@@ -189,6 +193,7 @@ void PPU::Halt(u64 haltOn, bool requestedByGuest, s8 ppuId, ePPUThreadID threadI
     LOG_DEBUG(Xenon, "Halting PPU{} on address 0x{:X}", ppeState->ppuID, haltOn);
     ppuHaltOn = haltOn;
   }
+  LOG_INFO(Xenon, "Halting PPU{}", ppeState->ppuID);
   guestHalt = requestedByGuest;
 #ifndef NO_GFX
   if (guestHalt && XeMain::renderer) {
@@ -199,6 +204,7 @@ void PPU::Halt(u64 haltOn, bool requestedByGuest, s8 ppuId, ePPUThreadID threadI
     ppuThreadPreviousState.store(ppuThreadState.load());
   ppuThreadState.store(eThreadState::Halted);
 }
+
 void PPU::Continue() {
   if (ppuThreadState.load() == eThreadState::Running)
     return;
@@ -208,6 +214,7 @@ void PPU::Continue() {
   ppuThreadPreviousState.store(eThreadState::None);
   guestHalt = false;
 }
+
 void PPU::ContinueFromException() {
   if (ppuThreadState.load() == eThreadState::Running)
     return;
@@ -222,6 +229,7 @@ void PPU::ContinueFromException() {
   ppuThreadPreviousState.store(eThreadState::None);
   guestHalt = false;
 }
+
 void PPU::Step(int amount) {
   if (ppuThreadState.load() == eThreadState::Running)
     return;
@@ -234,10 +242,15 @@ void PPU::Step(int amount) {
 void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
   // Start Profile
   MICROPROFILE_SCOPEI("[Xe::PPU]", "PPURunInstructions", MP_AUTO);
-  for (size_t instrCount = 0; instrCount < numInstrs && ppuThreadActive; ++instrCount) {
+  for (size_t instrCount = 0; instrCount < numInstrs && ppuThreadActive.load(std::memory_order_acquire); ++instrCount) {
     // Halt if needed before executing the next instruction
     if (enableHalt && ppuHaltOn == curThread.NIA) {
       Halt();
+    }
+
+    if (!XeRunning.load(std::memory_order_acquire) ||  ppuThreadState.load() == eThreadState::Quiting) {
+      ppuThreadActive.store(false, std::memory_order_release);
+      break;
     }
 
     // Read next instruction
@@ -275,8 +288,6 @@ void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
 
 // PPU Thread state machine, handles all execution and codeflow
 void PPU::ThreadStateMachine() {
-  // Check if we should exit or not
-  ppuThreadActive = ppuThreadState.load() != eThreadState::None;
   // Signal a reset if needed
   if (ppuThreadResetting) {
     ppuThreadState.store(eThreadState::Resetting);
@@ -303,18 +314,16 @@ void PPU::ThreadStateMachine() {
       if (!ppuThreadResetting && (state & ePPUThreadBit_Zero)) {
         // Thread 1 is running, process instructions until we reach TTR timeout.
         curThreadId = ePPUThread_Zero;
-        ppuJIT->ExecuteJITInstrs(ppeState->SPR.TTR.hexValue, ppuThreadActive, ppuHaltOn != 0);
+        ppuJIT->ExecuteJITInstrs(ppeState->SPR.TTR.hexValue, ppuHaltOn != 0);
       }
       if (!ppuThreadResetting && (state & ePPUThreadBit_One)) {
         // Thread 1 is running, process instructions until we reach TTR timeout.
         curThreadId = ePPUThread_One;
-        ppuJIT->ExecuteJITInstrs(ppeState->SPR.TTR.hexValue, ppuThreadActive, ppuHaltOn != 0);
+        ppuJIT->ExecuteJITInstrs(ppeState->SPR.TTR.hexValue, ppuHaltOn != 0);
       }
     }
   } break;
   case eThreadState::Halted: {
-    // Check if we should exit or not
-    ppuThreadActive = ppuThreadState.load() != eThreadState::None;
     // Handle stepping
     u8 state = GetCurrentRunningThreads();
     if (currentExecMode == eExecutorMode::Interpreter) {
@@ -336,14 +345,14 @@ void PPU::ThreadStateMachine() {
       if (state & ePPUThreadBit_Zero) {
         curThreadId = ePPUThread_Zero;
         if (ppuStepAmount > 0) {
-          ppuJIT->ExecuteJITInstrs(ppuStepAmount, ppuThreadActive, false);
+          ppuJIT->ExecuteJITInstrs(ppuStepAmount, false);
           ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
         }
       }
       if (state & ePPUThreadBit_One) {
         curThreadId = ePPUThread_One;
         if (ppuStepAmount > 0) {
-          ppuJIT->ExecuteJITInstrs(ppuStepAmount, ppuThreadActive, false);
+          ppuJIT->ExecuteJITInstrs(ppuStepAmount, false);
           ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
         }
       }
@@ -363,34 +372,36 @@ void PPU::ThreadStateMachine() {
       LOG_INFO(Xenon, "A PPU is in the middle of resetting!");
     ppuThreadState.store(eThreadState::None);
   } break;
+  //case eThreadState::None:
   case eThreadState::Quiting: {
-    ppuThreadState.store(eThreadState::None);
-  } break;
+    ppuThreadActive.store(false, std::memory_order_release);
+    return;
+  }
   default: {
 
   } break;
   }
 }
 void PPU::ThreadLoop() {
-  // Set thread name
-  if (ppeState.get())
+  if (ppeState)
     Base::SetCurrentThreadName("[Xe] " + ppeState->ppuName);
-  while (ppuThreadActive) {
-    // Start Profile
-    MICROPROFILE_SCOPEI("[Xe::PPU]", "ThreadLoop", MP_AUTO);
-    // Run state machine
-    ThreadStateMachine();
 
-    // If our thread is not active while running, abort early.
-    // We are likely destroying the handle
-    if (!ppuThreadActive)
+  while (true) {
+    auto state = ppuThreadState.load(std::memory_order_acquire);
+    if (!ppuThreadActive.load(std::memory_order_acquire) ||
+        !XeRunning.load(std::memory_order_acquire) ||
+        state == eThreadState::Quiting ||
+        state == eThreadState::None) {
       break;
+    }
+
+    ThreadStateMachine();
 
     if (PPUCheckInterrupts())
       continue;
   }
-  // Thread is done executing, just tell it to exit
-  ppuThreadActive = false;
+
+  ppuThreadActive.store(false, std::memory_order_release);
 }
 
 // Returns a pointer to the specified thread.
@@ -429,7 +440,7 @@ u32 PPU::GetIPS() {
   // Execute the amount of cycles we're requested
   while (auto timerEnd = std::chrono::steady_clock::now() <= timerStart + 1s) {
     if (currentExecMode != eExecutorMode::Interpreter) {
-      ppuJIT->ExecuteJITInstrs(4, ppuThreadActive);
+      ppuJIT->ExecuteJITInstrs(4);
       instrCount += 4;
       continue;
     } else {
@@ -846,6 +857,21 @@ u8 PPU::GetCurrentRunningThreads() {
   return (ctrlTE & 0b01) * ePPUThreadBit_One | (ctrlTE & 0b10) / 2 * ePPUThreadBit_Zero;
 }
 
+//
+// 1BL simulation helpers
+//
+
+static void hmacSha1(const u8 *key, u32 keySize, const u8 *data, u32 dataSize, u8 out[20]) {
+  CryptoPP::HMAC<CryptoPP::SHA1> hmac(reinterpret_cast<const CryptoPP::byte*>(key), keySize);
+  hmac.CalculateDigest( reinterpret_cast<CryptoPP::byte*>(out),
+    reinterpret_cast<const CryptoPP::byte*>(data), dataSize);
+}
+
+static void rc4ProcessData(const u8 *key, u32 keySize, const u8 *in, u8 *out, u32 size) {
+  CryptoPP::Weak::ARC4::Decryption rc4( reinterpret_cast<const CryptoPP::byte*>(key), keySize);
+  rc4.ProcessData( reinterpret_cast<CryptoPP::byte*>(out), reinterpret_cast<const CryptoPP::byte*>(in), size);
+}
+
 // Does a mostly complete simulation of the 1Bl inside the SROM.
 // This piece of code, in a nutshell does the following:
 // * Trains the CPU's FSB TX and RX lines.
@@ -857,20 +883,38 @@ u8 PPU::GetCurrentRunningThreads() {
 // * RC4 decrypts CB and verifies it.
 // * Sets up some states and registers and jumps to CB in the Secure ROM.
 bool PPU::Simulate1Bl() {
+  // Helper to read the flash without touching the spare data
+  const auto readNAND = [&](u32 logicalAddr, u8* dest, u32 size) {
+    while (size > 0) {
+      const u32 pageOff = logicalAddr % 0x200;
+      // Get the remaining size if this chunk is smaller than a full 512 byte page 
+      const u32 avail = 0x200 - pageOff;
+      // Calculate the chunk
+      const u32 chunk = (size < avail) ? size : avail;
+      // Read the flash contents 512 bytes at once avoiding spare data
+      PPCInterpreter::MMURead(xenonContext, ppeState.get(), static_cast<u64>(NAND_MEMORY_MAPPED_ADDR) + logicalAddr,
+        chunk, dest);
+      // Update state
+      logicalAddr += chunk;
+      dest += chunk;
+      size -= chunk;
+    }
+    };
+
   LOG_INFO(Xenon, "1BL Simulation started:");
-  // Since we dont actually have a FSB to make use of (nor we need one ofc) we can simply bypass this.
-  
+
   // Zero out Secure RAM:
   LOG_INFO(Xenon, " * Zeroing SRAM.");
-  PPCInterpreter::MMUMemSet(ppeState.get(), 0x10000, 0, 0x10000);
+  memset(xenonContext->SRAM.get(), 0, XE_SRAM_SIZE);
 
   // Verify CB's offset in NAND and fetch its header contents.
   // CB's offset should be stored in the NAND header at location 0x8.
   u32 cbOffset = PPCInterpreter::MMURead32(ppeState.get(), NAND_MEMORY_MAPPED_ADDR + 8);
-  
-  // Verification is nothing but a mere address alignment and a not zero check.
-  if (cbOffset == 0) {
-    LOG_CRITICAL(Xenos, "CB Offset verification failed, returned address is {:#x}.", cbOffset);
+  LOG_INFO(Xenon, " * CB offset from NAND: {:#x}.", cbOffset);
+
+  // Alignment and range verification (mirrors CB_VerifyOffset)
+  if (cbOffset == 0 || (cbOffset & 0xF) != 0 || cbOffset > 0x8000000) {
+    LOG_CRITICAL(Xenon, "1BL: CB offset verification failed ({:#x}). PANIC 0x94.", cbOffset);
     return false;
   }
 
@@ -878,23 +922,122 @@ bool PPU::Simulate1Bl() {
   Xe::PCIDev::BL_HEADER cbHeader = {};
   PPCInterpreter::MMURead(xenonContext, ppeState.get(), NAND_MEMORY_MAPPED_ADDR + cbOffset, 16, reinterpret_cast<u8*>(&cbHeader));
 
-  // Byteswap header data.
+  LOG_INFO(Xenon, " * Fetching CB header from NAND.");
+  
+  // Read the entire CB header into SRAM
+  readNAND(cbOffset, xenonContext->SRAM.get(), 0x140);
+
+  // Get a ptr to the CB key
+  const u8* cbKey = xenonContext->SRAM.get() + 0x10;
+
+  // Swap header data
   cbHeader.entryPoint = byteswap_be(cbHeader.entryPoint);
   cbHeader.length = byteswap_be(cbHeader.length);
 
-  LOG_INFO(Xenon, " * Found CB Header at offset {:#x}, entry point {:#x}, size {:#x}.", cbOffset, cbHeader.entryPoint,
-    cbHeader.length);
+  // Calculate next bootloader offset
+  const u32 nextStageAddress = cbOffset + cbHeader.length;
 
-  // Copy CB data from NAND.
-  LOG_INFO(Xenon, " * Fetching CB data.");
-  std::vector<u8> cbData;
-  for (size_t idx = 0; idx < cbHeader.length; idx++) {
-    cbData.push_back(PPCInterpreter::MMURead8(ppeState.get(), NAND_MEMORY_MAPPED_ADDR + cbOffset + idx));
+  LOG_INFO(Xenon, " * CB header: Magic = {:#06x}, Entry Point = {:#010x}, Size = {:#010x}.", 0, cbHeader.entryPoint, cbHeader.length);
+
+  // Verify CB header fields
+  const u32 cbSizeAligned = (cbHeader.length + 0xF) & 0xFFFFFFF0;
+
+  if (cbHeader.name[0] != 'C' || cbHeader.name[1] != 'B') {
+    LOG_CRITICAL(Xenon, "1BL: CB magic mismatch, magic must be 'CB' [0x4342]. PANIC 0x95.");
+    return false;
+  }
+  if (cbHeader.entryPoint & 0x3) {
+    LOG_CRITICAL(Xenon, "1BL: CB entry point not 4-byte aligned ({:#x}). PANIC 0x95.", cbHeader.entryPoint);
+    return false;
+  }
+  if (cbHeader.entryPoint < 0x264 || cbHeader.entryPoint >= cbHeader.length) {
+    LOG_CRITICAL(Xenon, "1BL: CB entry point {:#x} out of range (size={:#x}). PANIC 0x95.", cbHeader.entryPoint, cbHeader.length);
+    return false;
+  }
+  if ((cbHeader.length - 0x264) > 0xBD9C) {
+    LOG_CRITICAL(Xenon, "1BL: CB size {:#x} out of range. PANIC 0x95.", cbHeader.length);
+    return false;
+  }
+  if (cbSizeAligned >= XE_SRAM_SIZE) {
+    LOG_CRITICAL(Xenon, "1BL: CB aligned size {:#x} exceeds SRAM capacity. PANIC 0x95.", cbSizeAligned);
+    return false;
   }
 
-  // Initialize HMAC key.
+  // Copy the rest of the CB body from NAND to SRAM
+  LOG_INFO(Xenon, " * Copying CB body from NAND to SRAM ({:#x} bytes total).", cbSizeAligned);
+  const u32 bodyLen = cbSizeAligned - 0x140;
+  std::vector<u8> bodyBuf(bodyLen);
+  readNAND(cbOffset + 0x140, bodyBuf.data(), bodyLen);
+  memcpy(xenonContext->SRAM.get() + 0x140, bodyBuf.data(), bodyLen);
 
-  // All good.
+  // Derive RC4 key
+  // The public 1BL RC4 key used on all retail Xbox 360 consoles
+  static const u8 blKey[0x10] = { 0xDD, 0x88, 0xAD, 0x0C, 0x9E, 0xD6, 0x69, 0xE7, 0xB5, 0x67, 0x94, 0xFB, 0x68, 
+    0x56, 0x3E, 0xFA };
+
+  LOG_INFO(Xenon, " * Deriving CB decryption key via HMAC-SHA1.");
+
+  u8 derivedKey[20] = {};
+  hmacSha1(blKey, 0x10, cbKey, 0x10, derivedKey);
+  // Write derived key back into SRAM key slot (offset 0x10, only first 0x10 bytes used)
+  memcpy(xenonContext->SRAM.get() + 0x10, derivedKey, 0x10);
+
+  // POST 0x1B — RC4 decrypt CB body (everything from SRAM+0x20 onward, skipping 0x10 header + 0x10 key)
+  LOG_INFO(Xenon, " * RC4 decrypting CB body ({:#x} bytes).", cbSizeAligned - 0x20);
+  const u32 decLen = cbSizeAligned - 0x20;
+  std::vector<u8> plain(decLen);
+  rc4ProcessData(derivedKey, 0x10, xenonContext->SRAM.get() + 0x20, plain.data(), decLen);
+  memcpy(xenonContext->SRAM.get() + 0x20, plain.data(), decLen);
+
+  // POST 0x1E — set execution state and redirect to CB entry point within SRAM
+  // CB_Jump zeros r0-r26, sets up TLB mapping, then branches into the decrypted CB.
+  const u64 cbSRAMEntry = 0x2000000 + cbHeader.entryPoint;
+  LOG_INFO(Xenon, " * Done, CB entry point {:#x}", static_cast<u64>(cbSRAMEntry));
+
+  auto &thread = ppeState->ppuThread[ePPUThread_Zero];
+
+  // Clear everything inside SRAM
+  memset(xenonContext->SRAM.get() + 0x20, 0, 0x140 - 0x20);
+  memset(xenonContext->SRAM.get() + cbSizeAligned, 0, XE_SRAM_SIZE - cbSizeAligned);
+
+  // Set NIA to CB entry
+  thread.NIA = cbSRAMEntry;
+
+  // Setup TLB, SLB, MSR, and other state
+  // These are per dump of a retail Jasper 1BL
+  for (u32 i = 0; i <= 30; i++) { thread.GPR[i] = 0; }
+
+  // GPR 31 contains the next bootloader's Flash offset
+  thread.GPR[31] = nextStageAddress;
+
+  // MSR
+  thread.SPR.MSR.hexValue = 0x9000000000000020;
+
+  // SLB
+  thread.SLB[0].V = 1;
+  thread.SLB[0].L = 1;
+  thread.SLB[0].vsidReg = 0x100;
+  thread.SLB[0].esidReg = 0x8000000;
+
+  // Shared SPR's
+  ppeState->SPR.LPCR.hexValue = 0x402;
+  ppeState->SPR.TSCR.hexValue = 0x100000;
+  ppeState->SPR.TTR.hexValue = 0x4000;
+  ppeState->SPR.HID1.hexValue = 0x100000000000;
+  ppeState->SPR.HID6.hexValue = 0x1803800000000;
+
+  // TLB
+  ppeState->TLB.classes[0x20].ways[0].V = 1;
+  ppeState->TLB.classes[0x20].ways[0].L = 1;
+  ppeState->TLB.classes[0x20].ways[0].p = 0x10;
+  ppeState->TLB.classes[0x20].ways[0].pageMask = 0xffff;
+  ppeState->TLB.classes[0x20].ways[0].RPN = 0x20000010000;
+  ppeState->TLB.classes[0x20].ways[0].VPN = 0x2000000;
+  ppeState->TLB.classes[0x20].ways[0].pte0 = 0x205;
+  ppeState->TLB.classes[0x20].ways[0].pte1 = 0x200000101b3;
+
+
+  LOG_INFO(Xenon, "1BL Simulation complete. Jumping to CB.");
   return true;
 }
 
@@ -956,7 +1099,7 @@ bool PPU::Simulate1Bl() {
 // For convenience, we will flag them sepparately and process them acordingly.
 
 // Process Synchronous exceptions
-void PPU::PPUProcessSyncExceptions(sPPEState* ppeState) {
+void PPU::PPUProcessSyncExceptions(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
 
   // If we are here, it means that exceptions were detected. 
@@ -1057,7 +1200,7 @@ void PPU::PPUProcessSyncExceptions(sPPEState* ppeState) {
 }
 
 // Process Asynchronous exceptions
-void PPU::PPUProcessAsyncExceptions(sPPEState* ppeState) {
+void PPU::PPUProcessAsyncExceptions(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
 
   // NOTE: Already arranged by order of execution.
@@ -1128,7 +1271,7 @@ void PPU::PPUProcessAsyncExceptions(sPPEState* ppeState) {
 // Format: Exception name (Reset Vector)
 
 // System reset Exception (0x100)
-void PPU::PPUSystemResetException(sPPEState* ppeState) {
+void PPU::PPUSystemResetException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_INFO(Xenon, "[{}](Thrd{:#d}): System Reset exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.NIA;
@@ -1139,7 +1282,7 @@ void PPU::PPUSystemResetException(sPPEState* ppeState) {
 }
 
 // Data Storage Exception (0x300)
-void PPU::PPUDataStorageException(sPPEState* ppeState) {
+void PPU::PPUDataStorageException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Data Storage exception. EA: 0x{:X}.", ppeState->ppuName, static_cast<s8>(curThreadId), thread.SPR.DAR);
   thread.SPR.SRR0 = thread.CIA;
@@ -1150,7 +1293,7 @@ void PPU::PPUDataStorageException(sPPEState* ppeState) {
 }
 
 // Data Segment Exception (0x380)
-void PPU::PPUDataSegmentException(sPPEState* ppeState) {
+void PPU::PPUDataSegmentException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Data Segment exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA;
@@ -1161,7 +1304,7 @@ void PPU::PPUDataSegmentException(sPPEState* ppeState) {
 }
 
 // Instruction Storage Exception (0x400)
-void PPU::PPUInstStorageException(sPPEState* ppeState) {
+void PPU::PPUInstStorageException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Instruction Storage exception. EA = 0x{:X}", ppeState->ppuName, static_cast<s8>(curThreadId), thread.CIA);
   thread.SPR.SRR0 = thread.CIA;
@@ -1173,7 +1316,7 @@ void PPU::PPUInstStorageException(sPPEState* ppeState) {
 }
 
 // Instruction Segment Exception (0x480)
-void PPU::PPUInstSegmentException(sPPEState* ppeState) {
+void PPU::PPUInstSegmentException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Instruction Segment exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA;
@@ -1184,7 +1327,7 @@ void PPU::PPUInstSegmentException(sPPEState* ppeState) {
 }
 
 // External Exception (0x500)
-void PPU::PPUExternalException(sPPEState* ppeState) {
+void PPU::PPUExternalException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): External exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.NIA;
@@ -1195,7 +1338,7 @@ void PPU::PPUExternalException(sPPEState* ppeState) {
 }
 
 // Program Exception (0x700)
-void PPU::PPUProgramException(sPPEState* ppeState) {
+void PPU::PPUProgramException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Program exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA;
@@ -1207,7 +1350,7 @@ void PPU::PPUProgramException(sPPEState* ppeState) {
 }
 
 // FP Unavailable Exception (0x800)
-void PPU::PPUFPUnavailableException(sPPEState* ppeState) {
+void PPU::PPUFPUnavailableException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): FPU exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA;
@@ -1218,7 +1361,7 @@ void PPU::PPUFPUnavailableException(sPPEState* ppeState) {
 }
 
 // Decrementer Exception (0x900)
-void PPU::PPUDecrementerException(sPPEState* ppeState) {
+void PPU::PPUDecrementerException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): Decrementer exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.NIA;
@@ -1229,7 +1372,7 @@ void PPU::PPUDecrementerException(sPPEState* ppeState) {
 }
 
 // System Call Exception (0xC00)
-void PPU::PPUSystemCallException(sPPEState* ppeState) {
+void PPU::PPUSystemCallException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): System Call exception. Syscall ID: 0x{:X}", ppeState->ppuName, static_cast<s8>(curThreadId), GPR(0));
   thread.SPR.SRR0 = thread.NIA;
@@ -1240,7 +1383,7 @@ void PPU::PPUSystemCallException(sPPEState* ppeState) {
 }
 
 // VX Unavailable Exception (0xF20)
-void PPU::PPUVXUnavailableException(sPPEState* ppeState) {
+void PPU::PPUVXUnavailableException(sPPEState *ppeState) {
   sPPUThread& thread = curThread;
   LOG_TRACE(Xenon, "[{}](Thrd{:#d}): VXU exception.", ppeState->ppuName, static_cast<s8>(curThreadId));
   thread.SPR.SRR0 = thread.CIA; // See Cell Vector SIMD PEM, page 104, table 5.4.

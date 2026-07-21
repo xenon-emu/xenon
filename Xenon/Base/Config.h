@@ -165,7 +165,7 @@ inline struct _xcpu {
   u64 HW_INIT_SKIP_1 = 0;
   u64 HW_INIT_SKIP_2 = 0;
   // 1BL Simulation
-  bool simulate1BL = false;
+  bool simulate1BL = true;
   // Instruction tests execution
   bool runInstrTests = false;
   // Instruction tests mode
@@ -310,7 +310,7 @@ inline struct _network {
   bool verify_toml(toml::value &value);
 } network;
 
-void loadConfig(const fs::path &path);
-void saveConfig(const fs::path &path);
+void LoadConfig(const fs::path &path);
+void SaveConfig(const fs::path &path);
 
 } // namespace Config

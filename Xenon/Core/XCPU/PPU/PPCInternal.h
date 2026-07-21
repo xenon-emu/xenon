@@ -24,6 +24,25 @@ static constexpr u32 ExtractBits(u32 input, u32 begin, u32 end) {
   return (input >> (32 - 1 - end)) & ((1 << (end - begin + 1)) - 1);
 }
 
+constexpr s64 SignExtend16(u32 v) {
+  return (s64)((s16)v);
+}
+
+constexpr s64 SignExtend26(u32 v) {
+  return (s64)(v & 0x02000000 ? (s32)v | 0xFC000000 : (s32)(v));
+}
+
+constexpr u64 ZeroExtend16(u32 v) {
+  return (u64)((u16)v);
+}
+
+static inline u64 CreateMask(u32 mstart, u32 mstop) {
+  mstart &= 0x3F;
+  mstop &= 0x3F;
+  u64 value = (UINT64_MAX >> mstart) ^ ((mstop >= 63) ? 0 : UINT64_MAX >> (mstop + 1));
+  return mstart <= mstop ? value : ~value;
+}
+
 #define QMASK(b, e) ((0xFFFFFFFFFFFFFFFF << ((63 + (b)) - (e))) >> (b))
 #define QGET(qw, b, e) ((static_cast<u64>(qw) & QMASK((b), (e))) >> (63 - (e)))
 #define QSET(qw, b, e, qwSet)                                                  \
@@ -87,3 +106,86 @@ static constexpr u32 ExtractBits(u32 input, u32 begin, u32 end) {
 #define VMX128_R_VD128 (_instr.VMX128_R.VD128l | (_instr.VMX128_R.VD128h << 5))
 #define VMX128_R_VA128 (_instr.VMX128_R.VA128l | (_instr.VMX128_R.VA128h << 5) | (_instr.VMX128_R.VA128H << 6))
 #define VMX128_R_VB128 (_instr.VMX128_R.VB128l | (_instr.VMX128_R.VB128h << 5))
+
+// Pre-computed comparison masks for each page size.
+// These are used for VPN comparison during TLB lookup.
+static constexpr u64 TLB_COMPARE_MASK_4KB =   0xFFFFFFFFFFF00000ULL; // VA[0:59]
+static constexpr u64 TLB_COMPARE_MASK_64KB =  0xFFFFFFFFFF000000ULL; // VA[0:55]
+static constexpr u64 TLB_COMPARE_MASK_16MB =  0xFFFFFFFF00000000ULL; // VA[0:47]
+
+//
+// Xbox 360 Memory map, info taken from various sources.
+//
+
+// Everything can fit on 32 bits on the 360, so MS uses upper bits of the 64 bit
+// EA to manage L2 cache, further research required on this.
+
+// 0x200 00000000 - 0x200 00008000                  32K SROM - 1BL Location.
+// 0x200 00010000 - 0x200 00020000                  64K SRAM.
+// 0x200 00050000 - 0x200 00056000                  Interrupt controller.
+// 0x200 C8000000 - 0x200 C9000000                  NAND Flash 1:1
+// 0x200 C9000000 - 0x200 CA000000                  Currently unknown, I
+// suspect that maybe it is additional space for 512 MB NAND Flash images.
+// 0x200 EA000000 - 0x200 EA010000                  PCI Bridge
+// 0x200 EC800000 - 0x200 EC810000                  GPU
+
+#define MMU_PAGE_SIZE_4KB 12
+#define MMU_PAGE_SIZE_64KB 16
+#define MMU_PAGE_SIZE_1MB 20
+#define MMU_PAGE_SIZE_16MB 24
+
+// The processor generated address (EA) is subdivided, upper 32 bits are used
+// as flags for the 'Security Engine'
+//
+// 0x00000X**_00000000 X = region, ** = key select
+// X = 0 should be Physical
+// X = 1 should be Hashed
+// X = 2 should be SoC
+// X = 3 should be Encrypted
+
+// 0x8000020000060000 Seems to be the random number generator. Implement this?
+
+/*
+ * Hash page table definitions
+ */
+
+#define PPC_SPR_SDR_64_HTABORG 0x0FFFFFFFFFFC0000ULL
+#define PPC_SPR_SDR_64_HTABSIZE 0x000000000000001FULL
+
+#define PPC_HPTES_PER_GROUP 8
+
+//
+// PTE 0.
+//
+
+// Page valid.
+#define PPC_HPTE64_VALID 0x0000000000000001ULL
+// Page Hash identifier.
+#define PPC_HPTE64_HASH 0x0000000000000002ULL
+// Page Large bit.
+#define PPC_HPTE64_LARGE 0x0000000000000004ULL
+// Page AVPN.
+#define PPC_HPTE64_AVPN 0x0001FFFFFFFFFF80ULL
+// Page AVPN [0:51]
+#define PPC_HPTE64_AVPN_0_51 0x0001FFFFFFFFF000ULL
+
+//
+// PTE 1.
+//
+
+// RPN when L = 0.
+#define PPC_HPTE64_RPN_NO_LP 0x000003FFFFFFF000UL
+// RPN when L = 1.
+#define PPC_HPTE64_RPN_LP 0x000003FFFFFFE000UL
+// Large Page Selector bit.
+#define PPC_HPTE64_LP 0x0000000000001000ULL
+// Bolted PTE.
+#define HPTE64_V_BOLTED 0x0000000000000010ULL
+// Changed bit.
+#define PPC_HPTE64_C 0x0000000000000080ULL
+// Referenced bit.
+#define PPC_HPTE64_R 0x0000000000000100ULL
+
+// DSISR Flags.
+#define DSISR_ISSTORE 0x02000000
+#define DSISR_NOPTE 0x40000000

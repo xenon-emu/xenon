@@ -29,7 +29,7 @@ namespace PPCInterpreter {
   public:
     static InstructionProfiler &Get() noexcept;
 
-    // Ahora acepta el nombre de la instrucción (string) en lugar de un índice de tabla.
+    // Accepts the instruction name (string) instead of a table index.
     void Increment(const std::string &instrName) noexcept;
 
     // Reset all counters.

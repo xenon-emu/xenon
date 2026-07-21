@@ -4,8 +4,11 @@
 
 #pragma once
 
+#include <atomic>
+#include <condition_variable>
+#include <functional>
 #include <mutex>
-#include <set>
+#include <thread>
 
 namespace Xe::XCPU {
 
@@ -220,25 +223,12 @@ namespace Xe::XCPU {
     u64 Reserved12[495]; // 28808
   } SOCINTS_BLOCK, * PSOCINTS_BLOCK;
 
-  // Structure representing an Interrupt Packet
-  struct sInterruptPacket {
-    u8 interruptType = prioNONE;
-    mutable bool acknowledged = false; // mutable to allow modification in set
-
-    // Highest priority comes first (lower interruptType value = higher priority)
-    // Secondary sort by acknowledged status: non-acknowledged before acknowledged
-    friend constexpr bool operator<(const sInterruptPacket& lhs, const sInterruptPacket& rhs) noexcept {
-      if (lhs.interruptType != rhs.interruptType) {
-        return lhs.interruptType < rhs.interruptType; // Lower value = higher priority = comes first
-      }
-      // Same interrupt type: non-acknowledged comes before acknowledged
-      return !lhs.acknowledged && rhs.acknowledged;
-    }
-  };
-
-  // Structure tracking the state of interrupts for each PPU Thread.
+  // Per-thread interrupt state using atomic bitmasks for lock-free operation.
+  // Interrupt vectors are in range [0x08, 0x7C] and always multiples of 4,
+  // so (vector >> 2) gives bit indices [2..31] which fits in a u32.
   struct sInterruptState {
-    std::multiset<sInterruptPacket> pendingInterrupts;
+    std::atomic<u32> pendingMask{ 0 };      // Bit set = interrupt pending (not yet ACK'd)
+    std::atomic<u32> acknowledgedMask{ 0 }; // Bit set = interrupt ACK'd (in-service, awaiting EOI)
   };
 
   class XenonIIC {
@@ -264,14 +254,17 @@ namespace Xe::XCPU {
     // Interrupt States for each PPU Thread
     sInterruptState interruptState[6] = {};
 
-    // Mutex for thread safety
-    std::recursive_mutex iicMutex;
+    // Mutex for socINTBlock Read/Write only.
+    std::mutex iicMutex;
 
-    // Erases the first element in the queue that has been ack'd.
+    // Removes the highest-priority ACK'd interrupt (EOI) for a given thread.
     void removeFirstACKdInterrupt(u8 threadID);
 
-    // Reads out the first element that has not been ACk'd and marks it as ack'd.
+    // Acknowledges the highest-priority deliverable interrupt for a given thread.
     u8 acknowledgeInterrupt(u8 threadID);
+
+    // Converts an interrupt vector to its bitmask bit position.
+    static constexpr u32 vectorToBit(u8 vector) { return 1u << (vector >> 2); }
 
     // Processes an access offset and returns a string from where it belongs to.
     std::string getSOCINTAccess(u32 offset);

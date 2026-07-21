@@ -13,7 +13,7 @@ void DummyRenderer::BackendStart() {
   LOG_INFO(Render, "DummyRenderer::BackendStart");
   resourceFactory = std::make_unique<DummyResourceFactory>();
   shaderFactory = resourceFactory->CreateShaderFactory();
-  fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) };
+  fs::path shaderPath{ Base::FS::GetPath(Base::FS::PathType::ShaderDir) };
   shaderPath /= "dummy";
   computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
     { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
@@ -40,6 +40,10 @@ void DummyRenderer::BackendSDLShutdown() {
   LOG_INFO(Render, "DummyRenderer::BackendSDLShutdown");
 }
 
+void DummyRenderer::WaitIdle() {
+  LOG_INFO(Render, "DummyRenderer::WaitIdle");
+}
+
 void DummyRenderer::BackendResize(s32 x, s32 y) {
   LOG_INFO(Render, "DummyRenderer::BackendResize: {}, {}", x, y);
 }
@@ -64,7 +68,7 @@ void DummyRenderer::Clear() {
   LOG_INFO(Render, "DummyRenderer::Clear");
 }
 
-void DummyRenderer::UpdateViewportFromState(const Xe::XGPU::XenosState *state) {
+void DummyRenderer::UpdateViewportFromState(std::weak_ptr<Xe::XGPU::XenosState> statePtr) {
   LOG_INFO(Render, "DummyRenderer::UpdateViewportFromState");
 }
 

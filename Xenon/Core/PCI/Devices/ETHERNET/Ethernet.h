@@ -246,26 +246,29 @@ struct EthernetStats {
 
 class ETHERNET : public PCIDevice {
 public:
-  ETHERNET(const std::string &deviceName, u64 size, PCIBridge *parentPCIBridge, RAM *ram);
+  ETHERNET(u64 size, std::weak_ptr<PCIBridge> parentPCIBridge, std::weak_ptr<RAM> ram);
   ~ETHERNET();
   
-  void Read(u64 readAddress, u8 *data, u64 size) override;
-  void Write(u64 writeAddress, const u8 *data, u64 size) override;
-  void MemSet(u64 writeAddress, s32 data, u64 size) override;
-  void ConfigRead(u64 readAddress, u8* data, u64 size) override;
-  void ConfigWrite(u64 writeAddress, const u8* data, u64 size) override;
+  void Read(u64 address, u8 *data, u64 size) override;
+  void Write(u64 address, const u8 *data, u64 size) override;
+  void MemSet(u64 address, s32 data, u64 size) override;
+  void ConfigRead(u64 address, u8 *data, u64 size) override;
+  void ConfigWrite(u64 address, const u8 *data, u64 size) override;
 
   // External interface for future bridge support
-  void EnqueueRxPacket(const u8* data, u32 length);
-  bool DequeueRxPacket(EthernetPacket& packet);
+  void EnqueueRxPacket(const u8 *data, u32 length);
+  bool DequeueRxPacket(EthernetPacket &packet);
   
   // Get statistics
-  const EthernetStats& GetStats() const { return stats; }
+  const EthernetStats &GetStats() const {
+    return stats;
+  }
   
   // Link status
-  bool IsLinkUp() const { return linkUp; }
   void SetLinkUp(bool up);
-
+  bool IsLinkUp() const {
+    return linkUp;
+  }
 private:
   // Network bridge initialization
   void InitializeNetworkBridge();
@@ -279,7 +282,7 @@ private:
   void ProcessTxDescriptors(bool ring0);
   
   // Packet handling
-  void HandleTxPacket(const u8 *data, u32 len);
+  void HandleTxPacket(const u8 *data, u32 length);
   
   // Interrupt management
   void RaiseInterrupt(u32 bits);
@@ -288,18 +291,18 @@ private:
   void WorkerThreadLoop();
   
   // Descriptor operations
-  bool ReadTxDescriptor(bool ring0, u32 index, XE_TX_DESCRIPTOR& desc);
-  bool WriteTxDescriptor(bool ring0, u32 index, const XE_TX_DESCRIPTOR& desc);
+  bool ReadTxDescriptor(bool ring0, u32 index, XE_TX_DESCRIPTOR &desc);
+  bool WriteTxDescriptor(bool ring0, u32 index, const XE_TX_DESCRIPTOR &desc);
   bool ReadRxDescriptor(u32 index, XE_RX_DESCRIPTOR& desc);
   bool WriteRxDescriptor(u32 index, const XE_RX_DESCRIPTOR& desc);
   
   // Reset device
   void Reset();
 
-  // PCI Bridge pointer. Used for Interrupts.
-  PCIBridge *parentBus = nullptr;
+  // PCI Bridge pointer. Used for Interrupts
+  std::weak_ptr<PCIBridge> parentBus = {};
   // RAM Pointer
-  RAM *ramPtr = nullptr;
+  std::weak_ptr<RAM> ramPtr = {};
   
   // MDIO Registers - 32 registers
   // In reality an ethernet controller has around 32 PHY's for the MDIO protocol,

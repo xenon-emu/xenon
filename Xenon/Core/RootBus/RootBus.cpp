@@ -19,140 +19,196 @@ RootBus::RootBus() {
 }
 
 RootBus::~RootBus() {
+  if (!lifetimeGuard.RetireAndWait()) {
+    LOG_CRITICAL(RootBus, "Timed out waiting for in-flight accesses to drain during destruction!");
+  }
+
+  ramDevice.reset();
+  sfcxDevice.reset();
+
+  for (auto &[name, device] : connectedDevices) {
+    device.reset();
+  }
   connectedDevices.clear();
+
+  hostBridge.reset();
+
   biuData.reset();
 }
 
-void RootBus::AddHostBridge(std::shared_ptr<HostBridge> newHostBridge) {
-  hostBridge = newHostBridge;
+std::weak_ptr<HostBridge> RootBus::AddHostBridge(std::unique_ptr<HostBridge> newHostBridge) {
+  hostBridge = std::move(newHostBridge);
+
+  return hostBridge;
 }
 
-void RootBus::AddDevice(std::shared_ptr<SystemDevice> device) {
+void RootBus::AddDevice(std::unique_ptr<SystemDevice> device) {
   if (!device) {
     LOG_CRITICAL(RootBus, "Failed to attach device!");
     Base::SystemPause();
     return;
   }
 
-  deviceCount++;
-  LOG_INFO(RootBus, "Device attached: {}", device->GetDeviceName());
-  connectedDevices.insert({ device->GetDeviceName(), device });
+  u32 hash = device->GetHash();
+  if (auto it = connectedDevices.find(hash); it == connectedDevices.end()) {
+    deviceCount++;
+    LOG_INFO(RootBus, "Device attached: {}", device->GetDeviceName());
+    connectedDevices.insert({ hash, std::move(device) });
+  } else {
+    LOG_CRITICAL(RootBus, "Device already exists! You cannot attach a devce twice without first detaching.");
+    Base::SystemPause();
+  }
 
   // Get specific pointers
-  if (device->GetDeviceName() == "RAM") { ramDevice = device.get(); }
-  if (device->GetDeviceName() == "NAND") { sfcxDevice = device.get();}
+  if (auto it = connectedDevices.find("RAM"_j); it != connectedDevices.end())
+    ramDevice = it->second;
+  if (auto it = connectedDevices.find("NAND"_j); it != connectedDevices.end())
+    sfcxDevice = it->second;
 }
 
-void RootBus::ResetDevice(std::shared_ptr<SystemDevice> device) {
+void RootBus::ResetDevice(std::unique_ptr<SystemDevice> device) {
   if (!device) {
     LOG_CRITICAL(RootBus, "Failed to reset device!");
     Base::SystemPause();
     return;
   }
 
-  std::string name = device->GetDeviceName();
-  if (auto it = connectedDevices.find(name); it != connectedDevices.end()) {
-    LOG_INFO(RootBus, "Resetting device: {}", it->first);
+  u32 hash = device->GetHash();
+  if (auto it = connectedDevices.find(hash); it != connectedDevices.end()) {
+    LOG_INFO(RootBus, "Resetting device: {}", it->second->GetDeviceName());
+    if (!it->second->RetireAndWait()) {
+      LOG_CRITICAL(RootBus, "Timed out waiting for in-flight accesses to drain while resetting '{}'!", it->second->GetDeviceName());
+    }
     it->second.reset();
     connectedDevices.erase(it);
-    connectedDevices.insert({ device->GetDeviceName(), device });
+    connectedDevices.insert({ hash, std::move(device) });
   } else {
     LOG_CRITICAL(RootBus, "Failed to reset device! '{}' never existed.", it->first);
   }
+
+  // Get specific pointers
+  if (auto it = connectedDevices.find("RAM"_j); it != connectedDevices.end())
+    ramDevice = it->second;
+  if (auto it = connectedDevices.find("NAND"_j); it != connectedDevices.end())
+    sfcxDevice = it->second;
 }
 
-bool RootBus::Read(u64 readAddress, u8 *data, u64 size, bool soc) {
+bool RootBus::Read(u64 address, u8 *data, u64 size, bool soc) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "RootBus::Read", MP_AUTO);
+  auto lease = lifetimeGuard.TryAcquire();
+  if (!lease) {
+    memset(data, 0xFF, size);
+    return false;
+  }
 
   // Fast path, most reads go to RAM, so check there first.
-  if (!soc && readAddress < PHYS_MEMORY_END) {
-    ramDevice->Read(readAddress, data, size);
-    return true;
+  if (!soc && address < PHYS_MEMORY_END) {
+    if (ramDevice) {
+      ramDevice->Read(address, data, size);
+      return true;
+    } else {
+      return false;
+    }
   }
 
   // SFCX
-  if (readAddress >= sfcxDevice->GetStartAddress() &&
-    readAddress <= sfcxDevice->GetEndAddress()) {
-    // Hit
-    sfcxDevice->Read(readAddress, data, size);
-    return true;
+  if (sfcxDevice) {
+    if (address >= sfcxDevice->GetStartAddress() && address <= sfcxDevice->GetEndAddress()) {
+      // Hit
+      sfcxDevice->Read(address, data, size);
+      return true;
+    }
   }
 
   // Configuration Read?
-  if (readAddress >= PCI_CONFIG_REGION_ADDRESS &&
-    readAddress <= PCI_CONFIG_REGION_ADDRESS + PCI_CONFIG_REGION_SIZE) {
-    ConfigRead(readAddress, data, size);
+  if (address >= PCI_CONFIG_REGION_ADDRESS && address <= PCI_CONFIG_REGION_ADDRESS + PCI_CONFIG_REGION_SIZE) {
+    ConfigRead(address, data, size);
     return true;
   }
 
   // Check on the other busses
-  if (hostBridge->Read(readAddress, data, size)) {
+  if (hostBridge->Read(address, data, size)) {
     return true;
   }
 
   // Device not found
-  LOG_ERROR(RootBus, "Read failed at address 0x{:X}", readAddress);
+  LOG_ERROR(RootBus, "Read failed at address 0x{:X}", address);
+
   // Any reads to bus that don't belong to any device are always 0xFF
   memset(data, 0xFF, size);
+
   return false;
 }
 
-bool RootBus::MemSet(u64 writeAddress, s32 data, u64 size) {
+bool RootBus::MemSet(u64 address, s32 data, u64 size) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "RootBus::MemSet", MP_AUTO);
+  auto lease = lifetimeGuard.TryAcquire();
+  if (!lease) {
+    return false;
+  }
+
   for (auto &[name, dev] : connectedDevices) {
-    if (writeAddress >= dev->GetStartAddress() &&
-        writeAddress <= dev->GetEndAddress()) {
+    if (address >= dev->GetStartAddress() && address <= dev->GetEndAddress()) {
       // Hit
-      dev->MemSet(writeAddress, data, size);
+      dev->MemSet(address, data, size);
       return true;
     }
   }
 
   // Check on the other busses
-  if (hostBridge->MemSet(writeAddress, data, size)) {
+  if (hostBridge->MemSet(address, data, size)) {
     return true;
   }
 
   // Device or address not found
   if (false) {
-    LOG_ERROR(RootBus, "MemSet failed at address: 0x{:X}, data: 0x{:X}", writeAddress, data);
+    LOG_ERROR(RootBus, "MemSet failed at address: 0x{:X}, data: 0x{:X}", address, data);
     if (XeMain::GetCPU())
       XeMain::GetCPU()->Halt(); // Halt the CPU
     Config::imgui.debugWindow = true; // Open the debugger on bad fault
   }
+
   return false;
 }
 
-bool RootBus::Write(u64 writeAddress, const u8 *data, u64 size, bool soc) {
+bool RootBus::Write(u64 address, const u8 *data, u64 size, bool soc) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "RootBus::Write", MP_AUTO);
+  auto lease = lifetimeGuard.TryAcquire();
+  if (!lease) {
+    return false;
+  }
 
-  if (!soc && writeAddress < 0x3FFFFFFF) {
-    ramDevice->Write(writeAddress, data, size);
-    return true;
+  if (!soc && address < PHYS_MEMORY_END) {
+    if (ramDevice) {
+      ramDevice->Write(address, data, size);
+      return true;
+    } else {
+      return false;
+    }
   }
 
   // SFCX
-  if (writeAddress >= sfcxDevice->GetStartAddress() &&
-    writeAddress <= sfcxDevice->GetEndAddress()) {
-    // Hit
-    sfcxDevice->Write(writeAddress, data, size);
-    return true;
+  if (sfcxDevice) {
+    if (address >= sfcxDevice->GetStartAddress() && address <= sfcxDevice->GetEndAddress()) {
+      // Hit
+      sfcxDevice->Write(address, data, size);
+      return true;
+    }
   }
 
   // PCI Configuration Write?
-  if (writeAddress >= PCI_CONFIG_REGION_ADDRESS &&
-      writeAddress <= PCI_CONFIG_REGION_ADDRESS + PCI_CONFIG_REGION_SIZE) {
-    ConfigWrite(writeAddress, data, size);
+  if (address >= PCI_CONFIG_REGION_ADDRESS && address <= PCI_CONFIG_REGION_ADDRESS + PCI_CONFIG_REGION_SIZE) {
+    ConfigWrite(address, data, size);
     return true;
   }
 
   // Check on the other busses
-  if (hostBridge->Write(writeAddress, data, size)) {
+  if (hostBridge->Write(address, data, size)) {
     return true;
   }
 
   // Device or address not found
-  LOG_ERROR(RootBus, "Write to {:#x} failed, data {:#x}", writeAddress, *reinterpret_cast<const u64*>(data));
+  LOG_ERROR(RootBus, "Write to {:#x} failed, data {:#x}", address, *reinterpret_cast<const u64*>(data));
   return false;
 }
 
@@ -160,10 +216,19 @@ bool RootBus::Write(u64 writeAddress, const u8 *data, u64 size, bool soc) {
 // Configuration R/W
 //
 
-bool RootBus::ConfigRead(u64 readAddress, u8 *data, u64 size) {
-  return hostBridge->ConfigRead(readAddress, data, size);
+bool RootBus::ConfigRead(u64 address, u8 *data, u64 size) {
+  auto lease = lifetimeGuard.TryAcquire();
+  if (!lease) {
+    memset(data, 0xFF, size);
+    return false;
+  }
+  return hostBridge->ConfigRead(address, data, size);
 }
 
-bool RootBus::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
-  return hostBridge->ConfigWrite(writeAddress, data, size);
+bool RootBus::ConfigWrite(u64 address, const u8 *data, u64 size) {
+  auto lease = lifetimeGuard.TryAcquire();
+  if (!lease) {
+    return false;
+  }
+  return hostBridge->ConfigWrite(address, data, size);
 }

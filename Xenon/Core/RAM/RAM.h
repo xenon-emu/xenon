@@ -12,14 +12,17 @@
 
 class RAM : public SystemDevice {
 public:
-  RAM(const std::string &deviceName, u64 startAddress, std::string size,
-    bool isSOCDevice);
+  RAM(u64 startAddress, u64 size, bool isSOCDevice);
   ~RAM();
+
   void Reset();
+
+  static u64 ParseRamSize(std::string size);
+
   void Resize(u64 size);
-  void Read(u64 readAddress, u8 *data, u64 size) override;
-  void Write(u64 writeAddress, const u8 *data, u64 size) override;
-  void MemSet(u64 writeAddress, s32 data, u64 size) override;
+  void Read(u64 address, u8 *data, u64 size) override;
+  void Write(u64 address, const u8 *data, u64 size) override;
+  void MemSet(u64 address, s32 data, u64 size) override;
 
   u8 *GetPointerToAddress(u32 address);
   u64 GetSize() {

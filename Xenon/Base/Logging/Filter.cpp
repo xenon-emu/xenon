@@ -88,7 +88,8 @@ bool ParseFilterRule(Filter &instance, Iterator begin, Iterator end) {
   CLS(XMA)                                                                                       \
   CLS(DebugPrint)                                                                                \
   CLS(SMC)                                                                                       \
-  CLS(UART)  
+  CLS(UART)                                                                                      \
+  CLS(HLE)
 
 // GetClassName is a macro defined by Windows.h, grrr...
 const char* GetLogClassName(Class logClass) {

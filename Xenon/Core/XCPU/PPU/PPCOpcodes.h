@@ -9,6 +9,7 @@
 #include "Core/XCPU/JIT/PPU_JIT.h"
 
 namespace PPCInterpreter {
+
 //
 // Instruction definitions
 //
@@ -390,9 +391,9 @@ extern void PPCInterpreter_vspltw(sPPEState *ppeState);
 extern void PPCInterpreter_vmaxsb(sPPEState *ppeState);
 extern void PPCInterpreter_vmaxub(sPPEState *ppeState);
 extern void PPCInterpreter_vmaxuw(sPPEState *ppeState);
-extern void PPCInterpreter_vmaxsh(sPPEState* ppeState);
-extern void PPCInterpreter_vmaxuh(sPPEState* ppeState);
-extern void PPCInterpreter_vmaxsw(sPPEState* ppeState);
+extern void PPCInterpreter_vmaxsh(sPPEState *ppeState);
+extern void PPCInterpreter_vmaxuh(sPPEState *ppeState);
+extern void PPCInterpreter_vmaxsw(sPPEState *ppeState);
 extern void PPCInterpreter_vminsh(sPPEState *ppeState);
 extern void PPCInterpreter_vminuh(sPPEState *ppeState);
 extern void PPCInterpreter_vminuw(sPPEState *ppeState);
@@ -402,16 +403,16 @@ extern void PPCInterpreter_vminfp(sPPEState *ppeState);
 extern void PPCInterpreter_vminfp128(sPPEState *ppeState);
 extern void PPCInterpreter_vmaddfp(sPPEState *ppeState);
 extern void PPCInterpreter_vmulfp128(sPPEState *ppeState);
-extern void PPCInterpreter_vmaddcfp128(sPPEState* ppeState);
+extern void PPCInterpreter_vmaddcfp128(sPPEState *ppeState);
 extern void PPCInterpreter_vmrghb(sPPEState *ppeState);
 extern void PPCInterpreter_vmrghh(sPPEState *ppeState);
 extern void PPCInterpreter_vmrghw(sPPEState *ppeState);
-extern void PPCInterpreter_vmrghw128(sPPEState* ppeState);
+extern void PPCInterpreter_vmrghw128(sPPEState *ppeState);
 extern void PPCInterpreter_vmrglb(sPPEState *ppeState);
 extern void PPCInterpreter_vmrglh(sPPEState *ppeState);
 extern void PPCInterpreter_vmrglw(sPPEState *ppeState);
 extern void PPCInterpreter_vmrglw128(sPPEState *ppeState);
-extern void PPCInterpreter_vnmsubfp128(sPPEState* ppeState);
+extern void PPCInterpreter_vnmsubfp128(sPPEState *ppeState);
 extern void PPCInterpreter_vperm(sPPEState *ppeState);
 extern void PPCInterpreter_vperm128(sPPEState *ppeState);
 extern void PPCInterpreter_vpermwi128(sPPEState *ppeState);
@@ -442,8 +443,8 @@ extern void PPCInterpreter_vsldoi128(sPPEState *ppeState);
 extern void PPCInterpreter_vspltb(sPPEState *ppeState);
 extern void PPCInterpreter_vsplth(sPPEState *ppeState);
 extern void PPCInterpreter_vspltisb(sPPEState *ppeState);
-extern void PPCInterpreter_vspltish(sPPEState* ppeState);
-extern void PPCInterpreter_vspltisw(sPPEState* ppeState);
+extern void PPCInterpreter_vspltish(sPPEState *ppeState);
+extern void PPCInterpreter_vspltisw(sPPEState *ppeState);
 extern void PPCInterpreter_vspltisw128(sPPEState *ppeState);
 extern void PPCInterpreter_vsubfp128(sPPEState *ppeState);
 extern void PPCInterpreter_vspltw128(sPPEState *ppeState);
@@ -640,8 +641,14 @@ extern void PPCInterpreterJIT_extswx(sPPEState *ppeState, JITBlockBuilder *b, uP
 extern void PPCInterpreterJIT_eqvx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_icbi(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_isync(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_mtspr(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_mfspr(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_mftb(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_mfmsr(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_mtmsr(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_mtmsrd(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_slbmte(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_slbie(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_mfocrf(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_mulldx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_mullwx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
@@ -691,6 +698,16 @@ extern void PPCInterpreterJIT_lbz(sPPEState *ppeState, JITBlockBuilder *b, uPPCI
 extern void PPCInterpreterJIT_lbzu(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_lbzux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_lbzx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_lha(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_lhau(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_lhaux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_lhax(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_lhbrx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_lhz(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_lhzu(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_lhzux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_lhzx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_lwa(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_lwz(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_lwzu(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_lwzux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
@@ -699,13 +716,19 @@ extern void PPCInterpreterJIT_lwbrx(sPPEState *ppeState, JITBlockBuilder *b, uPP
 extern void PPCInterpreterJIT_ld(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_ldu(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_ldux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_ldbrx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_ldx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_lwarx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_ldarx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_lmw(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 
 extern void PPCInterpreterJIT_stb(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_stbu(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_stbux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_sth(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_sthu(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_sthux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_stmw(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_stbx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_stw(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_stwbrx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
@@ -745,6 +768,7 @@ extern void PPCInterpreterJIT_fabsx(sPPEState *ppeState, JITBlockBuilder *b, uPP
 extern void PPCInterpreterJIT_fctidx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_fctidzx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_fcfidx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_fnabsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_fmsubx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_fnmsubx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_fmsubsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
@@ -772,10 +796,14 @@ extern void PPCInterpreterJIT_stfs(sPPEState *ppeState, JITBlockBuilder *b, uPPC
 extern void PPCInterpreterJIT_stfsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_stfsu(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_stfsux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+
 //
 // VXU JIT emitters
 //
 
+extern void PPCInterpreterJIT_dss(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_dst(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_dstst(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vaddfp(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vaddfp128(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vaddcuw(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
@@ -885,4 +913,13 @@ extern void PPCInterpreterJIT_vmrghh(sPPEState *ppeState, JITBlockBuilder *b, uP
 extern void PPCInterpreterJIT_vmrglh(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vmrghb(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
 extern void PPCInterpreterJIT_vmrglb(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
-}
+
+//
+// MMU JIT Emitters
+//
+extern void PPCInterpreterJIT_tlbsync(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_slbia(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_tlbie(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+extern void PPCInterpreterJIT_tlbiel(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr);
+
+} // namespace PPCInterpreter

@@ -1,4 +1,6 @@
-# Copyright 2025 Xenon Emulator Project
+#***************************************************************
+#* Copyright 2026 Xenon Emulator Project. All rights reserved. *
+#***************************************************************
 
 cmake_minimum_required(VERSION 3.22)
 

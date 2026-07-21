@@ -1,4 +1,6 @@
-# Copyright 2025 Xenon Emulator Project
+#***************************************************************
+#* Copyright 2026 Xenon Emulator Project. All rights reserved. *
+#***************************************************************
 
 name: Build
 
@@ -6,276 +8,365 @@ permissions:
   contents: read
   pull-requests: read
 
-on: [push]
+on:
+  push:
 
 concurrency:
-  group: ci-${{github.event_name}}-${{github.ref}}
-  cancel-in-progress: ${{github.event_name == 'push'}}
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'push' }}
 
 env:
   BUILD_TYPE: Release
-  BUILD_DIR: ${{github.workspace}}/build
+  BUILD_DIR: build
+  XE_ASMJIT_NEW_OUT_API: "ON"
+
+  # Bump this once when cache gets haunted.
+  CACHE_VERSION: xenon-ci-v3
 
 jobs:
   get-info:
     name: Info
     runs-on: ubuntu-24.04
     outputs:
-      shorthash: ${{steps.vars.outputs.shorthash}}
-      commit: ${{steps.vars.outputs.commit}}
+      shorthash: ${{ steps.vars.outputs.shorthash }}
+      commit: ${{ steps.vars.outputs.commit }}
     steps:
-    - uses: actions/checkout@main
-      with:
-        fetch-depth: 0
-    - name: Commit Count and Git Hash
-      id: vars
-      run: |
-        echo "shorthash=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-        echo "commit=$(git rev-list --count HEAD)" >> $GITHUB_ENV
-        echo "shorthash=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-        echo "commit=$(git rev-list --count HEAD)" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Commit Count and Git Hash
+        id: vars
+        shell: bash
+        run: |
+          echo "shorthash=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          echo "commit=$(git rev-list --count HEAD)" >> "$GITHUB_OUTPUT"
 
   Linux-Clang:
     name: Linux (Clang)
     runs-on: ubuntu-24.04
     needs: get-info
     steps:
-    - uses: actions/checkout@main
-      with:
-        submodules: recursive
-        fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
 
-    - name: Install Dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y ninja-build clang lld cmake ccache \
-                           libx11-dev libxext-dev libxrandr-dev libxcursor-dev \
-                           libxi-dev libxinerama-dev libwayland-dev libxkbcommon-dev \
-                           wayland-protocols git
+      - name: Install Dependencies
+        shell: bash
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            ninja-build clang lld cmake ccache \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev \
+            libxi-dev libxinerama-dev libwayland-dev libxkbcommon-dev \
+            wayland-protocols git
 
-    - name: Cache Dependencies
-      uses: actions/cache@main
-      with:
-        path: |
-          build
-          Deps
-        key: xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-deps-${{ hashFiles('build/x64-clang-${env.BUILD_TYPE}/Deps/ThirdParty/**/CMakeLists.txt', 'build/x64-clang-${env.BUILD_TYPE}/Deps/ThirdParty/**cmake/**') }}
-        restore-keys: |
-          xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-deps-ccache-
+      - name: Clean build dir
+        shell: bash
+        run: rm -rf "${BUILD_DIR}"
 
-    - name: Cache CMake Build
-      uses: hendrikmuhs/ccache-action@v1.2.18
-      env:
-        cache-name: xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-ccache
-      with:
-        append-timestamp: false
-        key: xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
+      - name: Cache C/C++ compilation
+        uses: hendrikmuhs/ccache-action@v1.2.18
+        with:
+          append-timestamp: false
+          key: ${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ runner.arch }}-linux-clang-${{ env.BUILD_TYPE }}-asmjit-${{ env.XE_ASMJIT_NEW_OUT_API }}-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake', 'Xenon/**/*.cpp', 'Xenon/**/*.c', 'Xenon/**/*.h', 'Xenon/**/*.hpp', 'Deps/ThirdParty/**/CMakeLists.txt') }}
 
-    - name: Configure CMake (Clang)
-      run: cmake -G Ninja -B ${{env.BUILD_DIR}} -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
-                 -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++
-                 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+      - name: Configure CMake (Clang)
+        shell: bash
+        run: |
+          cmake -G Ninja -S . -B "${BUILD_DIR}" \
+            -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DXE_ASMJIT_NEW_OUT_API="${XE_ASMJIT_NEW_OUT_API}"
 
-    - name: Build
-      run: cmake --build ${{env.BUILD_DIR}} --config ${{env.BUILD_TYPE}} --parallel $(nproc)
+      - name: Build
+        shell: bash
+        run: cmake --build "${BUILD_DIR}" --config "${BUILD_TYPE}" --parallel "$(nproc)"
 
-    - name: Prepare Artifact Folder
-      run: |
-        mkdir -p artifact
-        cp -r ${{env.BUILD_DIR}}/Xenon artifact/xenon-clang-x64-${{env.BUILD_TYPE}}
+      - name: Prepare Artifact Folder
+        shell: bash
+        run: |
+          mkdir -p artifact
+          cp "${BUILD_DIR}/Xenon" "artifact/xenon-linux-clang-x64-${BUILD_TYPE}"
 
-    - name: Upload Linux Clang Artifact
-      uses: actions/upload-artifact@main
-      with:
-        name: Xenon-linux-clang-x64-${{env.BUILD_TYPE}}-${{ needs.get-info.outputs.commit }}-${{needs.get-info.outputs.shorthash}}
-        path: artifact/
+      - name: Upload Linux Clang Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Xenon-linux-clang-x64-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
+          path: artifact/
 
   Linux-GCC:
     name: Linux (GCC)
     runs-on: ubuntu-24.04
     needs: get-info
     steps:
-    - uses: actions/checkout@main
-      with:
-        submodules: recursive
-        fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
 
-    - name: Install Dependencies
-      run: |
-        sudo apt update
-        sudo apt install -y ninja-build g++ cmake ccache \
-                           libx11-dev libxext-dev libxrandr-dev libxcursor-dev \
-                           libxi-dev libxinerama-dev libwayland-dev libxkbcommon-dev \
-                           wayland-protocols git
+      - name: Install Dependencies
+        shell: bash
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            ninja-build g++ cmake ccache \
+            libx11-dev libxext-dev libxrandr-dev libxcursor-dev \
+            libxi-dev libxinerama-dev libwayland-dev libxkbcommon-dev \
+            wayland-protocols git
 
-    - name: Cache Dependencies
-      uses: actions/cache@main
-      with:
-        path: |
-          build
-          Deps
-        key: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-deps-${{ hashFiles('build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**/CMakeLists.txt', 'build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**cmake/**') }}
-        restore-keys: |
-          xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-deps-ccache-
+      - name: Clean build dir
+        shell: bash
+        run: rm -rf "${BUILD_DIR}"
 
-    - name: Cache CMake Build
-      uses: hendrikmuhs/ccache-action@v1.2.18
-      env:
-        cache-name: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-ccache
-      with:
-        append-timestamp: false
-        key: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
+      - name: Cache C/C++ compilation
+        uses: hendrikmuhs/ccache-action@v1.2.18
+        with:
+          append-timestamp: false
+          key: ${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ runner.arch }}-linux-gcc-${{ env.BUILD_TYPE }}-asmjit-${{ env.XE_ASMJIT_NEW_OUT_API }}-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake', 'Xenon/**/*.cpp', 'Xenon/**/*.c', 'Xenon/**/*.h', 'Xenon/**/*.hpp', 'Deps/ThirdParty/**/CMakeLists.txt') }}
 
-    - name: Configure CMake (GCC)
-      run: cmake -G Ninja -B ${{env.BUILD_DIR}} -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
-                 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++
-                 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+      - name: Configure CMake (GCC)
+        shell: bash
+        run: |
+          cmake -G Ninja -S . -B "${BUILD_DIR}" \
+            -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+            -DCMAKE_C_COMPILER=gcc \
+            -DCMAKE_CXX_COMPILER=g++ \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DXE_ASMJIT_NEW_OUT_API="${XE_ASMJIT_NEW_OUT_API}"
 
-    - name: Build
-      run: cmake --build ${{env.BUILD_DIR}} --config ${{env.BUILD_TYPE}} --parallel $(nproc)
+      - name: Build
+        shell: bash
+        run: cmake --build "${BUILD_DIR}" --config "${BUILD_TYPE}" --parallel "$(nproc)"
 
-    - name: Prepare Artifact Folder
-      run: |
-        mkdir -p artifact
-        cp -r ${{env.BUILD_DIR}}/Xenon artifact/xenon-gcc-amd64-${{env.BUILD_TYPE}}
+      - name: Prepare Artifact Folder
+        shell: bash
+        run: |
+          mkdir -p artifact
+          cp "${BUILD_DIR}/Xenon" "artifact/xenon-linux-gcc-x64-${BUILD_TYPE}"
 
-    - name: Upload Linux GCC Artifact
-      uses: actions/upload-artifact@main
-      with:
-        name: Xenon-linux-gcc-x64-${{env.BUILD_TYPE}}-${{ needs.get-info.outputs.commit }}-${{needs.get-info.outputs.shorthash}}
-        path: artifact/
-
+      - name: Upload Linux GCC Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Xenon-linux-gcc-x64-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
+          path: artifact/
 
   Windows-Clang:
     name: Windows (Clang)
     runs-on: windows-2025
     needs: get-info
     steps:
-    - uses: actions/checkout@main
-      with:
-        submodules: recursive
-        fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
 
-    - name: Cache Dependencies
-      uses: actions/cache@main
-      with:
-        path: |
-          build
-          Deps
+      - name: Clean build dir
+        shell: pwsh
+        run: |
+          if (Test-Path $env:BUILD_DIR) {
+            Remove-Item $env:BUILD_DIR -Recurse -Force
+          }
 
-        key: xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-deps-${{ hashFiles('build/x64-clang-${env.BUILD_TYPE}/Deps/ThirdParty/**/CMakeLists.txt', 'build/x64-clang-${env.BUILD_TYPE}/Deps/ThirdParty/**cmake/**') }}
-        restore-keys: |
-          xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-deps-ccache-
+      - name: Cache vcpkg packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ${{ env.VCPKG_INSTALLATION_ROOT }}\installed
+            ${{ env.LOCALAPPDATA }}\vcpkg\archives
+          key: ${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ runner.arch }}-vcpkg-cryptopp-x64-windows-static-md-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake') }}
 
-    - name: Cache CMake Build
-      uses: hendrikmuhs/ccache-action@v1.2.18
-      env:
-        cache-name: xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-ccache
-      with:
-        append-timestamp: false
-        key: xenon-${{runner.os}}-amd64-clang-${{env.BUILD_TYPE}}-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
+      - name: Install Crypto++ with vcpkg
+        shell: pwsh
+        run: |
+          & "$env:VCPKG_INSTALLATION_ROOT\vcpkg.exe" install cryptopp:x64-windows-static-md
 
-    - name: Configure CMake (Clang)
-      run: cmake -G Ninja -B "${{env.BUILD_DIR}}" -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
-                 -DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang-cl
-                 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+      - name: Cache C/C++ compilation
+        uses: hendrikmuhs/ccache-action@v1.2.18
+        with:
+          append-timestamp: false
+          key: ${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ runner.arch }}-windows-native-clang-${{ env.BUILD_TYPE }}-asmjit-${{ env.XE_ASMJIT_NEW_OUT_API }}-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake', 'Xenon/**/*.cpp', 'Xenon/**/*.c', 'Xenon/**/*.h', 'Xenon/**/*.hpp', 'Deps/ThirdParty/**/CMakeLists.txt') }}
 
-    - name: Build
-      run: cmake --build "${{env.BUILD_DIR}}" --config ${{env.BUILD_TYPE}} --parallel $env:NUMBER_OF_PROCESSORS
+      - name: Configure CMake (Clang)
+        shell: pwsh
+        run: |
+          cmake -G Ninja -S . -B "$env:BUILD_DIR" `
+            -DCMAKE_BUILD_TYPE="$env:BUILD_TYPE" `
+            -DCMAKE_C_COMPILER=clang `
+            -DCMAKE_CXX_COMPILER=clang++ `
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache `
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
+            -DCMAKE_TOOLCHAIN_FILE="$env:VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" `
+            -DVCPKG_TARGET_TRIPLET=x64-windows-static-md `
+            -DXENON_USE_SYSTEM_DEPS=ON `
+            -DXENON_ALLOW_BUNDLED_DEPS=ON `
+            -DXE_ASMJIT_NEW_OUT_API="$env:XE_ASMJIT_NEW_OUT_API"
 
-    - name: Prepare Artifact Folder
-      run: |
-        mkdir -p artifact
-        cp -r ${{env.BUILD_DIR}}/Xenon.exe artifact/xenon-clang-x64-${{env.BUILD_TYPE}}.exe
+      - name: Build
+        shell: pwsh
+        run: cmake --build "$env:BUILD_DIR" --config "$env:BUILD_TYPE" --parallel $env:NUMBER_OF_PROCESSORS
 
-    - name: Upload Windows Clang Artifact
-      uses: actions/upload-artifact@main
-      with:
-        name: Xenon-win64-clang-${{env.BUILD_TYPE}}-${{ needs.get-info.outputs.commit }}-${{needs.get-info.outputs.shorthash}}
-        path: artifact/
+      - name: Prepare Artifact Folder
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifact | Out-Null
+          Copy-Item "$env:BUILD_DIR\Xenon.exe" "artifact\xenon-windows-clang-x64-$env:BUILD_TYPE.exe"
+
+      - name: Upload Windows Clang Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Xenon-win64-clang-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
+          path: artifact/
 
   Windows-GCC:
-    name: Windows (GCC via MSYS2)
+    name: Windows (GCC via WinLibs, CLI)
     runs-on: windows-2025
     needs: get-info
-    defaults:
-      run:
-        shell: msys2 {0}
     steps:
-    - uses: actions/checkout@main
-      with:
-        submodules: recursive
-        fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
 
-    - uses: msys2/setup-msys2@v2
-      with:
-        msystem: UCRT64
-        update: true
-        install: >
-          git
-          mingw-w64-ucrt-x86_64-gcc
-          mingw-w64-ucrt-x86_64-cmake
-          mingw-w64-ucrt-x86_64-ninja
-          mingw-w64-ucrt-x86_64-ccache
-          make
+      - name: Setup WinLibs
+        uses: bwoodsend/setup-winlibs-action@v1
+        with:
+          tag: latest
+          architecture: x86_64
+          threads: posix
+          runtime: ucrt
 
-    - name: Cache Dependencies
-      uses: actions/cache@main
-      with:
-        path: |
-          build
-          Deps
+      - name: Clean build dir
+        shell: pwsh
+        run: |
+          if (Test-Path $env:BUILD_DIR) {
+            Remove-Item $env:BUILD_DIR -Recurse -Force
+          }
 
-        key: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-deps-${{ hashFiles('build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**/CMakeLists.txt', 'build/x64-gcc-${env.BUILD_TYPE}/Deps/ThirdParty/**cmake/**') }}
-        restore-keys: |
-          xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-deps-ccache-
+      - name: Cache C/C++ compilation
+        uses: hendrikmuhs/ccache-action@v1.2.18
+        with:
+          append-timestamp: false
+          key: ${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ runner.arch }}-windows-winlibs-gcc-${{ env.BUILD_TYPE }}-asmjit-${{ env.XE_ASMJIT_NEW_OUT_API }}-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake', 'Xenon/**/*.cpp', 'Xenon/**/*.c', 'Xenon/**/*.h', 'Xenon/**/*.hpp', 'Deps/ThirdParty/**/CMakeLists.txt') }}
 
-    - name: Cache CMake Build
-      uses: hendrikmuhs/ccache-action@v1.2.18
-      env:
-        cache-name: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-ccache
-      with:
-        append-timestamp: false
-        key: xenon-${{runner.os}}-amd64-gcc-${{env.BUILD_TYPE}}-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
+      - name: Configure CMake (GCC)
+        shell: pwsh
+        run: |
+          cmake -G Ninja -S . -B "$env:BUILD_DIR" `
+            -DCMAKE_BUILD_TYPE="$env:BUILD_TYPE" `
+            -DCMAKE_C_COMPILER=gcc `
+            -DCMAKE_CXX_COMPILER=g++ `
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache `
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache `
+            -DGFX_ENABLED=OFF `
+            -DXE_ASMJIT_NEW_OUT_API="$env:XE_ASMJIT_NEW_OUT_API"
 
-    - name: Configure CMake (GCC)
-      run: cmake -G Ninja -B "${{env.BUILD_DIR}}" -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
-                 -DCMAKE_C_COMPILER=gcc -DCMAKE_CXX_COMPILER=g++
-                 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+      - name: Build
+        shell: pwsh
+        run: cmake --build "$env:BUILD_DIR" --config "$env:BUILD_TYPE" --parallel $env:NUMBER_OF_PROCESSORS
 
-    - name: Build
-      run: cmake --build "${{env.BUILD_DIR}}" --config ${{env.BUILD_TYPE}} --parallel
+      - name: Prepare Artifact Folder
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path artifact | Out-Null
+          Copy-Item "$env:BUILD_DIR\Xenon.exe" "artifact\xenon-cli-windows-gcc-x64-$env:BUILD_TYPE.exe"
 
-    - name: Prepare Artifact Folder
-      run: |
-        mkdir -p artifact
-        cp -r "${{github.workspace}}/build/Xenon.exe" "artifact/xenon-gcc-amd64-${{env.BUILD_TYPE}}.exe"
+      - name: Upload Windows GCC Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Xenon-win64-winlibs-gcc-cli-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
+          path: artifact/
 
-    - name: Upload Windows-GCC Artifact
-      uses: actions/upload-artifact@main
-      with:
-        name: Xenon-win64-gcc-${{env.BUILD_TYPE}}-${{needs.get-info.outputs.commit}}-${{needs.get-info.outputs.shorthash}}
-        path: artifact/
+  Windows-GCC-Cross:
+    name: Windows (GCC cross-compile)
+    runs-on: ubuntu-24.04
+    needs: get-info
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Install MinGW dependencies
+        shell: bash
+        run: |
+          sudo apt update
+          sudo apt install -y \
+            ninja-build cmake ccache \
+            gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 \
+            binutils-mingw-w64-x86-64 \
+            git
+
+      - name: Clean build dir
+        shell: bash
+        run: rm -rf "${BUILD_DIR}"
+
+      - name: Cache C/C++ compilation
+        uses: hendrikmuhs/ccache-action@v1.2.18
+        with:
+          append-timestamp: false
+          key: ${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ runner.arch }}-windows-mingw-cross-gcc-${{ env.BUILD_TYPE }}-asmjit-${{ env.XE_ASMJIT_NEW_OUT_API }}-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake', 'Xenon/**/*.cpp', 'Xenon/**/*.c', 'Xenon/**/*.h', 'Xenon/**/*.hpp', 'Deps/ThirdParty/**/CMakeLists.txt') }}
+
+      - name: Configure CMake (MinGW cross GCC)
+        shell: bash
+        run: |
+          cmake -G Ninja -S . -B "${BUILD_DIR}" \
+            -DCMAKE_BUILD_TYPE="${BUILD_TYPE}" \
+            -DCMAKE_SYSTEM_NAME=Windows \
+            -DCMAKE_SYSTEM_PROCESSOR=x86_64 \
+            -DCMAKE_C_COMPILER=x86_64-w64-mingw32-gcc \
+            -DCMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++ \
+            -DCMAKE_RC_COMPILER=x86_64-w64-mingw32-windres \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DXE_ASMJIT_NEW_OUT_API="${XE_ASMJIT_NEW_OUT_API}"
+
+      - name: Build
+        shell: bash
+        run: cmake --build "${BUILD_DIR}" --config "${BUILD_TYPE}" --parallel "$(nproc)"
+
+      - name: Prepare Artifact Folder
+        shell: bash
+        run: |
+          mkdir -p artifact
+          cp "${BUILD_DIR}/Xenon.exe" "artifact/xenon-windows-mingw-gcc-x64-${BUILD_TYPE}.exe"
+
+      - name: Upload Windows GCC Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Xenon-win64-mingw-gcc-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
+          path: artifact/
 
   linux_nix:
     name: Linux (nix)
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout repository
-        uses: actions/checkout@main
-      - uses: cachix/install-nix-action@master
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - uses: cachix/install-nix-action@v31
+
       - name: Build Xenon
         run: nix build .#xenon -L
+
       - name: Build Xenon-cli
         run: nix build .#xenon-cli -L
 
-  macOS:
+  macOS-ARM:
     name: macOS (ARM)
-    runs-on: macos-latest
+    runs-on: macos-15
     needs: get-info
     steps:
       - name: Checkout repository
-        uses: actions/checkout@main
+        uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 0
@@ -285,50 +376,96 @@ jobs:
         with:
           xcode-version: latest-stable
 
-      - name: Install Dependencies (macOS)
-        run: |
-          brew install llvm@20
+      - name: Install Dependencies
+        run: brew install llvm@20 ccache ninja
 
-      - name: Cache CMake Configuration
-        uses: actions/cache@main
-        env:
-          cache-name: xenon-${{runner.os}}-aarch64-clang-{{env.BUILD_TYPE}}-config-cache
-        with:
-          path: |
-            ${{github.workspace}}/build
-          key: xenon-${{runner.os}}-aarch64-clang-${{env.BUILD_TYPE}}-deps-${{ hashFiles('**/CMakeLists.txt', 'cmake/**') }}
-          restore-keys: |
-            xenon-${{runner.os}}-aarch64-clang-${{env.BUILD_TYPE}}-deps-ccache-
+      - name: Clean build dir
+        run: rm -rf "${{ github.workspace }}/${BUILD_DIR}"
 
-      - name: Cache CMake Build
+      - name: Cache C/C++ compilation
         uses: hendrikmuhs/ccache-action@v1.2.18
-        env:
-          cache-name: xenon-${{runner.os}}-aarch64-clang-${{env.BUILD_TYPE}}-ccache
         with:
           append-timestamp: false
-          key: xenon-${{runner.os}}-aarch64-clang-${{env.BUILD_TYPE}}-${{ hashFiles('**/*.cpp', '**/*.c', '**/*.h') }}
+          key: ${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ runner.arch }}-macos-arm-clang-${{ env.BUILD_TYPE }}-asmjit-${{ env.XE_ASMJIT_NEW_OUT_API }}-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake', 'Xenon/**/*.cpp', 'Xenon/**/*.c', 'Xenon/**/*.h', 'Xenon/**/*.hpp', 'Deps/ThirdParty/**/CMakeLists.txt') }}
 
       - name: Configure CMake
         run: |
           export PATH="/opt/homebrew/opt/llvm@20/bin:$PATH"
-          export CPPFLAGS="-I/opt/homebrew/opt/llvm@20/include"
-          export LDFLAGS="-L/opt/homebrew/opt/llvm@20/lib"
-          cmake -G Ninja -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} -DCMAKE_C_COMPILER=$(brew --prefix llvm@20)/bin/clang -DCMAKE_CXX_COMPILER=$(brew --prefix llvm@20)/bin/clang++ -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+          cmake -G Ninja -S . -B "${{ github.workspace }}/${BUILD_DIR}" \
+            -DCMAKE_BUILD_TYPE="${{ env.BUILD_TYPE }}" \
+            -DCMAKE_C_COMPILER="$(brew --prefix llvm@20)/bin/clang" \
+            -DCMAKE_CXX_COMPILER="$(brew --prefix llvm@20)/bin/clang++" \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DXE_ASMJIT_NEW_OUT_API="${XE_ASMJIT_NEW_OUT_API}"
 
       - name: Build
         run: |
           export PATH="/opt/homebrew/opt/llvm@20/bin:$PATH"
-          export CPPFLAGS="-I/opt/homebrew/opt/llvm@20/include"
-          export LDFLAGS="-L/opt/homebrew/opt/llvm@20/lib"
-          cmake --build ${{github.workspace}}/build --config ${{env.BUILD_TYPE}} --parallel $(nproc)
+          cmake --build "${{ github.workspace }}/${BUILD_DIR}" --config "${{ env.BUILD_TYPE }}" --parallel "$(sysctl -n hw.ncpu)"
 
       - name: Prepare Artifact Folder
         run: |
           mkdir -p artifact
-          cp -r ${{env.BUILD_DIR}}/Xenon artifact/xenon-clang-arm64-${{env.BUILD_TYPE}}
+          cp -r "${{ github.workspace }}/${BUILD_DIR}/Xenon" "artifact/xenon-macos-arm64-clang-${{ env.BUILD_TYPE }}"
 
-      - name: Upload macOS Artifact
-        uses: actions/upload-artifact@main
+      - name: Upload macOS ARM Artifact
+        uses: actions/upload-artifact@v4
         with:
-          name: Xenon-${{runner.os}}-clang-arm64-${{ needs.get-info.outputs.commit }}-${{needs.get-info.outputs.shorthash}}
+          name: Xenon-macos-arm64-clang-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
+          path: artifact/
+
+  macOS-Intel:
+    name: macOS (Intel)
+    runs-on: macos-15-intel
+    needs: get-info
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup latest Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install Dependencies
+        run: brew install llvm@20 ccache ninja
+
+      - name: Clean build dir
+        run: rm -rf "${{ github.workspace }}/${BUILD_DIR}"
+
+      - name: Cache C/C++ compilation
+        uses: hendrikmuhs/ccache-action@v1.2.18
+        with:
+          append-timestamp: false
+          key: ${{ env.CACHE_VERSION }}-${{ runner.os }}-${{ runner.arch }}-macos-intel-clang-${{ env.BUILD_TYPE }}-asmjit-${{ env.XE_ASMJIT_NEW_OUT_API }}-${{ hashFiles('**/CMakeLists.txt', '**/*.cmake', 'Xenon/**/*.cpp', 'Xenon/**/*.c', 'Xenon/**/*.h', 'Xenon/**/*.hpp', 'Deps/ThirdParty/**/CMakeLists.txt') }}
+
+      - name: Configure CMake
+        run: |
+          export PATH="/usr/local/opt/llvm@20/bin:/opt/homebrew/opt/llvm@20/bin:$PATH"
+          cmake -G Ninja -S . -B "${{ github.workspace }}/${BUILD_DIR}" \
+            -DCMAKE_BUILD_TYPE="${{ env.BUILD_TYPE }}" \
+            -DCMAKE_C_COMPILER="$(brew --prefix llvm@20)/bin/clang" \
+            -DCMAKE_CXX_COMPILER="$(brew --prefix llvm@20)/bin/clang++" \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -DXE_ASMJIT_NEW_OUT_API="${XE_ASMJIT_NEW_OUT_API}"
+
+      - name: Build
+        run: |
+          export PATH="/usr/local/opt/llvm@20/bin:/opt/homebrew/opt/llvm@20/bin:$PATH"
+          cmake --build "${{ github.workspace }}/${BUILD_DIR}" --config "${{ env.BUILD_TYPE }}" --parallel "$(sysctl -n hw.ncpu)"
+
+      - name: Prepare Artifact Folder
+        run: |
+          mkdir -p artifact
+          cp -r "${{ github.workspace }}/${BUILD_DIR}/Xenon" "artifact/xenon-macos-intel-clang-${{ env.BUILD_TYPE }}"
+
+      - name: Upload macOS Intel Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Xenon-macos-intel-clang-${{ env.BUILD_TYPE }}-${{ needs.get-info.outputs.commit }}-${{ needs.get-info.outputs.shorthash }}
           path: artifact/

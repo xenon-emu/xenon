@@ -9,6 +9,8 @@
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
 #include "Core/XCPU/JIT/PPU_JIT.h"
 
+#include "Core/XCPU/JIT/JITCompat.h"
+
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
 using namespace asmjit;
 
@@ -17,11 +19,37 @@ using namespace asmjit;
 //
 // Allocates a new general purpose x86 register
 //
-#define newGP64()  b->compiler->newGpq()
-#define newGP32()  b->compiler->newGpd()
-#define newGP16()  b->compiler->newGpw()
-#define newGP8()   b->compiler->newGpb()
-#define newGPptr() b->compiler->newGpz()
+#define newGP64()  Xe::JITCompat::NewGP64(b->compiler)
+#define newGP32()  Xe::JITCompat::NewGP32(b->compiler)
+#define newGP16()  Xe::JITCompat::NewGP16(b->compiler)
+#define newGP8()   Xe::JITCompat::NewGP8(b->compiler)
+#define newGPptr() Xe::JITCompat::NewGPZ(b->compiler)
+
+#define newLabel() Xe::JITCompat::NewLabel(b->compiler)
+#define newStack(x, y) Xe::JITCompat::NewStack(b->compiler, x, y)
+
+//
+// Floating Point Register Pointer Helper
+//
+#define FPRPtr(x) b->threadCtx->array(&sPPUThread::FPR).Ptr(x)
+
+//
+// Allocates a new XMM register for floating-point operations
+//
+#define newXMM() Xe::JITCompat::NewXmm(b->compiler)
+
+#define newYMM() Xe::JITCompat::NewYmm(b->compiler)
+#define newZMM() Xe::JITCompat::NewZmm(b->compiler)
+
+//
+// FPSCR Pointer Helper
+//
+#define FPSCRPtr() b->threadCtx->scalar(&sPPUThread::FPSCR)
+
+//
+// Vector Register Pointer Helper
+//
+#define VPRPtr(x) b->threadCtx->array(&sPPUThread::VR).Ptr(x)
 
 //
 // Pointer Helpers
@@ -30,12 +58,12 @@ using namespace asmjit;
 #define GPRPtr(x) b->threadCtx->array(&sPPUThread::GPR).Ptr(x)
 #define SPRStruct(x) b->threadCtx->substruct(&sPPUThread::SPR).substruct(&sPPUThreadSPRs::x)
 #define SPRPtr(x) b->threadCtx->substruct(&sPPUThread::SPR).scalar(&sPPUThreadSPRs::x)
-#define SharedSPRStruct(x) b->ppeState->substruct(&sPPEState::SPR).substruct(&sPPESPRs::x)
+#define SharedSPRStruct(x) b->ppeState->substruct(&sPPEState::SPR).substruct(&sPPUGlobalSPRs::x)
 #define SharedSPRPtr(x) b->ppeState->substruct(&sPPEState::SPR).scalar(&sPPUGlobalSPRs::x)
 #define CRValPtr() b->threadCtx->scalar(&sPPUThread::CR)
 #define CIAPtr() b->threadCtx->scalar(&sPPUThread::CIA)
 #define NIAPtr() b->threadCtx->scalar(&sPPUThread::NIA)
-#define EXPtr() b->threadCtx->scalar(&sPPUThread::exceptReg) 
+#define EXPtr() b->threadCtx->scalar(&sPPUThread::exceptReg)
 #define LRPtr() SPRPtr(LR)
 
 // XER CA bit position (platform-dependent)
@@ -70,9 +98,9 @@ inline x86::Gp J_BuildCRU(JITBlockBuilder *b, x86::Gp lhs, x86::Gp rhs) {
   COMP->xor_(crValue, crValue);
 
   // Declare labels:
-  Label gt = COMP->newLabel(); // Self explanatory.
-  Label lt = COMP->newLabel(); // Self explanatory.
-  Label end = COMP->newLabel(); // Self explanatory.
+  Label gt = newLabel(); // Self explanatory.
+  Label lt = newLabel(); // Self explanatory.
+  Label end = newLabel(); // Self explanatory.
 
   COMP->cmp(lhs, rhs); // Compare lhs and rhs
   // Check Greater Than.
@@ -112,16 +140,16 @@ inline x86::Gp J_BuildCRU(JITBlockBuilder *b, x86::Gp lhs, x86::Gp rhs) {
 }
 
 // CR Signed comparison. Uses x86's JG and JL.
-inline x86::Gp J_BuildCRS(JITBlockBuilder* b, x86::Gp lhs, x86::Gp rhs) {
+inline x86::Gp J_BuildCRS(JITBlockBuilder *b, x86::Gp lhs, x86::Gp rhs) {
   x86::Gp crValue = newGP32();
   x86::Gp tmp = newGP8();
 
   COMP->xor_(crValue, crValue);
 
   // Declare labels:
-  Label gt = COMP->newLabel(); // Self explanatory.
-  Label lt = COMP->newLabel(); // Self explanatory.
-  Label end = COMP->newLabel(); // Self explanatory.
+  Label gt = newLabel(); // Self explanatory.
+  Label lt = newLabel(); // Self explanatory.
+  Label end = newLabel(); // Self explanatory.
 
   COMP->cmp(lhs, rhs); // Compare lhs and rhs
   // Check Greater Than.
@@ -171,7 +199,7 @@ inline void J_SetCRField(JITBlockBuilder *b, x86::Gp field, u32 index) {
 
   // Load CR value to temp storage.
   COMP->mov(tempCR, CRValPtr());
-  // Clear field to be modified. 
+  // Clear field to be modified.
   COMP->and_(tempCR, clearMask);
   // Left shift field bits to position.
   COMP->shl(field, sh);
@@ -183,10 +211,10 @@ inline void J_SetCRField(JITBlockBuilder *b, x86::Gp field, u32 index) {
 
 // Performs a comparison between the given input value and zero, and stores it in CR0 field.
 // * Takes into account the current computation mode (MSR[SF]).
-inline void J_ppuSetCR0(JITBlockBuilder* b, x86::Gp inValue) {
+inline void J_ppuSetCR0(JITBlockBuilder *b, x86::Gp inValue) {
   // Declare labels:
-  Label sfBitMode = COMP->newLabel(); // Determines if the compare is done using 64 bit mode.
-  Label end = COMP->newLabel(); // Self explanatory.
+  Label sfBitMode = newLabel(); // Determines if the compare is done using 64 bit mode.
+  Label end = newLabel(); // Self explanatory.
 
   // Check for MSR[SF]:
   x86::Gp tempMSR = newGP64(); // MSR is 64 bits wide.
@@ -221,8 +249,8 @@ inline void J_ppuSetCR0(JITBlockBuilder* b, x86::Gp inValue) {
 }
 
 inline void J_ppuSetCR(JITBlockBuilder *b, x86::Gp value, u32 index) {
-  Label use64 = COMP->newLabel();
-  Label done = COMP->newLabel();
+  Label use64 = newLabel();
+  Label done = newLabel();
 
   x86::Gp tempMSR = newGP64();
   x86::Gp tempCR = newGP32();
@@ -254,11 +282,11 @@ COMP->bind(use64);
 }
 
 // Check if carry took place according to computation modes and set XER[CA] depending on the result.
-inline void J_AddDidCarrySetCarry(JITBlockBuilder* b, x86::Gp a, x86::Gp result) {
-  Label use64 = COMP->newLabel();
-  Label resultCheck = COMP->newLabel();
-  Label setTrue = COMP->newLabel();
-  Label done = COMP->newLabel();
+inline void J_AddDidCarrySetCarry(JITBlockBuilder *b, x86::Gp a, x86::Gp result) {
+  Label use64 = newLabel();
+  Label resultCheck = newLabel();
+  Label setTrue = newLabel();
+  Label done = newLabel();
 
   // Get XER
   x86::Gp xer = newGP32();
@@ -300,7 +328,7 @@ inline void J_AddDidCarrySetCarry(JITBlockBuilder* b, x86::Gp a, x86::Gp result)
 #define FAST_TRAP
 
 // Trap Helper
-inline void TrapCheck(JITBlockBuilder* b, x86::Gp ra, x86::Gp rb, u32 TO) {
+inline void TrapCheck(JITBlockBuilder *b, x86::Gp ra, x86::Gp rb, u32 TO) {
   // if (a < b) & TO[0] then TRAP
   // if (a > b) & TO[1] then TRAP
   // if (a = b) & TO[2] then TRAP
@@ -310,8 +338,8 @@ inline void TrapCheck(JITBlockBuilder* b, x86::Gp ra, x86::Gp rb, u32 TO) {
   // Check TO - early exit if no conditions to check
   if (!TO) { return; }
 
-  Label end = COMP->newLabel();
-  Label doTrap = COMP->newLabel();
+  Label end = newLabel();
+  Label doTrap = newLabel();
 
   // Compare our values
   COMP->cmp(ra, rb);
@@ -354,11 +382,244 @@ COMP->bind(doTrap);
   COMP->mov(b->threadCtx->scalar(&sPPUThread::progExceptionType), exceptReg);
 #else
   // Slow but pretty, use our old function to print out debug messages, etc...
-  InvokeNode* inv = nullptr;
-  b->compiler->invoke(&inv, imm((void*)PPCInterpreter::ppcInterpreterTrap), FuncSignature::build<void, void*, u32>());
+  InvokeNode *inv = nullptr;
+  b->compiler->invoke(Out(inv, imm((void*)PPCInterpreter::ppcInterpreterTrap), FuncSignature::build<void, void*, u32>());
   inv->setArg(0, b->ppeState->Base());
   inv->setArg(1, rb);
 #endif // FAST_TRAP
   COMP->bind(end);
 }
+
+static constexpr size_t kLRUCacheNumSets = 256;
+static constexpr size_t kLRUCacheNumWays = 2;
+static constexpr u64 kLRUCacheInvalidKey = ~0ULL;
+static constexpr size_t kLRUCacheEntrySize = 24;
+static constexpr size_t kLRUCacheSetSize = kLRUCacheEntrySize * kLRUCacheNumWays; // 48
+static constexpr size_t kLRUEntryKeyOff = 0;
+static constexpr size_t kLRUEntryValueOff = 8;
+static constexpr size_t kLRUEntryValidOff = 16;
+static constexpr size_t kLRUEntriesOff = offsetof(LRUCache, entries);
+static constexpr size_t kLRULruBitsOff = offsetof(LRUCache, lruBits);
+
+
+static inline x86::Mem MemBI(const x86::Gp &base, const x86::Gp &index, s32 disp) {
+  return x86::ptr(base, index, 0, disp);
+}
+
+static inline x86::Mem ByteBI(const x86::Gp &base, const x86::Gp &index, s32 disp) {
+  return x86::byte_ptr(base, index, 0, disp);
+}
+
+static inline x86::Mem QwordBI(const x86::Gp &base, const x86::Gp &index, s32 disp) {
+  return x86::qword_ptr(base, index, 0, disp);
+}
+
+static inline void EmitLRUCacheInvalidateAll(JITBlockBuilder *b, const x86::Mem &cacheMem) {
+  x86::Gp cacheBase = newGP64();
+  x86::Gp entriesBase = newGP64();
+  x86::Gp lruBase = newGP64();
+  x86::Gp i = newGP32();
+  x86::Gp off = newGP64();
+
+  Label loop = newLabel();
+  Label done = newLabel();
+
+  COMP->lea(cacheBase, cacheMem);
+
+  COMP->mov(entriesBase, cacheBase);
+  if constexpr (kLRUEntriesOff != 0)
+    COMP->add(entriesBase, imm(static_cast<int32_t>(kLRUEntriesOff)));
+
+  COMP->mov(lruBase, cacheBase);
+  COMP->add(lruBase, imm(static_cast<int32_t>(kLRULruBitsOff)));
+
+  COMP->xor_(i, i);
+
+  COMP->bind(loop);
+  COMP->cmp(i, imm(static_cast<int32_t>(kLRUCacheNumSets)));
+  COMP->jge(done);
+
+  COMP->mov(off.r32(), i.r32());
+  COMP->imul(off, off, imm(static_cast<int32_t>(kLRUCacheSetSize)));
+
+  COMP->mov(ByteBI(entriesBase, off, static_cast<int32_t>(kLRUEntryValidOff)), imm(0));
+  COMP->mov(QwordBI(entriesBase, off, static_cast<int32_t>(kLRUEntryKeyOff)), imm<uint64_t>(kLRUCacheInvalidKey));
+
+  COMP->mov(ByteBI(entriesBase, off, static_cast<int32_t>(kLRUCacheEntrySize + kLRUEntryValidOff)), imm(0));
+  COMP->mov(QwordBI(entriesBase, off, static_cast<int32_t>(kLRUCacheEntrySize + kLRUEntryKeyOff)), imm<uint64_t>(kLRUCacheInvalidKey));
+
+  COMP->mov(x86::byte_ptr(lruBase, i.r64(), 0, 0), imm(0));
+
+  COMP->inc(i);
+  COMP->jmp(loop);
+
+  COMP->bind(done);
+}
+
+static inline void EmitLRUCacheInvalidateElement(JITBlockBuilder *b, const x86::Mem &cacheMem, x86::Gp key) {
+  x86::Gp cacheBase = newGP64();
+  x86::Gp entriesBase = newGP64();
+  x86::Gp setIdx = newGP64();
+  x86::Gp tmp = newGP64();
+  x86::Gp off = newGP64();
+  x86::Gp entryKey = newGP64();
+  x86::Gp valid = newGP32();
+
+  Label checkWay1 = newLabel();
+  Label done = newLabel();
+
+  COMP->lea(cacheBase, cacheMem);
+
+  COMP->mov(entriesBase, cacheBase);
+  if constexpr (kLRUEntriesOff != 0)
+    COMP->add(entriesBase, imm(static_cast<int32_t>(kLRUEntriesOff)));
+
+  COMP->mov(setIdx, key);
+  COMP->shr(setIdx, 12);
+
+  COMP->mov(tmp, key);
+  COMP->shr(tmp, 17);
+
+  COMP->xor_(setIdx, tmp);
+  COMP->and_(setIdx, imm<uint64_t>(kLRUCacheNumSets - 1));
+
+  COMP->mov(off.r32(), setIdx.r32());
+  COMP->imul(off, off, imm(static_cast<int32_t>(kLRUCacheSetSize)));
+
+  COMP->movzx(valid, ByteBI(entriesBase, off, static_cast<int32_t>(kLRUEntryValidOff)));
+  COMP->test(valid, valid);
+  COMP->jz(checkWay1);
+
+  COMP->mov(entryKey, QwordBI(entriesBase, off, static_cast<int32_t>(kLRUEntryKeyOff)));
+  COMP->cmp(entryKey, key);
+  COMP->jne(checkWay1);
+
+  COMP->mov(ByteBI(entriesBase, off, static_cast<int32_t>(kLRUEntryValidOff)), imm(0));
+  COMP->mov(QwordBI(entriesBase, off, static_cast<int32_t>(kLRUEntryKeyOff)), imm<uint64_t>(kLRUCacheInvalidKey));
+  COMP->jmp(done);
+
+  COMP->bind(checkWay1);
+
+  COMP->movzx(valid, ByteBI(entriesBase, off, static_cast<int32_t>(kLRUCacheEntrySize + kLRUEntryValidOff)));
+  COMP->test(valid, valid);
+  COMP->jz(done);
+
+  COMP->mov(entryKey, QwordBI(entriesBase, off, static_cast<int32_t>(kLRUCacheEntrySize + kLRUEntryKeyOff)));
+  COMP->cmp(entryKey, key);
+  COMP->jne(done);
+
+  COMP->mov(ByteBI(entriesBase, off, static_cast<int32_t>(kLRUCacheEntrySize + kLRUEntryValidOff)), imm(0));
+  COMP->mov(QwordBI(entriesBase, off, static_cast<int32_t>(kLRUCacheEntrySize + kLRUEntryKeyOff)), imm<uint64_t>(kLRUCacheInvalidKey));
+
+  COMP->bind(done);
+}
+
+static inline x86::Gp EmitEA_DForm_Halfword(JITBlockBuilder *b, uPPCInstr instr) {
+  x86::Compiler *cc = b->compiler;
+  x86::Gp EA = newGP64();
+
+  if (instr.ra) {
+    cc->mov(EA, GPRPtr(instr.ra));
+    cc->add(EA, imm<s64>(instr.simm16));
+  } else {
+    cc->mov(EA, imm<s64>(instr.simm16));
+  }
+
+  return EA;
+}
+
+static inline x86::Gp EmitEA_XForm_Halfword(JITBlockBuilder *b, uPPCInstr instr, bool ra_zero_means_zero) {
+  x86::Compiler *cc = b->compiler;
+  x86::Gp EA = newGP64();
+
+  if (ra_zero_means_zero) {
+    if (instr.ra) {
+      cc->mov(EA, GPRPtr(instr.ra));
+      cc->add(EA, GPRPtr(instr.rb));
+    } else {
+      cc->mov(EA, GPRPtr(instr.rb));
+    }
+  } else {
+    cc->mov(EA, GPRPtr(instr.ra));
+    cc->add(EA, GPRPtr(instr.rb));
+  }
+
+  return EA;
+}
+
+static inline x86::Gp EmitMMURead16(JITBlockBuilder *b, x86::Gp EA) {
+  x86::Gp data16 = newGP16();
+  InvokeNode *read = nullptr;
+  Xe::JITCompat::Invoke(b->compiler, read, imm((void *)PPCInterpreter::MMURead16), FuncSignature::build<u16, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(read, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(read, 1, EA);
+  Xe::JITCompat::SetArg(read, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(read, 0, data16);
+  return data16;
+}
+
+static inline void EmitMMUWrite16(JITBlockBuilder* b, x86::Gp EA, x86::Gp value32) {
+  InvokeNode *write = nullptr;
+  Xe::JITCompat::Invoke(b->compiler, write, imm((void*)PPCInterpreter::MMUWrite16), FuncSignature::build<void, sPPEState *, u64, u16, ePPUThreadID>());
+  Xe::JITCompat::SetArg(write, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(write, 1, EA);
+  Xe::JITCompat::SetArg(write, 2, value32.r16());
+  Xe::JITCompat::SetArg(write, 3, ePPUThread_None);
+}
+
+static inline x86::Gp EmitMMURead32(JITBlockBuilder* b, x86::Gp EA) {
+  x86::Gp data32 = newGP32();
+  InvokeNode *read = nullptr;
+  Xe::JITCompat::Invoke(b->compiler, read, imm((void*)PPCInterpreter::MMURead32), FuncSignature::build<u32, sPPEState*, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(read, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(read, 1, EA);
+  Xe::JITCompat::SetArg(read, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(read, 0, data32);
+  return data32;
+}
+
+static inline x86::Gp EmitMMURead64(JITBlockBuilder* b, x86::Gp EA) {
+  x86::Gp data64 = newGP64();
+  InvokeNode *read = nullptr;
+  Xe::JITCompat::Invoke(b->compiler, read, imm((void *)PPCInterpreter::MMURead64), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(read, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(read, 1, EA);
+  Xe::JITCompat::SetArg(read, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(read, 0, data64);
+  return data64;
+}
+
+static inline void EmitDataExceptionEarlyExit(JITBlockBuilder *b) {
+  Label noEx = newLabel();
+  x86::Gp exceptReg = newGP32();
+  COMP->movzx(exceptReg, b->threadCtx->scalar(&sPPUThread::exceptReg));
+  COMP->test(exceptReg, imm<u32>(ppuDataSegmentEx | ppuDataStorageEx));
+  COMP->jz(noEx);
+  COMP->ret();
+  COMP->bind(noEx);
+}
+
+static inline void EmitDataAccessEarlyExit(JITBlockBuilder *b) {
+  Label noEx = newLabel();
+  x86::Gp exceptReg = newGP32();
+  COMP->movzx(exceptReg, b->threadCtx->scalar(&sPPUThread::exceptReg));
+  COMP->test(exceptReg, imm<u32>(ppuDataSegmentEx | ppuDataStorageEx));
+  COMP->jz(noEx);
+  COMP->ret();
+  COMP->bind(noEx);
+}
+
+static inline x86::Gp EmitDSFormEA(JITBlockBuilder* b, uPPCInstr instr) {
+  x86::Gp EA = newGP64();
+  // ds-form immediate is simm16 with low 2 bits forced 0
+  const s64 ds = static_cast<s64>(instr.simm16 & ~3);
+  if (instr.ra) {
+    COMP->mov(EA, GPRPtr(instr.ra));
+    COMP->add(EA, imm(ds));
+  } else {
+    COMP->mov(EA, imm(ds));
+  }
+  return EA;
+}
+
 #endif

@@ -13,14 +13,14 @@
 //#define SFCX_DEBUG
 
 // There are two SFCX Versions, pre-Jasper and post-Jasper
-Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::string &nandLoadPath, PCIBridge *parentPCIBridge, RAM *ram) :
-  PCIDevice(deviceName, size),
+Xe::PCIDev::SFCX::SFCX(u64 size, const std::string &nandLoadPath, std::weak_ptr<PCIBridge>parentPCIBridge, std::weak_ptr<RAM> ram) :
+  PCIDevice(__func__, size),
   parentBus(parentPCIBridge), mainMemory(ram)
 {
   // Set PCI Properties
-  pciConfigSpace.configSpaceHeader.reg0.hexData = 0x580B1414;
-  pciConfigSpace.configSpaceHeader.reg1.hexData = 0x02000006;
-  pciConfigSpace.configSpaceHeader.reg2.hexData = 0x05010001;
+  pciConfigSpace.reg0.hexData = 0x580B1414;
+  pciConfigSpace.reg1.hexData = 0x02000006;
+  pciConfigSpace.reg2.hexData = 0x05010001;
 
   // Set our PCI Dev Sizes
   pciDevSizes[0] = 0x400; // BAR0
@@ -154,6 +154,8 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
 
   hasInitialised = true;
 
+  sfcxThreadRunning.store(hasInitialised, std::memory_order_release);
+
   // Get CB_A and CB_B headers
   BL_HEADER cbaHeader;
   BL_HEADER cbbHeader;
@@ -224,6 +226,7 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
     // CB_B 6752, 9188, 15432
     case 6752:
     case 9188:
+    case 15432:
       initSkip1 = 0x03003DC0;
       LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, initSkip1);
       initSkip2 = 0x03003E54;
@@ -231,7 +234,6 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
       break;
     // CB_B 14352
     case 14352:
-    case 15432:
       initSkip1 = 0x03003F48;
       LOG_INFO(SFCX, " > CB({:#d}): Skip Address 1 set to: 0x{:X}", cbVersion, initSkip1);
       initSkip2 = 0x03003FDC;
@@ -242,27 +244,35 @@ Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::strin
       break;
     }
   }
-}
 
-Xe::PCIDev::SFCX::~SFCX() {
-  // Clear NAND image data
-  rawImageData.clear();
-  // Terminate thread
-  sfcxThreadRunning = false;
-  if (sfcxThread.joinable())
-    sfcxThread.join();
-}
-
-void Xe::PCIDev::SFCX::Start() {
   // Enter SFCX Thread
   sfcxThread = std::thread(&Xe::PCIDev::SFCX::sfcxMainLoop, this);
 }
 
-void Xe::PCIDev::SFCX::Read(u64 readAddress, u8 *data, u64 size) {
+Xe::PCIDev::SFCX::~SFCX() {
+  if (!RetireAndWait()) {
+    LOG_CRITICAL(SFCX, "Timed out waiting for in-flight accesses to drain during destruction!");
+  }
+
+  // Clear NAND image data
+  rawImageData.clear();
+  // Terminate thread
+  sfcxThreadRunning.store(false, std::memory_order_release);
+  if (sfcxThread.joinable())
+    sfcxThread.join();
+}
+
+void Xe::PCIDev::SFCX::Read(u64 address, u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    memset(data, 0xFF, size);
+    return;
+  }
+
   // Set a lock on registers
   std::lock_guard lck(mutex);
 
-  const u16 reg = readAddress & 0xFF;
+  const u16 reg = address & 0xFF;
 
   switch (reg) {
   case SFCX_CONFIG_REG:
@@ -301,16 +311,26 @@ void Xe::PCIDev::SFCX::Read(u64 readAddress, u8 *data, u64 size) {
   }
 }
 
-void Xe::PCIDev::SFCX::ConfigRead(u64 readAddress, u8 *data, u64 size) {
-  const u8 offset = readAddress & 0xFF;
+void Xe::PCIDev::SFCX::ConfigRead(u64 address, u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    memset(data, 0xFF, size);
+    return;
+  }
+  const u8 offset = address & 0xFF;
   memcpy(data, &pciConfigSpace.data[offset], size);
 }
 
-void Xe::PCIDev::SFCX::Write(u64 writeAddress, const u8 *data, u64 size) {
+void Xe::PCIDev::SFCX::Write(u64 address, const u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
+
   // Set a lock on registers
   std::lock_guard lck(mutex);
 
-  const u16 reg = writeAddress & 0xFF;
+  const u16 reg = address & 0xFF;
 
   // Command register
   u32 command = NO_CMD;
@@ -378,11 +398,16 @@ void Xe::PCIDev::SFCX::Write(u64 writeAddress, const u8 *data, u64 size) {
     break;
   }
 }
-void Xe::PCIDev::SFCX::MemSet(u64 writeAddress, s32 data, u64 size) {
+void Xe::PCIDev::SFCX::MemSet(u64 address, s32 data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
+
   // Set a lock on registers
   std::lock_guard lck(mutex);
 
-  const u16 reg = writeAddress & 0xFF;
+  const u16 reg = address & 0xFF;
 
   switch (reg) {
   case SFCX_CONFIG_REG:
@@ -421,41 +446,45 @@ void Xe::PCIDev::SFCX::MemSet(u64 writeAddress, s32 data, u64 size) {
   }
 }
 
-void Xe::PCIDev::SFCX::ReadRaw(u64 readAddress, u8 *data, u64 size) {
-  u32 offset = static_cast<u32>(readAddress & 0xFFFFFF);
+void Xe::PCIDev::SFCX::ReadRaw(u64 address, u8 *data, u64 size) {
+  u32 offset = static_cast<u32>(address & 0xFFFFFF);
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
 #ifdef NAND_DEBUG
-  LOG_DEBUG(SFCX, "Reading RAW data at 0x{:X} (offset 0x{:X}) for 0x{:X} bytes", readAddress, offset, size);
+  LOG_DEBUG(SFCX, "Reading RAW data at 0x{:X} (offset 0x{:X}) for 0x{:X} bytes", address, offset, size);
 #endif // NAND_DEBUG
   memcpy(data, rawImageData.data() + offset, size);
 }
 
-void Xe::PCIDev::SFCX::WriteRaw(u64 writeAddress, const u8 *data, u64 size) {
-  u32 offset = static_cast<u32>(writeAddress & 0xFFFFFF);
+void Xe::PCIDev::SFCX::WriteRaw(u64 address, const u8 *data, u64 size) {
+  u32 offset = static_cast<u32>(address & 0xFFFFFF);
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
 #ifdef NAND_DEBUG
-  LOG_DEBUG(SFCX, "Writing RAW data at 0x{:X} (offset 0x{:X}) for 0x{:X} bytes", writeAddress, offset, size);
+  LOG_DEBUG(SFCX, "Writing RAW data at 0x{:X} (offset 0x{:X}) for 0x{:X} bytes", address, offset, size);
 #endif // NAND_DEBUG
   memcpy(rawImageData.data() + offset, data, size);
 }
 
-void Xe::PCIDev::SFCX::MemSetRaw(u64 writeAddress, s32 data, u64 size) {
-  u32 offset = static_cast<u32>(writeAddress & 0xFFFFFF);
+void Xe::PCIDev::SFCX::MemSetRaw(u64 address, s32 data, u64 size) {
+  u32 offset = static_cast<u32>(address & 0xFFFFFF);
   offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
 #ifdef NAND_DEBUG
-  LOG_DEBUG(SFCX, "Setting RAW data at 0x{:X} to 0x{:X} (offset 0x{:X}) for 0x{:X} bytes", writeAddress, data, offset, size);
+  LOG_DEBUG(SFCX, "Setting RAW data at 0x{:X} to 0x{:X} (offset 0x{:X}) for 0x{:X} bytes", address, data, offset, size);
 #endif // NAND_DEBUG
   memset(rawImageData.data() + offset, data, size);
 }
 
-void Xe::PCIDev::SFCX::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
-  const u8 offset = writeAddress & 0xFF;
+void Xe::PCIDev::SFCX::ConfigWrite(u64 address, const u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
+  const u8 offset = address & 0xFF;
 
   // Check if we're being scanned
   u64 tmp = 0;
   memcpy(&tmp, data, size);
-  if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
-    const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
+  if (static_cast<u8>(address) >= 0x10 && static_cast<u8>(address) < 0x34) {
+    const u32 regOffset = (static_cast<u8>(address) - 0x10) >> 2;
     if (pciDevSizes[regOffset] != 0) {
       if (tmp == 0xFFFFFFFF) { // PCI BAR Size discovery
         u64 x = 2;
@@ -469,7 +498,7 @@ void Xe::PCIDev::SFCX::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
         tmp &= ~0x3;
       }
     }
-    if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address
+    if (static_cast<u8>(address) == 0x30) { // Expansion ROM Base Address
       tmp = 0; // Register not implemented
     }
   }
@@ -479,15 +508,8 @@ void Xe::PCIDev::SFCX::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
 
 void Xe::PCIDev::SFCX::sfcxMainLoop() {
   Base::SetCurrentThreadName("[Xe] SFCX");
-  sfcxThreadRunning = XeRunning;
-  // Config register should be initialized by now
-  while (sfcxThreadRunning) {
-    // Ensure we haven't shutdown elsewhere.
-    sfcxThreadRunning = XeRunning;
-    if (!sfcxThreadRunning)
-      break;
+  while (sfcxThreadRunning.load(std::memory_order_acquire) && XeRunning.load(std::memory_order_acquire)) {
 
-    // Did we got a command?
     if (sfcxState.commandReg != NO_CMD) {
       // Check the command reg to see what command was issued
       std::lock_guard lck(mutex);
@@ -519,9 +541,12 @@ void Xe::PCIDev::SFCX::sfcxMainLoop() {
         LOG_ERROR(SFCX, "Unrecognized command was issued. 0x{:X}. Issuing interrupt if enabled.", sfcxState.commandReg);
         break;
       }
+
       if (sfcxState.configReg & CONFIG_INT_EN) {
-        parentBus->RouteInterrupt(PRIO_SFCX);
-        sfcxState.statusReg |= STATUS_INT_CP;
+        if (auto bus = parentBus.lock()) {
+          bus->RouteInterrupt(PRIO_SFCX);
+          sfcxState.statusReg |= STATUS_INT_CP;
+        }
       }
 
       // Clear Command Register
@@ -592,93 +617,110 @@ void Xe::PCIDev::SFCX::sfcxEraseBlock() {
 }
 
 void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND(bool physical) {
-  // Physical address when doing DMA
-  u32 physAddr = sfcxState.addressReg;
-  // Calculate Physical address offset for starting page
-  physAddr = 1 ? ((physAddr / sfcxState.pageSize) * sfcxState.pageSizePhys) + physAddr % sfcxState.pageSize : physAddr;
-
-  // Number of pages to be transfered when doing DMA
-  u32 dmaPagesNum = ((sfcxState.configReg & CONFIG_DMA_LEN) >> 6) + 1;
-
-  // Get RAM pointers for both buffers
-  u8* dataPhysAddrPtr = mainMemory->GetPointerToAddress(sfcxState.dataPhysAddrReg);
-  u8* sparePhysAddrPtr = nullptr;
-  if (physical) {
-    sparePhysAddrPtr = mainMemory->GetPointerToAddress(sfcxState.sparePhysAddrReg);
-  }
-  
-#ifdef SFCX_DEBUG
-  LOG_DEBUG(SFCX, "DMA_PHY_TO_RAM: Reading 0x{:X} pages. Logical Address: 0x{:X}, Physical Address: 0x{:X}, Data DMA address: 0x{:X}, Spare DMA address: 0x{:X}",
-    dmaPagesNum, sfcxState.addressReg, physAddr, sfcxState.dataPhysAddrReg, sfcxState.sparePhysAddrReg);
-#endif // SFCX_DEBUG
-
-  // Read Pages to SFCX_DATAPHYADDR_REG and page sapre to SFCX_SPAREPHYADDR_REG
-  for (size_t pageNum = 0; pageNum < dmaPagesNum; pageNum++) {
-#ifdef SFCX_DEBUG
-    LOG_DEBUG(SFCX, "DMA_PHY_TO_RAM: Reading Page 0x{:X}. Physical Address: 0x{:X}", pageNum, physAddr);
-#endif // SFCX_DEBUG
-
-    // Clear the page buffer
-    memset(sfcxState.pageBuffer, 0, sizeof(sfcxState.pageBuffer));
-
-    // Get page data
-    memcpy(sfcxState.pageBuffer, &rawImageData[physAddr], sfcxState.pageSizePhys);
-
-    // Write page and spare to RAM
-    // On DMA, physical pages are split into Page data and Spare Data, and stored at different locations in memory
-    memcpy(dataPhysAddrPtr, &sfcxState.pageBuffer, sfcxState.pageSize);
-    if (physical) {
-      memcpy(sparePhysAddrPtr, &sfcxState.pageBuffer[sfcxState.pageSize], sfcxState.spareSize);
+  if (auto ram = mainMemory.lock()) {
+    // Held for the whole multi-page DMA below, since it dereferences raw
+    // pointers into RAM's backing buffer across many memcpy calls.
+    auto ramLease = ram->GetLease();
+    if (!ramLease) {
+      return;
     }
 
-    // Increase buffer pointers
-    dataPhysAddrPtr += sfcxState.pageSize;   // Logical page size
+    u32 physAddr = sfcxState.addressReg;
+    // Calculate Physical address offset for starting page
+    physAddr = 1 ? ((physAddr / sfcxState.pageSize) * sfcxState.pageSizePhys) + physAddr % sfcxState.pageSize : physAddr;
+
+    // Number of pages to be transfered when doing DMA
+    u32 dmaPagesNum = ((sfcxState.configReg & CONFIG_DMA_LEN) >> 6) + 1;
+
+    // Get RAM pointers for both buffers
+    u8 *dataPhysAddrPtr = ram->GetPointerToAddress(sfcxState.dataPhysAddrReg);
+    u8 *sparePhysAddrPtr = nullptr;
     if (physical) {
-      sparePhysAddrPtr += sfcxState.spareSize; // Spare Size
+      sparePhysAddrPtr = ram->GetPointerToAddress(sfcxState.sparePhysAddrReg);
     }
 
-    // Increase read address
-    physAddr += sfcxState.pageSizePhys;
+#ifdef SFCX_DEBUG
+    LOG_DEBUG(SFCX, "DMA_PHY_TO_RAM: Reading 0x{:X} pages. Logical Address: 0x{:X}, Physical Address: 0x{:X}, Data DMA address: 0x{:X}, Spare DMA address: 0x{:X}",
+      dmaPagesNum, sfcxState.addressReg, physAddr, sfcxState.dataPhysAddrReg, sfcxState.sparePhysAddrReg);
+#endif // SFCX_DEBUG
+
+    // Read Pages to SFCX_DATAPHYADDR_REG and page sapre to SFCX_SPAREPHYADDR_REG
+    for (size_t pageNum = 0; pageNum < dmaPagesNum; pageNum++) {
+#ifdef SFCX_DEBUG
+      LOG_DEBUG(SFCX, "DMA_PHY_TO_RAM: Reading Page 0x{:X}. Physical Address: 0x{:X}", pageNum, physAddr);
+#endif // SFCX_DEBUG
+
+      // Clear the page buffer
+      memset(sfcxState.pageBuffer, 0, sizeof(sfcxState.pageBuffer));
+
+      // Get page data
+      memcpy(sfcxState.pageBuffer, &rawImageData[physAddr], sfcxState.pageSizePhys);
+
+      // Write page and spare to RAM
+      // On DMA, physical pages are split into Page data and Spare Data, and stored at different locations in memory
+      memcpy(dataPhysAddrPtr, &sfcxState.pageBuffer, sfcxState.pageSize);
+      if (physical) {
+        memcpy(sparePhysAddrPtr, &sfcxState.pageBuffer[sfcxState.pageSize], sfcxState.spareSize);
+      }
+
+      // Increase buffer pointers
+      dataPhysAddrPtr += sfcxState.pageSize; // Logical page size
+      if (physical) {
+        sparePhysAddrPtr += sfcxState.spareSize; // Spare Size
+      }
+
+      // Increase read address
+      physAddr += sfcxState.pageSizePhys;
+    }
   }
 }
 
 void Xe::PCIDev::SFCX::sfcxDoDMAtoNAND() {
-  // Physical address when doing DMA
-  u32 physAddr = sfcxState.addressReg;
-  // Calculate Physical address offset for starting page
-  physAddr = 1 ? ((physAddr / sfcxState.pageSize) * sfcxState.pageSizePhys) + physAddr % sfcxState.pageSize : physAddr;
+  if (auto ram = mainMemory.lock()) {
+    // Held for the whole multi-page DMA below, since it dereferences raw
+    // pointers into RAM's backing buffer across many memcpy calls.
+    auto ramLease = ram->GetLease();
+    if (!ramLease) {
+      return;
+    }
 
-  // Number of pages to be transfered when doing DMA
-  u32 dmaPagesNum = ((sfcxState.configReg & CONFIG_DMA_LEN) >> 6) + 1;
+    // Physical address when doing DMA
+    u32 physAddr = sfcxState.addressReg;
+    // Calculate Physical address offset for starting page
+    physAddr = 1 ? ((physAddr / sfcxState.pageSize) * sfcxState.pageSizePhys) + physAddr % sfcxState.pageSize : physAddr;
 
-  // Get RAM pointers for both buffers
-  u8 *dataPhysAddrPtr = mainMemory->GetPointerToAddress(sfcxState.dataPhysAddrReg);
-  u8 *sparePhysAddrPtr = mainMemory->GetPointerToAddress(sfcxState.sparePhysAddrReg);
+    // Number of pages to be transfered when doing DMA
+    u32 dmaPagesNum = ((sfcxState.configReg & CONFIG_DMA_LEN) >> 6) + 1;
+
+    // Get RAM pointers for both buffers
+    u8 *dataPhysAddrPtr = ram->GetPointerToAddress(sfcxState.dataPhysAddrReg);
+    u8 *sparePhysAddrPtr = ram->GetPointerToAddress(sfcxState.sparePhysAddrReg);
 
 #ifdef SFCX_DEBUG
-  LOG_DEBUG(SFCX, "DMA_RAM_TO_PHY: Writing 0x{:X} pages. Logical Address: 0x{:X}, Physical Address: 0x{:X}, Data DMA address: 0x{:X}, Spare DMA address: 0x{:X}",
-    dmaPagesNum, sfcxState.addressReg, physAddr, sfcxState.dataPhysAddrReg, sfcxState.sparePhysAddrReg);
+    LOG_DEBUG(SFCX, "DMA_RAM_TO_PHY: Writing 0x{:X} pages. Logical Address: 0x{:X}, Physical Address: 0x{:X}, Data DMA address: 0x{:X}, Spare DMA address: 0x{:X}",
+      dmaPagesNum, sfcxState.addressReg, physAddr, sfcxState.dataPhysAddrReg, sfcxState.sparePhysAddrReg);
 #endif // SFCX_DEBUG
 
-  // Read Pages to SFCX_DATAPHYADDR_REG and page sapre to SFCX_SPAREPHYADDR_REG
-  for (size_t pageNum = 0; pageNum < dmaPagesNum; pageNum++) {
+    // Read Pages to SFCX_DATAPHYADDR_REG and page sapre to SFCX_SPAREPHYADDR_REG
+    for (u32 pageNum = 0; pageNum != dmaPagesNum; ++pageNum) {
 #ifdef SFCX_DEBUG
-    LOG_DEBUG(SFCX, "DMA_RAM_TO_PHY: Writing page 0x{:X}. Physical Address: 0x{:X}", pageNum, physAddr);
+      LOG_DEBUG(SFCX, "DMA_RAM_TO_PHY: Writing page 0x{:X}. Physical Address: 0x{:X}", pageNum, physAddr);
 #endif // SFCX_DEBUG
 
-    // Clear the page buffer
-    memset(sfcxState.pageBuffer, 0, sizeof(sfcxState.pageBuffer));
+      // Clear the page buffer
+      memset(sfcxState.pageBuffer, 0, sizeof(sfcxState.pageBuffer));
 
-    // Write page and spare to NAND
-    // On DMA, physical pages are split into Page data and Spare Data, and stored at different locations in memory
-    memcpy(&rawImageData[physAddr], dataPhysAddrPtr, sfcxState.pageSize);
-    memcpy(&rawImageData[physAddr + sfcxState.pageSize], sparePhysAddrPtr, sfcxState.spareSize);
+      // Write page and spare to NAND
+      // On DMA, physical pages are split into Page data and Spare Data, and stored at different locations in memory
+      memcpy(&rawImageData[physAddr], dataPhysAddrPtr, sfcxState.pageSize);
+      memcpy(&rawImageData[physAddr + sfcxState.pageSize], sparePhysAddrPtr, sfcxState.spareSize);
 
-    // Increase buffer pointers
-    dataPhysAddrPtr += sfcxState.pageSize;   // Logical page size
-    sparePhysAddrPtr += sfcxState.spareSize; // Spare Size
+      // Increase buffer pointers
+      dataPhysAddrPtr += sfcxState.pageSize;   // Logical page size
+      sparePhysAddrPtr += sfcxState.spareSize; // Spare Size
 
-    // Increase read address
-    physAddr += sfcxState.pageSizePhys;
+      // Increase read address
+      physAddr += sfcxState.pageSizePhys;
+    }
   }
 }

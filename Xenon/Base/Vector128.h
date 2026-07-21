@@ -39,6 +39,7 @@ struct alignas(16) Vector128 {
     std::array<u16, 8> word;
     std::array<s16, 8> sword;
     std::array<u8, 16> bytes;
+    std::array<s8, 16> sbytes;
   };
 
   constexpr friend bool operator==(const Vector128 &a, const Vector128 &b) {

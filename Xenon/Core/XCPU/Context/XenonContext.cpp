@@ -119,7 +119,7 @@ bool XenonContext::HandleSecRNGRead(u64 readAddr, u8 *data, size_t byteCount) {
   u64 dataOut = 0;
   u16 offset = readAddr - XE_SOCSECRNG_BLOCK_START;
   if (readAddr == 0x26008) {
-    std::random_device randomDevice;  // Seed for the random number engine
+    std::random_device randomDevice; // Seed for the random number engine
     std::default_random_engine generator(randomDevice());
     std::uniform_int_distribution<u64> distribution(0, UINT64_MAX);
 
@@ -215,6 +215,7 @@ bool XenonContext::HandlePRVRead(u64 readAddr, u8 *data, size_t byteCount) {
   LOG_TRACE(Xenon, "SoC PRV Read at address 0x{:X}, data 0x{:X}.", readAddr, dataOut);
   return true;
 }
+
 // Pervasive logic Write
 bool XenonContext::HandlePRVWrite(u64 writeAddr, const u8 *data, size_t byteCount) {
   std::lock_guard lock(mutex);
@@ -234,14 +235,14 @@ bool XenonContext::HandlePRVWrite(u64 writeAddr, const u8 *data, size_t byteCoun
   case 0x611A0ULL:
     if (socPRVBlock.get()->TimebaseControl.AsBITS.TimebaseEnable) {
       // TimeBase Enabled
-      timeBaseActive = true;
+      timeBase.SetEnabled(true);
     } else {
       // TimeBase Disabled
-      timeBaseActive = false;
+      timeBase.SetEnabled(false);
     }
     // TimeBase Control
-    LOG_WARNING(Xenon, "SoC PRV: TimeBase Control being set 0x{:X}, enabled: {}, divider: 0x{:X}.",
-      dataIn, timeBaseActive, socPRVBlock.get()->TimebaseControl.AsBITS.TimebaseDivider);
+    LOG_TRACE(Xenon, "SoC PRV: TimeBase Control being set 0x{:X}, enabled: {}, divider: 0x{:X}.",
+      dataIn, timeBase.IsEnabled(), socPRVBlock.get()->TimebaseControl.AsBITS.TimebaseDivider);
     break;
   case 0x61188ULL:
     // CPU VID Register
@@ -254,4 +255,5 @@ bool XenonContext::HandlePRVWrite(u64 writeAddr, const u8 *data, size_t byteCoun
   LOG_TRACE(Xenon, "SoC PRV Write at address 0x{:X}, data 0x{:X}.", writeAddr, dataIn);
   return true;
 }
-}
+
+} // namespace Xe::XCPU

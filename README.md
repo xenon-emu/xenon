@@ -1,4 +1,4 @@
-<!-- Copyright 2025 Xenon Emulator Project -->
+<!-- Copyright 2026 Xenon Emulator Project -->
 
 <h1 align="center">
   <br>

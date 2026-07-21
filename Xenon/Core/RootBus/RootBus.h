@@ -6,6 +6,7 @@
 
 #include <unordered_map>
 
+#include "Base/LifetimeGuard.h"
 #include "Base/SystemDevice.h"
 #include "Core/PCI/Bridge/HostBridge.h"
 
@@ -22,26 +23,40 @@ public:
   RootBus();
   ~RootBus();
 
-  void AddHostBridge(std::shared_ptr<HostBridge> newHostBridge);
+  std::weak_ptr<HostBridge> AddHostBridge(std::unique_ptr<HostBridge> newHostBridge);
+  void AddDevice(std::unique_ptr<SystemDevice> device);
+  void ResetDevice(std::unique_ptr<SystemDevice> device);
 
-  void AddDevice(std::shared_ptr<SystemDevice> device);
-
-  void ResetDevice(std::shared_ptr<SystemDevice> device);
-
-  bool Read(u64 readAddress, u8 *data, u64 size, bool soc = false);
-  bool Write(u64 writeAddress, const u8 *data, u64 size, bool soc = false);
-  bool MemSet(u64 writeAddress, s32 data, u64 size);
+  bool Read(u64 address, u8 *data, u64 size, bool soc = false);
+  bool Write(u64 address, const u8 *data, u64 size, bool soc = false);
+  bool MemSet(u64 address, s32 data, u64 size);
 
   // Configuration Space R/W
-  bool ConfigRead(u64 readAddress, u8 *data, u64 size);
-  bool ConfigWrite(u64 writeAddress, const u8 *data, u64 size);
+  bool ConfigRead(u64 address, u8 *data, u64 size);
+  bool ConfigWrite(u64 address, const u8 *data, u64 size);
 
+  template <typename T>
+  std::weak_ptr<T> GetDevice(u32 hash) {
+    return std::dynamic_pointer_cast<T>(connectedDevices[hash]);
+  }
+
+  // Acquire a lease guarding this bus against concurrent teardown. See
+  // Base::LifetimeGuard for the contract.
+  Base::LifetimeGuard::Lease GetLease() {
+    return lifetimeGuard.TryAcquire();
+  }
 private:
-  std::shared_ptr<HostBridge> hostBridge{};
-  u32 deviceCount;
-  std::unordered_map<std::string, std::shared_ptr<SystemDevice>> connectedDevices;
-  // Direct device pointers for both RAM and SFCX
-  SystemDevice* ramDevice{ nullptr };
-  SystemDevice* sfcxDevice{ nullptr };
+  // Guards against destruction racing an in-flight Read/Write/MemSet/
+  // ConfigRead/ConfigWrite from another thread.
+  Base::LifetimeGuard lifetimeGuard{};
+
+  std::shared_ptr<HostBridge> hostBridge = {};
+
+  u32 deviceCount = 0;
+  std::unordered_map<u32, std::shared_ptr<SystemDevice>> connectedDevices = {};
+
+  std::shared_ptr<SystemDevice> ramDevice = {};
+  std::shared_ptr<SystemDevice> sfcxDevice = {};
+
   std::unique_ptr<u8> biuData{ std::make_unique<STRIP_UNIQUE(biuData)>(0x10000) };
 };

@@ -4,15 +4,17 @@
 
 #pragma once
 
-#ifdef __linux__
-#include <signal.h>
+#if defined(__linux__) || defined(__APPLE__)
+  #include <signal.h>
+  #include <pthread.h>
 #elif defined(_WIN32)
-#include <Windows.h>
+  #include <windows.h>
 #endif
 
 namespace Base {
 
-inline volatile int hupflag = 0;
+inline std::thread signalThread{};
+inline std::atomic<bool> signalThreadRunning = false;
 
 [[nodiscard]] extern const s32 InstallHangup();
 [[nodiscard]] extern const s32 RemoveHangup();

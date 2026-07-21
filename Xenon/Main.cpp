@@ -1,5 +1,5 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #include "Core/XeMain.h"
@@ -45,28 +45,40 @@ s32 main(s32 argc, char *argv[]) {
   if (XeMain::renderer.get()) {
     std::unique_lock<std::mutex> lock(XeMain::renderer->initMutex);
     XeMain::renderer->initCV.wait(lock, []{
-        return XeMain::renderer->imguiInitialized;
+      return XeMain::renderer->imguiInitialized;
     });
   }
 #endif
   // Inf wait until told otherwise
-  while (XeRunning) {
+  while (XeRunning.load(std::memory_order_acquire)) {
 #if MICROPROFILE_ENABLED && !AUTO_FLIP
     MicroProfileFlip(nullptr);
 #endif // MICROPROFILE_ENABLED && !AUTO_FLIP
 #ifndef NO_GFX
-    if (XeMain::renderer.get())
-      XeMain::renderer->HandleEvents();
+    SDL_Event e;
+    if (SDL_PollEvent(&e)) {
+      if (XeMain::renderer.get())
+        XeMain::renderer->OnEvent(e);
+    }
 #else
     std::this_thread::sleep_for(100ms);
 #endif // !NO_GFX
   }
 
+
   // Shutdown
-  XeMain::Shutdown();
+  if (!Base::gShutdownFinished) {
+    XeMain::Shutdown();
+  }
+
   // Remove hangup
   if (Base::RemoveHangup() != 0) {
     printf("Failed to remove signal handler. (this is more of a warning, than an issue)\n");
   }
+
+#ifndef NO_GFX
+  SDL_Quit();
+#endif
+
   return 0;
 }

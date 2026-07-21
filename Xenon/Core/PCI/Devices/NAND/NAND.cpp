@@ -3,24 +3,51 @@
 /***************************************************************/
 
 #include "NAND.h"
-#include "Base/Logging/Log.h"
 
-NAND::NAND(const std::string &deviceName, Xe::PCIDev::SFCX *sfcx) :
-  SystemDevice(deviceName, NAND_MEMORY_MAPPED_ADDR, NAND_MEMORY_MAPPED_ADDR + NAND_MEMORY_MAPPED_SIZE, true),
+NAND::NAND(std::weak_ptr<Xe::PCIDev::SFCX> sfcx) :
+  SystemDevice(__func__, NAND_MEMORY_MAPPED_ADDR, NAND_MEMORY_MAPPED_ADDR + NAND_MEMORY_MAPPED_SIZE, true),
   sfcxDevice(sfcx)
 {}
 
-NAND::~NAND()
-{}
-
-void NAND::Read(u64 readAddress, u8 *data, u64 size) {
-  sfcxDevice->ReadRaw(readAddress, data, size);
+NAND::~NAND() {
+  RetireAndWait();
 }
 
-void NAND::Write(u64 writeAddress, const u8 *data, u64 size) {
-  sfcxDevice->WriteRaw(writeAddress, data, size);
+void NAND::Read(u64 address, u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
+  if (auto sfcx = sfcxDevice.lock()) {
+    auto sfcxLease = sfcx->GetLease();
+    if (sfcxLease) {
+      sfcx->ReadRaw(address, data, size);
+    }
+  }
 }
 
-void NAND::MemSet(u64 writeAddress, s32 data, u64 size) {
-  sfcxDevice->MemSetRaw(writeAddress, data, size);
+void NAND::Write(u64 address, const u8 *data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
+  if (auto sfcx = sfcxDevice.lock()) {
+    auto sfcxLease = sfcx->GetLease();
+    if (sfcxLease) {
+      sfcx->WriteRaw(address, data, size);
+    }
+  }
+}
+
+void NAND::MemSet(u64 address, s32 data, u64 size) {
+  auto lease = GetLease();
+  if (!lease) {
+    return;
+  }
+  if (auto sfcx = sfcxDevice.lock()) {
+    auto sfcxLease = sfcx->GetLease();
+    if (sfcxLease) {
+      sfcx->MemSetRaw(address, data, size);
+    }
+  }
 }

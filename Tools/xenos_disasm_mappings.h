@@ -1,4 +1,6 @@
-// Copyright 2025 Xenon Emulator Project. All rights reserved.
+/***************************************************************/
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
+/***************************************************************/
 
 #pragma once
 
@@ -15,7 +17,7 @@ static Xe::eShaderType ParseShaderType(const std::string& path) {
   if (path.find("pixel") != std::string::npos || path.find("ps") != std::string::npos)
     return Xe::eShaderType::Pixel;
 
-  LOG_ERROR(Core, "Cannot infer shader type from path '{}' (expected 'vertex'/'vs' or 'pixel'/'ps' in name)", path);
+  LOG_ERROR(Xenos, "Cannot infer shader type from path '{}' (expected 'vertex'/'vs' or 'pixel'/'ps' in name)", path);
   ::abort();
 }
 

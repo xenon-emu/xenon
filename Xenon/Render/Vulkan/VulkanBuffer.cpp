@@ -1,5 +1,5 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #include "VulkanBuffer.h"
@@ -14,6 +14,7 @@ void Render::VulkanBuffer::CreateBuffer(u64 size, const void *data, eBufferUsage
   VkBufferCreateInfo bufferInfo = {};
   bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   bufferInfo.size = size;
+  bufferType = type;
   bufferInfo.usage = ConvertBufferType(type) | ConvertUsage(usage);
 
   VmaAllocationCreateInfo createInfo = {};
@@ -29,8 +30,9 @@ void Render::VulkanBuffer::UpdateBuffer(u64 offset, u64 size, const void *data) 
   ::memcpy(reinterpret_cast<void *>(reinterpret_cast<size_t>(allocationInfo.pMappedData) + offset), data, size);
 }
 
-void Render::VulkanBuffer::Bind(u32 binding) {
-
+void Render::VulkanBuffer::Bind(u32 /*binding*/) {
+  if (!renderer)
+    return;
 }
 
 void Render::VulkanBuffer::Unbind() {
@@ -38,13 +40,18 @@ void Render::VulkanBuffer::Unbind() {
 }
 
 void Render::VulkanBuffer::DestroyBuffer() {
-  if (buffer != VK_NULL_HANDLE) {
-    vmaDestroyBuffer(renderer->allocator, buffer, allocation);
-    buffer = VK_NULL_HANDLE;
-    allocation = VK_NULL_HANDLE;
-    allocationInfo = {};
-    SetSize(0);
-  }
+  if (!renderer || buffer == VK_NULL_HANDLE)
+    return;
+
+  renderer->garbage[renderer->currentFrame].buffers.push_back({
+    buffer,
+    allocation
+  });
+
+  buffer = VK_NULL_HANDLE;
+  allocation = VK_NULL_HANDLE;
+  allocationInfo = {};
+  SetSize(0);
 }
 
 void *Render::VulkanBuffer::GetBackendHandle() {

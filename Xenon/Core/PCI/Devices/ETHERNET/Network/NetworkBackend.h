@@ -44,39 +44,39 @@ struct BackendStats {
 class INetworkBackend {
 public:
   virtual ~INetworkBackend() = default;
-  
+
   // Initialize the backend
   // Returns true on success, false on failure
   virtual bool Initialize() = 0;
-  
+
   // Shutdown the backend
   virtual void Shutdown() = 0;
-  
+
   // Check if the backend is initialized and ready
   virtual bool IsReady() const = 0;
-  
+
   // Send a packet to the network
   // Returns true on success, false on failure
   virtual bool SendPacket(const u8* data, u32 length) = 0;
-  
+
   // Set the callback for received packets
   virtual void SetPacketCallback(PacketCallback callback) = 0;
-  
+
   // Get the backend type
   virtual BackendType GetType() const = 0;
-  
+
   // Get the backend name (for logging)
   virtual std::string GetName() const = 0;
-  
+
   // Get the MAC address of the backend interface (if applicable)
   virtual bool GetMACAddress(u8* mac) const = 0;
-  
+
   // Set the MAC address (if supported)
   virtual bool SetMACAddress(const u8* mac) = 0;
-  
+
   // Get statistics
   virtual const BackendStats& GetStats() const = 0;
-  
+
   // Check if link is up
   virtual bool IsLinkUp() const = 0;
 };
@@ -86,26 +86,26 @@ class NullBackend : public INetworkBackend {
 public:
   NullBackend() = default;
   ~NullBackend() override = default;
-  
+
   bool Initialize() override { ready = true; return true; }
   void Shutdown() override { ready = false; }
   bool IsReady() const override { return ready; }
-  
-  bool SendPacket(const u8* /*data*/, u32 /*length*/) override { 
+
+  bool SendPacket(const u8* /*data*/, u32 /*length*/) override {
     stats.txDropped++;
     return true; // Silently drop
   }
-  
-  void SetPacketCallback(PacketCallback callback) override { 
+
+  void SetPacketCallback(PacketCallback callback) override {
     this->callback = callback;
   }
-  
+
   BackendType GetType() const override { return BackendType::None; }
   std::string GetName() const override { return "Null"; }
-  
+
   bool GetMACAddress(u8* /*mac*/) const override { return false; }
   bool SetMACAddress(const u8* /*mac*/) override { return false; }
-  
+
   const BackendStats& GetStats() const override { return stats; }
   bool IsLinkUp() const override { return false; }
 

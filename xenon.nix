@@ -5,38 +5,23 @@
 , lib
 , ninja
 , pkg-config
-, roboto
-, libxcb
-, sdl3
+, asmjit
+, cryptopp
 , fmt_11
-, toml11
+, glslang
+, libxcb
 , python3
+, roboto
+, sdl3
+, toml11
+, vk-bootstrap
 , vulkan-headers
 , vulkan-loader
+, vulkan-memory-allocator
 , withGraphics ? true
 }:
 
 let
-  asmjit = fetchFromGitHub {
-    owner = "asmjit";
-    repo = "asmjit";
-    rev = "a3199e8857792cd10b7589ff5d58343d2c9008ea";
-    hash = "sha256-qb0lM1N1FIvoADNsZZdlg8HAheePv/LvSDvRhOAqZc0=";
-  };
-  cryptopp = fetchFromGitHub {
-    owner = "weidai11";
-    repo = "cryptopp";
-    rev = "60f81a77e0c9a0e7ffc1ca1bc438ddfa2e43b78e";
-    hash = "sha256-I94xGY0XVQu/RAtccf3dPbIuo1vtgVWvu56G7CaSth0=";
-  };
-  glslang = if withGraphics
-    then fetchFromGitHub {
-      owner = "KhronosGroup";
-      repo = "glslang";
-      rev = "9d764997360b202d2ba7aaad9a401e57d8df56b3";
-      hash = "sha256-mRpwvzW3YPjaFvWLOLQHUqrsAJoHEkM+v2fXY3IUxyc=";
-    }
-    else {};
   imgui = if withGraphics
     then fetchFromGitHub {
       owner = "ocornut";
@@ -54,22 +39,6 @@ let
       hash = "sha256-/nPJ4gJ48gWtpxJ2Tlz4Az07mdBLrL4w/gdb0Xjq47o= ";
     }
     else {};
-  vk-bootstrap = if withGraphics
-    then fetchFromGitHub {
-      owner = "charles-lunarg";
-      repo = "vk-bootstrap";
-      rev = "fe2cf07474bff6d7b7285e7af20b21656789dc07";
-      hash = "sha256-DgDfYNGIdemyLaedJk25EWAt1aFccb8rhCtw25RSGm4=";
-    }
-    else {};
-  vulkan-memory-allocator = if withGraphics
-    then fetchFromGitHub {
-      owner = "GPUOpen-LibrariesAndSDKs";
-      repo = "VulkanMemoryAllocator";
-      rev = "1076b348abd17859a116f4b111c43d58a588a086";
-      hash = "sha256-WOx9upf1wn+f07kWoi3CV8X2NKSL5Fmm8d7KvPLrU8o=";
-    }
-    else {};
   microprofile = fetchFromGitHub {
     fetchSubmodules = true;
     owner = "jonasmr";
@@ -85,52 +54,64 @@ let
   };
 in
 stdenv.mkDerivation {
-  name = "xenon";
-  allowSubstitutes = false;
-  src = ./.;
-  nativeBuildInputs = [ makeWrapper cmake pkg-config ninja ];
+  pname = "xenon";
+  version = "0.0.1";
 
-  buildInputs = [
-    fmt_11 toml11
-  ] ++ lib.optionals withGraphics [
-    libxcb
-    sdl3
-    python3 # Needed for glslang
-    vulkan-headers
+  src = ./.;
+
+  strictDeps = true;
+
+  nativeBuildInputs = [
+    cmake
+    ninja
+    pkg-config
+    makeWrapper
   ];
 
-  cmakeFlags = if withGraphics
-    then [ "-DGFX_ENABLED=True" ]
-    else [ "-DGFX_ENABLED=False" ];
+  buildInputs = [
+    fmt_11
+    toml11
+    asmjit
+    cryptopp
+  ] ++ lib.optionals withGraphics [
+    glslang
+    libxcb
+    sdl3
+    vulkan-headers
+    vk-bootstrap
+    vulkan-memory-allocator
+  ];
+
+  cmakeFlags = [
+    "-DXENON_USE_SYSTEM_DEPS=ON"
+    "-DXENON_ALLOW_BUNDLED_DEPS=OFF"
+  ] ++ lib.optionals withGraphics [
+    "-DGFX_ENABLED=ON"
+  ] ++ lib.optionals (!withGraphics) [
+    "-DGFX_ENABLED=OFF"
+  ];
 
   postUnpack = ''
     ${lib.optionalString withGraphics ''
       echo graphics present
-      rm -rf $sourceRoot/Deps/ThirdParty/glslang
       rm -rf $sourceRoot/Deps/ThirdParty/ImGui
-      rm -rf $sourceRoot/Deps/ThirdParty/Sirit
-      rm -rf $sourceRoot/Deps/ThirdParty/vk-bootstrap
-      rm -rf $sourceRoot/Deps/ThirdParty/VulkanMemoryAllocator
-      cp -r ${glslang} $sourceRoot/Deps/ThirdParty/glslang
       cp -r ${imgui} $sourceRoot/Deps/ThirdParty/ImGui
+
+      rm -rf $sourceRoot/Deps/ThirdParty/Sirit
       cp -r ${sirit} $sourceRoot/Deps/ThirdParty/Sirit
-      cp -r ${vk-bootstrap} $sourceRoot/Deps/ThirdParty/vk-bootstrap
-      cp -r ${vulkan-memory-allocator} $sourceRoot/Deps/ThirdParty/VulkanMemoryAllocator
     ''}
-    rm -rf $sourceRoot/Deps/ThirdParty/asmjit
-    rm -rf $sourceRoot/Deps/ThirdParty/cryptopp
+
     rm -rf $sourceRoot/Deps/ThirdParty/microprofile
-    rm -rf $sourceRoot/Deps/ThirdParty/plusaes
-    cp -r ${asmjit} $sourceRoot/Deps/ThirdParty/asmjit
-    cp -r ${cryptopp} $sourceRoot/Deps/ThirdParty/cryptopp
     cp -r ${microprofile} $sourceRoot/Deps/ThirdParty/microprofile
+
+    rm -rf $sourceRoot/Deps/ThirdParty/plusaes
     cp -r ${plusaes} $sourceRoot/Deps/ThirdParty/plusaes
+
     chmod -R +w $sourceRoot
   '';
 
   installPhase = ''
     ${lib.optionalString withGraphics ''
-      echo graphics present
       mkdir -p $out/share
       ln -sv ${roboto}/share/fonts $out/share/fonts
     ''}

@@ -48,6 +48,16 @@ struct FbConvertPC {
 };
 static_assert(sizeof(FbConvertPC) == 16);
 
+struct RetiredBuffer {
+  VkBuffer buffer = VK_NULL_HANDLE;
+  VmaAllocation allocation = VK_NULL_HANDLE;
+};
+
+struct FrameGarbage {
+  std::vector<RetiredBuffer> buffers;
+  std::vector<VkPipeline> pipelines;
+};
+
 class VulkanRenderer : public Renderer {
 public:
   void BackendSDLProperties(SDL_PropertiesID properties) override;
@@ -60,8 +70,10 @@ public:
   void UpdateViewport(s32 x, s32 y, u32 width, u32 height) override;
   void UpdateClearColor(u8 r, u8 b, u8 g, u8 a) override;
   void UpdateClearDepth(f64 depth) override;
-  void UpdateViewportFromState(const Xe::XGPU::XenosState *state) override;
+  void UpdateViewportFromState(std::weak_ptr<Xe::XGPU::XenosState> state) override;
   void BackendBindPixelBuffer(Buffer *buffer) override;
+  void BackendOnUploadBuffer(u32 bufferHash, Buffer *buffer) override;
+  void WaitIdle() override;
   void Clear() override;
 
   void VertexFetch(const u32 location, const u32 components, bool isFloat, bool isNormalized, const u32 fetchOffset, const u32 fetchStride) override;
@@ -111,6 +123,7 @@ public:
   VkPresentModeKHR chosenPresentMode{};
   u32 swapchainImageCount = 0;
   std::vector<VkImage> swapchainImages{};
+  std::vector<VkImageLayout> swapchainImageLayouts{};
   std::vector<VkImageView> swapchainImageViews{};
   std::vector<VkFramebuffer> swapchainFramebuffers{};
   VkExtent2D swapchainExtent{ 0, 0 };
@@ -120,6 +133,7 @@ public:
   std::array<VkCommandBuffer, MAX_FRAMES_IN_FLIGHT> commandBuffers{};
 
   // Synchronization
+  std::array<FrameGarbage, MAX_FRAMES_IN_FLIGHT> garbage;
   std::array<VkSemaphore, MAX_FRAMES_IN_FLIGHT> imageAvailable{};
   std::vector<VkSemaphore> renderFinishedPerImage{};
   std::array<VkFence, MAX_FRAMES_IN_FLIGHT> inFlight{};

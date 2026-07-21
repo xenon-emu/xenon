@@ -1,5 +1,5 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #include "Base/Thread.h"
@@ -7,339 +7,241 @@
 #include "Core/XCPU/XenonCPU.h"
 #include "Interpreter/PPCInterpreter.h"
 
-#ifdef _WIN32
-#include <Windows.h>
-
-// Returns the CPU Frequency using Windows QueryPerformanceFrequency/QueryPerformanceCounter routines.
-double calibrateCPUFrequency() {
-  LARGE_INTEGER freq;
-  QueryPerformanceFrequency(&freq);
-
-  LARGE_INTEGER t0, t1;
-  u64 c0, c1;
-
-  QueryPerformanceCounter(&t0);
-  c0 = __rdtsc();
-
-  // Wait ~100 ms
-  Sleep(100); 
-
-  QueryPerformanceCounter(&t1);
-  c1 = __rdtsc();
-
-  double elapsedSec = double(t1.QuadPart - t0.QuadPart) / double(freq.QuadPart);
-  double cycles = double(c1 - c0);
-
-  return cycles / elapsedSec; // Frequency in Hz
-}
-
-#endif // _WIN32
-
 namespace Xe::XCPU {
 
-  XenonCPU::XenonCPU(RootBus *inBus, const std::string blPath, const std::string fusesPath, RAM *ramPtr) {
-    // Initilize Xenon Context
-    xenonContext = std::make_unique<STRIP_UNIQUE(xenonContext)>(inBus, ramPtr);
+XenonCPU::XenonCPU(std::weak_ptr<RootBus> inBus, const std::string blPath, const std::string fusesPath, std::weak_ptr<RAM> ramPtr) {
+  // Initilize Xenon Context
+  xenonContext = std::make_unique<STRIP_UNIQUE(xenonContext)>(inBus, ramPtr);
 
-    // Set SROM to 0.
-    memset(xenonContext->SROM.get(), 0, XE_SROM_SIZE);
+  memset(xenonContext->SROM.get(), 0, XE_SROM_SIZE);
 
-    // Populate FuseSet
-    {
-      std::ifstream file(fusesPath);
-      if (!file.is_open()) {
-        xenonContext->socSecOTPBlock->sec->AsULONGLONG = { 0x9999999999999999 };
-      }
-      else {
-        LOG_INFO(System, "Current FuseSet:");
-        std::vector<std::pair<std::string, u64>> fusesets{};
-        std::string fuseset;
-        while (std::getline(file, fuseset)) {
-          if (size_t pos = fuseset.find(": "); pos != std::string::npos) {
-            fuseset = fuseset.substr(pos + 2);
-          }
-          u64 fuse = strtoull(fuseset.c_str(), nullptr, 16);
-          LOG_INFO(System, " * FuseSet {:02}: 0x{:X}", fusesets.size(), fuse);
-          fusesets.push_back(std::make_pair(fuseset, fuse));
+  // Populate FuseSet
+  {
+    std::ifstream file(fusesPath);
+    if (!file.is_open()) {
+      xenonContext->socSecOTPBlock->sec->AsULONGLONG = { 0x9999999999999999 };
+    } else {
+      LOG_INFO(System, "Current FuseSet:");
+      std::vector<std::pair<std::string, u64>> fusesets{};
+      std::string fuseset;
+      while (std::getline(file, fuseset)) {
+        if (size_t pos = fuseset.find(": "); pos != std::string::npos) {
+          fuseset = fuseset.substr(pos + 2);
         }
-
-        xenonContext->socSecOTPBlock->sec[0].AsULONGLONG = fusesets[0].second;
-        xenonContext->socSecOTPBlock->ConsoleType[0] = fusesets[1].second;
-        xenonContext->socSecOTPBlock->ConsoleSequence[0] = fusesets[2].second;
-        xenonContext->socSecOTPBlock->UniqueId1[0] = fusesets[3].second;
-        xenonContext->socSecOTPBlock->UniqueId2[0] = fusesets[4].second;
-        xenonContext->socSecOTPBlock->UniqueId3[0] = fusesets[5].second;
-        xenonContext->socSecOTPBlock->UniqueId4[0] = fusesets[6].second;
-        xenonContext->socSecOTPBlock->UpdateSequence[0] = fusesets[7].second;
-        xenonContext->socSecOTPBlock->EepromKey1[0] = fusesets[8].second;
-        xenonContext->socSecOTPBlock->EepromKey2[0] = fusesets[9].second;
-        xenonContext->socSecOTPBlock->EepromHash1[0] = fusesets[10].second;
-        xenonContext->socSecOTPBlock->EepromHash2[0] = fusesets[11].second;
+        u64 fuse = strtoull(fuseset.c_str(), nullptr, 16);
+        LOG_INFO(System, " * FuseSet {:02}: 0x{:X}", fusesets.size(), fuse);
+        fusesets.push_back(std::make_pair(fuseset, fuse));
       }
 
-      // Start timebase timer thread.
-      if (!timeBaseThreadActive.load()) {
-        timeBaseThreadActive.store(true);
-        timeBaseThread = std::thread(&XenonCPU::timeBaseThreadLoop, this);
-      }
+      xenonContext->socSecOTPBlock->sec[0].AsULONGLONG = fusesets[0].second;
+      xenonContext->socSecOTPBlock->ConsoleType[0] = fusesets[1].second;
+      xenonContext->socSecOTPBlock->ConsoleSequence[0] = fusesets[2].second;
+      xenonContext->socSecOTPBlock->UniqueId1[0] = fusesets[3].second;
+      xenonContext->socSecOTPBlock->UniqueId2[0] = fusesets[4].second;
+      xenonContext->socSecOTPBlock->UniqueId3[0] = fusesets[5].second;
+      xenonContext->socSecOTPBlock->UniqueId4[0] = fusesets[6].second;
+      xenonContext->socSecOTPBlock->UpdateSequence[0] = fusesets[7].second;
+      xenonContext->socSecOTPBlock->EepromKey1[0] = fusesets[8].second;
+      xenonContext->socSecOTPBlock->EepromKey2[0] = fusesets[9].second;
+      xenonContext->socSecOTPBlock->EepromHash1[0] = fusesets[10].second;
+      xenonContext->socSecOTPBlock->EepromHash2[0] = fusesets[11].second;
     }
-
-    // Load 1BL binary if needed.
-    if (!Config::xcpu.simulate1BL) {
-      // Load 1BL from path.
-      std::ifstream file(blPath, std::ios_base::in | std::ios_base::binary);
-      if (!file.is_open()) {
-        LOG_CRITICAL(Xenon, "Unable to open file: {} for reading. Check your file path. System Stopped!", blPath);
-        Base::SystemPause();
-      }
-      else {
-        u64 fileSize = 0;
-        // fs::file_size can cause a exception if it is not a valid file
-        try {
-          std::error_code ec;
-          fileSize = std::filesystem::file_size(blPath, ec);
-          if (fileSize == -1 || !fileSize) {
-            fileSize = 0;
-            LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of {} (Error: {})", blPath, ec.message());
-          }
-        }
-        catch (const std::exception &ex) {
-          LOG_ERROR(Base_Filesystem, "Exception trying to get file size. Reason: {}", ex.what());
-          return;
-        }
-
-        if (fileSize == XE_SROM_SIZE) {
-          file.read(reinterpret_cast<char *>(xenonContext->SROM.get()), XE_SROM_SIZE);
-          LOG_INFO(Xenon, "1BL Loaded.");
-        }
-      }
-      file.close();
-    }
-
-    // Asign Interpreter global CPU context
-    PPCInterpreter::xenonContext = xenonContext.get();
-
-    // Setup SOC blocks.
-    xenonContext->socPRVBlock.get()->PowerOnResetStatus.AsBITS.SecureMode = 1; // CB Checks this.
-    xenonContext->socPRVBlock.get()->PowerManagementControl.AsULONGLONG = 0x382C00000000B001ULL; // Power Management Control.
   }
 
-  XenonCPU::~XenonCPU() {
-    // First signal timer thread to stop and wait for it to exit.
-    timeBaseThreadActive.store(false);
-
-    // Ensure thread is joined before destroying resources it may touch.
-    try {
-      if (timeBaseThread.joinable()) {
-        timeBaseThread.join();
+  // Load 1BL binary if needed.
+  if (!Config::xcpu.simulate1BL) {
+    // Load 1BL from path.
+    std::ifstream file(blPath, std::ios_base::in | std::ios_base::binary);
+    if (!file.is_open()) {
+      LOG_CRITICAL(Xenon, "Unable to open file: {} for reading. Check your file path. System Stopped!", blPath);
+      Base::SystemPause();
+    } else {
+      u64 fileSize = 0;
+      // fs::file_size can cause a exception if it is not a valid file
+      try {
+        std::error_code ec;
+        fileSize = std::filesystem::file_size(blPath, ec);
+        if (fileSize == -1 || !fileSize) {
+          fileSize = 0;
+          LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of {} (Error: {})", blPath, ec.message());
+        }
+      } catch (const std::exception &ex) {
+        LOG_ERROR(Base_Filesystem, "Exception trying to get file size. Reason: {}", ex.what());
+        return;
       }
-    } catch (const std::system_error &e) {
-      LOG_ERROR(Xenon, "Failed to join timeBaseThread: {}", e.what());
-      // Proceed with shutdown; std::terminate would be worse here.
-    }
 
-    LOG_INFO(Xenon, "Shutting PPU cores down...");
-    ppu0.reset();
-    ppu1.reset();
-    ppu2.reset();
-    xenonContext.reset();
-  }
-
-  void XenonCPU::Start(u64 resetVector) {
-    // If we already have active objects, halt cpu and kill threads
-    if (ppu0.get()) {
-      Halt();
-      ppu0.reset();
-      ppu1.reset();
-      ppu2.reset();
-    }
-    // Create PPU elements
-    ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(xenonContext.get(), resetVector, 0); // Threads 0-1
-    ppu1 = std::make_unique<STRIP_UNIQUE(ppu1)>(xenonContext.get(), resetVector, 2); // Threads 2-3
-    ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(xenonContext.get(), resetVector, 4); // Threads 4-5
-    // Start execution on the main thread
-    ppu0->StartExecution();
-    // Start execution on the other threads
-    ppu1->StartExecution();
-    ppu2->StartExecution();
-  }
-
-  void XenonCPU::LoadElf(const std::string path) {
-    ppu0.reset();
-    ppu1.reset();
-    ppu2.reset();
-    ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(xenonContext.get(), 0, 0); // Threads 0-1
-    ppu1 = std::make_unique<STRIP_UNIQUE(ppu1)>(xenonContext.get(), 0, 2); // Threads 2-3
-    ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(xenonContext.get(), 0, 4); // Threads 4-5
-    std::filesystem::path filePath{ path };
-    std::ifstream file{ filePath, std::ios_base::in | std::ios_base::binary };
-    u64 fileSize = 0;
-    // fs::file_size can cause a exception if it is not a valid file
-    try {
-      std::error_code ec;
-      fileSize = std::filesystem::file_size(filePath, ec);
-      if (fileSize == -1 || !fileSize) {
-        fileSize = 0;
-        LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of {} (Error: {})", filePath.string(), ec.message());
+      if (fileSize == XE_SROM_SIZE) {
+        file.read(reinterpret_cast<char *>(xenonContext->SROM.get()), XE_SROM_SIZE);
+        LOG_INFO(Xenon, "1BL Loaded.");
       }
     }
-    catch (const std::exception &ex) {
-      LOG_ERROR(Base_Filesystem, "Exception trying to get file size. Exception: {}",
-        ex.what());
-      return;
-    }
-    std::unique_ptr<u8[]> elfBinary = std::make_unique<u8[]>(fileSize);
-    file.read(reinterpret_cast<char *>(elfBinary.get()), fileSize);
     file.close();
-    ppu0->loadElfImage(elfBinary.get(), fileSize);
-    // Start execution on the main thread
-    ppu0->StartExecution(false);
-    // Start execution on the other threads
-    ppu1->StartExecution(false);
-    ppu2->StartExecution(false);
   }
 
-  void XenonCPU::Reset() {
-    if (ppu0.get())
-      ppu0->Reset();
-    std::this_thread::sleep_for(200ms);
-    if (ppu1.get())
-      ppu1->Reset();
-    std::this_thread::sleep_for(200ms);
-    if (ppu2.get())
-      ppu2->Reset();
-    std::this_thread::sleep_for(200ms);
-  }
+  // Asign Interpreter global CPU context
+  PPCInterpreter::xenonContext = xenonContext.get();
 
-  void XenonCPU::Halt(u64 haltOn, bool requestedByGuest, u8 ppuId, ePPUThreadID threadId) {
-    if (ppu0.get())
-      ppu0->Halt(haltOn, requestedByGuest, ppuId, threadId);
-    if (ppu1.get())
-      ppu1->Halt(haltOn, requestedByGuest, ppuId, threadId);
-    if (ppu2.get())
-      ppu2->Halt(haltOn, requestedByGuest, ppuId, threadId);
-  }
+  // Setup SOC blocks.
+  xenonContext->socPRVBlock.get()->PowerOnResetStatus.AsBITS.SecureMode = 1; // CB Checks this.
+  xenonContext->socPRVBlock.get()->PowerManagementControl.AsULONGLONG = 0x382C00000000B001ULL; // Power Management Control.
+}
 
-  void XenonCPU::Continue() {
-    if (ppu0.get())
-      ppu0->Continue();
-    if (ppu1.get())
-      ppu1->Continue();
-    if (ppu2.get())
-      ppu2->Continue();
-  }
+XenonCPU::~XenonCPU() {
+  LOG_INFO(Xenon, "Shutting PPU cores down...");
+  ppu0.reset();
+  ppu1.reset();
+  ppu2.reset();
+  xenonContext.reset();
+}
 
-  void XenonCPU::ContinueFromException() {
-    if (ppu0.get())
-      ppu0->ContinueFromException();
-    if (ppu1.get())
-      ppu1->ContinueFromException();
-    if (ppu2.get())
-      ppu2->ContinueFromException();
+void XenonCPU::Start(u64 resetVector) {
+  // If we already have active objects, halt cpu and kill threads
+  if (ppu0.get()) {
+    Halt();
+    ppu0.reset();
+    ppu1.reset();
+    ppu2.reset();
   }
+  // Create PPU elements
+  ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(xenonContext.get(), resetVector, 0); // Threads 0-1
+  ppu1 = std::make_unique<STRIP_UNIQUE(ppu1)>(xenonContext.get(), resetVector, 2); // Threads 2-3
+  ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(xenonContext.get(), resetVector, 4); // Threads 4-5
+  
+  // Initialize the Time Base logic
+  std::array<sPPEState*, 3> ppeStates;
+  ppeStates[0] = ppu0->GetPPUState();
+  ppeStates[1] = ppu1->GetPPUState();
+  ppeStates[2] = ppu2->GetPPUState();
+  xenonContext->timeBase.Init(ppeStates);
+  
+  // Start execution on the main thread
+  ppu0->StartExecution();
+  // Start execution on the other threads
+  ppu1->StartExecution();
+  ppu2->StartExecution();
+}
 
-  void XenonCPU::Step(int amount) {
-    if (ppu0.get())
-      ppu0->Step(amount);
-    if (ppu1.get())
-      ppu1->Step(amount);
-    if (ppu2.get())
-      ppu2->Step(amount);
-  }
-
-  bool XenonCPU::IsHalted() {
-    if (ppu0.get() && ppu0->IsHalted()) {
-      return true;
+void XenonCPU::LoadElf(const std::string path) {
+  ppu0.reset();
+  ppu1.reset();
+  ppu2.reset();
+  ppu0 = std::make_unique<STRIP_UNIQUE(ppu0)>(xenonContext.get(), 0, 0); // Threads 0-1
+  ppu1 = std::make_unique<STRIP_UNIQUE(ppu1)>(xenonContext.get(), 0, 2); // Threads 2-3
+  ppu2 = std::make_unique<STRIP_UNIQUE(ppu2)>(xenonContext.get(), 0, 4); // Threads 4-5
+  std::filesystem::path filePath{ path };
+  std::ifstream file{ filePath, std::ios_base::in | std::ios_base::binary };
+  u64 fileSize = 0;
+  // fs::file_size can cause a exception if it is not a valid file
+  try {
+    std::error_code ec;
+    fileSize = std::filesystem::file_size(filePath, ec);
+    if (fileSize == -1 || !fileSize) {
+      fileSize = 0;
+      LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of {} (Error: {})", filePath.string(), ec.message());
     }
-    if (ppu1.get() && ppu1->IsHalted()) {
-      return true;
-    }
-    if (ppu2.get() && ppu2->IsHalted()) {
-      return true;
-    }
-    return false;
+  } catch (const std::exception &ex) {
+    LOG_ERROR(Base_Filesystem, "Exception trying to get file size. Exception: {}",
+      ex.what());
+    return;
+  }
+  std::unique_ptr<u8[]> elfBinary = std::make_unique<u8[]>(fileSize);
+  file.read(reinterpret_cast<char *>(elfBinary.get()), fileSize);
+  file.close();
+  ppu0->loadElfImage(elfBinary.get(), fileSize);
+  // Start execution on the main thread
+  ppu0->StartExecution(false);
+  // Start execution on the other threads
+  ppu1->StartExecution(false);
+  ppu2->StartExecution(false);
+}
+
+void XenonCPU::Reset() {
+  if (ppu0.get())
+    ppu0->Reset();
+  std::this_thread::sleep_for(200ms);
+  if (ppu1.get())
+    ppu1->Reset();
+  std::this_thread::sleep_for(200ms);
+  if (ppu2.get())
+    ppu2->Reset();
+  std::this_thread::sleep_for(200ms);
+}
+
+void XenonCPU::Halt(u64 haltOn, bool requestedByGuest, u8 ppuId, ePPUThreadID threadId) {
+  if (ppu0.get())
+    ppu0->Halt(haltOn, requestedByGuest, ppuId, threadId);
+  if (ppu1.get())
+    ppu1->Halt(haltOn, requestedByGuest, ppuId, threadId);
+  if (ppu2.get())
+    ppu2->Halt(haltOn, requestedByGuest, ppuId, threadId);
+}
+
+void XenonCPU::Continue() {
+  if (ppu0.get())
+    ppu0->Continue();
+  if (ppu1.get())
+    ppu1->Continue();
+  if (ppu2.get())
+    ppu2->Continue();
+}
+
+void XenonCPU::ContinueFromException() {
+  if (ppu0.get())
+    ppu0->ContinueFromException();
+  if (ppu1.get())
+    ppu1->ContinueFromException();
+  if (ppu2.get())
+    ppu2->ContinueFromException();
+}
+
+void XenonCPU::Step(int amount) {
+  if (ppu0.get())
+    ppu0->Step(amount);
+  if (ppu1.get())
+    ppu1->Step(amount);
+  if (ppu2.get())
+    ppu2->Step(amount);
+}
+
+bool XenonCPU::IsHalted() {
+  if (ppu0.get() && ppu0->IsHalted()) {
+    return true;
+  }
+  if (ppu1.get() && ppu1->IsHalted()) {
+    return true;
+  }
+  if (ppu2.get() && ppu2->IsHalted()) {
+    return true;
   }
 
-  bool XenonCPU::IsHaltedByGuest() {
-    if (ppu0.get() && ppu0->IsHaltedByGuest()) {
-      return true;
-    }
-    if (ppu1.get() && ppu1->IsHaltedByGuest()) {
-      return true;
-    }
-    if (ppu2.get() && ppu2->IsHaltedByGuest()) {
-      return true;
-    }
-    return false;
+  return false;
+}
+
+bool XenonCPU::IsHaltedByGuest() {
+  if (ppu0.get() && ppu0->IsHaltedByGuest()) {
+    return true;
+  }
+  if (ppu1.get() && ppu1->IsHaltedByGuest()) {
+    return true;
+  }
+  if (ppu2.get() && ppu2->IsHaltedByGuest()) {
+    return true;
   }
 
-  PPU *XenonCPU::GetPPU(u8 ppuID) {
-    switch (ppuID) {
-    case 0:
-      return ppu0.get();
-    case 1:
-      return ppu1.get();
-    case 2:
-      return ppu2.get();
-    }
+  return false;
+}
 
-    return nullptr;
+PPU *XenonCPU::GetPPU(u8 ppuID) {
+  switch (ppuID) {
+  case 0:
+    return ppu0.get();
+  case 1:
+    return ppu1.get();
+  case 2:
+    return ppu2.get();
   }
 
-  // TimeBase thread for increasing global timer counter.
-  void XenonCPU::timeBaseThreadLoop() {
-    Base::SetCurrentThreadName("[Xe] CPU Timer Thread");
+  return nullptr;
+}
 
-#ifdef _WIN32
-    // Get our CPU frequency.
-    double cpuFrequencyInHz = calibrateCPUFrequency();
-    // Target time in Ns we need to wait.
-    const double targetNs = 2500.0;
-    // Convert that to CPU cycles.
-    unsigned long long targetCPUCycles = static_cast<unsigned long long>((targetNs * 1e-9) * cpuFrequencyInHz);
-    unsigned long long startCycle = __rdtsc();
-    unsigned long long nextCycle = startCycle + targetCPUCycles;
-
-    while (timeBaseThreadActive.load()) {
-      // Wait x cycles.
-      while (__rdtsc() < nextCycle) {}
-
-      // We're waiting for approx 2500 Ns, which represent 125 XenonCPU cycles.
-      if (xenonContext->timeBaseActive) {
-        ppu0->UpdateTimeBase(125);
-        ppu1->UpdateTimeBase(125);
-        ppu2->UpdateTimeBase(125);
-      }
-      // Update our start cycle.
-      startCycle = __rdtsc();
-      // Add our target cycles amount.
-      nextCycle = startCycle + targetCPUCycles;
-    }
-#else
-    using clock = std::chrono::high_resolution_clock;
-    auto last = clock::now();
-    auto now = clock::now();
-
-    while (timeBaseThreadActive.load()) {
-      // Sleep a little to avoid burning CPU. We compute elapsed and convert to ticks.
-      // The lower we sleep, the more accurate the timebase will be, but it will also be more CPU intensive.
-      last = now;
-      std::this_thread::sleep_for(std::chrono::microseconds(100));
-      now = clock::now();
-      auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(now - last).count();
-      if (elapsed <= 0) continue;
-      // Xbox 360 timebase = 50 MHz -> period = 20 ns per tick
-      // ticks = elapsed_ns / 20
-      u64 ticks = static_cast<u64>(elapsed) / 20ULL;
-      if (ticks == 0) continue;
-      // Accumulate globally
-      if (xenonContext->timeBaseActive) {
-        ppu0->UpdateTimeBase(ticks);
-        ppu1->UpdateTimeBase(ticks);
-        ppu2->UpdateTimeBase(ticks);
-      }
-    }
-#endif // _WIN32
-  }
-
-} // Xe::XCPU
+} // namespace Xe::XCPU

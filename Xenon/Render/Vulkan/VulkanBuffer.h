@@ -33,6 +33,7 @@ private:
   VkBufferUsageFlags ConvertBufferType(eBufferType type);
   VkBufferUsageFlags ConvertUsage(eBufferUsage usage);
 
+  eBufferType bufferType{};
   VulkanRenderer *renderer = nullptr;
   VkBuffer buffer = nullptr;
   VmaAllocation allocation = VK_NULL_HANDLE;

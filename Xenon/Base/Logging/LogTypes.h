@@ -55,6 +55,7 @@ enum class Class : const u8 {
   SMC,                    // System Management Controller messages
   UART,                   // UART output
   DebugPrint,             // Guest hardware output Xbox Kernel Debug Prints
+  HLE,                    // High-level emulation messages
   Count                   // Total number of logging classes
 };
 

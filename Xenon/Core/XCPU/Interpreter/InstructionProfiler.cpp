@@ -28,8 +28,8 @@ namespace PPCInterpreter {
 
     // FPU instructions
     static const std::unordered_set<std::string> fpuNames = {
-      "fdivs", "fsubs", "fadds", "fsqrts", "fres", "fmuls", "fmsubs", "fmadds", "fnmsubs", "fnmadds", "mtfsb1", 
-      "mcrfs", "mtfsb0", "mtfsfi", "mffs", "mtfsf", "fcmpu", "frsp", "fctiw", "fctiwz", "fdiv", "fsub", "fadd", 
+      "fdivs", "fsubs", "fadds", "fsqrts", "fres", "fmuls", "fmsubs", "fmadds", "fnmsubs", "fnmadds", "mtfsb1",
+      "mcrfs", "mtfsb0", "mtfsfi", "mffs", "mtfsf", "fcmpu", "frsp", "fctiw", "fctiwz", "fdiv", "fsub", "fadd",
       "fsqrt", "fsel", "fmul", "frsqrte", "fmsub", "fmadd", "fnmsub", "fnmadd", "fcmpo", "fneg", "fmr", "fnabs",
       "fabs", "fctid", "fctidz", "fcfid",
     };
@@ -65,21 +65,21 @@ namespace PPCInterpreter {
       "lwz", "lwzu", "lbz", "lbzu", "lhz", "lhzu", "lha", "lhau", "lmw", "lfs", "lfsu", "lfd", "lfdu", "lvsl", "lvebx",
       "lwarx", "ldx", "lwzx", "lvsr", "lvehx", "ldux", "lwzux", "lvewx", "ldarx", "lbzx", "lvx", "lbzux", "lhzx",
       "lhzux", "lwax", "lhax", "lvxl", "lwaux", "lhaux", "lvlx", "ldbrx", "lswx", "lwbrx", "lfsx", "lvrx", "lfsux",
-      "lswi", "lfdx", "lfdux", "lvlxl", "lhbrx", "lvrxl", "ld", "ldu", "lwa", "lvsl128", "lvsr128", "lvewx128", 
+      "lswi", "lfdx", "lfdux", "lvlxl", "lhbrx", "lvrxl", "ld", "ldu", "lwa", "lvsl128", "lvsr128", "lvewx128",
       "lvx128", "lvxl128", "lvlx128", "lvrx128", "lvlxl128", "lvrxl128",
 
       // Stores
       "stw", "stwu", "stb", "stbu", "sth", "sthu", "stmw", "stfs", "stfsu", "stfd", "stfdu", "stvebx", "stdx", "stwcx",
-      "stwx", "stvehx", "stdux", "stwux", "stvewx", "stdcx", "stbx", "stvx", "stbux", "sthx", "sthux", "stvxl", 
+      "stwx", "stvehx", "stdux", "stwux", "stvewx", "stdcx", "stbx", "stvx", "stbux", "sthx", "sthux", "stvxl",
       "stvlx", "stdbrx", "stswx", "stwbrx", "stfsx", "stvrx", "stfsux", "stswi", "stfdx", "stfdux",
-      "stvlxl", "sthbrx", "stvrxl", "stfiwx", "std", "stdu", "stvewx128", "stvx128", "stvxl128","stvlx128", "stvrx128",    
+      "stvlxl", "sthbrx", "stvrxl", "stfiwx", "std", "stdu", "stvewx128", "stvx128", "stvxl128","stvlx128", "stvrx128",
       "stvlxl128", "stvrxl128",
     };
 
     // System instructions
     static const std::unordered_set<std::string> sysNames = {
-      "tdi", "twi", "bc", "sc", "b", "bclr", "rfid", "bcctr", "tw", "td", "mfmsr", "mtmsr", "tlbiel", "tlbie", "mfspr", 
-      "mftb", "slbmte", "slbie", "mtspr", "slbia", "tlbsync", 
+      "tdi", "twi", "bc", "sc", "b", "bclr", "rfid", "bcctr", "tw", "td", "mfmsr", "mtmsr", "tlbiel", "tlbie", "mfspr",
+      "mftb", "slbmte", "slbie", "mtspr", "slbia", "tlbsync",
     };
 
     static inline bool comparePairDesc(const std::pair<std::string, u64> &a,
@@ -94,7 +94,7 @@ namespace PPCInterpreter {
   }
 
   InstructionProfiler::InstructionProfiler() noexcept {
-    // No initialization required para el mapa dinámico.
+    // No initialization required.
   }
 
   InstructionProfiler::~InstructionProfiler() = default;
@@ -116,8 +116,7 @@ namespace PPCInterpreter {
         auto ptr = std::make_shared<std::atomic<u64>>(0);
         auto res = counters_.emplace(instrName, ptr);
         res.first->second->fetch_add(1, std::memory_order_relaxed);
-      }
-      else {
+      } else {
         it->second->fetch_add(1, std::memory_order_relaxed);
       }
     }

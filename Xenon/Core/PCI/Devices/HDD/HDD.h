@@ -5,7 +5,7 @@
 #pragma once
 
 #ifdef _WIN32
-#include <Windows.h>
+#include <windows.h>
 #else
 #include <fcntl.h>
 #include <unistd.h>
@@ -392,21 +392,39 @@ struct ATA_DEV_STATE {
 
 class HDD : public PCIDevice {
 public:
-  HDD(const std::string &deviceName, u64 size,
-    PCIBridge *parentPCIBridge, RAM* ram);
+  HDD(u64 size, std::weak_ptr<PCIBridge> parentPCIBridge, std::weak_ptr<RAM> ram);
   ~HDD();
-  void Read(u64 readAddress, u8 *data, u64 size) override;
-  void Write(u64 writeAddress, const u8 *data, u64 size) override;
-  void MemSet(u64 writeAddress, s32 data, u64 size) override;
-  void ConfigRead(u64 readAddress, u8* data, u64 size) override;
-  void ConfigWrite(u64 writeAddress, const u8* data, u64 size) override;
 
+  void Read(u64 address, u8 *data, u64 size) override;
+  void Write(u64 address, const u8 *data, u64 size) override;
+  void MemSet(u64 address, s32 data, u64 size) override;
+
+  void ConfigRead(u64 address, u8* data, u64 size) override;
+  void ConfigWrite(u64 address, const u8* data, u64 size) override;
 private:
+  // Thread loop for processing DMA requests, etc...
+  void hddThreadLoop();
+
+  // ATA Commands
+  void ATAReadDMACommand();
+  void ATAReadNativeMaxAddressExtCommand();
+  void ATAReadDMAExtCommand();
+  void ATAWriteDMACommand();
+  void ATAIdentifyDeviceCommand();
+
+  // Utilities
+  // Returns the name of a given command.
+  static const std::string GetATACommandName(u32 commandID);
+  // DMA Worker.
+  void DoDMA();
+  // Issues an interrupt if allowed.
+  void ATAIssueInterrupt();
+
   // PCI Bridge pointer. Used for Interrupts.
-  PCIBridge *parentBus;
+  std::weak_ptr<PCIBridge> parentBus;
 
   // RAM Pointer for DMA ops.
-  RAM* ramPtr;
+  std::weak_ptr<RAM> ramPtr;
 
   // Device State
   ATA_DEV_STATE ataState = {};
@@ -415,26 +433,7 @@ private:
   std::thread hddWorkerThread;
 
   // Thread running
-  volatile bool hddThreadRunning = false;
-
-  // Thread loop for processing DMA requests, etc...
-  void hddThreadLoop();
-
-  // ATA Commands.
-  void ataReadDMACommand();
-  void ataReadNativeMaxAddressExtCommand();
-  void ataReadDMAExtCommand();
-  void ataWriteDMACommand();
-  void ataIdentifyDeviceCommand();
-
-  // Utilities
-
-  // Returns the name of a given command.
-  static const std::string getATACommandName(u32 commandID);
-  // DMA Worker.
-  void doDMA();
-  // Issues an interrupt if allowed.
-  void ataIssueInterrupt();
+  std::atomic<bool> hddThreadRunning = false;
 };
 
 } // namespace PCIDev

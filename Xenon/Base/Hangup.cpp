@@ -1,5 +1,5 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #include "Hangup.h"
@@ -11,7 +11,7 @@ s32 globalShutdownHandler();
 
 #ifdef _WIN32
 BOOL WINAPI consoleControlHandler(ul32 ctrlType);
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__APPLE__)
 extern "C" void hangup(s32);
 #endif
 
@@ -19,27 +19,46 @@ const s32 InstallHangup() {
 #ifdef _WIN32
   if (!SetConsoleCtrlHandler(consoleControlHandler, TRUE))
     return -1;
-#elif defined(__linux__)
-  struct sigaction act {};
-  act.sa_handler = hangup;
-  sigemptyset(&act.sa_mask);
-  act.sa_flags = 0;
+#elif defined(__linux__) || defined(__APPLE__)
+  sigset_t set;
+  sigemptyset(&set);
+  sigaddset(&set, SIGHUP);
+  sigaddset(&set, SIGINT);
+  sigaddset(&set, SIGTERM);
 
-  if (sigaction(SIGHUP, &act, nullptr) < 0) {
+  // Block in this thread, and new threads inherit the mask
+  if (pthread_sigmask(SIG_BLOCK, &set, nullptr) != 0) {
     return -1;
   }
-  if (sigaction(SIGINT, &act, nullptr) < 0) {
-    return -1;
-  }
-  if (sigaction(SIGTERM, &act, nullptr) < 0) {
-    return -1;
-  }
-  if (sigaction(SIGHUP, &act, nullptr) < 0) {
-    return -1;
-  }
-#else
-  // I have zero clue if macOS handles it in the same way as Linux does
-  // Better to not handle it, until macOS is fully supported by Xenon
+
+  signalThreadRunning = true;
+  signalThread = std::thread([] {
+    sigset_t waitset;
+    sigemptyset(&waitset);
+    sigaddset(&waitset, SIGHUP);
+    sigaddset(&waitset, SIGINT);
+    sigaddset(&waitset, SIGTERM);
+
+    int sig = 0;
+    while (true) {
+      if (sigwait(&waitset, &sig) != 0) {
+        continue;
+      }
+
+      if (!signalThreadRunning) {
+        break;
+      }
+
+      if (!gShutdownRequested.exchange(true)) {
+        (void)globalShutdownHandler();
+      } else {
+        gForceExitRequested = true;
+        const s32 exitCode = Base::fexit(-1);
+        if (exitCode != 0) // This will never happen, it's to silence the compiler warnings
+          break;
+      }
+    }
+  });
 #endif
   return 0;
 }
@@ -48,6 +67,17 @@ const s32 RemoveHangup() {
 #ifdef _WIN32
   if (!SetConsoleCtrlHandler(consoleControlHandler, FALSE))
     return -1;
+#elif defined(__linux__) || defined(__APPLE__)
+  signalThreadRunning = false;
+
+  if (signalThread.joinable()) {
+    if (std::this_thread::get_id() == signalThread.get_id()) {
+      signalThread.detach();
+    } else {
+      pthread_kill(signalThread.native_handle(), SIGTERM);
+      signalThread.join();
+    }
+  }
 #endif
   return 0;
 }
@@ -57,32 +87,32 @@ s32 globalShutdownHandler() {
   // If we have been told we cannot safely terminate, just force exit without cleanup
   // The OS will need to handle it, but better than deadlocking the process
   if (XePaused) {
-    const s32 exitCode = Base::exit(-1);
-    return exitCode; // Avoid cleanup, as we cannot ensure it'll be done properly
+    return Base::exit(-1); // Avoid cleanup, as we cannot ensure it'll be done properly
   }
-  // If we tried to exit gracefully the first time and failed,
-  // use fexit to forcefully send a SIGTERM
-  if (!hupflag) {
-    printf("\nAttempting to clean shutdown...\n");
-    hupflag = 1;
-  } else {
-    printf("\nUnable to clean shutdown!\n");
-    printf("Press Crtl+C again to forcefully exit...\n");
-    const s32 exitCode = Base::fexit(-1);
-    return exitCode;
+
+  // If we tried to exit gracefully the first time and failed, use fexit to forcefully send a SIGTERM
+  if (gForceExitRequested) {
+    return Base::fexit(-1);
   }
+
   // Cleanly shutdown without the exit syscall
-  XeRunning = false;
+  XeRunning.store(false, std::memory_order_release);
+
+  // Since we wait to ensure shutdown is finished instead of a broad timer,
+  // We need to ensure we call it here, because a timer deadlocks the main thread.
+  XeMain::Shutdown();
+
   // Give everything a while to shut down. If it still hasn't shutdown, then something hung
-  std::this_thread::sleep_for(15s);
-  if (XeShutdownSignaled) {
-    printf("This was called because after 15s, and a shutdown call, it still hasn't shutdown.\n");
-    printf("Something likely hung. If you have issues, please make a GitHub Issue report with this message in it\n");
-    // We should force exit. We only should call shutdown once, and if we don't, then it hung
-    return Base::exit(-1);
-  } else {
-    XeMain::Shutdown();
+  int attempts = 0;
+  while (!gShutdownFinished) {
+    if (gForceExitRequested || attempts >= 400) {
+      // If it more than 400ms, just kill it forcefully, or if we get another interrupt.
+      return Base::fexit(-1);
+    }
+    ++attempts;
+    std::this_thread::sleep_for(1ms);
   }
+
   return 0;
 }
 
@@ -94,11 +124,6 @@ BOOL WINAPI consoleControlHandler(ul32 ctrlType) {
     return globalShutdownHandler() == 0 ? TRUE : FALSE; // Signal handled, prevent default behavior if told so
   }
   return FALSE; // Default handling
-}
-#elif defined(__linux__)
-extern "C" void hangup(s32) {
-  // Should this be handled here, if we deadlock our main thread?
-  (void)globalShutdownHandler();
 }
 #endif
 

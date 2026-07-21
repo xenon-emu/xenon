@@ -324,7 +324,7 @@ void PPCInterpreter::PPCInterpreter_mfspr(sPPEState *ppeState) {
     GPRi(rs) = curThread.SPR.DAR;
     break;
   case eXenonSPR::DEC:
-    GPRi(rs) = curThread.SPR.DEC;
+    GPRi(rs) = xenonContext->timeBase.ReadDEC(curThread.SPR.PIR);
     break;
   case eXenonSPR::HDEC:
     GPRi(rs) = ppeState->SPR.HDEC;
@@ -348,10 +348,10 @@ void PPCInterpreter::PPCInterpreter_mfspr(sPPEState *ppeState) {
     GPRi(rs) = curThread.SPR.VRSAVE;
     break;
   case eXenonSPR::TBLRO:
-    GPRi(rs) = ppeState->SPR.TB.TBL;
+    GPRi(rs) = xenonContext->timeBase.ReadTB() & 0xFFFFFFFF;
     break;
   case eXenonSPR::TBURO:
-    GPRi(rs) = ppeState->SPR.TB.TBU;
+    GPRi(rs) = ((xenonContext->timeBase.ReadTB() >> 32) & 0xFFFFFFFF);
     break;
   case eXenonSPR::SPRG0:
     GPRi(rs) = curThread.SPR.SPRG0;
@@ -441,6 +441,7 @@ void PPCInterpreter::PPCInterpreter_mtspr(sPPEState *ppeState) {
     curThread.SPR.DAR = GPRi(rd);
     break;
   case eXenonSPR::DEC:
+    xenonContext->timeBase.WriteDEC(curThread.SPR.PIR, static_cast<s32>(GPRi(rd)));
     curThread.SPR.DEC = static_cast<u32>(GPRi(rd));
     break;
   case eXenonSPR::SDR1:
@@ -498,9 +499,11 @@ void PPCInterpreter::PPCInterpreter_mtspr(sPPEState *ppeState) {
     curThread.SPR.SPRG3 = GPRi(rd);
     break;
   case eXenonSPR::TBLWO:
+    xenonContext->timeBase.WriteTBL(static_cast<u32>(GPRi(rd)));
     ppeState->SPR.TB.TBL = (GPRi(rd) & 0xFFFFFFFF);
     break;
   case eXenonSPR::TBUWO:
+    xenonContext->timeBase.WriteTBU(static_cast<u32>(GPRi(rd)));
     ppeState->SPR.TB.TBU = (GPRi(rd) & 0xFFFFFFFF);
     break;
   case eXenonSPR::HSPRG0:

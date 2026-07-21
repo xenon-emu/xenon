@@ -12,7 +12,6 @@
 // This implementation uses direct array indexing for O(1) lookups
 
 class LRUCache {
-private:
   // Cache entry structure - packed for better cache line utilization
   struct CacheEntry {
     u64 key;    // EA page (4KB aligned)
@@ -20,27 +19,6 @@ private:
     bool valid;
     u8 padding[7]; // Align to 24 bytes
   };
-
-  // 2-way set-associative cache with 256 sets = 512 total entries
-  // NOTE: On real hardware, the ERAT uses 64 entry sets, but we use 512 here for perf increases.
-  static constexpr size_t NUM_SETS = 256;
-  static constexpr size_t NUM_WAYS = 2;
-  static constexpr u64 INVALID_KEY = ~0ULL;
-
-  // Cache storage - each set has 2 ways
-  CacheEntry entries[NUM_SETS][NUM_WAYS];
-
-  // LRU bit per set: 0 = way0 is LRU, 1 = way1 is LRU
-  u8 lruBits[NUM_SETS];
-
-  // Hash function to compute set index from EA page
-  // Uses bits that vary most in typical address patterns
-  static constexpr size_t getSetIndex(u64 key) {
-    // Use bits 12-16 XOR'd with bits 17-21 for better distribution
-    // (bits 0-11 are always 0 since key is 4KB aligned)
-    return ((key >> 12) ^ (key >> 17)) & (NUM_SETS - 1);
-  }
-
 public:
   LRUCache() {
     invalidateAll();
@@ -119,5 +97,26 @@ public:
       entries[i][1].key = INVALID_KEY;
       lruBits[i] = 0;
     }
+  }
+
+  // 2-way set-associative cache with 256 sets = 512 total entries
+  // NOTE: On real hardware, the ERAT uses 64 entry sets, but we use 512 here for perf increases.
+  static constexpr size_t NUM_SETS = 256;
+  static constexpr size_t NUM_WAYS = 2;
+  static constexpr u64 INVALID_KEY = ~0ULL;
+
+  // Cache storage - each set has 2 ways
+  CacheEntry entries[NUM_SETS][NUM_WAYS];
+
+  // LRU bit per set: 0 = way0 is LRU, 1 = way1 is LRU
+  u8 lruBits[NUM_SETS];
+
+private:
+  // Hash function to compute set index from EA page
+  // Uses bits that vary most in typical address patterns
+  static constexpr size_t getSetIndex(u64 key) {
+    // Use bits 12-16 XOR'd with bits 17-21 for better distribution
+    // (bits 0-11 are always 0 since key is 4KB aligned)
+    return ((key >> 12) ^ (key >> 17)) & (NUM_SETS - 1);
   }
 };

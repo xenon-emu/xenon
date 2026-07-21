@@ -175,26 +175,23 @@ struct SFCX_STATE {
 // Secure Flash Controller for Xbox Device.
 class SFCX : public PCIDevice {
 public:
-  SFCX(const std::string &deviceName, u64 size, const std::string &nandLoadPath,
-    PCIBridge *parentPCIBridge, RAM *ram);
+  SFCX(u64 size, const std::string &nandLoadPath,
+    std::weak_ptr<PCIBridge> parentPCIBridge, std::weak_ptr<RAM> ram);
   ~SFCX();
 
-  // Starts the thread
-  void Start();
-
   // PCI Read/Write methods to the SFCX device.
-  void Read(u64 readAddress, u8* data, u64 size) override;
-  void Write(u64 writeAddress, const u8* data, u64 size) override;
-  void MemSet(u64 writeAddress, s32 data, u64 size) override;
+  void Read(u64 address, u8 *data, u64 size) override;
+  void Write(u64 address, const u8 *data, u64 size) override;
+  void MemSet(u64 address, s32 data, u64 size) override;
 
   // RAW NAND data R/W. Used by Memory-Mapped 1:1 access.
-  void ReadRaw(u64 readAddress, u8* data, u64 size);
-  void WriteRaw(u64 writeAddress, const u8* data, u64 size);
-  void MemSetRaw(u64 writeAddress, s32 data, u64 size);
+  void ReadRaw(u64 address, u8 *data, u64 size);
+  void WriteRaw(u64 address, const u8 *data, u64 size);
+  void MemSetRaw(u64 address, s32 data, u64 size);
 
   // Config space read/write.
-  void ConfigRead(u64 readAddress, u8* data, u64 size) override;
-  void ConfigWrite(u64 writeAddress, const u8* data, u64 size) override;
+  void ConfigRead(u64 address, u8 *data, u64 size) override;
+  void ConfigWrite(u64 address, const u8 *data, u64 size) override;
 
   bool hasInitialised = false;
   // Init skips
@@ -207,17 +204,17 @@ private:
   // Thread object
   std::thread sfcxThread;
   // Thread running
-  volatile bool sfcxThreadRunning = false;
+  std::atomic<bool> sfcxThreadRunning = false;
   // SFCX State
   SFCX_STATE sfcxState{};
   // I/O File stream.
   std::ifstream nandFile;
   // PCI Bridge pointer. Used for Interrupts.
-  PCIBridge *parentBus = nullptr;
+  std::weak_ptr<PCIBridge> parentBus = {};
   // Mutex for thread-safe behavior.
   std::recursive_mutex mutex;
   // RAM pointer. Used for DMA.
-  RAM *mainMemory = nullptr;
+  std::weak_ptr<RAM> mainMemory = {};
   // Read a page from memory to page buffer.
   void sfcxReadPageFromNAND(bool physical);
   // Erase NAND Block

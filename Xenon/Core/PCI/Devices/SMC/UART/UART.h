@@ -6,7 +6,7 @@
 
 #ifdef _WIN32
 #include <winsock2.h>
-#include <Windows.h>
+#include <windows.h>
 #define socketclose closesocket
 #else
 #include <arpa/inet.h>

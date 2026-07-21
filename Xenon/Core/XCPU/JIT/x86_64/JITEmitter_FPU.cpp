@@ -7,24 +7,6 @@
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
 
 //
-// Floating Point Register Pointer Helper
-//
-
-#define FPRPtr(x) b->threadCtx->array(&sPPUThread::FPR).Ptr(x)
-
-//
-// Allocates a new XMM register for floating-point operations
-//
-
-#define newXMM() b->compiler->newXmm()
-
-//
-// FPSCR Pointer Helper
-//
-
-#define FPSCRPtr() b->threadCtx->scalar(&sPPUThread::FPSCR)
-
-//
 // FPSCR bit definitions (in little-endian bit positions)
 // PowerPC FPSCR is big-endian, so bit 0 in BE = bit 31 in LE
 //
@@ -55,11 +37,11 @@
 //
 
 // Checks for FPU enabled bit of MSR and raises an exception if not set
-inline void J_checkFPUEnabled(JITBlockBuilder* b) {
+inline void J_checkFPUEnabled(JITBlockBuilder *b) {
   x86::Gp msrReg = newGP64();
   x86::Gp exceptionReg = newGP16();
 
-  Label fpEnabledLabel = b->compiler->newLabel();
+  Label fpEnabledLabel = newLabel();
 
   COMP->mov(msrReg, SPRPtr(MSR));
   COMP->bt(msrReg, 13);
@@ -72,7 +54,7 @@ inline void J_checkFPUEnabled(JITBlockBuilder* b) {
 }
 
 // Helper to reset FPSCR exception bits before an FPU operation
-inline void J_resetFPSCRExceptionBits(JITBlockBuilder* b) {
+inline void J_resetFPSCRExceptionBits(JITBlockBuilder *b) {
   x86::Gp fpscr = newGP32();
   COMP->mov(fpscr, FPSCRPtr().Ptr<u32>());
   // Clear FX, VX, OX and all VX sub-bits
@@ -81,13 +63,13 @@ inline void J_resetFPSCRExceptionBits(JITBlockBuilder* b) {
 }
 
 // Helper to check if a value is an SNaN and set FPSCR exception bits if so
-inline void J_checkAndSetSNaN(JITBlockBuilder* b, x86::Xmm value) {
+inline void J_checkAndSetSNaN(JITBlockBuilder *b, x86::Vec value) {
   x86::Gp valueBits = newGP64();
   x86::Gp expBits = newGP64();
   x86::Gp fracBits = newGP64();
   x86::Gp fpscr = newGP32();
 
-  Label notSNaN = b->compiler->newLabel();
+  Label notSNaN = newLabel();
 
   COMP->vmovq(valueBits, value);
   COMP->mov(expBits, valueBits);
@@ -116,13 +98,13 @@ inline void J_checkAndSetSNaN(JITBlockBuilder* b, x86::Xmm value) {
 // Helper to check if a value is an SNaN and return its QNaN conversion in snanQNaN if found
 // Sets snanFlag to 1 if SNaN found, 0 otherwise
 // snanQNaN will contain the SNaN converted to QNaN (bit 51 set)
-inline void J_checkSNaNAndGetQNaN(JITBlockBuilder* b, x86::Xmm value, x86::Gp snanFlag, x86::Gp snanQNaN) {
+inline void J_checkSNaNAndGetQNaN(JITBlockBuilder *b, x86::Vec value, x86::Gp snanFlag, x86::Gp snanQNaN) {
   x86::Gp valueBits = newGP64();
   x86::Gp expBits = newGP64();
   x86::Gp fracBits = newGP64();
 
-  Label notSNaN = b->compiler->newLabel();
-  Label done = b->compiler->newLabel();
+  Label notSNaN = newLabel();
+  Label done = newLabel();
 
   COMP->vmovq(valueBits, value);
   COMP->mov(expBits, valueBits);
@@ -160,13 +142,13 @@ inline void J_checkSNaNAndGetQNaN(JITBlockBuilder* b, x86::Xmm value, x86::Gp sn
 // A QNaN has exp=0x7FF, frac!=0, and bit 51 set
 // Sets qnanFlag to 1 if QNaN found, 0 otherwise
 // qnanValue will contain the QNaN value
-inline void J_checkQNaNAndGetValue(JITBlockBuilder* b, x86::Xmm value, x86::Gp qnanFlag, x86::Gp qnanValue) {
+inline void J_checkQNaNAndGetValue(JITBlockBuilder *b, x86::Vec value, x86::Gp qnanFlag, x86::Gp qnanValue) {
   x86::Gp valueBits = newGP64();
   x86::Gp expBits = newGP64();
   x86::Gp fracBits = newGP64();
 
-  Label notQNaN = b->compiler->newLabel();
-  Label done = b->compiler->newLabel();
+  Label notQNaN = newLabel();
+  Label done = newLabel();
 
   COMP->vmovq(valueBits, value);
   COMP->mov(expBits, valueBits);
@@ -199,13 +181,13 @@ inline void J_checkQNaNAndGetValue(JITBlockBuilder* b, x86::Xmm value, x86::Gp q
 
 // Helper to check if a value is infinity (positive or negative)
 // Sets infFlag to 1 if infinity, 0 otherwise
-inline void J_checkInfinity(JITBlockBuilder* b, x86::Xmm value, x86::Gp infFlag) {
+inline void J_checkInfinity(JITBlockBuilder *b, x86::Vec value, x86::Gp infFlag) {
   x86::Gp valueBits = newGP64();
   x86::Gp expBits = newGP64();
   x86::Gp fracBits = newGP64();
 
-  Label notInf = b->compiler->newLabel();
-  Label done = b->compiler->newLabel();
+  Label notInf = newLabel();
+  Label done = newLabel();
 
   COMP->vmovq(valueBits, value);
 
@@ -239,13 +221,13 @@ inline void J_checkInfinity(JITBlockBuilder* b, x86::Xmm value, x86::Gp infFlag)
 // Helper to check if a value is a double-precision denormal (for single-precision ops)
 // A denormal has exponent = 0 and fraction != 0
 // Returns 1 in denormFlag if either input is denormal, 0 otherwise
-inline void J_checkDenormal(JITBlockBuilder* b, x86::Xmm value, x86::Gp denormFlag) {
+inline void J_checkDenormal(JITBlockBuilder *b, x86::Vec value, x86::Gp denormFlag) {
   x86::Gp valueBits = newGP64();
   x86::Gp expBits = newGP64();
   x86::Gp fracBits = newGP64();
 
-  Label notDenorm = b->compiler->newLabel();
-  Label isDenorm = b->compiler->newLabel();
+  Label notDenorm = newLabel();
+  Label isDenorm = newLabel();
 
   COMP->vmovq(valueBits, value);
 
@@ -269,7 +251,7 @@ inline void J_checkDenormal(JITBlockBuilder* b, x86::Xmm value, x86::Gp denormFl
   // It's a denormal
   COMP->bind(isDenorm);
   COMP->mov(denormFlag, 1);
-  Label done = b->compiler->newLabel();
+  Label done = newLabel();
   COMP->jmp(done);
 
   COMP->bind(notDenorm);
@@ -279,7 +261,7 @@ inline void J_checkDenormal(JITBlockBuilder* b, x86::Xmm value, x86::Gp denormFl
 }
 
 // Helper to check for Inf + (-Inf) or Inf - Inf invalid operation
-inline void J_checkInfSubInf(JITBlockBuilder* b, x86::Xmm fra, x86::Xmm frb, x86::Gp vxisiFlag) {
+inline void J_checkInfSubInf(JITBlockBuilder *b, x86::Vec fra, x86::Vec frb, x86::Gp vxisiFlag) {
   x86::Gp aBits = newGP64();
   x86::Gp bBits = newGP64();
   x86::Gp aExp = newGP64();
@@ -290,7 +272,7 @@ inline void J_checkInfSubInf(JITBlockBuilder* b, x86::Xmm fra, x86::Xmm frb, x86
   x86::Gp bSign = newGP64();
   x86::Gp fpscr = newGP32();
 
-  Label notInfSubInf = b->compiler->newLabel();
+  Label notInfSubInf = newLabel();
 
   COMP->xor_(vxisiFlag, vxisiFlag);
 
@@ -338,7 +320,7 @@ inline void J_checkInfSubInf(JITBlockBuilder* b, x86::Xmm fra, x86::Xmm frb, x86
 }
 
 // Helper to check for Inf - Inf (same sign subtraction) invalid operation
-inline void J_checkInfMinusInf(JITBlockBuilder* b, x86::Xmm fra, x86::Xmm frb, x86::Gp vxisiFlag) {
+inline void J_checkInfMinusInf(JITBlockBuilder *b, x86::Vec fra, x86::Vec frb, x86::Gp vxisiFlag) {
   x86::Gp aBits = newGP64();
   x86::Gp bBits = newGP64();
   x86::Gp aExp = newGP64();
@@ -349,7 +331,7 @@ inline void J_checkInfMinusInf(JITBlockBuilder* b, x86::Xmm fra, x86::Xmm frb, x
   x86::Gp bSign = newGP64();
   x86::Gp fpscr = newGP32();
 
-  Label notInfSubInf = b->compiler->newLabel();
+  Label notInfSubInf = newLabel();
 
   COMP->xor_(vxisiFlag, vxisiFlag);
 
@@ -398,7 +380,7 @@ inline void J_checkInfMinusInf(JITBlockBuilder* b, x86::Xmm fra, x86::Xmm frb, x
 }
 
 // Helper to check for Inf * 0 invalid operation
-inline void J_checkInfMulZero(JITBlockBuilder* b, x86::Xmm fra, x86::Xmm frc, x86::Gp vximzFlag) {
+inline void J_checkInfMulZero(JITBlockBuilder *b, x86::Vec fra, x86::Vec frc, x86::Gp vximzFlag) {
   x86::Gp aBits = newGP64();
   x86::Gp cBits = newGP64();
   x86::Gp aExp = newGP64();
@@ -407,8 +389,8 @@ inline void J_checkInfMulZero(JITBlockBuilder* b, x86::Xmm fra, x86::Xmm frc, x8
   x86::Gp cFrac = newGP64();
   x86::Gp fpscr = newGP32();
 
-  Label notInfMulZero = b->compiler->newLabel();
-  Label checkCInfAZero = b->compiler->newLabel();
+  Label notInfMulZero = newLabel();
+  Label checkCInfAZero = newLabel();
 
   COMP->xor_(vximzFlag, vximzFlag);
 
@@ -484,7 +466,7 @@ inline void J_checkInfMulZero(JITBlockBuilder* b, x86::Xmm fra, x86::Xmm frc, x8
 }
 
 // Helper to set CR1 based on FPSCR (FX, FEX, VX, OX bits)
-inline void J_ppuSetCR1(JITBlockBuilder* b) {
+inline void J_ppuSetCR1(JITBlockBuilder *b) {
   x86::Gp fpscr = newGP32();
   x86::Gp cr1Value = newGP32();
   x86::Gp crReg = newGP32();
@@ -504,7 +486,7 @@ inline void J_ppuSetCR1(JITBlockBuilder* b) {
 }
 
 // Helper to classify a double-precision floating point value and set FPRF
-inline void J_classifyAndSetFPRF(JITBlockBuilder* b, x86::Xmm result) {
+inline void J_classifyAndSetFPRF(JITBlockBuilder *b, x86::Vec result) {
   x86::Gp resultBits = newGP64();
   x86::Gp fprf = newGP32();
   x86::Gp fpscr = newGP32();
@@ -512,18 +494,18 @@ inline void J_classifyAndSetFPRF(JITBlockBuilder* b, x86::Xmm result) {
   x86::Gp expBits = newGP64();
   x86::Gp fracBits = newGP64();
 
-  Label isNaNOrInf = b->compiler->newLabel();
-  Label isNaN = b->compiler->newLabel();
-  Label isInfPos = b->compiler->newLabel();
-  Label isInfNeg = b->compiler->newLabel();
-  Label isZeroOrDenorm = b->compiler->newLabel();
-  Label isZeroPos = b->compiler->newLabel();
-  Label isZeroNeg = b->compiler->newLabel();
-  Label isDenormPos = b->compiler->newLabel();
-  Label isDenormNeg = b->compiler->newLabel();
-  Label isNormPos = b->compiler->newLabel();
-  Label isNormNeg = b->compiler->newLabel();
-  Label done = b->compiler->newLabel();
+  Label isNaNOrInf = newLabel();
+  Label isNaN = newLabel();
+  Label isInfPos = newLabel();
+  Label isInfNeg = newLabel();
+  Label isZeroOrDenorm = newLabel();
+  Label isZeroPos = newLabel();
+  Label isZeroNeg = newLabel();
+  Label isDenormPos = newLabel();
+  Label isDenormNeg = newLabel();
+  Label isNormPos = newLabel();
+  Label isNormNeg = newLabel();
+  Label done = newLabel();
 
   COMP->vmovq(resultBits, result);
 
@@ -610,20 +592,20 @@ inline void J_classifyAndSetFPRF(JITBlockBuilder* b, x86::Xmm result) {
 }
 
 // Helper to convert double to single and store back as double (for single-precision operations)
-inline void J_roundToSingle(JITBlockBuilder* b, x86::Xmm frd) {
+inline void J_roundToSingle(JITBlockBuilder *b, x86::Vec frd) {
   COMP->vcvtsd2ss(frd, frd, frd);
   COMP->vcvtss2sd(frd, frd, frd);
 }
 
 // Floating Add (Double-Precision) (x'FC00 002A')
 // frD <- (frA) + (frB)
-void PPCInterpreter::PPCInterpreterJIT_faddx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_faddx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frd = newXMM();
 
   // Load frA (64-bit double from FPR[fra])
   // FPR is stored as u64, which represents the double bit pattern
@@ -645,7 +627,7 @@ void PPCInterpreter::PPCInterpreterJIT_faddx(sPPEState* ppeState, JITBlockBuilde
 
   // Clear MXCSR exception flags before the operation to detect inexact results
   x86::Gp mxcsrMem = newGP32();
-  x86::Mem mxcsrSlot = b->compiler->newStack(4, 4);
+  x86::Mem mxcsrSlot = newStack(4, 4);
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrMem, mxcsrSlot);
   COMP->and_(mxcsrMem, ~0x3F);
@@ -656,7 +638,7 @@ void PPCInterpreter::PPCInterpreterJIT_faddx(sPPEState* ppeState, JITBlockBuilde
   COMP->vaddsd(frd, fra, frb);
 
   // If VXISI occurred (Inf + (-Inf)), replace result with PowerPC default QNaN
-  Label noVxisiFixup = b->compiler->newLabel();
+  Label noVxisiFixup = newLabel();
   COMP->test(vxisiFlag, vxisiFlag);
   COMP->jz(noVxisiFixup);
 
@@ -671,7 +653,7 @@ void PPCInterpreter::PPCInterpreterJIT_faddx(sPPEState* ppeState, JITBlockBuilde
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrMem, mxcsrSlot);
 
-  Label notInexact = b->compiler->newLabel();
+  Label notInexact = newLabel();
   COMP->bt(mxcsrMem, 5);
   COMP->jnc(notInexact);
 
@@ -700,13 +682,13 @@ void PPCInterpreter::PPCInterpreterJIT_faddx(sPPEState* ppeState, JITBlockBuilde
 // Note: Single-precision operations treat double-precision denormals as invalid
 // EXCEPT when the other operand is infinity or NaN (infinity/NaN dominates)
 // NaN priority: fra NaN (SNaN->QNaN or QNaN) > frb NaN (SNaN->QNaN or QNaN) > VXISI > denorm
-void PPCInterpreter::PPCInterpreterJIT_faddsx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_faddsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frd = newXMM();
 
   // Load frA (64-bit double from FPR[fra])
   COMP->vmovsd(fra, FPRPtr(instr.fra));
@@ -767,7 +749,7 @@ void PPCInterpreter::PPCInterpreterJIT_faddsx(sPPEState* ppeState, JITBlockBuild
 
   // Clear MXCSR exception flags before the operation to detect inexact results
   x86::Gp mxcsrMem = newGP32();
-  x86::Mem mxcsrSlot = b->compiler->newStack(4, 4);
+  x86::Mem mxcsrSlot = newStack(4, 4);
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrMem, mxcsrSlot);
   COMP->and_(mxcsrMem, ~0x3F);
@@ -781,13 +763,13 @@ void PPCInterpreter::PPCInterpreterJIT_faddsx(sPPEState* ppeState, JITBlockBuild
   // Priority: fra NaN (any) > frb NaN (any) > VXISI > denorm (only if no infinity/NaN)
   // For fra: SNaN converted to QNaN takes precedence, then QNaN
   // For frb: SNaN converted to QNaN takes precedence, then QNaN
-  Label checkQNaNA = b->compiler->newLabel();
-  Label checkNaNB = b->compiler->newLabel();
-  Label checkQNaNB = b->compiler->newLabel();
-  Label checkVxisi = b->compiler->newLabel();
-  Label checkDenorm = b->compiler->newLabel();
-  Label doRounding = b->compiler->newLabel();
-  Label storeResult = b->compiler->newLabel();
+  Label checkQNaNA = newLabel();
+  Label checkNaNB = newLabel();
+  Label checkQNaNB = newLabel();
+  Label checkVxisi = newLabel();
+  Label checkDenorm = newLabel();
+  Label doRounding = newLabel();
+  Label storeResult = newLabel();
 
   // If fra is SNaN, use its converted QNaN (fra has priority)
   COMP->test(snanFlagA, snanFlagA);
@@ -861,7 +843,7 @@ void PPCInterpreter::PPCInterpreterJIT_faddsx(sPPEState* ppeState, JITBlockBuild
   {
     x86::Gp afterRound = newGP64();
     x86::Gp fpscr = newGP32();
-    Label notInexact = b->compiler->newLabel();
+    Label notInexact = newLabel();
 
     COMP->vmovq(afterRound, frd);
     COMP->cmp(beforeRound, afterRound);
@@ -890,13 +872,13 @@ void PPCInterpreter::PPCInterpreterJIT_faddsx(sPPEState* ppeState, JITBlockBuild
 
 // Floating Subtract (Double-Precision) (x'FC00 0028')
 // frD <- (frA) - (frB)
-void PPCInterpreter::PPCInterpreterJIT_fsubx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fsubx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frd = newXMM();
 
   // Load frA (64-bit double from FPR[fra])
   // FPR is stored as u64, which represents the double bit pattern
@@ -918,7 +900,7 @@ void PPCInterpreter::PPCInterpreterJIT_fsubx(sPPEState* ppeState, JITBlockBuilde
 
   // Clear MXCSR exception flags before the operation to detect inexact results
   x86::Gp mxcsrMem = newGP32();
-  x86::Mem mxcsrSlot = b->compiler->newStack(4, 4);
+  x86::Mem mxcsrSlot = newStack(4, 4);
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrMem, mxcsrSlot);
   COMP->and_(mxcsrMem, ~0x3F);
@@ -929,7 +911,7 @@ void PPCInterpreter::PPCInterpreterJIT_fsubx(sPPEState* ppeState, JITBlockBuilde
   COMP->vsubsd(frd, fra, frb);
 
   // If VXISI occurred (Inf - Inf), replace result with PowerPC default QNaN
-  Label noVxisiFixup = b->compiler->newLabel();
+  Label noVxisiFixup = newLabel();
   COMP->test(vxisiFlag, vxisiFlag);
   COMP->jz(noVxisiFixup);
 
@@ -944,7 +926,7 @@ void PPCInterpreter::PPCInterpreterJIT_fsubx(sPPEState* ppeState, JITBlockBuilde
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrMem, mxcsrSlot);
 
-  Label notInexact = b->compiler->newLabel();
+  Label notInexact = newLabel();
   COMP->bt(mxcsrMem, 5);
   COMP->jnc(notInexact);
 
@@ -971,13 +953,13 @@ void PPCInterpreter::PPCInterpreterJIT_fsubx(sPPEState* ppeState, JITBlockBuilde
 // Floating Subtract Single (x'EC00 0028')
 // frD <- (frA) - (frB) [single precision]
 // NaN priority: fra NaN > frb NaN > VXISI > denorm
-void PPCInterpreter::PPCInterpreterJIT_fsubsx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fsubsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -1032,7 +1014,7 @@ void PPCInterpreter::PPCInterpreterJIT_fsubsx(sPPEState* ppeState, JITBlockBuild
 
   // Clear MXCSR exception flags before the operation to detect inexact results
   x86::Gp mxcsrMem = newGP32();
-  x86::Mem mxcsrSlot = b->compiler->newStack(4, 4);
+  x86::Mem mxcsrSlot = newStack(4, 4);
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrMem, mxcsrSlot);
   COMP->and_(mxcsrMem, ~0x3F);
@@ -1044,13 +1026,13 @@ void PPCInterpreter::PPCInterpreterJIT_fsubsx(sPPEState* ppeState, JITBlockBuild
 
   // Determine the correct result:
   // Priority: fra NaN > frb NaN > VXISI > denorm
-  Label checkQNaNA = b->compiler->newLabel();
-  Label checkNaNB = b->compiler->newLabel();
-  Label checkQNaNB = b->compiler->newLabel();
-  Label checkVxisi = b->compiler->newLabel();
-  Label checkDenorm = b->compiler->newLabel();
-  Label doRounding = b->compiler->newLabel();
-  Label storeResult = b->compiler->newLabel();
+  Label checkQNaNA = newLabel();
+  Label checkNaNB = newLabel();
+  Label checkQNaNB = newLabel();
+  Label checkVxisi = newLabel();
+  Label checkDenorm = newLabel();
+  Label doRounding = newLabel();
+  Label storeResult = newLabel();
 
   // If fra is SNaN, use its converted QNaN (fra has priority)
   COMP->test(snanFlagA, snanFlagA);
@@ -1123,7 +1105,7 @@ void PPCInterpreter::PPCInterpreterJIT_fsubsx(sPPEState* ppeState, JITBlockBuild
   {
     x86::Gp afterRound = newGP64();
     x86::Gp fpscr = newGP32();
-    Label notInexact = b->compiler->newLabel();
+    Label notInexact = newLabel();
 
     COMP->vmovq(afterRound, frd);
     COMP->cmp(beforeRound, afterRound);
@@ -1151,13 +1133,13 @@ void PPCInterpreter::PPCInterpreterJIT_fsubsx(sPPEState* ppeState, JITBlockBuild
 }
 
 // Floating Multiply (Double-Precision) (x'FC00 0032')
-void PPCInterpreter::PPCInterpreterJIT_fmulx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fmulx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frc));
@@ -1196,7 +1178,7 @@ void PPCInterpreter::PPCInterpreterJIT_fmulx(sPPEState* ppeState, JITBlockBuilde
 
   // Clear MXCSR exception flags before the operation to detect inexact results
   x86::Gp mxcsrMem = newGP32();
-  x86::Mem mxcsrSlot = b->compiler->newStack(4, 4);
+  x86::Mem mxcsrSlot = newStack(4, 4);
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrMem, mxcsrSlot);
   COMP->and_(mxcsrMem, ~0x3F);
@@ -1213,11 +1195,11 @@ void PPCInterpreter::PPCInterpreterJIT_fmulx(sPPEState* ppeState, JITBlockBuilde
   // frb QNaN -> propagate
   // VXIMZ -> default QNaN
   // otherwise use computed product
-  Label checkQNaNA = b->compiler->newLabel();
-  Label checkNaNB = b->compiler->newLabel();
-  Label checkQNaNB = b->compiler->newLabel();
-  Label checkVximz = b->compiler->newLabel();
-  Label storeResult = b->compiler->newLabel();
+  Label checkQNaNA = newLabel();
+  Label checkNaNB = newLabel();
+  Label checkQNaNB = newLabel();
+  Label checkVximz = newLabel();
+  Label storeResult = newLabel();
 
   COMP->test(snanFlagA, snanFlagA);
   COMP->jz(checkQNaNA);
@@ -1258,7 +1240,7 @@ void PPCInterpreter::PPCInterpreterJIT_fmulx(sPPEState* ppeState, JITBlockBuilde
   COMP->mov(mxcsrMem, mxcsrSlot);
 
   {
-    Label notInexact = b->compiler->newLabel();
+    Label notInexact = newLabel();
     COMP->bt(mxcsrMem, 5);
     COMP->jnc(notInexact);
 
@@ -1284,13 +1266,13 @@ void PPCInterpreter::PPCInterpreterJIT_fmulx(sPPEState* ppeState, JITBlockBuilde
 }
 
 // Floating Multiply Single (x'EC00 0032')
-void PPCInterpreter::PPCInterpreterJIT_fmulsx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fmulsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frc = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frc = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frc, FPRPtr(instr.frc));
@@ -1345,7 +1327,7 @@ void PPCInterpreter::PPCInterpreterJIT_fmulsx(sPPEState* ppeState, JITBlockBuild
 
   // Clear MXCSR exception flags before the operation to detect inexact results
   x86::Gp mxcsrMem = newGP32();
-  x86::Mem mxcsrSlot = b->compiler->newStack(4, 4);
+  x86::Mem mxcsrSlot = newStack(4, 4);
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrMem, mxcsrSlot);
   COMP->and_(mxcsrMem, ~0x3F);
@@ -1357,13 +1339,13 @@ void PPCInterpreter::PPCInterpreterJIT_fmulsx(sPPEState* ppeState, JITBlockBuild
 
   // Determine the correct result:
   // Priority: fra NaN (any) > frc NaN (any) > VXIMZ > denorm
-  Label checkQNaNA = b->compiler->newLabel();
-  Label checkNaNB = b->compiler->newLabel();
-  Label checkQNaNB = b->compiler->newLabel();
-  Label checkVximz = b->compiler->newLabel();
-  Label checkDenorm = b->compiler->newLabel();
-  Label doRounding = b->compiler->newLabel();
-  Label storeResult = b->compiler->newLabel();
+  Label checkQNaNA = newLabel();
+  Label checkNaNB = newLabel();
+  Label checkQNaNB = newLabel();
+  Label checkVximz = newLabel();
+  Label checkDenorm = newLabel();
+  Label doRounding = newLabel();
+  Label storeResult = newLabel();
 
   // If fra is SNaN, use its converted QNaN (fra has priority)
   COMP->test(snanFlagA, snanFlagA);
@@ -1437,7 +1419,7 @@ void PPCInterpreter::PPCInterpreterJIT_fmulsx(sPPEState* ppeState, JITBlockBuild
   {
     x86::Gp afterRound = newGP64();
     x86::Gp fpscr = newGP32();
-    Label notInexact = b->compiler->newLabel();
+    Label notInexact = newLabel();
 
     COMP->vmovq(afterRound, frd);
     COMP->cmp(beforeRound, afterRound);
@@ -1465,13 +1447,13 @@ void PPCInterpreter::PPCInterpreterJIT_fmulsx(sPPEState* ppeState, JITBlockBuild
 }
 
 // Floating Divide (Double-Precision) (x'FC00 0024')
-void PPCInterpreter::PPCInterpreterJIT_fdivx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fdivx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -1522,7 +1504,7 @@ void PPCInterpreter::PPCInterpreterJIT_fdivx(sPPEState* ppeState, JITBlockBuilde
   COMP->mov(fracMaskTmp, 0x7FFFFFFFFFFFFFFFull);  // Mask out sign bit
   COMP->and_(bBits, fracMaskTmp);
   COMP->test(bBits, bBits);
-  Label bNotZero = b->compiler->newLabel();
+  Label bNotZero = newLabel();
   COMP->jnz(bNotZero);
   COMP->mov(bIsZero, 1);
   COMP->bind(bNotZero);
@@ -1535,14 +1517,14 @@ void PPCInterpreter::PPCInterpreterJIT_fdivx(sPPEState* ppeState, JITBlockBuilde
   COMP->mov(fracMaskTmp, 0x7FFFFFFFFFFFFFFFull);
   COMP->and_(aBits, fracMaskTmp);
   COMP->test(aBits, aBits);
-  Label aNotZero = b->compiler->newLabel();
+  Label aNotZero = newLabel();
   COMP->jnz(aNotZero);
   COMP->mov(aIsZero, 1);
   COMP->bind(aNotZero);
 
   // Clear MXCSR exception flags before the operation
   x86::Gp mxcsrMem = newGP32();
-  x86::Mem mxcsrSlot = b->compiler->newStack(4, 4);
+  x86::Mem mxcsrSlot = newStack(4, 4);
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrMem, mxcsrSlot);
   COMP->and_(mxcsrMem, ~0x3F);
@@ -1554,14 +1536,14 @@ void PPCInterpreter::PPCInterpreterJIT_fdivx(sPPEState* ppeState, JITBlockBuilde
 
   // Determine the correct result:
   // Priority: fra NaN > frb NaN > Inf/Inf (VXIDI) > 0/0 (VXZDZ) > x/0 (ZX) > normal result
-  Label checkQNaNA = b->compiler->newLabel();
-  Label checkNaNB = b->compiler->newLabel();
-  Label checkQNaNB = b->compiler->newLabel();
-  Label checkInfDivInf = b->compiler->newLabel();
-  Label checkZeroDivZero = b->compiler->newLabel();
-  Label checkDivByZero = b->compiler->newLabel();
-  Label checkOverflow = b->compiler->newLabel();
-  Label storeResult = b->compiler->newLabel();
+  Label checkQNaNA = newLabel();
+  Label checkNaNB = newLabel();
+  Label checkQNaNB = newLabel();
+  Label checkInfDivInf = newLabel();
+  Label checkZeroDivZero = newLabel();
+  Label checkDivByZero = newLabel();
+  Label checkOverflow = newLabel();
+  Label storeResult = newLabel();
 
   // If fra is SNaN, use its converted QNaN
   COMP->test(snanFlagA, snanFlagA);
@@ -1697,7 +1679,7 @@ void PPCInterpreter::PPCInterpreterJIT_fdivx(sPPEState* ppeState, JITBlockBuilde
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrMem, mxcsrSlot);
   {
-    Label notInexact = b->compiler->newLabel();
+    Label notInexact = newLabel();
     COMP->bt(mxcsrMem, 5);
     COMP->jnc(notInexact);
 
@@ -1722,13 +1704,13 @@ void PPCInterpreter::PPCInterpreterJIT_fdivx(sPPEState* ppeState, JITBlockBuilde
 }
 
 // Floating Divide Single (x'EC00 0024')
-void PPCInterpreter::PPCInterpreterJIT_fdivsx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fdivsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -1789,7 +1771,7 @@ void PPCInterpreter::PPCInterpreterJIT_fdivsx(sPPEState* ppeState, JITBlockBuild
   COMP->mov(absMask, 0x7FFFFFFFFFFFFFFFull);
   COMP->and_(bBits, absMask);
   COMP->test(bBits, bBits);
-  Label bNotZero = b->compiler->newLabel();
+  Label bNotZero = newLabel();
   COMP->jnz(bNotZero);
   COMP->mov(bIsZero, 1);
   COMP->bind(bNotZero);
@@ -1802,14 +1784,14 @@ void PPCInterpreter::PPCInterpreterJIT_fdivsx(sPPEState* ppeState, JITBlockBuild
   COMP->mov(absMask, 0x7FFFFFFFFFFFFFFFull);
   COMP->and_(aBits, absMask);
   COMP->test(aBits, aBits);
-  Label aNotZero = b->compiler->newLabel();
+  Label aNotZero = newLabel();
   COMP->jnz(aNotZero);
   COMP->mov(aIsZero, 1);
   COMP->bind(aNotZero);
 
   // Clear MXCSR exception flags before the operation
   x86::Gp mxcsrMem = newGP32();
-  x86::Mem mxcsrSlot = b->compiler->newStack(4, 4);
+  x86::Mem mxcsrSlot = newStack(4, 4);
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrMem, mxcsrSlot);
   COMP->and_(mxcsrMem, ~0x3F);
@@ -1821,15 +1803,15 @@ void PPCInterpreter::PPCInterpreterJIT_fdivsx(sPPEState* ppeState, JITBlockBuild
 
   // Determine the correct result:
   // Priority: fra NaN > frb NaN > Inf/Inf > 0/0 > x/0 (finite x only) > normal result
-  Label checkQNaNA = b->compiler->newLabel();
-  Label checkNaNB = b->compiler->newLabel();
-  Label checkQNaNB = b->compiler->newLabel();
-  Label checkInfDivInf = b->compiler->newLabel();
-  Label checkZeroDivZero = b->compiler->newLabel();
-  Label checkDivByZero = b->compiler->newLabel();
-  Label checkRounding = b->compiler->newLabel();
-  Label checkInexactAndOverflow = b->compiler->newLabel();
-  Label storeResult = b->compiler->newLabel();
+  Label checkQNaNA = newLabel();
+  Label checkNaNB = newLabel();
+  Label checkQNaNB = newLabel();
+  Label checkInfDivInf = newLabel();
+  Label checkZeroDivZero = newLabel();
+  Label checkDivByZero = newLabel();
+  Label checkRounding = newLabel();
+  Label checkInexactAndOverflow = newLabel();
+  Label storeResult = newLabel();
 
   // If fra is SNaN, use its converted QNaN
   COMP->test(snanFlagA, snanFlagA);
@@ -1968,7 +1950,7 @@ void PPCInterpreter::PPCInterpreterJIT_fdivsx(sPPEState* ppeState, JITBlockBuild
     // Check if result is infinity when fra was NOT infinity - this indicates overflow
     // This catches cases like normal/denormal_min = Inf (overflow)
     // But normal/denormal_max = large_number (NOT overflow)
-    Label checkInexactOnly = b->compiler->newLabel();
+    Label checkInexactOnly = newLabel();
 
     // First check if fra was already infinity - if so, no overflow possible
     COMP->test(infFlagA, infFlagA);
@@ -2002,7 +1984,7 @@ void PPCInterpreter::PPCInterpreterJIT_fdivsx(sPPEState* ppeState, JITBlockBuild
 
     COMP->bind(checkInexactOnly);
     // Check for inexact (bit 5 in MXCSR)
-    Label notInexact = b->compiler->newLabel();
+    Label notInexact = newLabel();
     COMP->bt(mxcsrMem, 5);
     COMP->jnc(notInexact);
 
@@ -2028,14 +2010,14 @@ void PPCInterpreter::PPCInterpreterJIT_fdivsx(sPPEState* ppeState, JITBlockBuild
 }
 
 // Floating Square Root (Double-Precision) (x'FC00 002C')
-void PPCInterpreter::PPCInterpreterJIT_fsqrtx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fsqrtx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm frb = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frd = newXMM();
 
-  Label setVxsqrt = b->compiler->newLabel();
+  Label setVxsqrt = newLabel();
 
   COMP->vmovsd(frb, FPRPtr(instr.frb));
 
@@ -2065,7 +2047,7 @@ void PPCInterpreter::PPCInterpreterJIT_fsqrtx(sPPEState* ppeState, JITBlockBuild
 
   // Check sign bit
   COMP->bt(bBits, 63);
-  Label notNegative = b->compiler->newLabel();
+  Label notNegative = newLabel();
   COMP->jnc(notNegative);
 
   // Sign bit is set - check if it's -0 (which is valid for sqrt)
@@ -2098,13 +2080,13 @@ void PPCInterpreter::PPCInterpreterJIT_fsqrtx(sPPEState* ppeState, JITBlockBuild
   COMP->bind(notNegative);
 
   // Check for negative non-zero, non-NaN value to set VXSQRT
-  Label checkNaN = b->compiler->newLabel();
+  Label checkNaN = newLabel();
   {
     x86::Gp checkNeg = newGP64();
     COMP->vmovq(checkNeg, frb);
 
     // Skip if sign bit is not set
-    Label noVxsqrt = b->compiler->newLabel();
+    Label noVxsqrt = newLabel();
     COMP->bt(checkNeg, 63);
     COMP->jnc(noVxsqrt);
 
@@ -2147,7 +2129,7 @@ void PPCInterpreter::PPCInterpreterJIT_fsqrtx(sPPEState* ppeState, JITBlockBuild
 
   // Clear MXCSR exception flags before the operation
   x86::Gp mxcsrMem = newGP32();
-  x86::Mem mxcsrSlot = b->compiler->newStack(4, 4);
+  x86::Mem mxcsrSlot = newStack(4, 4);
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrMem, mxcsrSlot);
   COMP->and_(mxcsrMem, ~0x3F);
@@ -2159,9 +2141,9 @@ void PPCInterpreter::PPCInterpreterJIT_fsqrtx(sPPEState* ppeState, JITBlockBuild
 
   // Determine the correct result:
   // Priority: SNaN -> QNaN > QNaN > negative -> default QNaN > normal result
-  Label checkQNaNB = b->compiler->newLabel();
-  Label checkNegative = b->compiler->newLabel();
-  Label storeResult = b->compiler->newLabel();
+  Label checkQNaNB = newLabel();
+  Label checkNegative = newLabel();
+  Label storeResult = newLabel();
 
   // If frb is SNaN, use its converted QNaN
   COMP->test(snanFlagB, snanFlagB);
@@ -2192,7 +2174,7 @@ void PPCInterpreter::PPCInterpreterJIT_fsqrtx(sPPEState* ppeState, JITBlockBuild
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrMem, mxcsrSlot);
   {
-    Label notInexact = b->compiler->newLabel();
+    Label notInexact = newLabel();
     COMP->bt(mxcsrMem, 5);
     COMP->jnc(notInexact);
 
@@ -2217,11 +2199,11 @@ void PPCInterpreter::PPCInterpreterJIT_fsqrtx(sPPEState* ppeState, JITBlockBuild
 }
 
 // Floating Compare Unordered (x'FC00 0000')
-void PPCInterpreter::PPCInterpreterJIT_fcmpu(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fcmpu(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -2248,7 +2230,7 @@ void PPCInterpreter::PPCInterpreterJIT_fcmpu(sPPEState* ppeState, JITBlockBuilde
     COMP->shr(aExp, 52);
     COMP->and_(aExp, 0x7FF);
     COMP->cmp(aExp.r32(), 0x7FF);
-    Label aNotNaN = b->compiler->newLabel();
+    Label aNotNaN = newLabel();
     COMP->jne(aNotNaN);
 
     COMP->mov(fracMask, 0x000FFFFFFFFFFFFFull);
@@ -2272,7 +2254,7 @@ void PPCInterpreter::PPCInterpreterJIT_fcmpu(sPPEState* ppeState, JITBlockBuilde
     COMP->shr(bExp, 52);
     COMP->and_(bExp, 0x7FF);
     COMP->cmp(bExp.r32(), 0x7FF);
-    Label bNotNaN = b->compiler->newLabel();
+    Label bNotNaN = newLabel();
     COMP->jne(bNotNaN);
 
     COMP->mov(fracMask, 0x000FFFFFFFFFFFFFull);
@@ -2288,10 +2270,10 @@ void PPCInterpreter::PPCInterpreterJIT_fcmpu(sPPEState* ppeState, JITBlockBuilde
   x86::Gp compareResult = newGP32();
   COMP->xor_(compareResult, compareResult);
 
-  Label checkNaNB = b->compiler->newLabel();
-  Label doCompare = b->compiler->newLabel();
-  Label setUnordered = b->compiler->newLabel();
-  Label setResult = b->compiler->newLabel();
+  Label checkNaNB = newLabel();
+  Label doCompare = newLabel();
+  Label setUnordered = newLabel();
+  Label setResult = newLabel();
 
   // If either is NaN, result is unordered
   COMP->test(aIsNaN, aIsNaN);
@@ -2326,10 +2308,10 @@ void PPCInterpreter::PPCInterpreterJIT_fcmpu(sPPEState* ppeState, JITBlockBuilde
     COMP->and_(bAbs, absMask);
 
     // Check for +0 == -0 case (both absolute values are 0)
-    Label notBothZero = b->compiler->newLabel();
-    Label setEqual = b->compiler->newLabel();
-    Label setLess = b->compiler->newLabel();
-    Label setGreater = b->compiler->newLabel();
+    Label notBothZero = newLabel();
+    Label setEqual = newLabel();
+    Label setLess = newLabel();
+    Label setGreater = newLabel();
 
     x86::Gp bothZeroCheck = newGP64();
     COMP->mov(bothZeroCheck, aAbs);
@@ -2342,7 +2324,7 @@ void PPCInterpreter::PPCInterpreterJIT_fcmpu(sPPEState* ppeState, JITBlockBuilde
     COMP->bind(notBothZero);
 
     // Different signs: negative < positive (unless both zero, handled above)
-    Label sameSign = b->compiler->newLabel();
+    Label sameSign = newLabel();
     COMP->cmp(aSign.r32(), bSign.r32());
     COMP->je(sameSign);
 
@@ -2356,9 +2338,9 @@ void PPCInterpreter::PPCInterpreterJIT_fcmpu(sPPEState* ppeState, JITBlockBuilde
     // For positive numbers: larger magnitude = larger value
     // For negative numbers: larger magnitude = smaller value
 
-    Label aAbsGreater = b->compiler->newLabel();
-    Label aAbsLess = b->compiler->newLabel();
-    Label aAbsEqual = b->compiler->newLabel();
+    Label aAbsGreater = newLabel();
+    Label aAbsLess = newLabel();
+    Label aAbsEqual = newLabel();
 
     COMP->cmp(aAbs, bAbs);
     COMP->ja(aAbsGreater);
@@ -2420,11 +2402,11 @@ void PPCInterpreter::PPCInterpreterJIT_fcmpu(sPPEState* ppeState, JITBlockBuilde
 }
 
 // Floating Compare Ordered (x'FC00 0040')
-void PPCInterpreter::PPCInterpreterJIT_fcmpo(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fcmpo(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -2447,7 +2429,7 @@ void PPCInterpreter::PPCInterpreterJIT_fcmpo(sPPEState* ppeState, JITBlockBuilde
     COMP->shr(aExp, 52);
     COMP->and_(aExp, 0x7FF);
     COMP->cmp(aExp.r32(), 0x7FF);
-    Label aNotSNaN = b->compiler->newLabel();
+    Label aNotSNaN = newLabel();
     COMP->jne(aNotSNaN);
 
     COMP->mov(fracMask, 0x000FFFFFFFFFFFFFull);
@@ -2476,7 +2458,7 @@ void PPCInterpreter::PPCInterpreterJIT_fcmpo(sPPEState* ppeState, JITBlockBuilde
     COMP->shr(bExp, 52);
     COMP->and_(bExp, 0x7FF);
     COMP->cmp(bExp.r32(), 0x7FF);
-    Label bNotSNaN = b->compiler->newLabel();
+    Label bNotSNaN = newLabel();
     COMP->jne(bNotSNaN);
 
     COMP->mov(fracMask, 0x000FFFFFFFFFFFFFull);
@@ -2504,7 +2486,7 @@ void PPCInterpreter::PPCInterpreterJIT_fcmpo(sPPEState* ppeState, JITBlockBuilde
     COMP->shr(aExp, 52);
     COMP->and_(aExp, 0x7FF);
     COMP->cmp(aExp.r32(), 0x7FF);
-    Label aNotQNaN = b->compiler->newLabel();
+    Label aNotQNaN = newLabel();
     COMP->jne(aNotQNaN);
 
     COMP->mov(fracMask, 0x000FFFFFFFFFFFFFull);
@@ -2533,7 +2515,7 @@ void PPCInterpreter::PPCInterpreterJIT_fcmpo(sPPEState* ppeState, JITBlockBuilde
     COMP->shr(bExp, 52);
     COMP->and_(bExp, 0x7FF);
     COMP->cmp(bExp.r32(), 0x7FF);
-    Label bNotQNaN = b->compiler->newLabel();
+    Label bNotQNaN = newLabel();
     COMP->jne(bNotQNaN);
 
     COMP->mov(fracMask, 0x000FFFFFFFFFFFFFull);
@@ -2562,9 +2544,9 @@ void PPCInterpreter::PPCInterpreterJIT_fcmpo(sPPEState* ppeState, JITBlockBuilde
   x86::Gp compareResult = newGP32();
   COMP->xor_(compareResult, compareResult);
 
-  Label doCompare = b->compiler->newLabel();
-  Label setUnordered = b->compiler->newLabel();
-  Label setResult = b->compiler->newLabel();
+  Label doCompare = newLabel();
+  Label setUnordered = newLabel();
+  Label setResult = newLabel();
 
   // If either is NaN, result is unordered
   COMP->test(aIsNaN, aIsNaN);
@@ -2599,10 +2581,10 @@ void PPCInterpreter::PPCInterpreterJIT_fcmpo(sPPEState* ppeState, JITBlockBuilde
     COMP->and_(bAbs, absMask);
 
     // Check for +0 == -0 case (both absolute values are 0)
-    Label notBothZero = b->compiler->newLabel();
-    Label setEqual = b->compiler->newLabel();
-    Label setLess = b->compiler->newLabel();
-    Label setGreater = b->compiler->newLabel();
+    Label notBothZero = newLabel();
+    Label setEqual = newLabel();
+    Label setLess = newLabel();
+    Label setGreater = newLabel();
 
     x86::Gp bothZeroCheck = newGP64();
     COMP->mov(bothZeroCheck, aAbs);
@@ -2614,7 +2596,7 @@ void PPCInterpreter::PPCInterpreterJIT_fcmpo(sPPEState* ppeState, JITBlockBuilde
     COMP->bind(notBothZero);
 
     // Different signs: negative < positive
-    Label sameSign = b->compiler->newLabel();
+    Label sameSign = newLabel();
     COMP->cmp(aSign.r32(), bSign.r32());
     COMP->je(sameSign);
 
@@ -2626,8 +2608,8 @@ void PPCInterpreter::PPCInterpreterJIT_fcmpo(sPPEState* ppeState, JITBlockBuilde
     COMP->bind(sameSign);
     // Same sign - compare magnitudes
     COMP->cmp(aAbs, bAbs);
-    Label aAbsGreater = b->compiler->newLabel();
-    Label aAbsLess = b->compiler->newLabel();
+    Label aAbsGreater = newLabel();
+    Label aAbsLess = newLabel();
     COMP->ja(aAbsGreater);
     COMP->jb(aAbsLess);
     COMP->jmp(setEqual);
@@ -2672,8 +2654,8 @@ void PPCInterpreter::PPCInterpreterJIT_fcmpo(sPPEState* ppeState, JITBlockBuilde
   x86::Gp fpscr = newGP32();
   COMP->mov(fpscr, FPSCRPtr().Ptr<u32>());
 
-  Label noSNaN = b->compiler->newLabel();
-  Label afterExceptions = b->compiler->newLabel();
+  Label noSNaN = newLabel();
+  Label afterExceptions = newLabel();
 
   // If SNaN present, set VXSNAN
   COMP->test(hasSNaN, hasSNaN);
@@ -2721,7 +2703,7 @@ void PPCInterpreter::PPCInterpreterJIT_fcmpo(sPPEState* ppeState, JITBlockBuilde
 }
 
 // Floating Negate (x'FC00 0050')
-void PPCInterpreter::PPCInterpreterJIT_fnegx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fnegx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
   x86::Gp frb = newGP64();
@@ -2744,7 +2726,7 @@ void PPCInterpreter::PPCInterpreterJIT_fnegx(sPPEState* ppeState, JITBlockBuilde
 }
 
 // Floating Move Register (x'FC00 0090')
-void PPCInterpreter::PPCInterpreterJIT_fmrx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fmrx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
   // Simple 64-bit move from frB to frD
@@ -2762,7 +2744,7 @@ void PPCInterpreter::PPCInterpreterJIT_fmrx(sPPEState* ppeState, JITBlockBuilder
 // Floating Select (x'FC00 002E')
 // Note: fsel does NOT check for NaN - it only checks the sign bit and treats -0.0 as >= 0.0
 // The comparison is: if frA >= +0.0 (including -0.0 which equals +0.0) then frC else frB
-void PPCInterpreter::PPCInterpreterJIT_fselx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fselx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
   x86::Gp fraBits = newGP64();
@@ -2787,8 +2769,8 @@ void PPCInterpreter::PPCInterpreterJIT_fselx(sPPEState* ppeState, JITBlockBuilde
   // Even simpler approach: check if NOT (negative and not -0.0)
   // frA < 0.0 only if sign bit is set AND (exp != 0 OR frac != 0)
 
-  Label selectFrB = b->compiler->newLabel();
-  Label done = b->compiler->newLabel();
+  Label selectFrB = newLabel();
+  Label done = newLabel();
 
   // Check sign bit first
   COMP->bt(fraBits, 63);
@@ -2816,7 +2798,7 @@ void PPCInterpreter::PPCInterpreterJIT_fselx(sPPEState* ppeState, JITBlockBuilde
   // We need to restructure this slightly
 
   // Actually, let's restructure for clarity
-  Label storeResult = b->compiler->newLabel();
+  Label storeResult = newLabel();
 
   // Reset and redo
   COMP->mov(frdBits, frcBits);  // Default: select frC
@@ -2845,11 +2827,11 @@ void PPCInterpreter::PPCInterpreterJIT_fselx(sPPEState* ppeState, JITBlockBuilde
 }
 
 // Floating Round to Single (x'FC00 0018')
-void PPCInterpreter::PPCInterpreterJIT_frspx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_frspx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  x86::Xmm frb = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(frb, FPRPtr(instr.frb));
 
@@ -2877,9 +2859,9 @@ void PPCInterpreter::PPCInterpreterJIT_frspx(sPPEState* ppeState, JITBlockBuilde
   COMP->vcvtss2sd(frd, frd, frd);
 
   // Handle NaN cases
-  Label checkQNaN = b->compiler->newLabel();
-  Label doFPRF = b->compiler->newLabel();
-  Label storeResult = b->compiler->newLabel();
+  Label checkQNaN = newLabel();
+  Label doFPRF = newLabel();
+  Label storeResult = newLabel();
 
   // If frb is SNaN, use converted QNaN
   COMP->test(snanFlagB, snanFlagB);
@@ -2908,7 +2890,7 @@ void PPCInterpreter::PPCInterpreterJIT_frspx(sPPEState* ppeState, JITBlockBuilde
     COMP->and_(fpscr, ~((1u << 14) | (1u << 13)));
 
     // Check if value changed (FI = inexact)
-    Label notInexact = b->compiler->newLabel();
+    Label notInexact = newLabel();
     COMP->cmp(beforeRound, afterRound);
     COMP->je(notInexact);
 
@@ -2950,10 +2932,10 @@ void PPCInterpreter::PPCInterpreterJIT_frspx(sPPEState* ppeState, JITBlockBuilde
 
 // Floating Convert to Integer Word (x'FC00 001C')
 // Convert frB to 32-bit signed integer using FPSCR[RN] rounding mode
-void PPCInterpreter::PPCInterpreterJIT_fctiwx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fctiwx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  x86::Xmm frb = newXMM();
+  x86::Vec frb = newXMM();
   x86::Gp result = newGP64();
   x86::Gp intResult = newGP32();
   x86::Gp frbBits = newGP64();
@@ -2975,7 +2957,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwx(sPPEState* ppeState, JITBlockBuild
   COMP->shr(expBits, 52);
   COMP->and_(expBits, 0x7FF);
 
-  Label notNaN = b->compiler->newLabel();
+  Label notNaN = newLabel();
   COMP->cmp(expBits.r32(), 0x7FF);
   COMP->jne(notNaN);
 
@@ -2992,7 +2974,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwx(sPPEState* ppeState, JITBlockBuild
   x86::Gp isInf = newGP32();
   COMP->xor_(isInf, isInf);
   {
-    Label notInf = b->compiler->newLabel();
+    Label notInf = newLabel();
     x86::Gp expTmp = newGP64();
     x86::Gp fracTmp = newGP64();
 
@@ -3013,15 +2995,15 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwx(sPPEState* ppeState, JITBlockBuild
   }
 
   // Labels
-  Label handleNaN = b->compiler->newLabel();
-  Label handleOverflowPos = b->compiler->newLabel();
-  Label handleOverflowNeg = b->compiler->newLabel();
-  Label doConversion = b->compiler->newLabel();
-  Label storeResult = b->compiler->newLabel();
+  Label handleNaN = newLabel();
+  Label handleOverflowPos = newLabel();
+  Label handleOverflowNeg = newLabel();
+  Label doConversion = newLabel();
+  Label storeResult = newLabel();
 
   // Save and setup MXCSR
   x86::Gp mxcsrOrig = newGP32();
-  x86::Mem mxcsrSlot = b->compiler->newStack(4, 4);
+  x86::Mem mxcsrSlot = newStack(4, 4);
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrOrig, mxcsrSlot);
 
@@ -3045,11 +3027,11 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwx(sPPEState* ppeState, JITBlockBuild
   COMP->mov(mxcsrNew, mxcsrOrig);
   COMP->and_(mxcsrNew, ~(0x3 << 13));
 
-  Label rmNearest = b->compiler->newLabel();
-  Label rmTowardZero = b->compiler->newLabel();
-  Label rmPlusInf = b->compiler->newLabel();
-  Label rmMinusInf = b->compiler->newLabel();
-  Label rmDone = b->compiler->newLabel();
+  Label rmNearest = newLabel();
+  Label rmTowardZero = newLabel();
+  Label rmPlusInf = newLabel();
+  Label rmMinusInf = newLabel();
+  Label rmDone = newLabel();
 
   COMP->test(roundMode, roundMode);
   COMP->jz(rmNearest);
@@ -3078,8 +3060,8 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwx(sPPEState* ppeState, JITBlockBuild
   COMP->ldmxcsr(mxcsrSlot);
 
   // Check bounds
-  x86::Xmm maxVal = newXMM();
-  x86::Xmm minVal = newXMM();
+  x86::Vec maxVal = newXMM();
+  x86::Vec minVal = newXMM();
   x86::Gp maxBits = newGP64();
   x86::Gp minBits = newGP64();
 
@@ -3154,7 +3136,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwx(sPPEState* ppeState, JITBlockBuild
 
   // Check for inexact result - compare numerically (handles -0.0 == +0.0)
   {
-    x86::Xmm converted = newXMM();
+    x86::Vec converted = newXMM();
     x86::Gp signedResult = newGP32();
     COMP->mov(signedResult, intResult);
     COMP->vcvtsi2sd(converted, converted, signedResult);
@@ -3163,7 +3145,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwx(sPPEState* ppeState, JITBlockBuild
     COMP->mov(fpscrTmp, FPSCRPtr().Ptr<u32>());
     COMP->and_(fpscrTmp, ~((1u << 14) | (1u << 13)));  // Clear FI, FR
 
-    Label notInexact = b->compiler->newLabel();
+    Label notInexact = newLabel();
 
     // Numeric compare: if equal -> no inexact
     COMP->vucomisd(frb, converted);
@@ -3182,7 +3164,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwx(sPPEState* ppeState, JITBlockBuild
     COMP->vmovq(absAfter, converted);
     COMP->and_(absAfter, absMaskTmp);
 
-    Label noFR = b->compiler->newLabel();
+    Label noFR = newLabel();
     COMP->cmp(absAfter, absBefore);
     COMP->jbe(noFR);
     COMP->or_(fpscrTmp, (1u << 13));
@@ -3201,10 +3183,10 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwx(sPPEState* ppeState, JITBlockBuild
 }
 
 // Floating Convert to Integer Word with Round toward Zero (x'FC00 001E')
-void PPCInterpreter::PPCInterpreterJIT_fctiwzx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fctiwzx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  x86::Xmm frb = newXMM();
+  x86::Vec frb = newXMM();
   x86::Gp result = newGP64();
   x86::Gp intResult = newGP32();
   x86::Gp frbBits = newGP64();
@@ -3226,7 +3208,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwzx(sPPEState* ppeState, JITBlockBuil
   COMP->shr(expBits, 52);
   COMP->and_(expBits, 0x7FF);
 
-  Label notNaN = b->compiler->newLabel();
+  Label notNaN = newLabel();
   COMP->cmp(expBits.r32(), 0x7FF);
   COMP->jne(notNaN);
 
@@ -3243,7 +3225,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwzx(sPPEState* ppeState, JITBlockBuil
   x86::Gp isInf = newGP32();
   COMP->xor_(isInf, isInf);
   {
-    Label notInf = b->compiler->newLabel();
+    Label notInf = newLabel();
     x86::Gp expTmp = newGP64();
     x86::Gp fracTmp = newGP64();
 
@@ -3263,11 +3245,11 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwzx(sPPEState* ppeState, JITBlockBuil
     COMP->bind(notInf);
   }
 
-  Label handleNaN = b->compiler->newLabel();
-  Label handleOverflowPos = b->compiler->newLabel();
-  Label handleOverflowNeg = b->compiler->newLabel();
-  Label doConversion = b->compiler->newLabel();
-  Label storeResult = b->compiler->newLabel();
+  Label handleNaN = newLabel();
+  Label handleOverflowPos = newLabel();
+  Label handleOverflowNeg = newLabel();
+  Label doConversion = newLabel();
+  Label storeResult = newLabel();
 
   COMP->test(isNaN, isNaN);
   COMP->jnz(handleNaN);
@@ -3277,8 +3259,8 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwzx(sPPEState* ppeState, JITBlockBuil
   COMP->jnz(handleOverflowPos);
 
   // Check bounds
-  x86::Xmm maxVal = newXMM();
-  x86::Xmm minVal = newXMM();
+  x86::Vec maxVal = newXMM();
+  x86::Vec minVal = newXMM();
   x86::Gp maxBits = newGP64();
   x86::Gp minBits = newGP64();
 
@@ -3347,7 +3329,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwzx(sPPEState* ppeState, JITBlockBuil
 
   // Check for inexact (numeric compare)
   {
-    x86::Xmm converted = newXMM();
+    x86::Vec converted = newXMM();
     x86::Gp signedResult = newGP32();
     COMP->mov(signedResult, intResult);
     COMP->vcvtsi2sd(converted, converted, signedResult);
@@ -3356,7 +3338,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwzx(sPPEState* ppeState, JITBlockBuil
     COMP->mov(fpscrTmp, FPSCRPtr().Ptr<u32>());
     COMP->and_(fpscrTmp, ~((1u << 14) | (1u << 13)));
 
-    Label notInexact = b->compiler->newLabel();
+    Label notInexact = newLabel();
 
     COMP->vucomisd(frb, converted);
     COMP->je(notInexact);
@@ -3372,7 +3354,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwzx(sPPEState* ppeState, JITBlockBuil
     COMP->vmovq(absAfter, converted);
     COMP->and_(absAfter, absMaskTmp);
 
-    Label noFR = b->compiler->newLabel();
+    Label noFR = newLabel();
     COMP->cmp(absAfter, absBefore);
     COMP->jbe(noFR);
     COMP->or_(fpscrTmp, (1u << 13));
@@ -3391,7 +3373,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctiwzx(sPPEState* ppeState, JITBlockBuil
 }
 
 // Floating Absolute Value (x'FC00 0210')
-void PPCInterpreter::PPCInterpreterJIT_fabsx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fabsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
@@ -3416,10 +3398,10 @@ void PPCInterpreter::PPCInterpreterJIT_fabsx(sPPEState* ppeState, JITBlockBuilde
 }
 
 // Floating Convert to Integer Double Word (x'FC00 065C')
-void PPCInterpreter::PPCInterpreterJIT_fctidx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fctidx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  x86::Xmm frb = newXMM();
+  x86::Vec frb = newXMM();
   x86::Gp frbBits = newGP64();
   x86::Gp converted = newGP64();
   x86::Gp result = newGP64();
@@ -3441,7 +3423,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctidx(sPPEState* ppeState, JITBlockBuild
   COMP->shr(expBits, 52);
   COMP->and_(expBits, 0x7FF);
 
-  Label notNaN = b->compiler->newLabel();
+  Label notNaN = newLabel();
   COMP->cmp(expBits.r32(), 0x7FF);
   COMP->jne(notNaN);
 
@@ -3457,7 +3439,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctidx(sPPEState* ppeState, JITBlockBuild
   x86::Gp isPosInf = newGP32();
   COMP->xor_(isPosInf, isPosInf);
   {
-    Label notPosInf = b->compiler->newLabel();
+    Label notPosInf = newLabel();
     COMP->cmp(expBits.r32(), 0x7FF);
     COMP->jne(notPosInf);
     COMP->mov(fracMask, 0x000FFFFFFFFFFFFFull);
@@ -3475,7 +3457,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctidx(sPPEState* ppeState, JITBlockBuild
   x86::Gp isNegInf = newGP32();
   COMP->xor_(isNegInf, isNegInf);
   {
-    Label notNegInf = b->compiler->newLabel();
+    Label notNegInf = newLabel();
     COMP->cmp(expBits.r32(), 0x7FF);
     COMP->jne(notNegInf);
     COMP->mov(fracMask, 0x000FFFFFFFFFFFFFull);
@@ -3490,13 +3472,13 @@ void PPCInterpreter::PPCInterpreterJIT_fctidx(sPPEState* ppeState, JITBlockBuild
   }
 
   // Labels for different cases
-  Label handleNaN = b->compiler->newLabel();
-  Label handlePosInf = b->compiler->newLabel();
-  Label handleNegInf = b->compiler->newLabel();
-  Label handlePosOverflow = b->compiler->newLabel();
-  Label handleNegOverflow = b->compiler->newLabel();
-  Label doConversion = b->compiler->newLabel();
-  Label storeResult = b->compiler->newLabel();
+  Label handleNaN = newLabel();
+  Label handlePosInf = newLabel();
+  Label handleNegInf = newLabel();
+  Label handlePosOverflow = newLabel();
+  Label handleNegOverflow = newLabel();
+  Label doConversion = newLabel();
+  Label storeResult = newLabel();
 
   // Check for NaN
   COMP->test(isNaN, isNaN);
@@ -3513,8 +3495,8 @@ void PPCInterpreter::PPCInterpreterJIT_fctidx(sPPEState* ppeState, JITBlockBuild
   // Check bounds for overflow
   // Max int64 is 2^63-1 = 9223372036854775807.0 = 0x43DFFFFFFFFFFFFF
   // Min int64 is -2^63 = -9223372036854775808.0 = 0xC3E0000000000000
-  x86::Xmm maxVal = newXMM();
-  x86::Xmm minVal = newXMM();
+  x86::Vec maxVal = newXMM();
+  x86::Vec minVal = newXMM();
   x86::Gp maxBits = newGP64();
   x86::Gp minBits = newGP64();
 
@@ -3596,7 +3578,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctidx(sPPEState* ppeState, JITBlockBuild
   {
     // Save and setup MXCSR for rounding mode
     x86::Gp mxcsrOrig = newGP32();
-    x86::Mem mxcsrSlot = b->compiler->newStack(4, 4);
+    x86::Mem mxcsrSlot = newStack(4, 4);
     COMP->stmxcsr(mxcsrSlot);
     COMP->mov(mxcsrOrig, mxcsrSlot);
 
@@ -3612,11 +3594,11 @@ void PPCInterpreter::PPCInterpreterJIT_fctidx(sPPEState* ppeState, JITBlockBuild
     COMP->mov(mxcsrNew, mxcsrOrig);
     COMP->and_(mxcsrNew, ~(0x3 << 13));
 
-    Label rmNearest = b->compiler->newLabel();
-    Label rmTowardZero = b->compiler->newLabel();
-    Label rmPlusInf = b->compiler->newLabel();
-    Label rmMinusInf = b->compiler->newLabel();
-    Label rmDone = b->compiler->newLabel();
+    Label rmNearest = newLabel();
+    Label rmTowardZero = newLabel();
+    Label rmPlusInf = newLabel();
+    Label rmMinusInf = newLabel();
+    Label rmDone = newLabel();
 
     COMP->test(roundMode, roundMode);
     COMP->jz(rmNearest);
@@ -3654,14 +3636,14 @@ void PPCInterpreter::PPCInterpreterJIT_fctidx(sPPEState* ppeState, JITBlockBuild
     COMP->mov(result, converted);
 
     // Check for inexact: convert back and compare
-    x86::Xmm reconverted = newXMM();
+    x86::Vec reconverted = newXMM();
     COMP->vcvtsi2sd(reconverted, reconverted, converted);
 
     x86::Gp fpscrTmp = newGP32();
     COMP->mov(fpscrTmp, FPSCRPtr().Ptr<u32>());
     COMP->and_(fpscrTmp, ~((1u << 14) | (1u << 13)));  // Clear FI, FR
 
-    Label notInexact = b->compiler->newLabel();
+    Label notInexact = newLabel();
     COMP->vucomisd(frb, reconverted);
     COMP->je(notInexact);
 
@@ -3678,7 +3660,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctidx(sPPEState* ppeState, JITBlockBuild
     COMP->vmovq(absAfter, reconverted);
     COMP->and_(absAfter, absMask);
 
-    Label noFR = b->compiler->newLabel();
+    Label noFR = newLabel();
     COMP->cmp(absAfter, absBefore);
     COMP->jbe(noFR);
     COMP->or_(fpscrTmp, (1u << 13));
@@ -3697,10 +3679,10 @@ void PPCInterpreter::PPCInterpreterJIT_fctidx(sPPEState* ppeState, JITBlockBuild
 }
 
 // Floating Convert to Integer Double Word with Round toward Zero (x'FC00 065E')
-void PPCInterpreter::PPCInterpreterJIT_fctidzx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fctidzx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  x86::Xmm frb = newXMM();
+  x86::Vec frb = newXMM();
   x86::Gp frbBits = newGP64();
   x86::Gp converted = newGP64();
   x86::Gp result = newGP64();
@@ -3721,7 +3703,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctidzx(sPPEState* ppeState, JITBlockBuil
   COMP->shr(expBits, 52);
   COMP->and_(expBits, 0x7FF);
 
-  Label notNaN = b->compiler->newLabel();
+  Label notNaN = newLabel();
   COMP->cmp(expBits.r32(), 0x7FF);
   COMP->jne(notNaN);
 
@@ -3737,7 +3719,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctidzx(sPPEState* ppeState, JITBlockBuil
   x86::Gp isPosInf = newGP32();
   COMP->xor_(isPosInf, isPosInf);
   {
-    Label notPosInf = b->compiler->newLabel();
+    Label notPosInf = newLabel();
     COMP->cmp(expBits.r32(), 0x7FF);
     COMP->jne(notPosInf);
     COMP->mov(fracMask, 0x000FFFFFFFFFFFFFull);
@@ -3755,7 +3737,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctidzx(sPPEState* ppeState, JITBlockBuil
   x86::Gp isNegInf = newGP32();
   COMP->xor_(isNegInf, isNegInf);
   {
-    Label notNegInf = b->compiler->newLabel();
+    Label notNegInf = newLabel();
     COMP->cmp(expBits.r32(), 0x7FF);
     COMP->jne(notNegInf);
     COMP->mov(fracMask, 0x000FFFFFFFFFFFFFull);
@@ -3769,13 +3751,13 @@ void PPCInterpreter::PPCInterpreterJIT_fctidzx(sPPEState* ppeState, JITBlockBuil
     COMP->bind(notNegInf);
   }
 
-  Label handleNaN = b->compiler->newLabel();
-  Label handlePosInf = b->compiler->newLabel();
-  Label handleNegInf = b->compiler->newLabel();
-  Label handlePosOverflow = b->compiler->newLabel();
-  Label handleNegOverflow = b->compiler->newLabel();
-  Label doConversion = b->compiler->newLabel();
-  Label storeResult = b->compiler->newLabel();
+  Label handleNaN = newLabel();
+  Label handlePosInf = newLabel();
+  Label handleNegInf = newLabel();
+  Label handlePosOverflow = newLabel();
+  Label handleNegOverflow = newLabel();
+  Label doConversion = newLabel();
+  Label storeResult = newLabel();
 
   COMP->test(isNaN, isNaN);
   COMP->jnz(handleNaN);
@@ -3787,8 +3769,8 @@ void PPCInterpreter::PPCInterpreterJIT_fctidzx(sPPEState* ppeState, JITBlockBuil
   COMP->jnz(handleNegInf);
 
   // Check bounds
-  x86::Xmm maxVal = newXMM();
-  x86::Xmm minVal = newXMM();
+  x86::Vec maxVal = newXMM();
+  x86::Vec minVal = newXMM();
   x86::Gp maxBits = newGP64();
   x86::Gp minBits = newGP64();
 
@@ -3868,14 +3850,14 @@ void PPCInterpreter::PPCInterpreterJIT_fctidzx(sPPEState* ppeState, JITBlockBuil
     COMP->mov(result, converted);
 
     // Check for inexact
-    x86::Xmm reconverted = newXMM();
+    x86::Vec reconverted = newXMM();
     COMP->vcvtsi2sd(reconverted, reconverted, converted);
 
     x86::Gp fpscrTmp = newGP32();
     COMP->mov(fpscrTmp, FPSCRPtr().Ptr<u32>());
     COMP->and_(fpscrTmp, ~((1u << 14) | (1u << 13)));
 
-    Label notInexact = b->compiler->newLabel();
+    Label notInexact = newLabel();
     COMP->vucomisd(frb, reconverted);
     COMP->je(notInexact);
 
@@ -3890,7 +3872,7 @@ void PPCInterpreter::PPCInterpreterJIT_fctidzx(sPPEState* ppeState, JITBlockBuil
     COMP->vmovq(absAfter, reconverted);
     COMP->and_(absAfter, absMask);
 
-    Label noFR = b->compiler->newLabel();
+    Label noFR = newLabel();
     COMP->cmp(absAfter, absBefore);
     COMP->jbe(noFR);
     COMP->or_(fpscrTmp, (1u << 13));
@@ -3909,11 +3891,11 @@ void PPCInterpreter::PPCInterpreterJIT_fctidzx(sPPEState* ppeState, JITBlockBuil
 }
 
 // Floating Convert from Integer Double Word (x'FC00 069C')
-void PPCInterpreter::PPCInterpreterJIT_fcfidx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fcfidx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
   x86::Gp frbInt = newGP64();
-  x86::Xmm frd = newXMM();
+  x86::Vec frd = newXMM();
 
   // Load frB as signed 64-bit integer (stored as raw bits in FPR)
   COMP->mov(frbInt, FPRPtr(instr.frb));
@@ -3932,6 +3914,20 @@ void PPCInterpreter::PPCInterpreterJIT_fcfidx(sPPEState* ppeState, JITBlockBuild
   }
 }
 
+void PPCInterpreter::PPCInterpreterJIT_fnabsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
+  J_checkFPUEnabled(b);
+
+  x86::Gp bits = newGP64();
+  COMP->mov(bits, FPRPtr(instr.frb)); // assumes raw 64-bit FP bits
+  COMP->and_(bits, imm<u64>(0x7FFFFFFFFFFFFFFFULL)); // abs
+  COMP->or_(bits,  imm<u64>(0x8000000000000000ULL)); // negate
+  COMP->mov(FPRPtr(instr.frd), bits);
+
+  if (instr.rc) {
+    J_ppuSetCR1(b);
+  }
+}
+
 //
 // Bugged instructions, mostly rounding and CR errors, but still
 // NOTE: Most of these are far more superior here than on the interpreter in terms of accuracy, 
@@ -3940,14 +3936,14 @@ void PPCInterpreter::PPCInterpreterJIT_fcfidx(sPPEState* ppeState, JITBlockBuild
 
 // Floating Negative Multiply-Add (Double-Precision) (x'FC00 003E')
 /* HAS ISSUES -> 56 Failed tests */
-void PPCInterpreter::PPCInterpreterJIT_fnmaddx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fnmaddx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frc = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frc = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -3998,15 +3994,15 @@ void PPCInterpreter::PPCInterpreterJIT_fnmaddx(sPPEState* ppeState, JITBlockBuil
   // NaN priority check: fra (any NaN) > frb (any NaN) > frc (any NaN)
   // For each operand, check SNaN first (convert to QNaN), then QNaN
   // This ensures we return the first NaN in operand order a, b, c
-  Label checkQNaNA = b->compiler->newLabel();
-  Label checkNaNB = b->compiler->newLabel();
-  Label checkQNaNB = b->compiler->newLabel();
-  Label checkNaNC = b->compiler->newLabel();
-  Label checkQNaNC = b->compiler->newLabel();
-  Label checkVximz = b->compiler->newLabel();
-  Label computeFMA = b->compiler->newLabel();
-  Label doNegate = b->compiler->newLabel();
-  Label storeResult = b->compiler->newLabel();
+  Label checkQNaNA = newLabel();
+  Label checkNaNB = newLabel();
+  Label checkQNaNB = newLabel();
+  Label checkNaNC = newLabel();
+  Label checkQNaNC = newLabel();
+  Label checkVximz = newLabel();
+  Label computeFMA = newLabel();
+  Label doNegate = newLabel();
+  Label storeResult = newLabel();
 
   // fra SNaN -> QNaN (highest priority)
   COMP->test(snanFlagA, snanFlagA);
@@ -4065,7 +4061,7 @@ void PPCInterpreter::PPCInterpreterJIT_fnmaddx(sPPEState* ppeState, JITBlockBuil
 
   // Clear MXCSR exception flags before the operation to detect inexact results
   x86::Gp mxcsrMem = newGP32();
-  x86::Mem mxcsrSlot = b->compiler->newStack(4, 4);
+  x86::Mem mxcsrSlot = newStack(4, 4);
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrMem, mxcsrSlot);
   COMP->and_(mxcsrMem, ~0x3F);
@@ -4081,7 +4077,7 @@ void PPCInterpreter::PPCInterpreterJIT_fnmaddx(sPPEState* ppeState, JITBlockBuil
   COMP->mov(mxcsrMem, mxcsrSlot);
 
   {
-    Label notInexact = b->compiler->newLabel();
+    Label notInexact = newLabel();
     COMP->bt(mxcsrMem, 5);
     COMP->jnc(notInexact);
 
@@ -4100,7 +4096,7 @@ void PPCInterpreter::PPCInterpreterJIT_fnmaddx(sPPEState* ppeState, JITBlockBuil
     x86::Gp resultBits = newGP64();
     x86::Gp expBits = newGP64();
     x86::Gp fracBits = newGP64();
-    Label notNaN = b->compiler->newLabel();
+    Label notNaN = newLabel();
 
     COMP->vmovq(resultBits, frd);
     COMP->mov(expBits, resultBits);
@@ -4135,14 +4131,14 @@ void PPCInterpreter::PPCInterpreterJIT_fnmaddx(sPPEState* ppeState, JITBlockBuil
 
 // Floating Negative Multiply-Add Single (x'EC00 003E')
 /* HAS ISSUES -> 128 Failed tests */
-void PPCInterpreter::PPCInterpreterJIT_fnmaddsx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fnmaddsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frc = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frc = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -4213,16 +4209,16 @@ void PPCInterpreter::PPCInterpreterJIT_fnmaddsx(sPPEState* ppeState, JITBlockBui
   // NaN priority check: fra (any NaN) > frb (any NaN) > frc (any NaN)
   // For each operand, check SNaN first (convert to QNaN), then QNaN
   // This ensures we return the first NaN in operand order a, b, c
-  Label checkQNaNA = b->compiler->newLabel();
-  Label checkNaNB = b->compiler->newLabel();
-  Label checkQNaNB = b->compiler->newLabel();
-  Label checkNaNC = b->compiler->newLabel();
-  Label checkQNaNC = b->compiler->newLabel();
-  Label checkVximz = b->compiler->newLabel();
-  Label checkDenorm = b->compiler->newLabel();
-  Label computeFMA = b->compiler->newLabel();
-  Label doRoundAndNegate = b->compiler->newLabel();
-  Label storeResult = b->compiler->newLabel();
+  Label checkQNaNA = newLabel();
+  Label checkNaNB = newLabel();
+  Label checkQNaNB = newLabel();
+  Label checkNaNC = newLabel();
+  Label checkQNaNC = newLabel();
+  Label checkVximz = newLabel();
+  Label checkDenorm = newLabel();
+  Label computeFMA = newLabel();
+  Label doRoundAndNegate = newLabel();
+  Label storeResult = newLabel();
 
   // fra SNaN -> QNaN (highest priority)
   COMP->test(snanFlagA, snanFlagA);
@@ -4310,7 +4306,7 @@ void PPCInterpreter::PPCInterpreterJIT_fnmaddsx(sPPEState* ppeState, JITBlockBui
     x86::Gp resultBits = newGP64();
     x86::Gp expBits = newGP64();
     x86::Gp fracBits = newGP64();
-    Label notNaN = b->compiler->newLabel();
+    Label notNaN = newLabel();
 
     COMP->vmovq(resultBits, frd);
     COMP->mov(expBits, resultBits);
@@ -4344,12 +4340,12 @@ void PPCInterpreter::PPCInterpreterJIT_fnmaddsx(sPPEState* ppeState, JITBlockBui
 
 // Floating Square Root Single (x'EC00 002C')
 /* HAS ISSUES -> 5 Failed tests */
-void PPCInterpreter::PPCInterpreterJIT_fsqrtsx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fsqrtsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm frb = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(frb, FPRPtr(instr.frb));
 
@@ -4376,8 +4372,8 @@ void PPCInterpreter::PPCInterpreterJIT_fsqrtsx(sPPEState* ppeState, JITBlockBuil
     x86::Gp bBits = newGP64();
     COMP->vmovq(bBits, frb);
 
-    Label noVxsqrt = b->compiler->newLabel();
-    Label setVxsqrt = b->compiler->newLabel();
+    Label noVxsqrt = newLabel();
+    Label setVxsqrt = newLabel();
 
     COMP->bt(bBits, 63);
     COMP->jnc(noVxsqrt);
@@ -4425,7 +4421,7 @@ void PPCInterpreter::PPCInterpreterJIT_fsqrtsx(sPPEState* ppeState, JITBlockBuil
     x86::Gp bBits = newGP64();
     COMP->vmovq(bBits, frb);
 
-    Label notDenormal = b->compiler->newLabel();
+    Label notDenormal = newLabel();
 
     x86::Gp exp = newGP64();
     COMP->mov(exp, bBits);
@@ -4450,7 +4446,7 @@ void PPCInterpreter::PPCInterpreterJIT_fsqrtsx(sPPEState* ppeState, JITBlockBuil
 
   // Save and configure MXCSR - disable DAZ/FTZ for proper denormal handling
   x86::Gp mxcsrOrig = newGP32();
-  x86::Mem mxcsrSlot = b->compiler->newStack(4, 4);
+  x86::Mem mxcsrSlot = newStack(4, 4);
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrOrig, mxcsrSlot);
 
@@ -4462,16 +4458,16 @@ void PPCInterpreter::PPCInterpreterJIT_fsqrtsx(sPPEState* ppeState, JITBlockBuil
 
   // For denormals: use scaling to bring value into normal range
   // We multiply by 2^1022 in two steps, compute sqrt, then divide by 2^511
-  Label skipDenormHandling = b->compiler->newLabel();
-  Label afterSqrt = b->compiler->newLabel();
+  Label skipDenormHandling = newLabel();
+  Label afterSqrt = newLabel();
 
   COMP->test(isDenormal, isDenormal);
   COMP->jz(skipDenormHandling);
 
   {
     x86::Gp scaleFactor = newGP64();
-    x86::Xmm scaleXmm = newXMM();
-    x86::Xmm tempXmm = newXMM();
+    x86::Vec scaleXmm = newXMM();
+    x86::Vec tempXmm = newXMM();
 
     // Step 1: multiply by 2^512 = 0x5FF0000000000000
     COMP->mov(scaleFactor, 0x5FF0000000000000ull);
@@ -4506,10 +4502,10 @@ void PPCInterpreter::PPCInterpreterJIT_fsqrtsx(sPPEState* ppeState, JITBlockBuil
   COMP->ldmxcsr(mxcsrSlot);
 
   // Determine the correct result
-  Label checkQNaNB = b->compiler->newLabel();
-  Label checkNegative = b->compiler->newLabel();
-  Label doRounding = b->compiler->newLabel();
-  Label storeResult = b->compiler->newLabel();
+  Label checkQNaNB = newLabel();
+  Label checkNegative = newLabel();
+  Label doRounding = newLabel();
+  Label storeResult = newLabel();
 
   COMP->test(snanFlagB, snanFlagB);
   COMP->jz(checkQNaNB);
@@ -4538,7 +4534,7 @@ void PPCInterpreter::PPCInterpreterJIT_fsqrtsx(sPPEState* ppeState, JITBlockBuil
   {
     x86::Gp resultBits = newGP64();
     x86::Gp resultExp = newGP64();
-    Label skipRounding = b->compiler->newLabel();
+    Label skipRounding = newLabel();
 
     COMP->vmovq(resultBits, frd);
     COMP->mov(resultExp, resultBits);
@@ -4566,14 +4562,14 @@ void PPCInterpreter::PPCInterpreterJIT_fsqrtsx(sPPEState* ppeState, JITBlockBuil
 }
 
 // Floating Multiply-Add (Double-Precision) (x'FC00 003A')
-void PPCInterpreter::PPCInterpreterJIT_fmaddx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fmaddx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frc = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frc = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -4622,14 +4618,14 @@ void PPCInterpreter::PPCInterpreterJIT_fmaddx(sPPEState* ppeState, JITBlockBuild
   x86::Gp vximzFlag = newGP32();
   J_checkInfMulZero(b, fra, frc, vximzFlag);
 
-  Label checkQNaNA = b->compiler->newLabel();
-  Label checkNaNB = b->compiler->newLabel();
-  Label checkQNaNB = b->compiler->newLabel();
-  Label checkNaNC = b->compiler->newLabel();
-  Label checkQNaNC = b->compiler->newLabel();
-  Label checkVximz = b->compiler->newLabel();
-  Label computeFMA = b->compiler->newLabel();
-  Label storeResult = b->compiler->newLabel();
+  Label checkQNaNA = newLabel();
+  Label checkNaNB = newLabel();
+  Label checkQNaNB = newLabel();
+  Label checkNaNC = newLabel();
+  Label checkQNaNC = newLabel();
+  Label checkVximz = newLabel();
+  Label computeFMA = newLabel();
+  Label storeResult = newLabel();
 
   // fra SNaN
   COMP->test(snanFlagA, snanFlagA);
@@ -4687,7 +4683,7 @@ void PPCInterpreter::PPCInterpreterJIT_fmaddx(sPPEState* ppeState, JITBlockBuild
   COMP->bind(computeFMA);
 
   x86::Gp mxcsrMem = newGP32();
-  x86::Mem mxcsrSlot = b->compiler->newStack(4, 4);
+  x86::Mem mxcsrSlot = newStack(4, 4);
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrMem, mxcsrSlot);
   COMP->and_(mxcsrMem, ~0x3F);
@@ -4701,7 +4697,7 @@ void PPCInterpreter::PPCInterpreterJIT_fmaddx(sPPEState* ppeState, JITBlockBuild
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrMem, mxcsrSlot);
   {
-    Label notInexact = b->compiler->newLabel();
+    Label notInexact = newLabel();
     COMP->bt(mxcsrMem, 5);
     COMP->jnc(notInexact);
 
@@ -4724,14 +4720,14 @@ void PPCInterpreter::PPCInterpreterJIT_fmaddx(sPPEState* ppeState, JITBlockBuild
 }
 
 // Floating Multiply-Subtract (Double-Precision) (x'FC00 0038')
-void PPCInterpreter::PPCInterpreterJIT_fmsubx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fmsubx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frc = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frc = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -4779,14 +4775,14 @@ void PPCInterpreter::PPCInterpreterJIT_fmsubx(sPPEState* ppeState, JITBlockBuild
   x86::Gp vximzFlag = newGP32();
   J_checkInfMulZero(b, fra, frc, vximzFlag);
 
-  Label checkQNaNA = b->compiler->newLabel();
-  Label checkNaNB = b->compiler->newLabel();
-  Label checkQNaNB = b->compiler->newLabel();
-  Label checkNaNC = b->compiler->newLabel();
-  Label checkQNaNC = b->compiler->newLabel();
-  Label checkVximz = b->compiler->newLabel();
-  Label computeFMS = b->compiler->newLabel();
-  Label storeResult = b->compiler->newLabel();
+  Label checkQNaNA = newLabel();
+  Label checkNaNB = newLabel();
+  Label checkQNaNB = newLabel();
+  Label checkNaNC = newLabel();
+  Label checkQNaNC = newLabel();
+  Label checkVximz = newLabel();
+  Label computeFMS = newLabel();
+  Label storeResult = newLabel();
 
   // fra SNaN
   COMP->test(snanFlagA, snanFlagA);
@@ -4844,7 +4840,7 @@ void PPCInterpreter::PPCInterpreterJIT_fmsubx(sPPEState* ppeState, JITBlockBuild
   COMP->bind(computeFMS);
 
   x86::Gp mxcsrMem = newGP32();
-  x86::Mem mxcsrSlot = b->compiler->newStack(4, 4);
+  x86::Mem mxcsrSlot = newStack(4, 4);
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrMem, mxcsrSlot);
   COMP->and_(mxcsrMem, ~0x3F);
@@ -4858,7 +4854,7 @@ void PPCInterpreter::PPCInterpreterJIT_fmsubx(sPPEState* ppeState, JITBlockBuild
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrMem, mxcsrSlot);
   {
-    Label notInexact = b->compiler->newLabel();
+    Label notInexact = newLabel();
     COMP->bt(mxcsrMem, 5);
     COMP->jnc(notInexact);
 
@@ -4879,13 +4875,13 @@ void PPCInterpreter::PPCInterpreterJIT_fmsubx(sPPEState* ppeState, JITBlockBuild
   }
 }
 // Floating Multiply-Add Single (x'EC00 003A')
-void PPCInterpreter::PPCInterpreterJIT_fmaddsx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fmaddsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frc = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frc = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -4929,14 +4925,14 @@ void PPCInterpreter::PPCInterpreterJIT_fmaddsx(sPPEState* ppeState, JITBlockBuil
   x86::Gp vximzFlag = newGP32();
   J_checkInfMulZero(b, fra, frc, vximzFlag);
 
-  Label checkQNaNA = b->compiler->newLabel();
-  Label checkNaNB = b->compiler->newLabel();
-  Label checkQNaNB = b->compiler->newLabel();
-  Label checkNaNC = b->compiler->newLabel();
-  Label checkQNaNC = b->compiler->newLabel();
-  Label checkVximz = b->compiler->newLabel();
-  Label computeFMA = b->compiler->newLabel();
-  Label storeResult = b->compiler->newLabel();
+  Label checkQNaNA = newLabel();
+  Label checkNaNB = newLabel();
+  Label checkQNaNB = newLabel();
+  Label checkNaNC = newLabel();
+  Label checkQNaNC = newLabel();
+  Label checkVximz = newLabel();
+  Label computeFMA = newLabel();
+  Label storeResult = newLabel();
 
   COMP->test(snanFlagA, snanFlagA);
   COMP->jz(checkQNaNA);
@@ -4998,13 +4994,13 @@ void PPCInterpreter::PPCInterpreterJIT_fmaddsx(sPPEState* ppeState, JITBlockBuil
 }
 
 // Floating Multiply-Subtract Single (x'EC00 0038')
-void PPCInterpreter::PPCInterpreterJIT_fmsubsx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fmsubsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frc = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frc = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -5048,14 +5044,14 @@ void PPCInterpreter::PPCInterpreterJIT_fmsubsx(sPPEState* ppeState, JITBlockBuil
   x86::Gp vximzFlag = newGP32();
   J_checkInfMulZero(b, fra, frc, vximzFlag);
 
-  Label checkQNaNA = b->compiler->newLabel();
-  Label checkNaNB = b->compiler->newLabel();
-  Label checkQNaNB = b->compiler->newLabel();
-  Label checkNaNC = b->compiler->newLabel();
-  Label checkQNaNC = b->compiler->newLabel();
-  Label checkVximz = b->compiler->newLabel();
-  Label computeFMS = b->compiler->newLabel();
-  Label storeResult = b->compiler->newLabel();
+  Label checkQNaNA = newLabel();
+  Label checkNaNB = newLabel();
+  Label checkQNaNB = newLabel();
+  Label checkNaNC = newLabel();
+  Label checkQNaNC = newLabel();
+  Label checkVximz = newLabel();
+  Label computeFMS = newLabel();
+  Label storeResult = newLabel();
 
   COMP->test(snanFlagA, snanFlagA);
   COMP->jz(checkQNaNA);
@@ -5118,14 +5114,14 @@ void PPCInterpreter::PPCInterpreterJIT_fmsubsx(sPPEState* ppeState, JITBlockBuil
 }
 
 // Floating Negative Multiply-Subtract (Double-Precision) (x'FC00 003C')
-void PPCInterpreter::PPCInterpreterJIT_fnmsubx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fnmsubx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frc = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frc = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -5172,15 +5168,15 @@ void PPCInterpreter::PPCInterpreterJIT_fnmsubx(sPPEState* ppeState, JITBlockBuil
   x86::Gp vximzFlag = newGP32();
   J_checkInfMulZero(b, fra, frc, vximzFlag);
 
-  Label checkQNaNA = b->compiler->newLabel();
-  Label checkNaNB = b->compiler->newLabel();
-  Label checkQNaNB = b->compiler->newLabel();
-  Label checkNaNC = b->compiler->newLabel();
-  Label checkQNaNC = b->compiler->newLabel();
-  Label checkVximz = b->compiler->newLabel();
-  Label computeFMS = b->compiler->newLabel();
-  Label negateResult = b->compiler->newLabel();
-  Label storeResult = b->compiler->newLabel();
+  Label checkQNaNA = newLabel();
+  Label checkNaNB = newLabel();
+  Label checkQNaNB = newLabel();
+  Label checkNaNC = newLabel();
+  Label checkQNaNC = newLabel();
+  Label checkVximz = newLabel();
+  Label computeFMS = newLabel();
+  Label negateResult = newLabel();
+  Label storeResult = newLabel();
 
   // fra SNaN
   COMP->test(snanFlagA, snanFlagA);
@@ -5238,7 +5234,7 @@ void PPCInterpreter::PPCInterpreterJIT_fnmsubx(sPPEState* ppeState, JITBlockBuil
 
   // Clear MXCSR exception flags before FMA
   x86::Gp mxcsrMem = newGP32();
-  x86::Mem mxcsrSlot = b->compiler->newStack(4, 4);
+  x86::Mem mxcsrSlot = newStack(4, 4);
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrMem, mxcsrSlot);
   COMP->and_(mxcsrMem, ~0x3F);
@@ -5251,7 +5247,7 @@ void PPCInterpreter::PPCInterpreterJIT_fnmsubx(sPPEState* ppeState, JITBlockBuil
   COMP->stmxcsr(mxcsrSlot);
   COMP->mov(mxcsrMem, mxcsrSlot);
   {
-    Label notInexact = b->compiler->newLabel();
+    Label notInexact = newLabel();
     COMP->bt(mxcsrMem, 5);
     COMP->jnc(notInexact);
 
@@ -5269,7 +5265,7 @@ void PPCInterpreter::PPCInterpreterJIT_fnmsubx(sPPEState* ppeState, JITBlockBuil
     x86::Gp resultBits = newGP64();
     x86::Gp expBits = newGP64();
     x86::Gp fracBits = newGP64();
-    Label notNaN = b->compiler->newLabel();
+    Label notNaN = newLabel();
 
     COMP->vmovq(resultBits, frd);
     COMP->mov(expBits, resultBits);
@@ -5302,14 +5298,14 @@ void PPCInterpreter::PPCInterpreterJIT_fnmsubx(sPPEState* ppeState, JITBlockBuil
 }
 
 // Floating Negative Multiply-Subtract Single (x'EC00 003C')
-void PPCInterpreter::PPCInterpreterJIT_fnmsubsx(sPPEState* ppeState, JITBlockBuilder* b, uPPCInstr instr) {
+void PPCInterpreter::PPCInterpreterJIT_fnmsubsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   // Ensure FPU is enabled
   J_checkFPUEnabled(b);
 
-  x86::Xmm fra = newXMM();
-  x86::Xmm frb = newXMM();
-  x86::Xmm frc = newXMM();
-  x86::Xmm frd = newXMM();
+  x86::Vec fra = newXMM();
+  x86::Vec frb = newXMM();
+  x86::Vec frc = newXMM();
+  x86::Vec frd = newXMM();
 
   COMP->vmovsd(fra, FPRPtr(instr.fra));
   COMP->vmovsd(frb, FPRPtr(instr.frb));
@@ -5375,16 +5371,16 @@ void PPCInterpreter::PPCInterpreterJIT_fnmsubsx(sPPEState* ppeState, JITBlockBui
   x86::Gp vximzFlag = newGP32();
   J_checkInfMulZero(b, fra, frc, vximzFlag);
 
-  Label checkQNaNA = b->compiler->newLabel();
-  Label checkNaNB = b->compiler->newLabel();
-  Label checkQNaNB = b->compiler->newLabel();
-  Label checkNaNC = b->compiler->newLabel();
-  Label checkQNaNC = b->compiler->newLabel();
-  Label checkVximz = b->compiler->newLabel();
-  Label checkDenorm = b->compiler->newLabel();
-  Label computeFMS = b->compiler->newLabel();
-  Label roundAndNegate = b->compiler->newLabel();
-  Label storeResult = b->compiler->newLabel();
+  Label checkQNaNA = newLabel();
+  Label checkNaNB = newLabel();
+  Label checkQNaNB = newLabel();
+  Label checkNaNC = newLabel();
+  Label checkQNaNC = newLabel();
+  Label checkVximz = newLabel();
+  Label checkDenorm = newLabel();
+  Label computeFMS = newLabel();
+  Label roundAndNegate = newLabel();
+  Label storeResult = newLabel();
 
   // fra SNaN
   COMP->test(snanFlagA, snanFlagA);
@@ -5472,7 +5468,7 @@ void PPCInterpreter::PPCInterpreterJIT_fnmsubsx(sPPEState* ppeState, JITBlockBui
     x86::Gp resultBits = newGP64();
     x86::Gp expBits = newGP64();
     x86::Gp fracBits = newGP64();
-    Label notNaN = b->compiler->newLabel();
+    Label notNaN = newLabel();
 
     COMP->vmovq(resultBits, frd);
     COMP->mov(expBits, resultBits);
@@ -5512,7 +5508,7 @@ void PPCInterpreter::PPCInterpreterJIT_fnmsubsx(sPPEState* ppeState, JITBlockBui
 void PPCInterpreter::PPCInterpreterJIT_lfd(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
   x86::Gp EA = newGP64();
   x86::Gp data64 = newGP64();
   x86::Gp exceptReg = newGP16();
@@ -5522,11 +5518,11 @@ void PPCInterpreter::PPCInterpreterJIT_lfd(sPPEState *ppeState, JITBlockBuilder 
   COMP->add(EA, imm<s16>(instr.simm16));
 
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   COMP->mov(exceptReg, EXPtr());
   COMP->and_(exceptReg, imm<u16>(0xC));
@@ -5543,7 +5539,7 @@ void PPCInterpreter::PPCInterpreterJIT_lfd(sPPEState *ppeState, JITBlockBuilder 
 void PPCInterpreter::PPCInterpreterJIT_lfdx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
   x86::Gp EA = newGP64();
   x86::Gp data64 = newGP64();
   x86::Gp exceptReg = newGP16();
@@ -5553,11 +5549,11 @@ void PPCInterpreter::PPCInterpreterJIT_lfdx(sPPEState *ppeState, JITBlockBuilder
   COMP->add(EA, GPRPtr(instr.rb));
 
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   COMP->mov(exceptReg, EXPtr());
   COMP->and_(exceptReg, imm<u16>(0xC));
@@ -5574,7 +5570,7 @@ void PPCInterpreter::PPCInterpreterJIT_lfdx(sPPEState *ppeState, JITBlockBuilder
 void PPCInterpreter::PPCInterpreterJIT_lfdu(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
   x86::Gp EA = newGP64();
   x86::Gp data64 = newGP64();
   x86::Gp exceptReg = newGP16();
@@ -5583,11 +5579,11 @@ void PPCInterpreter::PPCInterpreterJIT_lfdu(sPPEState *ppeState, JITBlockBuilder
   COMP->add(EA, imm<s16>(instr.simm16));
 
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   COMP->mov(exceptReg, EXPtr());
   COMP->and_(exceptReg, imm<u16>(0xC));
@@ -5608,7 +5604,7 @@ void PPCInterpreter::PPCInterpreterJIT_lfdu(sPPEState *ppeState, JITBlockBuilder
 void PPCInterpreter::PPCInterpreterJIT_lfdux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
   x86::Gp EA = newGP64();
   x86::Gp origEA = newGP64();
   x86::Gp data64 = newGP64();
@@ -5619,11 +5615,11 @@ void PPCInterpreter::PPCInterpreterJIT_lfdux(sPPEState *ppeState, JITBlockBuilde
   COMP->mov(origEA, EA);
 
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   COMP->mov(exceptReg, EXPtr());
   COMP->and_(exceptReg, imm<u16>(0xC));
@@ -5641,10 +5637,10 @@ void PPCInterpreter::PPCInterpreterJIT_lfdux(sPPEState *ppeState, JITBlockBuilde
 void PPCInterpreter::PPCInterpreterJIT_lfs(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
   x86::Gp EA = newGP64();
   x86::Gp data32 = newGP32();
-  x86::Xmm tmpXmm = newXMM();
+  x86::Vec tmpXmm = newXMM();
   x86::Gp exceptReg = newGP16();
 
   if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
@@ -5652,11 +5648,11 @@ void PPCInterpreter::PPCInterpreterJIT_lfs(sPPEState *ppeState, JITBlockBuilder 
   COMP->add(EA, imm<s16>(instr.simm16));
 
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   COMP->mov(exceptReg, EXPtr());
   COMP->and_(exceptReg, imm<u16>(0xC));
@@ -5676,10 +5672,10 @@ void PPCInterpreter::PPCInterpreterJIT_lfs(sPPEState *ppeState, JITBlockBuilder 
 void PPCInterpreter::PPCInterpreterJIT_lfsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
   x86::Gp EA = newGP64();
   x86::Gp data32 = newGP32();
-  x86::Xmm tmpXmm = newXMM();
+  x86::Vec tmpXmm = newXMM();
   x86::Gp exceptReg = newGP16();
 
   if (instr.ra != 0) { COMP->mov(EA, GPRPtr(instr.ra)); }
@@ -5687,11 +5683,11 @@ void PPCInterpreter::PPCInterpreterJIT_lfsx(sPPEState *ppeState, JITBlockBuilder
   COMP->add(EA, GPRPtr(instr.rb));
 
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   COMP->mov(exceptReg, EXPtr());
   COMP->and_(exceptReg, imm<u16>(0xC));
@@ -5711,21 +5707,21 @@ void PPCInterpreter::PPCInterpreterJIT_lfsx(sPPEState *ppeState, JITBlockBuilder
 void PPCInterpreter::PPCInterpreterJIT_lfsu(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
   x86::Gp EA = newGP64();
   x86::Gp data32 = newGP32();
-  x86::Xmm tmpXmm = newXMM();
+  x86::Vec tmpXmm = newXMM();
   x86::Gp exceptReg = newGP16();
 
   COMP->mov(EA, GPRPtr(instr.ra));
   COMP->add(EA, imm<s16>(instr.simm16));
 
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   COMP->mov(exceptReg, EXPtr());
   COMP->and_(exceptReg, imm<u16>(0xC));
@@ -5749,11 +5745,11 @@ void PPCInterpreter::PPCInterpreterJIT_lfsu(sPPEState *ppeState, JITBlockBuilder
 void PPCInterpreter::PPCInterpreterJIT_lfsux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
   x86::Gp EA = newGP64();
   x86::Gp origEA = newGP64();
   x86::Gp data32 = newGP32();
-  x86::Xmm tmpXmm = newXMM();
+  x86::Vec tmpXmm = newXMM();
   x86::Gp exceptReg = newGP16();
 
   COMP->mov(EA, GPRPtr(instr.ra));
@@ -5761,11 +5757,11 @@ void PPCInterpreter::PPCInterpreterJIT_lfsux(sPPEState *ppeState, JITBlockBuilde
   COMP->mov(origEA, EA);
 
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   COMP->mov(exceptReg, EXPtr());
   COMP->and_(exceptReg, imm<u16>(0xC));
@@ -5786,7 +5782,7 @@ void PPCInterpreter::PPCInterpreterJIT_lfsux(sPPEState *ppeState, JITBlockBuilde
 void PPCInterpreter::PPCInterpreterJIT_stfd(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
   x86::Gp EA = newGP64();
   x86::Gp data64 = newGP64();
   x86::Gp exceptReg = newGP16();
@@ -5796,11 +5792,11 @@ void PPCInterpreter::PPCInterpreterJIT_stfd(sPPEState *ppeState, JITBlockBuilder
   COMP->add(EA, imm<s16>(instr.simm16));
 
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   COMP->mov(exceptReg, EXPtr());
   COMP->and_(exceptReg, imm<u16>(0xC));
@@ -5817,7 +5813,7 @@ void PPCInterpreter::PPCInterpreterJIT_stfd(sPPEState *ppeState, JITBlockBuilder
 void PPCInterpreter::PPCInterpreterJIT_stfdx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
   x86::Gp EA = newGP64();
   x86::Gp data64 = newGP64();
   x86::Gp exceptReg = newGP16();
@@ -5827,11 +5823,11 @@ void PPCInterpreter::PPCInterpreterJIT_stfdx(sPPEState *ppeState, JITBlockBuilde
   COMP->add(EA, GPRPtr(instr.rb));
 
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   COMP->mov(exceptReg, EXPtr());
   COMP->and_(exceptReg, imm<u16>(0xC));
@@ -5848,7 +5844,7 @@ void PPCInterpreter::PPCInterpreterJIT_stfdx(sPPEState *ppeState, JITBlockBuilde
 void PPCInterpreter::PPCInterpreterJIT_stfdu(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
   x86::Gp EA = newGP64();
   x86::Gp origEA = newGP64();
   x86::Gp data64 = newGP64();
@@ -5859,11 +5855,11 @@ void PPCInterpreter::PPCInterpreterJIT_stfdu(sPPEState *ppeState, JITBlockBuilde
   COMP->mov(origEA, EA);
 
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   COMP->mov(exceptReg, EXPtr());
   COMP->and_(exceptReg, imm<u16>(0xC));
@@ -5881,7 +5877,7 @@ void PPCInterpreter::PPCInterpreterJIT_stfdu(sPPEState *ppeState, JITBlockBuilde
 void PPCInterpreter::PPCInterpreterJIT_stfdux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
   x86::Gp EA = newGP64();
   x86::Gp origEA = newGP64();
   x86::Gp data64 = newGP64();
@@ -5892,11 +5888,11 @@ void PPCInterpreter::PPCInterpreterJIT_stfdux(sPPEState *ppeState, JITBlockBuild
   COMP->mov(origEA, EA);
 
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   COMP->mov(exceptReg, EXPtr());
   COMP->and_(exceptReg, imm<u16>(0xC));
@@ -5914,9 +5910,9 @@ void PPCInterpreter::PPCInterpreterJIT_stfdux(sPPEState *ppeState, JITBlockBuild
 void PPCInterpreter::PPCInterpreterJIT_stfs(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
   x86::Gp EA = newGP64();
-  x86::Xmm tmpXmm = newXMM();
+  x86::Vec tmpXmm = newXMM();
   x86::Gp data32 = newGP32();
   x86::Gp exceptReg = newGP16();
 
@@ -5925,11 +5921,11 @@ void PPCInterpreter::PPCInterpreterJIT_stfs(sPPEState *ppeState, JITBlockBuilder
   COMP->add(EA, imm<s16>(instr.simm16));
 
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   COMP->mov(exceptReg, EXPtr());
   COMP->and_(exceptReg, imm<u16>(0xC));
@@ -5949,9 +5945,9 @@ void PPCInterpreter::PPCInterpreterJIT_stfs(sPPEState *ppeState, JITBlockBuilder
 void PPCInterpreter::PPCInterpreterJIT_stfsx(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
   x86::Gp EA = newGP64();
-  x86::Xmm tmpXmm = newXMM();
+  x86::Vec tmpXmm = newXMM();
   x86::Gp data32 = newGP32();
   x86::Gp exceptReg = newGP16();
 
@@ -5960,11 +5956,11 @@ void PPCInterpreter::PPCInterpreterJIT_stfsx(sPPEState *ppeState, JITBlockBuilde
   COMP->add(EA, GPRPtr(instr.rb));
 
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   COMP->mov(exceptReg, EXPtr());
   COMP->and_(exceptReg, imm<u16>(0xC));
@@ -5984,10 +5980,10 @@ void PPCInterpreter::PPCInterpreterJIT_stfsx(sPPEState *ppeState, JITBlockBuilde
 void PPCInterpreter::PPCInterpreterJIT_stfsu(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
   x86::Gp EA = newGP64();
   x86::Gp origEA = newGP64();
-  x86::Xmm tmpXmm = newXMM();
+  x86::Vec tmpXmm = newXMM();
   x86::Gp data32 = newGP32();
   x86::Gp exceptReg = newGP16();
 
@@ -5996,11 +5992,11 @@ void PPCInterpreter::PPCInterpreterJIT_stfsu(sPPEState *ppeState, JITBlockBuilde
   COMP->mov(origEA, EA);
 
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   COMP->mov(exceptReg, EXPtr());
   COMP->and_(exceptReg, imm<u16>(0xC));
@@ -6021,10 +6017,10 @@ void PPCInterpreter::PPCInterpreterJIT_stfsu(sPPEState *ppeState, JITBlockBuilde
 void PPCInterpreter::PPCInterpreterJIT_stfsux(sPPEState *ppeState, JITBlockBuilder *b, uPPCInstr instr) {
   J_checkFPUEnabled(b);
 
-  Label endLabel = COMP->newLabel();
+  Label endLabel = newLabel();
   x86::Gp EA = newGP64();
   x86::Gp origEA = newGP64();
-  x86::Xmm tmpXmm = newXMM();
+  x86::Vec tmpXmm = newXMM();
   x86::Gp data32 = newGP32();
   x86::Gp exceptReg = newGP16();
 
@@ -6033,11 +6029,11 @@ void PPCInterpreter::PPCInterpreterJIT_stfsux(sPPEState *ppeState, JITBlockBuild
   COMP->mov(origEA, EA);
 
   InvokeNode *mmuTranslation = nullptr;
-  COMP->invoke(&mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
-  mmuTranslation->setArg(0, b->ppeState->Base());
-  mmuTranslation->setArg(1, EA);
-  mmuTranslation->setArg(2, ePPUThread_None);
-  mmuTranslation->setRet(0, EA);
+  Xe::JITCompat::Invoke(b->compiler, mmuTranslation, imm((void *)JITTranslateAndGetHostPtr), FuncSignature::build<u64, sPPEState *, u64, ePPUThreadID>());
+  Xe::JITCompat::SetArg(mmuTranslation, 0, b->ppeState->Base());
+  Xe::JITCompat::SetArg(mmuTranslation, 1, EA);
+  Xe::JITCompat::SetArg(mmuTranslation, 2, ePPUThread_None);
+  Xe::JITCompat::SetRet(mmuTranslation, 0, EA);
 
   COMP->mov(exceptReg, EXPtr());
   COMP->and_(exceptReg, imm<u16>(0xC));

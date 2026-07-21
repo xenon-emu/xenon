@@ -36,48 +36,48 @@ class NetworkBridge {
 public:
   NetworkBridge();
   ~NetworkBridge();
-  
+
   // Initialize the bridge with the specified configuration
   bool Initialize(const BridgeConfig& config);
-  
+
   // Shutdown the bridge
   void Shutdown();
-  
+
   // Check if the bridge is active
   bool IsActive() const { return active; }
-  
+
   // Attach the Ethernet device to the bridge
   void AttachEthernetDevice(PCIDev::ETHERNET* device);
-  
+
   // Detach the Ethernet device
   void DetachEthernetDevice();
-  
+
   // Get the current backend (for diagnostics)
   INetworkBackend* GetBackend() const { return backend.get(); }
-  
+
   // Get configuration
   const BridgeConfig& GetConfig() const { return config; }
-  
+
   // Static instance for global access
   static NetworkBridge& Instance();
-  
+
 private:
   // Packet received callback from backend
   void OnPacketReceived(const u8* data, u32 length);
-  
+
   // Send packet from guest to host
   bool SendPacketToHost(const u8* data, u32 length);
-  
+
   // Configuration
   BridgeConfig config;
-  
+
   // Network backend
   std::unique_ptr<INetworkBackend> backend;
-  
+
   // Attached Ethernet device
   PCIDev::ETHERNET* ethernetDevice = nullptr;
   std::mutex deviceMutex;
-  
+
   // State
   std::atomic<bool> active{false};
 };

@@ -70,6 +70,11 @@ void Render::VulkanGUI::InitBackend(void *context) {
 void Render::VulkanGUI::ShutdownBackend() {
   ImGui_ImplVulkan_Shutdown();
   ImGui_ImplSDL3_Shutdown();
+
+  if (imguiDescriptorPool != VK_NULL_HANDLE) {
+    renderer->dispatch.destroyDescriptorPool(imguiDescriptorPool, nullptr);
+    imguiDescriptorPool = VK_NULL_HANDLE;
+  }
 }
 
 void Render::VulkanGUI::BeginSwap() {

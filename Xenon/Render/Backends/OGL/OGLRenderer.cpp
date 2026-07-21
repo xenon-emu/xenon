@@ -1,5 +1,5 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #include "Core/XeMain.h"
@@ -31,10 +31,9 @@ void OGLRenderer::BackendStart() {
   // Create the resource factory
   resourceFactory = std::make_unique<OGLResourceFactory>();
   shaderFactory = resourceFactory->CreateShaderFactory();
-  fs::path shaderPath{ Base::FS::GetUserPath(Base::FS::PathType::ShaderDir) };
+  fs::path shaderPath{ Base::FS::GetPath(Base::FS::PathType::ShaderOpenGLDir) };
   bool gles = GetBackendID() == "GLES"_jLower;
   std::string versionString = FMT("#version {} {}\n", gles ? 310 : 430, gles ? "es" : "core");
-  shaderPath /= "opengl";
   computeShaderProgram = shaderFactory->LoadFromFiles("XeFbConvert", {
     { eShaderType::Compute, shaderPath / "fb_deswizzle.comp" }
   });
@@ -143,12 +142,22 @@ void OGLRenderer::BackendSDLInit() {
 }
 
 void OGLRenderer::BackendShutdown() {
-  glDeleteVertexArrays(1, &dummyVAO);
-  glDeleteVertexArrays(1, &VAO);
-  glDeleteBuffers(1, &EBO);
+  if (glDeleteVertexArrays) {
+    glDeleteVertexArrays(1, &dummyVAO);
+    glDeleteVertexArrays(1, &VAO);
+  }
+  if (glDeleteBuffers) {
+    glDeleteBuffers(1, &EBO);
+  }
 }
 void OGLRenderer::BackendSDLShutdown() {
-  SDL_GL_DestroyContext(context);
+  if (context) {
+    SDL_GL_DestroyContext(context);
+  }
+}
+
+void OGLRenderer::WaitIdle() {
+
 }
 
 void OGLRenderer::BackendResize(s32 x, s32 y) {
@@ -223,68 +232,72 @@ void OGLRenderer::DrawIndexed(Xe::XGPU::XeShader shader, Xe::XGPU::XeDrawParams 
   u32 numIndices = params.vgtDrawInitiator.numIndices;
   s32 indexType = indexBufferInfo.indexFormat == eIndexFormat::xeInt16 ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
 
-  const u32 destInfo = params.state->copyDestInfo.hexValue;
-  const Xe::eEndianFormat endianFormat = static_cast<Xe::eEndianFormat>(destInfo & 7);
-  const u32 destArray = (destInfo >> 3) & 1;
-  const u32 destSlice = (destInfo >> 4) & 1;
-  const eColorFormat destformat = static_cast<eColorFormat>((destInfo >> 7) & 0x3F);
-  // Bind the constants
-  if (auto buffer = createdBuffers.find("FloatConsts"_j); buffer != createdBuffers.end())
-    buffer->second->Bind(0);
-  if (auto buffer = createdBuffers.find("CommonBoolConsts"_j); buffer != createdBuffers.end())
-    buffer->second->Bind(1);
-  // Bind the shader
-  if (shader.program)
-    shader.program->Bind();
-  // Bind the VAO
-  glBindVertexArray(VAO);
-  // Bind the VBO
-  if (auto buffer = createdBuffers.find("VertexFetch"_jLower); buffer != createdBuffers.end())
-    buffer->second->Bind();
-  // Bind and upload index buffer (TODO: Fix this)
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexBufferInfo.count, indexBufferInfo.elements, GL_STATIC_DRAW);
-  // Bind textures
-  for (u32 i = 0; i != shader.textures.size(); ++i) {
-    glActiveTexture(GL_TEXTURE0 + i);
-    shader.textures[i]->Bind();
+  if (auto state = params.state.lock()) {
+    const u32 destInfo = state->copyDestInfo.hexValue;
+    const Xe::eEndianFormat endianFormat = static_cast<Xe::eEndianFormat>(destInfo & 7);
+    const u32 destArray = (destInfo >> 3) & 1;
+    const u32 destSlice = (destInfo >> 4) & 1;
+    const eColorFormat destformat = static_cast<eColorFormat>((destInfo >> 7) & 0x3F);
+    // Bind the constants
+    if (auto buffer = createdBuffers.find("FloatConsts"_j); buffer != createdBuffers.end())
+      buffer->second->Bind(0);
+    if (auto buffer = createdBuffers.find("CommonBoolConsts"_j); buffer != createdBuffers.end())
+      buffer->second->Bind(1);
+    // Bind the shader
+    if (shader.program)
+      shader.program->Bind();
+    // Bind the VAO
+    glBindVertexArray(VAO);
+    // Bind the VBO
+    if (auto buffer = createdBuffers.find("VertexFetch"_jLower); buffer != createdBuffers.end())
+      buffer->second->Bind();
+    // Bind and upload index buffer (TODO: Fix this)
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexBufferInfo.count, indexBufferInfo.elements, GL_STATIC_DRAW);
+    // Bind textures
+    for (u32 i = 0; i != shader.textures.size(); ++i) {
+      glActiveTexture(GL_TEXTURE0 + i);
+      shader.textures[i]->Bind();
+    }
+    // Perform draw
+    glDrawElements(glPrimitive, numIndices, indexType, 0);
+    // Unbind VAO
+    glBindVertexArray(0);
   }
-  // Perform draw
-  glDrawElements(glPrimitive, numIndices, indexType, 0);
-  // Unbind VAO
-  glBindVertexArray(0);
 }
 
-void OGLRenderer::UpdateViewportFromState(const Xe::XGPU::XenosState *state) {
+void OGLRenderer::UpdateViewportFromState(std::weak_ptr<Xe::XGPU::XenosState> statePtr) {
   auto f = [](u32 val) {
     f32 fval;
     memcpy(&fval, &val, sizeof(f32));
     return fval;
   };
 
-  f32 xscale = f(state->viewportXScale);
-  f32 xoffset = f(state->viewportXOffset);
-  f32 yscale = f(state->viewportYScale);
-  f32 yoffset = f(state->viewportYOffset);
-  f32 zscale = f(state->viewportZScale);
-  f32 zoffset = f(state->viewportZOffset);
+  if (auto state = statePtr.lock()) {
+    f32 xscale = f(state->viewportXScale);
+    f32 xoffset = f(state->viewportXOffset);
+    f32 yscale = f(state->viewportYScale);
+    f32 yoffset = f(state->viewportYOffset);
+    f32 zscale = f(state->viewportZScale);
+    f32 zoffset = f(state->viewportZOffset);
 
-  // Compute viewport rectangle
-  s32 newWidth = static_cast<s32>(std::abs(xscale * 2));
-  s32 newHeight = static_cast<s32>(std::abs(yscale * 2));
-  s32 x = static_cast<s32>(xoffset - std::abs(xscale));
-  s32 y = static_cast<s32>(yoffset - std::abs(yscale));
+    // Compute viewport rectangle
+    s32 newWidth = static_cast<s32>(std::abs(xscale * 2));
+    s32 newHeight = static_cast<s32>(std::abs(yscale * 2));
+    s32 x = static_cast<s32>(xoffset - std::abs(xscale));
+    s32 y = static_cast<s32>(yoffset - std::abs(yscale));
 
-  if (newWidth != 32 && newHeight != 32) {
-    Resize(newWidth, newHeight);
-    glViewport(x, y, newWidth, newHeight);
+    if (newWidth != 32 && newHeight != 32) {
+      Resize(newWidth, newHeight);
+      glViewport(x, y, newWidth, newHeight);
+    }
+
+    // Clamp to valid ranges (just in case)
+    f32 nearZ = std::max(0.f, std::min(1.f, zoffset));
+    f32 farZ = std::max(nearZ, std::min(1.f, zoffset + zscale));
+
+    glDepthRangef(nearZ, farZ);
   }
-
-  // Clamp to valid ranges (just in case)
-  f32 nearZ = std::max(0.f, std::min(1.f, zoffset));
-  f32 farZ = std::max(nearZ, std::min(1.f, zoffset + zscale));
-
-  glDepthRangef(nearZ, farZ);
 }
 
 void OGLRenderer::BackendBindPixelBuffer(Buffer *buffer) {
@@ -305,7 +318,7 @@ void OGLRenderer::OnCompute() {
 }
 
 void OGLRenderer::OnBind() {
-  if (XeMain::xenos && XeMain::xenos->RenderingTo2DFramebuffer()) {
+  if (auto xenos = XeMain::xenos.lock(); xenos && xenos->RenderingTo2DFramebuffer()) {
     // Bind VAO
     glBindVertexArray(dummyVAO);
     // Draw fullscreen triangle
@@ -336,8 +349,8 @@ s32 OGLRenderer::GetXenosFlags() {
         eTextureDepth::R32U;
 }
 
-void* OGLRenderer::GetBackendContext() {
-  return reinterpret_cast<void*>(context);
+void *OGLRenderer::GetBackendContext() {
+  return reinterpret_cast<void *>(context);
 }
 
 u32 OGLRenderer::GetBackendID() {

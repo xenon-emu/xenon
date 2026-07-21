@@ -1,7 +1,9 @@
-// Copyright 2025 Xenon Emulator Project. All rights reserved.
+/***************************************************************/
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
+/***************************************************************/
 
 #ifdef _WIN32
-#include <Windows.h>
+#include <windows.h>
 #endif
 
 #include "Serial.h"
