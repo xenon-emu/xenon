@@ -24,6 +24,25 @@ static constexpr u32 ExtractBits(u32 input, u32 begin, u32 end) {
   return (input >> (32 - 1 - end)) & ((1 << (end - begin + 1)) - 1);
 }
 
+constexpr s64 SignExtend16(u32 v) {
+  return (s64)((s16)v);
+}
+
+constexpr s64 SignExtend26(u32 v) {
+  return (s64)(v & 0x02000000 ? (s32)v | 0xFC000000 : (s32)(v));
+}
+
+constexpr u64 ZeroExtend16(u32 v) {
+  return (u64)((u16)v);
+}
+
+static inline u64 CreateMask(u32 mstart, u32 mstop) {
+  mstart &= 0x3F;
+  mstop &= 0x3F;
+  u64 value = (UINT64_MAX >> mstart) ^ ((mstop >= 63) ? 0 : UINT64_MAX >> (mstop + 1));
+  return mstart <= mstop ? value : ~value;
+}
+
 #define QMASK(b, e) ((0xFFFFFFFFFFFFFFFF << ((63 + (b)) - (e))) >> (b))
 #define QGET(qw, b, e) ((static_cast<u64>(qw) & QMASK((b), (e))) >> (63 - (e)))
 #define QSET(qw, b, e, qwSet)                                                  \

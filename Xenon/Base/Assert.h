@@ -38,6 +38,8 @@ void throw_fail_debug_msg(const std::string& msg);
     }                                                                                        \
   })
 
+#define ASSERT_ZERO(value) ASSERT(value == 0)
+
 #define THROW_MSG(_a_, ...)                                                                  \
   ([&]() XENON_NO_INLINE {                                                                   \
     if (!(_a_)) [[unlikely]] {                                                               \

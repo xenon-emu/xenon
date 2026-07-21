@@ -12,6 +12,7 @@
 #include "Core/XCPU/MMU/XenonMMU.h"
 
 class PPU_JIT;
+namespace Xe::XCPU::JIT { class PPCTranslator; }
 
 // Describes the execution backends available for the PPU.
 enum class eExecutorMode : u8 {
@@ -170,6 +171,7 @@ private:
 
   std::unique_ptr<PPU_JIT> ppuJIT;
   friend class PPU_JIT;
+  friend class Xe::XCPU::JIT::PPCTranslator;
   // Function call epilogue.
   friend bool InstrEpilogue(PPU *ppu, sPPEState *ppeState);
 

@@ -49,9 +49,28 @@ public:
   // Returns a pointer to a given PPU.
   PPU *GetPPU(u8 ppuID);
 
+  // HW_INIT skip related methods.
+  bool HasHWINITPosted() { return hwInitPosted; }
+  void SetHWINITPosted(bool hasPosted) { hwInitPosted = hasPosted; }
+  u64 GetHWINITReturnAddress() { return hwInitReturnAddress; }
+  void SetHWINITReturnAddress(u64 address) { hwInitReturnAddress = address; }
+
 private:
   // Global Xenon CPU Content (shared between PPUs)
   std::unique_ptr<XenonContext> xenonContext;
+
+  // HW_INIT skip variables
+  bool hwInitPosted = false;
+  u64 hwInitReturnAddress = 0;
+
+  // TimeBase frequency timer
+  std::chrono::high_resolution_clock::time_point timeBaseUpdate{};
+
+  // High resolution timer thread for accumulating timebase ticks.
+  std::thread timeBaseThread{};
+  std::atomic<bool> timeBaseThreadActive{ false };
+  // Timer thread loop function.
+  void timeBaseThreadLoop();
 
   // Power Processing Units, the effective execution units inside the Xbox 360 CPU.
   std::unique_ptr<PPU> ppu0{};

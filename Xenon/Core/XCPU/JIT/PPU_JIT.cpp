@@ -4,6 +4,7 @@
 
 #include "Base/Logging/Log.h"
 #include "Base/Global.h"
+#include "Core/XeMain.h"
 
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
 #include "Core/XCPU/JIT/x86_64/JITEmitter_Helpers.h"
@@ -214,23 +215,6 @@ void PPU_JIT::InstrPrologue(JITBlockBuilder *b, u32 instrData) {
   COMP->mov(temp, instrData);
   COMP->mov(b->threadCtx->scalar(&sPPUThread::CI).Ptr<u32>(), temp);
 #endif
-}
-
-// Pre-computed instruction name hashes for fast comparison during block building
-namespace JITOpcodeHashes {
-  // Branch instructions that end blocks
-  static constexpr u32 BCLR = "bclr"_j;
-  static constexpr u32 BCCTR = "bcctr"_j;
-  static constexpr u32 BC = "bc"_j;
-  static constexpr u32 B = "b"_j;
-  static constexpr u32 RFID = "rfid"_j;
-  static constexpr u32 INVALID = "invalid"_j;
-
-  static constexpr u32 TLBIE  = "tlbie"_j;
-  static constexpr u32 TLBIEL = "tlbiel"_j;
-  static constexpr u32 SLBIA  = "slbia"_j;
-  static constexpr u32 SLBIE  = "slbie"_j;
-  static constexpr u32 SLBMTE = "slbmte"_j;
 }
 
 #undef GPR
@@ -533,6 +517,16 @@ void PPU_JIT::ExecuteJITInstrs(u64 numInstrs, bool enableHalt, bool singleBlock)
 
   while (instrsExecuted < numInstrs && XeRunning.load(std::memory_order_acquire)) {
     auto &thread = curThread;
+
+    // When POST 0x2E HW_INIT fires, hwInitPosted is set and hwReturnAddress.
+    // We make use of that to grab the LR and set it here, thus completly avoiding it.
+    if (XeMain::GetCPU()->HasHWINITPosted()) {
+      XeMain::GetCPU()->SetHWINITPosted(false);
+      PPCInterpreter::ppuSetCR(ppeState, 0, false, false, true, false);
+      thread.NIA = XeMain::GetCPU()->GetHWINITReturnAddress() & ~3ULL;
+      LOG_INFO(Xenon, "[JIT] HwInit intercepted. Returning to {:#x}.", thread.NIA);
+      continue;
+    }
 
     // Quick way of skiping function calls:
     // This *must *be done here simply because of how we handle JIT.
