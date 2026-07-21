@@ -6,7 +6,7 @@
 #include "Core/HLE/Input/XInputBackend/XInputBackend.h"
 
 #ifdef _WIN32
-#include <Windows.h>
+#include <windows.h>
 #include <xinput.h>
 #endif // _WIN32
 
