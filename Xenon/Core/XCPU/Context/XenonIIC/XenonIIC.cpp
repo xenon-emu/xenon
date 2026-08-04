@@ -1,11 +1,11 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #include "Core/XCPU/Context/XenonIIC/XenonIIC.h"
 
-  // Debug output enable.
-  //#define IIC_DEBUG
+// Debug output enable.
+//#define IIC_DEBUG
 
 #ifndef IIC_DEBUG
 #define DEBUGP(x, ...)
@@ -25,8 +25,6 @@ Xe::XCPU::XenonIIC::~XenonIIC() {
 
 // Write routine
 void Xe::XCPU::XenonIIC::Write(u64 writeAddress, const u8* data, u64 size) {
-  // Set a lock
-  std::lock_guard lock(iicMutex);
   // Offset to our structure
   u32 offset = static_cast<u32>(writeAddress & 0x7FFF);
 
@@ -35,8 +33,11 @@ void Xe::XCPU::XenonIIC::Write(u64 writeAddress, const u8* data, u64 size) {
   memcpy(&dataIn, data, size);
   dataIn = byteswap_be<u64>(dataIn);
 
-  // Write down the data
-  memcpy(reinterpret_cast<u8*>(socINTBlock.get()) + offset, &dataIn, size);
+  // Write down the data to socINTBlock under lock
+  {
+    std::lock_guard lock(iicMutex);
+    memcpy(reinterpret_cast<u8*>(socINTBlock.get()) + offset, &dataIn, size);
+  }
 
 
 #ifdef IIC_DEBUG
@@ -72,16 +73,17 @@ void Xe::XCPU::XenonIIC::Write(u64 writeAddress, const u8* data, u64 size) {
     case 0x0050: break; // InterruptAcknowledge
     case 0x0058: break; // InterruptAcknowledgeAutoUpdate
     case 0x0060: // EndOfInterrupt
-      // Erase the first interrupt in queue that has been ACK'd
+      // Erase the highest-priority ACK'd interrupt.
       {
         removeFirstACKdInterrupt(threadID);
       }
       break; 
     case 0x0068: // EndOfInterruptAutoUpdate
-      // Erase the first interrupt in queue that has been ACK'd and update the interrupt priority.
+      // Erase the highest-priority ACK'd interrupt and update the interrupt priority.
       {
         removeFirstACKdInterrupt(threadID);
         // Update task priority.
+        std::lock_guard lock(iicMutex);
         socINTBlock->ProcessorBlock[threadID].InterruptTaskPriority.AsULONGLONG = dataIn & 0xFF;
       }
       break; 
@@ -112,13 +114,15 @@ void Xe::XCPU::XenonIIC::Write(u64 writeAddress, const u8* data, u64 size) {
 
 // Read routine
 void Xe::XCPU::XenonIIC::Read(u64 readAddress, u8* data, u64 size) {
-  // Set a lock
-  std::lock_guard lock(iicMutex);
-  // Offset to our structure
+  // Offset to our structure.
   u32 offset = static_cast<u32>(readAddress & 0x7FFF);
-  // Read the data from our structure
+  // Read the data from our structure.
   u64 dataOut = 0;
-  memcpy(&dataOut, reinterpret_cast<u8*>(socINTBlock.get()) + offset, size);
+
+  {
+    std::lock_guard lock(iicMutex);
+    memcpy(&dataOut, reinterpret_cast<u8*>(socINTBlock.get()) + offset, size);
+  }
 
   //
   // Process state changes
@@ -141,7 +145,10 @@ void Xe::XCPU::XenonIIC::Read(u64 readAddress, u8* data, u64 size) {
       // Send out the highest priority pending interrupt for this thread and mark it as ACK'd.
       dataOut = acknowledgeInterrupt(threadID);
       // Update our state
-      socINTBlock->ProcessorBlock[threadID].InterruptAcknowledge.AsULONGLONG = dataOut;
+      {
+        std::lock_guard lock(iicMutex);
+        socINTBlock->ProcessorBlock[threadID].InterruptAcknowledge.AsULONGLONG = dataOut;
+      }
       break;
     case 0x0058: break; // InterruptAcknowledgeAutoUpdate
     case 0x0060: break; // EndOfInterrupt
@@ -157,11 +164,14 @@ void Xe::XCPU::XenonIIC::Read(u64 readAddress, u8* data, u64 size) {
     case 0x6010: break; // MiscellaneousInterruptGeneration1
     case 0x6020: // MiscellaneousInterruptGeneration2
       // Workaround for PowerMode setting where HV code checks for this specific bit changing.
-      if (socINTBlock->MiscellaneousInterruptGeneration2.AsBITS.InterruptState) {
-        dataOut |= 0x200;
-        socINTBlock->MiscellaneousInterruptGeneration2.AsBITS.InterruptState = 0;
+      {
+        std::lock_guard lock(iicMutex);
+        if (socINTBlock->MiscellaneousInterruptGeneration2.AsBITS.InterruptState) {
+          dataOut |= 0x200;
+          socINTBlock->MiscellaneousInterruptGeneration2.AsBITS.InterruptState = 0;
+        }
+        else { socINTBlock->MiscellaneousInterruptGeneration2.AsBITS.InterruptState = 1; }
       }
-      else { socINTBlock->MiscellaneousInterruptGeneration2.AsBITS.InterruptState = 1; }
       break;
     case 0x6030: break; // MiscellaneousInterruptGeneration3
     case 0x6040: break; // MiscellaneousInterruptGeneration4
@@ -196,21 +206,21 @@ void Xe::XCPU::XenonIIC::Read(u64 readAddress, u8* data, u64 size) {
 // Generates an interrupt of the specified type to the specified CPUs.
 void Xe::XCPU::XenonIIC::generateInterrupt(u8 interruptType, u8 cpusToInterrupt) {
   MICROPROFILE_SCOPEI("[Xe::IIC]", "GenInterrupt", MP_AUTO);
-  
-  // Set a lock
-  std::lock_guard lock(iicMutex);
 
   DEBUGP("[IIC]: Generating interrupt {} for threads with mask {:#x}", 
     getIntName(static_cast<eXeIntVectors>(interruptType)).c_str(), cpusToInterrupt);
 
-  // Create our interrupt packet
-  sInterruptPacket intPacket = { interruptType, false };
+  const u32 bit = vectorToBit(interruptType);
 
   for (u8 threadID = 0; threadID < 6; threadID++) {
-    u8 cpuMask = socINTBlock->ProcessorBlock[threadID].LogicalIdentification.AsBITS.LogicalId;
+    u8 cpuMask;
+    {
+      std::lock_guard lock(iicMutex);
+      cpuMask = socINTBlock->ProcessorBlock[threadID].LogicalIdentification.AsBITS.LogicalId;
+    }
     if ((cpusToInterrupt & cpuMask)) {
-      // Insert the interrupt into the sorted set - O(log n)
-      interruptState[threadID].pendingInterrupts.insert(intPacket);
+      // Atomically set the pending bit for this interrupt vector.
+      interruptState[threadID].pendingMask.fetch_or(bit, std::memory_order_release);
     }
   }
 }
@@ -220,114 +230,111 @@ void Xe::XCPU::XenonIIC::cancelInterrupt(u8 interruptType, u8 cpusToInterrupt) {
   return;
 }
 
-// Returns true if there are pending interrupts for the given thread that match the specified priority.
+// Returns true if there are pending interrupts for the given thread that are deliverable.
 bool Xe::XCPU::XenonIIC::hasPendingInterrupts(u8 threadID, bool ignorePendingACKd) {
   // Check for valid thread ID
   if (threadID >= 6) {
     return false;
   }
 
-  // Set a lock
-  std::lock_guard lock(iicMutex);
-
-  const auto& pendingSet = interruptState[threadID].pendingInterrupts;
-
-  if (pendingSet.empty()) {
+  // Load pending mask (interrupts not yet ACK'd).
+  const u32 pending = interruptState[threadID].pendingMask.load(std::memory_order_acquire);
+  if (!pending) {
     return false;
   }
 
   // Current task priority for this thread
-  const u8 currentPriority = static_cast<u8>(socINTBlock->ProcessorBlock[threadID].InterruptTaskPriority.AsULONGLONG & 0xFF);
-
-  // Iterate through the sorted set - O(n) worst case but typically exits early
-  for (const auto& pkt : pendingSet) {
-    if (pkt.acknowledged) {
-      // Found an ACK'd packet
-      if (!ignorePendingACKd) {
-        return false; // Can't signal while ACK'd packets exist
-      }
-      continue; // Skip ACK'd packets when ignoring
-    }
-    // Non-acknowledged packet found
-    if (pkt.interruptType > currentPriority) {
-      return true; // Found a pending interrupt with higher priority than current
-    }
+  u8 currentPriority;
+  {
+    std::lock_guard lock(iicMutex);
+    currentPriority = static_cast<u8>(socINTBlock->ProcessorBlock[threadID].InterruptTaskPriority.AsULONGLONG & 0xFF);
   }
 
-  return false;
+  // Build a mask of all vectors above the current priority threshold.
+  // Vectors > currentPriority are deliverable. vectorToBit gives 1 << (vec >> 2).
+  // All bits at positions > (currentPriority >> 2) represent deliverable vectors.
+  const u32 priorityBit = currentPriority >> 2;
+  // Mask of all bits strictly above the priority threshold
+  const u32 deliverableMask = (priorityBit < 31) ? ~((1u << (priorityBit + 1)) - 1) : 0u;
+
+  return (pending & deliverableMask) != 0;
 }
 
-// Removes the first ACK'd interrupt from the pending set for a given thread.
+// Removes the highest-priority ACK'd interrupt (EOI) for a given thread.
 void Xe::XCPU::XenonIIC::removeFirstACKdInterrupt(u8 threadID) {
   // Bounds check
   if (threadID >= 6) {
     return;
   }
 
-  // Set a lock
-  std::lock_guard lock(iicMutex);
-
-  auto& pendingSet = interruptState[threadID].pendingInterrupts;
-  if (pendingSet.empty()) {
-    DEBUGP("[IIC]: EOI on thread {} with empty set", threadID);
+  auto& state = interruptState[threadID];
+  u32 acked = state.acknowledgedMask.load(std::memory_order_acquire);
+  if (!acked) {
+    DEBUGP("[IIC]: EOI on thread {} with no ACK'd interrupts", threadID);
     return;
   }
 
-  // Find and remove the first acknowledged packet - O(n) search, O(log n) erase
-  for (auto it = pendingSet.begin(); it != pendingSet.end(); ++it) {
-    if (it->acknowledged) {
-      DEBUGP("[IIC]: Removed ACK'd interrupt {} from thread {}",
-          getIntName(static_cast<eXeIntVectors>(it->interruptType)).c_str(), threadID);
-      pendingSet.erase(it);
+  // Find the highest-priority (highest bit position) ACK'd interrupt using CAS loop.
+  // The highest set bit corresponds to the highest-priority vector on Xenon's IIC.
+  while (acked) {
+    const u32 highestBit = 1u << (31 - std::countl_zero(acked));
+    // Atomically clear this bit from acknowledgedMask
+    if (state.acknowledgedMask.compare_exchange_weak(acked, acked & ~highestBit,
+        std::memory_order_acq_rel, std::memory_order_acquire)) {
+      DEBUGP("[IIC]: Removed ACK'd interrupt with bit {:#x} from thread {}", highestBit, threadID);
       return;
     }
+    // CAS failed, acked was reloaded - retry
   }
 
   DEBUGP("[IIC]: EOI on thread {} found no ACK'd interrupts to remove", threadID);
 }
 
-// Acknowledges and returns the highest priority pending interrupt for a given thread.
-// NOTE: If the highest priority interrupt is the same priority as the current task priority, we return and ACK the next
-// higher priority interrupt instead.
+// Acknowledges the highest-priority deliverable interrupt for a given thread.
+// Returns the interrupt vector, or prioNONE if no deliverable interrupt exists.
 u8 Xe::XCPU::XenonIIC::acknowledgeInterrupt(u8 threadID) {
   // Bounds check
   if (threadID >= 6) {
     return prioNONE;
   }
 
-  // Set a lock
-  std::lock_guard lock(iicMutex);
-
-  auto& pendingSet = interruptState[threadID].pendingInterrupts;
-
-  if (pendingSet.empty()) {
-    return prioNONE;
-  }
+  auto& state = interruptState[threadID];
 
   // Current task priority for this thread
-  const u8 currentPriority = static_cast<u8>(socINTBlock->ProcessorBlock[threadID].InterruptTaskPriority.AsULONGLONG & 0xFF);
-
-  // Find the first non-acknowledged interrupt with priority > currentPriority
-  // The set is sorted by interruptType (ascending = highest priority first), then by acknowledged status
-  for (auto it = pendingSet.begin(); it != pendingSet.end(); ++it) {
-    if (it->acknowledged) {
-      continue; // Skip already acknowledged
-    }
-
-    if (it->interruptType > currentPriority) {
-      // Found an eligible interrupt - mark it as acknowledged (mutable field)
-      it->acknowledged = true;
-      return it->interruptType;
-    }
-
-    // If interruptType == currentPriority, skip to find next higher
-    // If interruptType < currentPriority, no need to continue (sorted order)
-    if (it->interruptType < currentPriority) {
-      break; // No eligible interrupts in remaining items
-    }
+  u8 currentPriority;
+  {
+    std::lock_guard lock(iicMutex);
+    currentPriority = static_cast<u8>(socINTBlock->ProcessorBlock[threadID].InterruptTaskPriority.AsULONGLONG & 0xFF);
   }
 
-  return prioNONE;
+  // Build mask of deliverable vectors (those with vector > currentPriority).
+  // Higher vector number = higher priority on Xenon's IIC.
+  const u32 priorityBit = currentPriority >> 2;
+  const u32 deliverableMask = (priorityBit < 31) ? ~((1u << (priorityBit + 1)) - 1) : 0u;
+
+  // CAS loop to atomically find and acknowledge the highest-priority deliverable interrupt.
+  // Highest priority = highest vector number = highest set bit in the deliverable portion.
+  u32 pending = state.pendingMask.load(std::memory_order_acquire);
+  while (true) {
+    const u32 eligible = pending & deliverableMask;
+    if (!eligible) {
+      return prioNONE;
+    }
+
+    // Isolate the highest set bit (highest priority deliverable interrupt).
+    const u32 highestBit = 1u << (31 - std::countl_zero(eligible));
+
+    // Atomically move this interrupt from pending to acknowledged
+    if (state.pendingMask.compare_exchange_weak(pending, pending & ~highestBit,
+        std::memory_order_acq_rel, std::memory_order_acquire)) {
+      // Set the acknowledged bit
+      state.acknowledgedMask.fetch_or(highestBit, std::memory_order_release);
+      // Convert bit position back to vector: bit position * 4
+      const u8 vector = static_cast<u8>(std::countr_zero(highestBit) << 2);
+      return vector;
+    }
+    // CAS failed, pending was reloaded - retry
+  }
 }
 
 // Returns the name of the register being accessed based on the offset and what block it belongs to.

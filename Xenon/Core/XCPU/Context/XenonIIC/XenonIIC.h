@@ -4,8 +4,8 @@
 
 #pragma once
 
+#include <atomic>
 #include <mutex>
-#include <set>
 
 namespace Xe::XCPU {
 
@@ -220,27 +220,18 @@ namespace Xe::XCPU {
     u64 Reserved12[495]; // 28808
   } SOCINTS_BLOCK, * PSOCINTS_BLOCK;
 
-  // Structure representing an Interrupt Packet
-  struct sInterruptPacket {
-    u8 interruptType = prioNONE;
-    mutable bool acknowledged = false; // mutable to allow modification in set
-
-    // Highest priority comes first (lower interruptType value = higher priority)
-    // Secondary sort by acknowledged status: non-acknowledged before acknowledged
-    friend constexpr bool operator<(const sInterruptPacket& lhs, const sInterruptPacket& rhs) noexcept {
-      if (lhs.interruptType != rhs.interruptType) {
-        return lhs.interruptType < rhs.interruptType; // Lower value = higher priority = comes first
-      }
-      // Same interrupt type: non-acknowledged comes before acknowledged
-      return !lhs.acknowledged && rhs.acknowledged;
-    }
-  };
-
-  // Structure tracking the state of interrupts for each PPU Thread.
+  // Per-thread interrupt state .
+  // Interrupt vectors are in range [0x08, 0x7C] and always multiples of 4,
+  // so (vector >> 2) gives bit indices [2..31] which fits in a u32.
   struct sInterruptState {
-    std::multiset<sInterruptPacket> pendingInterrupts;
+    std::atomic<u32> pendingMask{0};      // Bit set = interrupt pending (not yet ACK'd)
+    std::atomic<u32> acknowledgedMask{0}; // Bit set = interrupt ACK'd (in-service, awaiting EOI)
   };
 
+
+  // Xenon Integrated Interrupt Controller
+  // Handles external and inter-processor interrupts among PPU Threads, wakes CPU's when needed and shcedules their 
+  // delivery based on the current interrupt priority of the given thread.
   class XenonIIC {
   public:
     XenonIIC();
@@ -261,17 +252,21 @@ namespace Xe::XCPU {
     // Our Interrupt Block
     std::unique_ptr<SOCINTS_BLOCK> socINTBlock = {};
 
-    // Interrupt States for each PPU Thread
+    // Per-thread interrupt state.
     sInterruptState interruptState[6] = {};
 
-    // Mutex for thread safety
-    std::recursive_mutex iicMutex;
+    // Mutex for socINTBlock MMIO Read/Write serialization only.
+    // Not used in the hot-path interrupt check/generate/acknowledge operations.
+    std::mutex iicMutex;
 
-    // Erases the first element in the queue that has been ack'd.
+    // Removes the highest-priority ACK'd interrupt (EOI) for a given thread.
     void removeFirstACKdInterrupt(u8 threadID);
 
-    // Reads out the first element that has not been ACk'd and marks it as ack'd.
+    // Acknowledges the highest-priority deliverable interrupt for a given thread.
     u8 acknowledgeInterrupt(u8 threadID);
+
+    // Converts an interrupt vector to its bitmask bit position.
+    static constexpr u32 vectorToBit(u8 vector) { return 1u << (vector >> 2); }
 
     // Processes an access offset and returns a string from where it belongs to.
     std::string getSOCINTAccess(u32 offset);
