@@ -298,7 +298,7 @@ void _xcpu::to_toml(toml::value &value) {
   value["RunInstrTests"].comments().clear();
   value["InstrTestsMode"] = instrTestsMode;
   value["RunInstrTests"].comments().push_back("# Specifies the backend to test.");
-  value["RunInstrTests"].comments().push_back("# 0 = Interpreter, 1 = JITx86.");
+  value["RunInstrTests"].comments().push_back("# 0 = Interpreter.");
 }
 bool _xcpu::verify_toml(toml::value &value) {
   to_toml(value);
@@ -461,9 +461,6 @@ void _highlyExperimental::to_toml(toml::value &value) {
   value["CPUExecutor"] = cpuExecutor;
   value["CPUExecutor"].comments().push_back("# PowerPC CPU Executor:");
   value["CPUExecutor"].comments().push_back("# Interpreted - Cached Interpreter, uses regular interpreted execution with caching");
-  value["CPUExecutor"].comments().push_back("# JIT - Just In Time compilation, runs opcodes in 'blocks'");
-  value["CPUExecutor"].comments().push_back("# Hybrid - JIT with Cached Interpreter fallback, uses faster block system with Interpreter opcodes");
-  value["CPUExecutor"].comments().push_back("# [WARN] This is unfinished, you *will* break the emulator changing this");
 }
 bool _highlyExperimental::verify_toml(toml::value &value) {
   to_toml(value);

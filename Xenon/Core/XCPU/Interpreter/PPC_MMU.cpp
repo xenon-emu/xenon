@@ -227,15 +227,6 @@ void PPCInterpreter::PPCInterpreter_tlbiel(sPPEState *ppeState) {
     // Invalidate both ERAT's for the affected address range
     curThread.iERAT.invalidateAll();
     curThread.dERAT.invalidateAll();
-
-    // Invalidate JIT blocks
-    if (XeMain::GetCPU()) {
-      PPU *ppu = XeMain::GetCPU()->GetPPU(ppeState->ppuID);
-      if (ppu && ppu->GetPPUJIT()) {
-        DEBUGP(Xenon_MMU, "[TLBIEL]: Congruence-class invalidation (class {:#x})", classIndex);
-        ppu->GetPPUJIT()->InvalidateAllBlocks();
-      }
-    }
   } else {
     // Selective invalidation: only invalidate entries matching VPN
     const u64 rb = GPRi(rb);
@@ -255,18 +246,6 @@ void PPCInterpreter::PPCInterpreter_tlbiel(sPPEState *ppeState) {
     // Selective ERAT invalidation
     curThread.iERAT.invalidateAll();
     curThread.dERAT.invalidateAll();
-
-    // Invalidate JIT blocks for the affected page range
-    if (XeMain::GetCPU()) {
-      PPU *ppu = XeMain::GetCPU()->GetPPU(ppeState->ppuID);
-      if (ppu && ppu->GetPPUJIT()) {
-        u64 pageSize = 1ULL << p;
-        u64 start = rb & ~(pageSize - 1ULL);
-        u64 end = start + pageSize;
-        DEBUGP(Xenon_MMU, "[TLBIEL]: Invalidating JIT blocks for page {:#x} (size {:#x})", start, pageSize);
-        ppu->GetPPUJIT()->InvalidateBlocksForRange(start, end);
-      }
-    }
   }
 }
 
@@ -297,17 +276,6 @@ void PPCInterpreter::PPCInterpreter_tlbie(sPPEState *ppeState) {
   const u64 pageBase = EA & ~pageMask;
   curThread.iERAT.invalidateElement(pageBase);
   curThread.dERAT.invalidateElement(pageBase);
-
-  // Invalidate JIT blocks for the affected page
-  if (XeMain::GetCPU()) {
-    PPU *ppu = XeMain::GetCPU()->GetPPU(ppeState->ppuID);
-    if (ppu && ppu->GetPPUJIT()) {
-      u64 start = EA & ~pageMask;
-      u64 end = start + pageSize;
-      DEBUGP(Xenon_MMU, "[TLBIE]: Invalidating JIT blocks for page {:#x} (size {:#x})", start, pageSize);
-      ppu->GetPPUJIT()->InvalidateBlocksForRange(start, end);
-    }
-  }
 }
 
 // TLB Synchronize
@@ -529,21 +497,6 @@ void PPCInterpreter::mmuReadString(sPPEState *ppeState, u64 stringAddress,
   stringBufferAddress = MMURead32(ppeState, stringAddress + 4);
   MMURead(xenonContext, ppeState, stringBufferAddress, maxLength, reinterpret_cast<u8*>(string));
   string[maxLength - 1] = 0;
-}
-
-// Translates a given EA into a RA, and then returns a valid Host Ptr for the given guest EA.
-// NOTE: This is to be used by JIT'ed loads/stores that are known to be directed to RAM, mostly VXU L/S instrs.
-u64 PPCInterpreter::JITTranslateAndGetHostPtr(sPPEState *ppeState, u64 EA, ePPUThreadID thr) {
-  u64 returnedAddr = EA;
-  // Translate the given address
-  if (!MMUTranslateAddress(&returnedAddr, ppeState, false, thr)) {
-    DEBUGP(Xenon, "[JIT MMU]: Address translation failed for EA: {:#x}", EA);
-    return 0;
-  } 
-  // Correctly construct the end address
-  bool socRead = false;
-  returnedAddr = mmuContructEndAddressFromSecEngAddr(returnedAddr, &socRead);
-  return reinterpret_cast<u64>(xenonContext->GetRAM()->GetPointerToAddress(returnedAddr));
 }
 
 SECENG_ADDRESS_INFO

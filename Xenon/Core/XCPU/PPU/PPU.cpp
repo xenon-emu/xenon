@@ -14,7 +14,6 @@
 #include "Base/Logging/Log.h"
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
 #include "Core/XCPU/ElfABI.h"
-#include "Core/XCPU/JIT/PPU_JIT.h"
 
 PPU::PPU(Xe::XCPU::XenonContext *inXenonContext, u64 resetVector, u32 PIR) :
   resetVector(resetVector)
@@ -31,12 +30,6 @@ PPU::PPU(Xe::XCPU::XenonContext *inXenonContext, u64 resetVector, u32 PIR) :
   switch (executionMode) {
   case "Interpreted"_jLower:
     currentExecMode = eExecutorMode::Interpreter;
-    break;
-  case "JIT"_jLower:
-    currentExecMode = eExecutorMode::JIT;
-    break;
-  case "Hybrid"_jLower:
-    currentExecMode = eExecutorMode::Hybrid;
     break;
   default:
     LOG_WARNING(Xenon, "Invalid execution mode '{}'! Defaulting to Interpreted", Config::highlyExperimental.cpuExecutor);
@@ -71,8 +64,6 @@ PPU::PPU(Xe::XCPU::XenonContext *inXenonContext, u64 resetVector, u32 PIR) :
 
   // Set Thread Timeout Register
   ppeState->SPR.TTR.hexValue = 0x4000; // Docs say that the recommended value is 16K instructions.
-
-  ppuJIT = std::make_unique<PPU_JIT>(this);
 
   // Asign global Xenon context
   xenonContext = inXenonContext;
@@ -127,7 +118,6 @@ PPU::~PPU() {
   // Kill the thread
   if (ppuThread.joinable())
     ppuThread.join();
-  ppuJIT.reset();
   ppeState.reset();
 }
 
@@ -158,9 +148,8 @@ void PPU::StartExecution(bool setHRMOR) {
 
   // Check for instruction tests.
   if (Config::xcpu.runInstrTests && ppeState->ppuID == 0) {
-    LOG_INFO(Xenon, "Starting PowerPC instruction tests. Testing backend: {}",
-      Config::xcpu.instrTestsMode ? "JITx86" : "Interpreter");
-    RunInstructionTests(ppeState.get(), ppuJIT.get(), static_cast<ePPUTestingMode>(Config::xcpu.instrTestsMode));
+    LOG_INFO(Xenon, "Starting PowerPC instruction tests. Testing backend: {}", "Interpreter");
+    RunInstructionTests(ppeState.get(), static_cast<ePPUTestingMode>(Config::xcpu.instrTestsMode));
   }
 
   // If we're PPU0,thread0 then enable THRD 0 and set Reset Vector.
@@ -299,17 +288,6 @@ void PPU::ThreadStateMachine() {
         curThreadId = ePPUThread_One;
         PPURunInstructions(ppeState->SPR.TTR.hexValue, ppuHaltOn != 0);
       }
-    } else {
-      if (!ppuThreadResetting && (state & ePPUThreadBit_Zero)) {
-        // Thread 1 is running, process instructions until we reach TTR timeout.
-        curThreadId = ePPUThread_Zero;
-        ppuJIT->ExecuteJITInstrs(ppeState->SPR.TTR.hexValue, ppuThreadActive, ppuHaltOn != 0);
-      }
-      if (!ppuThreadResetting && (state & ePPUThreadBit_One)) {
-        // Thread 1 is running, process instructions until we reach TTR timeout.
-        curThreadId = ePPUThread_One;
-        ppuJIT->ExecuteJITInstrs(ppeState->SPR.TTR.hexValue, ppuThreadActive, ppuHaltOn != 0);
-      }
     }
   } break;
   case eThreadState::Halted: {
@@ -329,21 +307,6 @@ void PPU::ThreadStateMachine() {
         curThreadId = ePPUThread_One;
         if (ppuStepAmount > 0) {
           PPURunInstructions(ppuStepAmount, false);
-          ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
-        }
-      }
-    } else {
-      if (state & ePPUThreadBit_Zero) {
-        curThreadId = ePPUThread_Zero;
-        if (ppuStepAmount > 0) {
-          ppuJIT->ExecuteJITInstrs(ppuStepAmount, ppuThreadActive, false);
-          ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
-        }
-      }
-      if (state & ePPUThreadBit_One) {
-        curThreadId = ePPUThread_One;
-        if (ppuStepAmount > 0) {
-          ppuJIT->ExecuteJITInstrs(ppuStepAmount, ppuThreadActive, false);
           ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
         }
       }
@@ -428,11 +391,7 @@ u32 PPU::GetIPS() {
 
   // Execute the amount of cycles we're requested
   while (auto timerEnd = std::chrono::steady_clock::now() <= timerStart + 1s) {
-    if (currentExecMode != eExecutorMode::Interpreter) {
-      ppuJIT->ExecuteJITInstrs(4, ppuThreadActive);
-      instrCount += 4;
-      continue;
-    } else {
+    if (currentExecMode == eExecutorMode::Interpreter) {
       PPUReadNextInstruction();
       PPCInterpreter::ppcExecuteSingleInstruction(ppeState.get());
     }

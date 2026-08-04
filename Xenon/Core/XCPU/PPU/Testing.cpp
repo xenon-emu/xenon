@@ -233,8 +233,8 @@ private:
 
 class TestRunner {
 public:
-  TestRunner(sPPEState *ppeStatePtr, PPU_JIT* ppuJITPtr, ePPUTestingMode testMode)
-    : ppeState(ppeStatePtr), currentTestMode(testMode), ppuJIT(ppuJITPtr) {
+  TestRunner(sPPEState *ppeStatePtr, ePPUTestingMode testMode)
+    : ppeState(ppeStatePtr), currentTestMode(testMode) {
   }
 
   ~TestRunner() {}
@@ -309,8 +309,6 @@ public:
           PPCInterpreter::ppcExecuteSingleInstruction(ppeState);
         }
       }
-    } else if (currentTestMode == ePPUTestingMode::JITx86) {
-      ppuJIT->ExecuteJITInstrs(0x100, true, false, true);
     }
 
 
@@ -435,7 +433,6 @@ public:
   }
 
   sPPEState *ppeState;
-  PPU_JIT *ppuJIT;
   ePPUTestingMode currentTestMode;
 };
 
@@ -477,7 +474,7 @@ void ProtectedRunTest(TestSuite &testSuite, TestRunner &runner,
   }
 }
 
-bool PPU::RunInstructionTests(sPPEState *ppeState, PPU_JIT* ppuJITPtr, ePPUTestingMode testMode) {
+bool PPU::RunInstructionTests(sPPEState *ppeState, ePPUTestingMode testMode) {
   s32 result = 1, failedTestsCount = 0, passedTestsCount = 0;
 
   // Setup paths.
@@ -513,7 +510,7 @@ bool PPU::RunInstructionTests(sPPEState *ppeState, PPU_JIT* ppuJITPtr, ePPUTesti
   }
 
   LOG_INFO(Xenon, "[Testing]: {} tests loaded.", testSuites.size());
-  TestRunner runner(ppeState, ppuJITPtr, testMode);
+  TestRunner runner(ppeState, testMode);
   for (auto &testSuite : testSuites) {
     LOG_INFO(Xenon, "[Testing]: {}.s:", testSuite.name());
     for (auto &testCase : testSuite.getTestCases()) {

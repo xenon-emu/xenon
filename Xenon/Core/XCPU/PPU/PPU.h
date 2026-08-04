@@ -11,13 +11,9 @@
 #include "Core/RootBus/RootBus.h"
 #include "Core/XCPU/MMU/XenonMMU.h"
 
-class PPU_JIT;
-
 // Describes the execution backends available for the PPU.
 enum class eExecutorMode : u8 {
   Interpreter,
-  JIT,
-  Hybrid
 };
 
 // Current PPU Thread State.
@@ -35,7 +31,6 @@ enum class eThreadState : u8 {
 // Current 'testing' mode. Used for execution backend testing.
 enum class ePPUTestingMode : u8 {
  Interpreter, // Regular interpreter mode
- JITx86,      // X86 JIT mode
 };
 
 // Power Procesing Unit. Main execution unit inside the PPE's within the Xenon CPU.
@@ -89,8 +84,6 @@ public:
 
   // Get ppeState
   sPPEState *GetPPUState() { return ppeState.get(); }
-  // Get ppuJIT
-  PPU_JIT *GetPPUJIT() { return ppuJIT.get(); }
 
   // Updates the current PPU's time base and decrementer based on
   // the amount of tb ticks given.
@@ -163,15 +156,6 @@ private:
   void PPUVXUnavailableException(sPPEState* ppeState);
 
   //
-  // JIT
-  //
-
-  std::unique_ptr<PPU_JIT> ppuJIT;
-  friend class PPU_JIT;
-  // Function call epilogue.
-  friend bool InstrEpilogue(PPU *ppu, sPPEState *ppeState);
-
-  //
   // Helpers
   //
  
@@ -194,5 +178,5 @@ private:
   //
   
   // Runs instruction tests on the desired backend.
-  bool RunInstructionTests(sPPEState* ppeState, PPU_JIT* ppuJITPtr, ePPUTestingMode testMode);
+  bool RunInstructionTests(sPPEState* ppeState, ePPUTestingMode testMode);
 };

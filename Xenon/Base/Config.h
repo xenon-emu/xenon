@@ -282,8 +282,6 @@ inline struct _highlyExperimental {
   eConsoleRevision consoleRevison = eConsoleRevision::Corona;
   // Executor modes:
   // Interpreted - Cached Interpreter
-  // Hybrid - JIT with Cached Interpreter fallback
-  // JIT - Just In Time
   std::string cpuExecutor = "Interpreted";
 
   // TOML Conversion
