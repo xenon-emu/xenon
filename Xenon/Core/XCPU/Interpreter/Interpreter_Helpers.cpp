@@ -69,11 +69,11 @@ void PPCInterpreter::ppcDebugLoadImageSymbols(sPPEState *ppeState,
   // Loaded module info.
   KD_SYMBOLS_INFO Kdinfo;
 
-  mmuReadString(ppeState, moduleNameAddress, moduleName, 128);
-  Kdinfo.BaseOfDll = MMURead32(ppeState, moduleInfoAddress);
-  Kdinfo.ProcessId = MMURead32(ppeState, moduleInfoAddress + 4);
-  Kdinfo.CheckSum = MMURead32(ppeState, moduleInfoAddress + 8);
-  Kdinfo.SizeOfImage = MMURead32(ppeState, moduleInfoAddress + 12);
+  ppeState->mmu->ReadString(moduleNameAddress, moduleName, 128);
+  Kdinfo.BaseOfDll = ppeState->mmu->MMURead32(moduleInfoAddress);
+  Kdinfo.ProcessId = ppeState->mmu->MMURead32(moduleInfoAddress + 4);
+  Kdinfo.CheckSum = ppeState->mmu->MMURead32(moduleInfoAddress + 8);
+  Kdinfo.SizeOfImage = ppeState->mmu->MMURead32(moduleInfoAddress + 12);
 
   Base::Log::NoFmtMessage(Base::Log::Class::DebugPrint, Base::Log::Level::Guest, "*** DebugLoadImageSymbols ***\n");
   Base::Log::NoFmtMessage(Base::Log::Class::DebugPrint, Base::Log::Level::Guest, FMT("Loaded: {} at address 0x{:X} - 0x{:X}\n", moduleName, Kdinfo.BaseOfDll, (Kdinfo.BaseOfDll + Kdinfo.SizeOfImage)));

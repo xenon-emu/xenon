@@ -116,9 +116,6 @@ private:
   // Main CPU Context.
   Xe::XCPU::XenonContext* xenonContext = nullptr;
 
-  // Xenon Memory Management Unit
-  std::unique_ptr<Xe::XCPU::MMU::XenonMMU> xenonMMU;
-
   // Initial reset vector
   u32 resetVector = 0;
 

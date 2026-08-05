@@ -402,7 +402,7 @@ void PPCInterpreter::PPCInterpreter_mtspr(sPPEState* ppeState) {
     case eXenonSPR::PPE_TLB_Index_Hint: curThread.SPR.PPE_TLB_Index_Hint.hexValue = GPRi(rd); break;
     case eXenonSPR::PPE_TLB_VPN:
       ppeState->SPR.PPE_TLB_VPN.hexValue = GPRi(rd);
-      mmuAddTlbEntry(ppeState);
+      ppeState->mmu->AddTlbEntry();
       break;
     case eXenonSPR::PPE_TLB_RPN: ppeState->SPR.PPE_TLB_RPN.hexValue = GPRi(rd); break;
     case eXenonSPR::HID0: ppeState->SPR.HID0.hexValue = GPRi(rd); break;

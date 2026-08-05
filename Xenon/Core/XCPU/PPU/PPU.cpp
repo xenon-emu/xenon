@@ -64,7 +64,8 @@ PPU::PPU(Xe::XCPU::XenonContext* inXenonContext, u64 resetVector, u32 PIR)
   // Asign global Xenon context
   xenonContext = inXenonContext;
 
-  xenonMMU = std::make_unique<STRIP_UNIQUE(xenonMMU)>(xenonContext);
+  // The PPE owns the MMU.
+  ppeState->mmu = std::make_shared<Xe::XCPU::MMU::XenonMMU>(xenonContext, ppeState.get());
 
   // If we have a specific halt address, set it here
   ppuHaltOn = Config::debug.haltOnAddress;
@@ -482,10 +483,10 @@ u64 PPU::loadElfImage(u8* data, u64 size) {
                "Loading 0x{:X} bytes from offset 0x{:X} in the ELF to address "
                "0x{:X}",
                filesize, file_offset, target_addr);
-      PPCInterpreter::MMUMemCpyFromHost(ppeState.get(), target_addr, data + file_offset, filesize);
+      ppeState->mmu->MMUMemCpyFromHost(target_addr, data + file_offset, filesize);
       if (memsize > filesize) { // Memory size greater than file, zero out remainder
         u64 remainder = memsize - filesize;
-        PPCInterpreter::MMUMemSet(ppeState.get(), target_addr + filesize, 0, remainder);
+        ppeState->mmu->MMUMemSet(target_addr + filesize, 0, remainder);
       }
     }
   }
@@ -508,7 +509,7 @@ bool PPU::PPUReadNextInstruction() {
   thread.NIA += 4;
   thread.instrFetch = true;
   // Fetch the instruction from memory
-  _instr.opcode = PPCInterpreter::MMURead32(ppeState.get(), thread.CIA, thrId);
+  _instr.opcode = ppeState->mmu->MMURead32(thread.CIA, thrId);
   if (_instr.opcode == 0xFFFFFFFF || _instr.opcode == 0xCDCDCDCD) {
     LOG_CRITICAL(Xenon,
                  "PPU{} returned an invalid opcode found. Data = {:#x}, PIA "
@@ -579,11 +580,11 @@ bool PPU::Simulate1Bl() {
 
   // Zero out Secure RAM:
   LOG_INFO(Xenon, " * Zeroing SRAM.");
-  PPCInterpreter::MMUMemSet(ppeState.get(), 0x10000, 0, 0x10000);
+  ppeState->mmu->MMUMemSet(0x10000, 0, 0x10000);
 
   // Verify CB's offset in NAND and fetch its header contents.
   // CB's offset should be stored in the NAND header at location 0x8.
-  u32 cbOffset = PPCInterpreter::MMURead32(ppeState.get(), NAND_MEMORY_MAPPED_ADDR + 8);
+  u32 cbOffset = ppeState->mmu->MMURead32(NAND_MEMORY_MAPPED_ADDR + 8);
 
   // Verification is nothing but a mere address alignment and a not zero check.
   if (cbOffset == 0) {
@@ -594,8 +595,7 @@ bool PPU::Simulate1Bl() {
   // Read CB header, we don't print anything as SFCX code should have already
   // done this.
   Xe::PCIDev::BL_HEADER cbHeader = {};
-  PPCInterpreter::MMURead(xenonContext, ppeState.get(), NAND_MEMORY_MAPPED_ADDR + cbOffset, 16,
-                          reinterpret_cast<u8*>(&cbHeader));
+  ppeState->mmu->MMURead(NAND_MEMORY_MAPPED_ADDR + cbOffset, 16, reinterpret_cast<u8*>(&cbHeader));
 
   // Byteswap header data.
   cbHeader.entryPoint = byteswap_be(cbHeader.entryPoint);
@@ -608,7 +608,7 @@ bool PPU::Simulate1Bl() {
   LOG_INFO(Xenon, " * Fetching CB data.");
   std::vector<u8> cbData;
   for (size_t idx = 0; idx < cbHeader.length; idx++) {
-    cbData.push_back(PPCInterpreter::MMURead8(ppeState.get(), NAND_MEMORY_MAPPED_ADDR + cbOffset + idx));
+    cbData.push_back(ppeState->mmu->MMURead8(NAND_MEMORY_MAPPED_ADDR + cbOffset + idx));
   }
 
   // Initialize HMAC key.

@@ -217,7 +217,7 @@ public:
 
   bool Setup(TestSuite& suite) {
     // Clear the RAM area at tests load address.
-    PPCInterpreter::MMUMemSet(ppeState, START_ADDRESS, 0x00000000, 0x1000);
+    ppeState->mmu->MMUMemSet(START_ADDRESS, 0x00000000, 0x1000);
 
     // Load the test binary into RAM.
     std::vector<u8> testBinData;
@@ -244,7 +244,7 @@ public:
       testBinData.resize(fileSize);
       file.read(reinterpret_cast<char*>(testBinData.data()), XE_SROM_SIZE);
       for (int idx = 0; idx < fileSize; ++idx) {
-        PPCInterpreter::MMUWrite8(ppeState, START_ADDRESS + idx, testBinData[idx]);
+        ppeState->mmu->MMUWrite8(START_ADDRESS + idx, testBinData[idx]);
       }
     }
     file.close();
@@ -270,7 +270,7 @@ public:
         // Increase next instruction address
         thread.NIA += 4;
         // Fetch the instruction from memory
-        thread.CI.opcode = PPCInterpreter::MMURead32(ppeState, thread.CIA, ppeState->currentThread);
+        thread.CI.opcode = ppeState->mmu->MMURead32(thread.CIA, ppeState->currentThread);
         if (thread.CI.opcode == 0xFFFFFFFF || thread.CI.opcode == 0xCDCDCDCD) {
           LOG_CRITICAL(Xenon, "[Testing]: Invalid opcode found.");
           return false;
@@ -325,7 +325,7 @@ public:
         auto addressStr = it.second.substr(0, spacePos);
         auto bytesStr = it.second.substr(spacePos + 1);
         u32 address = std::strtoul(addressStr.c_str(), nullptr, 16);
-        auto p = PPCInterpreter::MMUGetPointerFromRAM(address);
+        auto p = ppeState->mmu->MMUGetPointerFromRAM(address);
         const char* c = bytesStr.c_str();
         while (*c) {
           while (*c == ' ') ++c;
@@ -360,7 +360,7 @@ public:
         auto addressStr = it.second.substr(0, spacePos);
         auto bytesStr = it.second.substr(spacePos + 1);
         u32 address = std::strtoul(addressStr.c_str(), nullptr, 16);
-        auto baseAddress = PPCInterpreter::MMUGetPointerFromRAM(address);
+        auto baseAddress = ppeState->mmu->MMUGetPointerFromRAM(address);
         auto p = baseAddress;
         const char* c = bytesStr.c_str();
         bool failed = false;

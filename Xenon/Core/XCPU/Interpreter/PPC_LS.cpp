@@ -134,7 +134,7 @@ void PPCInterpreter::PPCInterpreter_dcbz(sPPEState* ppeState) {
   EA = EA & ~(128 - 1); // Cache line size
 
   // Temporarily disable caching
-  for (u8 n = 0; n < 128; n += sizeof(u64)) MMUWrite64(ppeState, EA + n, 0);
+  for (u8 n = 0; n < 128; n += sizeof(u64)) ppeState->mmu->MMUWrite64(EA + n, 0);
   return;
 
   // As far as I can tell, XCPU does all the crypto, scrambling of
@@ -157,7 +157,7 @@ void PPCInterpreter::PPCInterpreter_stb(sPPEState* ppeState) {
   */
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  MMUWrite8(ppeState, EA, static_cast<u8>(GPRi(rs)));
+  ppeState->mmu->MMUWrite8(EA, static_cast<u8>(GPRi(rs)));
 }
 
 // Store Byte with Update (x'9C00 0000')
@@ -168,7 +168,7 @@ void PPCInterpreter::PPCInterpreter_stbu(sPPEState* ppeState) {
   rA <- EA
   */
   const u64 EA = GPRi(ra) + _instr.simm16;
-  MMUWrite8(ppeState, EA, static_cast<u8>(GPRi(rs)));
+  ppeState->mmu->MMUWrite8(EA, static_cast<u8>(GPRi(rs)));
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -183,7 +183,7 @@ void PPCInterpreter::PPCInterpreter_stbux(sPPEState* ppeState) {
   rA <- EA
   */
   const u64 EA = GPRi(ra) + GPRi(rb);
-  MMUWrite8(ppeState, EA, static_cast<u8>(GPRi(rs)));
+  ppeState->mmu->MMUWrite8(EA, static_cast<u8>(GPRi(rs)));
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -199,7 +199,7 @@ void PPCInterpreter::PPCInterpreter_stbx(sPPEState* ppeState) {
   MEM(EA, 1) <- rS[56-63]
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite8(ppeState, EA, static_cast<u8>(GPRi(rs)));
+  ppeState->mmu->MMUWrite8(EA, static_cast<u8>(GPRi(rs)));
 }
 
 //
@@ -215,7 +215,7 @@ void PPCInterpreter::PPCInterpreter_sth(sPPEState* ppeState) {
   MEM(EA, 2) <- rS[48-6316-31]
   */
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  MMUWrite16(ppeState, EA, static_cast<u16>(GPRi(rs)));
+  ppeState->mmu->MMUWrite16(EA, static_cast<u16>(GPRi(rs)));
 }
 
 // Store Half Word Byte-Reverse Indexed (x'7C00 072C')
@@ -227,7 +227,7 @@ void PPCInterpreter::PPCInterpreter_sthbrx(sPPEState* ppeState) {
   MEM(EA, 2) <- rS[56-63] || rS[48-55]
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite16(ppeState, EA, byteswap_be<u16>(static_cast<u16>(GPRi(rs))));
+  ppeState->mmu->MMUWrite16(EA, byteswap_be<u16>(static_cast<u16>(GPRi(rs))));
 }
 
 // Store Half Word with Update (x'B400 0000')
@@ -238,7 +238,7 @@ void PPCInterpreter::PPCInterpreter_sthu(sPPEState* ppeState) {
   rA <- EA
   */
   const u64 EA = GPRi(ra) + _instr.simm16;
-  MMUWrite16(ppeState, EA, static_cast<u16>(GPRi(rs)));
+  ppeState->mmu->MMUWrite16(EA, static_cast<u16>(GPRi(rs)));
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -253,7 +253,7 @@ void PPCInterpreter::PPCInterpreter_sthux(sPPEState* ppeState) {
   rA <- EA
   */
   const u64 EA = GPRi(ra) + GPRi(rb);
-  MMUWrite16(ppeState, EA, static_cast<u16>(GPRi(rs)));
+  ppeState->mmu->MMUWrite16(EA, static_cast<u16>(GPRi(rs)));
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -269,7 +269,7 @@ void PPCInterpreter::PPCInterpreter_sthx(sPPEState* ppeState) {
   MEM(EA, 2) <- rS[48-63]
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite16(ppeState, EA, static_cast<u16>(GPRi(rs)));
+  ppeState->mmu->MMUWrite16(EA, static_cast<u16>(GPRi(rs)));
 }
 
 // Store Multiple Word (x'BC00 0000')
@@ -286,7 +286,7 @@ void PPCInterpreter::PPCInterpreter_stmw(sPPEState* ppeState) {
   */
 
   u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  for (u32 idx = _instr.rs; idx < 32; ++idx, EA += 4) { MMUWrite32(ppeState, EA, static_cast<u32>(GPR(idx))); }
+  for (u32 idx = _instr.rs; idx < 32; ++idx, EA += 4) { ppeState->mmu->MMUWrite32(EA, static_cast<u32>(GPR(idx))); }
 }
 
 // Store String Word Immediate (x'7C00 05AA')
@@ -313,14 +313,14 @@ void PPCInterpreter::PPCInterpreter_stswi(sPPEState* ppeState) {
 
   while (N > 0) {
     if (N > 3) {
-      MMUWrite32(ppeState, EA, static_cast<u32>(GPR(reg)));
+      ppeState->mmu->MMUWrite32(EA, static_cast<u32>(GPR(reg)));
       EA += 4;
       N -= 4;
     } else {
       u32 buf = static_cast<u32>(GPR(reg));
       while (N > 0) {
         N = N - 1;
-        MMUWrite8(ppeState, EA, (0xFF000000 & buf) >> 24);
+        ppeState->mmu->MMUWrite8(EA, (0xFF000000 & buf) >> 24);
         buf <<= 8;
         EA++;
       }
@@ -342,7 +342,7 @@ void PPCInterpreter::PPCInterpreter_stw(sPPEState* ppeState) {
   MEM(EA, 4) <- rS[32-63]
   */
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  MMUWrite32(ppeState, EA, static_cast<u32>(GPRi(rs)));
+  ppeState->mmu->MMUWrite32(EA, static_cast<u32>(GPRi(rs)));
 }
 
 // Store Word Byte-Reverse Indexed (x'7C00 052C')
@@ -354,7 +354,7 @@ void PPCInterpreter::PPCInterpreter_stwbrx(sPPEState* ppeState) {
   MEM(EA, 4) <- rS[56-63] || rS[48-55] || rS[40-47] || rS[32-39]
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite32(ppeState, EA, byteswap_be<u32>(static_cast<u32>(GPRi(rs))));
+  ppeState->mmu->MMUWrite32(EA, byteswap_be<u32>(static_cast<u32>(GPRi(rs))));
 }
 
 // Store Word Conditional Indexed (x'7C00 012D')
@@ -384,7 +384,7 @@ void PPCInterpreter::PPCInterpreter_stwcx(sPPEState* ppeState) {
   if (curThread.SPR.XER.SO) BSET(CR, 4, CR_BIT_SO);
 
   // Translate address
-  MMUTranslateAddress(&RA, ppeState, true);
+  ppeState->mmu->MMUTranslateAddress(&RA, true);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -392,7 +392,7 @@ void PPCInterpreter::PPCInterpreter_stwcx(sPPEState* ppeState) {
     xenonContext->xenonRes.LockGuard([&] {
       if (curThread.ppuRes->valid) {
         if (curThread.ppuRes->reservedAddr == RA) {
-          MMUWrite32(ppeState, EA, static_cast<u32>(GPRi(rs)));
+          ppeState->mmu->MMUWrite32(EA, static_cast<u32>(GPRi(rs)));
           BSET(CR, 4, CR_BIT_EQ);
         } else {
           xenonContext->xenonRes.Decrement();
@@ -413,7 +413,7 @@ void PPCInterpreter::PPCInterpreter_stwu(sPPEState* ppeState) {
   rA <- EA
   */
   const u64 EA = GPRi(ra) + _instr.simm16;
-  MMUWrite32(ppeState, EA, static_cast<u32>(GPRi(rs)));
+  ppeState->mmu->MMUWrite32(EA, static_cast<u32>(GPRi(rs)));
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -428,7 +428,7 @@ void PPCInterpreter::PPCInterpreter_stwux(sPPEState* ppeState) {
   rA <- EA
   */
   const u64 EA = GPRi(ra) + GPRi(rb);
-  MMUWrite32(ppeState, EA, static_cast<u32>(GPRi(rs)));
+  ppeState->mmu->MMUWrite32(EA, static_cast<u32>(GPRi(rs)));
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -444,7 +444,7 @@ void PPCInterpreter::PPCInterpreter_stwx(sPPEState* ppeState) {
   MEM(EA, 4) <- rS[32-63]
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite32(ppeState, EA, static_cast<u32>(GPRi(rs)));
+  ppeState->mmu->MMUWrite32(EA, static_cast<u32>(GPRi(rs)));
 }
 
 //
@@ -460,7 +460,7 @@ void PPCInterpreter::PPCInterpreter_std(sPPEState* ppeState) {
   (MEM(EA, 8)) <- (rS)
   */
   const u64 EA = (_instr.simm16 & ~3) + (_instr.ra ? GPRi(ra) : 0);
-  MMUWrite64(ppeState, EA, GPRi(rs));
+  ppeState->mmu->MMUWrite64(EA, GPRi(rs));
 }
 
 // Store Double Word Conditional Indexed (x'7C00 01AD')
@@ -489,7 +489,7 @@ void PPCInterpreter::PPCInterpreter_stdcx(sPPEState* ppeState) {
 
   // TODO: If the address is not aligned by 4, then we must issue a trap.
 
-  MMUTranslateAddress(&RA, ppeState, true);
+  ppeState->mmu->MMUTranslateAddress(&RA, true);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -497,7 +497,7 @@ void PPCInterpreter::PPCInterpreter_stdcx(sPPEState* ppeState) {
     xenonContext->xenonRes.LockGuard([&] {
       if (curThread.ppuRes->valid) {
         if (curThread.ppuRes->reservedAddr == RA) {
-          MMUWrite64(ppeState, EA, GPRi(rd));
+          ppeState->mmu->MMUWrite64(EA, GPRi(rd));
           BSET(CR, 4, CR_BIT_EQ);
         } else {
           xenonContext->xenonRes.Decrement();
@@ -518,7 +518,7 @@ void PPCInterpreter::PPCInterpreter_stdu(sPPEState* ppeState) {
   rA <- EA
   */
   const u64 EA = GPRi(ra) + (_instr.simm16 & ~3);
-  MMUWrite64(ppeState, EA, GPRi(rs));
+  ppeState->mmu->MMUWrite64(EA, GPRi(rs));
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -533,7 +533,7 @@ void PPCInterpreter::PPCInterpreter_stdux(sPPEState* ppeState) {
   rA <- EA
   */
   const u64 EA = GPRi(ra) + GPRi(rb);
-  MMUWrite64(ppeState, EA, GPRi(rs));
+  ppeState->mmu->MMUWrite64(EA, GPRi(rs));
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -549,7 +549,7 @@ void PPCInterpreter::PPCInterpreter_stdx(sPPEState* ppeState) {
   (MEM(EA, 8)) <- (rS)
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite64(ppeState, EA, GPRi(rs));
+  ppeState->mmu->MMUWrite64(EA, GPRi(rs));
 }
 
 //
@@ -568,7 +568,7 @@ void PPCInterpreter::PPCInterpreter_stfs(sPPEState* ppeState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  MMUWrite32(ppeState, EA, ConvertToSingle(FPRi(frs).asU64()));
+  ppeState->mmu->MMUWrite32(EA, ConvertToSingle(FPRi(frs).asU64()));
 }
 
 // Store Floating-Point Single with Update (x'D400 0000')
@@ -582,7 +582,7 @@ void PPCInterpreter::PPCInterpreter_stfsu(sPPEState* ppeState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  MMUWrite32(ppeState, EA, ConvertToSingle(FPRi(frs).asU64()));
+  ppeState->mmu->MMUWrite32(EA, ConvertToSingle(FPRi(frs).asU64()));
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -600,7 +600,7 @@ void PPCInterpreter::PPCInterpreter_stfsux(sPPEState* ppeState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite32(ppeState, EA, ConvertToSingle(FPRi(frs).asU64()));
+  ppeState->mmu->MMUWrite32(EA, ConvertToSingle(FPRi(frs).asU64()));
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -619,7 +619,7 @@ void PPCInterpreter::PPCInterpreter_stfsx(sPPEState* ppeState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite32(ppeState, EA, ConvertToSingle(FPRi(frs).asU64()));
+  ppeState->mmu->MMUWrite32(EA, ConvertToSingle(FPRi(frs).asU64()));
 }
 
 // Store Floating-Point Double (x'D800 0000')
@@ -634,7 +634,7 @@ void PPCInterpreter::PPCInterpreter_stfd(sPPEState* ppeState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra || 1 ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  MMUWrite64(ppeState, EA, FPRi(frs).asU64());
+  ppeState->mmu->MMUWrite64(EA, FPRi(frs).asU64());
 }
 
 // Store Floating-Point Double Indexed
@@ -649,7 +649,7 @@ void PPCInterpreter::PPCInterpreter_stfdx(sPPEState* ppeState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra || 1 ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite64(ppeState, EA, FPRi(frs).asU64());
+  ppeState->mmu->MMUWrite64(EA, FPRi(frs).asU64());
 }
 
 // Store Floating-Point Double with Update
@@ -663,7 +663,7 @@ void PPCInterpreter::PPCInterpreter_stfdu(sPPEState* ppeState) {
   CHECK_FPU;
 
   const u64 EA = GPRi(ra) + _instr.simm16;
-  MMUWrite64(ppeState, EA, FPRi(frs).asU64());
+  ppeState->mmu->MMUWrite64(EA, FPRi(frs).asU64());
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -681,7 +681,7 @@ void PPCInterpreter::PPCInterpreter_stfdux(sPPEState* ppeState) {
   CHECK_FPU;
 
   const u64 EA = GPRi(ra) + GPRi(rb);
-  MMUWrite64(ppeState, EA, FPRi(frs).asU64());
+  ppeState->mmu->MMUWrite64(EA, FPRi(frs).asU64());
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -700,7 +700,7 @@ void PPCInterpreter::PPCInterpreter_stfiwx(sPPEState* ppeState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  MMUWrite32(ppeState, EA, FPRi(frs).asU32());
+  ppeState->mmu->MMUWrite32(EA, FPRi(frs).asU32());
 }
 
 //
@@ -722,10 +722,10 @@ void PPCInterpreter::PPCInterpreter_stvx(sPPEState* ppeState) {
 
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
 
-  MMUWrite32(ppeState, EA, VRi(vs).dword[0]);
-  MMUWrite32(ppeState, EA + (sizeof(u32) * 1), VRi(vs).dword[1]);
-  MMUWrite32(ppeState, EA + (sizeof(u32) * 2), VRi(vs).dword[2]);
-  MMUWrite32(ppeState, EA + (sizeof(u32) * 3), VRi(vs).dword[3]);
+  ppeState->mmu->MMUWrite32(EA, VRi(vs).dword[0]);
+  ppeState->mmu->MMUWrite32(EA + (sizeof(u32) * 1), VRi(vs).dword[1]);
+  ppeState->mmu->MMUWrite32(EA + (sizeof(u32) * 2), VRi(vs).dword[2]);
+  ppeState->mmu->MMUWrite32(EA + (sizeof(u32) * 3), VRi(vs).dword[3]);
 }
 
 // Store Vector Indexed 128
@@ -734,10 +734,10 @@ void PPCInterpreter::PPCInterpreter_stvx128(sPPEState* ppeState) {
 
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
 
-  MMUWrite32(ppeState, EA, VR(VMX128_1_VD128).dword[0]);
-  MMUWrite32(ppeState, EA + (sizeof(u32) * 1), VR(VMX128_1_VD128).dword[1]);
-  MMUWrite32(ppeState, EA + (sizeof(u32) * 2), VR(VMX128_1_VD128).dword[2]);
-  MMUWrite32(ppeState, EA + (sizeof(u32) * 3), VR(VMX128_1_VD128).dword[3]);
+  ppeState->mmu->MMUWrite32(EA, VR(VMX128_1_VD128).dword[0]);
+  ppeState->mmu->MMUWrite32(EA + (sizeof(u32) * 1), VR(VMX128_1_VD128).dword[1]);
+  ppeState->mmu->MMUWrite32(EA + (sizeof(u32) * 2), VR(VMX128_1_VD128).dword[2]);
+  ppeState->mmu->MMUWrite32(EA + (sizeof(u32) * 3), VR(VMX128_1_VD128).dword[3]);
 }
 
 // Store Vector Element Word Indexed (x'7C00 018E')
@@ -757,7 +757,7 @@ void PPCInterpreter::PPCInterpreter_stvewx(sPPEState* ppeState) {
   u64 EA = ((_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~3);
   const u8 eb = EA & 0xF;
 
-  MMUWrite32(ppeState, EA, VRi(vd).dword[eb / 4]);
+  ppeState->mmu->MMUWrite32(EA, VRi(vd).dword[eb / 4]);
 }
 
 // Store Vector Element Word Indexed 128
@@ -767,7 +767,7 @@ void PPCInterpreter::PPCInterpreter_stvewx128(sPPEState* ppeState) {
   u64 EA = ((_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~3);
   const u8 eb = EA & 0xF;
 
-  MMUWrite32(ppeState, EA, VR(VMX128_1_VD128).dword[eb / 4]);
+  ppeState->mmu->MMUWrite32(EA, VR(VMX128_1_VD128).dword[eb / 4]);
 }
 
 // Store Vector Right Indexed
@@ -789,7 +789,7 @@ void PPCInterpreter::PPCInterpreter_stvrx(sPPEState* ppeState) {
   vec.dword[3] = byteswap_be<u32>(vec.dword[3]);
 
   auto bytes = vec.bytes;
-  for (u32 i = 0; i < eb; ++i) { MMUWrite8(ppeState, EA + i, bytes[(16 - eb) + i]); }
+  for (u32 i = 0; i < eb; ++i) { ppeState->mmu->MMUWrite8(EA + i, bytes[(16 - eb) + i]); }
 }
 
 // Store Vector Right Indexed 128
@@ -811,7 +811,7 @@ void PPCInterpreter::PPCInterpreter_stvrx128(sPPEState* ppeState) {
   vec.dword[3] = byteswap_be<u32>(vec.dword[3]);
 
   auto bytes = vec.bytes;
-  for (u32 i = 0; i < eb; ++i) { MMUWrite8(ppeState, EA + i, bytes[(16 - eb) + i]); }
+  for (u32 i = 0; i < eb; ++i) { ppeState->mmu->MMUWrite8(EA + i, bytes[(16 - eb) + i]); }
 }
 
 // Store Vector Left Indexed
@@ -829,7 +829,7 @@ void PPCInterpreter::PPCInterpreter_stvlx(sPPEState* ppeState) {
   vec.dword[3] = byteswap_be<u32>(vec.dword[3]);
 
   auto bytes = vec.bytes;
-  for (int i = 0; i < 16 - eb; ++i) { MMUWrite8(ppeState, EA + i, bytes[i]); }
+  for (int i = 0; i < 16 - eb; ++i) { ppeState->mmu->MMUWrite8(EA + i, bytes[i]); }
 }
 
 // Store Vector Left Indexed 128
@@ -846,7 +846,7 @@ void PPCInterpreter::PPCInterpreter_stvlx128(sPPEState* ppeState) {
   vec.dword[3] = byteswap_be<u32>(vec.dword[3]);
 
   auto bytes = vec.bytes;
-  for (int i = 0; i < 16 - eb; ++i) { MMUWrite8(ppeState, EA + i, bytes[i]); }
+  for (int i = 0; i < 16 - eb; ++i) { ppeState->mmu->MMUWrite8(EA + i, bytes[i]); }
 }
 
 // Store Vector Left Indexed LRU 128
@@ -863,7 +863,7 @@ void PPCInterpreter::PPCInterpreter_stvlxl128(sPPEState* ppeState) {
   vec.dword[3] = byteswap_be<u32>(vec.dword[3]);
 
   auto bytes = vec.bytes;
-  for (int i = 0; i < 16 - eb; ++i) { MMUWrite8(ppeState, EA + i, bytes[i]); }
+  for (int i = 0; i < 16 - eb; ++i) { ppeState->mmu->MMUWrite8(EA + i, bytes[i]); }
 }
 
 // Store Vector Indexed LRU (x'7C00 03CE')
@@ -881,10 +881,10 @@ void PPCInterpreter::PPCInterpreter_stvxl(sPPEState* ppeState) {
 
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
 
-  MMUWrite32(ppeState, EA, VRi(vs).dword[0]);
-  MMUWrite32(ppeState, EA + (sizeof(u32) * 1), VRi(vs).dword[1]);
-  MMUWrite32(ppeState, EA + (sizeof(u32) * 2), VRi(vs).dword[2]);
-  MMUWrite32(ppeState, EA + (sizeof(u32) * 3), VRi(vs).dword[3]);
+  ppeState->mmu->MMUWrite32(EA, VRi(vs).dword[0]);
+  ppeState->mmu->MMUWrite32(EA + (sizeof(u32) * 1), VRi(vs).dword[1]);
+  ppeState->mmu->MMUWrite32(EA + (sizeof(u32) * 2), VRi(vs).dword[2]);
+  ppeState->mmu->MMUWrite32(EA + (sizeof(u32) * 3), VRi(vs).dword[3]);
 }
 
 //
@@ -900,7 +900,7 @@ void PPCInterpreter::PPCInterpreter_lbz(sPPEState* ppeState) {
   rD <- (56)0 || MEM(EA, 1)
   */
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  const u8 data = MMURead8(ppeState, EA);
+  const u8 data = ppeState->mmu->MMURead8(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -915,7 +915,7 @@ void PPCInterpreter::PPCInterpreter_lbzu(sPPEState* ppeState) {
   rA <- EA
   */
   const u64 EA = GPRi(ra) + _instr.simm16;
-  const u8 data = MMURead8(ppeState, EA);
+  const u8 data = ppeState->mmu->MMURead8(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -931,7 +931,7 @@ void PPCInterpreter::PPCInterpreter_lbzux(sPPEState* ppeState) {
   rA <- EA
   */
   const u64 EA = GPRi(ra) + GPRi(rb);
-  const u8 data = MMURead8(ppeState, EA);
+  const u8 data = ppeState->mmu->MMURead8(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -948,7 +948,7 @@ void PPCInterpreter::PPCInterpreter_lbzx(sPPEState* ppeState) {
   rD <- (56)0 || MEM(EA, 1)
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u8 data = MMURead8(ppeState, EA);
+  const u8 data = ppeState->mmu->MMURead8(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -968,7 +968,7 @@ void PPCInterpreter::PPCInterpreter_lha(sPPEState* ppeState) {
   rD <- EXTS(MEM(EA, 2))
   */
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  const u16 unsignedWord = MMURead16(ppeState, EA);
+  const u16 unsignedWord = ppeState->mmu->MMURead16(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -983,7 +983,7 @@ void PPCInterpreter::PPCInterpreter_lhau(sPPEState* ppeState) {
   rA <- EA
   */
   const u64 EA = GPRi(ra) + _instr.simm16;
-  const u16 unsignedWord = MMURead16(ppeState, EA);
+  const u16 unsignedWord = ppeState->mmu->MMURead16(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -999,7 +999,7 @@ void PPCInterpreter::PPCInterpreter_lhaux(sPPEState* ppeState) {
   rA <- EA
   */
   const u64 EA = GPRi(ra) + GPRi(rb);
-  const u16 unsignedWord = MMURead16(ppeState, EA);
+  const u16 unsignedWord = ppeState->mmu->MMURead16(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1016,7 +1016,7 @@ void PPCInterpreter::PPCInterpreter_lhax(sPPEState* ppeState) {
   rD <- EXTS(MEM(EA, 2))
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u16 unsignedWord = MMURead16(ppeState, EA);
+  const u16 unsignedWord = ppeState->mmu->MMURead16(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1032,7 +1032,7 @@ void PPCInterpreter::PPCInterpreter_lhbrx(sPPEState* ppeState) {
   rD <- (48)0 || MEM(EA + 1, 1) || MEM(EA, 1)
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u16 data = MMURead16(ppeState, EA);
+  const u16 data = ppeState->mmu->MMURead16(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1048,7 +1048,7 @@ void PPCInterpreter::PPCInterpreter_lhz(sPPEState* ppeState) {
   rD <- (48)0 || MEM(EA, 2)
   */
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  const u16 data = MMURead16(ppeState, EA);
+  const u16 data = ppeState->mmu->MMURead16(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1063,7 +1063,7 @@ void PPCInterpreter::PPCInterpreter_lhzu(sPPEState* ppeState) {
   rA <- EA
   */
   const u64 EA = GPRi(ra) + _instr.simm16;
-  const u16 data = MMURead16(ppeState, EA);
+  const u16 data = ppeState->mmu->MMURead16(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1079,7 +1079,7 @@ void PPCInterpreter::PPCInterpreter_lhzux(sPPEState* ppeState) {
   rA <- EA
   */
   const u64 EA = GPRi(ra) + GPRi(rb);
-  const u16 data = MMURead16(ppeState, EA);
+  const u16 data = ppeState->mmu->MMURead16(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1096,7 +1096,7 @@ void PPCInterpreter::PPCInterpreter_lhzx(sPPEState* ppeState) {
   rD <- (48)0 || MEM(EA, 2)
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u16 data = MMURead16(ppeState, EA);
+  const u16 data = ppeState->mmu->MMURead16(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1120,7 +1120,7 @@ void PPCInterpreter::PPCInterpreter_lmw(sPPEState* ppeState) {
     EA <- EA + 4
   */
   u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  for (u32 idx = _instr.rd; idx < 32; ++idx, EA += 4) { GPR(idx) = MMURead32(ppeState, EA); }
+  for (u32 idx = _instr.rd; idx < 32; ++idx, EA += 4) { GPR(idx) = ppeState->mmu->MMURead32(EA); }
 }
 
 // Load String Word Immediate (x'7C00 04AA')
@@ -1148,7 +1148,7 @@ void PPCInterpreter::PPCInterpreter_lswi(sPPEState* ppeState) {
 
   while (N > 0) {
     if (N > 3) {
-      GPR(reg) = MMURead32(ppeState, EA);
+      GPR(reg) = ppeState->mmu->MMURead32(EA);
       EA += 4;
       N -= 4;
     } else {
@@ -1156,7 +1156,7 @@ void PPCInterpreter::PPCInterpreter_lswi(sPPEState* ppeState) {
       u32 i = 3;
       while (N > 0) {
         N = N - 1;
-        buf |= MMURead8(ppeState, EA) << (i * 8);
+        buf |= ppeState->mmu->MMURead8(EA) << (i * 8);
         EA++;
         i--;
       }
@@ -1179,7 +1179,7 @@ void PPCInterpreter::PPCInterpreter_lwa(sPPEState* ppeState) {
   rD <- EXTS(MEM(EA, 4))
   */
   const u64 EA = (_instr.simm16 & ~3) + (_instr.ra ? GPRi(ra) : 0);
-  const u32 unsignedWord = MMURead32(ppeState, EA);
+  const u32 unsignedWord = ppeState->mmu->MMURead32(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1201,7 +1201,7 @@ void PPCInterpreter::PPCInterpreter_lwarx(sPPEState* ppeState) {
 
   // TODO: If address is not aligned by 4, then we must issue a trap.
 
-  MMUTranslateAddress(&RA, ppeState, false);
+  ppeState->mmu->MMUTranslateAddress(&RA, false);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1209,7 +1209,7 @@ void PPCInterpreter::PPCInterpreter_lwarx(sPPEState* ppeState) {
   curThread.ppuRes->reservedAddr = RA;
   xenonContext->xenonRes.Increment();
 
-  u32 data = MMURead32(ppeState, EA);
+  u32 data = ppeState->mmu->MMURead32(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1225,7 +1225,7 @@ void PPCInterpreter::PPCInterpreter_lwax(sPPEState* ppeState) {
   rD <- EXTS(MEM(EA, 4))
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u32 unsignedWord = MMURead32(ppeState, EA);
+  const u32 unsignedWord = ppeState->mmu->MMURead32(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1240,7 +1240,7 @@ void PPCInterpreter::PPCInterpreter_lwaux(sPPEState* ppeState) {
   rA <- EA
   */
   const u64 EA = GPRi(ra) + GPRi(rb);
-  const u32 unsignedWord = MMURead32(ppeState, EA);
+  const u32 unsignedWord = ppeState->mmu->MMURead32(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1257,7 +1257,7 @@ void PPCInterpreter::PPCInterpreter_lwbrx(sPPEState* ppeState) {
   rD <- (32)0 || MEM(EA + 3, 1) || MEM(EA + 2, 1) || MEM(EA + 1, 1) || MEM(EA, 1)
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u32 data = MMURead32(ppeState, EA);
+  const u32 data = ppeState->mmu->MMURead32(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1273,7 +1273,7 @@ void PPCInterpreter::PPCInterpreter_lwz(sPPEState* ppeState) {
   rD <- (32)0 || MEM(EA, 4)
   */
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  const u32 data = MMURead32(ppeState, EA);
+  const u32 data = ppeState->mmu->MMURead32(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1288,7 +1288,7 @@ void PPCInterpreter::PPCInterpreter_lwzu(sPPEState* ppeState) {
   rA <- EA
   */
   const u64 EA = GPRi(ra) + _instr.simm16;
-  const u32 data = MMURead32(ppeState, EA);
+  const u32 data = ppeState->mmu->MMURead32(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1304,7 +1304,7 @@ void PPCInterpreter::PPCInterpreter_lwzux(sPPEState* ppeState) {
   rA <- EA
   */
   const u64 EA = GPRi(ra) + GPRi(rb);
-  const u32 data = MMURead32(ppeState, EA);
+  const u32 data = ppeState->mmu->MMURead32(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1321,7 +1321,7 @@ void PPCInterpreter::PPCInterpreter_lwzx(sPPEState* ppeState) {
   rD <- (32)0 || MEM(EA, 4)
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u32 data = MMURead32(ppeState, EA);
+  const u32 data = ppeState->mmu->MMURead32(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1341,7 +1341,7 @@ void PPCInterpreter::PPCInterpreter_ld(sPPEState* ppeState) {
   rD <- MEM(EA, 8)
   */
   const u64 EA = (_instr.simm16 & ~3) + (_instr.ra ? GPRi(ra) : 0);
-  const u64 data = MMURead64(ppeState, EA);
+  const u64 data = ppeState->mmu->MMURead64(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1353,7 +1353,7 @@ void PPCInterpreter::PPCInterpreter_ldbrx(sPPEState* ppeState) {
   // TODO(bitsh1ft3r): Add instruction def and check for that ~7 to be correct
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   const u64 RA = EA & ~7;
-  const u64 data = MMURead64(ppeState, EA);
+  const u64 data = ppeState->mmu->MMURead64(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1375,7 +1375,7 @@ void PPCInterpreter::PPCInterpreter_ldarx(sPPEState* ppeState) {
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
   u64 RA = EA & ~7;
 
-  MMUTranslateAddress(&RA, ppeState, false);
+  ppeState->mmu->MMUTranslateAddress(&RA, false);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1383,7 +1383,7 @@ void PPCInterpreter::PPCInterpreter_ldarx(sPPEState* ppeState) {
   curThread.ppuRes->valid = true;
   xenonContext->xenonRes.Increment();
 
-  const u64 data = MMURead64(ppeState, EA);
+  const u64 data = ppeState->mmu->MMURead64(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1398,7 +1398,7 @@ void PPCInterpreter::PPCInterpreter_ldu(sPPEState* ppeState) {
   rA <- EA
   */
   const u64 EA = GPRi(ra) + (_instr.simm16 & ~3);
-  const u64 data = MMURead64(ppeState, EA);
+  const u64 data = ppeState->mmu->MMURead64(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1414,7 +1414,7 @@ void PPCInterpreter::PPCInterpreter_ldux(sPPEState* ppeState) {
   rA <- EA
   */
   const u64 EA = GPRi(ra) + GPRi(rb);
-  const u64 data = MMURead64(ppeState, EA);
+  const u64 data = ppeState->mmu->MMURead64(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1431,7 +1431,7 @@ void PPCInterpreter::PPCInterpreter_ldx(sPPEState* ppeState) {
   rD <- MEM(EA, 8)
   */
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u64 data = MMURead64(ppeState, EA);
+  const u64 data = ppeState->mmu->MMURead64(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1450,7 +1450,7 @@ void PPCInterpreter::PPCInterpreter_lfsx(sPPEState* ppeState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u32 data = MMURead32(ppeState, EA);
+  const u32 data = ppeState->mmu->MMURead32(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1470,7 +1470,7 @@ void PPCInterpreter::PPCInterpreter_lfsux(sPPEState* ppeState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u32 data = MMURead32(ppeState, EA);
+  const u32 data = ppeState->mmu->MMURead32(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1491,7 +1491,7 @@ void PPCInterpreter::PPCInterpreter_lfd(sPPEState* ppeState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
-  const u64 data = MMURead64(ppeState, EA);
+  const u64 data = ppeState->mmu->MMURead64(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1510,7 +1510,7 @@ void PPCInterpreter::PPCInterpreter_lfdx(sPPEState* ppeState) {
   CHECK_FPU;
 
   const u64 EA = _instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb);
-  const u64 data = MMURead64(ppeState, EA);
+  const u64 data = ppeState->mmu->MMURead64(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1528,7 +1528,7 @@ void PPCInterpreter::PPCInterpreter_lfdu(sPPEState* ppeState) {
   CHECK_FPU;
 
   const u64 EA = GPRi(ra) + _instr.simm16;
-  const u64 data = MMURead64(ppeState, EA);
+  const u64 data = ppeState->mmu->MMURead64(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1547,7 +1547,7 @@ void PPCInterpreter::PPCInterpreter_lfdux(sPPEState* ppeState) {
   CHECK_FPU;
 
   const u64 EA = GPRi(ra) + GPRi(rb);
-  const u64 data = MMURead64(ppeState, EA);
+  const u64 data = ppeState->mmu->MMURead64(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1568,7 +1568,7 @@ void PPCInterpreter::PPCInterpreter_lfs(sPPEState* ppeState) {
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
 
-  u32 data = MMURead32(ppeState, EA);
+  u32 data = ppeState->mmu->MMURead32(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1589,7 +1589,7 @@ void PPCInterpreter::PPCInterpreter_lfsu(sPPEState* ppeState) {
 
   const u64 EA = _instr.ra ? GPRi(ra) + _instr.simm16 : _instr.simm16;
 
-  u32 data = MMURead32(ppeState, EA);
+  u32 data = ppeState->mmu->MMURead32(EA);
 
   if (curThread.HasExc(ppuDataSegmentEx) || curThread.HasExc(ppuDataStorageEx)) return;
 
@@ -1621,10 +1621,10 @@ void PPCInterpreter::PPCInterpreter_lvebx(sPPEState* ppeState) {
 
   Vector128 vector = {};
 
-  vector.dword[0] = MMURead32(ppeState, EA);
-  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = ppeState->mmu->MMURead32(EA);
+  vector.dword[1] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 1));
+  vector.dword[2] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 2));
+  vector.dword[3] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   LOG_DEBUG(Xenon, "lvebx [EA = {:#x}, eb = {:#x} data = {:#x}]", (u32)EA, eb, data);
@@ -1653,10 +1653,10 @@ void PPCInterpreter::PPCInterpreter_lvehx(sPPEState* ppeState) {
 
   Vector128 vector = {};
 
-  vector.dword[0] = MMURead32(ppeState, EA);
-  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = ppeState->mmu->MMURead32(EA);
+  vector.dword[1] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 1));
+  vector.dword[2] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 2));
+  vector.dword[3] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   LOG_DEBUG(Xenon, "lvehx [EA = {:#x}, eb = {:#x} data = {:#x}]", (u32)EA, eb, data);
@@ -1686,10 +1686,10 @@ void PPCInterpreter::PPCInterpreter_lvewx(sPPEState* ppeState) {
 
   Vector128 vector = {};
 
-  vector.dword[0] = MMURead32(ppeState, EA);
-  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = ppeState->mmu->MMURead32(EA);
+  vector.dword[1] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 1));
+  vector.dword[2] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 2));
+  vector.dword[3] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   LOG_DEBUG(Xenon, "lvewx [EA = {:#x}, eb = {:#x} data = {:#x}]", (u32)EA, eb, data);
@@ -1708,10 +1708,10 @@ void PPCInterpreter::PPCInterpreter_lvewx128(sPPEState* ppeState) {
 
   Vector128 vector = {};
 
-  vector.dword[0] = MMURead32(ppeState, EA);
-  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = ppeState->mmu->MMURead32(EA);
+  vector.dword[1] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 1));
+  vector.dword[2] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 2));
+  vector.dword[3] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   LOG_DEBUG(Xenon, "lvewx128 [EA = {:#x}, eb = {:#x} data = {:#x}]", (u32)EA, eb, data);
@@ -1738,10 +1738,10 @@ void PPCInterpreter::PPCInterpreter_lvx(sPPEState* ppeState) {
   Vector128 vector{};
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
 
-  vector.dword[0] = MMURead32(ppeState, EA);
-  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = ppeState->mmu->MMURead32(EA);
+  vector.dword[1] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 1));
+  vector.dword[2] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 2));
+  vector.dword[3] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   u8 vrd = _instr.vd;
@@ -1762,10 +1762,10 @@ void PPCInterpreter::PPCInterpreter_lvx128(sPPEState* ppeState) {
   Vector128 vector{};
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
 
-  vector.dword[0] = MMURead32(ppeState, EA);
-  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = ppeState->mmu->MMURead32(EA);
+  vector.dword[1] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 1));
+  vector.dword[2] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 2));
+  vector.dword[3] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   u8 vrd = VMX128_1_VD128;
@@ -1785,10 +1785,10 @@ void PPCInterpreter::PPCInterpreter_lvxl128(sPPEState* ppeState) {
   Vector128 vector{};
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
 
-  vector.dword[0] = MMURead32(ppeState, EA);
-  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = ppeState->mmu->MMURead32(EA);
+  vector.dword[1] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 1));
+  vector.dword[2] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 2));
+  vector.dword[3] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   u8 vrd = VMX128_1_VD128;
@@ -1817,10 +1817,10 @@ void PPCInterpreter::PPCInterpreter_lvxl(sPPEState* ppeState) {
   Vector128 vector{};
   const u64 EA = (_instr.ra ? GPRi(ra) + GPRi(rb) : GPRi(rb)) & ~0xF;
 
-  vector.dword[0] = MMURead32(ppeState, EA);
-  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = ppeState->mmu->MMURead32(EA);
+  vector.dword[1] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 1));
+  vector.dword[2] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 2));
+  vector.dword[3] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   u8 vrd = _instr.vd;
@@ -1851,10 +1851,10 @@ void PPCInterpreter::PPCInterpreter_lvlx(sPPEState* ppeState) {
   const u8 eb = EA & 0xF;
   EA &= ~0xF;
 
-  vector.dword[0] = MMURead32(ppeState, EA);
-  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = ppeState->mmu->MMURead32(EA);
+  vector.dword[1] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 1));
+  vector.dword[2] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 2));
+  vector.dword[3] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   LOG_DEBUG(Xenon, "lvlx [EA {:#x}] Temp VR = [{:#x}, {:#x}, {:#x}, {:#x}]", (u32)EA, vector.dword[0], vector.dword[1],
@@ -1895,10 +1895,10 @@ void PPCInterpreter::PPCInterpreter_lvlx128(sPPEState* ppeState) {
   const u8 eb = EA & 0xF;
   EA &= ~0xF;
 
-  vector.dword[0] = MMURead32(ppeState, EA);
-  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = ppeState->mmu->MMURead32(EA);
+  vector.dword[1] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 1));
+  vector.dword[2] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 2));
+  vector.dword[3] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   LOG_DEBUG(Xenon, "lvlx128 [EA {:#x}] Temp VR = [{:#x}, {:#x}, {:#x}, {:#x}]", (u32)EA, vector.dword[0],
@@ -1947,10 +1947,10 @@ void PPCInterpreter::PPCInterpreter_lvrx(sPPEState* ppeState) {
   const u8 eb = EA & 0xF;
   EA &= ~0xF;
 
-  vector.dword[0] = MMURead32(ppeState, EA);
-  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = ppeState->mmu->MMURead32(EA);
+  vector.dword[1] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 1));
+  vector.dword[2] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 2));
+  vector.dword[3] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   LOG_DEBUG(Xenon, "lvrx [EA {:#x}] Temp VR = [{:#x}, {:#x}, {:#x}, {:#x}]", (u32)EA, vector.dword[0], vector.dword[1],
@@ -1998,10 +1998,10 @@ void PPCInterpreter::PPCInterpreter_lvrx128(sPPEState* ppeState) {
   const u8 eb = EA & 0xF;
   EA &= ~0xF;
 
-  vector.dword[0] = MMURead32(ppeState, EA);
-  vector.dword[1] = MMURead32(ppeState, EA + (sizeof(u32) * 1));
-  vector.dword[2] = MMURead32(ppeState, EA + (sizeof(u32) * 2));
-  vector.dword[3] = MMURead32(ppeState, EA + (sizeof(u32) * 3));
+  vector.dword[0] = ppeState->mmu->MMURead32(EA);
+  vector.dword[1] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 1));
+  vector.dword[2] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 2));
+  vector.dword[3] = ppeState->mmu->MMURead32(EA + (sizeof(u32) * 3));
 
 #ifdef VXU_LOAD_DEBUG
   LOG_DEBUG(Xenon, "lvrx128 [EA {:#x}] Temp VR = [{:#x}, {:#x}, {:#x}, {:#x}]", (u32)EA, vector.dword[0],

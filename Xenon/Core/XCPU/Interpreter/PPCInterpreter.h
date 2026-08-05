@@ -6,6 +6,7 @@
 
 #include "Core/RootBus/RootBus.h"
 #include "Core/XCPU/Context/XenonContext.h"
+#include "Core/XCPU/MMU/XenonMMU.h"
 #include "Core/XCPU/PPU/PPCInternal.h"
 #include "Core/XCPU/PPU/PPCOpcodes.h"
 #include "Core/XCPU/PPU/PowerPC.h"
@@ -140,45 +141,5 @@ namespace PPCInterpreter {
   void ppcExecuteSingleInstruction(sPPEState* ppeState);
 
   void ppcInterpreterTrap(sPPEState* ppeState, u32 trapNumber);
-
-  //
-  // MMU
-  //
-
-  bool MMUTranslateAddress(u64* EA, sPPEState* ppeState, bool memWrite, ePPUThreadID thr = ePPUThread_None);
-  u8 mmuGetPageSize(sPPEState* ppeState, bool L, u8 LP);
-  void mmuAddTlbEntry(sPPEState* ppeState);
-  void mmuAddTlbEntryHardware(sPPEState* ppeState, u64 VA, u64 pte0, u64 pte1, u8 p, bool L, bool LP);
-  bool mmuSearchTlbEntry(sPPEState* ppeState, u64* RPN, u64 VA, u8 p, bool L, bool LP);
-  void mmuReadString(sPPEState* ppeState, u64 stringAddress, char* string, u32 maxLength);
-
-  // Security Engine Related
-  SECENG_ADDRESS_INFO mmuGetSecEngInfoFromAddress(u64 inputAddress);
-  u64 mmuContructEndAddressFromSecEngAddr(u64 inputAddress, bool* socAccess);
-
-  // Main R/W Routines.
-  void MMURead(Xe::XCPU::XenonContext* cpuContext, sPPEState* ppeState, u64 EA, u64 byteCount, u8* outData,
-               ePPUThreadID thr = ePPUThread_None);
-  void MMUWrite(Xe::XCPU::XenonContext* cpuContext, sPPEState* ppeState, const u8* data, u64 EA, u64 byteCount,
-                ePPUThreadID thr = ePPUThread_None);
-
-  void MMUMemCpyFromHost(sPPEState* ppeState, u64 EA, const void* source, u64 size, ePPUThreadID thr = ePPUThread_None);
-
-  void MMUMemCpy(sPPEState* ppeState, u64 EA, u32 source, u64 size, ePPUThreadID thr = ePPUThread_None);
-
-  void MMUMemSet(sPPEState* ppeState, u64 EA, s32 data, u64 size, ePPUThreadID thr = ePPUThread_None);
-
-  u8* MMUGetPointerFromRAM(u64 EA);
-
-  // Helper Read Routines.
-  u8 MMURead8(sPPEState* ppeState, u64 EA, ePPUThreadID thr = ePPUThread_None);
-  u16 MMURead16(sPPEState* ppeState, u64 EA, ePPUThreadID thr = ePPUThread_None);
-  u32 MMURead32(sPPEState* ppeState, u64 EA, ePPUThreadID thr = ePPUThread_None);
-  u64 MMURead64(sPPEState* ppeState, u64 EA, ePPUThreadID thr = ePPUThread_None);
-  // Helper Write Routines.
-  void MMUWrite8(sPPEState* ppeState, u64 EA, u8 data, ePPUThreadID thr = ePPUThread_None);
-  void MMUWrite16(sPPEState* ppeState, u64 EA, u16 data, ePPUThreadID thr = ePPUThread_None);
-  void MMUWrite32(sPPEState* ppeState, u64 EA, u32 data, ePPUThreadID thr = ePPUThread_None);
-  void MMUWrite64(sPPEState* ppeState, u64 EA, u64 data, ePPUThreadID thr = ePPUThread_None);
 
 } // namespace PPCInterpreter

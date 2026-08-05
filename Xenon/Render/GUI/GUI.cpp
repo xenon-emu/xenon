@@ -319,7 +319,7 @@ void RenderInstructions(Render::GUI* gui, sPPEState* state, ePPUThreadID thr, u6
     u32 instr = 0;
     u64 addr = (thread.CIA - (4 * numInstructions + 1)) + (4 * i);
     thread.instrFetch = true;
-    instr = PPCInterpreter::MMURead32(state, addr, thr);
+    instr = state->mmu->MMURead32(addr, thr);
     if (thread.HasExc(ppuInstrStorageEx) || thread.HasExc(ppuInstrSegmentEx)) { break; }
     thread.instrFetch = false;
     const std::string instrName = PPCInterpreter::PPCInterpreter_getFullName(instr);

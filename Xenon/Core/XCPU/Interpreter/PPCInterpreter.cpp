@@ -148,7 +148,7 @@ void PPCInterpreter::ppcInterpreterTrap(sPPEState* ppeState, u32 trapNumber) {
       u32 strAddr = GPR(3);
       u64 strSize = static_cast<u64>(GPR(4));
       std::unique_ptr<u8[]> buffer = std::make_unique<STRIP_UNIQUE_ARR(buffer)>(strSize + 1);
-      MMURead(xenonContext, ppeState, strAddr, strSize, buffer.get());
+      ppeState->mmu->MMURead(strAddr, strSize, buffer.get());
       char* dbgString = reinterpret_cast<char*>(buffer.get());
       dbgString[strSize] = '\0'; // nul-term
       Base::Log::NoFmtMessage(Base::Log::Class::DebugPrint, Base::Log::Level::Guest, dbgString);

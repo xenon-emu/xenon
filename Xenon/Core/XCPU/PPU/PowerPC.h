@@ -13,6 +13,11 @@
 #include <memory>
 #include <unordered_map>
 
+// Forward declaration so sPPEState can hold a non-owning back-pointer to its MMU.
+namespace Xe::XCPU::MMU {
+  class XenonMMU;
+}
+
 // PowerPC Opcode definitions
 /*
  * All original authors of the rpcs3 PPU_Decoder and PPU_Opcodes maintain their original copyright.
@@ -1513,6 +1518,8 @@ struct sPPEState {
   std::string ppuName{};
   // PPU ID
   u8 ppuID = 0;
+  // Memory Management Unit, owned by the PPE and shared by both threads.
+  std::shared_ptr<Xe::XCPU::MMU::XenonMMU> mmu;
 };
 
 // Exception Bitmasks for Exception Register
