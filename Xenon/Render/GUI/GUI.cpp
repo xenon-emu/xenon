@@ -7,9 +7,13 @@
 #include "Roboto-Regular.h"
 
 #ifndef NO_GFX
-  #include "Base/Exit.h"
-  #include "Core/XCPU/Interpreter/PPCInterpreter.h"
-  #include "Core/XeMain.h"
+
+// clang-format off
+// Windows builds have a include order issue, fix for now.
+#include "Core/XeMain.h"
+#include "Base/Exit.h"
+#include "Core/XCPU/Interpreter/PPCInterpreter.h"
+// clang-format on
 
   #ifdef _WIN32
     #include <shellapi.h>
