@@ -4,17 +4,17 @@
 
 #pragma once
 
-#include <mutex>
-#include <memory>
-
-#include "XenonSOC.h"
 #include "Base/Types.h"
 #include "Core/RAM/RAM.h"
-#include "Core/XCPU/eFuse.h"
 #include "Core/RootBus/RootBus.h"
-#include "Core/XCPU/Context/XenonIIC/XenonIIC.h"
 #include "Core/XCPU/Context/Reservations/XenonReservations.h"
+#include "Core/XCPU/Context/TimeBase/XenonTimeBase.h"
+#include "Core/XCPU/Context/XenonIIC/XenonIIC.h"
+#include "Core/XCPU/eFuse.h"
+#include "XenonSOC.h"
 
+#include <memory>
+#include <mutex>
 
 namespace Xe::XCPU {
 
@@ -23,9 +23,9 @@ namespace Xe::XCPU {
   // for all three PPE's an their respecting Power Processing Units (PPU's) threads.
   class XenonContext {
   public:
-    XenonContext(RootBus *rootBusPtr, RAM *ramPtr) :
-      rootBus(rootBusPtr), ram(ramPtr)
-    {
+    XenonContext(RootBus* rootBusPtr, RAM* ramPtr)
+        : rootBus(rootBusPtr)
+        , ram(ramPtr) {
       SROM = std::make_unique<STRIP_UNIQUE_ARR(SROM)>(XE_SECROM_BLOCK_SIZE);
       SRAM = std::make_unique<STRIP_UNIQUE_ARR(SROM)>(XE_SECRAM_BLOCK_SIZE);
       socSecOTPBlock = std::make_unique<STRIP_UNIQUE(socSecOTPBlock)>();
@@ -46,10 +46,10 @@ namespace Xe::XCPU {
       socPRVBlock.reset();
     }
 
-    RootBus *GetRootBus() { return rootBus; }
-    RAM *GetRAM() { return ram; }
-    bool HandleSOCRead(u64 readAddr, u8 *data, size_t byteCount);
-    bool HandleSOCWrite(u64 writeAddr, const u8 *data, size_t byteCount);
+    RootBus* GetRootBus() { return rootBus; }
+    RAM* GetRAM() { return ram; }
+    bool HandleSOCRead(u64 readAddr, u8* data, size_t byteCount);
+    bool HandleSOCWrite(u64 writeAddr, const u8* data, size_t byteCount);
 
     // Xenon SecureROM
     // Contains the CPU's main startup code known as 1BL.
@@ -74,18 +74,14 @@ namespace Xe::XCPU {
 
     // Used for conditional load/store instructions regarding PowerPC atomic operations.
     XenonReservations xenonRes = {};
-    // Time Base switch, possibly RTC register, the TB counter only runs if this
-    // value is set.
-    bool timeBaseActive = false;
 
-    // Global timebase tick counter (Increments based on the timeBase frquency)
-    // The timer thread inside XenonCPU will increase this; each PPU reads the counter and applies the delta.
-    std::atomic<u64> timeBaseGlobalCounter{ 0 };
+    // Time Base Logic
+    TimeBase timeBase = {};
 
     //
     // SOC Blocks
     //
-    
+
     // Secure OTP Block
     std::unique_ptr<SOC::SOCSECOTP_ARRAY> socSecOTPBlock{};
     // Security Engine Block
@@ -98,42 +94,43 @@ namespace Xe::XCPU {
     std::unique_ptr<SOC::SOCPMW_BLOCK> socPMWBlock{};
     // Pervasive Block
     std::unique_ptr<SOC::SOCPRV_BLOCK> socPRVBlock{};
+
   private:
     // Mutex for thread safety
     std::recursive_mutex mutex{};
     // RootBus pointer
-    RootBus *rootBus{};
+    RootBus* rootBus{};
     // RAM pointer
-    RAM *ram{};
+    RAM* ram{};
 
     // SOC Blocks R/W.
 
     // Security Engine Block.
-    bool HandleSecEngRead(u64 readAddr, u8 *data, size_t byteCount);
-    bool HandleSecEngWrite(u64 writeAddr, const u8 *data, size_t byteCount);
+    bool HandleSecEngRead(u64 readAddr, u8* data, size_t byteCount);
+    bool HandleSecEngWrite(u64 writeAddr, const u8* data, size_t byteCount);
 
     // Secure OTP Block.
-    bool HandleSecOTPRead(u64 readAddr, u8 *data, size_t byteCount);
-    bool HandleSecOTPWrite(u64 writeAddr, const u8 *data, size_t byteCount);
+    bool HandleSecOTPRead(u64 readAddr, u8* data, size_t byteCount);
+    bool HandleSecOTPWrite(u64 writeAddr, const u8* data, size_t byteCount);
 
     // Secure RNG Block.
-    bool HandleSecRNGRead(u64 readAddr, u8 *data, size_t byteCount);
-    bool HandleSecRNGWrite(u64 writeAddr, const u8 *data, size_t byteCount);
+    bool HandleSecRNGRead(u64 readAddr, u8* data, size_t byteCount);
+    bool HandleSecRNGWrite(u64 writeAddr, const u8* data, size_t byteCount);
 
     // CBI Block.
-    bool HandleCBIRead(u64 readAddr, u8 *data, size_t byteCount);
-    bool HandleCBIWrite(u64 writeAddr, const u8 *data, size_t byteCount);
+    bool HandleCBIRead(u64 readAddr, u8* data, size_t byteCount);
+    bool HandleCBIWrite(u64 writeAddr, const u8* data, size_t byteCount);
 
     // INT Block.
-    bool HandleINTRead(u64 readAddr, u8 *data, size_t byteCount);
-    bool HandleINTWrite(u64 writeAddr, const u8 *data, size_t byteCount);
+    bool HandleINTRead(u64 readAddr, u8* data, size_t byteCount);
+    bool HandleINTWrite(u64 writeAddr, const u8* data, size_t byteCount);
 
     // PMW Block.
-    bool HandlePMWRead(u64 readAddr, u8 *data, size_t byteCount);
-    bool HandlePMWWrite(u64 writeAddr, const u8 *data, size_t byteCount);
+    bool HandlePMWRead(u64 readAddr, u8* data, size_t byteCount);
+    bool HandlePMWWrite(u64 writeAddr, const u8* data, size_t byteCount);
 
     // Pervasive logic Block.
-    bool HandlePRVRead(u64 readAddr, u8 *data, size_t byteCount);
-    bool HandlePRVWrite(u64 writeAddr, const u8 *data, size_t byteCount);
+    bool HandlePRVRead(u64 readAddr, u8* data, size_t byteCount);
+    bool HandlePRVWrite(u64 writeAddr, const u8* data, size_t byteCount);
   };
-}
+} // namespace Xe::XCPU

@@ -1,42 +1,43 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #include "GUI.h"
+
 #include "Roboto-Regular.h"
 
 #ifndef NO_GFX
-#include "Core/XeMain.h"
-#include "Base/Exit.h"
-#include "Core/XCPU/Interpreter/PPCInterpreter.h"
+  #include "Base/Exit.h"
+  #include "Core/XCPU/Interpreter/PPCInterpreter.h"
+  #include "Core/XeMain.h"
 
-#ifdef _WIN32
-#include <shellapi.h>
-#endif
+  #ifdef _WIN32
+    #include <shellapi.h>
+  #endif
 
-// Helper functions for text/string formatting with the gui
-#define TextFmt(g, x, ...) g->Text(FMT(x, __VA_ARGS__))
-#define TextCopyFmt(g, x, v, ...) g->TextCopy(x, FMT(v, __VA_ARGS__))
-#define CustomBase(g, x, fmt, ...) TextFmt(g, x ": " fmt, __VA_ARGS__)
-#define CopyCustomBase(g, x, fmt, ...) TextCopyFmt(g, x, fmt, __VA_ARGS__)
-#define Custom(g, x, fmt, ...) CustomBase(g, #x, fmt, __VA_ARGS__)
-#define CopyCustom(g, x, fmt, ...) CustomBase(g, #x, fmt, __VA_ARGS__)
-#define HexBase(g, x, ...) CopyCustomBase(g, x, "0x{:X}", __VA_ARGS__)
-#define Hex(g, c, x) HexBase(g, #x, c.x)
-#define HexPtr(g, c, x) HexBase(g, #x, c->x)
-#define BFHex(g, c, x) HexBase(g, #x, u32(c.x));
-#define BFHexPtr(g, c, x) HexBase(g, #x, u32(c->x));
-#define U8Hex(g, c, x) HexBase(g, #x, static_cast<u32>(c.x))
-#define U8HexPtr(g, c, x) HexBase(g, #x, static_cast<u32>(c->x))
-#define HexArr(g, a, i) HexBase(g, FMT("[{}]", i), a[i])
-#define Dec(g, c, x) CopyCustom(g, x, "{}", c.x)
-#define DecPtr(g, c, x) CopyCustom(g, x, "{}", c->x)
-#define U8Dec(g, c, x) CopyCustom(g, x, "{}", static_cast<u32>(c.x))
-#define U8DecPtr(g, c, x) CopyCustom(g, x, "{}", static_cast<u32>(c->x))
-#define Bool(g, c, x) CopyCustom(g, x, "{}", c.x ? "true" : "false")
-#define BoolPtr(g, c, x) CopyCustom(g, x, "{}", c->x ? "true" : "false")
+  // Helper functions for text/string formatting with the gui
+  #define TextFmt(g, x, ...)             g->Text(FMT(x, __VA_ARGS__))
+  #define TextCopyFmt(g, x, v, ...)      g->TextCopy(x, FMT(v, __VA_ARGS__))
+  #define CustomBase(g, x, fmt, ...)     TextFmt(g, x ": " fmt, __VA_ARGS__)
+  #define CopyCustomBase(g, x, fmt, ...) TextCopyFmt(g, x, fmt, __VA_ARGS__)
+  #define Custom(g, x, fmt, ...)         CustomBase(g, #x, fmt, __VA_ARGS__)
+  #define CopyCustom(g, x, fmt, ...)     CustomBase(g, #x, fmt, __VA_ARGS__)
+  #define HexBase(g, x, ...)             CopyCustomBase(g, x, "0x{:X}", __VA_ARGS__)
+  #define Hex(g, c, x)                   HexBase(g, #x, c.x)
+  #define HexPtr(g, c, x)                HexBase(g, #x, c->x)
+  #define BFHex(g, c, x)                 HexBase(g, #x, u32(c.x));
+  #define BFHexPtr(g, c, x)              HexBase(g, #x, u32(c->x));
+  #define U8Hex(g, c, x)                 HexBase(g, #x, static_cast<u32>(c.x))
+  #define U8HexPtr(g, c, x)              HexBase(g, #x, static_cast<u32>(c->x))
+  #define HexArr(g, a, i)                HexBase(g, FMT("[{}]", i), a[i])
+  #define Dec(g, c, x)                   CopyCustom(g, x, "{}", c.x)
+  #define DecPtr(g, c, x)                CopyCustom(g, x, "{}", c->x)
+  #define U8Dec(g, c, x)                 CopyCustom(g, x, "{}", static_cast<u32>(c.x))
+  #define U8DecPtr(g, c, x)              CopyCustom(g, x, "{}", static_cast<u32>(c->x))
+  #define Bool(g, c, x)                  CopyCustom(g, x, "{}", c.x ? "true" : "false")
+  #define BoolPtr(g, c, x)               CopyCustom(g, x, "{}", c->x ? "true" : "false")
 
-void Render::GUI::Init(SDL_Window *window, void *context) {
+void Render::GUI::Init(SDL_Window* window, void* context) {
   MICROPROFILE_SCOPEI("[Xe::Render::GUI]", "Init", MP_AUTO);
   // Set our mainWindow handle
   mainWindow = window;
@@ -45,7 +46,7 @@ void Render::GUI::Init(SDL_Window *window, void *context) {
   IMGUI_CHECKVERSION();
   // Create ImGui Context
   ImGui::CreateContext();
-  ImGuiIO &io = ImGui::GetIO();
+  ImGuiIO& io = ImGui::GetIO();
   // We don't want to create a ini because it stores positions.
   // Because we initialize with a 1280x720 window, then resize to whatever,
   // this will break the window positions, causing them to render off screen
@@ -70,15 +71,18 @@ bool RGH2{};
 bool storedPreviousInitSkips{};
 s32 initSkip1{}, initSkip2{};
 void Render::GUI::PostInit() {
-  ImGuiIO &io = ImGui::GetIO();
+  ImGuiIO& io = ImGui::GetIO();
 
   ImFontConfig fontConfig;
   fontConfig.FontDataOwnedByAtlas = false;
 
   // It might not be a bad idea to take the Xbox 360 font and convert it to TTF
-  robotRegular14 = io.Fonts->AddFontFromMemoryTTF((void*)Roboto_Regular_ttf, Roboto_Regular_ttf_len, 14.0f, &fontConfig);
-  robotRegular16 = io.Fonts->AddFontFromMemoryTTF((void*)Roboto_Regular_ttf, Roboto_Regular_ttf_len, 16.0f, &fontConfig);
-  robotRegular18 = io.Fonts->AddFontFromMemoryTTF((void*)Roboto_Regular_ttf, Roboto_Regular_ttf_len, 18.0f, &fontConfig);
+  robotRegular14
+    = io.Fonts->AddFontFromMemoryTTF((void*)Roboto_Regular_ttf, Roboto_Regular_ttf_len, 14.0f, &fontConfig);
+  robotRegular16
+    = io.Fonts->AddFontFromMemoryTTF((void*)Roboto_Regular_ttf, Roboto_Regular_ttf_len, 16.0f, &fontConfig);
+  robotRegular18
+    = io.Fonts->AddFontFromMemoryTTF((void*)Roboto_Regular_ttf, Roboto_Regular_ttf_len, 18.0f, &fontConfig);
 
   if (Config::xcpu.HW_INIT_SKIP_1 == 0x3003DC0 && Config::xcpu.HW_INIT_SKIP_2 == 0x3003E54) {
     storedPreviousInitSkips = true; // If we already have RGH2, ignore
@@ -91,82 +95,66 @@ void Render::GUI::Shutdown() {
   ImGui::DestroyContext();
 }
 
-//TODO(Vali0004): Make Windows into callbacks, so we can create a window from a different thread.
-bool Render::GUI::BeginWindow(const std::string &title, const ImVec2 &size, ImGuiWindowFlags flags, bool *conditon, const ImVec2 &position, ImGuiCond cond) {
+// TODO(Vali0004): Make Windows into callbacks, so we can create a window from a different thread.
+bool Render::GUI::BeginWindow(const std::string& title, const ImVec2& size, ImGuiWindowFlags flags, bool* conditon,
+                              const ImVec2& position, ImGuiCond cond) {
   ImGui::SetNextWindowPos(position, cond);
   ImGui::SetNextWindowSize(size, cond);
 
   return ImGui::Begin(title.c_str(), conditon, flags);
 }
 
-bool Render::GUI::BeginSimpleWindow(const std::string &title, bool *conditon, ImGuiWindowFlags flags) {
+bool Render::GUI::BeginSimpleWindow(const std::string& title, bool* conditon, ImGuiWindowFlags flags) {
   return ImGui::Begin(title.c_str(), conditon, flags);
 }
 
-void Render::GUI::EndWindow() {
-  ImGui::End();
-}
+void Render::GUI::EndWindow() { ImGui::End(); }
 
-bool Render::GUI::BeginChild(const std::string &title, const ImVec2 &size, ImGuiChildFlags flags, ImGuiWindowFlags windowFlags) {
+bool Render::GUI::BeginChild(const std::string& title, const ImVec2& size, ImGuiChildFlags flags,
+                             ImGuiWindowFlags windowFlags) {
   return ImGui::BeginChild(title.c_str(), size, flags, windowFlags);
 }
 
-void Render::GUI::EndChild() {
-  ImGui::EndChild();
-}
+void Render::GUI::EndChild() { ImGui::EndChild(); }
 
-bool Render::GUI::BeginNode(const std::string &title, ImGuiTreeNodeFlags flags) {
+bool Render::GUI::BeginNode(const std::string& title, ImGuiTreeNodeFlags flags) {
   return ImGui::TreeNodeEx(title.c_str(), flags);
 }
 
-void Render::GUI::EndNode() {
-  ImGui::TreePop();
-}
+void Render::GUI::EndNode() { ImGui::TreePop(); }
 
-bool Render::GUI::CollapsingHeader(const std::string &title, ImGuiTreeNodeFlags flags) {
+bool Render::GUI::CollapsingHeader(const std::string& title, ImGuiTreeNodeFlags flags) {
   return ImGui::CollapsingHeader(title.c_str(), flags);
 }
 
-void Render::GUI::Separator() {
-  ImGui::Separator();
-}
+void Render::GUI::Separator() { ImGui::Separator(); }
 
-void Render::GUI::IDGroup(const std::string &id, std::function<void()> callback) {
+void Render::GUI::IDGroup(const std::string& id, std::function<void()> callback) {
   ImGui::PushID(id.c_str());
-  if (callback) {
-    callback();
-  }
+  if (callback) { callback(); }
   ImGui::PopID();
 }
 
-void Render::GUI::Group(const std::string &label, std::function<void()> callback) {
+void Render::GUI::Group(const std::string& label, std::function<void()> callback) {
   ImGui::BeginGroup();
-  if (label.empty())
-    Text(label);
-  if (callback) {
-    callback();
-  }
+  if (label.empty()) Text(label);
+  if (callback) { callback(); }
   ImGui::EndGroup();
 }
 
 void Render::GUI::IDGroup(s32 id, std::function<void()> callback) {
   ImGui::PushID(id);
-  if (callback) {
-    callback();
-  }
+  if (callback) { callback(); }
   ImGui::PopID();
 }
 
-void Render::GUI::Text(const std::string &label) {
-  ImGui::TextUnformatted(label.c_str());
-}
+void Render::GUI::Text(const std::string& label) { ImGui::TextUnformatted(label.c_str()); }
 
 namespace ImGui {
   // Copies behaviour from ImGui::TextLink, then removes the line and color
   bool TextButton(const char* label) {
     ImGuiWindow* window = ImGui::GetCurrentWindow();
-    if (window->SkipItems)
-      return false;
+    if (window->SkipItems) return false;
 
     const ImGuiID id = window->GetID(label);
     const char* label_end = FindRenderedTextEnd(label);
@@ -175,159 +163,118 @@ namespace ImGui {
     ImVec2 size = CalcTextSize(label, label_end, true);
     ImRect bb(pos, pos + size);
     ItemSize(size, 0.0f);
-    if (!ItemAdd(bb, id))
-      return false;
+    if (!ItemAdd(bb, id)) return false;
 
     bool hovered, held;
     bool pressed = ButtonBehavior(bb, id, &hovered, &held);
     RenderNavCursor(bb, id);
 
-    if (hovered)
-      SetMouseCursor(ImGuiMouseCursor_Hand);
+    if (hovered) SetMouseCursor(ImGuiMouseCursor_Hand);
 
     RenderText(bb.Min, label, label_end);
     return pressed;
   }
-}
+} // namespace ImGui
 
-void Render::GUI::TextCopy(const std::string &label, const std::string &value) {
+void Render::GUI::TextCopy(const std::string& label, const std::string& value) {
   std::string flabel = label + ": " + value;
-  if (ImGui::TextButton(flabel.data())) {
-    LOG_INFO(Debug, "{}", flabel.data());
-  }
+  if (ImGui::TextButton(flabel.data())) { LOG_INFO(Debug, "{}", flabel.data()); }
   if (ImGui::BeginPopupContextItem()) {
-    if (MenuItem("Copy '" + flabel + "'")) {
-      SDL_SetClipboardText(flabel.data());
-    }
-    if (MenuItem("Copy '" + value + "'")) {
-      SDL_SetClipboardText(value.data());
-    }
+    if (MenuItem("Copy '" + flabel + "'")) { SDL_SetClipboardText(flabel.data()); }
+    if (MenuItem("Copy '" + value + "'")) { SDL_SetClipboardText(value.data()); }
     ImGui::EndPopup();
   }
 }
 
-void Render::GUI::TextCopySimple(const std::string &value) {
+void Render::GUI::TextCopySimple(const std::string& value) {
   u64 hashtagPos = value.find('#');
   std::string valueSimple = hashtagPos != std::string::npos ? value.substr(0, hashtagPos) : value;
   std::string hashTag = hashtagPos != std::string::npos ? value.substr(hashtagPos + 2) : value;
 
-  if (ImGui::TextButton(value.data())) {
-    LOG_INFO(Debug, "{}", valueSimple.data());
-  }
+  if (ImGui::TextButton(value.data())) { LOG_INFO(Debug, "{}", valueSimple.data()); }
   if (ImGui::BeginPopupContextItem()) {
-    if (MenuItem("Copy '" + valueSimple + "'##" + hashTag)) {
-      SDL_SetClipboardText(valueSimple.data());
-    }
+    if (MenuItem("Copy '" + valueSimple + "'##" + hashTag)) { SDL_SetClipboardText(valueSimple.data()); }
     ImGui::EndPopup();
   }
 }
 
-void Render::GUI::TextCopySplit(const std::string &value, const std::string &copyValue) {
+void Render::GUI::TextCopySplit(const std::string& value, const std::string& copyValue) {
   u64 hashtagPos = value.find('#');
   u64 hashtagCopyPos = copyValue.find('#');
   bool hasHashtag = hashtagPos != std::string::npos;
   bool copyHasHashtag = hashtagCopyPos != std::string::npos;
 
   std::string valueSimple = hasHashtag ? value.substr(0, hashtagPos) : value;
-  std::string hashTag = hasHashtag ? value.substr(hashtagPos+2) : value;
+  std::string hashTag = hasHashtag ? value.substr(hashtagPos + 2) : value;
 
   std::string copyValueSimple = copyHasHashtag ? copyValue.substr(0, hashtagCopyPos) : copyValue;
-  std::string copyHashTag = copyHasHashtag ? copyValue.substr(hashtagCopyPos+2) : copyValue;
+  std::string copyHashTag = copyHasHashtag ? copyValue.substr(hashtagCopyPos + 2) : copyValue;
 
-  if (ImGui::TextButton(value.data())) {
-    LOG_INFO(Debug, "{}", valueSimple);
-  }
+  if (ImGui::TextButton(value.data())) { LOG_INFO(Debug, "{}", valueSimple); }
   if (ImGui::BeginPopupContextItem()) {
-    if (MenuItem("Copy '" + valueSimple + "'##" + hashTag)) {
-      SDL_SetClipboardText(value.data());
-    }
-    if (MenuItem("Copy '" + copyValueSimple + "'##" + copyHashTag)) {
-      SDL_SetClipboardText(copyValueSimple.data());
-    }
+    if (MenuItem("Copy '" + valueSimple + "'##" + hashTag)) { SDL_SetClipboardText(value.data()); }
+    if (MenuItem("Copy '" + copyValueSimple + "'##" + copyHashTag)) { SDL_SetClipboardText(copyValueSimple.data()); }
     ImGui::EndPopup();
   }
 }
 
-void Render::GUI::SameLine(f32 xOffset, f32 spacing) {
-  ImGui::SameLine(xOffset, spacing);
-}
+void Render::GUI::SameLine(f32 xOffset, f32 spacing) { ImGui::SameLine(xOffset, spacing); }
 
-bool Render::GUI::BeginMenuBar() {
-  return ImGui::BeginMenuBar();
-}
+bool Render::GUI::BeginMenuBar() { return ImGui::BeginMenuBar(); }
 
-void Render::GUI::EndMenuBar() {
-  ImGui::EndMenuBar();
-}
+void Render::GUI::EndMenuBar() { ImGui::EndMenuBar(); }
 
-bool Render::GUI::BeginMenu(const std::string &title) {
-  return ImGui::BeginMenu(title.c_str());
-}
+bool Render::GUI::BeginMenu(const std::string& title) { return ImGui::BeginMenu(title.c_str()); }
 
-void Render::GUI::EndMenu() {
-  ImGui::EndMenu();
-}
+void Render::GUI::EndMenu() { ImGui::EndMenu(); }
 
-bool Render::GUI::MenuItem(const std::string &title, bool enabled, bool selected, const std::string &shortcut) {
+bool Render::GUI::MenuItem(const std::string& title, bool enabled, bool selected, const std::string& shortcut) {
   return ImGui::MenuItem(title.c_str(), shortcut.c_str(), selected, enabled);
 }
 
-bool Render::GUI::BeginTabBar(const std::string &title, ImGuiTabBarFlags flags) {
+bool Render::GUI::BeginTabBar(const std::string& title, ImGuiTabBarFlags flags) {
   return ImGui::BeginTabBar(title.c_str(), flags);
 }
 
-void Render::GUI::EndTabBar() {
-  ImGui::EndTabBar();
-}
+void Render::GUI::EndTabBar() { ImGui::EndTabBar(); }
 
-bool Render::GUI::BeginTabItem(const std::string &title, bool *conditon, ImGuiTabItemFlags flags) {
+bool Render::GUI::BeginTabItem(const std::string& title, bool* conditon, ImGuiTabItemFlags flags) {
   return ImGui::BeginTabItem(title.c_str(), conditon, flags);
 }
 
-void Render::GUI::EndTabItem() {
-  ImGui::EndTabItem();
-}
+void Render::GUI::EndTabItem() { ImGui::EndTabItem(); }
 
-bool Render::GUI::TabItemButton(const std::string &title, ImGuiTabItemFlags flags) {
+bool Render::GUI::TabItemButton(const std::string& title, ImGuiTabItemFlags flags) {
   return ImGui::TabItemButton(title.c_str(), flags);
 }
 
-bool Render::GUI::Button(const std::string &label, const ImVec2 &size) {
-  return ImGui::Button(label.c_str(), size);
-}
+bool Render::GUI::Button(const std::string& label, const ImVec2& size) { return ImGui::Button(label.c_str(), size); }
 
-bool Render::GUI::Toggle(const std::string &label, bool* conditon) {
+bool Render::GUI::Toggle(const std::string& label, bool* conditon) {
   bool dummy{};
-  if (!conditon) {
-    conditon = &dummy;
-  }
+  if (!conditon) { conditon = &dummy; }
   return ImGui::Checkbox(label.c_str(), conditon);
 }
 
-std::string Render::GUI::InputText(const std::string &title, std::string initValue, size_t maxCharacters,
-  const std::string &textHint, ImGuiInputTextFlags flags, ImVec2 size)
-{
+std::string Render::GUI::InputText(const std::string& title, std::string initValue, size_t maxCharacters,
+                                   const std::string& textHint, ImGuiInputTextFlags flags, ImVec2 size) {
   std::vector<char> buf(maxCharacters, '\0');
-  if (buf[0] == '\0' && !initValue.empty()) {
-    memcpy(buf.data(), initValue.data(), initValue.size());
-  }
+  if (buf[0] == '\0' && !initValue.empty()) { memcpy(buf.data(), initValue.data(), initValue.size()); }
 
   if (textHint.empty()) {
     ImGui::InputText(title.c_str(), buf.data(), maxCharacters, flags);
-  }
-  else if (textHint.compare(INPUT_TEXT_MULTILINE)) {
+  } else if (textHint.compare(INPUT_TEXT_MULTILINE)) {
     ImGui::InputTextWithHint(title.c_str(), textHint.c_str(), buf.data(), maxCharacters, flags);
-  }
-  else {
+  } else {
     ImGui::InputTextMultiline(title.c_str(), buf.data(), maxCharacters, size, flags);
   }
 
   return buf.data();
 }
 
-template <typename T>
+template<typename T>
   requires std::is_integral_v<T>
-void Render::GUI::InputInt(const std::string &label, T *value, T step, T stepFast, const char *format) {
+void Render::GUI::InputInt(const std::string& label, T* value, T step, T stepFast, const char* format) {
   ImGuiDataType_ dataType;
   if constexpr (std::is_same_v<T, u64>) {
     dataType = ImGuiDataType_U64;
@@ -346,79 +293,77 @@ void Render::GUI::InputInt(const std::string &label, T *value, T step, T stepFas
   } else if constexpr (std::is_same_v<T, s8>) {
     dataType = ImGuiDataType_S8;
   }
-  ImGui::InputScalar(label.c_str(), dataType, (void*)value, (void*)(step > 0 ? &step : nullptr), (void*)(stepFast > 0 ? &stepFast : nullptr), format);
+  ImGui::InputScalar(label.c_str(), dataType, (void*)value, (void*)(step > 0 ? &step : nullptr),
+                     (void*)(stepFast > 0 ? &stepFast : nullptr), format);
 }
 
-void Render::GUI::Tooltip(const std::string &contents, ImGuiHoveredFlags delay) {
-  if (delay != ImGuiHoveredFlags_DelayNone)
-    delay |= ImGuiHoveredFlags_NoSharedDelay;
+void Render::GUI::Tooltip(const std::string& contents, ImGuiHoveredFlags delay) {
+  if (delay != ImGuiHoveredFlags_DelayNone) delay |= ImGuiHoveredFlags_NoSharedDelay;
 
   if (ImGui::IsItemHovered(delay)) {
-    if (!ImGui::BeginTooltipEx(ImGuiTooltipFlags_OverridePrevious, ImGuiWindowFlags_None))
-      return;
+    if (!ImGui::BeginTooltipEx(ImGuiTooltipFlags_OverridePrevious, ImGuiWindowFlags_None)) return;
     ImGui::TextUnformatted(contents.c_str());
     ImGui::EndTooltip();
   }
 }
 
-void RenderInstructions(Render::GUI *gui, sPPEState *state, ePPUThreadID thr, u64 numInstructions) {
-  if (!gui || !state)
-    return;
-  sPPUThread &thread = state->ppuThread[thr];
+void RenderInstructions(Render::GUI* gui, sPPEState* state, ePPUThreadID thr, u64 numInstructions) {
+  if (!gui || !state) return;
+  sPPUThread& thread = state->ppuThread[thr];
   f32 maxLineWidth = ImGui::GetContentRegionAvail().x;
   for (u64 i = 0; i != (numInstructions * 2) + 1; ++i) {
     u32 instr = 0;
     u64 addr = (thread.CIA - (4 * numInstructions + 1)) + (4 * i);
     thread.instrFetch = true;
     instr = PPCInterpreter::MMURead32(state, addr, thr);
-    if (thread.exceptReg & ppuInstrStorageEx || thread.exceptReg & ppuInstrSegmentEx) {
-      break;
-    }
+    if (thread.HasExc(ppuInstrStorageEx) || thread.HasExc(ppuInstrSegmentEx)) { break; }
     thread.instrFetch = false;
     const std::string instrName = PPCInterpreter::PPCInterpreter_getFullName(instr);
-#ifdef __LITTLE_ENDIAN__
+  #ifdef __LITTLE_ENDIAN__
     const u32 b0 = static_cast<u8>((instr >> 24) & 0xFF);
     const u32 b1 = static_cast<u8>((instr >> 16) & 0xFF);
     const u32 b2 = static_cast<u8>((instr >> 8) & 0xFF);
     const u32 b3 = static_cast<u8>((instr >> 0) & 0xFF);
-#else
+  #else
     const u32 b0 = static_cast<u8>((instr >> 0) & 0xFF);
     const u32 b1 = static_cast<u8>((instr >> 8) & 0xFF);
     const u32 b2 = static_cast<u8>((instr >> 16) & 0xFF);
     const u32 b3 = static_cast<u8>((instr >> 24) & 0xFF);
-#endif
+  #endif
     gui->IDGroup(i, [&] {
-      gui->TextCopySimple(FMT("{}{:08X}", addr == thread.CIA ? "[*] " : "", addr)); gui->SameLine(0.f, 2.f);
-      gui->TextCopySplit(FMT("{:02X}##{}", b0, addr), FMT("{:08X}", instr)); gui->SameLine(0.f, 2.f);
-      gui->TextCopySimple(FMT("{:02X}##{}", b1, addr + 1)); gui->SameLine(0.f, 2.f);
-      gui->TextCopySimple(FMT("{:02X}##{}", b2, addr + 2)); gui->SameLine(0.f, 2.f);
-      gui->TextCopySimple(FMT("{:02X}##{}", b3, addr + 3)); gui->SameLine(0.f, maxLineWidth > 800.f ? 270.f : 120.f);
+      gui->TextCopySimple(FMT("{}{:08X}", addr == thread.CIA ? "[*] " : "", addr));
+      gui->SameLine(0.f, 2.f);
+      gui->TextCopySplit(FMT("{:02X}##{}", b0, addr), FMT("{:08X}", instr));
+      gui->SameLine(0.f, 2.f);
+      gui->TextCopySimple(FMT("{:02X}##{}", b1, addr + 1));
+      gui->SameLine(0.f, 2.f);
+      gui->TextCopySimple(FMT("{:02X}##{}", b2, addr + 2));
+      gui->SameLine(0.f, 2.f);
+      gui->TextCopySimple(FMT("{:02X}##{}", b3, addr + 3));
+      gui->SameLine(0.f, maxLineWidth > 800.f ? 270.f : 120.f);
       gui->TextCopySimple(FMT("{}##{}", instrName, addr));
     });
   }
 }
 
-void PPUThreadDiassembly(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
+void PPUThreadDiassembly(Render::GUI* gui, sPPEState* state, ePPUThreadID thr) {
   if (gui->BeginSimpleWindow(FMT("Diassembly [{}:{}]", state->ppuName, static_cast<u8>(thr)))) {
     RenderInstructions(gui, state, thr, 16);
   }
   gui->EndWindow();
 }
 
-void PPUThreadRegisters(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
-  if (!state)
-    return;
+void PPUThreadRegisters(Render::GUI* gui, sPPEState* state, ePPUThreadID thr) {
+  if (!state) return;
   if (gui->BeginSimpleWindow(FMT("Registers [{}:{}]", state->ppuName, static_cast<u8>(thr)))) {
-    sPPUThread &ppuRegisters = state->ppuThread[thr];
+    sPPUThread& ppuRegisters = state->ppuThread[thr];
     if (gui->BeginNode("GPRs")) {
-      for (u64 i = 0; i < 32; ++i) {
-        HexArr(gui, ppuRegisters.GPR, i);
-      }
+      for (u64 i = 0; i < 32; ++i) { HexArr(gui, ppuRegisters.GPR, i); }
       gui->EndNode();
     }
     if (gui->BeginNode("FPRs")) {
       for (u64 i = 0; i < 32; ++i) {
-        sFPR &FPR = ppuRegisters.FPR[i];
+        sFPR& FPR = ppuRegisters.FPR[i];
         gui->IDGroup(i, [&] {
           TextFmt(gui, "FPR[{}]", i);
           Custom(gui, valueAsDouble, "{}", FPR.asDouble());
@@ -428,9 +373,9 @@ void PPUThreadRegisters(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
       gui->EndNode();
     }
     if (gui->BeginNode("SPRs")) {
-      sPPUThreadSPRs &SPR = ppuRegisters.SPR;
+      sPPUThreadSPRs& SPR = ppuRegisters.SPR;
       if (gui->BeginNode("MSRs", ImGuiTreeNodeFlags_DefaultOpen)) {
-        uMSR &MSR = SPR.MSR;
+        uMSR& MSR = SPR.MSR;
         BFHex(gui, MSR, LE);
         BFHex(gui, MSR, RI);
         BFHex(gui, MSR, PMM);
@@ -489,7 +434,7 @@ void PPUThreadRegisters(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
     }
     if (gui->BeginNode("SLBs")) {
       for (u64 i = 0; i < 64; ++i) {
-        sSLBEntry &SLB = ppuRegisters.SLB[i];
+        sSLBEntry& SLB = ppuRegisters.SLB[i];
         if (gui->BeginNode(FMT("[{}]", i))) {
           U8Hex(gui, SLB, V);
           U8Hex(gui, SLB, LP);
@@ -507,7 +452,7 @@ void PPUThreadRegisters(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
       }
     }
     if (gui->BeginNode("GPR:CR")) {
-      uCR &CR = ppuRegisters.CR;
+      uCR& CR = ppuRegisters.CR;
       Hex(gui, CR, CR_Hex);
       BFHex(gui, CR, CR0);
       BFHex(gui, CR, CR1);
@@ -520,7 +465,7 @@ void PPUThreadRegisters(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
       gui->EndNode();
     }
     if (gui->BeginNode("Op:CI")) {
-      uPPCInstr &CI = ppuRegisters.CI;
+      uPPCInstr& CI = ppuRegisters.CI;
       Hex(gui, CI, opcode);
       BFHex(gui, CI, main);
       BFHex(gui, CI, sh64);
@@ -612,7 +557,7 @@ void PPUThreadRegisters(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
       gui->EndNode();
     }
     if (gui->BeginNode("PPU:Reserve")) {
-      PPU_RES *ppuRes = ppuRegisters.ppuRes.get();
+      PPU_RES* ppuRes = ppuRegisters.ppuRes.get();
       U8HexPtr(gui, ppuRes, ppuID);
       BoolPtr(gui, ppuRes, valid);
       // volatile? nah! (Required with std::format on macOS)
@@ -622,7 +567,6 @@ void PPUThreadRegisters(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
     Hex(gui, ppuRegisters, CIA);
     Hex(gui, ppuRegisters, NIA);
     Bool(gui, ppuRegisters, instrFetch);
-    Hex(gui, ppuRegisters, exceptReg);
     Hex(gui, ppuRegisters, progExceptionType);
     Bool(gui, ppuRegisters, exHVSysCall);
   }
@@ -631,14 +575,14 @@ void PPUThreadRegisters(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
 
 bool rebuildThreadDS[6]{};
 bool builtWithDisassembly[6]{};
-void PPUThreadDockSpace(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
-  if (!state)
-    return;
+void PPUThreadDockSpace(Render::GUI* gui, sPPEState* state, ePPUThreadID thr) {
+  if (!state) return;
   if (gui->BeginSimpleWindow(FMT("{} [{}]", static_cast<u8>(thr), state->ppuName))) {
     std::string id = FMT("{}:{}_DS", state->ppuName, static_cast<u8>(thr));
-    sPPUThread &thread = state->ppuThread[thr];
+    sPPUThread& thread = state->ppuThread[thr];
     ImGuiID dsId = ImGui::GetID(id.c_str());
-    if (!ImGui::DockBuilderGetNode(dsId) || (rebuildThreadDS[thread.SPR.PIR] && !builtWithDisassembly[thread.SPR.PIR])) {
+    if (!ImGui::DockBuilderGetNode(dsId)
+        || (rebuildThreadDS[thread.SPR.PIR] && !builtWithDisassembly[thread.SPR.PIR])) {
       ImGui::DockBuilderRemoveNode(dsId);
       ImGui::DockBuilderAddNode(dsId, ImGuiDockNodeFlags_DockSpace);
       if (thread.CIA != 0) {
@@ -658,7 +602,7 @@ void PPUThreadDockSpace(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
       rebuildThreadDS[thread.SPR.PIR] = false;
     }
     ImGui::DockSpace(dsId);
-    
+
     if (thread.CIA != 0) {
       rebuildThreadDS[thread.SPR.PIR] = true;
       PPUThreadDiassembly(gui, state, thr);
@@ -668,18 +612,17 @@ void PPUThreadDockSpace(Render::GUI *gui, sPPEState *state, ePPUThreadID thr) {
   gui->EndWindow();
 }
 
-void PPURegisters(Render::GUI *gui, sPPEState *state) {
+void PPURegisters(Render::GUI* gui, sPPEState* state) {
   if (gui->BeginSimpleWindow(FMT("Registers [{}]", state->ppuID))) {
-    Xe::XCPU::XenonCPU *CPU = XeMain::GetCPU();
-    if (!CPU)
-      return;
+    Xe::XCPU::XenonCPU* CPU = XeMain::GetCPU();
+    if (!CPU) return;
     if (gui->BeginNode("SPR")) {
-      sPPUGlobalSPRs &SPR = state->SPR;
+      sPPUGlobalSPRs& SPR = state->SPR;
       Hex(gui, SPR, SDR1.hexValue);
       Hex(gui, SPR, CTRL.hexValue);
       Hex(gui, SPR, TB.hexValue);
       if (gui->BeginNode("PVR", ImGuiTreeNodeFlags_DefaultOpen)) {
-        uPVR &PVR = SPR.PVR;
+        uPVR& PVR = SPR.PVR;
         Hex(gui, PVR, hexValue);
         U8Hex(gui, PVR, Revision);
         U8Hex(gui, PVR, Version);
@@ -716,30 +659,22 @@ void PPURegisters(Render::GUI *gui, sPPEState *state) {
   gui->EndWindow();
 }
 
-void PPUDockSpace(Render::GUI *gui, PPU *PPU) {
-  if (!PPU)
-    return;
+void PPUDockSpace(Render::GUI* gui, PPU* PPU) {
+  if (!PPU) return;
 
-  sPPEState *state = PPU->GetPPUState();
-  if (!state)
-    return;
+  sPPEState* state = PPU->GetPPUState();
+  if (!state) return;
 
   if (gui->BeginSimpleWindow(state->ppuName, &gui->ppcDebuggerActive[state->ppuID], ImGuiWindowFlags_MenuBar)) {
     if (gui->BeginMenuBar()) {
       bool halted = PPU->IsHalted();
       if (gui->MenuItem(halted ? "Continue" : "Pause")) {
-        if (halted)
-          PPU->Continue();
-        else
-          PPU->Halt();
+        if (halted) PPU->Continue();
+        else PPU->Halt();
       }
-      if (halted && gui->MenuItem("Step")) {
-        PPU->Step();
-      }
+      if (halted && gui->MenuItem("Step")) { PPU->Step(); }
       if (PPU->IsHaltedByGuest()) {
-        if (gui->MenuItem("Continue From Exception Handler")) {
-          PPU->ContinueFromException();
-        }
+        if (gui->MenuItem("Continue From Exception Handler")) { PPU->ContinueFromException(); }
       }
       gui->EndMenuBar();
     }
@@ -764,27 +699,21 @@ void PPUDockSpace(Render::GUI *gui, PPU *PPU) {
     ImGui::DockSpace(dsId);
 
     PPURegisters(gui, state);
-    for (u8 i = 0; i != 2; ++i) {
-      PPUThreadDockSpace(gui, state, static_cast<ePPUThreadID>(i));
-    }
+    for (u8 i = 0; i != 2; ++i) { PPUThreadDockSpace(gui, state, static_cast<ePPUThreadID>(i)); }
   }
   gui->EndWindow();
 }
 
 bool rebuildDock = false;
 u8 activeCountOnBuild = 0;
-void DebuggerDockSpace(Render::GUI *gui) {
+void DebuggerDockSpace(Render::GUI* gui) {
   u8 activeCount = 0;
   for (u8 i = 0; i != 3; ++i) {
-    if (gui->ppcDebuggerActive[i])
-      ++activeCount;
+    if (gui->ppcDebuggerActive[i]) ++activeCount;
   }
-  if (activeCountOnBuild != activeCount && activeCount)
-    rebuildDock = true;
+  if (activeCountOnBuild != activeCount && activeCount) rebuildDock = true;
 
-  if (!activeCount) {
-    return;
-  }
+  if (!activeCount) { return; }
 
   ImGuiID dsId = ImGui::GetID("DebuggerDS");
   if (!ImGui::DockBuilderGetNode(dsId) || rebuildDock) {
@@ -806,22 +735,16 @@ void DebuggerDockSpace(Render::GUI *gui) {
 
         if (gui->ppcDebuggerActive[0]) {
           ImGui::DockBuilderDockWindow("PPU0", left);
-          if (gui->ppcDebuggerActive[1])
-            ImGui::DockBuilderDockWindow("PPU1", right);
-          else if (gui->ppcDebuggerActive[2])
-            ImGui::DockBuilderDockWindow("PPU2", right);
+          if (gui->ppcDebuggerActive[1]) ImGui::DockBuilderDockWindow("PPU1", right);
+          else if (gui->ppcDebuggerActive[2]) ImGui::DockBuilderDockWindow("PPU2", right);
         } else if (gui->ppcDebuggerActive[1]) {
           ImGui::DockBuilderDockWindow("PPU1", left);
-          if (gui->ppcDebuggerActive[2])
-            ImGui::DockBuilderDockWindow("PPU2", right);
+          if (gui->ppcDebuggerActive[2]) ImGui::DockBuilderDockWindow("PPU2", right);
         }
       } else if (activeCount == 1) {
-        if (gui->ppcDebuggerActive[0])
-          ImGui::DockBuilderDockWindow("PPU0", dsId);
-        else if (gui->ppcDebuggerActive[1])
-          ImGui::DockBuilderDockWindow("PPU1", dsId);
-        else if (gui->ppcDebuggerActive[2])
-          ImGui::DockBuilderDockWindow("PPU2", dsId);
+        if (gui->ppcDebuggerActive[0]) ImGui::DockBuilderDockWindow("PPU0", dsId);
+        else if (gui->ppcDebuggerActive[1]) ImGui::DockBuilderDockWindow("PPU1", dsId);
+        else if (gui->ppcDebuggerActive[2]) ImGui::DockBuilderDockWindow("PPU2", dsId);
       }
     }
     ImGui::DockBuilderFinish(dsId);
@@ -829,26 +752,26 @@ void DebuggerDockSpace(Render::GUI *gui) {
   }
   ImGui::DockSpace(dsId);
 
-  Xe::XCPU::XenonCPU *CPU = XeMain::GetCPU();
+  Xe::XCPU::XenonCPU* CPU = XeMain::GetCPU();
   for (u8 ppuID = 0; ppuID != 3; ++ppuID) {
     if (CPU && gui->ppcDebuggerActive[ppuID]) {
-      PPU *PPU = CPU->GetPPU(ppuID);
+      PPU* PPU = CPU->GetPPU(ppuID);
       PPUDockSpace(gui, PPU);
     }
   }
 }
 
-void LogSettings(Render::GUI *gui) {
+void LogSettings(Render::GUI* gui) {
   static s32 logLevel = static_cast<s32>(Config::log.currentLevel);
   gui->Toggle("Advanced", &Config::log.advanced);
   gui->Tooltip("Enables more advanced logging ");
-#ifdef DEBUG_BUILD
+  #ifdef DEBUG_BUILD
   gui->Toggle("Debug Only", &Config::log.debugOnly);
   gui->Tooltip("Enables heavy logging for Debug purposes. Do not enable, causes extreme preformance loss");
-#endif
+  #endif
 }
 
-void GraphicsSettings(Render::GUI *gui) {
+void GraphicsSettings(Render::GUI* gui) {
   gui->Toggle("Enable", &Config::rendering.enable);
   gui->Tooltip("Enable GPU Rendering thread (Disabling this will kill rendering)");
   if (gui->Toggle("Fullscreen", &Config::rendering.isFullscreen)) {
@@ -862,12 +785,12 @@ void GraphicsSettings(Render::GUI *gui) {
   gui->Toggle("Exit on window close", &Config::rendering.quitOnWindowClosure);
 }
 
-void SMCSettings(Render::GUI *gui) {
+void SMCSettings(Render::GUI* gui) {
   Config::smc.uartSystem = gui->InputText("UART System", Config::smc.uartSystem);
-#ifdef _WIN32
+  #ifdef _WIN32
   gui->InputInt("vCOM Port", &Config::smc.comPort);
   gui->Tooltip("Note: a Virtual COM drier is needed, please use a different UART system if you do not have one");
-#endif
+  #endif
   Config::smc.socketIp = gui->InputText("Socket IP", Config::smc.socketIp);
   gui->Tooltip("Decides which IP the UART netcat/socat implementation listens for");
   gui->InputInt("Socket Port", &Config::smc.socketPort);
@@ -876,21 +799,15 @@ void SMCSettings(Render::GUI *gui) {
   gui->Tooltip("17 is Power Button, 18 is Eject Button");
 }
 
-void XCPUSettings(Render::GUI *gui) {
+void XCPUSettings(Render::GUI* gui) {
   gui->Toggle("Debug", &Config::imgui.debugWindow);
   if (XeMain::CPUStarted) {
-    if (gui->Button("Shutdown")) {
-      XeMain::ShutdownCPU();
-    }
+    if (gui->Button("Shutdown")) { XeMain::ShutdownCPU(); }
   } else {
-    if (gui->Button("Start")) {
-      XeMain::StartCPU();
-    }
+    if (gui->Button("Start")) { XeMain::StartCPU(); }
   }
   gui->SameLine();
-  if (gui->Button("Reboot")) {
-    XeMain::Reboot(static_cast<u32>(XeMain::smcCore->GetPowerOnReason()));
-  }
+  if (gui->Button("Reboot")) { XeMain::Reboot(static_cast<u32>(XeMain::smcCore->GetPowerOnReason())); }
   Config::xcpu.ramSize = gui->InputText("RAM Size", Config::xcpu.ramSize);
   gui->Tooltip("Requires an restart of the CPU for things to take effect");
   gui->Toggle("Load Elf", &Config::xcpu.elfLoader);
@@ -904,51 +821,44 @@ void XCPUSettings(Render::GUI *gui) {
   gui->InputInt("Init Skip 2", &Config::xcpu.HW_INIT_SKIP_2);
 }
 
-void PathSettings(Render::GUI *gui) {
+void PathSettings(Render::GUI* gui) {
   Config::filepaths.fuses = gui->InputText("Fuses", Config::filepaths.fuses);
   Config::filepaths.oneBl = gui->InputText("1BL", Config::filepaths.oneBl);
   Config::filepaths.nand = gui->InputText("NAND", Config::filepaths.nand);
   Config::filepaths.elfBinary = gui->InputText("ELF Binary", Config::filepaths.elfBinary);
   Config::filepaths.oddImage = gui->InputText("ODD Image File (iso)", Config::filepaths.oddImage);
-  Config::filepaths.instrTestsPath = gui->InputText("Instruction tests base path (.s)", Config::filepaths.instrTestsPath);
-  Config::filepaths.instrTestsBinPath = gui->InputText("Instruction tests binaries path (.bin)", Config::filepaths.instrTestsBinPath);
-  if (gui->Button("Reload files")) {
-    XeMain::ReloadFiles();
-  }
+  Config::filepaths.instrTestsPath
+    = gui->InputText("Instruction tests base path (.s)", Config::filepaths.instrTestsPath);
+  Config::filepaths.instrTestsBinPath
+    = gui->InputText("Instruction tests binaries path (.bin)", Config::filepaths.instrTestsBinPath);
+  if (gui->Button("Reload files")) { XeMain::ReloadFiles(); }
   gui->Tooltip("Warning: It is *highly* recommended you shutdown the CPU before reloading files");
 }
 
-void ImGuiSettings(Render::GUI *gui) {
+void ImGuiSettings(Render::GUI* gui) {
   gui->Toggle("Demo", &gui->demoWindow);
   if (gui->Toggle("Viewports", &Config::imgui.viewports)) {
-    ImGuiIO &io = ImGui::GetIO();
-    if (Config::imgui.viewports)
-      io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-    else
-      io.ConfigFlags &= ~(ImGuiConfigFlags_ViewportsEnable);
+    ImGuiIO& io = ImGui::GetIO();
+    if (Config::imgui.viewports) io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+    else io.ConfigFlags &= ~(ImGuiConfigFlags_ViewportsEnable);
   }
   gui->Tooltip("Allows ImGui windows to be 'detached' from the main window. Useful for debugging");
   Config::imgui.configPath = gui->InputText("Config path", Config::imgui.configPath);
   gui->Tooltip("Where imgui.ini is present (none is disabled)");
 }
 
-void ConfigSettings(Render::GUI *gui) {
-  if (gui->Button("Save")) {
-    XeMain::SaveConfig();
-  }
+void ConfigSettings(Render::GUI* gui) {
+  if (gui->Button("Save")) { XeMain::SaveConfig(); }
   gui->SameLine();
-  if (gui->Button("Load")) {
-    XeMain::LoadConfig();
-  }
+  if (gui->Button("Load")) { XeMain::LoadConfig(); }
 }
 
-void Render::GUI::OnSwap(Texture *texture) {
+void Render::GUI::OnSwap(Texture* texture) {
   if (Config::imgui.debugWindow) {
-    if (BeginWindow("PPC Debugger", { 1200.f, 700.f }, ImGuiWindowFlags_None, &Config::imgui.debugWindow, { 1000.f, 400.f })) {
+    if (BeginWindow("PPC Debugger", {1200.f, 700.f}, ImGuiWindowFlags_None, &Config::imgui.debugWindow,
+                    {1000.f, 400.f})) {
       if (BeginTabBar("##debug")) {
-        if (!ppcDebuggerDetached) {
-          DebuggerDockSpace(this);
-        }
+        if (!ppcDebuggerDetached) { DebuggerDockSpace(this); }
         for (u8 i = 0; i != 3; ++i) {
           if (TabItemButton("PPU" + std::to_string(i))) {
             rebuildDock = true;
@@ -957,17 +867,14 @@ void Render::GUI::OnSwap(Texture *texture) {
         }
         if (TabItemButton("All")) {
           rebuildDock = true;
-          for (bool &a : ppcDebuggerActive)
-            a ^= true;
+          for (bool& a : ppcDebuggerActive) a ^= true;
         }
-        Xe::XCPU::XenonCPU *CPU = XeMain::GetCPU();
+        Xe::XCPU::XenonCPU* CPU = XeMain::GetCPU();
         if (CPU) {
           bool halted = CPU->IsHalted();
           if (TabItemButton(halted ? "Continue" : "Pause")) {
-            if (halted)
-              CPU->Continue();
-            else
-              CPU->Halt();
+            if (halted) CPU->Continue();
+            else CPU->Halt();
           }
         }
         EndTabBar();
@@ -977,7 +884,7 @@ void Render::GUI::OnSwap(Texture *texture) {
   }
 }
 
-void Render::GUI::Render(Texture *texture) {
+void Render::GUI::Render(Texture* texture) {
   BeginSwap();
   ImGui::NewFrame();
   ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport(), ImGuiDockNodeFlags_PassthruCentralNode);
@@ -986,24 +893,24 @@ void Render::GUI::Render(Texture *texture) {
       ImGui::ShowStyleEditor();
       ImGui::EndMenu();
     }
-#if defined(MICROPROFILE_ENABLED) && MICROPROFILE_ENABLED
+  #if defined(MICROPROFILE_ENABLED) && MICROPROFILE_ENABLED
     if (ImGui::BeginMenu("Dump")) {
-#ifdef MICROPROFILE_WEBSERVER
+    #ifdef MICROPROFILE_WEBSERVER
       if (Button("Open")) {
         std::string url = FMT("http://127.0.0.1:{}/", MicroProfileWebServerPort());
-#ifdef _WIN32
+      #ifdef _WIN32
         ShellExecuteA(nullptr, "open", url.data(), nullptr, nullptr, SW_SHOWNORMAL);
-#elif defined(__linux__)
+      #elif defined(__linux__)
         std::string command = "xdg-open " + url;
         s32 result = std::system(command.c_str());
-#endif
+      #endif
       }
-#else
-      //TODO: Implement some system to display it in ImGui
-#endif
+    #else
+          // TODO: Implement some system to display it in ImGui
+    #endif
       ImGui::EndMenu();
     }
-#endif
+  #endif
     if (ImGui::BeginMenu("CPU")) {
       XCPUSettings(this);
       if (Button("Dump FB")) {
@@ -1012,13 +919,13 @@ void Render::GUI::Render(Texture *texture) {
       }
       if (Button("Dump Memory")) {
         const auto UserDir = Base::FS::GetUserPath(Base::FS::PathType::RootDir);
-        const auto &path = UserDir / "memory.bin";
+        const auto& path = UserDir / "memory.bin";
         std::ofstream f(path, std::ios::out | std::ios::binary | std::ios::trunc);
         if (!f) {
           LOG_ERROR(Xenon, "Failed to open {} for writing", path.filename().string());
         } else {
-          RAM *ramPtr = XeMain::ram.get();
-          f.write(reinterpret_cast<const char *>(ramPtr->GetPointerToAddress(0)), ramPtr->GetSize());
+          RAM* ramPtr = XeMain::ram.get();
+          f.write(reinterpret_cast<const char*>(ramPtr->GetPointerToAddress(0)), ramPtr->GetSize());
           LOG_INFO(Xenon, "RAM dumped to '{}' (size: 0x{:08X})", path.string(), ramPtr->GetSize());
         }
         f.close();
@@ -1040,9 +947,7 @@ void Render::GUI::Render(Texture *texture) {
       Separator();
       GraphicsSettings(this);
       Separator();
-      if (Button("Exit")) {
-        XeRunning = false;
-      }
+      if (Button("Exit")) { XeRunning = false; }
       Tooltip("Cleanly exits the process");
       if (Button("Force Exit")) {
         s32 exitCode = Base::fexit(0);
@@ -1053,18 +958,16 @@ void Render::GUI::Render(Texture *texture) {
     }
     ImGui::EndMainMenuBar();
   }
-  if (demoWindow) {
-    ImGui::ShowDemoWindow(&demoWindow);
-  }
+  if (demoWindow) { ImGui::ShowDemoWindow(&demoWindow); }
   OnSwap(texture);
   ImGui::EndFrame();
   ImGui::Render();
   EndSwap();
 }
 void Render::GUI::SetStyle() {
-  ImGuiIO &io = ImGui::GetIO();
-  ImGuiStyle &style = ImGui::GetStyle();
-  ImVec4 *colors = style.Colors;
+  ImGuiIO& io = ImGui::GetIO();
+  ImGuiStyle& style = ImGui::GetStyle();
+  ImVec4* colors = style.Colors;
   // Colors
   colors[ImGuiCol_Text] = ImColor(255, 255, 255, 255);
   colors[ImGuiCol_TextDisabled] = ImColor(255, 230, 49, 255);
@@ -1123,21 +1026,21 @@ void Render::GUI::SetStyle() {
   // Style config
   style.Alpha = 1.f;
   style.DisabledAlpha = 0.95f;
-  style.WindowPadding = { 10.f, 10.f };
+  style.WindowPadding = {10.f, 10.f};
   style.WindowRounding = 5.f;
   style.WindowBorderSize = 1.f;
-  style.WindowTitleAlign = { 0.f, 0.5f };
+  style.WindowTitleAlign = {0.f, 0.5f};
   style.WindowMenuButtonPosition = ImGuiDir_Left;
   style.ChildRounding = 6.f;
   style.ChildBorderSize = 0.f;
   style.PopupRounding = 0.f;
   style.PopupBorderSize = 1.f;
-  style.FramePadding = { 8.f, 4.f };
+  style.FramePadding = {8.f, 4.f};
   style.FrameRounding = 4.f;
   style.FrameBorderSize = 1.f;
-  style.ItemSpacing = { 4.f, 4.f };
-  style.ItemInnerSpacing = { 2.f, 2.f };
-  style.TouchExtraPadding = { 0.f, 0.f };
+  style.ItemSpacing = {4.f, 4.f};
+  style.ItemInnerSpacing = {2.f, 2.f};
+  style.TouchExtraPadding = {0.f, 0.f};
   style.IndentSpacing = 21.f;
   style.ScrollbarSize = 15.f;
   style.ScrollbarRounding = 0.f;
@@ -1147,8 +1050,8 @@ void Render::GUI::SetStyle() {
   style.TabBorderSize = 1.f;
   style.TabBarBorderSize = 0.f;
   style.TabBarOverlineSize = 0.f;
-  style.ButtonTextAlign = { 0.5f, 0.5f };
-  style.DisplaySafeAreaPadding = { 0.f, 0.f };
+  style.ButtonTextAlign = {0.5f, 0.5f};
+  style.DisplaySafeAreaPadding = {0.f, 0.f};
   style.MouseCursorScale = 1.f;
   // Change some style vars for Viewports
   if (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {

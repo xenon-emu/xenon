@@ -1,11 +1,10 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #include "Base/Arch.h"
-
-#include "Base/Types.h"
 #include "Base/Logging/Log.h"
+#include "Base/Types.h"
 #include "PPCInterpreter.h"
 
 //
@@ -14,32 +13,33 @@
 
 // Excpetion/Bit masks for FPSCR. See PPC Programming Environments Manual, Page 112, Table 3-9.
 enum eFPSCRExceptionBits : u32 {
-  FPSCR_BIT_FX = 1U << (31 - 0), // Floating-point exception summary.
-  FPSCR_BIT_FEX = 1U << (31 - 1), // Floating-point enabled exception summary.
-  FPSCR_BIT_VX = 1U << (31 - 2), // Floating-point invalid operation exception summary.
-  FPSCR_BIT_OX = 1U << (31 - 3), // Floating-point overflow exception.
-  FPSCR_BIT_UX = 1U << (31 - 4), // Floating-point underflow exception.
-  FPSCR_BIT_ZX = 1U << (31 - 5), // Floating-point zero divide exception.
-  FPSCR_BIT_XX = 1U << (31 - 6), // Floating-point inexact exception.
-  FPSCR_BIT_VXSNAN = 1U << (31 - 7), // Floating-point invalid operation exception for SNaN.
-  FPSCR_BIT_VXISI = 1U << (31 - 8), // Floating-point invalid operation exception for Infinity / Infinity.
-  FPSCR_BIT_VXIDI = 1U << (31 - 9), // Floating-point invalid operation exception for Infinity / Infinity.
-  FPSCR_BIT_VXZDZ = 1U << (31 - 10), // Floating-point invalid operation exception for Zero / Zero.
-  FPSCR_BIT_VXIMZ = 1U << (31 - 11), // Floating-point invalid operation exception for Infinity * Zero.
-  FPSCR_BIT_VXVC = 1U << (31 - 12), // Floating-point invalid operation exception for invalid compare.
+  FPSCR_BIT_FX = 1U << (31 - 0),      // Floating-point exception summary.
+  FPSCR_BIT_FEX = 1U << (31 - 1),     // Floating-point enabled exception summary.
+  FPSCR_BIT_VX = 1U << (31 - 2),      // Floating-point invalid operation exception summary.
+  FPSCR_BIT_OX = 1U << (31 - 3),      // Floating-point overflow exception.
+  FPSCR_BIT_UX = 1U << (31 - 4),      // Floating-point underflow exception.
+  FPSCR_BIT_ZX = 1U << (31 - 5),      // Floating-point zero divide exception.
+  FPSCR_BIT_XX = 1U << (31 - 6),      // Floating-point inexact exception.
+  FPSCR_BIT_VXSNAN = 1U << (31 - 7),  // Floating-point invalid operation exception for SNaN.
+  FPSCR_BIT_VXISI = 1U << (31 - 8),   // Floating-point invalid operation exception for Infinity / Infinity.
+  FPSCR_BIT_VXIDI = 1U << (31 - 9),   // Floating-point invalid operation exception for Infinity / Infinity.
+  FPSCR_BIT_VXZDZ = 1U << (31 - 10),  // Floating-point invalid operation exception for Zero / Zero.
+  FPSCR_BIT_VXIMZ = 1U << (31 - 11),  // Floating-point invalid operation exception for Infinity * Zero.
+  FPSCR_BIT_VXVC = 1U << (31 - 12),   // Floating-point invalid operation exception for invalid compare.
   FPSCR_BIT_VXSOFT = 1U << (31 - 21), // Floating-point invalid operation exception for software request.
   FPSCR_BIT_VXSQRT = 1U << (31 - 22), // Floating-point invalid operation exception for invalid square root.
-  FPSCR_BIT_VXCVI = 1U << (31 - 23), // Floating-point invalid operation exception for invalid integer convert.
-  FPSCR_BIT_VE = 1U << (31 - 24), // Floating-point invalid operation exception enable.
-  FPSCR_BIT_OE = 1U << (31 - 25), // IEEE floating-point overflow exception enable.
-  FPSCR_BIT_UE = 1U << (31 - 26), // IEEE floating-point underflow exception enable.
-  FPSCR_BIT_ZE = 1U << (31 - 27), // IEEE floating-point zero divide exception enable.
-  FPSCR_BIT_XE = 1U << (31 - 28), // Floating-point inexact exception enable.
+  FPSCR_BIT_VXCVI = 1U << (31 - 23),  // Floating-point invalid operation exception for invalid integer convert.
+  FPSCR_BIT_VE = 1U << (31 - 24),     // Floating-point invalid operation exception enable.
+  FPSCR_BIT_OE = 1U << (31 - 25),     // IEEE floating-point overflow exception enable.
+  FPSCR_BIT_UE = 1U << (31 - 26),     // IEEE floating-point underflow exception enable.
+  FPSCR_BIT_ZE = 1U << (31 - 27),     // IEEE floating-point zero divide exception enable.
+  FPSCR_BIT_XE = 1U << (31 - 28),     // Floating-point inexact exception enable.
 
   // VX Enabled Exceptions.
-  FPSCR_VX_ANY = FPSCR_BIT_VXSNAN | FPSCR_BIT_VXISI | FPSCR_BIT_VXIDI | FPSCR_BIT_VXZDZ | FPSCR_BIT_VXIMZ | FPSCR_BIT_VXVC |
-  // Software Generated Exceptions.
-  FPSCR_BIT_VXSOFT | FPSCR_BIT_VXSQRT | FPSCR_BIT_VXCVI,
+  FPSCR_VX_ANY = FPSCR_BIT_VXSNAN | FPSCR_BIT_VXISI | FPSCR_BIT_VXIDI | FPSCR_BIT_VXZDZ | FPSCR_BIT_VXIMZ
+                 | FPSCR_BIT_VXVC |
+                 // Software Generated Exceptions.
+                 FPSCR_BIT_VXSOFT | FPSCR_BIT_VXSQRT | FPSCR_BIT_VXCVI,
 
   FPSCR_ANY_X = FPSCR_BIT_OX | FPSCR_BIT_UX | FPSCR_BIT_ZX | FPSCR_BIT_XX | FPSCR_VX_ANY,
 
@@ -47,17 +47,17 @@ enum eFPSCRExceptionBits : u32 {
 };
 
 // Expresions for Siganling bits on NAN's.
-#define FP_DOUBLE_ZERO  0x0000000000000000ULL // Self explanatory.
-#define FP_DOUBLE_QBIT  0x0008000000000000ULL // Floating point Double Quiet bit.
-#define FP_DOUBLE_EXP   0x7FF0000000000000ULL // Floating point Double Exponent.
-#define FP_DOUBLE_FRAC  0x000FFFFFFFFFFFFFULL // Floating point Double Fraction.
-#define FP_DOUBLE_SIGN  0x8000000000000000ULL // Floating point Double Sign.
-#define FP_DOUBLE_FRAC_WIDTH  52              // Floating point Double Fraction Width.
+#define FP_DOUBLE_ZERO       0x0000000000000000ULL // Self explanatory.
+#define FP_DOUBLE_QBIT       0x0008000000000000ULL // Floating point Double Quiet bit.
+#define FP_DOUBLE_EXP        0x7FF0000000000000ULL // Floating point Double Exponent.
+#define FP_DOUBLE_FRAC       0x000FFFFFFFFFFFFFULL // Floating point Double Fraction.
+#define FP_DOUBLE_SIGN       0x8000000000000000ULL // Floating point Double Sign.
+#define FP_DOUBLE_FRAC_WIDTH 52                    // Floating point Double Fraction Width.
 
-#define FP_FLOAT_EXP    0x7F800000 // Floating point Single Exponent.
-#define FP_FLOAT_SIGN   0x80000000 // Floating point Single Sign.
-#define FP_FLOAT_FRAC   0x007FFFFF // Floating point Single Fraction.
-#define FP_FLOAT_ZERO   0x00000000 // Self explanatory.
+#define FP_FLOAT_EXP  0x7F800000 // Floating point Single Exponent.
+#define FP_FLOAT_SIGN 0x80000000 // Floating point Single Sign.
+#define FP_FLOAT_FRAC 0x007FFFFF // Floating point Single Fraction.
+#define FP_FLOAT_ZERO 0x00000000 // Self explanatory.
 
 // Floating-Point Result Flags, used to classify between result types.
 // See PPC Assembly Programming Environments, v2.3, page 114, table 3-10.
@@ -74,30 +74,30 @@ enum eFPResultValueClass {
 };
 
 enum class eFPCCBits {
-  FL = 8,  // <
-  FG = 4,  // >
-  FE = 2,  // =
-  FU = 1,  // ?
+  FL = 8, // <
+  FG = 4, // >
+  FE = 2, // =
+  FU = 1, // ?
 };
 
 // Updates CR1 field based on the contents of FPSCR's FX, FEX, VX and OX bits.
-void PPCInterpreter::ppuSetCR1(sPPEState *ppeState) {
+void PPCInterpreter::ppuSetCR1(sPPEState* ppeState) {
   u8 crValue = (curThread.FPSCR.FX << 3) | (curThread.FPSCR.FEX << 2) | (curThread.FPSCR.VX << 1) | curThread.FPSCR.OX;
   curThread.CR.CR1 = crValue;
 }
 
 // Checks if exceptions regarding FPU are to be generated.
-inline void FPCheckExceptions(sPPEState *ppeState) {
+inline void FPCheckExceptions(sPPEState* ppeState) {
   if (curThread.FPSCR.FEX && (curThread.SPR.MSR.FE0 || curThread.SPR.MSR.FE1)) {
     // Floating program exceptions are enabled and an exception is pending in
     // Floating Point Enabled Exception Summary bit of FPSCR.
-    curThread.exceptReg |= ppuProgramEx;
+    curThread.RaiseExc(ppuProgramEx);
     curThread.progExceptionType = ppuProgExTypeFPU;
   }
 }
 
 // Sets the FEX bit in FPSCR if any of the pending exception bits in it are to be raised.
-inline void FPUpdateExceptionSummaryBit(sPPEState *ppeState) {
+inline void FPUpdateExceptionSummaryBit(sPPEState* ppeState) {
   curThread.FPSCR.VX = (curThread.FPSCR.FPSCR_Hex & FPSCR_VX_ANY) != 0;
   curThread.FPSCR.FEX = ((curThread.FPSCR.FPSCR_Hex >> 22) & (curThread.FPSCR.FPSCR_Hex & FPSCR_ANY_E)) != 0;
 
@@ -105,7 +105,7 @@ inline void FPUpdateExceptionSummaryBit(sPPEState *ppeState) {
 }
 
 // Sets the FX bit in FPSCR and causes said exception if allowed following logic from docs.
-void FPSetException(sPPEState *ppeState, u32 exceptionMask) {
+void FPSetException(sPPEState* ppeState, u32 exceptionMask) {
   // Check for the same exception already being present
   if ((curThread.FPSCR.FPSCR_Hex & exceptionMask) != exceptionMask)
     // Set exception summary
@@ -122,9 +122,8 @@ void FPSetException(sPPEState *ppeState, u32 exceptionMask) {
 inline bool IsSignalingNAN(f64 inValue) {
   // Do a bit cast to u64 to check for bits.
   const u64 integer = std::bit_cast<u64>(inValue);
-  return ((integer & FP_DOUBLE_EXP) == FP_DOUBLE_EXP)
-    && ((integer & FP_DOUBLE_FRAC) != FP_DOUBLE_ZERO)
-    && ((integer & FP_DOUBLE_QBIT) == FP_DOUBLE_ZERO);
+  return ((integer & FP_DOUBLE_EXP) == FP_DOUBLE_EXP) && ((integer & FP_DOUBLE_FRAC) != FP_DOUBLE_ZERO)
+         && ((integer & FP_DOUBLE_QBIT) == FP_DOUBLE_ZERO);
 }
 
 inline f64 MakeQuiet(f64 d) {
@@ -153,22 +152,19 @@ u32 ClassifyDouble(f64 dvalue) {
   const u64 exp = inValue & FP_DOUBLE_EXP;
 
   // Normalized number
-  if (exp > FP_DOUBLE_ZERO && exp < FP_DOUBLE_EXP)
-    return sign ? FP_CLASS_NN : FP_CLASS_PN;
+  if (exp > FP_DOUBLE_ZERO && exp < FP_DOUBLE_EXP) return sign ? FP_CLASS_NN : FP_CLASS_PN;
 
   const u64 mantissa = inValue & FP_DOUBLE_FRAC;
   if (mantissa) {
     // Quiet NAN
-    if (exp)
-      return FP_CLASS_QNAN;
+    if (exp) return FP_CLASS_QNAN;
 
     // Denormalized number
     return sign ? FP_CLASS_ND : FP_CLASS_PD;
   }
 
   // Infinite
-  if (exp)
-    return sign ? FP_CLASS_NINF : FP_CLASS_PINF;
+  if (exp) return sign ? FP_CLASS_NINF : FP_CLASS_PINF;
 
   // Zero
   return sign ? FP_CLASS_NZ : FP_CLASS_PZ;
@@ -180,40 +176,36 @@ u32 ClassifyFloat(f32 fvalue) {
   const u32 exp = inValue & FP_FLOAT_EXP;
 
   // Normalized number
-  if (exp > FP_FLOAT_ZERO && exp < FP_FLOAT_EXP)
-    return sign ? FP_CLASS_NN : FP_CLASS_PN;
+  if (exp > FP_FLOAT_ZERO && exp < FP_FLOAT_EXP) return sign ? FP_CLASS_NN : FP_CLASS_PN;
 
   const u32 mantissa = inValue & FP_FLOAT_FRAC;
   if (mantissa) {
     // Quiet NAN
-    if (exp)
-      return FP_CLASS_QNAN;
+    if (exp) return FP_CLASS_QNAN;
 
     // Denormalized number
     return sign ? FP_CLASS_ND : FP_CLASS_PD;
   }
 
   // Infinite
-  if (exp)
-    return sign ? FP_CLASS_NINF : FP_CLASS_PINF;
+  if (exp) return sign ? FP_CLASS_NINF : FP_CLASS_PINF;
 
   // Zero
   return sign ? FP_CLASS_NZ : FP_CLASS_PZ;
 }
 
-void SetFI(sPPEState *ppeState, u32 FI){
+void SetFI(sPPEState* ppeState, u32 FI) {
   if (FI != 0) { FPSetException(ppeState, FPSCR_BIT_XX); }
   curThread.FPSCR.FI = FI;
 }
 
-inline f32 FPForceSingle(sPPEState *ppeState, f64 value) {
+inline f32 FPForceSingle(sPPEState* ppeState, f64 value) {
   if (curThread.FPSCR.NI) {
     // Emulate a rounding quirk. If the conversion result before rounding is a subnormal single,
     // it's always flushed to zero, even if rounding would have caused it to become normal.
 
     constexpr u64 smallest_normal_single = 0x3810000000000000;
-    const u64 value_without_sign =
-      std::bit_cast<u64>(value) & (FP_DOUBLE_EXP | FP_DOUBLE_FRAC);
+    const u64 value_without_sign = std::bit_cast<u64>(value) & (FP_DOUBLE_EXP | FP_DOUBLE_FRAC);
 
     if (value_without_sign < smallest_normal_single) {
       const u64 flushed_double = std::bit_cast<u64>(value) & FP_DOUBLE_SIGN;
@@ -225,14 +217,12 @@ inline f32 FPForceSingle(sPPEState *ppeState, f64 value) {
   // Emulate standard conversion to single precision.
 
   f32 x = static_cast<f32>(value);
-  if (curThread.FPSCR.NI)
-    x = FPFlushToZero(x);
+  if (curThread.FPSCR.NI) x = FPFlushToZero(x);
   return x;
 }
 
-inline f64 FPForceDouble(sPPEState *ppeState, f64 inValue) {
-  if (curThread.FPSCR.NI)
-    inValue = FPFlushToZero(inValue);
+inline f64 FPForceDouble(sPPEState* ppeState, f64 inValue) {
+  if (curThread.FPSCR.NI) inValue = FPFlushToZero(inValue);
   return inValue;
 }
 
@@ -267,15 +257,14 @@ inline f64 Force25Bit(f64 d) {
   return std::bit_cast<f64>(integral);
 }
 
-void PPCInterpreter::FPCompareOrdered(sPPEState *ppeState, f64 fra, f64 frb) {
+void PPCInterpreter::FPCompareOrdered(sPPEState* ppeState, f64 fra, f64 frb) {
   eFPCCBits compareResult;
 
   if (std::isnan(fra) || std::isnan(frb)) {
     compareResult = eFPCCBits::FU;
     if (IsSignalingNAN(fra) || IsSignalingNAN(frb)) {
       FPSetException(ppeState, FPSCR_BIT_VXSNAN);
-      if (curThread.FPSCR.VE == 0)
-        FPSetException(ppeState, FPSCR_BIT_VXVC);
+      if (curThread.FPSCR.VE == 0) FPSetException(ppeState, FPSCR_BIT_VXVC);
     } else {
       FPSetException(ppeState, FPSCR_BIT_VXVC);
     }
@@ -295,14 +284,13 @@ void PPCInterpreter::FPCompareOrdered(sPPEState *ppeState, f64 fra, f64 frb) {
   ppcUpdateCR(ppeState, _instr.crfd, compareValue);
 }
 
-void PPCInterpreter::FPCompareUnordered(sPPEState *ppeState, f64 fra, f64 frb) {
+void PPCInterpreter::FPCompareUnordered(sPPEState* ppeState, f64 fra, f64 frb) {
   eFPCCBits compareResult;
 
   if (std::isnan(fra) || std::isnan(frb)) {
     compareResult = eFPCCBits::FU;
 
-    if (IsSignalingNAN(fra) || IsSignalingNAN(frb))
-      FPSetException(ppeState, FPSCR_BIT_VXSNAN);
+    if (IsSignalingNAN(fra) || IsSignalingNAN(frb)) FPSetException(ppeState, FPSCR_BIT_VXSNAN);
   } else if (fra < frb) {
     compareResult = eFPCCBits::FL;
   } else if (fra > frb) {
@@ -334,7 +322,7 @@ f64 RoundToIntegerMode(f64 number) {
   return (number + intPrecision) - intPrecision;
 }
 
-void PPCInterpreter::ConvertToInteger(sPPEState *ppeState, eFPRoundMode roundingMode) {
+void PPCInterpreter::ConvertToInteger(sPPEState* ppeState, eFPRoundMode roundingMode) {
   const f64 b = FPRi(frb).asDouble();
   f64 rounded;
   u32 value;
@@ -342,30 +330,22 @@ void PPCInterpreter::ConvertToInteger(sPPEState *ppeState, eFPRoundMode rounding
 
   // To reduce complexity, this takes in a rounding mode in a switch case,
   // rather than always judging based on the emulated CPU rounding mode
-  switch (roundingMode)   {
-  case eFPRoundMode::roundModeNearest:
-    // On generic platforms, the rounding should be assumed to be ties to even
-    // For targeted platforms this would work for any rounding mode,
-    // but it's mainly just kept in to replace roundeven,
-    // due to its lack in the C++17 (and possible lack for future versions)
-    rounded = RoundToIntegerMode(b);
-    break;
-  case eFPRoundMode::roundModeTowardZero:
-    rounded = std::trunc(b);
-    break;
-  case eFPRoundMode::roundModePlusInfinity:
-    rounded = std::ceil(b);
-    break;
-  case eFPRoundMode::roundModeNegativeInfinity:
-    rounded = std::floor(b);
-    break;
-  default:
-    std::unreachable();
+  switch (roundingMode) {
+    case eFPRoundMode::roundModeNearest:
+      // On generic platforms, the rounding should be assumed to be ties to even
+      // For targeted platforms this would work for any rounding mode,
+      // but it's mainly just kept in to replace roundeven,
+      // due to its lack in the C++17 (and possible lack for future versions)
+      rounded = RoundToIntegerMode(b);
+      break;
+    case eFPRoundMode::roundModeTowardZero: rounded = std::trunc(b); break;
+    case eFPRoundMode::roundModePlusInfinity: rounded = std::ceil(b); break;
+    case eFPRoundMode::roundModeNegativeInfinity: rounded = std::floor(b); break;
+    default: std::unreachable();
   }
 
   if (std::isnan(b)) {
-    if (IsSignalingNAN(b))
-      FPSetException(ppeState, FPSCR_BIT_VXSNAN);
+    if (IsSignalingNAN(b)) FPSetException(ppeState, FPSCR_BIT_VXSNAN);
 
     value = 0x80000000;
     FPSetException(ppeState, FPSCR_BIT_VXCVI);
@@ -384,8 +364,12 @@ void PPCInterpreter::ConvertToInteger(sPPEState *ppeState, eFPRoundMode rounding
     s32 signed_value = static_cast<s32>(rounded);
     value = static_cast<u32>(signed_value);
     const f64 di = static_cast<f64>(signed_value);
-    if (di == b) { curThread.FPSCR.clearFIFR(); }
-    else { SetFI(ppeState, 1); curThread.FPSCR.FR = fabs(di) > fabs(b); }
+    if (di == b) {
+      curThread.FPSCR.clearFIFR();
+    } else {
+      SetFI(ppeState, 1);
+      curThread.FPSCR.FR = fabs(di) > fabs(b);
+    }
   }
 
   if (exceptionOccurred) {
@@ -394,23 +378,19 @@ void PPCInterpreter::ConvertToInteger(sPPEState *ppeState, eFPRoundMode rounding
     // Based on HW tests
     // FPRF is not affected
     u64 result = 0xFFF8000000000000ull | value;
-    if (value == 0 && std::signbit(b))
-      result |= 0x100000000ull;
+    if (value == 0 && std::signbit(b)) result |= 0x100000000ull;
 
     FPRi(frd).setValue(result);
   }
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Represents a FP Operation Result, which may set exceptions and/or check for them
 struct FPResult {
-  bool HasNoInvalidExceptions() const {
-    return (exception & FPSCR_VX_ANY) == 0;
-  }
+  bool HasNoInvalidExceptions() const { return (exception & FPSCR_VX_ANY) == 0; }
 
-  void SetException(sPPEState *ppeState, eFPSCRExceptionBits exceptionBits) {
+  void SetException(sPPEState* ppeState, eFPSCRExceptionBits exceptionBits) {
     exception = exceptionBits;
     FPSetException(ppeState, exceptionBits);
   }
@@ -421,14 +401,13 @@ struct FPResult {
 };
 
 // Floating point addition, with exception recording.
-inline FPResult FPAdd(sPPEState *ppeState, f64 fra, f64 frb) {
+inline FPResult FPAdd(sPPEState* ppeState, f64 fra, f64 frb) {
   // Calculate Result.
-  FPResult result{ fra + frb };
+  FPResult result{fra + frb};
 
   // Check for a NaN result.
   if (std::isnan(result.value)) {
-    if (IsSignalingNAN(fra) || IsSignalingNAN(frb))
-      result.SetException(ppeState, FPSCR_BIT_VXSNAN);
+    if (IsSignalingNAN(fra) || IsSignalingNAN(frb)) result.SetException(ppeState, FPSCR_BIT_VXSNAN);
     // Clear FIFR bits as per docs
     curThread.FPSCR.clearFIFR();
 
@@ -445,18 +424,16 @@ inline FPResult FPAdd(sPPEState *ppeState, f64 fra, f64 frb) {
     return result;
   }
 
-  if (std::isinf(fra) || std::isinf(frb))
-    curThread.FPSCR.clearFIFR();
+  if (std::isinf(fra) || std::isinf(frb)) curThread.FPSCR.clearFIFR();
 
   return result;
 }
 
-inline FPResult FPSub(sPPEState *ppeState, f64 fra, f64 frb) {
-  FPResult result{ fra - frb };
+inline FPResult FPSub(sPPEState* ppeState, f64 fra, f64 frb) {
+  FPResult result{fra - frb};
 
   if (std::isnan(result.value)) {
-    if (IsSignalingNAN(fra) || IsSignalingNAN(frb))
-      result.SetException(ppeState, FPSCR_BIT_VXSNAN);
+    if (IsSignalingNAN(fra) || IsSignalingNAN(frb)) result.SetException(ppeState, FPSCR_BIT_VXSNAN);
 
     curThread.FPSCR.clearFIFR();
 
@@ -473,19 +450,16 @@ inline FPResult FPSub(sPPEState *ppeState, f64 fra, f64 frb) {
     return result;
   }
 
-  if (std::isinf(fra) || std::isinf(frb))
-    curThread.FPSCR.clearFIFR();
+  if (std::isinf(fra) || std::isinf(frb)) curThread.FPSCR.clearFIFR();
 
   return result;
 }
 
-
-inline FPResult FPMul(sPPEState *ppeState, f64 fra, f64 frb) {
-  FPResult result{ fra * frb };
+inline FPResult FPMul(sPPEState* ppeState, f64 fra, f64 frb) {
+  FPResult result{fra * frb};
 
   if (std::isnan(result.value)) {
-    if (IsSignalingNAN(fra) || IsSignalingNAN(frb))
-      result.SetException(ppeState, FPSCR_BIT_VXSNAN);
+    if (IsSignalingNAN(fra) || IsSignalingNAN(frb)) result.SetException(ppeState, FPSCR_BIT_VXSNAN);
 
     curThread.FPSCR.clearFIFR();
 
@@ -505,17 +479,16 @@ inline FPResult FPMul(sPPEState *ppeState, f64 fra, f64 frb) {
   return result;
 }
 
-inline FPResult FPDiv(sPPEState *ppeState, f64 fra, f64 frb) {
-  FPResult result{ fra / frb };
+inline FPResult FPDiv(sPPEState* ppeState, f64 fra, f64 frb) {
+  FPResult result{fra / frb};
 
   if (std::isinf(result.value)) {
     if (frb == 0.0) {
       result.SetException(ppeState, FPSCR_BIT_ZX);
       return result;
     }
-  } else if (std::isnan(result.value)) {\
-    if (IsSignalingNAN(fra) || IsSignalingNAN(frb))
-      result.SetException(ppeState, FPSCR_BIT_VXSNAN);
+  } else if (std::isnan(result.value)) {
+    if (IsSignalingNAN(fra) || IsSignalingNAN(frb)) result.SetException(ppeState, FPSCR_BIT_VXSNAN);
 
     curThread.FPSCR.clearFIFR();
 
@@ -527,10 +500,8 @@ inline FPResult FPDiv(sPPEState *ppeState, f64 fra, f64 frb) {
       return result;
     }
 
-    if (frb == 0.0)
-      result.SetException(ppeState, FPSCR_BIT_VXZDZ);
-    else if (std::isinf(fra) && std::isinf(frb))
-      result.SetException(ppeState, FPSCR_BIT_VXIDI);
+    if (frb == 0.0) result.SetException(ppeState, FPSCR_BIT_VXZDZ);
+    else if (std::isinf(fra) && std::isinf(frb)) result.SetException(ppeState, FPSCR_BIT_VXIDI);
 
     result.value = std::numeric_limits<f64>::quiet_NaN();
     return result;
@@ -542,9 +513,8 @@ inline FPResult FPDiv(sPPEState *ppeState, f64 fra, f64 frb) {
 // FMA instructions on PowerPC are weird:
 // They calculate (a * c) + b, but the order in which
 // inputs are checked for NaN is still a, b, c.
-inline FPResult FPMadd(sPPEState *ppeState, f64 fra, f64 frc, f64 frb)
-{
-  FPResult result{ std::fma(fra, frc, frb) };
+inline FPResult FPMadd(sPPEState* ppeState, f64 fra, f64 frc, f64 frb) {
+  FPResult result{std::fma(fra, frc, frb)};
 
   if (std::isnan(result.value)) {
     if (IsSignalingNAN(fra) || IsSignalingNAN(frb) || IsSignalingNAN(frc))
@@ -568,14 +538,13 @@ inline FPResult FPMadd(sPPEState *ppeState, f64 fra, f64 frc, f64 frb)
     return result;
   }
 
-  if (std::isinf(fra) || std::isinf(frb) || std::isinf(frc))
-    curThread.FPSCR.clearFIFR();
+  if (std::isinf(fra) || std::isinf(frb) || std::isinf(frc)) curThread.FPSCR.clearFIFR();
 
   return result;
 }
 
-inline FPResult FPMsub(sPPEState *ppeState, f64 fra, f64 frc, f64 frb) {
-  FPResult result{ std::fma(fra, frc, -frb) };
+inline FPResult FPMsub(sPPEState* ppeState, f64 fra, f64 frc, f64 frb) {
+  FPResult result{std::fma(fra, frc, -frb)};
 
   if (std::isnan(result.value)) {
     if (IsSignalingNAN(fra) || IsSignalingNAN(frb) || IsSignalingNAN(frc))
@@ -599,15 +568,13 @@ inline FPResult FPMsub(sPPEState *ppeState, f64 fra, f64 frc, f64 frb) {
     return result;
   }
 
-  if (std::isinf(fra) || std::isinf(frb) || std::isinf(frc))
-    curThread.FPSCR.clearFIFR();
+  if (std::isinf(fra) || std::isinf(frb) || std::isinf(frc)) curThread.FPSCR.clearFIFR();
 
   return result;
 }
-
 
 // Updates needed fields from FPSCR and CR1 bits if requested
-void PPCInterpreter::ppuUpdateFPSCR(sPPEState *ppeState, f64 op0, f64 op1, bool updateCR, u8 CR) {
+void PPCInterpreter::ppuUpdateFPSCR(sPPEState* ppeState, f64 op0, f64 op1, bool updateCR, u8 CR) {
   // TODO(bitsh1ft3r): Detect NaN's
 
   static_assert(std::endian::native == std::endian::little, "ppcUpdateFPSCR not implemented for Big-Endian arch.");
@@ -634,25 +601,25 @@ void PPCInterpreter::ppuUpdateFPSCR(sPPEState *ppeState, f64 op0, f64 op1, bool 
   // Update CRx bits if requested.
   if (updateCR) {
     switch (CR) {
-    CR_CASE(0)
-    CR_CASE(1)
-    CR_CASE(2)
-    CR_CASE(3)
-    CR_CASE(4)
-    CR_CASE(5)
-    CR_CASE(6)
-    CR_CASE(7)
+      CR_CASE(0)
+      CR_CASE(1)
+      CR_CASE(2)
+      CR_CASE(3)
+      CR_CASE(4)
+      CR_CASE(5)
+      CR_CASE(6)
+      CR_CASE(7)
     }
   }
 }
 
 // Move to Condition Register from FPSCR (x'FC00 0080')
-void PPCInterpreter::PPCInterpreter_mcrfs(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_mcrfs(sPPEState* ppeState) {
   /*
-  * CR4 * BF + 32:4 * BF + 35 <- CR4 * crS + 32:4 * crS + 35
-  * The contents of field crS (bits 4 * crS + 32-4 * crS + 35) of CR are copied to field
-  * crD (bits 4 * crD + 32-4 * crD + 35) of CR.
-  */
+   * CR4 * BF + 32:4 * BF + 35 <- CR4 * crS + 32:4 * crS + 35
+   * The contents of field crS (bits 4 * crS + 32-4 * crS + 35) of CR are copied to field
+   * crD (bits 4 * crD + 32-4 * crD + 35) of CR.
+   */
 
   CHECK_FPU;
 
@@ -665,7 +632,7 @@ void PPCInterpreter::PPCInterpreter_mcrfs(sPPEState *ppeState) {
 }
 
 // Floating Add (Double-Precision) (x'FC00 002A')
-void PPCInterpreter::PPCInterpreter_faddx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_faddx(sPPEState* ppeState) {
   /*
   frD <- (frA) + (frB)
   */
@@ -684,12 +651,11 @@ void PPCInterpreter::PPCInterpreter_faddx(sPPEState *ppeState) {
     curThread.FPSCR.FPRF = ClassifyDouble(result);
   }
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Absolute Value (x'FC00 0210')
-void PPCInterpreter::PPCInterpreter_fabsx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fabsx(sPPEState* ppeState) {
   /*
   frD <- abs(frB)
   */
@@ -699,12 +665,11 @@ void PPCInterpreter::PPCInterpreter_fabsx(sPPEState *ppeState) {
   const f64 frB = FPRi(frb).asDouble();
   FPRi(frd).setValue(std::fabs(frB));
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Add Single (x'EC00 002A')
-void PPCInterpreter::PPCInterpreter_faddsx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_faddsx(sPPEState* ppeState) {
   /*
   frD <- (frA) + (frB)
   */
@@ -723,12 +688,11 @@ void PPCInterpreter::PPCInterpreter_faddsx(sPPEState *ppeState) {
     curThread.FPSCR.FPRF = ClassifyFloat(result);
   }
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Compare Unordered (x'FC00 0000')
-void PPCInterpreter::PPCInterpreter_fcmpu(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fcmpu(sPPEState* ppeState) {
   /*
   if (frA) is a NaN or
      (frB) is a NaN then      c <- 0b0001
@@ -751,7 +715,7 @@ void PPCInterpreter::PPCInterpreter_fcmpu(sPPEState *ppeState) {
 }
 
 // Floating Compare Ordered (x'FC00 0040')
-void PPCInterpreter::PPCInterpreter_fcmpo(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fcmpo(sPPEState* ppeState) {
   /*
   if (frA) is a NaN or
      (frB) is a NaN then c <- 0b0001
@@ -779,14 +743,14 @@ void PPCInterpreter::PPCInterpreter_fcmpo(sPPEState *ppeState) {
 }
 
 // Floating Convert to Integer Word (x'FC00 001C')
-void PPCInterpreter::PPCInterpreter_fctiwx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fctiwx(sPPEState* ppeState) {
   CHECK_FPU;
 
   ConvertToInteger(ppeState, static_cast<eFPRoundMode>(curThread.FPSCR.RN.value()));
 }
 
 // Floating Convert to Integer Double Word(x'FC00 065C')
-void PPCInterpreter::PPCInterpreter_fctidx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fctidx(sPPEState* ppeState) {
   // TODO(bitsh1ft3r): Respect rounding modes!
   // Test correct behavior.
 
@@ -794,7 +758,8 @@ void PPCInterpreter::PPCInterpreter_fctidx(sPPEState *ppeState) {
 
 #if defined(ARCH_X86_64)
   const auto val = _mm_set_sd(FPRi(frb).asDouble());
-  const auto res = _mm_xor_si128(_mm_set1_epi64x(_mm_cvtsd_si64(val)), _mm_castpd_si128(_mm_cmpge_pd(val, _mm_set1_pd(f64(1ull << 63)))));
+  const auto res = _mm_xor_si128(_mm_set1_epi64x(_mm_cvtsd_si64(val)),
+                                 _mm_castpd_si128(_mm_cmpge_pd(val, _mm_set1_pd(f64(1ull << 63)))));
   FPRi(frd).setValue(std::bit_cast<f64>(_mm_cvtsi128_si64(res)));
 #elif defined(ARCH_X86)
   const f64 val = FPRi(frb).asDouble();
@@ -806,22 +771,22 @@ void PPCInterpreter::PPCInterpreter_fctidx(sPPEState *ppeState) {
   FPRi(frd).setValue(std::bit_cast<f64>(flippedVal));
 #elif defined(ARCH_AARCH64)
   #if defined(__ARM_FEATURE_FP64) && __ARM_FEATURE_FP64
-    const float64x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
-    const int64x2_t intVal = vcvtq_s64_f64(val);
-    const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
-    const uint64x2_t cmpMask = vcgeq_f64(val, threshold);
-    const uint64x2_t xorResult = veorq_u64(vreinterpretq_u64_s64(intVal), cmpMask);
-    u64 result = vgetq_lane_u64(xorResult, 0);
+  const float64x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
+  const int64x2_t intVal = vcvtq_s64_f64(val);
+  const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
+  const uint64x2_t cmpMask = vcgeq_f64(val, threshold);
+  const uint64x2_t xorResult = veorq_u64(vreinterpretq_u64_s64(intVal), cmpMask);
+  u64 result = vgetq_lane_u64(xorResult, 0);
   #else
-    const float64x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
-    const int64x2_t intVal = vcvtq_s64_f64(val);
-    const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
-    const uint64x2_t cmpMask = vcgeq_f64(val, threshold);
-    const uint64x2_t xorResult = veorq_u64(vreinterpretq_u64_s64(intVal), cmpMask);
-    u64 result = vgetq_lane_u64(xorResult, 0);
+  const float64x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
+  const int64x2_t intVal = vcvtq_s64_f64(val);
+  const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
+  const uint64x2_t cmpMask = vcgeq_f64(val, threshold);
+  const uint64x2_t xorResult = veorq_u64(vreinterpretq_u64_s64(intVal), cmpMask);
+  u64 result = vgetq_lane_u64(xorResult, 0);
   #endif
 
-    FPRi(frd).setValue(std::bit_cast<f64>(result));
+  FPRi(frd).setValue(std::bit_cast<f64>(result));
 #else
   LOG_ERROR(Xenon, "fctidx: Unsupported arch!");
 #endif
@@ -831,7 +796,7 @@ void PPCInterpreter::PPCInterpreter_fctidx(sPPEState *ppeState) {
 }
 
 // Floating Convert to Integer Double Word with Round toward Zero (x'FC00 065E')
-void PPCInterpreter::PPCInterpreter_fctidzx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fctidzx(sPPEState* ppeState) {
   // This was mostly taken from rpcs3's PPUInterpreter.
   // TODO: Verify.
 
@@ -839,7 +804,8 @@ void PPCInterpreter::PPCInterpreter_fctidzx(sPPEState *ppeState) {
 
 #if defined(ARCH_X86_64)
   const auto val = _mm_set_sd(FPRi(frb).asDouble());
-  const auto res = _mm_xor_si128(_mm_set1_epi64x(_mm_cvttsd_si64(val)), _mm_castpd_si128(_mm_cmpge_pd(val, _mm_set1_pd(f64(1ull << 63)))));
+  const auto res = _mm_xor_si128(_mm_set1_epi64x(_mm_cvttsd_si64(val)),
+                                 _mm_castpd_si128(_mm_cmpge_pd(val, _mm_set1_pd(f64(1ull << 63)))));
   FPRi(frd).setValue(std::bit_cast<f64>(_mm_cvtsi128_si64(res)));
 #elif defined(ARCH_X86)
   // NOTE: This should be properly handled, but this is kind of a "placeholder" for non-SSE platforms
@@ -852,21 +818,21 @@ void PPCInterpreter::PPCInterpreter_fctidzx(sPPEState *ppeState) {
   FPRi(frd).setValue(std::bit_cast<f64>(flippedVal));
 #elif defined(ARCH_AARCH64)
   #if defined(__ARM_FEATURE_FP64) && __ARM_FEATURE_FP64
-    const float64x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
-    const s64 intVal = static_cast<s64>(vgetq_lane_f64(val, 0));
-    const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
-    const uint64x2_t cmpMask = vcgeq_f64(val, threshold);
-    const uint64x2_t xorResult = veorq_u64(vsetq_lane_u64(static_cast<u64>(intVal), vdupq_n_u64(0), 0), cmpMask);
-    u64 result = vgetq_lane_u64(xorResult, 0);
+  const float64x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
+  const s64 intVal = static_cast<s64>(vgetq_lane_f64(val, 0));
+  const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
+  const uint64x2_t cmpMask = vcgeq_f64(val, threshold);
+  const uint64x2_t xorResult = veorq_u64(vsetq_lane_u64(static_cast<u64>(intVal), vdupq_n_u64(0), 0), cmpMask);
+  u64 result = vgetq_lane_u64(xorResult, 0);
   #else
-    const float64x2_t fval = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
-    const s64 intVal = static_cast<s64>(vgetq_lane_f64(fval, 0));
-    const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
-    const uint64x2_t cmpMask = vcgeq_f64(fval, threshold);
-    const uint64x2_t xorResult = veorq_u64(vsetq_lane_u64(static_cast<u64>(intVal), vdupq_n_u64(0), 0), cmpMask);
-    u64 result = vgetq_lane_u64(xorResult, 0);
+  const float64x2_t fval = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
+  const s64 intVal = static_cast<s64>(vgetq_lane_f64(fval, 0));
+  const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(1ULL << 63));
+  const uint64x2_t cmpMask = vcgeq_f64(fval, threshold);
+  const uint64x2_t xorResult = veorq_u64(vsetq_lane_u64(static_cast<u64>(intVal), vdupq_n_u64(0), 0), cmpMask);
+  u64 result = vgetq_lane_u64(xorResult, 0);
   #endif
-    FPRi(frd).setValue(std::bit_cast<f64>(result));
+  FPRi(frd).setValue(std::bit_cast<f64>(result));
 #else
   LOG_ERROR(Xenon, "fctidzx: Unsupported arch!");
 #endif
@@ -876,7 +842,7 @@ void PPCInterpreter::PPCInterpreter_fctidzx(sPPEState *ppeState) {
 }
 
 // Floating Convert to Integer Word with Round toward Zero (x'FC00 001E')
-void PPCInterpreter::PPCInterpreter_fctiwzx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fctiwzx(sPPEState* ppeState) {
   // This was mostly taken from rpcs3's PPUInterpreter.
   // TODO: Verify.
 
@@ -896,24 +862,24 @@ void PPCInterpreter::PPCInterpreter_fctiwzx(sPPEState *ppeState) {
   FPRi(frd).setValue(std::bit_cast<f64>(static_cast<s64>(flippedVal)));
 #elif defined(ARCH_AARCH64)
   #if defined(__ARM_FEATURE_FP64)
-    const float64x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
-    const s32 intVal = static_cast<s32>(vgetq_lane_f64(val, 0));
-    const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(0x80000000));
-    const uint32x4_t cmpMask = vreinterpretq_u32_u64(vcgeq_f64(val, threshold));
-    const uint32x4_t xorResult = veorq_u32(vsetq_lane_u32(static_cast<u32>(intVal), vdupq_n_u32(0), 0), cmpMask);
-    u32 uResult = vgetq_lane_u32(xorResult, 0);
-    const s32 result = static_cast<s32>(uResult);
+  const float64x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
+  const s32 intVal = static_cast<s32>(vgetq_lane_f64(val, 0));
+  const float64x2_t threshold = vdupq_n_f64(static_cast<f64>(0x80000000));
+  const uint32x4_t cmpMask = vreinterpretq_u32_u64(vcgeq_f64(val, threshold));
+  const uint32x4_t xorResult = veorq_u32(vsetq_lane_u32(static_cast<u32>(intVal), vdupq_n_u32(0), 0), cmpMask);
+  u32 uResult = vgetq_lane_u32(xorResult, 0);
+  const s32 result = static_cast<s32>(uResult);
   #else
-    const float64x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
-    const f64 scalar = vgetq_lane_f64(val, 0);
-    const float32x2_t converted = vcvt_f32_f64(val);
-    const f32 result_f32 = vget_lane_f32(converted, 0);
-    const s32 intVal = static_cast<s32>(result_f32);
-    const bool flip = scalar >= static_cast<f64>(0x80000000);
-    const s32 result = flip ? intVal ^ 0x80000000 : intVal;
+  const float64x2_t val = vsetq_lane_f64(FPRi(frb).asDouble(), vdupq_n_f64(0), 0);
+  const f64 scalar = vgetq_lane_f64(val, 0);
+  const float32x2_t converted = vcvt_f32_f64(val);
+  const f32 result_f32 = vget_lane_f32(converted, 0);
+  const s32 intVal = static_cast<s32>(result_f32);
+  const bool flip = scalar >= static_cast<f64>(0x80000000);
+  const s32 result = flip ? intVal ^ 0x80000000 : intVal;
   #endif
 
-    FPRi(frd).setValue(std::bit_cast<f64>(static_cast<s64>(result)));
+  FPRi(frd).setValue(std::bit_cast<f64>(static_cast<s64>(result)));
 #else
   LOG_ERROR(Xenon, "fctiwzx: Unsupported arch!");
 #endif
@@ -923,7 +889,7 @@ void PPCInterpreter::PPCInterpreter_fctiwzx(sPPEState *ppeState) {
 }
 
 // Floating Convert from Integer Double Word (x'FC00 069C')
-void PPCInterpreter::PPCInterpreter_fcfidx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fcfidx(sPPEState* ppeState) {
   /*
   frD <- signedInt64todouble(frB)
   */
@@ -938,7 +904,7 @@ void PPCInterpreter::PPCInterpreter_fcfidx(sPPEState *ppeState) {
 }
 
 // Floating Divide (Double-Precision) (x'FC00 0024')
-void PPCInterpreter::PPCInterpreter_fdivx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fdivx(sPPEState* ppeState) {
   /*
   frD <- (frA) / (frB)
   */
@@ -958,12 +924,11 @@ void PPCInterpreter::PPCInterpreter_fdivx(sPPEState *ppeState) {
     curThread.FPSCR.FPRF = ClassifyDouble(result);
   }
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Divide Single (x'EC00 0024')
-void PPCInterpreter::PPCInterpreter_fdivsx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fdivsx(sPPEState* ppeState) {
   /*
   frD <- f32(frA) / (frB)
   */
@@ -983,12 +948,11 @@ void PPCInterpreter::PPCInterpreter_fdivsx(sPPEState *ppeState) {
     curThread.FPSCR.FPRF = ClassifyFloat(result);
   }
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Multiply-Add (Double-Precision) (x'FC00 003A')
-void PPCInterpreter::PPCInterpreter_fmaddx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fmaddx(sPPEState* ppeState) {
   /*
   frD <- (frA * frC) + frB
   */
@@ -1007,12 +971,11 @@ void PPCInterpreter::PPCInterpreter_fmaddx(sPPEState *ppeState) {
     curThread.FPSCR.FPRF = ClassifyDouble(result);
   }
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Multiply-Add Single (x'EC00 003A')
-void PPCInterpreter::PPCInterpreter_fmaddsx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fmaddsx(sPPEState* ppeState) {
   /*
   frD <- (frA * frC) + frB
   */
@@ -1034,12 +997,11 @@ void PPCInterpreter::PPCInterpreter_fmaddsx(sPPEState *ppeState) {
     curThread.FPSCR.FPRF = ClassifyFloat(result);
   }
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Multiply (Double-Precision) (x'FC00 0032')
-void PPCInterpreter::PPCInterpreter_fmulx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fmulx(sPPEState* ppeState) {
   /*
   frD <- (frA) * (frC)
   */
@@ -1055,17 +1017,16 @@ void PPCInterpreter::PPCInterpreter_fmulx(sPPEState *ppeState) {
     const f64 result = FPForceDouble(ppeState, product.value);
 
     FPRi(frd).setValue(result);
-    
+
     curThread.FPSCR.clearFIFR();
     curThread.FPSCR.FPRF = ClassifyDouble(result);
   }
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Multiply Single (x'EC00 0032')
-void PPCInterpreter::PPCInterpreter_fmulsx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fmulsx(sPPEState* ppeState) {
   /*
   frD <- (frA) * (frC)
   */
@@ -1086,12 +1047,11 @@ void PPCInterpreter::PPCInterpreter_fmulsx(sPPEState *ppeState) {
     curThread.FPSCR.FPRF = ClassifyFloat(result);
   }
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Move Register (Double-Precision) (x'FC00 0090')
-void PPCInterpreter::PPCInterpreter_fmrx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fmrx(sPPEState* ppeState) {
   /*
   frD <- (frB)
   */
@@ -1100,12 +1060,11 @@ void PPCInterpreter::PPCInterpreter_fmrx(sPPEState *ppeState) {
 
   FPRi(frd).setValue(FPRi(frb).asU64());
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Multiply-Subtract (Double-Precision) (x'FC00 0038')
-void PPCInterpreter::PPCInterpreter_fmsubx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fmsubx(sPPEState* ppeState) {
   /*
   frD <- ([frA * frC] - frB)
   */
@@ -1124,12 +1083,11 @@ void PPCInterpreter::PPCInterpreter_fmsubx(sPPEState *ppeState) {
     curThread.FPSCR.FPRF = ClassifyDouble(result);
   }
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Multiply-Subtract Single (x'EC00 0038')
-void PPCInterpreter::PPCInterpreter_fmsubsx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fmsubsx(sPPEState* ppeState) {
   /*
   frD <- ([frA * frC] - frB)
   */
@@ -1149,12 +1107,11 @@ void PPCInterpreter::PPCInterpreter_fmsubsx(sPPEState *ppeState) {
     curThread.FPSCR.FPRF = ClassifyFloat(result);
   }
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Negative Absolute Value
-void PPCInterpreter::PPCInterpreter_fnabsx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fnabsx(sPPEState* ppeState) {
   /*
   frD <- - abs(frB)
   */
@@ -1164,12 +1121,11 @@ void PPCInterpreter::PPCInterpreter_fnabsx(sPPEState *ppeState) {
   const f64 frB = FPRi(frb).asDouble();
   FPRi(frd).setValue(-(std::fabs(frB)));
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Negative Multiply-Add (Double-Precision) (x'FC00 003E')
-void PPCInterpreter::PPCInterpreter_fnmaddx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fnmaddx(sPPEState* ppeState) {
   /*
   frD <- - ([frA * frC] + frB)
   */
@@ -1189,12 +1145,11 @@ void PPCInterpreter::PPCInterpreter_fnmaddx(sPPEState *ppeState) {
     curThread.FPSCR.FPRF = ClassifyDouble(result);
   }
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Negative Multiply-Add Single (x'EC00 003E')
-void PPCInterpreter::PPCInterpreter_fnmaddsx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fnmaddsx(sPPEState* ppeState) {
   /*
   frD <- - ([frA * frC] + frB)
   */
@@ -1215,12 +1170,11 @@ void PPCInterpreter::PPCInterpreter_fnmaddsx(sPPEState *ppeState) {
     curThread.FPSCR.FPRF = ClassifyFloat(result);
   }
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Negate (x'FC00 0050')
-void PPCInterpreter::PPCInterpreter_fnegx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fnegx(sPPEState* ppeState) {
   /*
   frD <- ~ frB[0] || frB[1-63]
   */
@@ -1229,12 +1183,11 @@ void PPCInterpreter::PPCInterpreter_fnegx(sPPEState *ppeState) {
 
   FPRi(frd).setValue(FPRi(frb).asU64() ^ (UINT64_C(1) << 63));
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Negative Multiply-Subtract (Double-Precision)
-void PPCInterpreter::PPCInterpreter_fnmsubx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fnmsubx(sPPEState* ppeState) {
   /*
   frD <- - ([frA * frC] - frB)
   */
@@ -1254,12 +1207,11 @@ void PPCInterpreter::PPCInterpreter_fnmsubx(sPPEState *ppeState) {
     curThread.FPSCR.FPRF = ClassifyDouble(result);
   }
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Negative Multiply-Subtract Single (x'EC00 003C')
-void PPCInterpreter::PPCInterpreter_fnmsubsx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fnmsubsx(sPPEState* ppeState) {
   /*
   frD <- - ([frA * frC] - frB)
   */
@@ -1280,12 +1232,11 @@ void PPCInterpreter::PPCInterpreter_fnmsubsx(sPPEState *ppeState) {
     curThread.FPSCR.FPRF = ClassifyFloat(result);
   }
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Round to Single (x'FC00 0018')
-void PPCInterpreter::PPCInterpreter_frspx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_frspx(sPPEState* ppeState) {
   /*
   frD <- Round_single( frB )
   */
@@ -1306,20 +1257,18 @@ void PPCInterpreter::PPCInterpreter_frspx(sPPEState *ppeState) {
     }
 
     curThread.FPSCR.clearFIFR();
-  }
-  else {
+  } else {
     SetFI(ppeState, b != rounded);
     curThread.FPSCR.FR = fabs(rounded) > fabs(b);
     FPRi(frd).setValue(rounded);
     curThread.FPSCR.FPRF = ClassifyFloat(rounded);
   }
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Subtract (Double-Precision) (x'FC00 0028')
-void PPCInterpreter::PPCInterpreter_fsubx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fsubx(sPPEState* ppeState) {
   /*
     frD <- (frA) - (frB)
     */
@@ -1337,29 +1286,25 @@ void PPCInterpreter::PPCInterpreter_fsubx(sPPEState *ppeState) {
     curThread.FPSCR.FPRF = ClassifyDouble(result);
   }
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Select (Double-Precision)
-void PPCInterpreter::PPCInterpreter_fselx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fselx(sPPEState* ppeState) {
   /*
     frD <- (frA >= 0.0 ? (frC) : (frB))
     */
 
   CHECK_FPU;
 
-  if (FPRi(fra).asDouble() >= 0.0)
-    FPRi(frd).setValue(FPRi(frc).asDouble());
-  else
-    FPRi(frd).setValue(FPRi(frb).asDouble());
+  if (FPRi(fra).asDouble() >= 0.0) FPRi(frd).setValue(FPRi(frc).asDouble());
+  else FPRi(frd).setValue(FPRi(frb).asDouble());
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Subtract Single (x'EC00 0028')
-void PPCInterpreter::PPCInterpreter_fsubsx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fsubsx(sPPEState* ppeState) {
   /*
   frD <- (frA) - (frB)
   */
@@ -1377,12 +1322,11 @@ void PPCInterpreter::PPCInterpreter_fsubsx(sPPEState *ppeState) {
     curThread.FPSCR.FPRF = ClassifyFloat(result);
   }
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Floating Square Root (Double-Precision) (x'FC00 002C')
-void PPCInterpreter::PPCInterpreter_fsqrtx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fsqrtx(sPPEState* ppeState) {
   /*
   frD <- (Sqrt(frB))
   */
@@ -1397,7 +1341,7 @@ void PPCInterpreter::PPCInterpreter_fsqrtx(sPPEState *ppeState) {
 }
 
 // Floating Square Root Single (x'EC00 002C')
-void PPCInterpreter::PPCInterpreter_fsqrtsx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_fsqrtsx(sPPEState* ppeState) {
   /*
   frD <- Single(Sqrt(frB))
   */
@@ -1412,7 +1356,7 @@ void PPCInterpreter::PPCInterpreter_fsqrtsx(sPPEState *ppeState) {
 }
 
 // Floating Reciprocal Square Root Estimate
-void PPCInterpreter::PPCInterpreter_frsqrtex(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_frsqrtex(sPPEState* ppeState) {
   /*
   frD <- Single(1 / Sqrt(frB))
   */
@@ -1424,7 +1368,7 @@ void PPCInterpreter::PPCInterpreter_frsqrtex(sPPEState *ppeState) {
   // The lovely algorithm that Quake III used
   const f32 threehalfs = 1.5f;
   f32 x2 = frb * 0.5f, y = frb;
-  s32 i = *(s32*)&y; // evil floating point bit level hacking
+  s32 i = *(s32*)&y;         // evil floating point bit level hacking
   i = 0x5F3759DF - (i >> 1); // what the fuck?
   y = *(f32*)&i;
   y = y * (threehalfs - (x2 * y * y)); // 1st iteration
@@ -1435,37 +1379,34 @@ void PPCInterpreter::PPCInterpreter_frsqrtex(sPPEState *ppeState) {
 }
 
 // Move from FPSCR (x'FC00 048E')
-void PPCInterpreter::PPCInterpreter_mffsx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_mffsx(sPPEState* ppeState) {
   CHECK_FPU;
 
   FPRi(frd).setValue(static_cast<u64>(GET_FPSCR));
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Move to FPSCR Fields (x'FC00 058E')
-void PPCInterpreter::PPCInterpreter_mtfsfx(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_mtfsfx(sPPEState* ppeState) {
   CHECK_FPU;
 
   const u32 fm = _instr.flm;
   u32 m = 0;
 
   for (u32 i = 0; i < 8; i++) {
-    if ((fm & (1U << i)) != 0)
-      m |= (0xFU << (i * 4));
+    if ((fm & (1U << i)) != 0) m |= (0xFU << (i * 4));
   }
 
   curThread.FPSCR = (curThread.FPSCR.FPSCR_Hex & ~m) | (static_cast<u32>(FPRi(frb).asU64()) & m);
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Move to FPSCR Bit 0 (x'FC00 008C')
-void PPCInterpreter::PPCInterpreter_mtfsb0x(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_mtfsb0x(sPPEState* ppeState) {
   /*
-  Bit crbD of the FPSCR is unset. 
+  Bit crbD of the FPSCR is unset.
   */
 
   CHECK_FPU;
@@ -1474,12 +1415,11 @@ void PPCInterpreter::PPCInterpreter_mtfsb0x(sPPEState *ppeState) {
 
   curThread.FPSCR.FPSCR_Hex &= ~b;
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }
 
 // Move to FPSCR Bit 1 (x'FC00 004C')
-void PPCInterpreter::PPCInterpreter_mtfsb1x(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_mtfsb1x(sPPEState* ppeState) {
   /*
   Bit crbD of the FPSCR is set.
   */
@@ -1489,11 +1429,8 @@ void PPCInterpreter::PPCInterpreter_mtfsb1x(sPPEState *ppeState) {
   const u32 bit = _instr.crbd;
   const u32 b = 0x80000000 >> bit;
 
-  if ((b & FPSCR_ANY_X) != 0)
-    FPSetException(ppeState, b);
-  else
-    curThread.FPSCR |= b;
+  if ((b & FPSCR_ANY_X) != 0) FPSetException(ppeState, b);
+  else curThread.FPSCR |= b;
 
-  if (_instr.rc)
-    ppuSetCR1(ppeState);
+  if (_instr.rc) ppuSetCR1(ppeState);
 }

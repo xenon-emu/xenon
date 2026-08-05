@@ -1,19 +1,19 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
-
-#include <stdio.h>
-#include <memory>
-#include "fmt/format.h"
 
 #include "Base/PathUtil.h"
 #include "Base/StringUtil.h"
-#include "Core/XCPU/PPU/PPU.h"
 #include "Core/XCPU/Interpreter/PPCInterpreter.h"
+#include "Core/XCPU/PPU/PPU.h"
+#include "fmt/format.h"
 
-#define BLR_OPCODE 0x4e800020
-#define curThreadId   ppeState->currentThread
-#define curThread     ppeState->ppuThread[curThreadId]
+#include <memory>
+#include <stdio.h>
+
+#define BLR_OPCODE  0x4e800020
+#define curThreadId ppeState->currentThread
+#define curThread   ppeState->ppuThread[curThreadId]
 
 const u32 START_ADDRESS = 0x10000000;
 
@@ -22,13 +22,13 @@ std::filesystem::path testsBinPath;
 
 typedef std::vector<std::pair<std::string, std::string>> AnnotationList;
 
-void SetRegFromString(sPPEState *ppeState, const char *regName, const char *regValue) {
+void SetRegFromString(sPPEState* ppeState, const char* regName, const char* regValue) {
   s32 value;
   if (sscanf(regName, "r%d", &value) == 1) {
     curThread.GPR[value] = Base::getFromString<u64>(regValue);
   } else if (sscanf(regName, "f%d", &value) == 1) {
     curThread.FPR[value].setValue(Base::getFromString<f64>(regValue));
-  }  else if (sscanf(regName, "v%d", &value) == 1) {
+  } else if (sscanf(regName, "v%d", &value) == 1) {
     curThread.VR[value] = Base::getFromString<Base::Vector128>(regValue);
   } else if (std::strcmp(regName, "cr") == 0) {
     curThread.CR.CR_Hex = static_cast<u32>(Base::getFromString<u64>(regValue));
@@ -37,7 +37,7 @@ void SetRegFromString(sPPEState *ppeState, const char *regName, const char *regV
   }
 }
 
-bool CompareRegWithString(sPPEState *ppeState, const char *regName, const char *regValue, std::string &outRegValue) {
+bool CompareRegWithString(sPPEState* ppeState, const char* regName, const char* regValue, std::string& outRegValue) {
   s32 value = 0;
   if (sscanf(regName, "r%d", &value) == 1) {
     u64 expected = Base::getFromString<u64>(regValue);
@@ -66,7 +66,7 @@ bool CompareRegWithString(sPPEState *ppeState, const char *regName, const char *
     Base::Vector128 expected = Base::getFromString<Base::Vector128>(regValue);
     if (curThread.VR[value] != expected) {
       outRegValue = FMT("[{:08X}, {:08X}, {:08X}, {:08X}]", curThread.VR[value].dsword[0],
-          curThread.VR[value].dsword[1], curThread.VR[value].dsword[2], curThread.VR[value].dsword[3]);
+                        curThread.VR[value].dsword[1], curThread.VR[value].dsword[2], curThread.VR[value].dsword[3]);
       return false;
     }
     return true;
@@ -85,21 +85,18 @@ bool CompareRegWithString(sPPEState *ppeState, const char *regName, const char *
 }
 
 // Searches for a list of tests within a given path.
-bool DiscoverTests(const std::filesystem::path &testsPath,
-  std::vector<std::filesystem::path> &testFiles) {
+bool DiscoverTests(const std::filesystem::path& testsPath, std::vector<std::filesystem::path>& testFiles) {
   auto filesInPath = Base::FS::ListFilesFromPath(testsPath);
-  for (auto &file : filesInPath) {
-    if (file.fileName.extension() == ".s") {
-      testFiles.push_back(testsPath / file.fileName);
-    }
+  for (auto& file : filesInPath) {
+    if (file.fileName.extension() == ".s") { testFiles.push_back(testsPath / file.fileName); }
   }
   return true;
 }
 
 struct TestCase {
-  TestCase(u32 execAddress, std::string &tstName)
-    : executionAddress(execAddress), testName(tstName) {
-  }
+  TestCase(u32 execAddress, std::string& tstName)
+      : executionAddress(execAddress)
+      , testName(tstName) { }
   u32 executionAddress;
   std::string testName;
   AnnotationList testAnnotations;
@@ -107,8 +104,8 @@ struct TestCase {
 
 class TestSuite {
 public:
-  TestSuite(const std::filesystem::path &inSourceFilePath)
-    : sourceFilePath(inSourceFilePath) {
+  TestSuite(const std::filesystem::path& inSourceFilePath)
+      : sourceFilePath(inSourceFilePath) {
     auto name = inSourceFilePath.filename();
     name = name.replace_extension();
 
@@ -119,23 +116,21 @@ public:
 
   bool Load() {
     if (!ReadMap()) {
-      LOG_ERROR(Xenon, "[Testing]: Unable to read map for test {}",
-        Base::FS::PathToUTF8String(sourceFilePath));
+      LOG_ERROR(Xenon, "[Testing]: Unable to read map for test {}", Base::FS::PathToUTF8String(sourceFilePath));
       return false;
     }
     if (!ReadAnnotations()) {
-      LOG_ERROR(Xenon, "[Testing]: Unable to read annotations for test {}",
-        Base::FS::PathToUTF8String(sourceFilePath));
+      LOG_ERROR(Xenon, "[Testing]: Unable to read annotations for test {}", Base::FS::PathToUTF8String(sourceFilePath));
       return false;
     }
     return true;
   }
 
-  const std::string &name() const { return name_; }
-  const std::filesystem::path &inSourceFilePath() const { return sourceFilePath; }
-  const std::filesystem::path &getMapFilePath() const { return mapFilePath; }
-  const std::filesystem::path &getBinFilePath() const { return binFilePath; }
-  std::vector<TestCase> &getTestCases() { return testCases; }
+  const std::string& name() const { return name_; }
+  const std::filesystem::path& inSourceFilePath() const { return sourceFilePath; }
+  const std::filesystem::path& getMapFilePath() const { return mapFilePath; }
+  const std::filesystem::path& getBinFilePath() const { return binFilePath; }
+  std::vector<TestCase>& getTestCases() { return testCases; }
 
 private:
   std::string name_;
@@ -144,82 +139,63 @@ private:
   std::filesystem::path binFilePath;
   std::vector<TestCase> testCases;
 
-  TestCase *FindTestCase(const std::string_view name) {
-    for (auto &testCase : testCases) {
-      if (testCase.testName == name) {
-        return &testCase;
-      }
+  TestCase* FindTestCase(const std::string_view name) {
+    for (auto& testCase : testCases) {
+      if (testCase.testName == name) { return &testCase; }
     }
     return nullptr;
   }
 
   bool ReadMap() {
-    FILE *f = fopen(mapFilePath.string().c_str(), "r");
-    if (!f) {
-      return false;
-    }
+    FILE* f = fopen(mapFilePath.string().c_str(), "r");
+    if (!f) { return false; }
     char lineBuffer[BUFSIZ];
     while (fgets(lineBuffer, sizeof(lineBuffer), f)) {
-      if (!strlen(lineBuffer)) {
-        continue;
-      }
+      if (!strlen(lineBuffer)) { continue; }
       // Format: 0000000000000000 t test_add1\n
-      char *newline = strrchr(lineBuffer, '\n');
-      if (newline) {
-        *newline = 0;
-      }
-      char *t_test_ = strstr(lineBuffer, " t test_");
-      if (!t_test_) {
-        continue;
-      }
+      char* newline = strrchr(lineBuffer, '\n');
+      if (newline) { *newline = 0; }
+      char* t_test_ = strstr(lineBuffer, " t test_");
+      if (!t_test_) { continue; }
       std::string address(lineBuffer, t_test_ - lineBuffer);
       std::string name(t_test_ + strlen(" t test_"));
-      testCases.emplace_back(START_ADDRESS + std::stoul(address, 0, 16),
-        name);
+      testCases.emplace_back(START_ADDRESS + std::stoul(address, 0, 16), name);
     }
     fclose(f);
     return true;
   }
 
   bool ReadAnnotations() {
-    TestCase *currentTestCase = nullptr;
-    FILE *f = fopen(sourceFilePath.string().c_str(), "r");
-    if (!f) {
-      return false;
-    }
+    TestCase* currentTestCase = nullptr;
+    FILE* f = fopen(sourceFilePath.string().c_str(), "r");
+    if (!f) { return false; }
     char lineBuffer[BUFSIZ];
     while (fgets(lineBuffer, sizeof(lineBuffer), f)) {
-      if (!strlen(lineBuffer)) {
-        continue;
-      }
+      if (!strlen(lineBuffer)) { continue; }
       // Eat leading whitespace.
-      char *start = lineBuffer;
-      while (*start == ' ') {
-        ++start;
-      }
+      char* start = lineBuffer;
+      while (*start == ' ') { ++start; }
       if (strncmp(start, "test_", strlen("test_")) == 0) {
         // Global test label.
         std::string label(start + strlen("test_"), strchr(start, ':'));
         currentTestCase = FindTestCase(label);
         if (!currentTestCase) {
           LOG_ERROR(Xenon, "[Testing]: Test case {} not found in corresponding map for {}", label,
-            Base::FS::PathToUTF8String(sourceFilePath));
+                    Base::FS::PathToUTF8String(sourceFilePath));
           return false;
         }
       } else if (strlen(start) > 3 && start[0] == '#' && start[1] == '_') {
         // Annotation.
         // We don't actually verify anything here.
-        char *nextSpace = strchr(start + 3, ' ');
+        char* nextSpace = strchr(start + 3, ' ');
         if (nextSpace) {
           // Looks legit.
           std::string key(start + 3, nextSpace);
           std::string value(nextSpace + 1);
-          while (value.find_last_of(" \t\n") == value.size() - 1) {
-            value.erase(value.end() - 1);
-          }
+          while (value.find_last_of(" \t\n") == value.size() - 1) { value.erase(value.end() - 1); }
           if (!currentTestCase) {
             LOG_ERROR(Xenon, "[Testing]: Annotation outside of test case in {}",
-              Base::FS::PathToUTF8String(sourceFilePath));
+                      Base::FS::PathToUTF8String(sourceFilePath));
             return false;
           }
           currentTestCase->testAnnotations.emplace_back(key, value);
@@ -233,13 +209,13 @@ private:
 
 class TestRunner {
 public:
-  TestRunner(sPPEState *ppeStatePtr, ePPUTestingMode testMode)
-    : ppeState(ppeStatePtr), currentTestMode(testMode) {
-  }
+  TestRunner(sPPEState* ppeStatePtr, ePPUTestingMode testMode)
+      : ppeState(ppeStatePtr)
+      , currentTestMode(testMode) { }
 
-  ~TestRunner() {}
+  ~TestRunner() { }
 
-  bool Setup(TestSuite &suite) {
+  bool Setup(TestSuite& suite) {
     // Clear the RAM area at tests load address.
     PPCInterpreter::MMUMemSet(ppeState, START_ADDRESS, 0x00000000, 0x1000);
 
@@ -247,7 +223,8 @@ public:
     std::vector<u8> testBinData;
     std::ifstream file(suite.getBinFilePath(), std::ios_base::in | std::ios_base::binary);
     if (!file.is_open()) {
-      LOG_CRITICAL(Xenon, "[Testing]: Unable to open file: {} for reading. Check your file path.", suite.getBinFilePath().string());
+      LOG_CRITICAL(Xenon, "[Testing]: Unable to open file: {} for reading. Check your file path.",
+                   suite.getBinFilePath().string());
       return false;
     } else {
       u64 fileSize = 0;
@@ -257,10 +234,10 @@ public:
         fileSize = std::filesystem::file_size(suite.getBinFilePath(), ec);
         if (fileSize == -1 || !fileSize) {
           fileSize = 0;
-          LOG_ERROR(Base_Filesystem, "[Testing]: Failed to retrieve the file size of {} (Error: {})", 
-            suite.getBinFilePath().string(), ec.message());
+          LOG_ERROR(Base_Filesystem, "[Testing]: Failed to retrieve the file size of {} (Error: {})",
+                    suite.getBinFilePath().string(), ec.message());
         }
-      } catch (const std::exception &ex) {
+      } catch (const std::exception& ex) {
         LOG_ERROR(Base_Filesystem, "[Testing]: Exception trying to get file size. Reason: {}", ex.what());
         return false;
       }
@@ -274,7 +251,7 @@ public:
     return true;
   }
 
-  bool Run(TestCase &testCase) {
+  bool Run(TestCase& testCase) {
     // Setup test state from annotations.
     if (!SetupTestState(testCase)) {
       LOG_ERROR(Xenon, "[Testing]: Test setup failed");
@@ -285,7 +262,7 @@ public:
     if (currentTestMode == ePPUTestingMode::Interpreter) {
       bool testRunning = true;
       while (testRunning) {
-        sPPUThread &thread = ppeState->ppuThread[ppeState->currentThread];
+        sPPUThread& thread = ppeState->ppuThread[ppeState->currentThread];
         // Update previous instruction address
         thread.PIA = thread.CIA;
         // Update current instruction address
@@ -299,9 +276,7 @@ public:
           return false;
         }
 
-        if (_ex & ppuInstrStorageEx || _ex & ppuInstrSegmentEx) {
-          return false;
-        }
+        if (thread.HasExc(ppuInstrStorageEx) || thread.HasExc(ppuInstrSegmentEx)) { return false; }
 
         if (thread.CI.opcode == BLR_OPCODE) {
           testRunning = false;
@@ -311,27 +286,21 @@ public:
       }
     }
 
-
     // Assert test state expectations.
     bool testResult = CheckTestResults(testCase);
-    if (!testResult) {
-      LOG_ERROR(Xenon, "[Testing]: Test result failed.");
-    }
+    if (!testResult) { LOG_ERROR(Xenon, "[Testing]: Test result failed."); }
 
     return testResult;
   }
 
-  bool SetupTestState(TestCase &testCase) {
-    sPPUThread &thread = ppeState->ppuThread[ppeState->currentThread];
+  bool SetupTestState(TestCase& testCase) {
+    sPPUThread& thread = ppeState->ppuThread[ppeState->currentThread];
     // Clear registers involved in tests.
-    for (auto &reg : thread.GPR)
-      reg = 0;
+    for (auto& reg : thread.GPR) reg = 0;
 
-    for (auto &reg : thread.FPR)
-      reg.setValue(0.0);
+    for (auto& reg : thread.FPR) reg.setValue(0.0);
 
-    for (auto &reg : thread.VR)
-      reg.x = reg.y = reg.z = reg.w = 0;
+    for (auto& reg : thread.VR) reg.x = reg.y = reg.z = reg.w = 0;
 
     thread.CR.CR_Hex = 0;
     thread.SPR.XER.hexValue = 0;
@@ -345,7 +314,7 @@ public:
     thread.SPR.MSR.VXU = 1;
     thread.SPR.MSR.SF = 0; // Tests in xenia were designed for 32-bit mode of operation.
 
-    for (auto &it : testCase.testAnnotations) {
+    for (auto& it : testCase.testAnnotations) {
       if (it.first == "REGISTER_IN") {
         size_t spacePosition = it.second.find(" ");
         auto regName = it.second.substr(0, spacePosition);
@@ -357,13 +326,11 @@ public:
         auto bytesStr = it.second.substr(spacePos + 1);
         u32 address = std::strtoul(addressStr.c_str(), nullptr, 16);
         auto p = PPCInterpreter::MMUGetPointerFromRAM(address);
-        const char *c = bytesStr.c_str();
+        const char* c = bytesStr.c_str();
         while (*c) {
           while (*c == ' ') ++c;
-          if (!*c) {
-            break;
-          }
-          char ccs[3] = { c[0], c[1], 0 };
+          if (!*c) { break; }
+          char ccs[3] = {c[0], c[1], 0};
           c += 2;
           u32 b = std::strtoul(ccs, nullptr, 16);
           *p = static_cast<u8>(b);
@@ -374,16 +341,15 @@ public:
     return true;
   }
 
-  bool CheckTestResults(TestCase &testCase) {
+  bool CheckTestResults(TestCase& testCase) {
     bool any_failed = false;
-    for (auto &it : testCase.testAnnotations) {
+    for (auto& it : testCase.testAnnotations) {
       if (it.first == "REGISTER_OUT") {
         size_t spacePos = it.second.find(" ");
         auto regName = it.second.substr(0, spacePos);
         auto regValue = it.second.substr(spacePos + 1);
         std::string actualValue;
-        if (!CompareRegWithString(ppeState,
-          regName.c_str(), regValue.c_str(), actualValue)) {
+        if (!CompareRegWithString(ppeState, regName.c_str(), regValue.c_str(), actualValue)) {
           any_failed = true;
           LOG_ERROR(Xenon, "[Testing]: Register {} assert failed:\n", regName);
           LOG_ERROR(Xenon, "[Testing]:   Expected: {} == {}\n", regName, regValue);
@@ -396,17 +362,15 @@ public:
         u32 address = std::strtoul(addressStr.c_str(), nullptr, 16);
         auto baseAddress = PPCInterpreter::MMUGetPointerFromRAM(address);
         auto p = baseAddress;
-        const char *c = bytesStr.c_str();
+        const char* c = bytesStr.c_str();
         bool failed = false;
         size_t count = 0;
         std::string expecteds;
         std::string actuals;
         while (*c) {
           while (*c == ' ') ++c;
-          if (!*c) {
-            break;
-          }
-          char ccs[3] = { c[0], c[1], 0 };
+          if (!*c) { break; }
+          char ccs[3] = {c[0], c[1], 0};
           c += 2;
           count++;
           u32 current_address = address + static_cast<u32>(p - baseAddress);
@@ -432,24 +396,19 @@ public:
     return !any_failed;
   }
 
-  sPPEState *ppeState;
+  sPPEState* ppeState;
   ePPUTestingMode currentTestMode;
 };
 
 #ifdef _WIN32
 int filter(unsigned int code) {
-  if (code == EXCEPTION_ILLEGAL_INSTRUCTION) {
-    return EXCEPTION_EXECUTE_HANDLER;
-  }
+  if (code == EXCEPTION_ILLEGAL_INSTRUCTION) { return EXCEPTION_EXECUTE_HANDLER; }
   return EXCEPTION_CONTINUE_SEARCH;
 }
 #endif // _WIN32
 
-
-void ProtectedRunTest(TestSuite &testSuite, TestRunner &runner,
-  TestCase &testCase, s32 &failedCount,
-  s32 &passedCount)
-{
+void ProtectedRunTest(TestSuite& testSuite, TestRunner& runner, TestCase& testCase, s32& failedCount,
+                      s32& passedCount) {
   try {
 
     if (!runner.Setup(testSuite)) {
@@ -463,18 +422,16 @@ void ProtectedRunTest(TestSuite &testSuite, TestRunner &runner,
       LOG_ERROR(Xenon, "[Testing]:     TEST FAILED");
       ++failedCount;
     }
-  }
-  catch (const std::exception &e) {
+  } catch (const std::exception& e) {
     LOG_ERROR(Xenon, "[Testing]:     TEST FAILED (exception: %s)", e.what());
     ++failedCount;
-  }
-  catch (...) {
+  } catch (...) {
     LOG_ERROR(Xenon, "[Testing]:     TEST FAILED (unknown exception)");
     ++failedCount;
   }
 }
 
-bool PPU::RunInstructionTests(sPPEState *ppeState, ePPUTestingMode testMode) {
+bool PPU::RunInstructionTests(sPPEState* ppeState, ePPUTestingMode testMode) {
   s32 result = 1, failedTestsCount = 0, passedTestsCount = 0;
 
   // Setup paths.
@@ -483,9 +440,7 @@ bool PPU::RunInstructionTests(sPPEState *ppeState, ePPUTestingMode testMode) {
 
   auto testsPathDir = testsPath;
   std::vector<std::filesystem::path> testFilesList;
-  if (!DiscoverTests(testsPathDir, testFilesList)) {
-    return false;
-  }
+  if (!DiscoverTests(testsPathDir, testFilesList)) { return false; }
   if (!testFilesList.size()) {
     LOG_ERROR(Xenon, "[Testing]: No tests were discovered. Check your path or correct files.");
     return false;
@@ -496,7 +451,7 @@ bool PPU::RunInstructionTests(sPPEState *ppeState, ePPUTestingMode testMode) {
   std::vector<TestSuite> testSuites;
 
   bool loadFailed = false;
-  for (auto &testPath : testFilesList) {
+  for (auto& testPath : testFilesList) {
     TestSuite testSuite(testPath);
     if (!testSuite.Load()) {
       LOG_ERROR(Xenon, "[Testing]: Test suite {} failed to load.", Base::FS::PathToUTF8String(testPath));
@@ -505,15 +460,13 @@ bool PPU::RunInstructionTests(sPPEState *ppeState, ePPUTestingMode testMode) {
     }
     testSuites.push_back(std::move(testSuite));
   }
-  if (loadFailed) {
-    LOG_ERROR(Xenon, "[Testing]: One or more test suites failed to load.");
-  }
+  if (loadFailed) { LOG_ERROR(Xenon, "[Testing]: One or more test suites failed to load."); }
 
   LOG_INFO(Xenon, "[Testing]: {} tests loaded.", testSuites.size());
   TestRunner runner(ppeState, testMode);
-  for (auto &testSuite : testSuites) {
+  for (auto& testSuite : testSuites) {
     LOG_INFO(Xenon, "[Testing]: {}.s:", testSuite.name());
-    for (auto &testCase : testSuite.getTestCases()) {
+    for (auto& testCase : testSuite.getTestCases()) {
       LOG_INFO(Xenon, "[Testing]:   - {}", testCase.testName);
       ProtectedRunTest(testSuite, runner, testCase, failedTestsCount, passedTestsCount);
     }
@@ -526,11 +479,16 @@ bool PPU::RunInstructionTests(sPPEState *ppeState, ePPUTestingMode testMode) {
   LOG_INFO(Xenon, "[Testing]: Failed: {}", failedTestsCount);
 
   // Reset the state:
-  sPPUThread &thread = ppeState->ppuThread[ppeState->currentThread];
+  sPPUThread& thread = ppeState->ppuThread[ppeState->currentThread];
   // Clear registers involved in tests.
   for (auto& reg : thread.GPR) { reg = 0; }
   for (auto& reg : thread.FPR) { reg.setValue(0.0); }
-  for (auto& reg : thread.VR) { reg.x = 0; reg.y = 0; reg.z = 0; reg.w = 0; }
+  for (auto& reg : thread.VR) {
+    reg.x = 0;
+    reg.y = 0;
+    reg.z = 0;
+    reg.w = 0;
+  }
   thread.CR.CR_Hex = 0;
   thread.SPR.XER.hexValue = 0;
   thread.SPR.MSR.FP = 0;
