@@ -1122,92 +1122,130 @@ struct sSLBEntry {
   u64 esidReg;
 };
 
-// Traslation lookaside buffer entry.
-// Cache-line aligned for optimal (64-bit) CPU cache performance.
-// Holds a cache of the recently used PTE's.
-struct alignas(64) TLBEntry {
-  u64 VPN;      // Pre calculated VPN for fast comparison
-  u64 pte0;     // Holds the valid bit, AVPN, L bit
-  u64 pte1;     // Contains the RPN and LP bit
-  u64 RPN;      // Pre-calculated RPN for fast lookup
-  u32 pageMask; // Pre-calculated page mask based on page size
-  u8 p;         // Page size (log2)
-  u8 L;         // Large page bit
-  u8 LP;        // Large page selector
-  bool V;       // Entry valid
+// Translation Lookaside Buffer entry:
+//   tag    : compressed tlb tag.
+//   pte0   : HPTE word 0 (V|H|L|AVPN|...). Stored with H bit cleared.
+//   pte1   : HPTE word 1 (RPN|attributes|R|C|LP).
+//   lpidr  : Logical partition ID that owned this insertion. Snapshot of the
+//            owning thread's LPIDR � gates lookups and partition-scoped flushes.
+//   valid  : non-zero when the entry holds a live translation. WRITTEN LAST when
+//            inserting so a concurrent lookup walking the same class can never
+//            observe a half-initialized entry.
+struct TLBEntry {
+  u64 tag;   // TLB match tag
+  u64 pte0;  // HPTE word 0, H bit cleared (& ~PPC_HPTE64_HASH)
+  u64 pte1;  // HPTE word 1 raw
+  u32 lpidr; // logical partition ID at insert
+  u8 valid;  // non-zero when live; written last on insert (publish barrier)
 };
+static_assert(sizeof(TLBEntry) == 32, "TLBEntry should pack to 32 bytes (2 ways/line halved)");
 
-// TLB congruence class - represents one row in the 4-way set associative TLB.
-// Each class contains 4 entries (ways) that can hold translations for the same index.
-struct alignas(64) TLBCongruenceClass {
-  TLBEntry ways[4]; // 4-way set associative
-  u8 lruBits;       // LRU tracking: 6 bits for 4-way pseudo-LRU
-                    // Bit layout: [0:1] = MRU between (0,1), [2:3] = MRU between (2,3),
-                    // [4:5] = MRU between winners
-
-  // Get the LRU way index for replacement
-  inline u8 getLRUWay() const {
-    // Pseudo-LRU: Find least recently used way
-    // Check which pair was least recently used, then which entry in that pair
-    if (lruBits & 0x30) {              // Pair (2,3) more recently used
-      return (lruBits & 0x03) ? 1 : 0; // Return LRU of pair (0,1)
-    } else {
-      return (lruBits & 0x0C) ? 3 : 2; // Return LRU of pair (2,3)
-    }
-  }
-
-  // Update LRU bits when accessing a way
-  inline void updateLRU(u8 accessedWay) {
-    switch (accessedWay) {
-      case 0:
-        lruBits |= 0x01;  // Way 0 more recent than 1
-        lruBits &= ~0x30; // Pair (0,1) more recent than (2,3)
-        break;
-      case 1:
-        lruBits &= ~0x01; // Way 1 more recent than 0
-        lruBits &= ~0x30; // Pair (0,1) more recent than (2,3)
-        break;
-      case 2:
-        lruBits |= 0x04; // Way 2 more recent than 3
-        lruBits |= 0x30; // Pair (2,3) more recent than (0,1)
-        break;
-      case 3:
-        lruBits &= ~0x04; // Way 3 more recent than 2
-        lruBits |= 0x30;  // Pair (2,3) more recent than (0,1)
-        break;
-    }
-  }
-
-  // Invalidate a specific way
-  inline void invalidateWay(u8 way) {
-    ways[way].V = false;
-    ways[way].VPN = 0;
-    ways[way].pte0 = 0;
-    ways[way].pte1 = 0;
-    ways[way].RPN = 0;
-  }
-
-  // Invalidate all ways in this class
-  inline void invalidateAll() {
-    for (u8 i = 0; i < 4; ++i) { invalidateWay(i); }
-    lruBits = 0;
-  }
-};
+// PPE_TLB_Index one-hot way encoding (see CBE Public Registers spec, PPE_TLB_Index).
+// Low 4 bits of the register select which of the 4 ways within a congruence
+// class to read/write; the upper bits index the class.
+//
+//   0b1000 -> way 0
+//   0b0100 -> way 1
+//   0b0010 -> way 2
+//   0b0001 -> way 3
+constexpr u8 TLB_WAY_BITMASK[4] = {0b1000, 0b0100, 0b0010, 0b0001};
 
 // PPE Translation Lookaside Buffer.
-// 1024-entry, 4-way set associative, unified (instruction and data).
-// Organized as 256 congruence classes with 4 entries each.
-// Shared by both PPE threads.
+//
+// 1024 entries organized as 256 congruence classes of 4 ways each.
+// Shared by both PPE threads (PPE TLB is per-PPE, not per-thread).
 struct TLB_Reg {
-  TLBCongruenceClass classes[256];
+  static constexpr u32 NUM_CLASSES = 256;
+  static constexpr u32 NUM_WAYS = 4;
+  static constexpr u32 NUM_ENTRIES = NUM_CLASSES * NUM_WAYS; // 1024
 
-  // Invalidate entire TLB
-  inline void invalidateAll() {
-    for (auto& tlbClass : classes) { tlbClass.invalidateAll(); }
+  // Flat 1024-entry array. entries[class*4 + way] addresses ways linearly.
+  TLBEntry entries[NUM_ENTRIES]{};
+
+  // Pseudo-LRU bits, one byte per congruence class.
+  //   bit 0..1 : MRU within pair (way0, way1)
+  //   bit 2..3 : MRU within pair (way2, way3)
+  //   bit 4..5 : MRU between the two pairs
+  u8 lruBits[NUM_CLASSES]{};
+
+  // Entry access helpers.
+
+  inline TLBEntry& entry(u32 flatIdx) { return entries[flatIdx]; }
+  inline const TLBEntry& entry(u32 flatIdx) const { return entries[flatIdx]; }
+  inline TLBEntry& entryAt(u32 classIdx, u32 way) { return entries[classIdx * NUM_WAYS + way]; }
+  inline const TLBEntry& entryAt(u32 classIdx, u32 way) const { return entries[classIdx * NUM_WAYS + way]; }
+
+  // Map a PPE_TLB_Index register value to a flat entry index.
+  // The low 4 bits are a one-hot way selector, the next 8 bits index the class.
+  // Returns ~0u if the way selector is zero or not one-hot (malformed).
+  static inline u32 flatIndexFromTlbIndexReg(u64 idxReg) {
+    const u32 wayMask = static_cast<u32>(idxReg) & 0xF;
+    // CBE PPE_TLB_Index way field is strictly one-hot, anything else is malformed.
+    if (!std::has_single_bit(wayMask)) return ~0u;
+    // One-hot -> way index via trailing-zero count: 0b1000 -> 0 ... 0b0001 -> 3.
+    const u32 way = (NUM_WAYS - 1) - static_cast<u32>(std::countr_zero(wayMask));
+    const u32 classIdx = static_cast<u32>((idxReg >> 4) & (NUM_CLASSES - 1));
+    return classIdx * NUM_WAYS + way;
   }
 
-  // Invalidate a specific congruence class
-  inline void invalidateClass(u8 classIndex) { classes[classIndex].invalidateAll(); }
+  // Pseudo-LRU
+
+  inline u8 getLRUWay(u32 classIdx) const {
+    const u8 lru = lruBits[classIdx];
+    if (lru & 0x30) {              // pair (2,3) is the MRU pair
+      return (lru & 0x03) ? 1 : 0; // -> LRU of pair (0,1)
+    } else {                       // pair (0,1) is the MRU pair
+      return (lru & 0x0C) ? 3 : 2; // -> LRU of pair (2,3)
+    }
+  }
+
+  inline void updateLRU(u32 classIdx, u8 accessedWay) {
+    u8& lru = lruBits[classIdx];
+    switch (accessedWay) {
+      case 0:
+        lru |= 0x01;
+        lru &= ~0x30;
+        break;
+      case 1:
+        lru &= ~0x01;
+        lru &= ~0x30;
+        break;
+      case 2:
+        lru |= 0x04;
+        lru |= 0x30;
+        break;
+      case 3:
+        lru &= ~0x04;
+        lru |= 0x30;
+        break;
+    }
+  }
+
+  // Pick the way to (re)fill in a congruence class: first invalid way if any,
+  // otherwise the pseudo-LRU victim. Shared by the HW reload and the SW-managed
+  // miss-hint paths so both follow identical "invalid-first, else LRU" policy.
+  inline u32 pickVictimWay(u32 classIdx) const {
+    for (u32 way = 0; way < NUM_WAYS; ++way) {
+      if (!entryAt(classIdx, way).valid) return way;
+    }
+    return getLRUWay(classIdx);
+  }
+
+  // Invalidation
+
+  // Invalidate one way of a congruence class. Only the valid byte needs to be
+  // cleared � the tag/pte fields are dead state until valid is set again.
+  inline void invalidateWay(u32 classIdx, u32 way) { entries[classIdx * NUM_WAYS + way].valid = 0; }
+
+  inline void invalidateClass(u32 classIdx) {
+    for (u32 w = 0; w < NUM_WAYS; ++w) { entries[classIdx * NUM_WAYS + w].valid = 0; }
+    lruBits[classIdx] = 0;
+  }
+
+  inline void invalidateAll() {
+    for (u32 i = 0; i < NUM_ENTRIES; ++i) { entries[i].valid = 0; }
+    for (u32 c = 0; c < NUM_CLASSES; ++c) { lruBits[c] = 0; }
+  }
 };
 
 // Xenon Special Purpose Registers

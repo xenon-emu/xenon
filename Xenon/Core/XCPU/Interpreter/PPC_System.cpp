@@ -180,10 +180,8 @@ void PPCInterpreter::PPCInterpreter_slbmte(sPPEState* ppeState) {
   bool V = QGET(GPRi(rb), 36, 36);
   const u16 Index = QGET(GPRi(rb), 52, 63);
 
-  // VSID is VA 0-52 bit, the remaining 28 bits are adress data
-  // so whe shift 28 bits left here so we only do it once per entry.
-  // This speeds MMU translation since the shift is only done once.
-  VSID = VSID << 28;
+  // Store the pre calculated VSID.
+  VSID = (VSID << 12) & 0x1FFFFFFFFF000ULL;
 
   curThread.SLB[Index].ESID = ESID;
   curThread.SLB[Index].VSID = VSID;

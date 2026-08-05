@@ -98,13 +98,73 @@ struct PPC_HPTE64 {
   u64 pte1;
 };
 
-// Pre-computed comparison masks for each page size.
-// These are used for VPN comparison during TLB lookup.
+static constexpr u32 TLB_IDX_BITS = 10; // log2(NUM_ENTRIES)
+static constexpr u32 TLB_WAYS_LOG2 = 2; // log2(NUM_WAYS)
+static constexpr u32 TLB_SEG_SIZE = 28; // 256 MB segment
+
+// Page-size-dependent runtime tag mask, used to compare TLB tags at a given p size.
+inline u64 mmuTlbTagMask(u8 p) { return ~((4ULL * (1ULL << (TLB_IDX_BITS - TLB_WAYS_LOG2 + p - 3))) - 4ULL); }
+
+// Lookup search TLB tag, holds VSID, L bit and the VA encoded.
+inline u64 mmuTlbSearchTag(u64 VA, u8 p, bool L) {
+  const u64 VSID = (VA & ~0xFFFFFFFULL) >> 16;
+  return (L ? 2ULL : 0ULL) | (VSID << 15) | ((VA & 0xFFFF000ULL) >> 1);
+}
+
+// Store tag built from the real/insert pte0 for the TLB entry. Encodes the L bit, EA page, and PTE0.
+inline u64 mmuTlbStoreTag(u64 pte0, u64 ea) {
+  return ((ea & 0x7FF000ULL) >> 1) | ((pte0 & ~0x7FULL) << 15) | (2ULL * ((pte0 >> 2) & 1)); // L bit -> tag[1]
+}
+
+// Congruence-class set-hash:
+// Returns 0..255: the class index.
+inline u16 mmuTlbClass(u64 VA, u8 p) {
+  const u32 setMask = (1u << (TLB_IDX_BITS - TLB_WAYS_LOG2)) - 1; // 0xFF
+  u64 set = setMask & (VA >> p);
+  const u64 hi = ((0xFFFFFFFull >> p) & ~static_cast<u64>(setMask)) << p;
+  if (hi) set ^= ((hi & VA) >> (TLB_WAYS_LOG2 + 28 - TLB_IDX_BITS)) & ~0xFull; // >> 20
+  return static_cast<u16>(set & 0xFF);
+}
+
+// Note for tlbiel/tlbie:
+// The IS (Invalidation Selector) field is RB[52:53], it chooses how the matching congruence class is invalidated:
+//   IS = 0  selective : clear entries whose (tag & mask) == search_tag  ("as selective as possible", mask widens
+//                       with page size)
+//   IS = 1  reserved  : NO entry is invalidated
+//   IS = 2  partition : clear entries whose LPIDR == the issuing LPIDR
+//   IS = 3  class     : clear EVERY way of the congruence class, no tag test
+
+// TLB IS Fields
+enum MMU_TLB_IS : u8 {
+  MMU_TLB_IS_SELECTIVE = 0,
+  MMU_TLB_IS_RESERVED = 1,
+  MMU_TLB_IS_LPID = 2,
+  MMU_TLB_IS_CLASS = 3,
+};
+
+// Precise, VSID-aware selective invalidation
+// Hash the VA to its single congruence class, build the page-size-masked search tag, and clear only the ways whose
+// stored tag matches.
+inline void mmuTlbInvalidateSelective(sPPEState* ppeState, u64 VA, u8 p, bool L) {
+  const u16 classIdx = mmuTlbClass(VA, p);
+  const u64 tagMask = mmuTlbTagMask(p);
+  const u64 searchTag = mmuTlbSearchTag(VA, p, L) & tagMask;
+
+  for (u32 way = 0; way < TLB_Reg::NUM_WAYS; ++way) {
+    TLBEntry& entry = ppeState->TLB.entryAt(classIdx, way);
+    if (entry.valid && (entry.tag & tagMask) == searchTag) {
+      DEBUGP("[TLB]: Selective invalidate match: class:{:#x} way:{} tag:{:#x} (VA:{:#x} p:{} L:{})", classIdx, way,
+             entry.tag, VA, p, static_cast<u32>(L));
+      entry.valid = 0;
+    }
+  }
+}
+
+// Page-size masks used by the HTAB PTE compare (mmuComparePTE) � unrelated to the TLB tag; left as-is.
 static constexpr u64 TLB_COMPARE_MASK_4KB = 0xFFFFFFFFFFF00000ULL;  // VA[0:59]
 static constexpr u64 TLB_COMPARE_MASK_64KB = 0xFFFFFFFFFF000000ULL; // VA[0:55]
 static constexpr u64 TLB_COMPARE_MASK_16MB = 0xFFFFFFFF00000000ULL; // VA[0:47]
 
-// Get comparison mask for a given page size.
 inline u64 mmuGetCompareMask(u8 p) {
   switch (p) {
     case MMU_PAGE_SIZE_4KB: return TLB_COMPARE_MASK_4KB;
@@ -112,42 +172,6 @@ inline u64 mmuGetCompareMask(u8 p) {
     case MMU_PAGE_SIZE_16MB: return TLB_COMPARE_MASK_16MB;
     default: return TLB_COMPARE_MASK_4KB;
   }
-}
-
-// Compute TLB congruence class index from VA and page size.
-// The TLB is 4-way set associative with 256 congruence classes.
-inline u16 mmuComputeTLBIndex(u64 VA, u8 p) {
-  // TLB indexing formulas from IBM CBE documentation:
-  // 4 KB:  (VA[52:55] xor VA[60:63]) || VA[64:67]
-  // 64 KB: (VA[52:55] xor VA[56:59]) || VA[60:63]
-  // 16 MB: VA[48:55]
-
-  // Extract bit fields (adjusted for 64-bit VA from 80-bit addressing)
-  const u16 bits36_39 = static_cast<u16>((VA >> 24) & 0xF); // VA[52:55] -> bits 36-39 of 64-bit
-  const u16 bits40_43 = static_cast<u16>((VA >> 20) & 0xF); // VA[56:59] -> bits 40-43
-  const u16 bits44_47 = static_cast<u16>((VA >> 16) & 0xF); // VA[60:63] -> bits 44-47
-  const u16 bits48_51 = static_cast<u16>((VA >> 12) & 0xF); // VA[64:67] -> bits 48-51
-
-  switch (p) {
-    case MMU_PAGE_SIZE_64KB: return ((bits36_39 ^ bits40_43) << 4) | bits44_47;
-    case MMU_PAGE_SIZE_16MB: return (VA >> 24) & 0xFF;
-    default: // 4KB
-      return ((bits36_39 ^ bits44_47) << 4) | bits48_51;
-  }
-}
-
-// Fast TLB entry comparison.
-// Returns true if the entry matches the given VA with correct page attributes.
-inline bool mmuCompareTLBEntry(const TLBEntry& entry, u64 VA, u8 p, bool L, bool LP) {
-  // Entry must be valid
-  if (!entry.V) { return false; }
-
-  // Page size attributes must match
-  if (entry.L != L || (L && entry.LP != LP)) { return false; }
-
-  // Compare VPN using pre-computed mask
-  const u64 mask = mmuGetCompareMask(p);
-  return (entry.VPN & mask) == (VA & mask);
 }
 
 inline bool mmuComparePTE(u64 VA, u64 VPN, u64 pte0, u64 pte1, u8 p, bool L, bool LP, u64* RPN) {
@@ -174,12 +198,12 @@ inline bool mmuComparePTE(u64 VA, u64 VPN, u64 pte0, u64 pte1, u8 p, bool L, boo
   if (pteAVPN_0_51 != (VA & 0xFFFFFFFFF0000000)) { return false; }
 
   if (L != pteL) {
-    DEBUGP(Xenon_MMU, "L mismatch: L={}, PTE[L]={}", L, pteL);
+    DEBUGP("L mismatch: L={}, PTE[L]={}", L, pteL);
     return false;
   }
 
   if (L && LP != pteLP) {
-    DEBUGP(Xenon_MMU, "LP mismatch: LP={}, PTE[LP]={}", LP, pteLP);
+    DEBUGP("LP mismatch: LP={}, PTE[LP]={}", LP, pteLP);
     return false;
   }
 
@@ -194,7 +218,9 @@ inline bool mmuComparePTE(u64 VA, u64 VPN, u64 pte0, u64 pte1, u8 p, bool L, boo
 
 // SLB Invalidate All
 void PPCInterpreter::PPCInterpreter_slbia(sPPEState* ppeState) {
-  for (auto& slbEntry : curThread.SLB) { slbEntry.V = 0; }
+  // Entry 0 is the bolted segment and must be preserved across SLBIA. Confirmed thru reverse-engineering efforts.
+  for (size_t i = 1; i < std::size(curThread.SLB); ++i) { curThread.SLB[i].V = 0; }
+
   // Invalidate both ERAT's
   curThread.iERAT.invalidateAll();
   curThread.dERAT.invalidateAll();
@@ -202,36 +228,50 @@ void PPCInterpreter::PPCInterpreter_slbia(sPPEState* ppeState) {
 
 // TLB Invalidate Entry Local
 void PPCInterpreter::PPCInterpreter_tlbiel(sPPEState* ppeState) {
-  const bool LP = (GPRi(rb) & 0x1000) >> 12;
-  const bool invalSelector = (GPRi(rb) & 0x800) >> 11;
+  const u64 rb = GPRi(rb);
+  const u8 IS = static_cast<u8>((rb >> 10) & 0x3); // RB[52:53]
+  const bool LP = (rb & 0x1000) >> 12;
   const u8 p = mmuGetPageSize(ppeState, _instr.l10, LP);
 
-  if (invalSelector) {
-    // Congruence class invalidation: invalidate all 4 ways at the specified index
-    const u8 classIndex = (GPRi(rb) & 0xFF000) >> 12;
-    ppeState->TLB.invalidateClass(classIndex);
+  DEBUGP("[TLBIEL]: RB:{:#x} IS:{} p:{} L:{} LP:{}", rb, static_cast<u32>(IS), p, static_cast<u32>(_instr.l10),
+         static_cast<u32>(LP));
 
-    // Invalidate both ERAT's for the affected address range
-    curThread.iERAT.invalidateAll();
-    curThread.dERAT.invalidateAll();
-  } else {
-    // Selective invalidation: only invalidate entries matching VPN
-    const u64 rb = GPRi(rb);
-    const u64 compareMask = mmuGetCompareMask(p);
-    const u16 tlbIndex = mmuComputeTLBIndex(rb, p);
+  switch (IS) {
+    case MMU_TLB_IS_RESERVED:
+      // IS=1: Invalidate nothing. No ERAT/JIT flush either.
+      LOG_ERROR(Xenon_MMU, "[TLBIEL]: IS=1 (reserved), UNIMPLEMENTED! Please report to Xenon devs.");
+      return;
 
-    TLBCongruenceClass& tlbClass = ppeState->TLB.classes[tlbIndex];
-    for (u8 way = 0; way < 4; ++way) {
-      TLBEntry& entry = tlbClass.ways[way];
-      if (entry.V && ((entry.VPN & compareMask) == (rb & compareMask))) {
-        DEBUGP(Xenon_MMU, "[TLB]: TLBIEL: Invalidating entry at class {} way {} VPN: {:#x}", tlbIndex, way, entry.VPN);
-        tlbClass.invalidateWay(way);
-      }
+    case MMU_TLB_IS_SELECTIVE: {
+      // IS=0: Be as selective as possible when invalidating.
+      mmuTlbInvalidateSelective(ppeState, rb, p, _instr.l10);
+
+      // Invalidate other caches
+      curThread.iERAT.invalidateAll();
+      curThread.dERAT.invalidateAll();
+      break;
     }
 
-    // Selective ERAT invalidation
-    curThread.iERAT.invalidateAll();
-    curThread.dERAT.invalidateAll();
+    case MMU_TLB_IS_LPID: {
+      // IS=2: partition-scoped. Unused on Xenon apparently.
+      LOG_ERROR(Xenon_MMU, "[TLBIEL]: IS=2: Partition flush based on Logical Partition ID (LPID), UNIMPLEMENTED!"
+                           "Please report to Xenon devs.");
+
+      // Perform invalidation and notify the user. This isn't implemented.
+      curThread.iERAT.invalidateAll();
+      curThread.dERAT.invalidateAll();
+      break;
+    }
+
+    case MMU_TLB_IS_CLASS: {
+      // IS=3: class level. Invalidate every way of the congruence class. The class index is carried in RB[12:19].
+      const u16 classIndex = static_cast<u16>((rb & 0xFF000) >> 12);
+      ppeState->TLB.invalidateClass(classIndex);
+
+      curThread.iERAT.invalidateAll();
+      curThread.dERAT.invalidateAll();
+      break;
+    }
   }
 }
 
@@ -242,6 +282,7 @@ void PPCInterpreter::PPCInterpreter_tlbiel(sPPEState* ppeState) {
   and ignores the content of the Segment Registers. Entries that satisfy the search criteria are made invalid so will
   not be used to translate subsequent storage accesses.
 */
+
 // rB is the GPR containing the EA for the search
 // L is the page size
 
@@ -252,23 +293,28 @@ void PPCInterpreter::PPCInterpreter_tlbie(sPPEState* ppeState) {
   const u8 p = mmuGetPageSize(ppeState, _instr.l10, LP);
   const u64 pageSize = 1ULL << p;
   const u64 pageMask = pageSize - 1;
+  const u64 pageBase = EA & ~pageMask;
 
 #ifdef DEBUGP
   if (Config::log.advanced)
-    DEBUGP(Xenon, "tlbie, EA:0x{:X} | PageSize:{} | Full:0x{:X} | LP:{}", EA, p, pageSize, LP ? "true" : "false");
+    DEBUGP("[TLBIE]: EA: {:#x} | PageSize: {} | Full: {:#x} | LP:{}", EA, p, pageSize, LP ? "true" : "false");
 #endif
 
-  // Invalidate ERAT entries for the entire page (not byte-by-byte)
-  const u64 pageBase = EA & ~pageMask;
-  curThread.iERAT.invalidateElement(pageBase);
-  curThread.dERAT.invalidateElement(pageBase);
+  // IS is forced to 0 (selective).
+  mmuTlbInvalidateSelective(ppeState, EA, p, _instr.l10);
+
+  // Broadcast: flush the per-thread ERAT page on every PPE thread.
+  for (auto& thread : ppeState->ppuThread) {
+    thread.iERAT.invalidateElement(pageBase);
+    thread.dERAT.invalidateElement(pageBase);
+  }
 }
 
 // TLB Synchronize
 void PPCInterpreter::PPCInterpreter_tlbsync(sPPEState* ppeState) {
   // Do nothing
 #ifdef DEBUGP
-  if (Config::log.advanced) DEBUGP(Xenon, "tlbsync");
+  if (Config::log.advanced) DEBUGP("tlbsync");
 #endif
 }
 
@@ -301,158 +347,146 @@ u8 PPCInterpreter::mmuGetPageSize(sPPEState* ppeState, bool L, u8 LP) {
   }
 }
 
-// This is done when TLB Reload is in software-controlled mode.
+//
+// Software-managed TLB insert
+//
+// The flow:
+//   1. Take the flat entry index directly from PPE_TLB_Index. The register encodes (class_index << 4) |
+//      one_hot_way_bitmask; Convert that to (class * num_ways + (num_ways - 1 - bsf(way_mask))).
+//   2. Reconstruct the page EA from PPE_TLB_VPN.AVPN bits [37..47] and from pte0 bits [7..17]
+//   3. Compute the lpid_bit from VPN bit 12 when L=1, else 0.
+//   4. Build the store tag.
 void PPCInterpreter::mmuAddTlbEntry(sPPEState* ppeState) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUAddTlbEntry", MP_AUTO);
 
-  const u64 tlbIndex = ppeState->SPR.PPE_TLB_Index.hexValue;
-  const u64 tlbVpn = ppeState->SPR.PPE_TLB_VPN.hexValue;
-  const u64 tlbRpn = ppeState->SPR.PPE_TLB_RPN.hexValue;
+  const u64 tlbIndexReg = ppeState->SPR.PPE_TLB_Index.hexValue;
+  const u64 tlbVpnReg = ppeState->SPR.PPE_TLB_VPN.hexValue;
+  const u64 tlbRpnReg = ppeState->SPR.PPE_TLB_RPN.hexValue;
 
-  // Extract index and set from PPE_TLB_Index
-  const u8 TI = (tlbIndex >> 4) & 0xFF; // TLB Index (0-255)
-  const u8 TS = tlbIndex & 0xF;         // TLB Set (encoded as bitmask)
+  // The PPE_TLB_VPN register is the pte0 image (V|H|L|AVPN bits). The PPE_TLB_RPN register is the pte1
+  // image (RPN|attrs|R|C|LP). Stored pte0 has the H bit cleared.
+  const u64 storedPte0 = tlbVpnReg & ~PPC_HPTE64_HASH;
+  const u64 storedPte1 = tlbRpnReg;
 
-  // Calculate VPN from AVPN and LVPN
-  const u64 AVPN = (tlbVpn & PPC_HPTE64_AVPN) << 16;
-  const u64 LVPN = (tlbIndex & 0xE00000000000ULL) >> 25;
-  const u64 VPN = AVPN | LVPN;
-
-  // Extract page attributes
-  const bool L = (tlbVpn & PPC_HPTE64_LARGE) >> 2;
-  const bool LP = (tlbRpn & PPC_HPTE64_LP) >> 12;
+  // Page attributes for diagnostics / EA reconstruction.
+  const bool L = (tlbVpnReg & PPC_HPTE64_LARGE) >> 2;
+  const bool LP = (tlbRpnReg & PPC_HPTE64_LP) >> 12;
   const u8 p = mmuGetPageSize(ppeState, L, LP);
 
-  // Pre-calculate RPN for fast lookup
-  const u64 RPN = L ? (tlbRpn & PPC_HPTE64_RPN_LP) : (tlbRpn & PPC_HPTE64_RPN_NO_LP);
+  // Reconstruct page EA for the store tag's EA[12:22] slice. The low VA bits (the LVPN, VA[12:22]) are carried
+  // by PPE_TLB_Index[37..47], not by PPE_TLB_VPN. That register only holds the AVPN (high VA bits), which reach
+  // the tag through the (pte0 & ~0x7F) term of mmuTlbStoreTag.
+  const u64 eaPage = ((((tlbIndexReg >> 37) & 0x7FF) | ((storedPte0 >> 7) << 11)) << 12);
+
+  // Resolve flat entry index from PPE_TLB_Index.
+  const u32 flatIdx = TLB_Reg::flatIndexFromTlbIndexReg(tlbIndexReg);
+  if (flatIdx == ~0u) {
+    DEBUGP("[TLB]: mmuAddTlbEntry: malformed PPE_TLB_Index {:#x}", tlbIndexReg);
+    return;
+  }
+  const u32 classIdx = flatIdx / TLB_Reg::NUM_WAYS;
+  const u32 wayIdx = flatIdx % TLB_Reg::NUM_WAYS;
+
+  TLBEntry& entry = ppeState->TLB.entry(flatIdx);
+
+  // If we're replacing a live entry, invalidate it first.
+  if (entry.valid) { entry.valid = 0; }
+
+  // Populate everything BEFORE setting valid.
+  // Store tag is the un-masked tag, the lookup masks it given that the p bit is controlled by the lookup.
+  entry.tag = mmuTlbStoreTag(storedPte0, eaPage);
+  entry.pte0 = storedPte0;
+  entry.pte1 = storedPte1;
+  entry.lpidr = ppeState->SPR.LPIDR.hexValue;
 
 #ifdef DEBUGP
   if (XeMain::GetCPU()) {
     PPU* ppu = XeMain::GetCPU()->GetPPU(ppeState->ppuID);
-    if (ppu && ppu->traceFile) { fprintf(ppu->traceFile, "TLB[%d:%d] map 0x%llx -> 0x%llx\n", TS, TI, tlbVpn, tlbRpn); }
-  }
-#endif
-
-  DEBUGP(Xenon_MMU, "[TLB]: Adding entry: Class: {:#x}, Set: {:#b}, VPN: {:#x}, RPN: {:#x}", TI, TS, VPN, RPN);
-
-  // Map TS bitmask to way index
-  u8 wayIndex;
-  switch (TS) {
-    case 0b1000: wayIndex = 0; break;
-    case 0b0100: wayIndex = 1; break;
-    case 0b0010: wayIndex = 2; break;
-    case 0b0001: wayIndex = 3; break;
-    default: wayIndex = 0; break;
-  }
-
-  TLBCongruenceClass& tlbClass = ppeState->TLB.classes[TI];
-  TLBEntry& entry = tlbClass.ways[wayIndex];
-
-  entry.V = true;
-  entry.VPN = VPN;
-  entry.pte0 = tlbVpn;
-  entry.pte1 = tlbRpn;
-  entry.RPN = RPN;
-  entry.p = p;
-  entry.L = L;
-  entry.LP = LP;
-  entry.pageMask = (1U << p) - 1;
-
-  // Update LRU
-  tlbClass.updateLRU(wayIndex);
-}
-
-// This is done when TLB Reload is in hardware-controlled mode.
-void PPCInterpreter::mmuAddTlbEntryHardware(sPPEState* ppeState, u64 VA, u64 pte0, u64 pte1, u8 p, bool L, bool LP) {
-  MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUAddTlbEntryHardware", MP_AUTO);
-
-  const u16 tlbIndex = mmuComputeTLBIndex(VA, p);
-
-  // Pre-calculate RPN for fast lookup
-  const u64 RPN = L ? (pte1 & PPC_HPTE64_RPN_LP) : (pte1 & PPC_HPTE64_RPN_NO_LP);
-
-  // Calculate VPN (masked by page size)
-  const u64 compareMask = mmuGetCompareMask(p);
-  const u64 VPN = VA & compareMask;
-
-  TLBCongruenceClass& tlbClass = ppeState->TLB.classes[tlbIndex];
-
-  // Select victim way
-  // 1. Check for invalid entries
-  u8 wayIndex = tlbClass.getLRUWay();
-  for (u8 way = 0; way < 4; ++way) {
-    if (!tlbClass.ways[way].V) {
-      wayIndex = way;
-      break;
+    if (ppu && ppu->traceFile) {
+      fprintf(ppu->traceFile, "TLB[%d:%d] map 0x%llx -> 0x%llx\n", static_cast<int>(tlbIndexReg & 0xF),
+              static_cast<int>((tlbIndexReg >> 4) & 0xFF), storedPte0, storedPte1);
     }
   }
+#endif
+  DEBUGP("[TLB]: Software insert: class: {:#x} way: {} tag: {:#x} PTE0: {:#x} PTE1: {:#x} p: {}", classIdx, wayIdx,
+         entry.tag, storedPte0, storedPte1, p);
 
-  DEBUGP(Xenon_MMU,
-         "[TLB]: Hardware reload: Class: {:#x}, Way: {}, VPN: {:#x}, RPN: "
-         "{:#x}, p: {}",
-         tlbIndex, wayIndex, VPN, RPN, p);
-
-  TLBEntry& entry = tlbClass.ways[wayIndex];
-
-  entry.V = true;
-  entry.VPN = VPN;
-  entry.pte0 = pte0;
-  entry.pte1 = pte1;
-  entry.RPN = RPN;
-  entry.p = p;
-  entry.L = L;
-  entry.LP = LP;
-  entry.pageMask = (1ULL << p) - 1;
-
-  // Update LRU
-  tlbClass.updateLRU(wayIndex);
+  // Atomic publish � readers either see valid==0 (skip) or a fully written entry.
+  entry.valid = 1;
+  ppeState->TLB.updateLRU(classIdx, static_cast<u8>(wayIdx));
 }
 
-// Translation Lookaside Buffer Search
+// Hardware-managed TLB insert (HTAB walk path).
+void PPCInterpreter::mmuAddTlbEntryHardware(sPPEState* ppeState, u64 VA, u64 pte0, u64 pte1, u8 p, bool L,
+                                            bool /*LP*/) {
+  MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUAddTlbEntryHardware", MP_AUTO);
+
+  const u16 classIdx = mmuTlbClass(VA, p);
+
+  // pte0 stored with H cleared.
+  const u64 storedPte0 = pte0 & ~PPC_HPTE64_HASH;
+
+  // Victim selection � invalid ways first, then pseudo-LRU.
+  const u32 wayIdx = ppeState->TLB.pickVictimWay(classIdx);
+
+  TLBEntry& entry = ppeState->TLB.entryAt(classIdx, wayIdx);
+  if (entry.valid) { entry.valid = 0; }
+
+  // Un-masked store tag from the freshly-walked HPTE.
+  entry.tag = mmuTlbStoreTag(storedPte0, VA);
+  entry.pte0 = storedPte0;
+  entry.pte1 = pte1;
+  entry.lpidr = ppeState->SPR.LPIDR.hexValue;
+
+  DEBUGP("[TLB]: Hardware reload: class: {:#x} way: {} tag: {:#x} PTE0: {:#x} PTE1: {:#x} p: {} L: {}", classIdx,
+         wayIdx, entry.tag, storedPte0, pte1, p, L);
+
+  entry.valid = 1;
+  ppeState->TLB.updateLRU(classIdx, static_cast<u8>(wayIdx));
+}
+
+// TLB lookup
 bool PPCInterpreter::mmuSearchTlbEntry(sPPEState* ppeState, u64* RPN, u64 VA, u8 p, bool L, bool LP) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMUSearchTlbEntry", MP_AUTO);
 
-  const u16 classIndex = mmuComputeTLBIndex(VA, p);
-  TLBCongruenceClass& tlbClass = ppeState->TLB.classes[classIndex];
+  // Runtime tag + page-size mask + masked compare, mask is generated using the provide p size.
+  const u16 classIdx = mmuTlbClass(VA, p);
+  const u64 tagMask = mmuTlbTagMask(p);
+  const u64 search = mmuTlbSearchTag(VA, p, L) & tagMask;
 
-  // Search all 4 ways in the congruence class
-  for (u8 way = 0; way < 4; ++way) {
-    const TLBEntry& entry = tlbClass.ways[way];
+  // Partition scoping, gates every hit on entry->lpidr == lpid, in addition to the masked tag compare.
+  // Entries inserted under a different LPIDR never satisfy a lookup, so a partition switch
+  // transparently shadows stale translations.
+  const u32 lpid = static_cast<u32>(ppeState->SPR.LPIDR.hexValue);
 
-    if (mmuCompareTLBEntry(entry, VA, p, L, LP)) {
-      // TLB Hit - return pre-calculated RPN and update LRU
-      *RPN = entry.RPN;
-      tlbClass.updateLRU(way);
-      return true;
-    }
+  // Walk the four ways of the class over contiguous memory: one multiply to find
+  // the class base, then linear indexing (vs recomputing class*4+way each step).
+  TLBEntry* ways = &ppeState->TLB.entryAt(classIdx, 0);
+  for (u32 way = 0; way < TLB_Reg::NUM_WAYS; ++way) {
+    TLBEntry& entry = ways[way];
+
+    // valid==0 entries can be safely skipped, given that valid is only set after an insert has fully finished.
+    if (!entry.valid) continue;
+    if (entry.lpidr != lpid) continue;
+    if ((entry.tag & tagMask) != search) continue;
+
+    // Tag hit. Derive RPN from the stored pte1
+    const bool entryL = (entry.pte0 & PPC_HPTE64_LARGE) >> 2;
+    const bool entryLP = (entry.pte1 & PPC_HPTE64_LP) >> 12;
+    if (entryL != L) continue;
+    if (L && entryLP != LP) continue;
+
+    *RPN = entryL ? (entry.pte1 & PPC_HPTE64_RPN_LP) : (entry.pte1 & PPC_HPTE64_RPN_NO_LP);
+    ppeState->TLB.updateLRU(classIdx, static_cast<u8>(way));
+    return true;
   }
 
-  // TLB Miss - update index hint for software management
+  // Miss. Update the PPE_TLB_Index_Hint with a replacement suggestion for software-managed mode so the kernel's
+  // TLB-miss handler can MTSPR PPE_TLB_Index directly from the hint.
   const bool tlbSoftwareManaged = (ppeState->SPR.LPCR.hexValue & 0x400) >> 10;
-
   if (tlbSoftwareManaged) {
-    // Find an invalid entry or use LRU for replacement hint
-    u8 replacementWay = tlbClass.getLRUWay();
-
-    // Check for invalid entries first (preferred for replacement)
-    for (u8 way = 0; way < 4; ++way) {
-      if (!tlbClass.ways[way].V) {
-        replacementWay = way;
-        break;
-      }
-    }
-
-    // Convert way to bitmask format for PPE_TLB_Index_Hint
-    u8 wayBitmask;
-    switch (replacementWay) {
-      case 0: wayBitmask = 0b1000; break;
-      case 1: wayBitmask = 0b0100; break;
-      case 2: wayBitmask = 0b0010; break;
-      case 3: wayBitmask = 0b0001; break;
-      default: wayBitmask = 0b0001; break;
-    }
-
-    u64 hint = (static_cast<u64>(classIndex) << 4) | wayBitmask;
+    const u32 replacementWay = ppeState->TLB.pickVictimWay(classIdx);
+    const u64 hint = (static_cast<u64>(classIdx) << 4) | static_cast<u64>(TLB_WAY_BITMASK[replacementWay]);
     curThread.SPR.PPE_TLB_Index_Hint.hexValue = hint;
   }
 
@@ -676,8 +710,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64* EA, sPPEState* ppeState, bool memW
       if (slbEntry.V) {
 #ifdef DEBUGP
         if (Config::log.advanced)
-          DEBUGP(Xenon_MMU,
-                 "Checking valid SLB "
+          DEBUGP("Checking valid SLB "
                  "(V:0x{:X},LP:0x{:X},C:0x{:X},L:0x{:X},N:0x{:X},Kp:0x{:X},Ks:0x{:X},VSID:0x{:X},ESID:0x{:X},vsidReg:"
                  "0x{:X},esidReg:0x{:X})",
                  static_cast<u32>(slbEntry.V), static_cast<u32>(slbEntry.LP), static_cast<u32>(slbEntry.C),
@@ -686,7 +719,7 @@ bool PPCInterpreter::MMUTranslateAddress(u64* EA, sPPEState* ppeState, bool memW
 #endif
         if (slbEntry.ESID == ESID) {
 #ifdef DEBUGP
-          if (Config::log.advanced) DEBUGP(Xenon_MMU, "SLB Match");
+          if (Config::log.advanced) DEBUGP("SLB Match");
 #endif
           // Entry valid & SLB->ESID = EA->VSID
           currslbEntry = slbEntry;
@@ -715,11 +748,8 @@ bool PPCInterpreter::MMUTranslateAddress(u64* EA, sPPEState* ppeState, bool memW
       // 1. Get the p Size
       p = mmuGetPageSize(ppeState, L, LP);
 
-      // Get our Virtual Address - 65 bit
-      // VSID + 28 bit adress data.
-      const u64 VA = VSID | (*EA & 0xFFFFFFF);
-      // Page Offset.
-      const u64 PAGE = (QGET(*EA, 36, 63 - p) << p);
+      // Get our Virtual Address.
+      const u64 VA = (VSID << 16) | (*EA & 0xFFFFFFF);
 
       // Search the tlb for an entry.
       if (mmuSearchTlbEntry(ppeState, &RPN, VA, p, L, LP)) {
@@ -741,8 +771,6 @@ bool PPCInterpreter::MMUTranslateAddress(u64* EA, sPPEState* ppeState, bool memW
           // Page Table Lookup:
           // Walk the Page table to find a Page that translates our current VA
 
-          // TODO(bitsh1ft3r): Add TLB Reloading code
-
           // Save MSR DR & IR Bits. When an exception occurs they must be reset
           // to whatever they where
           const bool msrDR = thread.SPR.MSR.DR;
@@ -752,24 +780,26 @@ bool PPCInterpreter::MMUTranslateAddress(u64* EA, sPPEState* ppeState, bool memW
           thread.SPR.MSR.DR = 0;
           thread.SPR.MSR.IR = 0;
 
-          // Get the primary and secondary hashes
-          u64 hash0 = (VSID >> 28) ^ (PAGE >> p);
-          u64 hash1 = ~hash0;
+          // Hash page table lookup
+          //
+          // SDR1 layout: HTABORG = bits[18:63], HTABSIZE = bits[59:63] (5-bit exponent).
+          // HTAB byte size = 2^(HTABSIZE+11) * 128.
+          //
+          // page_idx = EA page-aligned, masked to segment page index bits [p:27].
+          // primary_hash = ((vsid_<<12 XOR page_idx_<<p) >> 5) & PTEG-align-mask.
+          // pteg_addr = HTABORG | (hash & (htab_size_mask | 0x3FF80)).
 
-          // Get hash table origin and hash table mask
           const u64 htabOrg = ppeState->SPR.SDR1.hexValue & PPC_SPR_SDR_64_HTABORG;
           const u64 htabSize = ppeState->SPR.SDR1.hexValue & PPC_SPR_SDR_64_HTABSIZE;
+          const u64 htab_mask = ((1ULL << htabSize) - 1) << 18;
 
-          // Create the mask
-          u64 htabMask = QMASK(64 - (11 + htabSize), 63);
+          // Page-aligned EA, bits [p:27] only (the segment page index field).
+          const u64 ea_page = *EA & ~((1ULL << p) - 1);
+          const u64 page_idx = ea_page & (((1ULL << (28 - p)) - 1) << p);
 
-          // And both hashes with the created mask
-          hash0 = hash0 & htabMask;
-          hash1 = hash1 & htabMask;
-
-          // Get both PTEG's addresses
-          const u64 pteg0Addr = htabOrg | (hash0 << 7);
-          const u64 pteg1Addr = htabOrg | (hash1 << 7);
+          const u64 primary_hash = ((VSID ^ page_idx) >> 5) & 0x3FFFFFFFFF80ULL;
+          const u64 pteg0Addr = htabOrg | (primary_hash & (htab_mask | 0x3FF80ULL));
+          const u64 pteg1Addr = htabOrg | (~primary_hash & (htab_mask | 0x3FF80ULL));
 
           /*
           The 16-byte PTEs are organized in memory as groups of eight entries,
@@ -820,21 +850,24 @@ bool PPCInterpreter::MMUTranslateAddress(u64* EA, sPPEState* ppeState, bool memW
             thread.SPR.MSR.DR = msrDR;
             thread.SPR.MSR.IR = msrIR;
 
-            // Update TLB
-            mmuAddTlbEntryHardware(ppeState, VA, pteg0[i].pte0, pteg0[i].pte1, p, L, LP);
-
-            // Update Referenced and Change Bits if necessary
-            if (!((pteg0[i].pte1 & PPC_HPTE64_R) >> 8)) {
-              // Referenced
-              MMUWrite64(ppeState, pteg0Addr + i * 16 + 8, (pteg0[i].pte1 | 0x100), thr);
-            }
-            if (!((pteg0[i].pte1 & PPC_HPTE64_C) >> 7)) {
-              // Access is a data write?
-              if (memWrite) {
-                // Change
-                MMUWrite64(ppeState, pteg0Addr + i * 16 + 8, (pteg0[i].pte1 | 0x80), thr);
+            // Update R (Referenced) and C (Changed) bits in pte1 with a single write.
+            // R is set on every access; C is set only on stores.
+            // Both bits live in pte1 (PTEL): R=0x100, C=0x80.
+            // Do this BEFORE caching into the TLB so the reloaded entry carries
+            // the up-to-date R/C state, which is fed the freshly-updated HPTE by the HTAB-walk caller).
+            {
+              u64 newPte1 = pteg0[i].pte1;
+              if (!(newPte1 & PPC_HPTE64_R)) newPte1 |= PPC_HPTE64_R;
+              if (memWrite && !(newPte1 & PPC_HPTE64_C)) newPte1 |= PPC_HPTE64_C;
+              if (newPte1 != pteg0[i].pte1) {
+                MMUWrite64(ppeState, pteg0Addr + i * 16 + 8, newPte1, thr);
+                pteg0[i].pte1 = newPte1;
               }
             }
+
+            // Reload the on-chip TLB with this walked HPTE so subsequent
+            // accesses to the page hit the TLB instead of re-walking the HTAB
+            mmuAddTlbEntryHardware(ppeState, VA, pteg0[i].pte0, pteg0[i].pte1, p, L, LP);
 
             goto end;
           }
@@ -871,29 +904,20 @@ bool PPCInterpreter::MMUTranslateAddress(u64* EA, sPPEState* ppeState, bool memW
             thread.SPR.MSR.DR = msrDR;
             thread.SPR.MSR.IR = msrIR;
 
-            // Update TLB
-            mmuAddTlbEntryHardware(ppeState, VA, pteg1[i].pte0, pteg1[i].pte1, p, L, LP);
-
-            // Update Referenced and Change Bits if necessary
-            if (!((pteg1[i].pte1 & PPC_HPTE64_R) >> 8)) {
-              // Referenced
-              MMUWrite64(ppeState, pteg1Addr + i * 16 + 8, (pteg1[i].pte1 | 0x100), thr);
-            }
-            if (!((pteg1[i].pte1 & PPC_HPTE64_C) >> 7)) {
-              // Access is a data write?
-              if (memWrite) {
-                // Change
-                MMUWrite64(ppeState, pteg1Addr + i * 16 + 8, (pteg1[i].pte1 | 0x80), thr);
+            // Update R/C bits in pte1 with a single write (same logic as primary PTEG).
+            {
+              u64 newPte1 = pteg1[i].pte1;
+              if (!(newPte1 & PPC_HPTE64_R)) newPte1 |= PPC_HPTE64_R;
+              if (memWrite && !(newPte1 & PPC_HPTE64_C)) newPte1 |= PPC_HPTE64_C;
+              if (newPte1 != pteg1[i].pte1) {
+                MMUWrite64(ppeState, pteg1Addr + i * 16 + 8, newPte1, thr);
+                pteg1[i].pte1 = newPte1;
               }
             }
 
-            if (L) {
-              // RPN is PTE[86:114]
-              RPN = pteg1[i].pte1 & PPC_HPTE64_RPN_LP;
-            } else {
-              // RPN is PTE[86:115]
-              RPN = pteg1[i].pte1 & PPC_HPTE64_RPN_NO_LP;
-            }
+            // Reload the on-chip TLB (secondary-PTEG hit). pte0 here has H=1;
+            // mmuAddTlbEntryHardware stores it with H cleared.
+            mmuAddTlbEntryHardware(ppeState, VA, pteg1[i].pte0, pteg1[i].pte1, p, L, LP);
 
             goto end;
           }
@@ -960,6 +984,7 @@ void PPCInterpreter::MMURead(Xe::XCPU::XenonContext* cpuContext, sPPEState* ppeS
                              u8* outData, ePPUThreadID thr) {
   MICROPROFILE_SCOPEI("[Xe::PPCInterpreter]", "MMURead", MP_AUTO);
   sPPUThread& thread = ppeState->ppuThread[thr != ePPUThread_None ? thr : curThreadId];
+
   const u64 oldEA = EA;
   if (!MMUTranslateAddress(&EA, ppeState, false, thr)) {
     memset(outData, 0, byteCount);
@@ -978,17 +1003,6 @@ void PPCInterpreter::MMURead(Xe::XCPU::XenonContext* cpuContext, sPPEState* ppeS
     XeMain::GetCPU()->Halt();         // Halt the CPU
     Config::imgui.debugWindow = true; // Open the debugger after halting
   }
-
-  // TODO: Investigate why FSB_CONFIG_RX_STATE needs these values to work
-  switch (thread.CIA) {
-    case 0x1003598ULL: {
-      GPR(11) = 0x0E;
-    } break;
-    case 0x1003644ULL: {
-      GPR(11) = 0x02;
-    } break;
-  }
-
   // Handle SoC reads
   if (socRead) {
     // Check if the read is from the SROM
@@ -1019,6 +1033,18 @@ void PPCInterpreter::MMURead(Xe::XCPU::XenonContext* cpuContext, sPPEState* ppeS
   // External read
   if (!xenonContext->GetRootBus()->Read(EA, outData, byteCount, socRead) && socRead) {
     if (Config::log.advanced) LOG_WARNING(Xenon_MMU, "Invalid SoC Read from 0x{:X}", EA);
+  }
+
+  // TODO: Investigate why FSB_CONFIG_RX_STATE needs these values to work
+  switch (thread.CIA) {
+    case 0x1003590ULL: {
+      u64 patchData = 0xEEEEEEEEEEEEEEEE;
+      memcpy(outData, &patchData, byteCount);
+    } break;
+    case 0x100363CULL: {
+      u64 patchData = 0x2222222222222222;
+      memcpy(outData, &patchData, byteCount);
+    } break;
   }
 }
 
