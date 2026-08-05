@@ -305,8 +305,8 @@ void PPCInterpreter::PPCInterpreter_mfspr(sPPEState* ppeState) {
     case eXenonSPR::CFAR: GPRi(rs) = curThread.SPR.CFAR; break;
     case eXenonSPR::CTRLRD: GPRi(rs) = ppeState->SPR.CTRL.hexValue; break;
     case eXenonSPR::VRSAVE: GPRi(rs) = curThread.SPR.VRSAVE; break;
-    case eXenonSPR::TBLRO: GPRi(rs) = ppeState->SPR.TB.TBL; break;
-    case eXenonSPR::TBURO: GPRi(rs) = ppeState->SPR.TB.TBU; break;
+    case eXenonSPR::TBLRO: GPRi(rs) = xenonContext->timeBase.ReadTB(); break;
+    case eXenonSPR::TBURO: GPRi(rs) = (xenonContext->timeBase.ReadTB() >> 32); break;
     case eXenonSPR::SPRG0: GPRi(rs) = curThread.SPR.SPRG0; break;
     case eXenonSPR::SPRG1: GPRi(rs) = curThread.SPR.SPRG1; break;
     case eXenonSPR::SPRG2: GPRi(rs) = curThread.SPR.SPRG2; break;

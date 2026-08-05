@@ -774,8 +774,6 @@ void PPU::PPUProcessAsyncExceptions(sPPEState* ppeState) {
 // Exception definitions.
 //
 
-// Format: Exception name (Reset Vector)
-
 // Unified exception delivery core.
 // A single routine drives every PPU interrupt: it saves the machine state into the appropriate save/restore register
 // pair, composes the new MSR for the handler and redirects NIA to the architected vector.
@@ -793,6 +791,7 @@ void PPU::PPUDeliverException(sPPEState* ppeState, u16 excType) {
     case ppuSystemResetEx:
       vector = 0x100;
       srr0IsNIA = true;
+      LOG_DEBUG(Xenon, "Thread {}: Reset Exception.", thread.SPR.PIR);
       break;
     case ppuMachineCheckEx:
       vector = 0x100;
