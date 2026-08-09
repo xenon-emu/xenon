@@ -658,7 +658,6 @@ void PPURegisters(Render::GUI* gui, sPPEState* state) {
       gui->EndNode();
     }
     Custom(gui, ppuName, "{}", state->ppuName);
-    U8DecPtr(gui, state, currentThread);
   }
   gui->EndWindow();
 }
@@ -673,10 +672,10 @@ void PPUDockSpace(Render::GUI* gui, PPU* PPU) {
     if (gui->BeginMenuBar()) {
       bool halted = PPU->IsHalted();
       if (gui->MenuItem(halted ? "Continue" : "Pause")) {
-        if (halted) PPU->Continue();
-        else PPU->Halt();
+        if (halted) PPU->ContinueFromHalt();
+        else PPU->HaltGuestThread();
       }
-      if (halted && gui->MenuItem("Step")) { PPU->Step(); }
+      if (halted && gui->MenuItem("Step")) { PPU->StepInstructions(); }
       if (PPU->IsHaltedByGuest()) {
         if (gui->MenuItem("Continue From Exception Handler")) { PPU->ContinueFromException(); }
       }

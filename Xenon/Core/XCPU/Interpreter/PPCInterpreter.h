@@ -20,10 +20,10 @@ namespace PPCInterpreter {
 
   extern Xe::XCPU::XenonContext* xenonContext;
 
-//
-//  Helper macros for instructions
-//
-#define curThreadId   ppeState->currentThread
+  //
+  //  Helper macros for instructions
+  //
+
 #define curThread     ppeState->ppuThread[curThreadId]
 #define _previnstr    curThread.PI
 #define _instr        curThread.CI

@@ -21,15 +21,17 @@ namespace Xe::XCPU {
   // - 768 bits of IBM's eFuse technology.
   class XenonCPU {
   public:
+    // Constructor
     XenonCPU(RootBus* inBus, const std::string blPath, const std::string fusesPath, RAM* ramPtr);
+    // Destructor
     ~XenonCPU();
 
     // Starts the CPU at the given reset vector. (Usually address 0x100).
     void Start(u64 resetVector = 0x100);
     // Resets the CPU to POR state and efectively restarts execution.
     void Reset();
-    // Halts one or more cores.
-    void Halt(u64 haltOn = 0, bool requestedByGuest = false, u8 ppuId = 0, ePPUThreadID threadId = ePPUThread_Zero);
+    // Halts one or more cores. threadId == ePPUThread_None halts both SMT threads of every core.
+    void Halt(u64 haltOn = 0, bool requestedByGuest = false, u8 ppuId = 0, ePPUThreadID threadId = ePPUThread_None);
     // Continues execution on all enabled cores after a Halt was issued.
     void Continue();
     // Resumes execution from a previously ocurred exception.

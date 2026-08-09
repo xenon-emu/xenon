@@ -75,7 +75,7 @@ void PPCInterpreter::PPCInterpreter_tlbiel(sPPEState* ppeState) {
     case MMU_TLB_IS_CLASS: {
       // IS=3: class level. Invalidate every way of the congruence class. The class index is carried in RB[12:19].
       const u16 classIndex = static_cast<u16>((rb & 0xFF000) >> 12);
-      ppeState->TLB.invalidateClass(classIndex);
+      ppeState->mmu->TlbInvalidateClass(classIndex);
 
       curThread.iERAT.invalidateAll();
       curThread.dERAT.invalidateAll();
@@ -104,10 +104,16 @@ void PPCInterpreter::PPCInterpreter_tlbie(sPPEState* ppeState) {
   // IS is forced to 0 (selective).
   ppeState->mmu->TlbInvalidateSelective(EA, p, _instr.l10);
 
-  // Broadcast: flush the per-thread ERAT page on every PPE thread.
-  for (auto& thread : ppeState->ppuThread) {
-    thread.iERAT.invalidateElement(pageBase);
-    thread.dERAT.invalidateElement(pageBase);
+  // Flush the per-thread ERAT page on every PPE thread. We may only touch our own ERATs directly, the sibling's ERATs
+  // are not thread-safe, so we  ask it to flush on its own host thread.
+  for (u8 t = 0; t < 2; ++t) {
+    sPPUThread& thread = ppeState->ppuThread[t];
+    if (static_cast<ePPUThreadID>(t) == curThreadId) {
+      thread.iERAT.invalidateElement(pageBase);
+      thread.dERAT.invalidateElement(pageBase);
+    } else {
+      thread.eratFlushRequest.store(true, std::memory_order_release);
+    }
   }
 }
 

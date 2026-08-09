@@ -1,5 +1,5 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #include "XenonReservations.h"
@@ -11,7 +11,7 @@ XenonReservations::XenonReservations() {
   reservations[0] = nullptr;
 }
 
-bool XenonReservations::Register(PPU_RES *Res) {
+bool XenonReservations::Register(PPU_RES* Res) {
   std::lock_guard lock(reservationLock);
   reservations[processors] = Res;
   processors++;

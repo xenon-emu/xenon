@@ -9,8 +9,12 @@
 #include "Base/Vector128.h"
 #include "Core/XCPU/Context/Reservations/XenonReservations.h"
 
+#include <atomic>
 #include <bit>
+#include <condition_variable>
 #include <memory>
+#include <mutex>
+#include <shared_mutex>
 #include <unordered_map>
 
 // Forward declaration so sPPEState can hold a non-owning back-pointer to its MMU.
@@ -21,7 +25,8 @@ namespace Xe::XCPU::MMU {
 // PowerPC Opcode definitions
 /*
  * All original authors of the rpcs3 PPU_Decoder and PPU_Opcodes maintain their original copyright.
- * Modifed for usage in the Xenon Emulator
+ * Modifed for
+ * usage in the Xenon Emulator
  * All rights reserved
  * License: GPL2
  */
@@ -1113,6 +1118,7 @@ union uVSCR {
 };
 
 // Segment Lookaside Buffer Entry
+// NOTE: The SLB is a per thread cache, therefore it belongs here and in the sPPEState structure.
 struct sSLBEntry {
   u8 V;
   u8 LP; // Large Page selector
@@ -1125,132 +1131,6 @@ struct sSLBEntry {
   u64 ESID;
   u64 vsidReg;
   u64 esidReg;
-};
-
-// Translation Lookaside Buffer entry:
-//   tag    : compressed tlb tag.
-//   pte0   : HPTE word 0 (V|H|L|AVPN|...). Stored with H bit cleared.
-//   pte1   : HPTE word 1 (RPN|attributes|R|C|LP).
-//   lpidr  : Logical partition ID that owned this insertion. Snapshot of the
-//            owning thread's LPIDR � gates lookups and partition-scoped flushes.
-//   valid  : non-zero when the entry holds a live translation. WRITTEN LAST when
-//            inserting so a concurrent lookup walking the same class can never
-//            observe a half-initialized entry.
-struct TLBEntry {
-  u64 tag;   // TLB match tag
-  u64 pte0;  // HPTE word 0, H bit cleared (& ~PPC_HPTE64_HASH)
-  u64 pte1;  // HPTE word 1 raw
-  u32 lpidr; // logical partition ID at insert
-  u8 valid;  // non-zero when live; written last on insert (publish barrier)
-};
-static_assert(sizeof(TLBEntry) == 32, "TLBEntry should pack to 32 bytes (2 ways/line halved)");
-
-// PPE_TLB_Index one-hot way encoding (see CBE Public Registers spec, PPE_TLB_Index).
-// Low 4 bits of the register select which of the 4 ways within a congruence
-// class to read/write; the upper bits index the class.
-//
-//   0b1000 -> way 0
-//   0b0100 -> way 1
-//   0b0010 -> way 2
-//   0b0001 -> way 3
-constexpr u8 TLB_WAY_BITMASK[4] = {0b1000, 0b0100, 0b0010, 0b0001};
-
-// PPE Translation Lookaside Buffer.
-//
-// 1024 entries organized as 256 congruence classes of 4 ways each.
-// Shared by both PPE threads (PPE TLB is per-PPE, not per-thread).
-struct TLB_Reg {
-  static constexpr u32 NUM_CLASSES = 256;
-  static constexpr u32 NUM_WAYS = 4;
-  static constexpr u32 NUM_ENTRIES = NUM_CLASSES * NUM_WAYS; // 1024
-
-  // Flat 1024-entry array. entries[class*4 + way] addresses ways linearly.
-  TLBEntry entries[NUM_ENTRIES]{};
-
-  // Pseudo-LRU bits, one byte per congruence class.
-  //   bit 0..1 : MRU within pair (way0, way1)
-  //   bit 2..3 : MRU within pair (way2, way3)
-  //   bit 4..5 : MRU between the two pairs
-  u8 lruBits[NUM_CLASSES]{};
-
-  // Entry access helpers.
-
-  inline TLBEntry& entry(u32 flatIdx) { return entries[flatIdx]; }
-  inline const TLBEntry& entry(u32 flatIdx) const { return entries[flatIdx]; }
-  inline TLBEntry& entryAt(u32 classIdx, u32 way) { return entries[classIdx * NUM_WAYS + way]; }
-  inline const TLBEntry& entryAt(u32 classIdx, u32 way) const { return entries[classIdx * NUM_WAYS + way]; }
-
-  // Map a PPE_TLB_Index register value to a flat entry index.
-  // The low 4 bits are a one-hot way selector, the next 8 bits index the class.
-  // Returns ~0u if the way selector is zero or not one-hot (malformed).
-  static inline u32 flatIndexFromTlbIndexReg(u64 idxReg) {
-    const u32 wayMask = static_cast<u32>(idxReg) & 0xF;
-    // CBE PPE_TLB_Index way field is strictly one-hot, anything else is malformed.
-    if (!std::has_single_bit(wayMask)) return ~0u;
-    // One-hot -> way index via trailing-zero count: 0b1000 -> 0 ... 0b0001 -> 3.
-    const u32 way = (NUM_WAYS - 1) - static_cast<u32>(std::countr_zero(wayMask));
-    const u32 classIdx = static_cast<u32>((idxReg >> 4) & (NUM_CLASSES - 1));
-    return classIdx * NUM_WAYS + way;
-  }
-
-  // Pseudo-LRU
-
-  inline u8 getLRUWay(u32 classIdx) const {
-    const u8 lru = lruBits[classIdx];
-    if (lru & 0x30) {              // pair (2,3) is the MRU pair
-      return (lru & 0x03) ? 1 : 0; // -> LRU of pair (0,1)
-    } else {                       // pair (0,1) is the MRU pair
-      return (lru & 0x0C) ? 3 : 2; // -> LRU of pair (2,3)
-    }
-  }
-
-  inline void updateLRU(u32 classIdx, u8 accessedWay) {
-    u8& lru = lruBits[classIdx];
-    switch (accessedWay) {
-      case 0:
-        lru |= 0x01;
-        lru &= ~0x30;
-        break;
-      case 1:
-        lru &= ~0x01;
-        lru &= ~0x30;
-        break;
-      case 2:
-        lru |= 0x04;
-        lru |= 0x30;
-        break;
-      case 3:
-        lru &= ~0x04;
-        lru |= 0x30;
-        break;
-    }
-  }
-
-  // Pick the way to (re)fill in a congruence class: first invalid way if any,
-  // otherwise the pseudo-LRU victim. Shared by the HW reload and the SW-managed
-  // miss-hint paths so both follow identical "invalid-first, else LRU" policy.
-  inline u32 pickVictimWay(u32 classIdx) const {
-    for (u32 way = 0; way < NUM_WAYS; ++way) {
-      if (!entryAt(classIdx, way).valid) return way;
-    }
-    return getLRUWay(classIdx);
-  }
-
-  // Invalidation
-
-  // Invalidate one way of a congruence class. Only the valid byte needs to be
-  // cleared � the tag/pte fields are dead state until valid is set again.
-  inline void invalidateWay(u32 classIdx, u32 way) { entries[classIdx * NUM_WAYS + way].valid = 0; }
-
-  inline void invalidateClass(u32 classIdx) {
-    for (u32 w = 0; w < NUM_WAYS; ++w) { entries[classIdx * NUM_WAYS + w].valid = 0; }
-    lruBits[classIdx] = 0;
-  }
-
-  inline void invalidateAll() {
-    for (u32 i = 0; i < NUM_ENTRIES; ++i) { entries[i].valid = 0; }
-    for (u32 c = 0; c < NUM_CLASSES; ++c) { lruBits[c] = 0; }
-  }
 };
 
 // Xenon Special Purpose Registers
@@ -1326,6 +1206,10 @@ enum eXenonSPR : u16 {
 // PPU Thread definition and related structures
 //
 
+// NOTE: All SPR's are set to 0 on POR, except for the DEC, HDEC, PVR, PIR and CTRL.
+// On Xenon, PVR and PIR are set according to console revision and PPU ID later on. CTRL value is N/A at POR, so we just
+// zero it out.
+
 // Contains the Per PPU Thread, 'duplicated' Special Purpose Registers.
 struct sPPUThreadSPRs {
   uXER XER;                               // Fixed-Point Exception Register
@@ -1334,7 +1218,7 @@ struct sPPUThreadSPRs {
   u64 CFAR;                               // Used in Linux, unknown definition atm.
   DSISR_t DSISR;                          // Data Storage Interrupt Status Register
   DAR_t DAR;                              // Data Address Register
-  DEC_t DEC;                              // Decrementer Register
+  DEC_t DEC = 0x7FFFFFFF;                 // Decrementer Register
   SRR_t SRR0;                             // Machine Status Save/Restore Register 0
   SRR_t SRR1;                             // Machine Status Save/Restore Register 1
   uACCR ACCR;                             // Address Compare Control Register
@@ -1362,7 +1246,7 @@ struct sPPUGlobalSPRs {
   uCTRL CTRL;                   // Control Register
   uTB TB;                       // Time Base Register
   uPVR PVR;                     // Processor Version Register
-  DEC_t HDEC;                   // Hypervisor Decrementer Register
+  DEC_t HDEC = 0x7FFFFFFF;      // Hypervisor Decrementer Register
   uRMOR RMOR;                   // Real Mode Offset Register
   uRMOR HRMOR;                  // Hypervisor Real Mode Offset Register
   uLPCR LPCR;                   // 'Global' Logical Partition Control Register
@@ -1379,6 +1263,10 @@ struct sPPUGlobalSPRs {
   uHID6 HID6;                   // Hardware Implementation Register 6
 };
 
+//
+// Exception Related structures and enums
+//
+
 // A single pending PPU exception
 struct PPUExceptionEvent {
   u16 type = 0;     // eExceptionBitmask single bit.
@@ -1390,6 +1278,63 @@ struct PPUExceptionEvent {
 // Maximum simultaneously-pending exception events. There are 16 architected PPU interrupt types, one slot per type is
 // sufficient because a given type is idempotent (raising it twice before delivery is a no-op).
 inline constexpr u32 kMaxPendingExc = 16;
+
+// Program Exception types
+enum ePPUProgramExType {
+  ppuProgExTypeFPU = 43,  // Floating Point Exception
+  ppuProgExTypeILL = 44,  // Illegal instruction Exception
+  ppuProgExTypePRIV = 45, // Priviliged instruction Exception
+  ppuProgExTypeTRAP = 46, // TRAP instruction type Exception
+};
+
+// Exception Bitmasks for Exception Register
+enum eExceptionBitmask {
+  ppuNone = 0x0,                      // No Exception
+  ppuSystemResetEx = 0x1,             // System Reset Exception
+  ppuMachineCheckEx = 0x2,            // Machine Check Exception
+  ppuDataStorageEx = 0x4,             // Data Storage Exception
+  ppuDataSegmentEx = 0x8,             // Data Segment Exception
+  ppuInstrStorageEx = 0x10,           // Instruction Storage Exception
+  ppuInstrSegmentEx = 0x20,           // Instruction segment Exception
+  ppuExternalEx = 0x40,               // External Exception
+  ppuAlignmentEx = 0x80,              // Alignment Exception
+  ppuProgramEx = 0x100,               // Program Exception
+  ppuFPUnavailableEx = 0x200,         // Floating-Point Unavailable Exception
+  ppuDecrementerEx = 0x400,           // Decrementer Exception
+  ppuHypervisorDecrementerEx = 0x800, // Hypervisor Decrementer Exception
+  ppuVXUnavailableEx = 0x1000,        // Vector Execution Unit Unavailable Exception
+  ppuSystemCallEx = 0x2000,           // System Call Exception
+  ppuTraceEx = 0x4000,                // Trace Exception
+  ppuPerformanceMonitorEx = 0x8000,   // Performance Monitor Exception
+};
+
+constexpr u16 StorageExceptionMask = ppuDataSegmentEx | ppuDataStorageEx | ppuInstrSegmentEx | ppuInstrStorageEx;
+constexpr u16 AsyncExceptionMask = ppuSystemResetEx | ppuMachineCheckEx | ppuExternalEx | ppuDecrementerEx;
+constexpr u16 SyncExceptionMask = ppuDataStorageEx | ppuDataSegmentEx | ppuFPUnavailableEx | ppuVXUnavailableEx
+                                  | ppuProgramEx | ppuSystemCallEx | ppuInstrStorageEx | ppuInstrSegmentEx;
+
+// Architected interrupt priority (lower value = higher priority), used to keep the pending-exception queue sorted.
+inline constexpr u16 ppuExcPriority(u16 type) {
+  switch (type) {
+    case ppuSystemResetEx: return 0x100;
+    case ppuMachineCheckEx: return 0x200;
+    case ppuDataStorageEx: return 0x300;
+    case ppuDataSegmentEx: return 0x300;
+    case ppuInstrStorageEx: return 0x300;
+    case ppuInstrSegmentEx: return 0x300;
+    case ppuAlignmentEx: return 0x300;
+    case ppuProgramEx: return 0x300;
+    case ppuFPUnavailableEx: return 0x300;
+    case ppuVXUnavailableEx: return 0x300;
+    case ppuSystemCallEx: return 0x300;
+    case ppuTraceEx: return 0x300;
+    case ppuHypervisorDecrementerEx: return 0x400;
+    case ppuExternalEx: return 0x500;
+    case ppuPerformanceMonitorEx: return 0x600;
+    case ppuDecrementerEx: return 0x700;
+    default: return 0xFFFF;
+  }
+}
 
 // Basic Execution Thread inside each PPU Core.
 struct sPPUThread {
@@ -1453,11 +1398,14 @@ struct sPPUThread {
   // Remove type from the queue (used when an exception is delivered or squashed).
   void ClearExc(u16 type);
 
-  // Fast gate: is any queued type present?
+  // Is any queued type present?
   bool HasExc(u16 mask) const { return (pendingExcMask & mask) != 0; }
 
-  // Any exception pending at all?
+  // Any this thread any exception pending at all?
   bool HasAnyExc() const { return pendingExcCount != 0; }
+
+  // Has this thread Storage related exceptions pending?
+  bool HasStorageExceptions() const { return (pendingExcMask & StorageExceptionMask) != 0; }
 
   // Raises any dec related signals into the pending-exception queue.
   void CheckDecSignals();
@@ -1466,121 +1414,31 @@ struct sPPUThread {
   u16 progExceptionType = 0;
   // SystemCall Type (Hypervisor syscall)
   bool exHVSysCall = false;
+
   // Decrementer expired flag.
   std::atomic_bool decExpired{false};
+
   // Hypervisor decrementer expired flag.
   std::atomic_bool hdecExpired{false};
+
+  // Cross-thread bring-up request. Set by whoever enables this thread (the sibling via mtspr CTRL[TEx], or the Power On
+  // Reset/IPI bring-up path).
+  std::atomic<s8> pendingWakeReason{-1};
+
+  // Cross-thread ERAT flush request. A sibling's tlbie sets this instead of touching the ERATs directly. We flush them
+  // on our own host thread when we drain it.
+  std::atomic_bool eratFlushRequest{false};
+
+  // CTRL[RUN] software latch (bit 31), per hardware thread. mtspr CTRL stores the writing thread's RUN bit here.
+  // mfspr CTRL recomposes RUN[31] (for the reading thread) and RS[16:17] (per-thread run status) from these latches.
+  // NOTE: Linux does make use of this latch feature, but the xboxknrl does not apparently.
+  std::atomic<u8> ctrlRunLatch{0};
+
   // PPU reservations for PPC atomic load/store operations.
   std::unique_ptr<PPU_RES> ppuRes{};
 };
 
-// The structure of the Xenon CPU differs from that on the CELL/BE in that instead of having one PPE and 8 SPE's
-// it contains 3 parallel PPE's each managing two threads (one physical and one logical).
-// Should be depicted as follows:
-/*
- * Xenon XCPU --->PPE 0 --- PPU Thread 0
- *             |            PPU Thread 1
- *             |->PPE 1 --- PPU Thread 2
- *             |            PPU Thread 3
- *             |->PPE 2 --- PPU Thread 4
- *                          PPU Thread 5
- */
-
-// Thread IDs for ease of handling
-enum ePPUThreadID : u8 {
-  ePPUThread_Zero = 0,
-  ePPUThread_One,
-  ePPUThread_None
-};
-enum ePPUThreadBit : u8 {
-  ePPUThreadBit_None = 0,
-  ePPUThreadBit_Zero,
-  ePPUThreadBit_One
-};
-
-// Power Processor Element (PPE)
-struct sPPEState {
-  ~sPPEState() {
-    for (u8 i = 0; i < 2; ++i) {
-      // Clear reservations.
-      ppuThread[i].ppuRes.reset();
-    }
-  }
-  // Power Processing Unit Threads
-  sPPUThread ppuThread[2] = {};
-  // Current executing thread ID.
-  ePPUThreadID currentThread = ePPUThread_Zero;
-  // Shared Special Purpose Registers.
-  sPPUGlobalSPRs SPR{};
-  // Translation Lookaside Buffer
-  TLB_Reg TLB{};
-  // Current PPU Name, for ease of debugging.
-  std::string ppuName{};
-  // PPU ID
-  u8 ppuID = 0;
-  // Memory Management Unit, owned by the PPE and shared by both threads.
-  std::shared_ptr<Xe::XCPU::MMU::XenonMMU> mmu;
-};
-
-// Exception Bitmasks for Exception Register
-enum eExceptionBitmask {
-  ppuNone = 0x0,                      // No Exception
-  ppuSystemResetEx = 0x1,             // System Reset Exception
-  ppuMachineCheckEx = 0x2,            // Machine Check Exception
-  ppuDataStorageEx = 0x4,             // Data Storage Exception
-  ppuDataSegmentEx = 0x8,             // Data Segment Exception
-  ppuInstrStorageEx = 0x10,           // Instruction Storage Exception
-  ppuInstrSegmentEx = 0x20,           // Instruction segment Exception
-  ppuExternalEx = 0x40,               // External Exception
-  ppuAlignmentEx = 0x80,              // Alignment Exception
-  ppuProgramEx = 0x100,               // Program Exception
-  ppuFPUnavailableEx = 0x200,         // Floating-Point Unavailable Exception
-  ppuDecrementerEx = 0x400,           // Decrementer Exception
-  ppuHypervisorDecrementerEx = 0x800, // Hypervisor Decrementer Exception
-  ppuVXUnavailableEx = 0x1000,        // Vector Execution Unit Unavailable Exception
-  ppuSystemCallEx = 0x2000,           // System Call Exception
-  ppuTraceEx = 0x4000,                // Trace Exception
-  ppuPerformanceMonitorEx = 0x8000,   // Performance Monitor Exception
-};
-
-constexpr u16 AsyncExceptionMask = ppuSystemResetEx | ppuMachineCheckEx | ppuExternalEx | ppuDecrementerEx;
-constexpr u16 SyncExceptionMask = ppuDataStorageEx | ppuDataSegmentEx | ppuFPUnavailableEx | ppuVXUnavailableEx
-                                  | ppuProgramEx | ppuSystemCallEx | ppuInstrStorageEx | ppuInstrSegmentEx;
-
-// Program Exception types
-enum ePPUProgramExType {
-  ppuProgExTypeFPU = 43,  // Floating Point Exception
-  ppuProgExTypeILL = 44,  // Illegal instruction Exception
-  ppuProgExTypePRIV = 45, // Priviliged instruction Exception
-  ppuProgExTypeTRAP = 46, // TRAP instruction type Exception
-};
-
-// Architected interrupt priority (lower value = higher priority), used to keep the
-// pending-exception queue sorted.
-inline constexpr u16 ppuExcPriority(u16 type) {
-  switch (type) {
-    case ppuSystemResetEx: return 0x100;
-    case ppuMachineCheckEx: return 0x200;
-    case ppuDataStorageEx: return 0x300;
-    case ppuDataSegmentEx: return 0x300;
-    case ppuInstrStorageEx: return 0x300;
-    case ppuInstrSegmentEx: return 0x300;
-    case ppuAlignmentEx: return 0x300;
-    case ppuProgramEx: return 0x300;
-    case ppuFPUnavailableEx: return 0x300;
-    case ppuVXUnavailableEx: return 0x300;
-    case ppuSystemCallEx: return 0x300;
-    case ppuTraceEx: return 0x300;
-    case ppuHypervisorDecrementerEx: return 0x400;
-    case ppuExternalEx: return 0x500;
-    case ppuPerformanceMonitorEx: return 0x600;
-    case ppuDecrementerEx: return 0x700;
-    default: return 0xFFFF;
-  }
-}
-
-// Enqueue type into the thread's pending-exception queue, keeping it sorted by
-// ascending priority.
+// Enqueue type into the thread's pending-exception queue, keeping it sorted by ascending priority.
 // NOTE: Re-raising a type that is already queued only refreshes its program subtype.
 inline void sPPUThread::RaiseExc(u16 type, u16 progType) {
   if (type == ppuProgramEx) progExceptionType = progType;
@@ -1621,10 +1479,125 @@ inline void sPPUThread::ClearExc(u16 type) {
   pendingExcMask &= ~type;
 }
 
-// Checks and raises the decrementer/HDEC signals into the queue.
+// Checks for pending DEC signals and raises the appropriate exception.
 inline void sPPUThread::CheckDecSignals() {
   if (decExpired.exchange(false, std::memory_order_acquire)) RaiseExc(ppuDecrementerEx);
   if (hdecExpired.exchange(false, std::memory_order_acquire)) RaiseExc(ppuHypervisorDecrementerEx);
+  // TODO: Move ERAT to a per MMU state.
+  if (eratFlushRequest.exchange(false, std::memory_order_acquire)) {
+    iERAT.invalidateAll();
+    dERAT.invalidateAll();
+  }
+}
+
+// The structure of the Xenon CPU differs from that on the CELL/BE in that instead of having one PPE and 8 SPE's
+// it contains 3 parallel PPE's each managing two threads (one physical and one logical).
+// Should be depicted as follows:
+/*
+ * Xenon XCPU --->PPE 0 --- PPU Thread 0
+ *             |            PPU Thread 1
+ *             |->PPE 1 --- PPU
+ * Thread 2
+ *             |            PPU Thread 3
+ *             |->PPE 2 --- PPU Thread 4
+ * PPU Thread 5
+ */
+
+// Thread IDs for ease of handling
+enum ePPUThreadID : u8 {
+  ePPUThread_Zero = 0,
+  ePPUThread_One,
+  ePPUThread_None
+};
+
+// The PPU thread ID of the currently executing thread. Thread-local so each host thread has its own copy. It is set by
+// the PPU core when it switches to a new thread, and is used by the PPU core to determine which thread's state to
+// access.
+extern thread_local ePPUThreadID curThreadId;
+
+// Current Thread ID.
+enum ePPUThreadBit : u8 {
+  ePPUThreadBit_None = 0,
+  ePPUThreadBit_Zero,
+  ePPUThreadBit_One
+};
+
+// Power Processor Element (PPE) State
+struct sPPEState {
+  ~sPPEState() {
+    for (u8 i = 0; i < 2; ++i) {
+      // Clear reservations.
+      ppuThread[i].ppuRes.reset();
+    }
+  }
+
+  // Guest Power Processing Unit Thread State.
+  sPPUThread ppuThread[2] = {};
+
+  // Globally Shared Special Purpose Registers.
+  sPPUGlobalSPRs SPR{};
+  // Current PPU Name, for ease of debugging.
+  std::string ppuName{};
+  // PPU ID
+  u8 ppuID = 0;
+  // Memory Management Unit, owned by the PPE and shared by both threads.
+  std::shared_ptr<Xe::XCPU::MMU::XenonMMU> mmu;
+
+  // Park sync for Sleeping PPU threads (D9). A thread with no work (disabled or awaiting bring-up) waits on parkCV
+  // instead of busy polling. Wake signals like mtspr CTRL[TEx] and the DEC/HDEC notify it so the wake is serviced
+  // promptly.
+  std::mutex parkMutex{};
+  std::condition_variable parkCV{};
+};
+
+// Atomic accessors for the per-PPE CTRL register. CTRL is shared by both SMT threads (each reads its own TE bit while
+// the sibling may write it via mtspr), so accesses must be thread-safe.
+
+// Load the whole CTRL register atomically.
+inline uCTRL AtomicLoadCTRL(sPPEState* ppeState) {
+  uCTRL c;
+  c.hexValue = std::atomic_ref<u32>(ppeState->SPR.CTRL.hexValue).load(std::memory_order_acquire);
+  return c;
+}
+
+// True if the given thread is enabled (CTRL[TEx]).
+inline bool IsThreadEnabled(sPPEState* ppeState, ePPUThreadID thr) {
+  const uCTRL c = AtomicLoadCTRL(ppeState);
+  return thr == ePPUThread_Zero ? c.TE0 != 0 : c.TE1 != 0;
+}
+
+// Atomically set a thread's enable bit (used during core/thread bring-up).
+inline void SetThreadEnable(sPPEState* ppeState, ePPUThreadID thr) {
+  const u32 bit = (thr == ePPUThread_Zero) ? (1u << 23) : (1u << 22);
+  std::atomic_ref<u32>(ppeState->SPR.CTRL.hexValue).fetch_or(bit, std::memory_order_acq_rel);
+}
+
+// PPU thread wake-up reason, staged into SRR1[42:44] by the System Reset that a
+// thread takes when it is (re)enabled.
+enum eThreadWakeReason : u8 {
+  WAKE_POR = 0,      // Power-On-Reset
+  WAKE_DEC = 2,      // Decrementer wake
+  WAKE_HDEC = 3,     // Hypervisor Decrementer wake
+  WAKE_EXTERNAL = 4, // External interrupt
+  WAKE_CTRL = 5,     // Write to CTRL[TEx]
+  WAKE_MAX           // MAX wake reason value (used for bounds checking)
+};
+
+// SRR1[42:44] field derived from a wake reason (big-endian bits 42..44).
+inline constexpr u64 ThreadWakeReasonToSRR1(u8 reason) {
+  return (static_cast<u64>(reason) << 19) & 0x0000000000380000ULL;
+}
+
+// Returns the Thread Wake reason as a string.
+inline const char* ThreadWakeReasonToString(u8 reason) {
+  switch (reason) {
+    case WAKE_POR: return "Power On Reset";
+    case WAKE_DEC: return "Decrementer Wake";
+    case WAKE_HDEC: return "Hypervisor Decrementer Wake";
+    case WAKE_EXTERNAL: return "External Wake";
+    case WAKE_CTRL: return "CTRL Wake";
+    default: return "UNKNOWN";
+  }
 }
 
 //

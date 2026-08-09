@@ -150,7 +150,7 @@ namespace Xe::XCPU {
     std::unique_ptr<u8[]> elfBinary = std::make_unique<u8[]>(fileSize);
     file.read(reinterpret_cast<char*>(elfBinary.get()), fileSize);
     file.close();
-    ppu0->loadElfImage(elfBinary.get(), fileSize);
+    ppu0->LoadElfImage(elfBinary.get(), fileSize);
     // Start execution on the main thread
     ppu0->StartExecution(false);
     // Start execution on the other threads
@@ -159,24 +159,24 @@ namespace Xe::XCPU {
   }
 
   void XenonCPU::Reset() {
-    if (ppu0.get()) ppu0->Reset();
+    if (ppu0.get()) ppu0->ResetGuestThreads();
     std::this_thread::sleep_for(200ms);
-    if (ppu1.get()) ppu1->Reset();
+    if (ppu1.get()) ppu1->ResetGuestThreads();
     std::this_thread::sleep_for(200ms);
-    if (ppu2.get()) ppu2->Reset();
+    if (ppu2.get()) ppu2->ResetGuestThreads();
     std::this_thread::sleep_for(200ms);
   }
 
   void XenonCPU::Halt(u64 haltOn, bool requestedByGuest, u8 ppuId, ePPUThreadID threadId) {
-    if (ppu0.get()) ppu0->Halt(haltOn, requestedByGuest, ppuId, threadId);
-    if (ppu1.get()) ppu1->Halt(haltOn, requestedByGuest, ppuId, threadId);
-    if (ppu2.get()) ppu2->Halt(haltOn, requestedByGuest, ppuId, threadId);
+    if (ppu0.get()) ppu0->HaltGuestThread(haltOn, requestedByGuest, threadId);
+    if (ppu1.get()) ppu1->HaltGuestThread(haltOn, requestedByGuest, threadId);
+    if (ppu2.get()) ppu2->HaltGuestThread(haltOn, requestedByGuest, threadId);
   }
 
   void XenonCPU::Continue() {
-    if (ppu0.get()) ppu0->Continue();
-    if (ppu1.get()) ppu1->Continue();
-    if (ppu2.get()) ppu2->Continue();
+    if (ppu0.get()) ppu0->ContinueFromHalt();
+    if (ppu1.get()) ppu1->ContinueFromHalt();
+    if (ppu2.get()) ppu2->ContinueFromHalt();
   }
 
   void XenonCPU::ContinueFromException() {
@@ -186,9 +186,9 @@ namespace Xe::XCPU {
   }
 
   void XenonCPU::Step(int amount) {
-    if (ppu0.get()) ppu0->Step(amount);
-    if (ppu1.get()) ppu1->Step(amount);
-    if (ppu2.get()) ppu2->Step(amount);
+    if (ppu0.get()) ppu0->StepInstructions(amount);
+    if (ppu1.get()) ppu1->StepInstructions(amount);
+    if (ppu2.get()) ppu2->StepInstructions(amount);
   }
 
   bool XenonCPU::IsHalted() {

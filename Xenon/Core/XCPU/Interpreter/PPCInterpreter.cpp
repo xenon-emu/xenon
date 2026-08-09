@@ -158,7 +158,7 @@ void PPCInterpreter::ppcInterpreterTrap(sPPEState* ppeState, u32 trapNumber) {
       if (Config::debug.softHaltOnAssertions && XeMain::GetCPU()) {
         LOG_XBOX(Xenon, "FATAL ERROR! Halting CPU...");
         PPU* PPU = XeMain::GetCPU()->GetPPU(ppeState->ppuID);
-        if (PPU) PPU->Halt(0, true, ppeState->ppuID, curThreadId);
+        if (PPU) PPU->HaltGuestThread(0, true, curThreadId);
       }
     } break;
     case 0x17:
@@ -173,7 +173,7 @@ void PPCInterpreter::ppcInterpreterTrap(sPPEState* ppeState, u32 trapNumber) {
         if (XeMain::GetCPU()) {
           LOG_XBOX(Xenon, "Assertion! Halting CPU... (Continuing will cause execution to resume as normal)");
           PPU* PPU = XeMain::GetCPU()->GetPPU(ppeState->ppuID);
-          if (PPU) PPU->Halt(0, true, ppeState->ppuID, curThreadId);
+          if (PPU) PPU->HaltGuestThread(0, true, curThreadId);
         }
 #else
         LOG_XBOX(Xenon, "Assertion! Continuing...");

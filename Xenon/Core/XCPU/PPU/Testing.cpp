@@ -11,9 +11,9 @@
 #include <memory>
 #include <stdio.h>
 
-#define BLR_OPCODE  0x4e800020
-#define curThreadId ppeState->currentThread
-#define curThread   ppeState->ppuThread[curThreadId]
+#define BLR_OPCODE 0x4e800020
+
+#define curThread ppeState->ppuThread[curThreadId]
 
 const u32 START_ADDRESS = 0x10000000;
 
@@ -243,9 +243,7 @@ public:
       }
       testBinData.resize(fileSize);
       file.read(reinterpret_cast<char*>(testBinData.data()), XE_SROM_SIZE);
-      for (int idx = 0; idx < fileSize; ++idx) {
-        ppeState->mmu->MMUWrite8(START_ADDRESS + idx, testBinData[idx]);
-      }
+      for (int idx = 0; idx < fileSize; ++idx) { ppeState->mmu->MMUWrite8(START_ADDRESS + idx, testBinData[idx]); }
     }
     file.close();
     return true;
@@ -262,7 +260,7 @@ public:
     if (currentTestMode == ePPUTestingMode::Interpreter) {
       bool testRunning = true;
       while (testRunning) {
-        sPPUThread& thread = ppeState->ppuThread[ppeState->currentThread];
+        sPPUThread& thread = ppeState->ppuThread[curThreadId];
         // Update previous instruction address
         thread.PIA = thread.CIA;
         // Update current instruction address
@@ -270,7 +268,7 @@ public:
         // Increase next instruction address
         thread.NIA += 4;
         // Fetch the instruction from memory
-        thread.CI.opcode = ppeState->mmu->MMURead32(thread.CIA, ppeState->currentThread);
+        thread.CI.opcode = ppeState->mmu->MMURead32(thread.CIA, curThreadId);
         if (thread.CI.opcode == 0xFFFFFFFF || thread.CI.opcode == 0xCDCDCDCD) {
           LOG_CRITICAL(Xenon, "[Testing]: Invalid opcode found.");
           return false;
@@ -294,7 +292,7 @@ public:
   }
 
   bool SetupTestState(TestCase& testCase) {
-    sPPUThread& thread = ppeState->ppuThread[ppeState->currentThread];
+    sPPUThread& thread = ppeState->ppuThread[curThreadId];
     // Clear registers involved in tests.
     for (auto& reg : thread.GPR) reg = 0;
 
@@ -479,7 +477,7 @@ bool PPU::RunInstructionTests(sPPEState* ppeState, ePPUTestingMode testMode) {
   LOG_INFO(Xenon, "[Testing]: Failed: {}", failedTestsCount);
 
   // Reset the state:
-  sPPUThread& thread = ppeState->ppuThread[ppeState->currentThread];
+  sPPUThread& thread = ppeState->ppuThread[curThreadId];
   // Clear registers involved in tests.
   for (auto& reg : thread.GPR) { reg = 0; }
   for (auto& reg : thread.FPR) { reg.setValue(0.0); }

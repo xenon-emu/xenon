@@ -278,6 +278,9 @@ namespace Xe::XCPU {
     sPPUThread& thread = ppeStates[ppuIdx]->ppuThread[static_cast<ePPUThreadID>(threadIdx)];
     thread.decExpired.store(true, std::memory_order_release);
 
+    // Wake the thread if it is parked/napped so it can take the DEC if said thread's WDEC is enabled.
+    ppeStates[ppuIdx]->parkCV.notify_all();
+
     LOG_TRACE(Xenon, "TimeBase: DEC expired, signal set on thread {}", threadId);
   }
 

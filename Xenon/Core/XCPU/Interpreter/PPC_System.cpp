@@ -159,7 +159,7 @@ void PPCInterpreter::PPCInterpreter_sc(sPPEState* ppeState) {
   curThread.exHVSysCall = _instr.lev & 1;
 #ifdef SYSCALL_DEBUG
   if (curThread.GPR[0] != 0) { // Don't want to ouput every time that HvxGetVersions is called.
-    LOG_DEBUG(Xenon, "{}(Thread{:#d}): Issuing Syscall {}", ppeState->ppuName, (u8)ppeState->currentThread,
+    LOG_DEBUG(Xenon, "{}(Thread{:#d}): Issuing Syscall {}", ppeState->ppuName, (u8)curThreadId,
               getSyscallNameFromIndex17489(curThread.GPR[0]));
   }
 #endif // SYSCALL_DEBUG
@@ -303,7 +303,24 @@ void PPCInterpreter::PPCInterpreter_mfspr(sPPEState* ppeState) {
     case eXenonSPR::SRR0: GPRi(rs) = curThread.SPR.SRR0; break;
     case eXenonSPR::SRR1: GPRi(rs) = curThread.SPR.SRR1; break;
     case eXenonSPR::CFAR: GPRi(rs) = curThread.SPR.CFAR; break;
-    case eXenonSPR::CTRLRD: GPRi(rs) = ppeState->SPR.CTRL.hexValue; break;
+    case eXenonSPR::CTRLRD: {
+      // CTRL read is composed, not a raw read. The CT[0:1] field is a read-only one-hot marker of the
+      // *reading* thread. TE[8:9] and RUN[31] come from the shared register. The composed CT bits are never
+      // written back into the stored CTRL (it is recomposed on every read).
+      u32 ctrl = std::atomic_ref<u32>(ppeState->SPR.CTRL.hexValue).load(std::memory_order_acquire);
+      ctrl &= ~0xC0000000u;                               // clear CT field
+      ctrl |= 1u << (31 - static_cast<u32>(curThreadId)); // thread 0 -> bit31 (PPC 0), thread 1 -> bit30 (PPC 1)
+      // RUN[31] (value bit 0) reflects the reading thread's software RUN latch;
+      // RS[16:17] (value bits 15,14) reflect each thread's RUN latch (RO).
+      const bool run0 = ppeState->ppuThread[ePPUThread_Zero].ctrlRunLatch.load(std::memory_order_acquire) != 0;
+      const bool run1 = ppeState->ppuThread[ePPUThread_One].ctrlRunLatch.load(std::memory_order_acquire) != 0;
+      ctrl &= ~0x0000C001u;                                           // clear RUN[31] and RS[16:17]
+      if (curThreadId == ePPUThread_Zero ? run0 : run1) ctrl |= 0x1u; // RUN[31]
+      if (run0) ctrl |= 0x8000u;                                      // RS0 -> value bit 15 (PPC 16)
+      if (run1) ctrl |= 0x4000u;                                      // RS1 -> value bit 14 (PPC 17)
+      GPRi(rs) = ctrl;
+      break;
+    }
     case eXenonSPR::VRSAVE: GPRi(rs) = curThread.SPR.VRSAVE; break;
     case eXenonSPR::TBLRO: GPRi(rs) = xenonContext->timeBase.ReadTB(); break;
     case eXenonSPR::TBURO: GPRi(rs) = (xenonContext->timeBase.ReadTB() >> 32); break;
@@ -355,31 +372,37 @@ void PPCInterpreter::PPCInterpreter_mtspr(sPPEState* ppeState) {
     case eXenonSPR::SRR1: curThread.SPR.SRR1 = GPRi(rd); break;
     case eXenonSPR::CFAR: curThread.SPR.CFAR = GPRi(rd); break;
     case eXenonSPR::CTRLWR: {
-      uCTRL newCTRL;
-      newCTRL.hexValue = static_cast<u32>(GPRi(rd));
-      if (ppeState->currentThread == ePPUThread_Zero) {
-        // Thread Zero
-        if (ppeState->SPR.CTRL.TE1) {
-          // TE1 is set, do not modify it.
-          newCTRL.TE1 = 1;
+      // CTRL is shared by both PPU threads, so apply the write atomically. A thread may enable its sibling but must not
+      // clear the sibling's enable bit, so preserve a sibling TE bit that is already set. Retry on races  with a
+      // concurrent CTRL update from the sibling.
+      const u32 writeVal = static_cast<u32>(GPRi(rd));
+      std::atomic_ref<u32> ctrlRef(ppeState->SPR.CTRL.hexValue);
+      u32 expected = ctrlRef.load(std::memory_order_acquire);
+      uCTRL prev, desired;
+      do {
+        prev.hexValue = expected;
+        desired.hexValue = writeVal;
+        if (curThreadId == ePPUThread_Zero) {
+          if (prev.TE1) { desired.TE1 = 1; } // Do not clear the sibling's enable.
+        } else {
+          if (prev.TE0) { desired.TE0 = 1; }
         }
-      } else {
-        // Thread One
-        if (ppeState->SPR.CTRL.TE0) {
-          // TE0 is set, do not modify it.
-          newCTRL.TE0 = 1;
-        }
-      }
+      } while (!ctrlRef.compare_exchange_weak(expected, desired.hexValue, std::memory_order_acq_rel,
+                                              std::memory_order_acquire));
 
-      // TODO: Check this, reversing and docs suggests this is the correct behavior.
-      // If a thread is being enabled, we must generate a reset interrupt on said thread.
-      if (ppeState->SPR.CTRL.TE0 == 0 && newCTRL.TE0) { ppeState->ppuThread[0].RaiseExc(ppuSystemResetEx); }
-      if (ppeState->SPR.CTRL.TE1 == 0 && newCTRL.TE1) { ppeState->ppuThread[1].RaiseExc(ppuSystemResetEx); }
+      // A 0 -> 1 TE transition starts that thread. Post a bring-up request carrying the CTRL wake reason.
+      auto postBringUp
+        = [&](ePPUThreadID t) { ppeState->ppuThread[t].pendingWakeReason.store(WAKE_CTRL, std::memory_order_release); };
+      if (!prev.TE0 && desired.TE0) { postBringUp(ePPUThread_Zero); }
+      if (!prev.TE1 && desired.TE1) { postBringUp(ePPUThread_One); }
 
-      LOG_TRACE(Xenon, "{} (Thread{:#d}): Setting ctrl to {:#x}", ppeState->ppuName, (u8)ppeState->currentThread,
-                newCTRL.hexValue);
+      // Wake a parked sibling if we just enabled it.
+      if ((!prev.TE0 && desired.TE0) || (!prev.TE1 && desired.TE1)) { ppeState->parkCV.notify_all(); }
 
-      ppeState->SPR.CTRL = newCTRL;
+      // RUN[31] is a per-thread software latch: the writing thread records its own RUN bit
+      ppeState->ppuThread[curThreadId].ctrlRunLatch.store(static_cast<u8>(writeVal & 1), std::memory_order_release);
+
+      LOG_TRACE(Xenon, "{} (Thread{:#d}): Setting CTRL to {:#x}", ppeState->ppuName, (u8)curThreadId, desired.hexValue);
       break;
     }
     case eXenonSPR::VRSAVE: curThread.SPR.VRSAVE = static_cast<u32>(GPRi(rd)); break;
@@ -422,7 +445,18 @@ void PPCInterpreter::PPCInterpreter_mtspr(sPPEState* ppeState) {
 void PPCInterpreter::PPCInterpreter_mfmsr(sPPEState* ppeState) { GPRi(rd) = curThread.SPR.MSR.hexValue; }
 
 // Move To Machine State Register
-void PPCInterpreter::PPCInterpreter_mtmsr(sPPEState* ppeState) { curThread.SPR.MSR.hexValue = GPRi(rs); }
+// Only the low-order 32 MSR bits are updated.
+void PPCInterpreter::PPCInterpreter_mtmsr(sPPEState* ppeState) {
+  if (_instr.l15) {
+    // L=1: only EE (bit 48) and RI (bit 62) are updated.
+    curThread.SPR.MSR.EE = (GPRi(rs) & 0x8000) ? 1 : 0;
+    curThread.SPR.MSR.RI = (GPRi(rs) & 0x2) ? 1 : 0;
+  } else {
+    // L=0: MSR[32:63] <- RS[32:63], MSR[0:31] unchanged.
+    curThread.SPR.MSR.hexValue
+      = (curThread.SPR.MSR.hexValue & 0xFFFFFFFF00000000ULL) | (GPRi(rs) & 0x00000000FFFFFFFFULL);
+  }
+}
 
 // Move To Machine State Register Doubleword
 void PPCInterpreter::PPCInterpreter_mtmsrd(sPPEState* ppeState) {

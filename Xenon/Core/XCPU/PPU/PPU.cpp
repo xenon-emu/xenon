@@ -15,6 +15,12 @@
 #include <chrono>
 #include <thread>
 
+// Definition of the thread_local PPU-thread selector.
+// Each PPU host thread sets this once before executing guest code.
+// All theread related code distinguishes from thread 0 or thread 1 based on this.
+thread_local ePPUThreadID curThreadId = ePPUThread_Zero;
+
+// Constructor
 PPU::PPU(Xe::XCPU::XenonContext* inXenonContext, u64 resetVector, u32 PIR)
     : resetVector(resetVector) {
   traceFile = nullptr;
@@ -25,6 +31,9 @@ PPU::PPU(Xe::XCPU::XenonContext* inXenonContext, u64 resetVector, u32 PIR)
     traceFile = fopen(path, "w");
   }
 #endif
+
+  // Get execution mode. This should select from any availeable backends and set the exeecution mode to the specified
+  // backend if its avialeable.
   u32 executionMode = Base::JoaatStringHash(Config::highlyExperimental.cpuExecutor);
   switch (executionMode) {
     case "Interpreted"_jLower: currentExecMode = eExecutorMode::Interpreter; break;
@@ -35,52 +44,33 @@ PPU::PPU(Xe::XCPU::XenonContext* inXenonContext, u64 resetVector, u32 PIR)
       break;
   }
 
-  //
-  // Set everything as in POR. See CELL-BE Programming Handbook
-  //
-
-  if (ppuThreadState.load() == eThreadState::Unused) { return; }
-
-  // Allocate memory for our PPE state
+  // Initialize out PPE State pointer.
   ppeState = std::make_unique<STRIP_UNIQUE(ppeState)>();
-
-  // Set PPU Thread ID (PIR, as 0 indexed. So 0-5)
-  ppeState->ppuID = PIR / 2;
-
-  // Set PPU Thread Name
-  ppeState->ppuName = FMT("PPU{}", ppeState->ppuID);
-
-  // Initialize Both threads as in a Reset
-  for (u8 thrdNum = 0; thrdNum < 2; thrdNum++) {
-    // Set Reset vector for both threads
-    ppeState->ppuThread[static_cast<ePPUThreadID>(thrdNum)].NIA = XE_RESET_VECTOR;
-    // Set MSR for both Threads
-    ppeState->ppuThread[static_cast<ePPUThreadID>(thrdNum)].SPR.MSR.hexValue = 0x9000000000000000;
-  }
-
-  // Set Thread Timeout Register
-  ppeState->SPR.TTR.hexValue = 0x4000; // Docs say that the recommended value is 16K instructions.
 
   // Asign global Xenon context
   xenonContext = inXenonContext;
 
-  // The PPE owns the MMU.
+  // Create the MMU instance for this PPE.
   ppeState->mmu = std::make_shared<Xe::XCPU::MMU::XenonMMU>(xenonContext, ppeState.get());
 
-  // If we have a specific halt address, set it here
-  ppuHaltOn = Config::debug.haltOnAddress;
+  // If we have a specific halt address, set it here.
+  guestThreadRunState[ePPUThread_Zero].haltOn = Config::debug.haltOnAddress;
+  guestThreadRunState[ePPUThread_One].haltOn = Config::debug.haltOnAddress;
 
-  for (u8 thrdID = 0; thrdID < 2; thrdID++) {
-    sPPUThread& thread = ppeState->ppuThread[static_cast<ePPUThreadID>(thrdID)];
+  // Initialize the Reservation logic and raise a system reset exception on both threads.
+  for (u8 thrdNum = 0; thrdNum < 2; thrdNum++) {
+    // Get the PPU Thread State for the current thread ID.
+    sPPUThread& thread = ppeState->ppuThread[static_cast<ePPUThreadID>(thrdNum)];
+
+    // Assign and register the PPU Reservation logic for this thread.
     thread.ppuRes = std::make_unique<STRIP_UNIQUE(sPPUThread::ppuRes)>();
-    memset(thread.ppuRes.get(), 0, sizeof(PPU_RES));
     xenonContext->xenonRes.Register(thread.ppuRes.get());
 
-    // Set the decrementer as per docs. See CBE Public Registers pdf in Docs
-    thread.SPR.DEC = 0x7FFFFFFF;
+    // Issue a system reset exception on both threads.
+    thread.RaiseExc(eExceptionBitmask::ppuSystemResetEx);
   }
 
-  // Set PVR and PIR
+  // Set Processor Version Register (PVR) based on the console revision.
   switch (Config::highlyExperimental.consoleRevison) {
     case Config::eConsoleRevision::Xenon: {
       ppeState->SPR.PVR.hexValue = 0x00710200;
@@ -105,35 +95,61 @@ PPU::PPU(Xe::XCPU::XenonContext* inXenonContext, u64 resetVector, u32 PIR)
       ppeState->SPR.PVR.hexValue = 0x00710900;
     } break;
   }
+
+  // Set the PPU Thread ID (0 - 2).
+  ppeState->ppuID = PIR / 2;
+
+  // Set the PPU Name
+  ppeState->ppuName = FMT("PPU{}", ppeState->ppuID);
+
+  // Set Processor Information Register (PIR).
   ppeState->ppuThread[ePPUThread_Zero].SPR.PIR = PIR;
   ppeState->ppuThread[ePPUThread_One].SPR.PIR = PIR + 1;
 }
 
 // Destructor
 PPU::~PPU() {
-  // Signal we're quitting
-  ppuThreadState.store(eThreadState::Quiting);
-  ppuThreadActive = false;
-  // Kill the thread
-  if (ppuThread.joinable()) ppuThread.join();
+  // Signal both PPU host threads to quit, then join them.
+  for (u8 thr = 0; thr < 2; ++thr) {
+    guestThreadRunState[thr].state.store(eThreadState::Quiting);
+    guestThreadRunState[thr].active.store(false);
+  }
+
+  // Wake any parked (Sleeping) thread so it observes the quit request.
+  if (ppeState) ppeState->parkCV.notify_all();
+
+  // Join the host threads.
+  for (u8 thr = 0; thr < 2; ++thr) {
+    if (guestThreadRunState[thr].hostThread.joinable()) guestThreadRunState[thr].hostThread.join();
+  }
+
+  // Reset the PPE state pointer.
   ppeState.reset();
 }
 
+// Starts execution of the PPU.
 void PPU::StartExecution(bool setHRMOR) {
-  // If we want to start halted, then set the state
-  if (Config::debug.startHalted) {
-    ppuThreadState.store(eThreadState::Halted);
-    // If we were told to halt on startup, ensure we are able to continue,
-    // otherwise it'll deadlock We have it like this to safeguard against
-    // sleeping threads waking themselves after continuing, thus destroying the
-    // stack
-    ppuThreadPreviousState.store(ppeState->ppuID == 0 ? eThreadState::Running : eThreadState::Sleeping);
-    LOG_DEBUG(Xenon, "{} was set to be halted, setting previous state to {}", ppeState->ppuName,
-              ppeState->ppuID == 0 ? "Running" : "Sleeping");
-  } else {
-    LOG_DEBUG(Xenon, "{} setting to {}", ppeState->ppuName, ppeState->ppuID == 0 ? "Running" : "Sleeping");
-    ppuThreadState.store(ppeState->ppuID == 0 ? eThreadState::Running : eThreadState::Sleeping);
-    ppuThreadPreviousState.store(ppuThreadState);
+  // Only PPU0[thread0] comes up 'Running', every other PPU thread starts 'Sleeping' and is woken
+  // either by an IPI or by its sibling enabling it via CTRL[TEx].
+  for (u8 thr = 0; thr < 2; ++thr) {
+    // See if the current thread is the primary thread for this PPE.
+    const bool isPrimaryThread = (ppeState->ppuID == 0 && thr == ePPUThread_Zero);
+
+    // Check if we should start halted.
+    if (Config::debug.startHalted) {
+      // Start halted, but remember where to resume.
+      guestThreadRunState[thr].state.store(eThreadState::Halted);
+      guestThreadRunState[thr].previousState.store(isPrimaryThread ? eThreadState::Running : eThreadState::Sleeping);
+
+      LOG_DEBUG(Xenon, "{}.T{} was set to be halted, setting previous state to {}", ppeState->ppuName, thr,
+                isPrimaryThread ? "Running" : "Sleeping");
+    } else {
+      // Only the primary thread (PPU0[thread0]) starts Running, every other thread starts Sleeping.
+      guestThreadRunState[thr].state.store(isPrimaryThread ? eThreadState::Running : eThreadState::Sleeping);
+      guestThreadRunState[thr].previousState.store(guestThreadRunState[thr].state.load());
+
+      LOG_DEBUG(Xenon, "{}.T{}: Starting execution.", ppeState->ppuName, thr);
+    }
   }
 
   // TLB Software reload Mode?
@@ -145,210 +161,312 @@ void PPU::StartExecution(bool setHRMOR) {
   // TSCR[WEXT] = 1??
   ppeState->SPR.TSCR.hexValue = 0x100000UL;
 
-  // Check for instruction tests.
+  // Set Thread Timeout Register
+  ppeState->SPR.TTR.hexValue = 0x4000; // Docs say that the recommended value is 16K instructions.
+
+  // Check for instruction tests on PPU0[Thread 0].
   if (Config::xcpu.runInstrTests && ppeState->ppuID == 0) {
     LOG_INFO(Xenon, "Starting PowerPC instruction tests. Testing backend: {}", "Interpreter");
     RunInstructionTests(ppeState.get(), static_cast<ePPUTestingMode>(Config::xcpu.instrTestsMode));
+    // Return from execution after tests.
+    return;
   }
 
-  // If we're PPU0,thread0 then enable THRD 0 and set Reset Vector.
+  // If we're PPU0 then enable thread 0 and set Reset Vector if not default.
   if (ppeState->ppuID == 0 && setHRMOR) {
-    ppeState->SPR.CTRL.TE0 = 1; // Enable Thread 0
+    // Set CTRL[TEx] to 1 to enable the thread.
+    SetThreadEnable(ppeState.get(), ePPUThread_Zero);
+    // Enable the thread and set the wake reason to Power-On-Reset (POR).
+    EnableGuestThread(ePPUThread_Zero, WAKE_POR);
+    // Set HRMOR.
     ppeState->SPR.HRMOR.hexValue = 0x20000000000ULL;
-    ppeState->ppuThread[ePPUThread_Zero].NIA = resetVector;
-    // Also simulate 1BL if we're told to.
+    // Reset vector if not default.
+    if (resetVector != 0x100) ppeState->ppuThread[ePPUThread_Zero].NIA = resetVector;
+    // Also simulate 1BL if we're told to. This happens on thread 0.
     if (Config::xcpu.simulate1BL) { Simulate1Bl(); }
   }
 
-  ppuThread = std::thread(&PPU::ThreadLoop, this);
+  // Spawn one host thread per PPU guest thread so the two guest threads run concurrently.
+  guestThreadRunState[ePPUThread_Zero].hostThread = std::thread(&PPU::HostThreadLoop, this, ePPUThread_Zero);
+  guestThreadRunState[ePPUThread_One].hostThread = std::thread(&PPU::HostThreadLoop, this, ePPUThread_One);
 }
 
-void PPU::Reset() {
-  // Signal that we are resetting
-  ppuThreadState.store(eThreadState::Resetting);
-  ppuThreadPreviousState.store(eThreadState::None);
-
-  // Tell the thread to reset it
-  ppuThreadResetting = true;
-}
-
-void PPU::Halt(u64 haltOn, bool requestedByGuest, s8 ppuId, ePPUThreadID threadId) {
-  if (haltOn && !guestHalt) {
-    LOG_DEBUG(Xenon, "Halting PPU{} on address 0x{:X}", ppeState->ppuID, haltOn);
-    ppuHaltOn = haltOn;
+// Resets both guest PPU threads
+void PPU::ResetGuestThreads() {
+  // Signal both PPU threads to reset.
+  for (u8 thr = 0; thr < 2; ++thr) {
+    guestThreadRunState[thr].state.store(eThreadState::Resetting);
+    guestThreadRunState[thr].previousState.store(eThreadState::None);
+    guestThreadRunState[thr].resetting.store(true);
   }
-  guestHalt = requestedByGuest;
+}
+
+// Halts a single PPU thread by it's thread ID.
+void PPU::HaltGuestThreadByThreadID(ePPUThreadID thrId, u64 haltOn, bool requestedByGuest) {
+  // Bounds check
+  u8 threadIndex = static_cast<u8>(thrId);
+  if (threadIndex != 0 && threadIndex != 1) {
+    LOG_ERROR(Xenon, "PPU{}.T{}: Invalid thread ID {:#d} for halting!", ppeState->ppuID, threadIndex,
+              static_cast<u8>(thrId));
+    return;
+  }
+
+  // Get the Guest Thread Run State for the specified thread ID.
+  sThreadRunState& rs = guestThreadRunState[thrId];
+
+  // If we got a halt address, refelct it on out state.
+  if (haltOn && !rs.guestHalt) {
+    LOG_DEBUG(Xenon, "PPU{}.T{}: Halting on address {:#x}", ppeState->ppuID, static_cast<u8>(thrId), haltOn);
+    rs.haltOn = haltOn;
+  }
+
+  // Signal wheter this halt was guest requested.
+  rs.guestHalt = requestedByGuest;
+
+  // If we have a renderer, set the debugger active for this PPU Guest thread on 'guest halt'.
 #ifndef NO_GFX
-  if (guestHalt && XeMain::renderer) { XeMain::renderer->SetDebuggerActive(ppuId); }
+  if (rs.guestHalt && XeMain::renderer) { XeMain::renderer->SetDebuggerActive(ppeState->ppuID); }
 #endif
-  if (ppuThreadPreviousState == eThreadState::None) // If we were told to ignore it, then do so
-    ppuThreadPreviousState.store(ppuThreadState.load());
-  ppuThreadState.store(eThreadState::Halted);
-}
-void PPU::Continue() {
-  if (ppuThreadState.load() == eThreadState::Running) return;
-  if (ppuThreadPreviousState == eThreadState::Running)
-    LOG_DEBUG(Xenon, "Continuing execution on PPU{}", ppeState->ppuID);
-  ppuThreadState.store(ppuThreadPreviousState.load());
-  ppuThreadPreviousState.store(eThreadState::None);
-  guestHalt = false;
-}
-void PPU::ContinueFromException() {
-  if (ppuThreadState.load() == eThreadState::Running) return;
-  if (ppuThreadPreviousState == eThreadState::Running) LOG_DEBUG(Xenon, "Jumping to exception handler");
-  if (guestHalt) {
-    sPPUThread& thread = ppeState->ppuThread[curThreadId];
-    thread.RaiseExc(ppuProgramEx);
-    thread.progExceptionType = ppuProgExTypeTRAP;
-  }
-  ppuThreadState.store(ppuThreadPreviousState.load());
-  ppuThreadPreviousState.store(eThreadState::None);
-  guestHalt = false;
-}
-void PPU::Step(int amount) {
-  if (ppuThreadState.load() == eThreadState::Running) return;
-  if (ppuThreadPreviousState == eThreadState::Running)
-    LOG_DEBUG(Xenon, "Continuing PPU{} for {} Instructions", ppeState->ppuID, amount);
-  ppuStepAmount = amount;
+
+  // Save the previous state so we can resume after a halt.
+  if (rs.previousState == eThreadState::None) // If we were told to ignore it, then do so
+    rs.previousState.store(rs.state.load());
+
+  // Set the state to Halted.
+  rs.state.store(eThreadState::Halted);
 }
 
-// PPU Entry Point.
-void PPU::PPURunInstructions(u64 numInstrs, bool enableHalt) {
+// Halt both guestthreads unless specified otherwise.
+void PPU::HaltGuestThread(u64 haltOn, bool requestedByGuest, ePPUThreadID threadId) {
+  // If threadId is None, halt both threads. Otherwise, halt the specified thread.
+  if (threadId == ePPUThread_None) {
+    HaltGuestThreadByThreadID(ePPUThread_Zero, haltOn, requestedByGuest);
+    HaltGuestThreadByThreadID(ePPUThread_One, haltOn, requestedByGuest);
+  } else {
+    HaltGuestThreadByThreadID(threadId, haltOn, requestedByGuest);
+  }
+}
+
+// Continue after halt.
+void PPU::ContinueFromHalt() {
+  for (u8 thr = 0; thr < 2; ++thr) {
+    // Get the Guest Thread Run State for the specified thread ID.
+    sThreadRunState& rs = guestThreadRunState[thr];
+    // Only resume halted threads.
+    if (rs.state.load() == eThreadState::Running) continue;
+
+    if (rs.previousState == eThreadState::Running)
+      LOG_DEBUG(Xenon, "PPU{}.T{}: Continuing execution after halt. ", ppeState->ppuID, thr);
+
+    // Update state from previous stored state, then clear previous state.
+    rs.state.store(rs.previousState.load());
+    rs.previousState.store(eThreadState::None);
+    rs.guestHalt = false;
+  }
+}
+
+// Continues any halted threads after an exception.
+void PPU::ContinueFromException() {
+  for (u8 thr = 0; thr < 2; ++thr) {
+    // Get the Guest Thread Run State for the specified thread ID.
+    sThreadRunState& rs = guestThreadRunState[thr];
+    // Only resume halted threads.
+    if (rs.state.load() == eThreadState::Running) continue;
+
+    if (rs.previousState == eThreadState::Running)
+      LOG_DEBUG(Xenon, "PPU{}.T{}: Issuing a Program Exception.", ppeState->ppuID, thr);
+
+    // Raise the proper exception on the halted thread if it was a 'guest halt'.
+    if (rs.guestHalt) {
+      sPPUThread& thread = ppeState->ppuThread[thr];
+      thread.RaiseExc(ppuProgramEx);
+      thread.progExceptionType = ppuProgExTypeTRAP;
+    }
+
+    // Update state from previous stored state, then clear previous state.
+    rs.state.store(rs.previousState.load());
+    rs.previousState.store(eThreadState::None);
+    rs.guestHalt = false;
+  }
+}
+
+// Updates the amount of instructions to be stepped on any halted threads.
+void PPU::StepInstructions(int amount) {
+  for (u8 thr = 0; thr < 2; ++thr) {
+    // Get the Guest Thread Run State for the specified thread ID.
+    sThreadRunState& rs = guestThreadRunState[thr];
+    // Only step halted threads.
+    if (rs.state.load() == eThreadState::Running) continue;
+
+    if (rs.previousState == eThreadState::Running)
+      LOG_DEBUG(Xenon, "PPU{}.T{}: Continuing for {:#d} Instructions", ppeState->ppuID, thr, amount);
+
+    // Reflect the step amount on the state.
+    rs.stepAmount = amount;
+  }
+}
+
+// Enables one Guest PPU thread, and sets the wake reason for the System Reset exception.
+void PPU::EnableGuestThread(ePPUThreadID thrId, eThreadWakeReason wakeReason) {
+  // Get the target Guest Thread State.
+  sPPUThread& thread = ppeState->ppuThread[thrId];
+
+  // Get the architected wake reason into SRR1[42:44].
+  thread.SPR.SRR1 = ThreadWakeReasonToSRR1(wakeReason);
+
+  // Issue the System Reset exception.
+  DeliverGuestException(ppeState.get(), ppuSystemResetEx);
+
+  // Set the thread state to Running so the thread loop will execute instructions.
+  guestThreadRunState[thrId].state.store(eThreadState::Running);
+
+  LOG_DEBUG(Xenon, "{}.T{} brought online (Reason: {}), issuing System Reset Exception.", ppeState->ppuName,
+            static_cast<u8>(thrId), ThreadWakeReasonToString(wakeReason));
+}
+
+// Runs a burst of instructions on a single PPU thread.
+void PPU::RunInstructions(ePPUThreadID thrId, u64 numInstrs, bool enableHalt) {
   // Start Profile
   MICROPROFILE_SCOPEI("[Xe::PPU]", "PPURunInstructions", MP_AUTO);
-  for (size_t instrCount = 0; instrCount < numInstrs && ppuThreadActive; ++instrCount) {
+  // Get the Guest Thread Run State.
+  sThreadRunState& rs = guestThreadRunState[thrId];
+  // Get the PPU Thread State for the current thread ID.
+  sPPUThread& thread = ppeState->ppuThread[thrId];
+
+  // Execute while numInstr > 0.
+  for (size_t instrCount = 0; instrCount < numInstrs && rs.active.load(); ++instrCount) {
+    // Consume a pending bring-up if present.
+    const s8 wake = thread.pendingWakeReason.exchange(-1, std::memory_order_acquire);
+
+    // Enable the guest thread if we have a pending wake reason.
+    if (wake >= eThreadWakeReason::WAKE_POR && wake < eThreadWakeReason::WAKE_MAX) {
+      EnableGuestThread(thrId, static_cast<eThreadWakeReason>(wake));
+    }
+
     // Halt if needed before executing the next instruction
-    if (enableHalt && ppuHaltOn == curThread.NIA) { Halt(); }
+    if (enableHalt && rs.haltOn == thread.NIA) { HaltGuestThread(thrId); }
+
+    // Check external interrupts and raise an exception if found.
+    CheckAndRaiseExternalExceptions(ppeState.get());
+
+    // Handle any pending exceptions
+    CheckAndProcessExceptions(ppeState.get());
 
     // Read next instruction
-    bool readNextInstr = false;
-    // Profile read next instruction
-    {
-      MICROPROFILE_SCOPEI("[Xe::PPU]", "ReadNextInstruction", MP_AUTO);
-      readNextInstr = PPUReadNextInstruction();
-    }
-    if (readNextInstr) {
+    if (ReadNextInstruction(thrId)) {
 #ifdef DEBUG_BUILD
       if (traceFile) {
-        const std::string instrName = PPCInterpreter::PPCInterpreter_getFullName(_instr.opcode);
-        fprintf(traceFile, "%llx: 0x%x %s\n", curThread.CIA, _instr.opcode, instrName.c_str());
+        const std::string instrName = PPCInterpreter::PPCInterpreter_getFullName(thread.CI.opcode);
+        fprintf(traceFile, "%llx: 0x%x %s\n", thread.CIA, thread.CI.opcode, instrName.c_str());
       }
 #endif
       // Start Profile
       MICROPROFILE_SCOPEI("[Xe::PPU]", "ExecuteSingleInstruction", MP_AUTO);
-      // Execute instruction
+      // Execute instruction (resolves the active thread via the thread_local curThreadId == thrId).
       PPCInterpreter::ppcExecuteSingleInstruction(ppeState.get());
     }
 
-    if (xenonContext->iic.hasPendingInterrupts(curThread.SPR.PIR)) { curThread.RaiseExc(ppuExternalEx); }
+    // If the thread was suspended due to CTRL being written, we must end execution on said thread.
+    if (!IsThreadEnabled(ppeState.get(), thrId)) { break; }
 
-    curThread.CheckDecSignals();
-
-    // Handle pending exceptions
-    if (curThread.HasExc(SyncExceptionMask)) { PPUProcessSyncExceptions(ppeState.get()); }
-    if (curThread.HasExc(AsyncExceptionMask)) { PPUProcessAsyncExceptions(ppeState.get()); }
-
-    // If the thread was suspended due to CTRL being written, we must end
-    // execution on said thread.
-    if (ppeState->currentThread == 0 && ppeState->SPR.CTRL.TE0 != true) { break; }
-    if (ppeState->currentThread == 1 && ppeState->SPR.CTRL.TE1 != true) { break; }
-
-    // Break after exec and if it's halted
-    if ((enableHalt && ppuThreadState == eThreadState::Halted) || ppuThreadState == eThreadState::Resetting) break;
+    // Break after exec and if it's halted.
+    const eThreadState st = rs.state.load();
+    if ((enableHalt && st == eThreadState::Halted) || st == eThreadState::Resetting) break;
   }
 }
 
-// PPU Thread state machine, handles all execution and codeflow
-void PPU::ThreadStateMachine() {
-  // Check if we should exit or not
-  ppuThreadActive = ppuThreadState.load() != eThreadState::None;
-  // Signal a reset if needed
-  if (ppuThreadResetting) { ppuThreadState.store(eThreadState::Resetting); }
-  switch (ppuThreadState) {
-    case eThreadState::Executing: {
-      ppuThreadState.store(eThreadState::Running);
-    } break;
+// Guest thread state machine, handles all execution and codeflow for one PPU thread.
+void PPU::GuestThreadStateMachine(ePPUThreadID thrId) {
+  // Get the Guest Thread Run State.
+  sThreadRunState& rs = guestThreadRunState[thrId];
+
+  // Check if we should exit or not.
+  rs.active.store(rs.state.load() != eThreadState::None);
+
+  // Signal a reset if needed.
+  if (rs.resetting.load()) { rs.state.store(eThreadState::Resetting); }
+
+  // Is this PPU thread enabled by its CTRL[TEx] bit?
+  const bool teEnabled = IsThreadEnabled(ppeState.get(), thrId);
+
+  switch (rs.state.load()) {
     case eThreadState::Running: {
-      // Check our threads to see if any are running
-      u8 state = GetCurrentRunningThreads();
-      if (currentExecMode == eExecutorMode::Interpreter) {
-        if (!ppuThreadResetting && (state & ePPUThreadBit_Zero)) {
-          // Thread 0 is running, process instructions until we reach TTR timeout.
-          curThreadId = ePPUThread_Zero;
-          PPURunInstructions(ppeState->SPR.TTR.hexValue, ppuHaltOn != 0);
-        }
-        if (!ppuThreadResetting && (state & ePPUThreadBit_One)) {
-          // Thread 1 is running, process instructions until we reach TTR timeout.
-          curThreadId = ePPUThread_One;
-          PPURunInstructions(ppeState->SPR.TTR.hexValue, ppuHaltOn != 0);
-        }
+      // If the thread is disabled or was disabled via CTRL, we must sleep until awaken again.
+      if (!teEnabled) {
+        // Thread was disabled, park it until re-enabled.
+        rs.state.store(eThreadState::Sleeping);
+        break;
+      }
+      if (currentExecMode == eExecutorMode::Interpreter && !rs.resetting.load()) {
+        // Process instructions until we reach the TTR timeout.
+        RunInstructions(thrId, ppeState->SPR.TTR.hexValue, rs.haltOn != 0);
       }
     } break;
     case eThreadState::Halted: {
-      // Check if we should exit or not
-      ppuThreadActive = ppuThreadState.load() != eThreadState::None;
+      // Check if we should exit or not.
+      rs.active.store(rs.state.load() != eThreadState::None);
+
       // Handle stepping
-      u8 state = GetCurrentRunningThreads();
-      if (currentExecMode == eExecutorMode::Interpreter) {
-        if (state & ePPUThreadBit_Zero) {
-          curThreadId = ePPUThread_Zero;
-          if (ppuStepAmount > 0) {
-            PPURunInstructions(ppuStepAmount, false);
-            ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
-          }
-        }
-        if (state & ePPUThreadBit_One) {
-          curThreadId = ePPUThread_One;
-          if (ppuStepAmount > 0) {
-            PPURunInstructions(ppuStepAmount, false);
-            ppuStepAmount = 0; // Ensure step mode doesn't continue indefinitely
-          }
-        }
+      // TODO: Stepping is currently unimplemented!!!!!
+      if (currentExecMode == eExecutorMode::Interpreter && teEnabled && rs.stepAmount > 0) {
+        RunInstructions(thrId, rs.stepAmount, false);
+        rs.stepAmount = 0; // Ensure step mode doesn't continue indefinitely.
       }
     } break;
     case eThreadState::Sleeping: {
-      // Waiting for an event, do nothing
-      std::this_thread::sleep_for(1ms); // Don't burn the CPU
-    } break;
-    case eThreadState::Unused: {
-      ppuThreadState.store(eThreadState::None);
+      // Park until a wake event notifies the per-PPU conditional var, or a short timeout elapses.
+      std::unique_lock<std::mutex> lk(ppeState->parkMutex);
+      // Timeout of 2ms.
+      ppeState->parkCV.wait_for(lk, 2ms);
     } break;
     case eThreadState::Resetting: {
-      if (ppeState.get()) LOG_INFO(Xenon, "PPU{} is resetting!", ppeState->ppuID);
+      if (ppeState.get()) LOG_INFO(Xenon, "PPU{}.T{}: Thread is resetting!", ppeState->ppuID, static_cast<u8>(thrId));
       else LOG_INFO(Xenon, "A PPU is in the middle of resetting!");
-      ppuThreadState.store(eThreadState::None);
+      rs.state.store(eThreadState::None);
     } break;
     case eThreadState::Quiting: {
-      ppuThreadState.store(eThreadState::None);
+      // Thread's exiting. Update status.
+      rs.state.store(eThreadState::None);
     } break;
     default: {
     } break;
   }
 }
-void PPU::ThreadLoop() {
-  // Set thread name
-  if (ppeState.get()) Base::SetCurrentThreadName("[Xe] " + ppeState->ppuName);
-  while (ppuThreadActive) {
+
+// PPU Host Thread Loop
+void PPU::HostThreadLoop(ePPUThreadID thrId) {
+  // Bind this host thread to its PPU thread ID.
+  curThreadId = thrId;
+  // Get the Guest Thread Run State.
+  sThreadRunState& rs = guestThreadRunState[thrId];
+
+  // Set this thread's name.
+  if (ppeState.get()) Base::SetCurrentThreadName(FMT("[Xe] {}.T{}", ppeState->ppuName, static_cast<u8>(thrId)));
+
+  // Loop while the thread is active.
+  while (rs.active.load()) {
     // Start Profile
-    MICROPROFILE_SCOPEI("[Xe::PPU]", "ThreadLoop", MP_AUTO);
-    // Run state machine
-    ThreadStateMachine();
+    MICROPROFILE_SCOPEI("[Xe::PPU]", "Guest Thread Loop", MP_AUTO);
+
+    // Run the guest state machine.
+    GuestThreadStateMachine(thrId);
 
     // If our thread is not active while running, abort early.
-    // We are likely destroying the handle
-    if (!ppuThreadActive) break;
+    // We are likely destroying the handle.
+    if (!rs.active.load()) break;
 
-    if (PPUCheckInterrupts()) continue;
+    // Check enabling interrupts (external IPI, DEC, etc...)
+    CheckForGuestThreadEnablingExceptions(thrId);
   }
-  // Thread is done executing, just tell it to exit
-  ppuThreadActive = false;
+
+  // Thread is done executing, just tell it to exit.
+  rs.active.store(false);
 }
 
 // Returns a pointer to the specified thread.
 sPPUThread* PPU::GetPPUThread(u8 thrdID) { return &ppeState->ppuThread[static_cast<ePPUThreadID>(thrdID)]; }
 
-// Loads a elf binary at a specificed address
-// Returns entrypoint
+// Helper macros for loading ELF files and performing byteswap.
 #define IS_ELF(ehdr)                                                                                                   \
   ((ehdr).e_ident[EI_MAG0] == ELFMAG0 && (ehdr).e_ident[EI_MAG1] == ELFMAG1 && (ehdr).e_ident[EI_MAG2] == ELFMAG2      \
    && (ehdr).e_ident[EI_MAG3] == ELFMAG3)
@@ -360,7 +478,9 @@ template<typename T> void bswap_elf(T& value) { value = byteswap_be<T>(value); }
     bswap_elf(header##64 entry);                                                                                       \
   }
 #define READ(header, entry) elf32 ? header entry : header##64 entry
-u64 PPU::loadElfImage(u8* data, u64 size) {
+
+// Loads a elf binary at a specificed address. Returns entrypoint
+u64 PPU::LoadElfImage(u8* data, u64 size) {
   // Setup HRMOR for elf binaries
   ppeState->SPR.CTRL.hexValue = 0x800000; // CTRL[TE0] = 1;
   ppeState->SPR.HRMOR.hexValue = 0x0000000000000000;
@@ -497,9 +617,9 @@ u64 PPU::loadElfImage(u8* data, u64 size) {
   return curThread.NIA;
 }
 
-// Reads the next instruction from memory and advances the NIP accordingly.
-bool PPU::PPUReadNextInstruction() {
-  ePPUThreadID thrId = curThreadId;
+// Reads the next instruction from memory and advances the NIP accordingly. Returns false if an exception was raised
+// during the read.
+bool PPU::ReadNextInstruction(ePPUThreadID thrId) {
   sPPUThread& thread = ppeState->ppuThread[thrId];
   // Update previous instruction address
   thread.PIA = thread.CIA;
@@ -509,58 +629,21 @@ bool PPU::PPUReadNextInstruction() {
   thread.NIA += 4;
   thread.instrFetch = true;
   // Fetch the instruction from memory
-  _instr.opcode = ppeState->mmu->MMURead32(thread.CIA, thrId);
-  if (_instr.opcode == 0xFFFFFFFF || _instr.opcode == 0xCDCDCDCD) {
+  thread.CI.opcode = ppeState->mmu->MMURead32(thread.CIA, thrId);
+  if (thread.CI.opcode == 0xFFFFFFFF || thread.CI.opcode == 0xCDCDCDCD) {
     LOG_CRITICAL(Xenon,
-                 "PPU{} returned an invalid opcode found. Data = {:#x}, PIA "
+                 "PPU{}.T{} returned an invalid opcode found. Data = {:#x}, PIA "
                  "[{:#x}] -> CIA [{:#x}]. Halting...",
-                 ppeState->ppuID, _instr.opcode, thread.PIA, thread.CIA);
-    Halt();
+                 ppeState->ppuID, static_cast<u8>(thrId), thread.CI.opcode, thread.PIA, thread.CIA);
+    HaltGuestThread(thrId);
     return false;
   }
-  if (thread.HasExc(ppuInstrStorageEx) || thread.HasExc(ppuInstrSegmentEx)) { return false; }
+
+  // Check for storage exceptions.
+  if (thread.HasStorageExceptions()) { return false; }
+
   thread.instrFetch = false;
   return true;
-}
-
-// Checks for CPU bringup interrupts
-bool PPU::PPUCheckInterrupts() {
-  // Check if we are allowed to enable thread zero if the thread is sleeping...
-  bool WEXT = (ppeState->SPR.TSCR.hexValue & 0x100000) >> 20;
-
-  // Check for external interrupts that enable execution
-  if (ppuThreadActive && !ppuThreadResetting
-      && (ppuThreadState.load() == eThreadState::Halted || ppuThreadState.load() == eThreadState::Sleeping) && WEXT) {
-    // Check for an external interrupt that enables execution.
-    if (!xenonContext->iic.hasPendingInterrupts(curThread.SPR.PIR, true)) { return true; }
-
-    // Proceed.
-    LOG_DEBUG(Xenon, "{} was previously halted or sleeping, bringing online", ppeState->ppuName);
-    ppuThreadState.store(eThreadState::Running);
-
-    // Enable thread 0 execution and issue a system reset exception.
-    ppeState->SPR.CTRL.TE0 = 1;
-    ppeState->ppuThread[ePPUThread_Zero].RaiseExc(ppuSystemResetEx);
-
-    sPPUThread& thread = curThread;
-    thread.SPR.SRR1 = 0x200000; // Set SRR1[42:44] = 100
-  }
-
-  return false;
-}
-
-// Returns current executing thread by reading CTRL register
-u8 PPU::GetCurrentRunningThreads() {
-  if (!ppeState) return ePPUThreadBit_None;
-
-  // Extract bits 22-23 in one step and directly map them to thread states
-  u8 ctrlTE = (ppeState->SPR.CTRL.hexValue >> 22) & 0b11;
-  // If the thread state was changed to shut down both threads, set the thread
-  // state to sleeping.
-  if (!(ppeState->SPR.CTRL.TE0 || ppeState->SPR.CTRL.TE1)) { ppuThreadState.store(eThreadState::Sleeping); }
-
-  // Directly map ctrlTE to thread states using bit shifting
-  return (ctrlTE & 0b01) * ePPUThreadBit_One | (ctrlTE & 0b10) / 2 * ePPUThreadBit_Zero;
 }
 
 // Does a mostly complete simulation of the 1Bl inside the SROM.
@@ -617,12 +700,11 @@ bool PPU::Simulate1Bl() {
   return true;
 }
 
-//
+//*****************************************************************************
 // Exception Processing
-//
+//*****************************************************************************
 
-// Exceptions in the CELL/BE and thus the Xenon, are subdivided onto two main
-// categories:
+// Exceptions in the CELL/BE and thus the Xenon, are subdivided onto two main categories:
 // -------------------
 // *** Synchronous ***
 // -------------------
@@ -673,52 +755,68 @@ bool PPU::Simulate1Bl() {
 // * Hypervisor decrementer Interrupt
 // * Decrementer Interrupt
 
-// Process Synchronous exceptions, single priority-ordered dispatcher.
-void PPU::PPUProcessSyncExceptions(sPPEState* ppeState) {
+// Checks for any pending exceptions and processes them accordingly.
+void PPU::CheckAndProcessExceptions(sPPEState* ppeState) {
+  // Get the PPU Thread State for the current thread ID.
+  sPPUThread& thread = curThread;
+
+  // Check and process synchronous exceptions first, then asynchronous exceptions.
+  // NOTE: Only one exception is processed at a time, so if any exception is found, it will be processed and the rest
+  // will be handled on the next check.
+
+  if (thread.HasExc(SyncExceptionMask)) {
+    ProcessSyncExceptions(ppeState);
+    return;
+  }
+
+  if (thread.HasExc(AsyncExceptionMask)) {
+    ProcessAsyncExceptions(ppeState);
+    return;
+  }
+}
+
+// Process Synchronous exceptions.
+void PPU::ProcessSyncExceptions(sPPEState* ppeState) {
   sPPUThread& thread = curThread;
 
   // NOTE: Already arranged by order of execution.
   // TODO: Missing Alignment, Trace and Maintenance exceptions.
   if (thread.HasExc(ppuDataStorageEx)) {
-    PPUDeliverException(ppeState, ppuDataStorageEx);
+    DeliverGuestException(ppeState, ppuDataStorageEx);
     return;
   }
   if (thread.HasExc(ppuDataSegmentEx)) {
-    PPUDeliverException(ppeState, ppuDataSegmentEx);
+    DeliverGuestException(ppeState, ppuDataSegmentEx);
     return;
   }
   if (thread.HasExc(ppuFPUnavailableEx)) {
-    PPUDeliverException(ppeState, ppuFPUnavailableEx);
+    DeliverGuestException(ppeState, ppuFPUnavailableEx);
     return;
   }
   if (thread.HasExc(ppuVXUnavailableEx)) {
-    PPUDeliverException(ppeState, ppuVXUnavailableEx);
+    DeliverGuestException(ppeState, ppuVXUnavailableEx);
     return;
   }
   if (thread.HasExc(ppuProgramEx)) {
-    PPUDeliverException(ppeState, ppuProgramEx);
+    DeliverGuestException(ppeState, ppuProgramEx);
     return;
   }
   if (thread.HasExc(ppuSystemCallEx)) {
-    PPUDeliverException(ppeState, ppuSystemCallEx);
+    DeliverGuestException(ppeState, ppuSystemCallEx);
     return;
   }
   if (thread.HasExc(ppuInstrStorageEx)) {
-    PPUDeliverException(ppeState, ppuInstrStorageEx);
+    DeliverGuestException(ppeState, ppuInstrStorageEx);
     return;
   }
   if (thread.HasExc(ppuInstrSegmentEx)) {
-    PPUDeliverException(ppeState, ppuInstrSegmentEx);
+    DeliverGuestException(ppeState, ppuInstrSegmentEx);
     return;
   }
 }
 
 // Process Asynchronous exceptions.
-// Priority-ordered dispatcher: System Reset and
-// Machine Check are non-maskable; External/Decrementer/HV-Decrementer are gated
-// by MSR[EE] (the gate is evaluated here, at delivery time, not when the
-// exception was raised).
-void PPU::PPUProcessAsyncExceptions(sPPEState* ppeState) {
+void PPU::ProcessAsyncExceptions(sPPEState* ppeState) {
   sPPUThread& thread = curThread;
 
   // NOTE: Already arranged by order of execution.
@@ -727,7 +825,7 @@ void PPU::PPUProcessAsyncExceptions(sPPEState* ppeState) {
   // System Reset (0x100) - non-maskable. Does not set interruptTaken so that a
   // synchronous exception can still be raised from within the reset handler.
   if (thread.HasExc(ppuSystemResetEx)) {
-    PPUDeliverException(ppeState, ppuSystemResetEx);
+    DeliverGuestException(ppeState, ppuSystemResetEx);
     return;
   }
 
@@ -735,7 +833,7 @@ void PPU::PPUProcessAsyncExceptions(sPPEState* ppeState) {
   // non-maskable.
   if (thread.HasExc(ppuMachineCheckEx)) {
     if (thread.SPR.MSR.ME) {
-      PPUDeliverException(ppeState, ppuMachineCheckEx);
+      DeliverGuestException(ppeState, ppuMachineCheckEx);
       return;
     }
     // Checkstop Mode. Hard Fault. A checkstop is a full-stop of the processor
@@ -749,12 +847,19 @@ void PPU::PPUProcessAsyncExceptions(sPPEState* ppeState) {
   if (thread.SPR.MSR.EE) {
     // External (0x500)
     if (thread.HasExc(ppuExternalEx)) {
-      PPUDeliverException(ppeState, ppuExternalEx);
+      DeliverGuestException(ppeState, ppuExternalEx);
+      return;
+    }
+    // Mediated external (0x500) - hypervisor-requested via LPCR[MER]. The hypervisor sets MER to present a virtual
+    // external interrupt to the partition, it shares the 0x500 vector, and the handler distinguishes it by MER being
+    // set. Havent't seen it on Xenon, but it's defined in the CBEA so it's best to have it.
+    if (ppeState->SPR.LPCR.MER) {
+      DeliverGuestException(ppeState, ppuExternalEx);
       return;
     }
     // Decrementer (0x900)
     if (thread.HasExc(ppuDecrementerEx)) {
-      PPUDeliverException(ppeState, ppuDecrementerEx);
+      DeliverGuestException(ppeState, ppuDecrementerEx);
       return;
     }
   }
@@ -764,20 +869,17 @@ void PPU::PPUProcessAsyncExceptions(sPPEState* ppeState) {
     if (!ppeState->SPR.LPCR.HDICE) {
       thread.ClearExc(ppuHypervisorDecrementerEx);
     } else if (!thread.SPR.MSR.HV || thread.SPR.MSR.EE) {
-      PPUDeliverException(ppeState, ppuHypervisorDecrementerEx);
+      DeliverGuestException(ppeState, ppuHypervisorDecrementerEx);
       return;
     }
   }
 }
 
-//
-// Exception definitions.
-//
-
-// Unified exception delivery core.
-// A single routine drives every PPU interrupt: it saves the machine state into the appropriate save/restore register
-// pair, composes the new MSR for the handler and redirects NIA to the architected vector.
-void PPU::PPUDeliverException(sPPEState* ppeState, u16 excType) {
+// Delivers one guest exception of the specified type.
+// Saves the machine state into the appropriate save/restore register pair, composes the new MSR for the handler and
+// redirects NIA to the architected vector.
+void PPU::DeliverGuestException(sPPEState* ppeState, u16 excType) {
+  // Get the target thread to deliver the exception to.
   sPPUThread& thread = curThread;
 
   // Per-vector descriptor.
@@ -791,12 +893,11 @@ void PPU::PPUDeliverException(sPPEState* ppeState, u16 excType) {
     case ppuSystemResetEx:
       vector = 0x100;
       srr0IsNIA = true;
-      LOG_DEBUG(Xenon, "Thread {}: Reset Exception.", thread.SPR.PIR);
       break;
     case ppuMachineCheckEx:
-      vector = 0x100;
+      vector = 0x200;
       srr0IsNIA = true;
-      break; // In Xenon, MC enters the reset handler.
+      break;
     case ppuDataStorageEx: vector = 0x300; break;
     case ppuDataSegmentEx: vector = 0x380; break;
     case ppuInstrStorageEx:
@@ -828,35 +929,137 @@ void PPU::PPUDeliverException(sPPEState* ppeState, u16 excType) {
     case ppuPerformanceMonitorEx: vector = 0xF00; break;
     case ppuVXUnavailableEx: vector = 0xF20; break;
     default:
-      LOG_ERROR(Xenon, "[{}](Thrd{:#d}): PPUDeliverException called with unknown type {:#x}.", ppeState->ppuName,
+      LOG_ERROR(Xenon, "[{}](Thrd{:#d}): DeliverGuestException called with unknown type {:#x}.", ppeState->ppuName,
                 static_cast<s8>(curThreadId), excType);
       return;
   }
 
-  // SRR0 = the saved program counter. In 32-bit mode (MSR[SF] = 0) the saved address is truncated to 32 bits.
-  u64 savedPC = srr0IsNIA ? thread.NIA : thread.CIA;
-  if (!thread.SPR.MSR.SF) savedPC = static_cast<u32>(savedPC);
+  // SRR0 = the saved instruction address. Depending on the interrupt type it's either the NIA or the CIA.
+  u64 SRR0 = srr0IsNIA ? thread.NIA : thread.CIA;
+  // Truncate to 32 bits if the thread is in 32-bit mode (MSR[SF] = 0).
+  if (!thread.SPR.MSR.SF) SRR0 = static_cast<u32>(SRR0);
 
-  // SRR1 = (MSR & save-mask) | cause bits. The 0xFFFFFFFF87C0FFFF mask is the
-  // PPC's "MSR bits copied into SRR1" set.
-  u64 srr1 = (thread.SPR.MSR.hexValue & 0xFFFFFFFF87C0FFFF) | srr1SetBits;
-  if (excType == ppuProgramEx) BSET(srr1, 64, thread.progExceptionType);
+  // SRR1 = (MSR & save-mask) | cause bits. The 0xFFFFFFFF87C0FFFF mask is precomputed PPC architecture set of MSR bits
+  // saved.
+  u64 SRR1 = (thread.SPR.MSR.hexValue & 0xFFFFFFFF87C0FFFF) | srr1SetBits;
+
+  // Program exception type is saved in SRR1 for program exceptions.
+  if (excType == ppuProgramEx) BSET(SRR1, 64, thread.progExceptionType);
+
   if (excType == ppuSystemResetEx)
     // Preserve the SRR1[42:44] wake cause already staged by PPUCheckInterrupts.
-    srr1 |= (thread.SPR.SRR1 & 0x0000000000380000ULL);
+    SRR1 |= (thread.SPR.SRR1 & 0x0000000000380000ULL);
 
+  // Set the save/restore registers for the exception. Hypervisor-directed exceptions save to HSRR0/HSRR1.
   if (toHSRR) {
-    thread.SPR.HSRR0 = savedPC;
-    thread.SPR.HSRR1 = srr1;
+    thread.SPR.HSRR0 = SRR0;
+    thread.SPR.HSRR1 = SRR1;
   } else {
-    thread.SPR.SRR0 = savedPC;
-    thread.SPR.SRR1 = srr1;
+    thread.SPR.SRR0 = SRR0;
+    thread.SPR.SRR1 = SRR1;
   }
 
   // New MSR for the handler: clear IR/DR/EE/PR/... and force SF|HV (0x9...0).
   thread.SPR.MSR.hexValue &= 0xFFFFFFFFFFFF10C8; // Clears IR and DR (and EE/PR/...) bits.
   thread.SPR.MSR.hexValue |= 0x9000000000000000;
 
+  // Set the new NIA to the architected vector for the exception.
   thread.NIA = vector;
+
+  // Clear the exception from the thread's pending exception set.
   thread.ClearExc(excType);
+}
+
+// Checks the IIC for external exceptions and both the HDEC and DEC sources and raises the appropriate exception if
+// found.
+void PPU::CheckAndRaiseExternalExceptions(sPPEState* ppeState) {
+  // Get the PPU Thread State for the current thread ID.
+  sPPUThread& thread = curThread;
+
+  // Check Dec signals.
+  thread.CheckDecSignals();
+
+  // Check for external interrupts from the IIC. If any is indeed found raise the appropriate exception.
+  if (xenonContext->iic.hasPendingInterrupts(thread.SPR.PIR)) { thread.RaiseExc(ppuExternalEx); }
+}
+
+// Checks for PPU Thread bring-up/thread-enable interrupts for a single PPU thread.
+void PPU::CheckForGuestThreadEnablingExceptions(ePPUThreadID thrId) {
+  // Get the active thread's Run State.
+  sThreadRunState& rs = guestThreadRunState[thrId];
+
+  // Return if the thread's not active or resetting.
+  if (!rs.active.load() || rs.resetting.load()) { return; }
+
+  // Get the Guest thread state.
+  const eThreadState st = rs.state.load();
+  // Return if the Thread is sleeping or halted.
+  if (st != eThreadState::Halted && st != eThreadState::Sleeping) { return; }
+
+  // Get the PPU Thread.
+  sPPUThread& thread = ppeState->ppuThread[thrId];
+
+  //
+  // Thread-enable wake: our sibling set our CTRL[TEx] bit and queued our System Reset via the CTRLWR path.
+  //
+
+  const bool teSet = IsThreadEnabled(ppeState.get(), thrId);
+  if (teSet && st == eThreadState::Sleeping) {
+    rs.state.store(eThreadState::Running);
+    return;
+  }
+
+  //
+  // Napped-thread decrementer/HDEC wake. A thread that disabled itself via CTRL[TE]=0 sits Sleeping with TE clear.
+  // Without this it could sleep forever through its own decrementer. Gate on TSCR[WDEC0]/[WDEC1].
+  //
+
+  if (st == eThreadState::Sleeping && !teSet) {
+    uTSCR tscr{};
+    tscr.hexValue = ppeState->SPR.TSCR.hexValue;
+    const bool WDEC = (thrId == ePPUThread_Zero) ? tscr.WDEC0 : tscr.WDEC1;
+    // Wake reason.
+    s8 wakeReason = -1;
+
+    // Check if the decrementer or hypervisor decrementer expired and wake the thread if so and the WDEC is enabled for
+    // said thread. Note that the HDEC exception is discarded. We issue a system reset since the thread is sleeping.
+    if (WDEC && thread.hdecExpired.load(std::memory_order_acquire)) {
+      thread.hdecExpired.store(false, std::memory_order_release);
+      wakeReason = WAKE_HDEC;
+    } else if (WDEC && thread.decExpired.load(std::memory_order_acquire)) {
+      thread.decExpired.store(false, std::memory_order_release);
+      wakeReason = WAKE_DEC;
+    }
+
+    // Check for a valid wake reason.
+    if (wakeReason >= 0) {
+      LOG_DEBUG(Xenon, "{}.T{} woken from nap (wake reason {})", ppeState->ppuName, static_cast<u8>(thrId), wakeReason);
+      // Enable the thread via CTRL.
+      SetThreadEnable(ppeState.get(), thrId);
+      // Update the Guest Thread State.
+      rs.state.store(eThreadState::Running);
+      // Store the wake reason.
+      thread.pendingWakeReason.store(wakeReason, std::memory_order_release);
+      return;
+    }
+  }
+
+  //
+  // External interrupt wakeup.
+  //
+
+  const bool WEXT = (ppeState->SPR.TSCR.hexValue & 0x100000) >> 20;
+  if (WEXT && thrId == ePPUThread_Zero) {
+    // Check for an external interrupt that enables execution.
+    if (!xenonContext->iic.hasPendingInterrupts(thread.SPR.PIR, true)) { return; }
+
+    // Proceed.
+    rs.state.store(eThreadState::Running);
+
+    // Enable thread 0 and post an external-wake bringup.
+    SetThreadEnable(ppeState.get(), ePPUThread_Zero);
+    thread.pendingWakeReason.store(WAKE_EXTERNAL, std::memory_order_release);
+  }
+
+  return;
 }

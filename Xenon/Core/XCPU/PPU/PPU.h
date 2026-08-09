@@ -8,109 +8,109 @@
 #include "Core/XCPU/MMU/XenonMMU.h"
 #include "PowerPC.h"
 
+#include <atomic>
 #include <memory>
+#include <thread>
 
 // Describes the execution backends available for the PPU.
+// TODO: Move to the execution backend system once we have more than one.
 enum class eExecutorMode : u8 {
   Interpreter,
+};
+
+// Current 'testing' mode. Used for execution backend testing.
+// Same as above, move to the execution backend system.
+enum class ePPUTestingMode : u8 {
+  Interpreter, // Regular interpreter mode
 };
 
 // Current PPU Thread State.
 enum class eThreadState : u8 {
   None,      // Not created
-  Unused,    // Should we create a handle? (Only really used in elf loading and single-core testing)
   Sleeping,  // Waiting for wakeup
   Halted,    // Halted, but ready for execution
   Running,   // Running
-  Executing, // Actively running opcodes
   Resetting, // Recreating handle, same as halted but will resume afterwards
   Quiting    // Currently in a shutdown
-};
-
-// Current 'testing' mode. Used for execution backend testing.
-enum class ePPUTestingMode : u8 {
-  Interpreter, // Regular interpreter mode
 };
 
 // Power Procesing Unit. Main execution unit inside the PPE's within the Xenon CPU.
 class PPU {
 public:
+  // Constructor
   PPU(Xe::XCPU::XenonContext* inXenonContext, u64 resetVector, u32 PIR);
+  // Destructor
   ~PPU();
 
-  // Start execution
+  // Start execution of the PPU, initialize the state machine and loop on the first thread.
+  // @param setHRMOR: Set HRMOR register to 0x200'0000'0000, as it would seem default on the Xenon.
   void StartExecution(bool setHRMOR = true);
 
-  // Reset the PPU state
-  void Reset();
+  // Reset both Guest Threads.
+  void ResetGuestThreads();
 
-  // Debug tools
-  void Halt(u64 haltOn = 0, bool requestedByGuest = false, s8 ppuId = 0, ePPUThreadID threadId = ePPUThread_None);
-  void Continue();
-  void ContinueFromException();
-  void Step(int amount = 1);
+  // Checks if any PPU thread is halted.
+  bool IsHalted() {
+    return AnyThread([](const sThreadRunState& rs) { return rs.state.load() == eThreadState::Halted; });
+  }
 
-  // Thread state machine
-  void ThreadStateMachine();
+  // Checks if any PPU thread is halted due to a guest request.
+  bool IsHaltedByGuest() {
+    return AnyThread([](const sThreadRunState& rs) { return rs.guestHalt && rs.state.load() == eThreadState::Halted; });
+  }
 
-  // Thread function
-  void ThreadLoop();
-
-  // Returns a pointer to a thread
-  sPPUThread* GetPPUThread(u8 thrdID);
-
-  // Runs a specified number of instructions
-  void PPURunInstructions(u64 numInstrs, bool enableHalt = true);
-
-  // Checks if the thread is active
-  bool ThreadActive() { return ppuThreadState == eThreadState::Executing || ppuThreadState == eThreadState::Running; }
-
-  // Checks if the thread is halted
-  bool IsHalted() { return ppuThreadState == eThreadState::Halted; }
-
-  // Checks if the thread is halted
-  bool IsHaltedByGuest() { return guestHalt && IsHalted(); }
-
-  // Returns the thread state
-  eThreadState ThreadState() { return ppuThreadState; }
-
-  // Get ppeState
+  // Returns a pointer to the PPE state.
   sPPEState* GetPPUState() { return ppeState.get(); }
 
-  // Load a elf image from host memory. Copies into RAM
-  // Returns entrypoint
-  u64 loadElfImage(u8* data, u64 size);
+  // Returns a pointer to a guest PPU thread.
+  // @param thrdID: Guest thread ID [0-1] to return the pointer from.
+  sPPUThread* GetPPUThread(u8 thrdID);
 
-  FILE* traceFile;
+  // Load an ELF image, copies it into RAM and returns entrypoint.
+  // @param data: Pointer to the ELF data stream.
+  // @param size: ELF data stream size in memory.
+  u64 LoadElfImage(u8* data, u64 size);
 
+  // Current CPU exection mode backend.
   eExecutorMode currentExecMode = eExecutorMode::Interpreter;
 
+  // Trace file stream.
+  FILE* traceFile;
+
+  // Debugging tools.
+  // NOTE: threadId == ePPUThread_None targets both PPU threads.
+
+  void HaltGuestThread(u64 haltOn = 0, bool requestedByGuest = false, ePPUThreadID threadId = ePPUThread_None);
+  void ContinueFromHalt();
+  void ContinueFromException();
+  void StepInstructions(int amount = 1);
+
 private:
-  // Thread handle
-  std::thread ppuThread;
+  // Per-PPU Guest thread state. One instance per PPU thread.
+  struct sThreadRunState {
+    // Host thread driving this Guest PPU thread.
+    std::thread hostThread;
+    // Current run state.
+    std::atomic<eThreadState> state = eThreadState::None;
+    // Run state before halting (used to resume after a debugger halt).
+    std::atomic<eThreadState> previousState = eThreadState::None;
+    // Whether the host thread should keep looping.
+    std::atomic<bool> active = true;
+    // Whether the thread is currently resetting.
+    std::atomic<bool> resetting = false;
+    // If non-zero, halt when NIA reaches this address, then clear it.
+    u64 haltOn = 0;
+    // Set when the guest requested the halt.
+    bool guestHalt = false;
+    // Amount of instructions left to step while halted.
+    u64 stepAmount = 0;
+  };
 
-  // PPU Thread state
-  std::atomic<eThreadState> ppuThreadState = eThreadState::None;
+  // Represents the state of two Guest PPU hardware threads inside this PPE.
+  sThreadRunState guestThreadRunState[2];
 
-  // Thread active?
-  volatile bool ppuThreadActive = true;
-
-  // Thread resetting?
-  volatile bool ppuThreadResetting = false;
-
-  // PPU thread state before halting
-  std::atomic<eThreadState> ppuThreadPreviousState = eThreadState::None;
-
-  // If this is set to a non-zero value, it will halt on that address then clear it
-  u64 ppuHaltOn = 0;
-
-  // If this is set, then the guest requested us to halt. Opens another option in the debugger
-  bool guestHalt = false;
-
-  // Amount of instructions to step
-  u64 ppuStepAmount = 0;
-
-  // Execution threads inside this PPU.
+  // Guest PPE Context.
+  // Contains both guest PPU Contexts.
   std::unique_ptr<sPPEState> ppeState;
 
   // Main CPU Context.
@@ -119,29 +119,64 @@ private:
   // Initial reset vector
   u32 resetVector = 0;
 
+  // Applies a predicate to both PPU threads and returns true if any matches.
+  template<typename Pred> bool AnyThread(Pred pred) const {
+    return pred(guestThreadRunState[ePPUThread_Zero]) || pred(guestThreadRunState[ePPUThread_One]);
+  }
+
+  //
+  // Per-thread execution
+  //
+
+  // Host thread entry point for one Guest PPU thread.
+  void HostThreadLoop(ePPUThreadID thrId);
+
+  // Guest thread state machine, handles all execution and codeflow.
+  void GuestThreadStateMachine(ePPUThreadID thrId);
+
+  // Runs a specified number of instructions on one PPU thread.
+  void RunInstructions(ePPUThreadID thrId, u64 numInstrs, bool enableHalt = true);
+
+  // Halts a single Guest PPU thread based on its thread ID.
+  // @param thrId: The thread ID to halt (ePPUThread_Zero or ePPUThread_One).
+  // @param haltOn: Optional address to halt on (default is 0, meaning no specific address).
+  // @param requestedByGuest :Whether the halt was requested by the guest (default is false).
+  void HaltGuestThreadByThreadID(ePPUThreadID thrId, u64 haltOn = 0, bool requestedByGuest = false);
+
+  // Enables a Guest PPU thread with the specified bringup reason.
+  // @param thrId: The thread ID to enable (ePPUThread_Zero or ePPUThread_One).
+  // @param wakeReason: The reason for enabling the thread (power-on-reset, decrementer wake, etc.).
+  void EnableGuestThread(ePPUThreadID thrId, eThreadWakeReason wakeReason);
+
   //
   // Exceptions
   //
 
-  // Delivers an exception to the current thread.
-  void PPUDeliverException(sPPEState* ppeState, u16 excType);
+  // Check and process any pending exceptions for the current thread.
+  void CheckAndProcessExceptions(sPPEState* ppeState);
 
   // Process Synchronous exceptions.
-  void PPUProcessSyncExceptions(sPPEState* ppeState);
+  void ProcessSyncExceptions(sPPEState* ppeState);
 
   // Process Asynchronous exceptions.
-  void PPUProcessAsyncExceptions(sPPEState* ppeState);
+  void ProcessAsyncExceptions(sPPEState* ppeState);
+
+  // Delivers an exception to the current thread.
+  void DeliverGuestException(sPPEState* ppeState, u16 excType);
+
+  // Checks for external exceptions from the IIC and DEC/HDEC and raises them.
+  void CheckAndRaiseExternalExceptions(sPPEState* ppeState);
+
+  // Checks for pending bring-up/enable exceptions for the given thread.
+  void CheckForGuestThreadEnablingExceptions(ePPUThreadID thrId);
 
   //
   // Helpers
   //
 
-  // Read next intruction from memory
-  bool PPUReadNextInstruction();
-  // Checks for pending exceptions
-  bool PPUCheckInterrupts();
-  // Gets the current running threads.
-  u8 GetCurrentRunningThreads();
+  // Read next intruction from memory for the given thread.
+  bool ReadNextInstruction(ePPUThreadID thrId);
+
   // Simulates the behavior of the 1BL inside the Xenon Secure ROM.
   bool Simulate1Bl();
 

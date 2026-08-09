@@ -17,9 +17,8 @@
   #define DEBUGP(x, ...) LOG_DEBUG(Xenon_MMU, x, ##__VA_ARGS__);
 #endif
 
-// Thread selection helpers.
-#define curThreadId ppeState->currentThread
-#define curThread   ppeState->ppuThread[curThreadId]
+// Thread selection helper.
+#define curThread ppeState->ppuThread[curThreadId]
 
 //
 // Xbox 360 Memory map, info taken from various sources.
@@ -129,18 +128,27 @@ namespace Xe::XCPU::MMU {
   // Hash the VA to its single congruence class, build the page-size-masked search tag, and clear only the ways whose
   // stored tag matches.
   void XenonMMU::TlbInvalidateSelective(u64 VA, u8 p, bool L) {
+    // Hold lock.
+    std::unique_lock tlbLock(tlbMutex);
+
     const u16 classIdx = GetTlbClass(VA, p);
     const u64 tagMask = GetTlbTagMask(p);
     const u64 searchTag = GetTlbSearchTag(VA, p, L) & tagMask;
 
     for (u32 way = 0; way < TLB_Reg::NUM_WAYS; ++way) {
-      TLBEntry& entry = ppeState->TLB.entryAt(classIdx, way);
+      TLBEntry& entry = tlb.entryAt(classIdx, way);
       if (entry.valid && (entry.tag & tagMask) == searchTag) {
         DEBUGP("[TLB]: Selective invalidate match: class:{:#x} way:{} tag:{:#x} (VA:{:#x} p:{} L:{})", classIdx, way,
                entry.tag, VA, p, static_cast<u32>(L));
         entry.valid = 0;
       }
     }
+  }
+
+  // Class-level (IS=3) selective invalidation. Clears every way of a single congruence class.
+  void XenonMMU::TlbInvalidateClass(u32 classIdx) {
+    std::unique_lock tlbLock(tlbMutex);
+    tlb.invalidateClass(classIdx);
   }
 
   /* Hardware Based Page Table Walk */
@@ -202,6 +210,9 @@ namespace Xe::XCPU::MMU {
   void XenonMMU::AddTlbEntry() {
     MICROPROFILE_SCOPEI("[Xe::XenonMMU]", "MMUAddTlbEntry", MP_AUTO);
 
+    // Hold lock.
+    std::unique_lock tlbLock(tlbMutex);
+
     const u64 tlbIndexReg = ppeState->SPR.PPE_TLB_Index.hexValue;
     const u64 tlbVpnReg = ppeState->SPR.PPE_TLB_VPN.hexValue;
     const u64 tlbRpnReg = ppeState->SPR.PPE_TLB_RPN.hexValue;
@@ -230,7 +241,7 @@ namespace Xe::XCPU::MMU {
     const u32 classIdx = flatIdx / TLB_Reg::NUM_WAYS;
     const u32 wayIdx = flatIdx % TLB_Reg::NUM_WAYS;
 
-    TLBEntry& entry = ppeState->TLB.entry(flatIdx);
+    TLBEntry& entry = tlb.entry(flatIdx);
 
     // If we're replacing a live entry, invalidate it first.
     if (entry.valid) { entry.valid = 0; }
@@ -256,12 +267,15 @@ namespace Xe::XCPU::MMU {
 
     // Atomic publish: readers either see valid==0 (skip) or a fully written entry.
     entry.valid = 1;
-    ppeState->TLB.updateLRU(classIdx, static_cast<u8>(wayIdx));
+    tlb.updateLRU(classIdx, static_cast<u8>(wayIdx));
   }
 
   // Hardware-managed TLB insert (HTAB walk path).
   void XenonMMU::AddTlbEntryHardware(u64 VA, u64 pte0, u64 pte1, u8 p, bool L, bool /*LP*/) {
     MICROPROFILE_SCOPEI("[Xe::XenonMMU]", "MMUAddTlbEntryHardware", MP_AUTO);
+
+    // Hold lock.
+    std::unique_lock tlbLock(tlbMutex);
 
     const u16 classIdx = GetTlbClass(VA, p);
 
@@ -269,9 +283,9 @@ namespace Xe::XCPU::MMU {
     const u64 storedPte0 = pte0 & ~PPC_HPTE64_HASH;
 
     // Victim selection: invalid ways first, then pseudo-LRU.
-    const u32 wayIdx = ppeState->TLB.pickVictimWay(classIdx);
+    const u32 wayIdx = tlb.pickVictimWay(classIdx);
 
-    TLBEntry& entry = ppeState->TLB.entryAt(classIdx, wayIdx);
+    TLBEntry& entry = tlb.entryAt(classIdx, wayIdx);
     if (entry.valid) { entry.valid = 0; }
 
     // Un-masked store tag from the freshly-walked HPTE.
@@ -284,12 +298,16 @@ namespace Xe::XCPU::MMU {
            wayIdx, entry.tag, storedPte0, pte1, p, L);
 
     entry.valid = 1;
-    ppeState->TLB.updateLRU(classIdx, static_cast<u8>(wayIdx));
+    tlb.updateLRU(classIdx, static_cast<u8>(wayIdx));
   }
 
   // TLB lookup
   bool XenonMMU::SearchTlbEntry(u64* RPN, u64 VA, u8 p, bool L, bool LP) {
     MICROPROFILE_SCOPEI("[Xe::XenonMMU]", "MMUSearchTlbEntry", MP_AUTO);
+
+    // Shared lockdue to the fact that siblings may look up concurrently, but never while a writer is
+    // inserting/invalidating (which would tear the multi-field entry read below).
+    std::shared_lock tlbLock(tlbMutex);
 
     // Runtime tag + page-size mask + masked compare, mask is generated using the provide p size.
     const u16 classIdx = GetTlbClass(VA, p);
@@ -303,7 +321,7 @@ namespace Xe::XCPU::MMU {
 
     // Walk the four ways of the class over contiguous memory: one multiply to find
     // the class base, then linear indexing (vs recomputing class*4+way each step).
-    TLBEntry* ways = &ppeState->TLB.entryAt(classIdx, 0);
+    TLBEntry* ways = &tlb.entryAt(classIdx, 0);
     for (u32 way = 0; way < TLB_Reg::NUM_WAYS; ++way) {
       TLBEntry& entry = ways[way];
 
@@ -319,7 +337,7 @@ namespace Xe::XCPU::MMU {
       if (L && entryLP != LP) continue;
 
       *RPN = entryL ? (entry.pte1 & PPC_HPTE64_RPN_LP) : (entry.pte1 & PPC_HPTE64_RPN_NO_LP);
-      ppeState->TLB.updateLRU(classIdx, static_cast<u8>(way));
+      tlb.updateLRU(classIdx, static_cast<u8>(way));
       return true;
     }
 
@@ -327,7 +345,7 @@ namespace Xe::XCPU::MMU {
     // TLB-miss handler can MTSPR PPE_TLB_Index directly from the hint.
     const bool tlbSoftwareManaged = (ppeState->SPR.LPCR.hexValue & 0x400) >> 10;
     if (tlbSoftwareManaged) {
-      const u32 replacementWay = ppeState->TLB.pickVictimWay(classIdx);
+      const u32 replacementWay = tlb.pickVictimWay(classIdx);
       const u64 hint = (static_cast<u64>(classIdx) << 4) | static_cast<u64>(TLB_WAY_BITMASK[replacementWay]);
       curThread.SPR.PPE_TLB_Index_Hint.hexValue = hint;
     }
@@ -405,14 +423,29 @@ namespace Xe::XCPU::MMU {
                slot, EA, pteRA, pte0, pte1, wimg, pp, static_cast<u32>((pte1 & PPC_HPTE64_R) != 0),
                static_cast<u32>((pte1 & PPC_HPTE64_C) != 0));
 
-        // Reference/Change bit update: R on any access, C on a store. Write pte1 back to the
-        // hash table in guest (big-endian) memory only if it actually changed.
-        const u64 oldPte1 = pte1;
-        pte1 |= PPC_HPTE64_R;
-        if (memWrite) pte1 |= PPC_HPTE64_C;
-        if (pte1 != oldPte1) {
-          *reinterpret_cast<u64*>(ptePtr + 8) = byteswap_be<u64>(pte1);
-          DEBUGP("[HTAB]: Set R/C bits at RA:{:#x}: {:#x} -> {:#x}", pteRA + 8, oldPte1, pte1);
+        // Reference/Change bit update: R on any access, C on a store. Two cores
+        // can walk the same PTEG at once, so update the guest PTE word with an
+        // atomic compare-exchange (values are big-endian in memory) instead of a
+        // plain store, so neither core loses the other's R/C update.
+        {
+          std::atomic_ref<u64> pte1Ref(*reinterpret_cast<u64*>(ptePtr + 8));
+          u64 curBE = pte1Ref.load(std::memory_order_acquire);
+          for (;;) {
+            const u64 cur = byteswap_be<u64>(curBE);
+            u64 want = cur | PPC_HPTE64_R;
+            if (memWrite) want |= PPC_HPTE64_C;
+            if (want == cur) {
+              pte1 = cur; // Already set; nothing to write back.
+              break;
+            }
+            const u64 wantBE = byteswap_be<u64>(want);
+            if (pte1Ref.compare_exchange_weak(curBE, wantBE, std::memory_order_acq_rel, std::memory_order_acquire)) {
+              pte1 = want;
+              DEBUGP("[HTAB]: Set R/C bits at RA:{:#x}: {:#x} -> {:#x}", pteRA + 8, cur, want);
+              break;
+            }
+            // curBE now holds the latest value; retry.
+          }
         }
 
         // Reload the TLB from the walked entry so later accesses hit without another walk.
@@ -1013,4 +1046,3 @@ namespace Xe::XCPU::MMU {
 } // namespace Xe::XCPU::MMU
 
 #undef curThread
-#undef curThreadId
