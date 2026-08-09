@@ -1421,6 +1421,9 @@ struct sPPUThread {
   // Hypervisor decrementer expired flag.
   std::atomic_bool hdecExpired{false};
 
+  // External interrupt line from the IIC, set by the IIC callback when a deliverable interrupt exists.
+  std::atomic_bool extIntPending{false};
+
   // Cross-thread bring-up request. Set by whoever enables this thread (the sibling via mtspr CTRL[TEx], or the Power On
   // Reset/IPI bring-up path).
   std::atomic<s8> pendingWakeReason{-1};

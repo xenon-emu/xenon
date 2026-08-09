@@ -91,6 +91,8 @@ namespace Xe::XCPU {
   // Destructor
   XenonCPU::~XenonCPU() {
     LOG_INFO(Xenon, "Shutting PPU cores down...");
+    // Detach the IIC signal callback before destroying the PPUs it references.
+    if (xenonContext) xenonContext->iic.ClearSignalCallback();
     ppu0.reset();
     ppu1.reset();
     ppu2.reset();
@@ -101,6 +103,8 @@ namespace Xe::XCPU {
     // If we already have active objects, halt cpu and kill threads
     if (ppu0.get()) {
       Halt();
+      // Detach the IIC signal callback before destroying the PPUs it references.
+      xenonContext->iic.ClearSignalCallback();
       ppu0.reset();
       ppu1.reset();
       ppu2.reset();
@@ -117,6 +121,14 @@ namespace Xe::XCPU {
     ppeStates[2] = ppu2->GetPPUState();
     xenonContext->timeBase.Init(ppeStates);
 
+    // Signal callback for external interrupts.
+    xenonContext->iic.RegisterSignalCallback([ppeStates](u8 threadID, bool asserted) {
+      const u8 ppuIdx = threadID / 2;
+      if (ppuIdx >= 3 || !ppeStates[ppuIdx]) { return; }
+      ppeStates[ppuIdx]->ppuThread[threadID % 2].extIntPending.store(asserted, std::memory_order_release);
+      if (asserted) { ppeStates[ppuIdx]->parkCV.notify_all(); }
+    });
+
     // Start execution on the main thread
     ppu0->StartExecution();
     // Start execution on the other threads
@@ -125,6 +137,8 @@ namespace Xe::XCPU {
   }
 
   void XenonCPU::LoadElf(const std::string path) {
+    // Detach the IIC signal callback before destroying the PPUs it references.
+    xenonContext->iic.ClearSignalCallback();
     ppu0.reset();
     ppu1.reset();
     ppu2.reset();
@@ -151,6 +165,14 @@ namespace Xe::XCPU {
     file.read(reinterpret_cast<char*>(elfBinary.get()), fileSize);
     file.close();
     ppu0->LoadElfImage(elfBinary.get(), fileSize);
+    // Refresh the IIC signal callback so it targets the freshly-created PPEs.
+    std::array<sPPEState*, 3> ppeStates{ppu0->GetPPUState(), ppu1->GetPPUState(), ppu2->GetPPUState()};
+    xenonContext->iic.RegisterSignalCallback([ppeStates](u8 threadID, bool asserted) {
+      const u8 ppuIdx = threadID / 2;
+      if (ppuIdx >= 3 || !ppeStates[ppuIdx]) { return; }
+      ppeStates[ppuIdx]->ppuThread[threadID % 2].extIntPending.store(asserted, std::memory_order_release);
+      if (asserted) { ppeStates[ppuIdx]->parkCV.notify_all(); }
+    });
     // Start execution on the main thread
     ppu0->StartExecution(false);
     // Start execution on the other threads

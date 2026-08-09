@@ -4,6 +4,8 @@
 
 #include "Core/XCPU/Context/XenonIIC/XenonIIC.h"
 
+#include "Base/Thread.h"
+
 // Debug output enable.
 // #define IIC_DEBUG
 
@@ -17,7 +19,13 @@
 Xe::XCPU::XenonIIC::XenonIIC() { socINTBlock = std::make_unique<STRIP_UNIQUE(socINTBlock)>(); }
 
 // Destructor
-Xe::XCPU::XenonIIC::~XenonIIC() { socINTBlock.reset(); }
+Xe::XCPU::XenonIIC::~XenonIIC() {
+  // Stop the interrupt evaluation thread and wait for it to finish before tearing down state.
+  signalThreadActive.store(false, std::memory_order_release);
+  signalCV.notify_all();
+  if (signalThread.joinable()) { signalThread.join(); }
+  socINTBlock.reset();
+}
 
 // Write routine
 void Xe::XCPU::XenonIIC::Write(u64 writeAddress, const u8* data, u64 size) {
@@ -52,8 +60,12 @@ void Xe::XCPU::XenonIIC::Write(u64 writeAddress, const u8* data, u64 size) {
 
     switch (blockOffset) {
       case 0x0000: break; // LogicalIdentification
-      case 0x0008: break; // InterruptTaskPriority
-      case 0x0010:        // IpiGeneration
+      case 0x0008:        // InterruptTaskPriority
+        // Lowering the task priority can make a previously-masked interrupt deliverable (and raising
+        // it can retract the interrupt).
+        markDirty(threadID);
+        break;
+      case 0x0010: // IpiGeneration
         // Interrupt packet received, generate appropriate interrupt to target threads.
         {
           const u8 interruptType = static_cast<u8>(dataIn & 0xFF);
@@ -76,8 +88,12 @@ void Xe::XCPU::XenonIIC::Write(u64 writeAddress, const u8* data, u64 size) {
         {
           removeFirstACKdInterrupt(threadID);
           // Update task priority.
-          std::lock_guard lock(iicMutex);
-          socINTBlock->ProcessorBlock[threadID].InterruptTaskPriority.AsULONGLONG = dataIn & 0xFF;
+          {
+            std::lock_guard lock(iicMutex);
+            socINTBlock->ProcessorBlock[threadID].InterruptTaskPriority.AsULONGLONG = dataIn & 0xFF;
+          }
+          // Mark dirty after both the EOI and the priority change.
+          markDirty(threadID);
         }
         break;
       case 0x0070: break; // SpuriousVector
@@ -196,6 +212,78 @@ void Xe::XCPU::XenonIIC::Read(u64 readAddress, u8* data, u64 size) {
 // Helper Routines
 //
 
+// Registers the external interrupt callback and starts the evaluation thread.
+void Xe::XCPU::XenonIIC::RegisterSignalCallback(InterruptSignalCallback cb) {
+  {
+    std::lock_guard lock(signalMutex);
+    signalCallback = std::move(cb);
+  }
+
+  // Start the evaluation thread.
+  if (!signalThreadActive.exchange(true, std::memory_order_acq_rel)) {
+    signalThread = std::thread(&XenonIIC::SignalThread, this);
+  }
+}
+
+// Detaches the signal callback.
+void Xe::XCPU::XenonIIC::ClearSignalCallback() {
+  std::lock_guard lock(signalMutex);
+  signalCallback = {};
+}
+
+// Marks a thread's interrupt queue dirty and wakes the evaluation thread.
+void Xe::XCPU::XenonIIC::markDirty(u8 threadID) {
+  if (threadID >= 6) { return; }
+  {
+    std::lock_guard lock(signalMutex);
+    dirtyThreads |= (1u << threadID);
+  }
+
+  signalCV.notify_one();
+}
+
+// Re-evaluates deliverability for a thread and calls the callback based on it.
+void Xe::XCPU::XenonIIC::recomputeAndSignal(u8 threadID) {
+  if (threadID >= 6) { return; }
+  // Check if line should be asserted.
+  const bool asserted = hasPendingInterrupts(threadID);
+  InterruptSignalCallback cb;
+  {
+    std::lock_guard lock(signalMutex);
+    cb = signalCallback;
+  }
+  // Issue call.
+  if (cb) { cb(threadID, asserted); }
+}
+
+// Interrupt evaluation thread. Sleeps on signalCV until a mutation marks a thread dirty, then recomputes and pushes
+// each dirty thread's interrupt line status to the PPU.
+void Xe::XCPU::XenonIIC::SignalThread() {
+  Base::SetCurrentThreadName("[Xe] IIC Signal Thread");
+
+  std::unique_lock<std::mutex> lock(signalMutex);
+  while (signalThreadActive.load(std::memory_order_acquire)) {
+    signalCV.wait(lock, [this] { return !signalThreadActive.load(std::memory_order_acquire) || dirtyThreads != 0; });
+
+    if (!signalThreadActive.load(std::memory_order_acquire)) { break; }
+
+    // Drain the dirty set under the lock, then evaluate without holding it.
+    u32 dirty = dirtyThreads;
+    dirtyThreads = 0;
+    lock.unlock();
+
+    while (dirty) {
+      const u8 threadID = static_cast<u8>(std::countr_zero(dirty));
+      dirty &= dirty - 1;
+      recomputeAndSignal(threadID);
+    }
+
+    lock.lock();
+  }
+
+  DEBUGP("[IIC]: Signal thread exiting.");
+}
+
 // Generates an interrupt of the specified type to the specified CPUs.
 void Xe::XCPU::XenonIIC::generateInterrupt(u8 interruptType, u8 cpusToInterrupt) {
   MICROPROFILE_SCOPEI("[Xe::IIC]", "GenInterrupt", MP_AUTO);
@@ -214,6 +302,8 @@ void Xe::XCPU::XenonIIC::generateInterrupt(u8 interruptType, u8 cpusToInterrupt)
     if ((cpusToInterrupt & cpuMask)) {
       // Atomically set the pending bit for this interrupt vector.
       interruptState[threadID].pendingMask.fetch_or(bit, std::memory_order_release);
+      // Mark the thread dirty. The evaluation thread recomputes the line level and pushes it to the PPU.
+      markDirty(threadID);
     }
   }
 }

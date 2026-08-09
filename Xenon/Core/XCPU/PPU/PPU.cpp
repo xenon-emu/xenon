@@ -979,8 +979,12 @@ void PPU::CheckAndRaiseExternalExceptions(sPPEState* ppeState) {
   // Check Dec signals.
   thread.CheckDecSignals();
 
-  // Check for external interrupts from the IIC. If any is indeed found raise the appropriate exception.
-  if (xenonContext->iic.hasPendingInterrupts(thread.SPR.PIR)) { thread.RaiseExc(ppuExternalEx); }
+  // Update the external interrupt status based on the external interrupt pending flag.
+  if (thread.extIntPending.load(std::memory_order_acquire)) {
+    thread.RaiseExc(ppuExternalEx);
+  } else {
+    thread.ClearExc(ppuExternalEx);
+  }
 }
 
 // Checks for PPU Thread bring-up/thread-enable interrupts for a single PPU thread.

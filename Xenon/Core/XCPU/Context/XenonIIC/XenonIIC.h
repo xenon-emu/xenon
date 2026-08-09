@@ -5,7 +5,10 @@
 #pragma once
 
 #include <atomic>
+#include <condition_variable>
+#include <functional>
 #include <mutex>
+#include <thread>
 
 namespace Xe::XCPU {
 
@@ -228,6 +231,9 @@ namespace Xe::XCPU {
     std::atomic<u32> acknowledgedMask{0}; // Bit set = interrupt ACK'd (in-service, awaiting EOI)
   };
 
+  // External interrupt signal callback.
+  using InterruptSignalCallback = std::function<void(u8 threadID, bool asserted)>;
+
   // Xenon Integrated Interrupt Controller
   // Handles external and inter-processor interrupts among PPU Threads, wakes CPU's when needed and shcedules their
   // delivery based on the current interrupt priority of the given thread.
@@ -239,6 +245,12 @@ namespace Xe::XCPU {
     // Read/Write routines
     void Write(u64 writeAddress, const u8* data, u64 size);
     void Read(u64 readAddress, u8* data, u64 size);
+
+    // Registers the external interrupt signal callback.
+    void RegisterSignalCallback(InterruptSignalCallback cb);
+
+    // Detaches the signal callback.
+    void ClearSignalCallback();
 
     // Interrupt Generation Routine
     void generateInterrupt(u8 interruptType, u8 cpusToInterrupt);
@@ -257,6 +269,35 @@ namespace Xe::XCPU {
     // Mutex for socINTBlock MMIO Read/Write serialization only.
     // Not used in the hot-path interrupt check/generate/acknowledge operations.
     std::mutex iicMutex;
+
+    //
+    // Interrupt evaluation thread.
+    //
+
+    // External interrupt signal callback.
+    InterruptSignalCallback signalCallback = {};
+
+    // Synchronization for the evaluation thread.
+    std::mutex signalMutex;
+    std::condition_variable signalCV;
+
+    // Bit x set = hardware thread x needs its interrupt line re-evaluated.
+    u32 dirtyThreads = 0;
+
+    // The evaluation thread and its run flag.
+    std::thread signalThread;
+    std::atomic<bool> signalThreadActive{false};
+
+    // Marks a hardware thread's interrupt line dirty and wakes the evaluation thread.
+    void markDirty(u8 threadID);
+
+    // Evaluation thread entry point.
+    // Waits on signalCV, drains the dirty set, and pushes each dirty thread's recomputed line level to the PPU.
+    void SignalThread();
+
+    // Re-evaluates the deliverable interrupt state for a thread and pushes the resulting line level
+    // to the PPU via signalCallback.
+    void recomputeAndSignal(u8 threadID);
 
     // Removes the highest-priority ACK'd interrupt (EOI) for a given thread.
     void removeFirstACKdInterrupt(u8 threadID);
