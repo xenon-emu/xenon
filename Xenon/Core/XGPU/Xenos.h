@@ -9,6 +9,32 @@
 // Contains Xenos related enums and structures.
 // Mostly taken from Xenia, as their research is much more consistent than other sources.
 
+// Byte alignment of texture subresources in memory - of each mip and stack slice / cube face (and of textures
+// themselves), this number of bits is also omitted from base address and mip address.
+constexpr u32 xeTextureSubresourceAlignmentBytesLog2 = 12;
+constexpr u32 xeTextureSubresourceAlignmentBytes = 1 << xeTextureSubresourceAlignmentBytesLog2;
+
+// Texture fetch constant size field widths.
+constexpr u32 xeTexture1DMaxWidthLog2 = 24;
+constexpr u32 xeTexture1DMaxWidth = 1 << xeTexture1DMaxWidthLog2;
+constexpr u32 xeTexture2DCubeMaxWidthHeightLog2 = 13;
+constexpr u32 xeTexture2DCubeMaxWidthHeight = 1 << xeTexture2DCubeMaxWidthHeightLog2;
+constexpr u32 xeTexture2DMaxStackDepthLog2 = 6;
+constexpr u32 xeTexture2DMaxStackDepth = 1 << xeTexture2DMaxStackDepthLog2;
+constexpr u32 xeTexture3DMaxWidthHeightLog2 = 11;
+constexpr u32 xeTexture3DMaxWidthHeight = 1 << xeTexture3DMaxWidthHeightLog2;
+constexpr u32 xeTexture3DMaxDepthLog2 = 10;
+constexpr u32 xeTexture3DMaxDepth = 1 << xeTexture3DMaxDepthLog2;
+
+constexpr u32 xeTextureMaxMips = std::max(xeTexture2DCubeMaxWidthHeightLog2, xeTexture3DMaxWidthHeightLog2) + 1;
+
+constexpr u32 xeTextureTileWidthHeightLog2 = 5;
+constexpr u32 xeTextureTileWidthHeight = 1 << xeTextureTileWidthHeightLog2;
+// 3D tiled texture slices 0:3 and 4:7 are stored separately in memory, in
+// non-overlapping ranges, but addressing in 4:7 is different than in 0:3.
+constexpr u32 xeTextureTileDepthLog2 = 2;
+constexpr u32 xeTextureTileDepth = 1 << xeTextureTileDepthLog2;
+
 // Primitive Types used on the Xenos.
 enum class ePrimitiveType : u32 {
   xeNone = 0x00,
@@ -27,9 +53,9 @@ enum class ePrimitiveType : u32 {
 
   // Note from Xenia devs:
   // Starting with this primitive type, explicit major mode is assumed (in the
-  // R6xx/R7xx registers, k2DCopyRectListV0 is 22, and implicit major mode is
+  // R6xx/R7xx registers, xe2DCopyRectListV0 is 22, and implicit major mode is
   // only used for primitive types 0 through 21) - and tessellation patches use
-  // the range that starts from k2DCopyRectListV0.
+  // the range that starts from xe2DCopyRectListV0.
   // TODO(bitsh1ft3r): Verify if this is also true for the Xenos.
   xeExplicitMajorModeForceStart = 0x10,
 
@@ -42,7 +68,7 @@ enum class ePrimitiveType : u32 {
   xe2DTriStrip = 0x16,
 
   // Tessellation patches when VGT_OUTPUT_PATH_CNTL::path_select is
-  // VGTOutputPath::kTessellationEnable. The vertex shader receives the patch
+  // VGTOutputPath::xeTessellationEnable. The vertex shader receives the patch
   // index rather than control point indices.
   // With non-adaptive tessellation, VGT_DRAW_INITIATOR::num_indices is the
   // patch count (4D5307F1 draws single ground patches by passing 1 as the index
@@ -143,7 +169,7 @@ enum class eCopyCommand : u32 {
   xeRaw = 0,
   xeConvert = 1,
   xeConstantOne = 2,
-  xeNull = 3,  // ?
+  xeNull = 3, // ?
 };
 
 // Subset of a2xx_sq_surfaceformat - formats that RTs can be resolved to.
@@ -188,40 +214,38 @@ enum class eSurfaceNumberFormat : u32 {
 
 inline uint16_t xeEndianSwap(uint16_t value, eEndian endianness) {
   switch (endianness) {
-  case eEndian::xeNone:
-    // No swap.
-    return value;
-  case eEndian::xe8in16:
-    // Swap bytes in half words.
-    return ((value << 8) & 0xFF00FF00) | ((value >> 8) & 0x00FF00FF);
-  default:
-    LOG_ERROR(Xenos, "GPUSwap: Invalid endianness was passed in.");
-    return value;
+    case eEndian::xeNone:
+      // No swap.
+      return value;
+    case eEndian::xe8in16:
+      // Swap bytes in half words.
+      return ((value << 8) & 0xFF00FF00) | ((value >> 8) & 0x00FF00FF);
+    default: LOG_ERROR(Xenos, "GPUSwap: Invalid endianness was passed in."); return value;
   }
 }
 
-inline uint32_t xeEndianSwap(uint32_t value, eEndian endianness) {
+inline u32 xeEndianSwap(u32 value, eEndian endianness) {
   switch (endianness) {
-  default:
-  case eEndian::xeNone:
-    // No swap.
-    return value;
-  case eEndian::xe8in16:
-    // Swap bytes in half words.
-    return ((value << 8) & 0xFF00FF00) | ((value >> 8) & 0x00FF00FF);
-  case eEndian::xe8in32:
-    // Swap bytes.
-    // NOTE: we are likely doing two swaps here. Wasteful. Oh well.
-    return byteswap_be<u32>(value);
-  case eEndian::xe16in32:
-    // Swap half words.
-    return ((value >> 16) & 0xFFFF) | (value << 16);
+    default:
+    case eEndian::xeNone:
+      // No swap.
+      return value;
+    case eEndian::xe8in16:
+      // Swap bytes in half words.
+      return ((value << 8) & 0xFF00FF00) | ((value >> 8) & 0x00FF00FF);
+    case eEndian::xe8in32:
+      // Swap bytes.
+      // NOTE: we are likely doing two swaps here. Wasteful. Oh well.
+      return byteswap_be<u32>(value);
+    case eEndian::xe16in32:
+      // Swap half words.
+      return ((value >> 16) & 0xFFFF) | (value << 16);
   }
 }
 
 inline float xeEndianSwap(float value, eEndian endianness) {
   union {
-    uint32_t i;
+    u32 i;
     float f;
   } v;
   v.f = value;

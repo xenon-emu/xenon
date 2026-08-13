@@ -559,6 +559,10 @@ namespace Xe::Microcode::AST {
         LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc1(ADDs)");
         result = Chunk(module.OpFAdd(type, a.id, a.id), eChunkType::Scalar); // a + a
         break;
+      case SUBs:
+        LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc1(SUBs)");
+        result = Chunk(module.OpFSub(type, a.id, a.id), eChunkType::Scalar); // a + a
+        break;
       case ADD_PREVs:
         LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc1(ADD_PREVs)");
         result = Chunk(module.OpFAdd(float_type, a.id, prev), eChunkType::Scalar); // a + ps
@@ -616,6 +620,14 @@ namespace Xe::Microcode::AST {
         LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc1(LOG_IEEE)");
         result = Chunk(module.OpLog2(float_type, a.id)); // log2(x)
         break;
+      case RECIP_IEEE:
+        LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc1(RECIP_IEEE)");
+        result = Chunk(module.OpFDiv(type, module.Constant(type, 1.f), a.id), eChunkType::Scalar); // 1 / a
+        break;
+      case RECIPSQ_IEEE:
+        LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc1(RECIPSQ_IEEE)");
+        result = Chunk(module.OpInverseSqrt(type, a.id), eChunkType::Scalar); // 1 / sqrt(a)
+        break;
       default:
         // Keep the hard failure as an alert for genuinely unimplemented scalar ops.
         LOG_ERROR(Xenos, "[AST::Emitter] Unsupported scalar unary op '{}'!", static_cast<u32>(instr));
@@ -670,6 +682,10 @@ namespace Xe::Microcode::AST {
         break;
       case SETGTEs:
         result = Chunk(boolToFloat(module.OpFOrdGreaterThanEqual(bool_type, a.id, b.id)), eChunkType::Scalar); // a >= b
+        break;
+      case MUL_CONST_0:
+        LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc2(MUL_CONST_0)");
+        result = Chunk(module.OpFMul(float_type, a.id, b.id), eChunkType::Scalar); // a * b (const)
         break;
       default:
         // Keep the hard failure as an alert for genuinely unimplemented scalar ops.
