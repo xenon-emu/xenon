@@ -1,17 +1,14 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #include "Base/Config.h"
 #include "Core/XeMain.h"
-
 #include "PPCInterpreter.h"
 
 // Branch Conditional
-void PPCInterpreter::PPCInterpreter_bc(sPPEState *ppeState) {
-  if ((_instr.bo & 0x4) == 0) {
-    curThread.SPR.CTR -= 1;
-  }
+void PPCInterpreter::PPCInterpreter_bc(sPPEState* ppeState) {
+  if ((_instr.bo & 0x4) == 0) { curThread.SPR.CTR -= 1; }
 
   const bool ctrOk = ((_instr.bo & 0x4) != 0 ? 1 : 0) | ((curThread.SPR.CTR != 0) ^ ((_instr.bo & 0x2) != 0));
   const bool condOk = ((_instr.bo & 0x10) != 0 ? 1 : 0) || (CR_GET(_instr.bi) == ((_instr.bo & 0x8) != 0));
@@ -24,14 +21,14 @@ void PPCInterpreter::PPCInterpreter_bc(sPPEState *ppeState) {
 }
 
 // Branch
-void PPCInterpreter::PPCInterpreter_b(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_b(sPPEState* ppeState) {
   curThread.NIA = (_instr.aa ? 0 : curThread.CIA) + _instr.bt24;
   curThread.NIA = curThread.SPR.MSR.SF ? curThread.NIA : static_cast<u32>(curThread.NIA);
   if (_instr.lk) { curThread.SPR.LR = curThread.CIA + 4; }
 }
 
 // Branch Conditional to Count Register
-void PPCInterpreter::PPCInterpreter_bcctr(sPPEState *ppeState) {
+void PPCInterpreter::PPCInterpreter_bcctr(sPPEState* ppeState) {
   const bool condOk = ((_instr.bo & 0x10) != 0 ? 1 : 0) || (CR_GET(_instr.bi) == ((_instr.bo & 0x8) != 0));
 
   if (condOk) {
@@ -41,22 +38,11 @@ void PPCInterpreter::PPCInterpreter_bcctr(sPPEState *ppeState) {
 }
 
 // Branch Conditional to Link Register
-void PPCInterpreter::PPCInterpreter_bclr(sPPEState *ppeState) {
-  if ((_instr.bo & 0x4) != 0 ? false : true) {
-    curThread.SPR.CTR -= 1;
-  }
+void PPCInterpreter::PPCInterpreter_bclr(sPPEState* ppeState) {
+  if ((_instr.bo & 0x4) != 0 ? false : true) { curThread.SPR.CTR -= 1; }
 
   const bool ctrOk = ((_instr.bo & 0x4) != 0 ? 1 : 0) | ((curThread.SPR.CTR != 0) ^ ((_instr.bo & 0x2) != 0));
   bool condOk = ((_instr.bo & 0x10) != 0 ? 1 : 0) || (CR_GET(_instr.bi) == ((_instr.bo & 0x8) != 0));
-
-  // CB/SB Hardware Init step skip (hacky)
-  if (XeMain::sfcx && XeMain::sfcx->initSkip1 && XeMain::sfcx->initSkip2) {
-    if (curThread.CIA == XeMain::sfcx->initSkip1)
-      condOk = false;
-
-    if (curThread.CIA == XeMain::sfcx->initSkip2)
-      condOk = true;
-  }
 
   if (ctrOk && condOk) {
     curThread.NIA = curThread.SPR.MSR.SF ? curThread.SPR.LR & ~3 : static_cast<u32>(curThread.SPR.LR & ~3);
