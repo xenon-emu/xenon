@@ -270,7 +270,7 @@ void Xe::Xenos::XGPU::xeVSyncWorkerThreadLoop() {
     // Should be a 60Hz (16.6ms) timer, for testing purposes and because we're currently too slow we're setting up to 1s.
     // This actually controls the frequency in wich the kernel does Back -> Front buffer VdSwap commands, so by changing 
     // this we effectively can control the refresh rate of the emulated console (as long as the system runs fast enough). 
-    if (timerNow >= timerStart + 1s && (xenosState.get()->d1modeIntMask & 0x40000011)) {
+    if (timerNow >= timerStart + 16.6ms && (xenosState.get()->d1modeIntMask & 0x40000011)) {
       // Set  VBLANK Pending
       xenosState.get()->vblankVlineStatus |= 0x11000100; // Hardware dump shows this (byteswapped) value at interrupt time.
       xenosState.get()->d1modeIntMask &= ~0x40000011;
