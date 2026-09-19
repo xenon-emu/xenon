@@ -687,6 +687,26 @@ namespace Xe::Microcode::AST {
         LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc2(MUL_CONST_0)");
         result = Chunk(module.OpFMul(float_type, a.id, b.id), eChunkType::Scalar); // a * b (const)
         break;
+      case MUL_CONST_1:
+        LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc2(MUL_CONST_1)");
+        result = Chunk(module.OpFMul(float_type, a.id, b.id), eChunkType::Scalar); // a * b (const)
+        break;
+      case ADD_CONST_0:
+        LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc2(ADD_CONST_0)");
+        result = Chunk(module.OpFAdd(float_type, a.id, b.id), eChunkType::Scalar); // a + b (const)
+        break;
+      case ADD_CONST_1:
+        LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc2(ADD_CONST_1)");
+        result = Chunk(module.OpFAdd(float_type, a.id, b.id), eChunkType::Scalar); // a + b (const)
+        break;
+      case SUB_CONST_0:
+        LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc2(SUB_CONST_0)");
+        result = Chunk(module.OpFSub(float_type, a.id, b.id), eChunkType::Scalar); // a - b (const)
+        break;
+      case SUB_CONST_1:
+        LOG_DEBUG(Xenos, "[AST::Sirit] ScalarFunc2(SUB_CONST_1)");
+        result = Chunk(module.OpFSub(float_type, a.id, b.id), eChunkType::Scalar); // a - b (const)
+        break;
       default:
         // Keep the hard failure as an alert for genuinely unimplemented scalar ops.
         LOG_ERROR(Xenos, "[AST::Emitter] Unsupported scalar binary op '{}'!", static_cast<u32>(instr));
