@@ -32,9 +32,6 @@
 	path = Deps/ThirdParty/cryptopp
 	url = https://github.com/weidai11/cryptopp.git
 	shallow = true
-[submodule "Deps/ThirdParty/volk"]
-	path = Deps/ThirdParty/volk
-	url = https://github.com/zeux/volk.git
 [submodule "Deps/ThirdParty/Vulkan-Headers"]
 	path = Deps/ThirdParty/Vulkan-Headers
 	url = https://github.com/KhronosGroup/Vulkan-Headers.git
@@ -50,3 +47,7 @@
 [submodule "Deps/ThirdParty/plusaes"]
 	path = Deps/ThirdParty/plusaes
 	url = https://github.com/kkAyataka/plusaes.git
+[submodule "Deps/ThirdParty/libusb"]
+	path = Deps/ThirdParty/libusb
+	url = https://github.com/libusb/libusb.git
+	shallow = true
