@@ -1,441 +1,248 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #pragma once
 
-#ifdef _WIN32
-#include <Windows.h>
-#else
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#endif
-#include <cstring>
+#include "Base/RWStorage.h"
+#include "Core/PCI/Bridge/PCIBridge.h"
+#include "Core/PCI/DmaEngine.h"
+#include "Core/PCI/PrdTable.h"
+#include "Core/PCI/SATA.h"
+#include "Core/PCI/SataScr.h"
+#include "Core/PCI/Worker.h"
+#include "Core/RAM/RAM.h"
+
+#include <array>
+#include <atomic>
+#include <bitset>
+#include <chrono>
+#include <condition_variable>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
+#include <vector>
 
-#include "Core/RAM/RAM.h"
-#include "Core/XCPU/PPU/PPCInternal.h"
-#include "Core/PCI/SATA.h"
-#include "Core/PCI/Bridge/PCIBridge.h"
+namespace Xe::PCIDev {
 
-#define HDD_DEV_SIZE 0x30
+  // SATA hard drive on the southbridge (PCI dev 2, registers at 0x7FEA1300 under the kernel).
+  //
+  // The kernel's SATA disk driver gets BAR0 (0x20 bytes) with the ATA shadow task file at 0x00-0x07, Device
+  // Control/AltStatus at 0x0A, SStatus/SError/SControl at 0x10/0x14/0x18 and the hotplug register at 0x1C, and BAR1
+  // (0x10 bytes) with the bus master DMA block (command 0x00, status 0x02, PRD table 0x04). Reading Status acknowledges
+  // every INTRQ. The bus master INTERRUPT bit latches every INTRQ, and ACTIVE clears when the PRD table is used up. The
+  // data port moves 16 bits at a time in 512 byte DRQ blocks.
+  //
+  // COMRESET (SControl DET 1 -> 0) and SRST end with Status 0x50, Error 0x01 and the ATA signature. The hotplug change
+  // bits (0x04/0x08) are never latched on this channel, the kernel resets the console when it sees them.
 
-namespace Xe {
-namespace PCIDev {
-
-//
-// Read/Write Storage.
-//
-#ifdef _WIN32
-class ReadWriteStorage {
-public:
-  ReadWriteStorage(const std::string Filename) {
-    hFile = CreateFileA(Filename.data(), GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
-      OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
-  }
-
-  ~ReadWriteStorage(void) {
-    if (hFile != INVALID_HANDLE_VALUE)
-      CloseHandle(hFile);
-    hFile = INVALID_HANDLE_VALUE;
-  }
-
-  u32 Size() {
-    u32 cb;
-    cb = GetFileSize(hFile, nullptr);
-    return (cb == INVALID_FILE_SIZE) ? 0 : cb;
-  }
-
-  bool Read(u64 Offset, u8* Destination, u32 cu8s) {
-    DWORD cbRead;
-    OVERLAPPED Over;
-
-    memset(&Over, 0, sizeof Over);
-    Over.Offset = LODW(Offset);
-    Over.OffsetHigh = HIDW(Offset);
-    return (ReadFile(hFile, Destination, cu8s, &cbRead, &Over) &&
-      (cbRead == cu8s));
-  }
-
-  bool Write(u64 Offset, u8* Source, u32 cu8s) {
-    DWORD cbWritten;
-    OVERLAPPED Over;
-
-    memset(&Over, 0, sizeof Over);
-    Over.Offset = LODW(Offset);
-    Over.OffsetHigh = HIDW(Offset);
-    return (WriteFile(hFile, Source, cu8s, &cbWritten, &Over) &&
-      (cbWritten == cu8s));
-  }
-
-    bool isHandleValid() {
-      return (hFile != INVALID_HANDLE_VALUE);
-    }
-
-  private:
-    HANDLE hFile;
-  };
-#else
-class ReadWriteStorage {
-public:
-  ReadWriteStorage(const std::string Filename) {
-    fd = open(Filename.c_str(), O_RDWR);
-  }
-  ~ReadWriteStorage() {
-    if (fd != -1)
-      close(fd);
-    fd = -1;
-  }
-
-  u32 Size() {
-    struct stat st;
-    if (fstat(fd, &st) != 0)
-      return 0;
-    return static_cast<u32>(st.st_size);
-  }
-
-  bool Read(u64 Offset, u8* Destination, u32 cu8s) {
-    if (lseek(fd, Offset, SEEK_SET) == (off_t)-1)
-      return false;
-    ssize_t bytesRead = read(fd, Destination, cu8s);
-    return bytesRead == static_cast<ssize_t>(cu8s);
-  }
-
-  bool Write(u64 Offset, u8* Source, u32 cu8s) {
-    if (lseek(fd, Offset, SEEK_SET) == (off_t)-1)
-      return false;
-    ssize_t bytesWritten = write(fd, Source, cu8s);
-    return bytesWritten == static_cast<ssize_t>(cu8s);
-  }
-
-  bool isHandleValid() {
-    return (fd != -1);
-  }
-
-private:
-  int fd;
-};
-#endif // ifdef _WIN32
-
-//
-// Data Buffers
-//
-
-  class HDDDataBuffer {
+  class HDD : public PCIDevice {
   public:
-    bool empty(void) { return _pointer >= _size; }
-    u32 count(void) { return _size - _pointer; }
-    u32 size(void) { return _pointer; }
-    u8* get(void) { return _data.get() + _pointer; }
-    void resize(u32 v) { _pointer += v; }
-    void reset(void) { _pointer = 0; }
-    bool init(u32 maxLength, bool clear) {
-      if (_data && (maxLength > _size)) {
-        _data.reset();
-        _size = 0;
-        reset();
-      }
-      if (!_data) {
-        _data = std::make_unique<STRIP_UNIQUE_ARR(_data)>(maxLength);
-      }
-      if (_data) {
-        _size = std::max(_size, maxLength);
-        _pointer = _size; // Empty()
-        if (clear)
-          memset(_data.get(), 0, maxLength);
-        return true;
-      }
-      return false;
-    }
+    // Register window size handed to the PCI device.
+    static constexpr u32 DevSize = 0x30;
+
+    HDD(const std::string &deviceName, u64 size, PCIBridge *parentPCIBridge, RAM *ram);
+    ~HDD();
+    void BarRead(u32 bar, u64 barOffset, u8 *data, u64 size) override;
+    void BarWrite(u32 bar, u64 barOffset, const u8 *data, u64 size) override;
+    void ConfigRead(u64 readAddress, u8 *data, u64 size) override;
+    void ConfigWrite(u64 writeAddress, const u8 *data, u64 size) override;
+    void PlatformReset() override;
+    // When the drive last moved data to or from the image, in milliseconds on the steady clock. Used by the activity
+    // marker in the status strip, 0 until the first transfer.
+    u64 LastActivityMs() const { return lastActivityMs.load(std::memory_order_relaxed); }
+
   private:
-    std::unique_ptr<u8[]> _data;
-    u32 _size;
-    u32 _pointer;
-  };
+    void NoteActivity() {
+      lastActivityMs.store(static_cast<u64>(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                              std::chrono::steady_clock::now().time_since_epoch())
+                                              .count()),
+                           std::memory_order_relaxed);
+    }
+    std::atomic<u64> lastActivityMs{0};
 
-/*
-* This structure is returned by the IDENTIFY_DEVICE and IDENTIFY_PACKET_DEVICE commands
-*/
-#pragma pack(push, 1)
-struct XE_ATA_IDENTIFY_DATA {
-  u16 generalConfiguration;            // word 0
-  u16 numberOfCylinders;               // word 1
-  u16 reserved1;                       // word 2
-  u16 numberOfHeads;                   // word 3
-  u16 reserved2[2];                    // word 4-5
-  u16 NumberOfSectorsPerTrack;         // word 6
-  u16 reserved3[3];                    // word 7-9
-  u8 serialNumber[20];                 // word 10-19
-  u16 reserved4[3];                    // word 20-22
-  u8 firmwareRevision[8];              // word 23-26
-  u8 modelNumber[40];                  // word 27-46
-  u16 maximumBlockTransfer : 8;        // word 47
-  u16 reserved5 : 8;
-  u16 reserved6;                       // word 48
-  u16 capabilities;                    // word 49
-  u16 reserved7;                       // word 50
-  u16 reserved8 : 8;                   // word 51
-  u16 pioCycleTimingMode : 8;
-  u16 reserved9;                       // word 52
-  u16 translationFieldsValid : 3;      // word 53
-  u16 reserved10 : 13;
-  u16 numberOfCurrentCylinders;        // word 54
-  u16 numberOfCurrentHeads;            // word 55
-  u16 currentSectorsPerTrack;          // word 56
-  u32 currentSectorCapacity;           // word 57-58
-  u16 currentMultiSectorSetting;       // word 59
-  u32 userAddressableSectors;          // word 60-61
-  u16 singleWordDMASupport : 8;        // word 62
-  u16 singleWordDMAActive : 8;
-  u16 multiWordDMASupport : 8;         // word 63
-  u16 multiWordDMAActive : 8;
-  u16 advancedPIOModes : 8;            // word 64
-  u16 reserved11 : 8;
-  u16 minimumMWXferCycleTime;          // word 65
-  u16 recommendedMWXferCycleTime;      // word 66
-  u16 minimumPIOCycleTime;             // word 67
-  u16 minimumPIOCycleTimeIORDY;        // word 68
-  u16 reserved12[11];                  // word 69-79
-  u16 majorRevision;                   // word 80
-  u16 minorRevision;                   // word 81
-  union {                              // word 82
-    struct {
-      u16 SMARTFeatureSupport : 1;
-      u16 securityModeFeatureSupport : 1;
-      u16 removableMediaFeatureSupport : 1;
-      u16 powerManagementFeatureSupport : 1;
-      u16 packetFeatureSupport : 1;
-      u16 writeCacheFeatureSupport : 1;
-      u16 lookAheadFeatureSupport : 1;
-      u16 releaseInterruptSupport : 1;
-      u16 serviceInterruptSupport : 1;
-      u16 deviceResetCommandSupport : 1;
-      u16 hostProtectedAreaFeatureSupport : 1;
-      u16 reserved13 : 1;
-      u16 writeBufferCommandSupport : 1;
-      u16 readBufferCommandSupport : 1;
-      u16 nopCommandSupport : 1;
-      u16 reserved14 : 1;
+    // What the drive is doing with the current command.
+    enum class Phase : u8 {
+      Idle,   // No command, or the last one completed.
+      PioIn,  // DRQ set, the host reads the current block from the data port.
+      PioOut, // DRQ set, the host writes the current block to the data port.
+      Dma,    // DMA command accepted, waiting for (or running) the bus master transfer.
+      Busy,   // A worker job (cache flush) runs. BSY is set.
     };
-    u16 dataAsu16;
-  } support1;
-  union {                              // word 83
-    struct {
-      u16 downloadMicrocodeCommandSupport : 1;
-      u16 dmaQueuedCommandSupport : 1;
-      u16 CFAFeatureSupport : 1;
-      u16 advancedPowerManagementFeatureSupport : 1;
-      u16 mediaStatusNotificationFeatureSupport : 1;
-      u16 powerFromStandbyFeatureSupport : 1;
-      u16 setFeaturesAfterPowerUpRequired : 1;
-      u16 addressOffsetReservedAreaBoot : 1;
-      u16 setMaximumCommandSupport : 1;
-      u16 acousticManagementFeatureSupport : 1;
-      u16 lba48BitFeatureSupport : 1;
-      u16 deviceConfigOverlapFeatureSupport : 1;
-      u16 flushCacheCommandSupport : 1;
-      u16 flushCacheExtCommandSupport : 1;
-      u16 reserved15 : 2;
+
+    // Where PIO data comes from / goes to.
+    enum class PioTarget : u8 {
+      Buffer, // Generated data (IDENTIFY, SMART, logs) or the READ/WRITE BUFFER sector.
+      Disk,   // Sectors of the mounted image.
     };
-    u16 dataAsu16;
-  } support2;
-  union {                              // word 84
-    u16 dataAsu16;
-  } support3;
-  union {                              // word 85
-    struct {
-      u16 SMARTFeatureEnabled : 1;
-      u16 securityModeFeatureEnabled : 1;
-      u16 removableMediaFeatureEnabled : 1;
-      u16 powerManagementFeatureEnabled : 1;
-      u16 packetFeatureEnabled : 1;
-      u16 writeCacheFeatureEnabled : 1;
-      u16 lookAheadFeatureEnabled : 1;
-      u16 releaseInterruptEnabled : 1;
-      u16 serviceInterruptEnabled : 1;
-      u16 deviceResetCommandEnabled : 1;
-      u16 hostProtectedAreaFeatureEnabled : 1;
-      u16 reserved16 : 1;
-      u16 writeBufferCommandEnabled : 1;
-      u16 readBufferCommandEnabled : 1;
-      u16 nopCommandEnabled : 1;
-      u16 reserved17 : 1;
+
+    // Work handed to the worker thread.
+    enum class JobKind : u8 {
+      None,
+      Dma,
+      Flush
     };
-    u16 dataAsu16;
-  } enabled1;
-  union {                              // word 86
-    struct {
-      u16 downloadMicrocodeCommandEnabled : 1;
-      u16 dmaQueuedCommandEnabled : 1;
-      u16 CFAFeatureEnabled : 1;
-      u16 ddvancedPowerManagementFeatureEnabled : 1;
-      u16 mediaStatusNotificationFeatureEnabled : 1;
-      u16 powerFromStandbyFeatureEnabled : 1;
-      u16 setFeaturesAfterPowerUpRequired2 : 1;
-      u16 addressOffsetReservedAreaBoot2 : 1;
-      u16 setMaximumCommandEnabled : 1;
-      u16 acousticManagementFeatureEnabled : 1;
-      u16 lba48BitFeatureEnabled : 1;
-      u16 deviceConfigOverlapFeatureEnabled : 1;
-      u16 flushCacheCommandEnabled : 1;
-      u16 flushCacheExtCommandEnabled : 1;
-      u16 reserved18 : 2;
+
+    // Shadow task file. 48-bit commands write each register twice, the *Prev copy holds the first (high order) byte
+    // and is what reads return while Device Control HOB is set.
+    struct TaskFile {
+      u8 features = 0;
+      u8 featuresPrev = 0;
+      u8 sectorCount = 0;
+      u8 sectorCountPrev = 0;
+      u8 lbaLow = 0;
+      u8 lbaLowPrev = 0;
+      u8 lbaMid = 0;
+      u8 lbaMidPrev = 0;
+      u8 lbaHigh = 0;
+      u8 lbaHighPrev = 0;
+      u8 device = 0;
+      u8 error = 0;
+      u8 status = 0;
+      u8 deviceControl = 0;
     };
-    u16 dataAsu16;
-  } enabled2;
-  union {                              // word 87
-    u16 dataAsu16;
-  } enabled3;
-  u16 ultraDMASupport : 8;             // word 88
-  u16 ultraDMAActive : 8;
-  u16 reserved19[11];                  // word 89-99
-  u32 userAddressableSectors48Bit[2];  // word 100-104
-  u16 reserved20[23];                  // word 104-126
-  u16 mediaStatusNotification : 2;     // word 127
-  u16 reserved21 : 6;
-  u16 deviceWriteProtect : 1;
-  u16 reserved22 : 7;
-  u16 securitySupported : 1;           // word 128
-  u16 securityEnabled : 1;
-  u16 securityLocked : 1;
-  u16 securityFrozen : 1;
-  u16 securityCountExpired : 1;
-  u16 securityEraseSupported : 1;
-  u16 reserved23 : 2;
-  u16 securityLevel : 1;
-  u16 reserved24 : 7;
-  u16 reserved25[127];                 // word 129-255
-};
-#pragma pack(pop)
 
-  //
-  // DMA related structures
-  //
-  
-  // DMA Physical Region Descriptor
-  struct XE_ATA_DMA_PRD {
-    u32 physAddress; // physical memory address of a data buffer
-    u16 sizeInBytes;
-    u16 control;
+    // Disk transfer of the current command (PIO or DMA).
+    struct DiskTransfer {
+      u64 lba = 0;     // Next sector to move.
+      u32 sectors = 0; // Sectors left.
+      bool toHost = false;
+      bool forceUnitAccess = false;
+    };
+
+    // DMA job parameters, copied out of the locked state for the worker.
+    struct DmaJob {
+      u64 lba = 0;
+      u32 sectors = 0;
+      bool toHost = false;
+      bool forceUnitAccess = false;
+      u32 prdTable = 0;
+    };
+
+    // PCI Bridge pointer. Used for Interrupts.
+    PCIBridge *parentBus = nullptr;
+    // Bus-master access to guest RAM for DMA ops.
+    Xe::PCI::DmaEngine dma;
+
+    // Guards everything.
+    std::mutex ataMutex;
+    std::condition_variable workCV;
+    Xe::PCI::Worker hddWorkerThread;
+    bool workerStop = false;
+    // A job is running outside the lock (PlatformReset waits for it before guest memory is cleared).
+    bool workerActive = false;
+    std::condition_variable idleCV;
+
+    // Mounted image.
+    std::unique_ptr<Base::ReadWriteStorage> image{};
+    bool imageAttached = false;
+    u64 imageSizeInBytes = 0;
+    u64 sectorCount = 0;
+    // Image written since the last cache flush.
+    bool imageDirty = false;
+
+    // IDENTIFY DEVICE words. SET FEATURES and friends keep them current.
+    std::array<u16, 256> identify{};
+
+    // Registers.
+    TaskFile tf{};
+    Xe::PCI::SataScr scr;
+    u8 dmaCommand = 0;
+    u8 dmaStatus = 0;
+    u32 dmaPrdTable = 0;
+
+    // INTRQ pending (cleared by a Status read or a command write).
+    bool intrqPending = false;
+
+    // Current command.
+    Phase phase = Phase::Idle;
+    u8 command = 0;
+    PioTarget pioTarget = PioTarget::Buffer;
+    DiskTransfer xfer{};
+    // The DMA transfer of the current command was handed to the worker.
+    bool dmaQueued = false;
+    // Sectors per DRQ block for disk PIO (1, or the multiple count for READ/WRITE MULTIPLE).
+    u32 drqSectors = 1;
+    // PIO data of the current DRQ block and the position in it.
+    std::vector<u8> pioBlock;
+    u32 pioPos = 0;
+    // Generated data still to come after the current block (Buffer target).
+    std::vector<u8> pioPending;
+    // 512 byte sector for READ BUFFER / WRITE BUFFER.
+    std::array<u8, 512> sectorBuffer{};
+
+    // Worker job. Resets and aborted commands bump generation, so a job that finishes after its command was abandoned
+    // leaves the new state alone.
+    JobKind job = JobKind::None;
+    DmaJob dmaJob{};
+    u64 generation = 0;
+
+    // Drive settings changed by commands.
+    u8 multipleCount = 0;
+    bool smartEnabled = true;
+    bool standby = false;
+
+    // Power-on time for the SMART power-on hours attribute.
+    std::chrono::steady_clock::time_point powerOnTime = std::chrono::steady_clock::now();
+
+    // Unsupported commands we already warned about.
+    std::bitset<256> warnedCommands{};
+
+    // Worker thread.
+    void WorkerLoop();
+    void RunDmaJob(const DmaJob &params, u64 jobGeneration);
+    void RunFlushJob(u64 jobGeneration, bool flushNeeded);
+
+    // Register access.
+    u8 ReadTaskFileRegister(u32 reg);
+    void WriteTaskFileRegister(u32 reg, u8 value);
+    void ReadDataPort(u8 *data, u64 size);
+    void WriteDataPort(const u8 *data, u64 size);
+    void WriteDeviceControl(u8 value);
+    void WriteDmaCommand(u8 value);
+    // A write to the SCR block (MMIO 0x10, config 0xC0), offset 0..15 from SStatus, and what it did to the link.
+    void WriteScr(u32 offset, const u8 *data, u64 size);
+
+    // Command execution.
+    void ExecuteCommand(u8 cmd);
+    void ExecuteSetFeatures();
+    void ExecuteSmart();
+    void ExecuteReadLog(bool extended);
+    void BeginDiskPio(bool toHost, bool lba48, bool multiple, bool forceUnitAccess = false);
+    void BeginDma(bool toHost, bool lba48, bool forceUnitAccess);
+    void BeginPioIn(std::vector<u8> data);
+    void BeginPioOut(u32 bytes);
+    bool LoadNextPioInBlock();
+    void FinishPioOutBlock();
+    void StartDmaIfReady();
+    void QueueFlush();
+
+    // Completion and reset helpers.
+    void CompleteOk();
+    void CompleteError(u8 error);
+    void Abort();
+    void RaiseInterrupt();
+    void AcknowledgeInterrupt();
+    void SetSignature();
+    void DeviceReset();
+    void AbandonCommand();
+
+    // Addressing helpers.
+    u64 Lba28() const;
+    u64 Lba48() const;
+    u32 Count28() const;
+    u32 Count48() const;
+    bool RangeValid(u64 lba, u64 count, bool lba48) const;
+
+    // IDENTIFY and SMART data.
+    void BuildIdentify();
+    void UpdateIdentifyChecksum();
+    std::vector<u8> IdentifyBytes() const;
+    std::vector<u8> SmartData() const;
+    std::vector<u8> SmartThresholds() const;
+
+    static const char *CommandName(u8 cmd);
   };
 
-  struct XE_ATA_DMA_STATE {
-    XE_ATA_DMA_PRD currentPRD = {0};
-    u32 currentTableOffset = 0;
-  };
-
-//
-// ATA Register State
-//
-struct ATA_REG_STATE {
-  // Command Block
-  u32 data;         // Address 0x00
-  struct {          // Address 0x01
-    u32 error;      // When Read
-    u32 features;   // When Written
-  };                
-  u8 sectorCount;  // Address 0x02
-  u8 lbaLow;       // Address 0x03
-  u8 lbaMiddle;    // Address 0x04
-  u8 lbaHigh;      // Address 0x05
-  u32 deviceSelect; // Address 0x06
-  struct {          // Address 0x07
-    u32 status;     // When Read
-    u32 command;    // When Written
-  };
-  // Control Block
-  struct {              // Address 0xA
-    u32 altStatus;      // When Read
-    u32 deviceControl;  // When Written
-  };
-  u32 SStatus;          // Address 0x10 (4 bytes)
-  u32 SError;           // Address 0x14 (4 bytes)
-  u32 SControl;         // Address 0x18 (4 bytes)
-  u32 SActive;          // Address 0x1C (4 bytes)
-
-  // Transfer mode, set by the set features command using the subcommand 0x3.
-  u32 ataTransferMode;
-
-  // DMA registers
-  u32 dmaCommand;
-  u32 dmaStatus;
-  u32 dmaTableOffset;
-
-  // Previous LBA and sector count.
-  // Used in LBA 48 addressing.
-  u8 prevLBALow;
-  u8 prevLBAMiddle;
-  u8 prevLBAHigh;
-  u8 prevSectorCount;
-};
-
-// ATA Device State
-struct ATA_DEV_STATE {
-  // Register state.
-  ATA_REG_STATE regs = {0};
-  // Identify Data for our Hard Drive.
-  XE_ATA_IDENTIFY_DATA ataIdentifyData = {0};
-  // Mounted HDD Image.
-  std::unique_ptr<ReadWriteStorage> mountedHDDImage{};
-  // Input/Output buffers.
-  HDDDataBuffer dataInBuffer;
-  HDDDataBuffer dataOutBuffer;
-  // DMA State
-  XE_ATA_DMA_STATE dmaState = {0};
-  // Do we have an image?
-  bool imageAttached = false;
-};
-
-class HDD : public PCIDevice {
-public:
-  HDD(const std::string &deviceName, u64 size,
-    PCIBridge *parentPCIBridge, RAM* ram);
-  ~HDD();
-  void Read(u64 readAddress, u8 *data, u64 size) override;
-  void Write(u64 writeAddress, const u8 *data, u64 size) override;
-  void MemSet(u64 writeAddress, s32 data, u64 size) override;
-  void ConfigRead(u64 readAddress, u8* data, u64 size) override;
-  void ConfigWrite(u64 writeAddress, const u8* data, u64 size) override;
-
-private:
-  // PCI Bridge pointer. Used for Interrupts.
-  PCIBridge *parentBus;
-
-  // RAM Pointer for DMA ops.
-  RAM* ramPtr;
-
-  // Device State
-  ATA_DEV_STATE ataState = {};
-
-  // Worker Thread for DMA requests.
-  std::thread hddWorkerThread;
-
-  // Thread running
-  volatile bool hddThreadRunning = false;
-
-  // Thread loop for processing DMA requests, etc...
-  void hddThreadLoop();
-
-  // ATA Commands.
-  void ataReadDMACommand();
-  void ataReadNativeMaxAddressExtCommand();
-  void ataReadDMAExtCommand();
-  void ataWriteDMACommand();
-  void ataIdentifyDeviceCommand();
-
-  // Utilities
-
-  // Returns the name of a given command.
-  static const std::string getATACommandName(u32 commandID);
-  // DMA Worker.
-  void doDMA();
-  // Issues an interrupt if allowed.
-  void ataIssueInterrupt();
-};
-
-} // namespace PCIDev
-} // namespace Xe
+} // namespace Xe::PCIDev
