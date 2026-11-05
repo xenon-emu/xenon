@@ -7,581 +7,1084 @@
 #include "Base/Config.h"
 #include "Base/Global.h"
 #include "Base/Logging/Log.h"
-#include "Base/Thread.h"
-#include "Core/XCPU/XenonCPU.h"
+#include "Base/Param.h"
 
+#include <algorithm>
+#include <bit>
+#include <cstring>
+
+// Every register access, command and MMC command of the flash controller.
 // #define SFCX_DEBUG
 
-// There are two SFCX Versions, pre-Jasper and post-Jasper
-Xe::PCIDev::SFCX::SFCX(const std::string& deviceName, u64 size, const std::string& nandLoadPath,
-                       PCIBridge* parentPCIBridge, RAM* ram)
+#ifdef SFCX_DEBUG
+  #define SFCX_DEBUGP(x, ...) LOG_DEBUG(SFCX, "[SFCX] " x, ##__VA_ARGS__)
+#else
+  #define SFCX_DEBUGP(x, ...)
+#endif
+
+PARAM(sfcx_config,
+      "Overrides the SFCX CONFIG value the guest sees (hex, e.g. 0x00023010). Default: derived from the NAND image");
+
+using namespace Xe::PCIDev::Sfcx;
+
+// MMCX interrupt status bits (SDHCI normal/error interrupt status, 0x30)
+constexpr u32 MmcIntCommandComplete = 0x00000001;
+constexpr u32 MmcIntTransferComplete = 0x00000002;
+constexpr u32 MmcIntBufferWriteReady = 0x00000010;
+constexpr u32 MmcIntBufferReadReady = 0x00000020;
+constexpr u32 MmcIntError = 0x00008000;
+constexpr u32 MmcIntDataTimeoutError = 0x00100000;
+constexpr u32 MmcIntAdmaError = 0x02000000;
+
+// MMCX registers
+constexpr u32 MmcRegSdmaAddress = 0x00;
+constexpr u32 MmcRegBlockSizeCount = 0x04;
+constexpr u32 MmcRegArgument = 0x08;
+constexpr u32 MmcRegTransferModeCommand = 0x0C;
+constexpr u32 MmcRegResponse0 = 0x10;
+constexpr u32 MmcRegBufferDataPort = 0x20;
+constexpr u32 MmcRegPresentState = 0x24;
+constexpr u32 MmcRegHostControl = 0x28;
+constexpr u32 MmcRegClockTimeoutReset = 0x2C;
+constexpr u32 MmcRegInterruptStatus = 0x30;
+constexpr u32 MmcRegInterruptStatusEnable = 0x34;
+constexpr u32 MmcRegInterruptSignalEnable = 0x38;
+constexpr u32 MmcRegHostControl2 = 0x3C;
+constexpr u32 MmcRegCapabilities = 0x40;
+constexpr u32 MmcRegAdmaAddressLow = 0x58;
+constexpr u32 MmcRegAdmaAddressHigh = 0x5C;
+constexpr u32 MmcRegVendorControl = 0xF0;
+constexpr u32 MmcRegHostVersion = 0xFC;
+
+// VendorControl: bit 5 = sector-addressed part (read when the kernel sets the driver up), bit 21 = ready after a
+// controller reset (the kernel polls it).
+constexpr u32 MmcVendorSectorAddressing = 0x00000020;
+constexpr u32 MmcVendorReady = 0x00200000;
+
+// R1 card status: READY_FOR_DATA, CURRENT_STATE = tran.
+constexpr u32 MmcCardStatusTran = 0x00000900;
+
+// Power-on register values of the NAND controller.
+constexpr u32 SfcxResetAddress = 0x00F70030;
+constexpr u32 SfcxResetLogical = 0x00000100;
+constexpr u32 SfcxResetPhysical = 0x00000100;
+
+// Flash image
+
+bool Xe::PCIDev::SFCX::FlashImage::Open(const std::string &path) {
+  file = std::make_unique<Base::ReadWriteStorage>(path);
+  if (!file->isHandleValid()) {
+    file.reset();
+    return false;
+  }
+  fileSize = file->Size();
+  chunks.clear();
+  chunks.resize((fileSize + ChunkSize - 1) / ChunkSize);
+  return fileSize != 0;
+}
+
+u8 *Xe::PCIDev::SFCX::FlashImage::Chunk(u64 index) {
+  if (index >= chunks.size()) { return nullptr; }
+  std::unique_ptr<u8[]> &chunk = chunks[index];
+  if (!chunk) {
+    chunk = std::make_unique<u8[]>(ChunkSize);
+    const u64 base = index * ChunkSize;
+    const u64 length = std::min<u64>(ChunkSize, fileSize - base);
+    memset(chunk.get() + length, 0xFF, ChunkSize - length);
+    if (!file->Read(base, chunk.get(), static_cast<u32>(length))) {
+      LOG_ERROR(SFCX, "Failed to read the flash image at {:#x}.", base);
+      memset(chunk.get(), 0xFF, length);
+    }
+  }
+  return chunk.get();
+}
+
+void Xe::PCIDev::SFCX::FlashImage::Read(u64 offset, u8 *destination, u64 length) {
+  while (length != 0) {
+    const u64 within = offset % ChunkSize;
+    const u64 count = std::min(length, ChunkSize - within);
+    if (const u8 *chunk = Chunk(offset / ChunkSize)) {
+      memcpy(destination, chunk + within, count);
+    } else {
+      memset(destination, 0xFF, count);
+    }
+    offset += count;
+    destination += count;
+    length -= count;
+  }
+}
+
+// mode: 0 copy, 1 NAND program (AND), 2 fill with source[0]
+bool Xe::PCIDev::SFCX::FlashImage::Modify(u64 offset, u64 length, const u8 *source, int mode) {
+  bool ok = true;
+  while (length != 0) {
+    const u64 within = offset % ChunkSize;
+    const u64 count = std::min(length, ChunkSize - within);
+    u8 *chunk = Chunk(offset / ChunkSize);
+    if (!chunk) {
+      // Past the end of the file: the guest sees a larger device than the dump holds.
+      if (!writeFailureLogged) {
+        LOG_WARNING(SFCX, "Write past the end of the flash image ({:#x}); the data is dropped.", offset);
+        writeFailureLogged = true;
+      }
+      return false;
+    }
+    u8 *target = chunk + within;
+    switch (mode) {
+      case 0: memcpy(target, source, count); break;
+      case 1:
+        for (u64 i = 0; i < count; ++i) { target[i] &= source[i]; }
+        break;
+      default: memset(target, source[0], count); break;
+    }
+    // The last chunk may run past the end of the file. Only the part inside it is written back.
+    const u64 inFile = offset < fileSize ? std::min<u64>(count, fileSize - offset) : 0;
+    if (inFile != 0 && !file->Write(offset, target, static_cast<u32>(inFile))) {
+      LOG_ERROR(SFCX, "Failed to write the flash image at {:#x}.", offset);
+      ok = false;
+    }
+    if (mode != 2) { source += count; }
+    offset += count;
+    length -= count;
+  }
+  return ok;
+}
+
+bool Xe::PCIDev::SFCX::FlashImage::Write(u64 offset, const u8 *source, u64 length) {
+  return Modify(offset, length, source, 0);
+}
+
+bool Xe::PCIDev::SFCX::FlashImage::Program(u64 offset, const u8 *source, u64 length) {
+  return Modify(offset, length, source, 1);
+}
+
+bool Xe::PCIDev::SFCX::FlashImage::Fill(u64 offset, u8 value, u64 length) { return Modify(offset, length, &value, 2); }
+
+// Construction
+
+Xe::PCIDev::SFCX::SFCX(const std::string &deviceName, u64 size, const std::string &nandLoadPath,
+                       PCIBridge *parentPCIBridge, RAM *ram)
     : PCIDevice(deviceName, size)
     , parentBus(parentPCIBridge)
-    , mainMemory(ram) {
+    , dma(ram) {
   // Set PCI Properties
-  pciConfigSpace.configSpaceHeader.reg0.hexData = 0x580B1414;
-  pciConfigSpace.configSpaceHeader.reg1.hexData = 0x02000006;
-  pciConfigSpace.configSpaceHeader.reg2.hexData = 0x05010001;
-
-  // Set our PCI Dev Sizes
-  pciDevSizes[0] = 0x400; // BAR0
+  pciConfigSpace.configSpaceHeader.id.hexData = 0x580B1414;
+  pciConfigSpace.configSpaceHeader.commandStatus.hexData = 0x02000006;
+  pciConfigSpace.configSpaceHeader.classRev.hexData = 0x05010001;
+  // Register window (BAR0)
+  pciDevSizes[0] = DevSize;
+  // Flash window (BAR1, 64 MiB). The 1BL reads the flash through it before anything configures the controller, so it
+  // decodes at 0xC8000000 out of reset (the kernel programs the same address later).
+  pciDevSizes[1] = FlashWindowSize;
+  SetBar(1, FlashWindowAddress);
 
   LOG_INFO(SFCX, "Xenon Secure Flash Controller for Xbox.");
+  LOG_INFO(SFCX, "Loading flash image from path: {}", nandLoadPath);
 
-  // Set the registers as a dump from my Corona 16MB. These were dumped at POR
-  // via Xell before SFCX Init. These are also readable via JRunner and
-  // simple360 flasher
-
-  // Xenon Dev Kit ES DD2 64 MB
-  // 0x01198030
-
-  // Corona 16 Megs Retail
-  // 0x000043000
-
-  // Config Reg is VERY Important. Tells info
-  // about Meta/NAND Type
-
-  // Set according to current system type.
-  u32 configReg
-    = Config::highlyExperimental.consoleRevison == Config::eConsoleRevision::Xenon ? 0x01198030 : 0x000043000;
-
-  sfcxState.configReg = configReg;
-  sfcxState.statusReg = 0x00000600;
-  sfcxState.statusReg = 0x00000600;
-  sfcxState.addressReg = 0x00F70030;
-  sfcxState.logicalReg = 0x00000100;
-  sfcxState.physicalReg = 0x0000100;
-  sfcxState.commandReg = NO_CMD;
-
-  // Display Flash config
-  LOG_INFO(SFCX, "FlashConfig: 0x{:X}", sfcxState.configReg);
-
-  // Load the NAND dump
-  LOG_INFO(SFCX, "Loading NAND from path: {}", nandLoadPath);
-
-  // Check Image size
-  u64 imageSize = 0;
-
-  // fs::file_size can cause a exception if it is not a valid file
-  try {
-    std::error_code ec;
-    imageSize = std::filesystem::file_size(nandLoadPath, ec);
-    if (imageSize == -1 || !imageSize) {
-      imageSize = 0;
-      LOG_ERROR(Base_Filesystem, "Failed to retrieve the file size of {} (Error: {})", nandLoadPath, ec.message());
-    }
-  } catch (const std::exception& ex) {
-    LOG_ERROR(Base_Filesystem, "Exception trying to get file size. Exception: {}", ex.what());
-    return;
-  }
-
-  mountedNANDImage = std::make_unique<STRIP_UNIQUE(mountedNANDImage)>(nandLoadPath);
-
-  if (!mountedNANDImage->isHandleValid()) {
+  if (!image.Open(nandLoadPath)) {
     LOG_CRITICAL(SFCX, "Fatal error! Please make sure your NAND (or NAND path) is valid!");
     return;
   }
 
-  // Check file magic
-  if (!checkMagic()) {
-    LOG_CRITICAL(SFCX, "Fatal error! The loaded 'nand.bin' doesn't correspond to a Xbox 360 NAND.");
+  if (!DetectGeometry()) { return; }
+
+  // Flash header (data view, big-endian on flash).
+  u8 headerBytes[sizeof(NandLayout::Header)];
+  ReadFlashData(0, headerBytes, sizeof(headerBytes));
+  nandHeader = NandLayout::ReadHeader(headerBytes);
+  const u16 magic = nandHeader.nandMagic;
+  // Retail 0xFF4F, devkit 0x0F4F, older devkits 0x0F3F.
+  if (magic != 0xFF4F && magic != 0x0F4F && magic != 0x0F3F) {
+    LOG_CRITICAL(SFCX, "Fatal error! The loaded image doesn't correspond to a Xbox 360 NAND (magic {:#06x}).", magic);
     return;
   }
 
-  // Get the block size based on the blockSize / pageSize * pageSizePhys
-  sfcxState.blockSizePhys = (sfcxState.blockSize / sfcxState.pageSize) * sfcxState.pageSizePhys;
-
-  // Set our device BAR register based on the image size
-  pciDevSizes[1] = imageSize; // BAR1
-
-  // Read NAND header.
-  mountedNANDImage->Read(0, reinterpret_cast<u8*>(&sfcxState.nandHeader), sizeof(sfcxState.nandHeader));
-
-  // Display info about the loaded image header
-  sfcxState.nandHeader.nandMagic = byteswap_be<u16>(sfcxState.nandHeader.nandMagic);
-  LOG_INFO(SFCX, " * NAND Magic: 0x{:X}", sfcxState.nandHeader.nandMagic);
-
-  sfcxState.nandHeader.build = byteswap_be<u16>(sfcxState.nandHeader.build);
-  LOG_INFO(SFCX, " * Build: 0x{:X}", sfcxState.nandHeader.build);
-
-  sfcxState.nandHeader.qfe = byteswap_be<u16>(sfcxState.nandHeader.qfe);
-  LOG_INFO(SFCX, " * QFE: 0x{:X}", sfcxState.nandHeader.qfe);
-
-  sfcxState.nandHeader.flags = byteswap_be<u16>(sfcxState.nandHeader.flags);
-  LOG_INFO(SFCX, " * Flags: 0x{:X}", sfcxState.nandHeader.flags);
-
-  sfcxState.nandHeader.entry = byteswap_be<u32>(sfcxState.nandHeader.entry);
-  LOG_INFO(SFCX, " * Entry: 0x{:X}", sfcxState.nandHeader.entry);
-
-  sfcxState.nandHeader.size = byteswap_be<u32>(sfcxState.nandHeader.size);
-  LOG_INFO(SFCX, " * Size: 0x{:X}", sfcxState.nandHeader.size);
-
-  sfcxState.nandHeader.keyvaultSize = byteswap_be<u32>(sfcxState.nandHeader.keyvaultSize);
-  LOG_INFO(SFCX, " * Keyvault Size: 0x{:X}", sfcxState.nandHeader.keyvaultSize);
-
-  sfcxState.nandHeader.sysUpdateAddr = byteswap_be<u32>(sfcxState.nandHeader.sysUpdateAddr);
-  LOG_INFO(SFCX, " * System Update Addr: 0x{:X}", sfcxState.nandHeader.sysUpdateAddr);
-
-  sfcxState.nandHeader.sysUpdateCount = byteswap_be<u16>(sfcxState.nandHeader.sysUpdateCount);
-  LOG_INFO(SFCX, " * System Update Count: 0x{:X}", sfcxState.nandHeader.sysUpdateCount);
-
-  sfcxState.nandHeader.keyvaultVer = byteswap_be<u16>(sfcxState.nandHeader.keyvaultVer);
-  LOG_INFO(SFCX, " * Keyvault Ver: 0x{:X}", sfcxState.nandHeader.keyvaultVer);
-
-  sfcxState.nandHeader.keyvaultAddr = byteswap_be<u32>(sfcxState.nandHeader.keyvaultAddr);
-  LOG_INFO(SFCX, " * Keyvault Addr: 0x{:X}", sfcxState.nandHeader.keyvaultAddr);
-
-  sfcxState.nandHeader.sysUpdateSize = byteswap_be<u32>(sfcxState.nandHeader.sysUpdateSize);
-  LOG_INFO(SFCX, " * System Update Size: 0x{:X}", sfcxState.nandHeader.sysUpdateSize);
-
-  sfcxState.nandHeader.smcConfigAddr = byteswap_be<u32>(sfcxState.nandHeader.smcConfigAddr);
-  LOG_INFO(SFCX, " * SMC Config Addr: 0x{:X}", sfcxState.nandHeader.smcConfigAddr);
-
-  sfcxState.nandHeader.smcBootSize = byteswap_be<u32>(sfcxState.nandHeader.smcBootSize);
-  LOG_INFO(SFCX, " * SMC Boot Size: 0x{:X}", sfcxState.nandHeader.smcBootSize);
-
-  sfcxState.nandHeader.smcBootAddr = byteswap_be<u32>(sfcxState.nandHeader.smcBootAddr);
-  LOG_INFO(SFCX, " * SMC Boot Addr: 0x{:X}", sfcxState.nandHeader.smcBootAddr);
-
-  hasInitialised = true;
-
-  // Get CB_A and CB_B headers
-  BL_HEADER cbaHeader;
-  BL_HEADER cbbHeader;
-
-  // Get CB_A header data from image data.
-  u32 cbaOffset = sfcxState.nandHeader.entry;
-  cbaOffset = 1 ? ((cbaOffset / 0x200) * 0x210) + cbaOffset % 0x200 : cbaOffset;
-  mountedNANDImage->Read(cbaOffset, reinterpret_cast<u8*>(&cbaHeader), sizeof(cbaHeader));
-
-  // Byteswap CB_A info from header
-  cbaHeader.buildNumber = byteswap_be<u16>(cbaHeader.buildNumber);
-  cbaHeader.length = byteswap_be<u32>(cbaHeader.length);
-  cbaHeader.entryPoint = byteswap_be<u32>(cbaHeader.entryPoint);
-
-  // Get CB_B header data from image data
-  u32 cbbOffset = sfcxState.nandHeader.entry + cbaHeader.length;
-  cbbOffset = 1 ? ((cbbOffset / 0x200) * 0x210) + cbbOffset % 0x200 : cbbOffset;
-  mountedNANDImage->Read(cbbOffset, reinterpret_cast<u8*>(&cbbHeader), sizeof(cbbHeader));
-
-  // Byteswap CB_B info from header
-  cbbHeader.buildNumber = byteswap_be<u16>(cbbHeader.buildNumber);
-  cbbHeader.length = byteswap_be<u32>(cbbHeader.length);
-  cbbHeader.entryPoint = byteswap_be<u32>(cbbHeader.entryPoint);
-
-  // Check for CB(_A) Magic
-  if (cbaHeader.name[0] == 'C' && cbaHeader.name[1] == 'B') {
-    LOG_INFO(SFCX, "Found CB(_A) Header: Physical: 0x{:X}, LBA: 0x{:X}", sfcxState.nandHeader.entry, cbaOffset);
-    LOG_INFO(SFCX, " * CB Entry: 0x{:X}", cbaHeader.entryPoint);
-    LOG_INFO(SFCX, " * CB Length: 0x{:X}", cbaHeader.length);
-  }
-
-  // Check for CB(_B) Magic
-  if (cbbHeader.name[0] == 'C' && cbbHeader.name[1] == 'B') {
-    LOG_INFO(SFCX, "Found CB(_B) Header: Physical: 0x{:X}, LBA: 0x{:X}", sfcxState.nandHeader.entry + cbaHeader.length,
-             cbbOffset);
-    LOG_INFO(SFCX, " * CB Entry: 0x{:X}", cbbHeader.entryPoint);
-    LOG_INFO(SFCX, " * CB Length: 0x{:X}", cbbHeader.length);
-  }
-
-  u32 cbVersion = (cbaHeader.buildNumber == cbbHeader.buildNumber) ? cbaHeader.buildNumber : cbbHeader.buildNumber;
-
-  if (cbaHeader.buildNumber == cbbHeader.buildNumber) {
-    LOG_INFO(SFCX, "Detected Unified CB: ");
-    LOG_INFO(SFCX, "   * CB Version: {:#d}", cbVersion);
+  if (geometry.emmc) {
+    mmc.sectorAddressing = image.Size() > 0x80000000ull;
+    MmcBuildExtCsd();
   } else {
-    LOG_INFO(SFCX, "Detected Split CB:");
-    LOG_INFO(SFCX, " * CB_A Version: {:#d}", cbaHeader.buildNumber);
-    LOG_INFO(SFCX, " * CB_B Version: {:#d}", cbbHeader.buildNumber);
+    sfcx.config = geometry.config;
+    sfcx.address = SfcxResetAddress;
+    sfcx.logical = SfcxResetLogical;
+    sfcx.physical = SfcxResetPhysical;
+    sfcx.pageBuffer.fill(0xFF);
+    remapCache.assign(geometry.systemBlocks - geometry.spareBlocks, -2);
   }
+
+  LogImageInfo();
+  hasInitialised = true;
 }
 
-Xe::PCIDev::SFCX::~SFCX() {
-  // Terminate thread
-  sfcxThreadRunning = false;
-  // Signal the worker thread so its able to start shutdown
-  sfcxCV.notify_one();
-  if (sfcxThread.joinable()) sfcxThread.join();
-}
+Xe::PCIDev::SFCX::~SFCX() = default;
 
-void Xe::PCIDev::SFCX::Start() {
-  // Enter SFCX Thread
-  sfcxThread = std::thread(&Xe::PCIDev::SFCX::sfcxMainLoop, this);
-}
-
-void Xe::PCIDev::SFCX::Read(u64 readAddress, u8* data, u64 size) {
-  // Set a lock on registers
-  std::lock_guard lck(mutex);
-
-  const u16 reg = readAddress & 0xFF;
-
-  switch (reg) {
-    case SFCX_CONFIG_REG: *reinterpret_cast<u32*>(data) = sfcxState.configReg; break;
-    case SFCX_STATUS_REG: *reinterpret_cast<u32*>(data) = sfcxState.statusReg; break;
-    case SFCX_COMMAND_REG: *reinterpret_cast<u32*>(data) = sfcxState.commandReg; break;
-    case SFCX_ADDRESS_REG: *reinterpret_cast<u32*>(data) = sfcxState.addressReg; break;
-    case SFCX_DATA_REG: *reinterpret_cast<u32*>(data) = sfcxState.dataReg; break;
-    case SFCX_LOGICAL_REG: *reinterpret_cast<u32*>(data) = sfcxState.logicalReg; break;
-    case SFCX_PHYSICAL_REG: *reinterpret_cast<u32*>(data) = sfcxState.physicalReg; break;
-    case SFCX_DATAPHYADDR_REG: *reinterpret_cast<u32*>(data) = sfcxState.dataPhysAddrReg; break;
-    case SFCX_SPAREPHYADDR_REG: *reinterpret_cast<u32*>(data) = sfcxState.sparePhysAddrReg; break;
-    case SFCX_MMC_ID_REG: *reinterpret_cast<u32*>(data) = sfcxState.mmcIDReg; break;
-    default: LOG_ERROR(SFCX, "Read from unknown register 0x{:X}", reg); break;
+// The console's reset line: controller / host registers and the partial-program assembly go back to power-on. The flash
+// contents are non-volatile and stay. Commands run inside register writes under the mutex, so none is in flight once
+// the lock is held.
+void Xe::PCIDev::SFCX::PlatformReset() {
+  if (hasInitialised) {
+    std::lock_guard lock(mutex);
+    raisePending = false;
+    windowWriteLogged = false;
+    if (geometry.emmc) {
+      mmc = {};
+      mmc.sectorAddressing = image.Size() > 0x80000000ull;
+      MmcBuildExtCsd();
+    } else {
+      sfcx = {};
+      sfcx.config = geometry.config;
+      sfcx.address = SfcxResetAddress;
+      sfcx.logical = SfcxResetLogical;
+      sfcx.physical = SfcxResetPhysical;
+      sfcx.pageBuffer.fill(0xFF);
+      remapCache.assign(geometry.systemBlocks - geometry.spareBlocks, -2);
+    }
   }
+  if (parentBus) { parentBus->CancelInterrupt(PRIO_SFCX); }
 }
 
-void Xe::PCIDev::SFCX::ConfigRead(u64 readAddress, u8* data, u64 size) {
-  const u8 offset = readAddress & 0xFF;
-  memcpy(data, &pciConfigSpace.data[offset], size);
-}
+// Works out the part from the image: eMMC dumps have no spare area, NAND dumps interleave 16 spare bytes per 512 data
+// bytes. The spare layout (and so the block size) is the one whose block-id field matches the block index on most
+// blocks, which the factory and the kernel write into every programmed block.
+bool Xe::PCIDev::SFCX::DetectGeometry() {
+  const u64 size = image.Size();
+  geometry = {};
 
-void Xe::PCIDev::SFCX::Write(u64 writeAddress, const u8* data, u64 size) {
-  // Set a lock on registers
-  std::lock_guard lck(mutex);
+  if (size % (32 * RawSectorSize) != 0) {
+    if (size % SectorSize != 0) {
+      LOG_CRITICAL(SFCX, "Flash image size {:#x} is neither a NAND dump (0x210 per sector) nor an eMMC dump.", size);
+      return false;
+    }
+    geometry.emmc = true;
+    geometry.sectorCount = size / SectorSize;
+    geometry.sectorsPerBlock = 32; // 16 KiB, the MMC FlashFs block
+    geometry.blockCount = static_cast<u32>(geometry.sectorCount / 32);
+    if (Config::highlyExperimental.consoleRevison != Config::eConsoleRevision::Corona4GB
+        && Config::highlyExperimental.consoleRevison != Config::eConsoleRevision::Winchester
+        && Config::highlyExperimental.consoleRevison != Config::eConsoleRevision::Corona) {
+      LOG_WARNING(SFCX, "eMMC image with a non-Corona console revision: the kernel only uses the MMC host when the "
+                        "PCI bridge revision is >= 0x70.");
+    }
+    return true;
+  }
 
-  const u16 reg = writeAddress & 0xFF;
+  geometry.sectorCount = size / RawSectorSize;
 
-  // Command register
-  u32 command = NO_CMD;
+  struct Candidate {
+    u8 metaType;
+    u32 sectorsPerBlock;
+  };
+  static constexpr Candidate candidates[] = {{0, 32}, {1, 32}, {2, 256}, {2, 512}};
+  const Candidate *best = nullptr;
+  u32 bestMatches = 0;
+  for (const Candidate &candidate : candidates) {
+    const u64 blocks = geometry.sectorCount / candidate.sectorsPerBlock;
+    u32 matches = 0;
+    for (u64 block = 1; block < blocks && block <= 512; ++block) {
+      u8 spare[SpareSize];
+      image.Read(block * candidate.sectorsPerBlock * RawSectorSize + SectorSize, spare, SpareSize);
+      if (std::all_of(spare, spare + SpareSize, [](u8 b) { return b == 0xFF; })) { continue; }
+      const bool good = candidate.metaType == 2 ? spare[0] == 0xFF : spare[5] == 0xFF;
+      if (!good) { continue; }
+      const u32 id = candidate.metaType == 0 ? spare[0] | ((spare[1] & 0xF) << 8) : spare[1] | ((spare[2] & 0xF) << 8);
+      if (id == block) { ++matches; }
+    }
+    if (matches > bestMatches) {
+      bestMatches = matches;
+      best = &candidate;
+    }
+  }
 
-  switch (reg) {
-    case SFCX_CONFIG_REG: memcpy(&sfcxState.configReg, data, size); break;
-    case SFCX_STATUS_REG:
-      memcpy(&sfcxState.statusReg, data, size);
-      // Read then write to status register resets its state
-      sfcxState.statusReg = STATUS_PIN_WP_N | STATUS_PIN_BY_N;
+  u8 metaType = 0;
+  u32 sectorsPerBlock = 32;
+  if (best && bestMatches >= 2) {
+    metaType = best->metaType;
+    sectorsPerBlock = best->sectorsPerBlock;
+  } else {
+    // Blank or unusual image: go by the console revision.
+    const auto revision = Config::highlyExperimental.consoleRevison;
+    const bool smallBlockConsole = revision == Config::eConsoleRevision::Xenon
+                                   || revision == Config::eConsoleRevision::Zephyr
+                                   || revision == Config::eConsoleRevision::Falcon;
+    if (smallBlockConsole) {
+      metaType = 0;
+    } else if (geometry.sectorCount * SectorSize >= 0x4000000) {
+      metaType = 2;
+      sectorsPerBlock = 256;
+    } else {
+      metaType = 1;
+    }
+    LOG_WARNING(SFCX, "Couldn't identify the spare layout from the image; assuming metadata type {}.", metaType);
+  }
+
+  geometry.metaType = metaType;
+  geometry.sectorsPerBlock = sectorsPerBlock;
+  geometry.blockCount = static_cast<u32>(geometry.sectorCount / sectorsPerBlock);
+
+  // CONFIG values the kernel decodes back into the same geometry:
+  //   bits 17-18 type, bits 4-5 size code, big block: size = 1 << (bits 21-24 + bits 19-20 + 23)
+  switch (metaType) {
+    case 0: {
+      // Small block: 16 KiB blocks, size code 1/2/3 = 1024/2048/4096 blocks, 1/32 of them spares.
+      const u32 code = geometry.blockCount <= 1024 ? 1 : geometry.blockCount <= 2048 ? 2 : 3;
+      geometry.sectorsPerPage = 1;
+      geometry.systemBlocks = 1024u << (code - 1);
+      geometry.spareBlocks = 32u << (code - 1);
+      geometry.config = 0x01198000 | (code << 4);
+    } break;
+    case 1:
+      // Big-on-small (Jasper/Trinity/Corona 16 MB), 1024 blocks. Jasper parts report type 1 code 1 (0x00023010),
+      // Trinity/Corona parts type 2 code 0 (0x00043000). Current kernels decode both the same, but kernels from before
+      // Trinity (2.0.9199) bugcheck on type 2 code 0, so only the newer boards get it.
+      geometry.sectorsPerPage = 1;
+      if (geometry.blockCount <= 1024) {
+        geometry.systemBlocks = 1024;
+        geometry.spareBlocks = 32;
+        const auto revision = Config::highlyExperimental.consoleRevison;
+        const bool trinityOrLater =
+          revision == Config::eConsoleRevision::Trinity || revision == Config::eConsoleRevision::Corona
+          || revision == Config::eConsoleRevision::Corona4GB || revision == Config::eConsoleRevision::Winchester;
+        geometry.config = trinityOrLater ? 0x00043000 : 0x00023010;
+      } else {
+        geometry.systemBlocks = 4096;
+        geometry.spareBlocks = 128;
+        geometry.config = 0x00043010;
+      }
       break;
-    case SFCX_COMMAND_REG:
-      // Set status to busy
-      sfcxState.statusReg |= STATUS_BUSY;
+    default: {
+      // Big block: 128 KiB blocks / 2 KiB pages (code 2) or 256 KiB / 4 KiB (code 3). The file system region is the
+      // first 512 (256) blocks, the rest is the built-in memory unit.
+      const bool hugeBlocks = sectorsPerBlock == 512;
+      geometry.sectorsPerPage = hugeBlocks ? 8 : 4;
+      geometry.systemBlocks = hugeBlocks ? 256 : 512;
+      geometry.spareBlocks = hugeBlocks ? 16 : 32;
+      // Device size: the image rounded up to a power of two, at least 64 MiB (the kernel bugchecks below the system
+      // region).
+      const u64 dataBytes = std::max<u64>(geometry.sectorCount * SectorSize, 0x4000000);
+      const u32 log2Size = static_cast<u32>(std::bit_width(dataBytes - 1));
+      const u32 sizeHigh = std::min<u32>(log2Size - 24, 15);
+      geometry.config = (sizeHigh << 21) | (1u << 19) | (1u << 17) | (hugeBlocks ? 0x3030 : 0x3020);
+    } break;
+  }
 
-      // Get the command
-      memcpy(&command, data, size);
+  if (PARAM_sfcx_config.Present()) {
+    geometry.config = PARAM_sfcx_config.Get<u32>();
+    LOG_WARNING(SFCX, "CONFIG overridden to {:#010x}; the image layout is still treated as detected.", geometry.config);
+  }
+  return true;
+}
 
-      // This command has high priority.
-      if (command == PAGE_BUF_TO_REG) {
-        // If we're reading from Data Buffer to Data reg the Address reg becomes
-        // our buffer pointer
-        memcpy(&sfcxState.dataReg, &sfcxState.pageBuffer[sfcxState.addressReg], 4);
+void Xe::PCIDev::SFCX::LogImageInfo() {
+  if (geometry.emmc) {
+    LOG_INFO(SFCX, "eMMC image: {:#x} sectors ({} MiB), {} addressing.", geometry.sectorCount,
+             geometry.sectorCount / 2048, mmc.sectorAddressing ? "sector" : "byte");
+  } else {
+    static constexpr const char *layouts[] = {"small block", "big-on-small", "big block"};
+    LOG_INFO(SFCX,
+             "NAND image: {} (metadata type {}), {} blocks of {} KiB, {}-byte pages, FlashFs region {} blocks "
+             "({} spares).",
+             layouts[geometry.metaType], geometry.metaType, geometry.blockCount, geometry.sectorsPerBlock / 2,
+             geometry.sectorsPerPage * SectorSize, geometry.systemBlocks, geometry.spareBlocks);
+    LOG_INFO(SFCX, "FlashConfig: {:#010x}", geometry.config);
+  }
 
-#ifdef SFCX_DEBUG
-        LOG_DEBUG(SFCX, "PAGE_BUF_TO_REG[0x{:X}] = 0x{:X}", sfcxState.addressReg, sfcxState.dataReg);
-#endif // SFCX_DEBUG
+  const NandLayout::Header &header = nandHeader;
+  LOG_INFO(SFCX, " * NAND Magic: {:#x}", header.nandMagic);
+  LOG_INFO(SFCX, " * Build: {:#x}", header.build);
+  LOG_INFO(SFCX, " * QFE: {:#x}", header.qfe);
+  LOG_INFO(SFCX, " * Flags: {:#x}", header.flags);
+  LOG_INFO(SFCX, " * Entry: {:#x}", header.entry);
+  LOG_INFO(SFCX, " * Size: {:#x}", header.size);
+  LOG_INFO(SFCX, " * Keyvault Size: {:#x}", header.keyvaultSize);
+  LOG_INFO(SFCX, " * System Update Addr: {:#x}", header.sysUpdateAddr);
+  LOG_INFO(SFCX, " * System Update Count: {:#x}", header.sysUpdateCount);
+  LOG_INFO(SFCX, " * Keyvault Ver: {:#x}", header.keyvaultVer);
+  LOG_INFO(SFCX, " * Keyvault Addr: {:#x}", header.keyvaultAddr);
+  LOG_INFO(SFCX, " * System Update Size: {:#x}", header.sysUpdateSize);
+  LOG_INFO(SFCX, " * SMC Config Addr: {:#x}", header.smcConfigAddr);
+  LOG_INFO(SFCX, " * SMC Boot Size: {:#x}", header.smcBootSize);
+  LOG_INFO(SFCX, " * SMC Boot Addr: {:#x}", header.smcBootAddr);
 
-        // Increase buffer pointer
-        sfcxState.addressReg += 4;
+  u8 cbBytes[sizeof(NandLayout::BootloaderHeader)] = {};
+  const u32 cbaOffset = header.entry;
+  ReadFlashData(cbaOffset, cbBytes, sizeof(cbBytes));
+  const NandLayout::BootloaderHeader cba = NandLayout::ReadBootloaderHeader(cbBytes);
+  const u32 cbbOffset = cbaOffset + cba.length;
+  ReadFlashData(cbbOffset, cbBytes, sizeof(cbBytes));
+  const NandLayout::BootloaderHeader cbb = NandLayout::ReadBootloaderHeader(cbBytes);
 
-        command = NO_CMD;
-        // Reset status
-        sfcxState.statusReg &= ~STATUS_BUSY;
-      }
-
-      // Set command register
-      sfcxState.commandReg = command;
-
-      // Notify the SFCX thread if a command was received.
-      if (command != NO_CMD) { sfcxCV.notify_one(); }
-      break;
-    case SFCX_ADDRESS_REG: memcpy(&sfcxState.addressReg, data, size); break;
-    case SFCX_DATA_REG: memcpy(&sfcxState.dataReg, data, size); break;
-    case SFCX_LOGICAL_REG: memcpy(&sfcxState.logicalReg, data, size); break;
-    case SFCX_PHYSICAL_REG: memcpy(&sfcxState.physicalReg, data, size); break;
-    case SFCX_DATAPHYADDR_REG: memcpy(&sfcxState.dataPhysAddrReg, data, size); break;
-    case SFCX_SPAREPHYADDR_REG: memcpy(&sfcxState.sparePhysAddrReg, data, size); break;
-    case SFCX_MMC_ID_REG: memcpy(&sfcxState.mmcIDReg, data, size); break;
-    default: LOG_ERROR(SFCX, "Write from unknown register 0x{:X}", reg); break;
+  if (cba.name[0] == 'C' && cba.name[1] == 'B') {
+    LOG_INFO(SFCX, "Found CB(_A) Header at {:#x}: entry {:#x}, length {:#x}, build {}.", cbaOffset, cba.entryPoint,
+             cba.length, cba.buildNumber);
+  }
+  if (cbb.name[0] == 'C' && cbb.name[1] == 'B') {
+    LOG_INFO(SFCX, "Found CB(_B) Header at {:#x}: entry {:#x}, length {:#x}, build {}.", cbbOffset, cbb.entryPoint,
+             cbb.length, cbb.buildNumber);
+    // A second CB header right after the first makes it a split CB, whatever the builds (Jasper BB: 6754 + 6754).
+    LOG_INFO(SFCX, "Detected Split CB: CB_A {}, CB_B {}.", cba.buildNumber, cbb.buildNumber);
+  } else if (cba.name[0] == 'C' && cba.name[1] == 'B') {
+    LOG_INFO(SFCX, "Detected Unified CB, version {}.", cba.buildNumber);
   }
 }
-void Xe::PCIDev::SFCX::MemSet(u64 writeAddress, s32 data, u64 size) {
-  // Set a lock on registers
-  std::lock_guard lck(mutex);
 
-  const u16 reg = writeAddress & 0xFF;
+// Data view of the flash, what the memory-mapped window shows. NAND reads go through the controller's logical mapping
+// (bad blocks of the file-system region replaced by their spare blocks), anything outside it is physical.
+void Xe::PCIDev::SFCX::ReadFlashData(u64 offset, u8 *data, u64 size) {
+  if (geometry.emmc) {
+    image.Read(offset, data, size);
+    return;
+  }
+  while (size != 0) {
+    const u64 within = offset & (SectorSize - 1);
+    const u64 count = std::min<u64>(size, SectorSize - within);
+    u64 sector = offset / SectorSize;
+    u64 physical = sector;
+    u32 status = 0;
+    if (!remapCache.empty() && SfcxTranslate(sector, physical, status)) { sector = physical; }
+    image.Read(sector * RawSectorSize + within, data, count);
+    offset += count;
+    data += count;
+    size -= count;
+  }
+}
 
+// Register access
+
+void Xe::PCIDev::SFCX::RaiseInterrupt() {
+  if (parentBus) { parentBus->RouteInterrupt(PRIO_SFCX); }
+}
+
+void Xe::PCIDev::SFCX::Read(u64 barOffset, u8 *data, u64 size) {
+  if (!hasInitialised) {
+    memset(data, 0, size);
+    return;
+  }
+  const u32 offset = static_cast<u32>(barOffset & 0xFF);
+  bool raise = false;
+  {
+    std::lock_guard lock(mutex);
+    // The register file is 0x100 bytes and repeats over the BAR. Every register is read once per access, which matters
+    // for registers with read side effects (the MMC data port).
+    u64 done = 0;
+    for (u32 reg = offset & ~3u; done < size; reg = (reg + 4) & 0xFF) {
+      const u32 value = ReadRegister(reg);
+      const u32 lane = done == 0 ? offset & 3 : 0;
+      const u64 count = std::min<u64>(size - done, 4 - lane);
+      memcpy(data + done, reinterpret_cast<const u8 *>(&value) + lane, count);
+      done += count;
+    }
+    raise = raisePending;
+    raisePending = false;
+  }
+  if (raise) { RaiseInterrupt(); }
+}
+
+void Xe::PCIDev::SFCX::Write(u64 barOffset, const u8 *data, u64 size) {
+  if (!hasInitialised) { return; }
+  const u32 offset = static_cast<u32>(barOffset & 0xFF);
+  bool raise = false;
+  {
+    std::lock_guard lock(mutex);
+    if ((offset & 3) != 0 || (size != 4 && size != 8)) {
+      // The kernel only does aligned 32-bit accesses. Treat anything else as a write of the touched lanes.
+      LOG_WARNING(SFCX, "Unaligned/partial register write at {:#x} (size {})", offset, size);
+    }
+    u64 done = 0;
+    for (u32 reg = offset & ~3u; done < size; reg = (reg + 4) & 0xFF) {
+      u32 value = 0;
+      const u32 lane = done == 0 ? offset & 3 : 0;
+      const u64 count = std::min<u64>(size - done, 4 - lane);
+      memcpy(reinterpret_cast<u8 *>(&value) + lane, data + done, count);
+      WriteRegister(reg, value);
+      done += count;
+    }
+    raise = raisePending;
+    raisePending = false;
+  }
+  if (raise) { RaiseInterrupt(); }
+}
+
+u32 Xe::PCIDev::SFCX::ReadRegister(u32 reg) { return geometry.emmc ? MmcRead(reg) : SfcxRead(reg); }
+
+void Xe::PCIDev::SFCX::WriteRegister(u32 reg, u32 value) {
+  if (geometry.emmc) {
+    MmcWrite(reg, value);
+  } else {
+    SfcxWrite(reg, value);
+  }
+}
+
+// Memory-mapped flash window
+
+void Xe::PCIDev::SFCX::BarRead(u32 bar, u64 offset, u8 *data, u64 size) {
+  if (bar == 1) {
+    ReadRaw(offset, data, size);
+  } else {
+    Read(offset, data, size);
+  }
+}
+
+void Xe::PCIDev::SFCX::BarWrite(u32 bar, u64 offset, const u8 *data, u64 size) {
+  if (bar == 1) {
+    WriteRaw(offset, data, size);
+  } else {
+    Write(offset, data, size);
+  }
+}
+
+void Xe::PCIDev::SFCX::ReadRaw(u64 offset, u8 *data, u64 size) {
+  if (!hasInitialised) {
+    memset(data, 0xFF, size);
+    return;
+  }
+  std::lock_guard lock(mutex);
+  ReadFlashData(offset, data, size);
+}
+
+void Xe::PCIDev::SFCX::WriteRaw(u64 offset, const u8 *data, u64 size) {
+  std::lock_guard lock(mutex);
+  if (!windowWriteLogged) {
+    LOG_WARNING(SFCX, "Write to the read-only flash window at {:#x} ignored (flash is written through the controller).",
+                offset);
+    windowWriteLogged = true;
+  }
+}
+
+// NAND controller (SFCX)
+
+u32 Xe::PCIDev::SFCX::SfcxRead(u32 reg) {
   switch (reg) {
-    case SFCX_CONFIG_REG: memset(&sfcxState.configReg, data, size); break;
-    case SFCX_STATUS_REG: memset(&sfcxState.statusReg, data, size); break;
-    case SFCX_COMMAND_REG: memset(&sfcxState.commandReg, data, size); break;
-    case SFCX_ADDRESS_REG: memset(&sfcxState.addressReg, data, size); break;
-    case SFCX_DATA_REG: memset(&sfcxState.dataReg, data, size); break;
-    case SFCX_LOGICAL_REG: memset(&sfcxState.logicalReg, data, size); break;
-    case SFCX_PHYSICAL_REG: memset(&sfcxState.physicalReg, data, size); break;
-    case SFCX_DATAPHYADDR_REG: memset(&sfcxState.dataPhysAddrReg, data, size); break;
-    case SFCX_SPAREPHYADDR_REG: memset(&sfcxState.sparePhysAddrReg, data, size); break;
-    case SFCX_MMC_ID_REG: memset(&sfcxState.mmcIDReg, data, size); break;
-    default: LOG_ERROR(SFCX, "Write from unknown register 0x{:X}", reg); break;
+    case RegConfig: return sfcx.config;
+    case RegStatus: return sfcx.status;
+    case RegCommand: return sfcx.command;
+    case RegAddress: return sfcx.address;
+    case RegData: return sfcx.data;
+    case RegLogical: return sfcx.logical;
+    case RegPhysical: return sfcx.physical;
+    case RegDataPhysAddr: return sfcx.dataPhysAddr;
+    case RegMetaPhysAddr: return sfcx.metaPhysAddr;
+    case RegMmcPresent: return 0; // NAND controller: the kernel keeps the SFCX path
+    default: SFCX_DEBUGP("Read from unknown register {:#x}", reg); return 0;
   }
 }
 
-void Xe::PCIDev::SFCX::ReadRaw(u64 readAddress, u8* data, u64 size) {
-  u32 offset = static_cast<u32>(readAddress & 0xFFFFFF);
-  offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
-#ifdef NAND_DEBUG
-  LOG_DEBUG(SFCX, "Reading RAW data at 0x{:X} (offset 0x{:X}) for 0x{:X} bytes", readAddress, offset, size);
-#endif // NAND_DEBUG
-  mountedNANDImage->Read(offset, data, size);
-}
-
-void Xe::PCIDev::SFCX::WriteRaw(u64 writeAddress, const u8* data, u64 size) {
-  u32 offset = static_cast<u32>(writeAddress & 0xFFFFFF);
-  offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
-#ifdef NAND_DEBUG
-  LOG_DEBUG(SFCX, "Writing RAW data at 0x{:X} (offset 0x{:X}) for 0x{:X} bytes", writeAddress, offset, size);
-#endif // NAND_DEBUG
-
-  mountedNANDImage->Write(offset, reinterpret_cast<u8*>(&data), size);
-}
-
-void Xe::PCIDev::SFCX::MemSetRaw(u64 writeAddress, s32 data, u64 size) {
-  u32 offset = static_cast<u32>(writeAddress & 0xFFFFFF);
-  offset = 1 ? ((offset / 0x200) * 0x210) + offset % 0x200 : offset;
-#ifdef NAND_DEBUG
-  LOG_DEBUG(SFCX, "Setting RAW data at 0x{:X} to 0x{:X} (offset 0x{:X}) for 0x{:X} bytes", writeAddress, data, offset,
-            size);
-#endif // NAND_DEBUG
-  mountedNANDImage->Write(offset, reinterpret_cast<u8*>(&data), size);
-}
-
-void Xe::PCIDev::SFCX::ConfigWrite(u64 writeAddress, const u8* data, u64 size) {
-  const u8 offset = writeAddress & 0xFF;
-
-  // Check if we're being scanned
-  u64 tmp = 0;
-  memcpy(&tmp, data, size);
-  if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
-    const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
-    if (pciDevSizes[regOffset] != 0) {
-      if (tmp == 0xFFFFFFFF) { // PCI BAR Size discovery
-        u64 x = 2;
-        for (int idx = 2; idx < 31; idx++) {
-          tmp &= ~x;
-          x <<= 1;
-          if (x >= pciDevSizes[regOffset]) { break; }
-        }
-        tmp &= ~0x3;
+void Xe::PCIDev::SFCX::SfcxWrite(u32 reg, u32 value) {
+  switch (reg) {
+    case RegConfig: {
+      // Geometry bits are fixed by the part. The kernel only read-modify-writes the others.
+      constexpr u32 readOnly = ConfigSizeMask | ConfigTypeMask;
+      u32 config = (value & ~readOnly) | (sfcx.config & readOnly);
+      if (config & ConfigSoftReset) {
+        // Self-clearing controller reset.
+        sfcx.status = StatusPinNotBusy | StatusPinNotWriteProtected;
+        sfcx.unlock55 = sfcx.unlockAA = false;
+        sfcx.partialActive = false;
+        sfcx.pageBuffer.fill(0xFF);
+        config &= ~ConfigSoftReset;
       }
-    }
-    if (static_cast<u8>(writeAddress) == 0x30) { // Expansion ROM Base Address
-      tmp = 0; // Register not implemented
-    }
-  }
-
-  memcpy(&pciConfigSpace.data[offset], &tmp, size);
-}
-
-void Xe::PCIDev::SFCX::sfcxMainLoop() {
-  Base::SetCurrentThreadName("[Xe] SFCX");
-  sfcxThreadRunning = XeRunning;
-  // Config register should be initialized by now
-  while (sfcxThreadRunning) {
-    // Ensure we haven't shutdown elsewhere.
-    sfcxThreadRunning = XeRunning;
-    if (!sfcxThreadRunning) break;
-
-    // Wait for a command to arrive
-    {
-      std::unique_lock lck(mutex);
-      sfcxCV.wait_for(lck, std::chrono::milliseconds(100),
-                      [this] { return sfcxState.commandReg != NO_CMD || !sfcxThreadRunning; });
-    }
-
-    if (!sfcxThreadRunning) break;
-
-    // Did we got a command?
-    if (sfcxState.commandReg != NO_CMD) {
-      // Tracks whether we should fire an interrupt after releasing the lock.
-      bool shouldInterrupt = false;
-
-      // Scope the lock to command processing only
-      {
-        std::lock_guard lck(mutex);
-        // Check the command reg to see what command was issued
-        switch (sfcxState.commandReg) {
-          case PHY_PAGE_TO_BUF: sfcxReadPageFromNAND(true); break;
-          case LOG_PAGE_TO_BUF: sfcxReadPageFromNAND(false); break;
-          case DMA_LOG_TO_RAM: sfcxDoDMAfromNAND(false); break;
-          case DMA_PHY_TO_RAM: sfcxDoDMAfromNAND(true); break;
-          case DMA_RAM_TO_PHY: sfcxDoDMAtoNAND(); break;
-          case BLOCK_ERASE: sfcxEraseBlock(); break;
-          case UNLOCK_CMD_0: LOG_DEBUG(SFCX, "Performing unlock sequence for NAND write."); break;
-          case UNLOCK_CMD_1: break;
-          default:
-            LOG_ERROR(SFCX, "Unrecognized command was issued. 0x{:X}. Issuing interrupt if enabled.",
-                      sfcxState.commandReg);
-            break;
-        }
-
-        // Check if interrupt should be generated.
-        shouldInterrupt = (sfcxState.configReg & CONFIG_INT_EN) != 0;
-        if (shouldInterrupt) { sfcxState.statusReg |= STATUS_INT_CP; }
-
-        // Clear Command Register
-        sfcxState.commandReg = NO_CMD;
-
-        // Set Status to Ready again
-        sfcxState.statusReg &= ~STATUS_BUSY;
+      const bool enabled = !(sfcx.config & ConfigIntEnable) && (config & ConfigIntEnable);
+      sfcx.config = config;
+      // A completion latched while interrupts were off asserts the (level) line now.
+      if (enabled && (sfcx.status & StatusIntComplete)) { raisePending = true; }
+    } break;
+    case RegStatus:
+      // Write 1 to clear. The kernel writes back what it read.
+      sfcx.status &= ~(value & StatusLatchedMask);
+      // Level-sensitive line: still asserted if the guest left INT_CP set.
+      if ((sfcx.status & StatusIntComplete) && (sfcx.config & ConfigIntEnable)) { raisePending = true; }
+      break;
+    case RegCommand: {
+      sfcx.command = value;
+      const u8 command = static_cast<u8>(value);
+      switch (command) {
+        case CmdPageBufToReg:
+          // DATA <- page buffer[ADDRESS], ADDRESS += 4. Synchronous, no interrupt.
+          if (sfcx.address + 4 <= RawSectorSize) {
+            memcpy(&sfcx.data, &sfcx.pageBuffer[sfcx.address], 4);
+          } else {
+            sfcx.data = 0xFFFFFFFF;
+          }
+          sfcx.address += 4;
+          break;
+        case CmdRegToPageBuf:
+          // page buffer[ADDRESS] <- DATA, ADDRESS += 4. Synchronous, no interrupt.
+          if (sfcx.address + 4 <= RawSectorSize) { memcpy(&sfcx.pageBuffer[sfcx.address], &sfcx.data, 4); }
+          sfcx.address += 4;
+          break;
+        case CmdUnlock0: sfcx.unlock55 = true; break;
+        case CmdUnlock1: sfcx.unlockAA = true; break;
+        default: SfcxExecute(command); break;
       }
-
-      // Route interrupt outside the SFCX mutex to avoid the
-      // SFCX lock -> IIC lock dependency chain.
-      if (shouldInterrupt) { parentBus->RouteInterrupt(PRIO_SFCX); }
-    }
+    } break;
+    case RegAddress: sfcx.address = value; break;
+    case RegData: sfcx.data = value; break;
+    case RegLogical: sfcx.logical = value; break;
+    case RegPhysical: sfcx.physical = value; break;
+    case RegDataPhysAddr: sfcx.dataPhysAddr = value; break;
+    case RegMetaPhysAddr: sfcx.metaPhysAddr = value; break;
+    default: SFCX_DEBUGP("Write to unknown register {:#x} = {:#x}", reg, value); break;
   }
 }
 
-bool Xe::PCIDev::SFCX::checkMagic() {
-  char magic[2];
-
-  mountedNANDImage->Read(0, reinterpret_cast<u8*>(magic), sizeof(magic));
-
-  // Retail Nand Magic is 0xFF4F
-  // Devkit Nand Magic is 0x0F4F
-  // Older Devkit Nand's magic is 0x0F3F
-
-  if (magic[0] == (char)0xFF && magic[1] == (char)0x4F) {
-    LOG_INFO(SFCX, "Retail NAND Magic found.");
-    return true;
-  }
-  if (magic[0] == (char)0x0F && magic[1] == (char)0x4F) {
-    LOG_INFO(SFCX, "Devkit NAND Magic found.");
-    return true;
-  }
-  if (magic[0] == (char)0x0F && magic[1] == (char)0x3F) {
-    LOG_INFO(SFCX, "Old Devkit NAND Magic found.");
-    return true;
-  }
+// Program/erase need CONFIG write-enable and both unlock bytes since the previous command (the kernel sends 0x55,0xAA
+// before programs and 0xAA,0x55 before erases, libxenon does the same).
+bool Xe::PCIDev::SFCX::SfcxUnlocked() {
+  if ((sfcx.config & ConfigWriteEnable) && sfcx.unlock55 && sfcx.unlockAA) { return true; }
+  LOG_WARNING(SFCX, "Program/erase at {:#x} without write enable / unlock sequence (config {:#x}).", sfcx.address,
+              sfcx.config);
   return false;
 }
 
-void Xe::PCIDev::SFCX::sfcxReadPageFromNAND(bool physical) {
-  // Calculate NAND offset
-  u32 nandOffset = sfcxState.addressReg;
-  nandOffset
-    = 1 ? ((nandOffset / sfcxState.pageSize) * sfcxState.pageSizePhys) + nandOffset % sfcxState.pageSize : nandOffset;
-
-#ifdef SFCX_DEBUG
-  LOG_DEBUG(SFCX, "Reading Page[Physical = {:#d}] Logical address: 0x{:X}, Physical address: 0x{:X}", physical,
-            sfcxState.addressReg, nandOffset);
-#endif // SFCX_DEBUG
-
-  // Clear the page buffer
-  memset(sfcxState.pageBuffer, 0, sizeof(sfcxState.pageBuffer));
-
-  // Perform the read
-  mountedNANDImage->Read(nandOffset, reinterpret_cast<u8*>(&sfcxState.pageBuffer),
-                         physical ? sfcxState.pageSizePhys : sfcxState.pageSize);
+void Xe::PCIDev::SFCX::SfcxExecute(u8 command) {
+  const u64 sector = sfcx.address / SectorSize;
+  u32 result = 0;
+  switch (command) {
+    case CmdLogPageToBuf:
+    case CmdPhyPageToBuf:
+      result = SfcxReadSector(sector, command == CmdLogPageToBuf, sfcx.pageBuffer.data(), true);
+      break;
+    case CmdWritePageToPhy:
+      result = SfcxUnlocked() ? SfcxProgramSector(sector, sfcx.pageBuffer.data()) : StatusWriteError;
+      break;
+    case CmdBlockErase: result = SfcxUnlocked() ? SfcxEraseBlock(sector) : StatusWriteError; break;
+    case CmdDmaLogToRam:
+    case CmdDmaPhyToRam: result = SfcxDma(false, command == CmdDmaLogToRam); break;
+    case CmdDmaRamToPhy: result = SfcxUnlocked() ? SfcxDma(true, false) : StatusWriteError; break;
+    case CmdPartialFirst:
+    case CmdPartialNext:
+    case CmdPartialCommit: result = SfcxPartial(command); break;
+    default: LOG_ERROR(SFCX, "Unknown command {:#x} (address {:#x}).", command, sfcx.address); break;
+  }
+  SFCX_DEBUGP("Command {:#x} address {:#x} -> status bits {:#x}", command, sfcx.address, result);
+  sfcx.unlock55 = sfcx.unlockAA = false;
+  // Every command but the page-buffer transfers and the unlock bytes completes with INT_CP. The interrupt is level:
+  // asserted while INT_CP and INT_EN are both set.
+  sfcx.status = (sfcx.status & ~StatusBusy) | result | StatusIntComplete;
+  if (sfcx.config & ConfigIntEnable) { raisePending = true; }
 }
 
-void Xe::PCIDev::SFCX::sfcxEraseBlock() {
-  // Block address, or whatever the nand register is pointing to
-  u32 nandOffset = sfcxState.addressReg;
-  // Calculate offset for the starting page
-  nandOffset
-    = 1 ? ((nandOffset / sfcxState.pageSize) * sfcxState.pageSizePhys) + nandOffset % sfcxState.pageSize : nandOffset;
+bool Xe::PCIDev::SFCX::BlockIsGood(u32 block) {
+  u8 spare[SpareSize];
+  image.Read(static_cast<u64>(block) * geometry.sectorsPerBlock * RawSectorSize + SectorSize, spare, SpareSize);
+  // Bad-block marker: byte 0 on big block, byte 5 otherwise. 0xFF = good.
+  return (geometry.metaType == 2 ? spare[0] : spare[5]) == 0xFF;
+}
 
-#ifdef SFCX_DEBUG
-  LOG_DEBUG(SFCX, "Erasing page at logical address: 0x{:X}, physical address: 0x{:X}", sfcxState.addressReg,
-            nandOffset);
-#endif // SFCX_DEBUG
+u32 Xe::PCIDev::SFCX::BlockId(const u8 *spare) const {
+  return geometry.metaType == 0 ? spare[0] | ((spare[1] & 0xF) << 8) : spare[1] | ((spare[2] & 0xF) << 8);
+}
 
-  // Clear the page buffer
-  memset(sfcxState.pageBuffer, 0, sizeof(sfcxState.pageBuffer));
+// Bad blocks of the file-system region are replaced by spare blocks taken from the top of the region, and a spare
+// block's metadata names the logical block it stands for. Same scheme as the kernel's.
+s64 Xe::PCIDev::SFCX::SfcxTranslateBlock(u32 logicalBlock) {
+  s64 &entry = remapCache[logicalBlock];
+  if (entry != -2) { return entry; }
+  // Blocks past the end of a short dump read as erased. Nothing to replace there.
+  if (logicalBlock >= geometry.blockCount || BlockIsGood(logicalBlock)) { return entry = logicalBlock; }
+  for (u32 i = 0; i < geometry.spareBlocks; ++i) {
+    const u32 block = geometry.systemBlocks - 1 - i;
+    if (block >= geometry.blockCount || !BlockIsGood(block)) { continue; }
+    u8 spare[SpareSize];
+    image.Read(static_cast<u64>(block) * geometry.sectorsPerBlock * RawSectorSize + SectorSize, spare, SpareSize);
+    if (std::all_of(spare, spare + SpareSize, [](u8 b) { return b == 0xFF; })) { continue; }
+    if (BlockId(spare) == logicalBlock) { return entry = block; }
+  }
+  return entry = -1;
+}
 
-  // Perform the erase
-  u64 data = 0;
-  for (size_t idx = 0; idx <= sfcxState.blockSizePhys; idx += sizeof(u64)) {
-    mountedNANDImage->Write(nandOffset + idx, reinterpret_cast<u8*>(data), sizeof(u64));
+bool Xe::PCIDev::SFCX::SfcxTranslate(u64 logicalSector, u64 &physicalSector, u32 &status) {
+  const u64 logicalBlock = logicalSector / geometry.sectorsPerBlock;
+  if (logicalBlock >= remapCache.size()) {
+    status |= StatusIllegalLogical;
+    return false;
+  }
+  const s64 block = SfcxTranslateBlock(static_cast<u32>(logicalBlock));
+  if (block < 0) {
+    status |= StatusReplacementNotFound;
+    return false;
+  }
+  physicalSector = static_cast<u64>(block) * geometry.sectorsPerBlock + logicalSector % geometry.sectorsPerBlock;
+  return true;
+}
+
+void Xe::PCIDev::SFCX::SfcxInvalidateRemap(u64 sector) {
+  // Only the first sector of a block carries the bad-block marker and block id the translation looks at.
+  if (sector % geometry.sectorsPerBlock == 0 && sector / geometry.sectorsPerBlock < geometry.systemBlocks) {
+    std::fill(remapCache.begin(), remapCache.end(), -2);
   }
 }
 
-void Xe::PCIDev::SFCX::sfcxDoDMAfromNAND(bool physical) {
-  // Physical address when doing DMA
-  u32 physAddr = sfcxState.addressReg;
-  // Calculate Physical address offset for starting page
-  physAddr = 1 ? ((physAddr / sfcxState.pageSize) * sfcxState.pageSizePhys) + physAddr % sfcxState.pageSize : physAddr;
-
-  // Number of pages to be transfered when doing DMA
-  u32 dmaPagesNum = ((sfcxState.configReg & CONFIG_DMA_LEN) >> 6) + 1;
-
-  // Get RAM pointers for both buffers
-  u8* dataPhysAddrPtr = mainMemory->GetPointerToAddress(sfcxState.dataPhysAddrReg);
-  u8* sparePhysAddrPtr = nullptr;
-  if (physical) { sparePhysAddrPtr = mainMemory->GetPointerToAddress(sfcxState.sparePhysAddrReg); }
-
-#ifdef SFCX_DEBUG
-  LOG_DEBUG(SFCX,
-            "DMA_PHY_TO_RAM: Reading 0x{:X} pages. Logical Address: 0x{:X}, Physical Address: 0x{:X}, Data DMA "
-            "address: 0x{:X}, Spare DMA address: 0x{:X}",
-            dmaPagesNum, sfcxState.addressReg, physAddr, sfcxState.dataPhysAddrReg, sfcxState.sparePhysAddrReg);
-#endif // SFCX_DEBUG
-
-  // Read Pages to SFCX_DATAPHYADDR_REG and page sapre to SFCX_SPAREPHYADDR_REG
-  for (size_t pageNum = 0; pageNum < dmaPagesNum; pageNum++) {
-#ifdef SFCX_DEBUG
-    LOG_DEBUG(SFCX, "DMA_PHY_TO_RAM: Reading Page 0x{:X}. Physical Address: 0x{:X}", pageNum, physAddr);
-#endif // SFCX_DEBUG
-
-    // Clear the page buffer
-    memset(sfcxState.pageBuffer, 0, sizeof(sfcxState.pageBuffer));
-
-    // Get page data
-    mountedNANDImage->Read(physAddr, reinterpret_cast<u8*>(&sfcxState.pageBuffer), sfcxState.pageSizePhys);
-
-    // Write page and spare to RAM
-    // On DMA, physical pages are split into Page data and Spare Data, and stored at different locations in memory
-    memcpy(dataPhysAddrPtr, &sfcxState.pageBuffer, sfcxState.pageSize);
-    if (physical) { memcpy(sparePhysAddrPtr, &sfcxState.pageBuffer[sfcxState.pageSize], sfcxState.spareSize); }
-
-    // Increase buffer pointers
-    dataPhysAddrPtr += sfcxState.pageSize; // Logical page size
-    if (physical) {
-      sparePhysAddrPtr += sfcxState.spareSize; // Spare Size
+u32 Xe::PCIDev::SFCX::SfcxReadSector(u64 sector, bool logical, u8 *raw, bool updateTranslation) {
+  u32 status = 0;
+  u64 physical = sector;
+  if (logical) {
+    const bool mapped = SfcxTranslate(sector, physical, status);
+    if (updateTranslation) {
+      sfcx.logical = static_cast<u32>(sector * SectorSize);
+      sfcx.physical = mapped ? ((static_cast<u32>(physical * SectorSize) & PagePidMask) | PageValid) : 0;
     }
+    if (!mapped) {
+      // Unmapped logical page: the kernel's legacy reader returns zeros for it.
+      memset(raw, 0xFF, RawSectorSize);
+      return status;
+    }
+  }
+  if (physical >= geometry.sectorCount) {
+    memset(raw, 0xFF, RawSectorSize);
+    return status | StatusAddressError;
+  }
+  image.Read(physical * RawSectorSize, raw, RawSectorSize);
+  // ECC is not checked: dumps carry the controller's ECC and the kernel computes its own on writes.
+  return status;
+}
 
-    // Increase read address
-    physAddr += sfcxState.pageSizePhys;
+u32 Xe::PCIDev::SFCX::SfcxProgramSector(u64 sector, const u8 *raw) {
+  if (sector >= geometry.sectorCount) { return StatusAddressError | StatusWriteError; }
+  // NAND program: bits only go from 1 to 0 (the kernel always erases first).
+  const bool ok = image.Program(sector * RawSectorSize, raw, RawSectorSize);
+  SfcxInvalidateRemap(sector);
+  return ok ? 0 : StatusWriteError;
+}
+
+u32 Xe::PCIDev::SFCX::SfcxEraseBlock(u64 sector) {
+  const u64 first = sector - sector % geometry.sectorsPerBlock;
+  if (first >= geometry.sectorCount) { return StatusAddressError | StatusWriteError; }
+  SFCX_DEBUGP("Erasing block {:#x}", first / geometry.sectorsPerBlock);
+  // Erased NAND reads all ones, data and spare (bad marker 0xFF, sequence -1).
+  const bool ok = image.Fill(first * RawSectorSize, 0xFF, static_cast<u64>(geometry.sectorsPerBlock) * RawSectorSize);
+  SfcxInvalidateRemap(first);
+  return ok ? 0 : StatusWriteError;
+}
+
+// DMA between flash and RAM: CONFIG.DMA_LEN + 1 native pages (512/2048/4096 bytes), data at DataPhysAddr and 16 spare
+// bytes per sector at MetaPhysAddr (0 means no spare transfer, the kernel does that for logical reads).
+u32 Xe::PCIDev::SFCX::SfcxDma(bool toFlash, bool logical) {
+  const u32 pages = ((sfcx.config & ConfigDmaLenMask) >> ConfigDmaLenShift) + 1;
+  const u32 sectors = pages * geometry.sectorsPerPage;
+  const u64 first = sfcx.address / SectorSize;
+  const u64 dataBytes = static_cast<u64>(sectors) * SectorSize;
+  const u64 metaBytes = static_cast<u64>(sectors) * SpareSize;
+  const bool withSpare = sfcx.metaPhysAddr != 0;
+  if (!dma.Contains(sfcx.dataPhysAddr, dataBytes) || (withSpare && !dma.Contains(sfcx.metaPhysAddr, metaBytes))) {
+    LOG_ERROR(SFCX, "DMA outside guest memory (data {:#x}, spare {:#x}, {} sectors).", sfcx.dataPhysAddr,
+              sfcx.metaPhysAddr, sectors);
+    return StatusMasterAbort;
+  }
+
+  u32 status = 0;
+  std::array<u8, RawSectorSize> raw{};
+  for (u32 i = 0; i < sectors; ++i) {
+    // Both ranges were checked above.
+    const u32 dataAddress = sfcx.dataPhysAddr + i * SectorSize;
+    const u32 spareAddress = sfcx.metaPhysAddr + i * SpareSize;
+    if (toFlash) {
+      dma.Read(dataAddress, raw.data(), SectorSize);
+      if (withSpare) {
+        dma.Read(spareAddress, raw.data() + SectorSize, SpareSize);
+      } else {
+        memset(raw.data() + SectorSize, 0xFF, SpareSize);
+      }
+      status |= SfcxProgramSector(first + i, raw.data());
+    } else {
+      status |= SfcxReadSector(first + i, logical, raw.data(), i == 0);
+      dma.Write(dataAddress, raw.data(), SectorSize);
+      if (withSpare) { dma.Write(spareAddress, raw.data() + SectorSize, SpareSize); }
+    }
+  }
+  return status;
+}
+
+// Big page program: 0x10 starts a page with the 512+16 slice in the page buffer at ADDRESS, 0x11 adds a slice, 0x12
+// (after the unlock bytes) programs the slices.
+u32 Xe::PCIDev::SFCX::SfcxPartial(u8 command) {
+  const u32 sectorsPerPage = geometry.sectorsPerPage;
+  const u64 sector = sfcx.address / SectorSize;
+  const u64 pageSector = sector - sector % sectorsPerPage;
+
+  if (command == CmdPartialFirst) {
+    sfcx.partialPage.fill(0xFF);
+    sfcx.partialSlots = 0;
+    sfcx.partialPageSector = pageSector;
+    sfcx.partialActive = true;
+  }
+  if (command != CmdPartialCommit) {
+    if (!sfcx.partialActive || pageSector != sfcx.partialPageSector) {
+      LOG_WARNING(SFCX, "Partial program slice at {:#x} outside the open page.", sfcx.address);
+      return StatusAddressError;
+    }
+    const u64 slot = sector - pageSector;
+    memcpy(&sfcx.partialPage[slot * RawSectorSize], sfcx.pageBuffer.data(), RawSectorSize);
+    sfcx.partialSlots |= 1u << slot;
+    return 0;
+  }
+
+  if (!sfcx.partialActive) {
+    LOG_WARNING(SFCX, "Partial program commit without an open page.");
+    return StatusWriteError;
+  }
+  sfcx.partialActive = false;
+  if (!SfcxUnlocked()) { return StatusWriteError; }
+  u32 status = 0;
+  for (u32 slot = 0; slot < sectorsPerPage; ++slot) {
+    if (sfcx.partialSlots & (1u << slot)) {
+      status |= SfcxProgramSector(sfcx.partialPageSector + slot, &sfcx.partialPage[slot * RawSectorSize]);
+    }
+  }
+  return status;
+}
+
+// eMMC host (MMCX)
+
+void Xe::PCIDev::SFCX::MmcBuildExtCsd() {
+  mmc.extCsd.fill(0);
+  const u32 sectors = static_cast<u32>(std::min<u64>(geometry.sectorCount, 0xFFFFFFFFull));
+  mmc.extCsd[192] = 5;    // EXT_CSD_REV (eMMC 4.41)
+  mmc.extCsd[194] = 2;    // CSD_STRUCTURE
+  mmc.extCsd[196] = 0x07; // DEVICE_TYPE
+  // SEC_COUNT, little-endian: the kernel's sector count (must be >= 0x18000, the 48 MB system area).
+  memcpy(&mmc.extCsd[212], &sectors, sizeof(sectors));
+  mmc.extCsd[504] = 1; // S_CMD_SET
+}
+
+u32 Xe::PCIDev::SFCX::MmcPresentState() const {
+  // Card inserted, stable, detect, not write protected, DAT[3:0] and CMD lines high.
+  u32 state = 0x01FF0000;
+  if (mmc.pioActive) {
+    state |= 0x00000002;                            // DAT inhibit
+    state |= mmc.pioRead ? 0x00000A00 : 0x00000500; // read/write transfer active + buffer enable
+  }
+  return state;
+}
+
+u32 Xe::PCIDev::SFCX::MmcRead(u32 reg) {
+  switch (reg) {
+    case MmcRegSdmaAddress: return mmc.sdmaAddress;
+    case MmcRegBlockSizeCount: return mmc.blockSizeCount;
+    case MmcRegArgument: return mmc.argument;
+    case MmcRegTransferModeCommand: return mmc.transferModeCommand;
+    case MmcRegResponse0:
+    case MmcRegResponse0 + 4:
+    case MmcRegResponse0 + 8:
+    case MmcRegResponse0 + 12: return mmc.response[(reg - MmcRegResponse0) / 4];
+    case MmcRegBufferDataPort: {
+      // PIO read (the kernel reads one block per buffer-read-ready). Plain byte order.
+      if (!mmc.pioActive || !mmc.pioRead) { return 0xFFFFFFFF; }
+      u32 value = 0xFFFFFFFF;
+      if (mmc.pioPosition + 4 <= mmc.pioBuffer.size()) { memcpy(&value, &mmc.pioBuffer[mmc.pioPosition], 4); }
+      mmc.pioPosition += 4;
+      if (mmc.pioPosition % mmc.pioBlockSize == 0) {
+        if (mmc.pioPosition >= mmc.pioBuffer.size()) {
+          mmc.pioActive = false;
+          MmcSetStatus(MmcIntTransferComplete);
+        } else {
+          MmcSetStatus(MmcIntBufferReadReady);
+        }
+      }
+      return value;
+    }
+    case MmcRegPresentState: return MmcPresentState();
+    case MmcRegHostControl: return mmc.hostControl;
+    case MmcRegClockTimeoutReset: return mmc.clockTimeoutReset;
+    case MmcRegInterruptStatus: return mmc.interruptStatus;
+    case MmcRegInterruptStatusEnable: return mmc.interruptStatusEnable;
+    case MmcRegInterruptSignalEnable: return mmc.interruptSignalEnable;
+    case MmcRegHostControl2: return mmc.hostControl2;
+    case MmcRegCapabilities: return 0x01EC0080; // ADMA2, 8-bit bus, 3.3 V (not read by the kernel)
+    case MmcRegAdmaAddressLow: return mmc.admaAddressLow;
+    case MmcRegAdmaAddressHigh: return mmc.admaAddressHigh;
+    case MmcRegVendorControl:
+      return mmc.vendorControl | MmcVendorReady | (mmc.sectorAddressing ? MmcVendorSectorAddressing : 0);
+    case MmcRegHostVersion: return 0x00010000; // nonzero: the kernel takes this as an MMC console
+    default: return 0;
   }
 }
 
-void Xe::PCIDev::SFCX::sfcxDoDMAtoNAND() {
-  // Physical address when doing DMA
-  u32 physAddr = sfcxState.addressReg;
-  // Calculate Physical address offset for starting page
-  physAddr = 1 ? ((physAddr / sfcxState.pageSize) * sfcxState.pageSizePhys) + physAddr % sfcxState.pageSize : physAddr;
-
-  // Number of pages to be transfered when doing DMA
-  u32 dmaPagesNum = ((sfcxState.configReg & CONFIG_DMA_LEN) >> 6) + 1;
-
-  // Get RAM pointers for both buffers
-  u8* dataPhysAddrPtr = mainMemory->GetPointerToAddress(sfcxState.dataPhysAddrReg);
-  u8* sparePhysAddrPtr = mainMemory->GetPointerToAddress(sfcxState.sparePhysAddrReg);
-
-#ifdef SFCX_DEBUG
-  LOG_DEBUG(SFCX,
-            "DMA_RAM_TO_PHY: Writing 0x{:X} pages. Logical Address: 0x{:X}, Physical Address: 0x{:X}, Data DMA "
-            "address: 0x{:X}, Spare DMA address: 0x{:X}",
-            dmaPagesNum, sfcxState.addressReg, physAddr, sfcxState.dataPhysAddrReg, sfcxState.sparePhysAddrReg);
-#endif // SFCX_DEBUG
-
-  // Read Pages to SFCX_DATAPHYADDR_REG and page sapre to SFCX_SPAREPHYADDR_REG
-  for (size_t pageNum = 0; pageNum < dmaPagesNum; pageNum++) {
-#ifdef SFCX_DEBUG
-    LOG_DEBUG(SFCX, "DMA_RAM_TO_PHY: Writing page 0x{:X}. Physical Address: 0x{:X}", pageNum, physAddr);
-#endif // SFCX_DEBUG
-
-    // Clear the page buffer
-    memset(sfcxState.pageBuffer, 0, sizeof(sfcxState.pageBuffer));
-
-    // Write page and spare to NAND
-    // On DMA, physical pages are split into Page data and Spare Data, and stored at different locations in memory
-    mountedNANDImage->Write(physAddr, dataPhysAddrPtr, sfcxState.pageSize);
-    mountedNANDImage->Write(physAddr + sfcxState.pageSize, sparePhysAddrPtr, sfcxState.spareSize);
-
-    // Increase buffer pointers
-    dataPhysAddrPtr += sfcxState.pageSize; // Logical page size
-    sparePhysAddrPtr += sfcxState.spareSize; // Spare Size
-
-    // Increase read address
-    physAddr += sfcxState.pageSizePhys;
+void Xe::PCIDev::SFCX::MmcWrite(u32 reg, u32 value) {
+  switch (reg) {
+    case MmcRegSdmaAddress: mmc.sdmaAddress = value; break;
+    case MmcRegBlockSizeCount: mmc.blockSizeCount = value; break;
+    case MmcRegArgument: mmc.argument = value; break;
+    case MmcRegTransferModeCommand: MmcCommand(value); break;
+    case MmcRegBufferDataPort: {
+      // PIO write, one block per buffer-write-ready.
+      if (!mmc.pioActive || mmc.pioRead) { break; }
+      if (mmc.pioPosition + 4 <= mmc.pioBuffer.size()) { memcpy(&mmc.pioBuffer[mmc.pioPosition], &value, 4); }
+      mmc.pioPosition += 4;
+      if (mmc.pioPosition % mmc.pioBlockSize == 0) {
+        const u32 blockStart = mmc.pioPosition - mmc.pioBlockSize;
+        image.Write(mmc.pioByteOffset + blockStart, &mmc.pioBuffer[blockStart], mmc.pioBlockSize);
+        if (mmc.pioPosition >= mmc.pioBuffer.size()) {
+          mmc.pioActive = false;
+          MmcSetStatus(MmcIntTransferComplete);
+        } else {
+          MmcSetStatus(MmcIntBufferWriteReady);
+        }
+      }
+    } break;
+    case MmcRegHostControl: mmc.hostControl = value; break;
+    case MmcRegClockTimeoutReset: {
+      u32 clock = value & 0x00FFFFFF;
+      // Internal clock stable follows internal clock enable.
+      clock = (clock & ~0x2u) | ((clock & 0x1u) << 1);
+      mmc.clockTimeoutReset = clock;
+      // Software reset bits (24 all, 25 CMD line, 26 DAT line) complete immediately and read back as 0.
+      if (value & 0x07000000) { MmcSoftwareReset(value & 0x07000000); }
+    } break;
+    case MmcRegInterruptStatus:
+      mmc.interruptStatus &= ~value;
+      if ((mmc.interruptStatus & 0xFFFF0000) == 0) { mmc.interruptStatus &= ~MmcIntError; }
+      // Level line: re-assert while anything is still pending.
+      if (mmc.interruptStatus != 0) { raisePending = true; }
+      break;
+    case MmcRegInterruptStatusEnable: mmc.interruptStatusEnable = value; break;
+    case MmcRegInterruptSignalEnable: mmc.interruptSignalEnable = value; break;
+    case MmcRegHostControl2: mmc.hostControl2 = value; break;
+    case MmcRegAdmaAddressLow: mmc.admaAddressLow = value; break;
+    case MmcRegAdmaAddressHigh: mmc.admaAddressHigh = value; break;
+    case MmcRegVendorControl: mmc.vendorControl = value & ~(MmcVendorReady | MmcVendorSectorAddressing); break;
+    default: break;
   }
+}
+
+// Status bits are latched whatever the enable registers say, the kernel never programs them. The line is asserted when
+// the status goes from clear to pending.
+void Xe::PCIDev::SFCX::MmcSetStatus(u32 bits) {
+  const u32 previous = mmc.interruptStatus;
+  mmc.interruptStatus |= bits;
+  if (bits & 0xFFFF0000) { mmc.interruptStatus |= MmcIntError; }
+  if (previous == 0 && mmc.interruptStatus != 0) { raisePending = true; }
+}
+
+void Xe::PCIDev::SFCX::MmcSoftwareReset(u32 bits) {
+  if (bits & 0x01000000) {
+    // Reset all: command/data state and interrupt status. The card keeps its contents.
+    mmc.interruptStatus = 0;
+    mmc.response[0] = mmc.response[1] = mmc.response[2] = mmc.response[3] = 0;
+    mmc.blockSizeCount = 0;
+    mmc.blockCountFromCmd23 = 0;
+    mmc.hostControl = 0;
+    mmc.clockTimeoutReset = 0;
+    mmc.pioActive = false;
+  }
+  if (bits & 0x04000000) { mmc.pioActive = false; }
+}
+
+// ADMA2: 8-byte descriptors {attr | length << 16, address}, little-endian. attr bit 0 is valid, bit 1 end, bits 4-5 the
+// action (2 transfer, 3 link).
+bool Xe::PCIDev::SFCX::MmcAdmaTransfer(u8 *buffer, u64 length, bool toHost) {
+  u32 table = mmc.admaAddressLow;
+  u64 done = 0;
+  for (u32 guard = 0; guard < 0x1000 && done < length; ++guard) {
+    const u8 *descriptor = dma.ReadPointer(table, 8);
+    if (!descriptor) { return false; }
+    const u32 attributes = Xe::PCI::LoadLe32(descriptor);
+    const u32 address = Xe::PCI::LoadLe32(descriptor + 4);
+    if (!(attributes & 1)) { return false; }
+    const u32 action = (attributes >> 4) & 3;
+    if (action == 3) {
+      table = address;
+      continue;
+    }
+    if (action == 2) {
+      u64 count = attributes >> 16;
+      if (count == 0) { count = 0x10000; }
+      count = std::min(count, length - done);
+      if (!(toHost ? dma.Write(address, buffer + done, count) : dma.Read(address, buffer + done, count))) {
+        return false;
+      }
+      done += count;
+    }
+    if (attributes & 2) { break; }
+    table += 8;
+  }
+  return done == length;
+}
+
+// TRANSFER_MODE | COMMAND << 16: command index bits 24-29, response type 16-17, data present 21. Transfer mode: 0x01
+// DMA, 0x02 block count, 0x04 auto CMD12, 0x10 read, 0x20 multi-block. The command completes immediately: CMD_COMPLETE
+// plus TRANSFER_COMPLETE (ADMA) or the first buffer-ready (PIO).
+void Xe::PCIDev::SFCX::MmcCommand(u32 transferModeCommand) {
+  mmc.transferModeCommand = transferModeCommand;
+  const u32 index = (transferModeCommand >> 24) & 0x3F;
+  const bool dataPresent = transferModeCommand & 0x00200000;
+  const bool useDma = transferModeCommand & 0x01;
+  const bool multiBlock = transferModeCommand & 0x20;
+  const u32 argument = mmc.argument;
+
+  mmc.response[0] = MmcCardStatusTran;
+  mmc.response[1] = mmc.response[2] = mmc.response[3] = 0;
+  u32 status = MmcIntCommandComplete;
+
+  switch (index) {
+    case 0: // GO_IDLE_STATE
+      mmc.response[0] = 0;
+      mmc.blockCountFromCmd23 = 0;
+      break;
+    case 1: // SEND_OP_COND: OCR, ready, access mode
+      mmc.response[0] = mmc.sectorAddressing ? 0xC0FF8080 : 0x80FF8080;
+      break;
+    case 2:  // ALL_SEND_CID
+    case 9:  // SEND_CSD
+    case 10: // SEND_CID
+      mmc.response[0] = 0x00000000;
+      mmc.response[1] = 0x00000000;
+      mmc.response[2] = 0x00000000;
+      mmc.response[3] = 0x00150100;
+      break;
+    case 23: // SET_BLOCK_COUNT
+      mmc.blockCountFromCmd23 = argument & 0xFFFF;
+      break;
+    default: // CMD3/6/7/12/13 ...: R1 / R1b, card in tran state
+      break;
+  }
+
+  if (dataPresent) {
+    const bool isRead =
+      index == 8 || index == 17 || index == 18 || (index != 24 && index != 25 && (transferModeCommand & 0x10));
+    u32 blockSize = mmc.blockSizeCount & 0xFFF;
+    if (blockSize == 0) { blockSize = 512; }
+    u32 blockCount = 1;
+    if (multiBlock) {
+      blockCount = (transferModeCommand & 0x02) ? (mmc.blockSizeCount >> 16) : mmc.blockCountFromCmd23;
+      if (blockCount == 0) { blockCount = mmc.blockCountFromCmd23 ? mmc.blockCountFromCmd23 : 1; }
+    }
+    const u64 length = static_cast<u64>(blockSize) * blockCount;
+
+    std::vector<u8> buffer(length, 0xFF);
+    u64 byteOffset = 0;
+    bool rangeOk = true;
+    if (index == 8) {
+      // SEND_EXT_CSD (PIO, 512 bytes)
+      memcpy(buffer.data(), mmc.extCsd.data(), std::min<u64>(length, mmc.extCsd.size()));
+    } else {
+      // Sector-addressed parts take a sector number, byte-addressed ones a byte offset.
+      const u64 sector = mmc.sectorAddressing ? argument : argument / SectorSize;
+      byteOffset = sector * SectorSize;
+      rangeOk = byteOffset + length <= image.Size();
+      if (isRead) { image.Read(byteOffset, buffer.data(), length); }
+    }
+    mmc.blockCountFromCmd23 = 0;
+
+    if (!rangeOk && !isRead) {
+      LOG_ERROR(SFCX, "MMC write past the end of the image ({:#x} + {:#x}).", byteOffset, length);
+      status |= MmcIntDataTimeoutError;
+    } else if (useDma) {
+      if (MmcAdmaTransfer(buffer.data(), length, isRead)) {
+        if (!isRead) { image.Write(byteOffset, buffer.data(), length); }
+        status |= MmcIntTransferComplete;
+      } else {
+        LOG_ERROR(SFCX, "MMC ADMA error (descriptor table {:#x}).", mmc.admaAddressLow);
+        status |= MmcIntAdmaError;
+      }
+    } else {
+      mmc.pioActive = true;
+      mmc.pioRead = isRead;
+      mmc.pioBlockSize = blockSize;
+      mmc.pioPosition = 0;
+      mmc.pioByteOffset = byteOffset;
+      mmc.pioBuffer = std::move(buffer);
+      status |= isRead ? MmcIntBufferReadReady : MmcIntBufferWriteReady;
+    }
+  }
+  SFCX_DEBUGP("MMC CMD{} arg {:#x} mode/cmd {:#x} -> status {:#x}", index, argument, transferModeCommand, status);
+  MmcSetStatus(status);
 }
