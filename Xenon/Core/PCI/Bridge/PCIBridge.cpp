@@ -1,807 +1,456 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
-#include "Base/Logging/Log.h"
-#include "Base/Global.h"
-
 #include "PCIBridge.h"
-#include "PCIBridgeConfig.h"
 
-// Device tree, taken from an actual system, Corona V6.
-/*
-      BUS0
-      -Dev 0, Func 0: Microsoft Corp. XMA Decoder
-      -Dev 1, Func 0: Microsoft Corp. SATA Controller - CDROM
-      -Dev 2, Func 0: Microsoft Corp. SATA Controller - HDD
-      -Dev 4, Func 0: Microsoft Corp. OHCI Controller 0
-      -Dev 4, Func 1: Microsoft Corp. EHCI Controller 0
-      -Dev 5, Func 0: Microsoft Corp. OHCI Controller 1
-      -Dev 5, Func 1: Microsoft Corp. EHCI Controller 1
-      -Dev 7, Func 0: Microsoft Corp. Fast Ethernet Adapter
-      -Dev 8, Func 0: Microsoft Corp. Secure Flash Controller
-      -Dev 9, Func 0: Microsoft Corp. 580C
-      -Dev A, Func 0: Microsoft Corp. System Management Controller
-      -Dev F, Func 0: Microsoft Corp. 5841
-*/
+#include "Base/Global.h"
+#include "Base/Logging/Log.h"
+#include "Core/PCI/Bridge/NorthbridgeRegisters.h"
+#include "Core/PCI/Bridge/PCIBridgeConfig.h"
+#include "Core/PCI/PCIBar.h"
 
-#define XMA_DEV_NUM 0x0
-#define CDROM_DEV_NUM 0x1
-#define HDD_DEV_NUM 0x2
-#define OHCI0_DEV_NUM 0x4
-#define EHCI0_DEV_NUM 0x4
-#define OHCI1_DEV_NUM 0x5
-#define EHCI1_DEV_NUM 0x5
-#define FAST_ETH_DEV_NUM 0x7
-#define SFC_DEV_NUM 0x8
-#define AUDIO_CTRLR_DEV_NUM 0x9
-#define SMC_DEV_NUM 0xA
-#define _5841_DEV_NUM 0xF
+#include <algorithm>
+#include <bit>
+#include <thread>
+#include <vector>
+
+using Xe::PCI::FillInChunks;
+using Xe::PCI::ForEachDwordLane;
+
+// Interrupt controller registers.
+constexpr u32 kRegControl = 0x00;
+constexpr u32 kRegConfig = 0x04;
+constexpr u32 kRegSourceMask = 0x0C;
+constexpr u32 kRegRoute0 = 0x10;
+
+// True if offset is a register the bridge models. The others just read back what was written.
+static constexpr bool IsModelledRegister(u32 offset, u32 numSources) {
+  return offset == kRegControl || offset == kRegConfig || offset == kRegSourceMask
+         || (offset >= kRegRoute0 && offset < kRegRoute0 + 4 * numSources);
+}
 
 PCIBridge::PCIBridge() {
-  // Set config registers
-  u8 i = 0;
-  for (u16 idx = 0; idx < 256; idx += 4) {
-    memcpy(&pciBridgeConfigSpace[idx], &pciBridgeConfigMap[i], 4);
-    i++;
-  }
+  // The header the way a running console has it (HWINIT and the kernel program the same bus numbers and BAR0).
+  for (u32 i = 0; i != 64; ++i) { header.SetDword(i * 4, kPciBridgeConfigMap[i]); }
 
-  pciBridgeConfig.configSpaceHeader.reg0.hexData = pciBridgeConfigMap[0];
-  pciBridgeConfig.configSpaceHeader.reg1.hexData = pciBridgeConfigMap[1];
-  pciBridgeConfig.configSpaceHeader.reg2.hexData = pciBridgeConfigMap[2];
-  pciBridgeConfig.configSpaceHeader.reg3.hexData = pciBridgeConfigMap[3];
-  pciBridgeConfig.configSpaceHeader.BAR0 = pciBridgeConfigMap[4];
-  pciBridgeConfig.configSpaceHeader.BAR1 = pciBridgeConfigMap[5];
-  pciBridgeConfig.configSpaceHeader.reg6.hexData = pciBridgeConfigMap[6];
-  pciBridgeConfig.configSpaceHeader.reg7.hexData = pciBridgeConfigMap[7];
-  pciBridgeConfig.configSpaceHeader.reg8.hexData = pciBridgeConfigMap[8];
-  pciBridgeConfig.configSpaceHeader.reg9.hexData = pciBridgeConfigMap[9];
-  pciBridgeConfig.configSpaceHeader.prefetchableBaseUpper32Bits =
-      pciBridgeConfigMap[0xA];
-  pciBridgeConfig.configSpaceHeader.prefetchableLimitUpper32Bits =
-      pciBridgeConfigMap[0xB];
-  pciBridgeConfig.configSpaceHeader.regC.hexData = pciBridgeConfigMap[0xC];
-  pciBridgeConfig.configSpaceHeader.regD.hexData = pciBridgeConfigMap[0xD];
-  pciBridgeConfig.configSpaceHeader.expansionROMBaseAddress =
-      pciBridgeConfigMap[0xE];
-  pciBridgeConfig.configSpaceHeader.regF.hexData = pciBridgeConfigMap[0xF];
-
-  // PCI Bridge Config regs
-  pciBridgeState.REG_EA00000C = 0x7CFF; // Software writes here to enable interrupts (Bus IRQL)
-
-  // Set Revision based on system config.
+  // Revision depends on the board. The kernel picks the EHCI/SATA PHY setup off it, and Trinity vs Corona too: below
+  // 0x70 is Trinity (Panda SB), 0x80 and up has Corona (Koala SB) PHYs.
+  u8 revision = 0x60;
   switch (Config::highlyExperimental.consoleRevison) {
-  case Config::eConsoleRevision::Xenon:
-    pciBridgeConfig.configSpaceHeader.reg2.revID = 0x2;
-    break;
-  case Config::eConsoleRevision::Zephyr:
-  case Config::eConsoleRevision::Falcon:
-  case Config::eConsoleRevision::Jasper:
-  case Config::eConsoleRevision::Trinity:
-    pciBridgeConfig.configSpaceHeader.reg2.revID = 0x60;
-    break;
-  case Config::eConsoleRevision::Corona:
-  case Config::eConsoleRevision::Corona4GB:
-  case Config::eConsoleRevision::Winchester:
-    pciBridgeConfig.configSpaceHeader.reg2.revID = 0x90;
-    break;
+    case Config::eConsoleRevision::Xenon: revision = 0x02; break;
+    case Config::eConsoleRevision::Zephyr:
+    case Config::eConsoleRevision::Falcon:
+    case Config::eConsoleRevision::Jasper:
+    case Config::eConsoleRevision::Trinity: revision = 0x60; break;
+    case Config::eConsoleRevision::Corona:
+    case Config::eConsoleRevision::Corona4GB:
+    case Config::eConsoleRevision::Winchester: revision = 0x90; break;
   }
+  header.bytes[Xe::PCI::ConfigRevisionId] = revision;
+  revisionId = revision;
+
+  // Nothing is masked until the guest programs the controller (the kernel masks everything at init, Linux
+  // unmasks it all).
+  RebuildDecode();
 }
 
 PCIBridge::~PCIBridge() {
-  for (auto &[name, dev] : connectedPCIDevices) {
-    dev.reset();
-  }
-  connectedPCIDevices.clear();
+  for (auto &slot : slots) { slot.reset(); }
 }
 
-void PCIBridge::RegisterIIC(Xe::XCPU::XenonIIC *xenonIICPtr) {
-  xenonIIC = xenonIICPtr;
-}
+void PCIBridge::RegisterIIC(Xe::XCPU::XenonIIC *xenonIICPtr) { xenonIIC = xenonIICPtr; }
 
-bool PCIBridge::RouteInterrupt(u8 prio, u8 targetCPU) {
-  MICROPROFILE_SCOPEI("[Xe::PCI]", "PCIBridge::RouteInterrupt", MP_AUTO);
-  switch (prio) {
-  case PRIO_CLOCK:
-    if (pciBridgeState.PRIO_REG_CLCK.intEnabled) {
-      xenonIIC->generateInterrupt(PRIO_CLOCK,
-        pciBridgeState.PRIO_REG_CLCK.targetCPU);
-    }
-    break;
-  case PRIO_SATA_ODD:
-    if (pciBridgeState.PRIO_REG_ODD.intEnabled) {
-      xenonIIC->generateInterrupt(PRIO_SATA_ODD,
-        pciBridgeState.PRIO_REG_ODD.targetCPU);
-    }
-    break;
-  case PRIO_SATA_HDD:
-    if (pciBridgeState.PRIO_REG_HDD.intEnabled) {
-      xenonIIC->generateInterrupt(PRIO_SATA_HDD,
-        pciBridgeState.PRIO_REG_HDD.targetCPU);
-    }
-    break;
-  case PRIO_SMM:
-    if (pciBridgeState.PRIO_REG_SMM.intEnabled) {
-      xenonIIC->generateInterrupt(PRIO_SMM,
-        pciBridgeState.PRIO_REG_SMM.targetCPU);
-    }
-    break;
-  case PRIO_OHCI_0:
-    if (pciBridgeState.PRIO_REG_OHCI0.intEnabled) {
-      xenonIIC->generateInterrupt(PRIO_OHCI_0,
-        pciBridgeState.PRIO_REG_OHCI0.targetCPU);
-    }
-    break;
-  case PRIO_OHCI_1:
-    if (pciBridgeState.PRIO_REG_OHCI1.intEnabled) {
-      xenonIIC->generateInterrupt(PRIO_OHCI_1,
-        pciBridgeState.PRIO_REG_OHCI1.targetCPU);
-    }
-    break;
-  case PRIO_EHCI_0:
-    if (pciBridgeState.PRIO_REG_EHCI0.intEnabled) {
-      xenonIIC->generateInterrupt(PRIO_EHCI_0,
-        pciBridgeState.PRIO_REG_EHCI0.targetCPU);
-    }
-    break;
-  case PRIO_EHCI_1:
-    if (pciBridgeState.PRIO_REG_EHCI1.intEnabled) {
-      xenonIIC->generateInterrupt(PRIO_EHCI_1,
-        pciBridgeState.PRIO_REG_EHCI1.targetCPU);
-    }
-    break;
-  case PRIO_XMA:
-    if (pciBridgeState.PRIO_REG_XMA.intEnabled) {
-      xenonIIC->generateInterrupt(PRIO_XMA,
-        pciBridgeState.PRIO_REG_XMA.targetCPU);
-    }
-    break;
-  case PRIO_AUDIO:
-    if (pciBridgeState.PRIO_REG_AUDIO.intEnabled) {
-      xenonIIC->generateInterrupt(PRIO_AUDIO,
-        pciBridgeState.PRIO_REG_AUDIO.targetCPU);
-    }
-    break;
-  case PRIO_ENET:
-    if (pciBridgeState.PRIO_REG_ENET.intEnabled) {
-      xenonIIC->generateInterrupt(PRIO_ENET,
-        pciBridgeState.PRIO_REG_ENET.targetCPU);
-    }
-    break;
-  case PRIO_GRAPHICS:
-    if (targetCPU != 0xFF) {
-      xenonIIC->generateInterrupt(PRIO_GRAPHICS, targetCPU);
-    } else {
-      LOG_ERROR(PCIBridge, "Routing GFX interrupt without target CPU index.");
-    }
-    break;
-  case PRIO_XPS:
-    if (targetCPU != 0xFF) {
-      xenonIIC->generateInterrupt(PRIO_XPS, targetCPU);
-    }
-    else {
-      LOG_ERROR(PCIBridge, "Routing GFX interrupt without target CPU index.");
-    }
-    break;
-  case PRIO_SFCX:
-    if (pciBridgeState.PRIO_REG_SFCX.intEnabled) {
-      xenonIIC->generateInterrupt(PRIO_SFCX,
-        pciBridgeState.PRIO_REG_SFCX.targetCPU);
-    }
-    break;
-  default:
-    LOG_ERROR(PCIBridge, "Unknown interrupt being routed: 0x{:X}", prio);
-    break;
-  }
-  return false;
-}
+// Devices
 
-void PCIBridge::CancelInterrupt(u8 prio) {
-  switch (prio) {
-  case PRIO_CLOCK:
-    if (pciBridgeState.PRIO_REG_CLCK.intEnabled) {
-      xenonIIC->cancelInterrupt(PRIO_CLOCK,
-        pciBridgeState.PRIO_REG_CLCK.targetCPU);
-    }
-    break;
-  case PRIO_SATA_ODD:
-    if (pciBridgeState.PRIO_REG_ODD.intEnabled) {
-      xenonIIC->cancelInterrupt(PRIO_SATA_ODD,
-        pciBridgeState.PRIO_REG_ODD.targetCPU);
-    }
-    break;
-  case PRIO_SATA_HDD:
-    if (pciBridgeState.PRIO_REG_HDD.intEnabled) {
-      xenonIIC->cancelInterrupt(PRIO_SATA_HDD,
-        pciBridgeState.PRIO_REG_HDD.targetCPU);
-    }
-    break;
-  case PRIO_SMM:
-    if (pciBridgeState.PRIO_REG_SMM.intEnabled) {
-      xenonIIC->cancelInterrupt(PRIO_SMM,
-        pciBridgeState.PRIO_REG_SMM.targetCPU);
-    }
-    break;
-  case PRIO_OHCI_0:
-    if (pciBridgeState.PRIO_REG_OHCI0.intEnabled) {
-      xenonIIC->cancelInterrupt(PRIO_OHCI_0,
-        pciBridgeState.PRIO_REG_OHCI0.targetCPU);
-    }
-    break;
-  case PRIO_OHCI_1:
-    if (pciBridgeState.PRIO_REG_OHCI1.intEnabled) {
-      xenonIIC->cancelInterrupt(PRIO_OHCI_1,
-        pciBridgeState.PRIO_REG_OHCI1.targetCPU);
-    }
-    break;
-  case PRIO_EHCI_0:
-    if (pciBridgeState.PRIO_REG_EHCI0.intEnabled) {
-      xenonIIC->cancelInterrupt(PRIO_EHCI_0,
-        pciBridgeState.PRIO_REG_EHCI0.targetCPU);
-    }
-    break;
-  case PRIO_EHCI_1:
-    if (pciBridgeState.PRIO_REG_EHCI1.intEnabled) {
-      xenonIIC->cancelInterrupt(PRIO_EHCI_1,
-        pciBridgeState.PRIO_REG_EHCI1.targetCPU);
-    }
-    break;
-  case PRIO_XMA:
-    if (pciBridgeState.PRIO_REG_XMA.intEnabled) {
-      xenonIIC->cancelInterrupt(PRIO_XMA,
-        pciBridgeState.PRIO_REG_XMA.targetCPU);
-    }
-    break;
-  case PRIO_AUDIO:
-    if (pciBridgeState.PRIO_REG_AUDIO.intEnabled) {
-      xenonIIC->cancelInterrupt(PRIO_AUDIO,
-        pciBridgeState.PRIO_REG_AUDIO.targetCPU);
-    }
-    break;
-  case PRIO_ENET:
-    if (pciBridgeState.PRIO_REG_ENET.intEnabled) {
-      xenonIIC->cancelInterrupt(PRIO_ENET,
-        pciBridgeState.PRIO_REG_ENET.targetCPU);
-    }
-    break;
-  case PRIO_GRAPHICS:
-    if (pciBridgeState.PRIO_REG_GRAPHICS.intEnabled) {
-      xenonIIC->cancelInterrupt(PRIO_GRAPHICS,
-        pciBridgeState.PRIO_REG_GRAPHICS.targetCPU);
-    }
-    break;
-  case PRIO_SFCX:
-    if (pciBridgeState.PRIO_REG_SFCX.intEnabled) {
-      xenonIIC->cancelInterrupt(PRIO_SFCX,
-        pciBridgeState.PRIO_REG_SFCX.targetCPU);
-    }
-    break;
-  default:
-    LOG_ERROR(PCIBridge, "Unknown interrupt being cancelled: 0x{:X}", prio);
-    break;
-  }
-}
-
-bool PCIBridge::IsAddressMappedinBAR(u32 address) {
-  u32 bar0 = pciBridgeConfig.configSpaceHeader.BAR0;
-  u32 bar1 = pciBridgeConfig.configSpaceHeader.BAR1;
-
-  if ((address >= bar0 && address < (bar0 + PCI_BRIDGE_SIZE)) ||
-      (address >= bar1 && address < (bar1 + PCI_BRIDGE_SIZE))) {
-    return true;
-  }
-
-  return false;
-}
-
-void PCIBridge::AddPCIDevice(std::shared_ptr<PCIDevice> device) {
-  if (!device.get()) {
+void PCIBridge::AddPCIDevice(std::shared_ptr<PCIDevice> device, u8 deviceNumber, u8 function) {
+  if (!device || deviceNumber >= 32 || function >= 8) {
     LOG_CRITICAL(PCIBridge, "Failed to attach a device!");
     return;
   }
-
-  LOG_INFO(PCIBridge, "Attached: {}", device->GetDeviceName());
-
-  connectedPCIDevices.insert({ device->GetDeviceName(), device });
+  std::lock_guard lock(configMutex);
+  auto &slot = slots[deviceNumber * 8 + function];
+  // Where a platform reset puts the config space back to, before the guest's BARs are carried over.
+  device->SavePowerOnConfig();
+  if (slot && slot != device) {
+    // Same slot, new object: keep what the guest assigned.
+    device->SetCommand(slot->GetCommand());
+    for (u32 bar = 0; bar != Xe::PCI::ConfigBarCount; ++bar) {
+      device->SetBar(bar, Xe::PCI::BarLatch(device->GetBar(bar), slot->GetBar(bar), device->BarSize(bar)));
+    }
+    LOG_INFO(PCIBridge, "Replaced 1:{:X}.{} ({} -> {})", deviceNumber, function, slot->GetDeviceName(),
+             device->GetDeviceName());
+  } else {
+    LOG_INFO(PCIBridge, "Attached 1:{:X}.{}: {}", deviceNumber, function, device->GetDeviceName());
+  }
+  // The decode table points at the old device until it's rebuilt. Keep it alive until then.
+  const std::shared_ptr<PCIDevice> previous = std::exchange(slot, std::move(device));
+  RebuildDecode();
 }
 
-void PCIBridge::ResetPCIDevice(std::shared_ptr<PCIDevice> device) {
-  if (!device.get()) {
-    LOG_CRITICAL(PCIBridge, "Failed to reset a device!");
-    return;
+void PCIBridge::RemovePCIDevice(u8 deviceNumber, u8 function) {
+  if (deviceNumber >= 32 || function >= 8) { return; }
+  std::lock_guard lock(configMutex);
+  const std::shared_ptr<PCIDevice> previous = std::exchange(slots[deviceNumber * 8 + function], nullptr);
+  if (previous) {
+    LOG_INFO(PCIBridge, "Detached 1:{:X}.{}: {}", deviceNumber, function, previous->GetDeviceName());
+    RebuildDecode();
   }
+}
 
-  std::string name = device->GetDeviceName();
-  if (auto it = connectedPCIDevices.find(name); it != connectedPCIDevices.end()) {
-    LOG_INFO(PCIBridge, "Resetting device: {}", it->first);
-    it->second.reset();
-    connectedPCIDevices.erase(it);
-    connectedPCIDevices.insert({ device->GetDeviceName(), device });
-  } else {
-    LOG_CRITICAL(PCIBridge, "Failed to reset device! '{}' never existed.", it->first);
+// Platform reset
+
+void PCIBridge::Reset() {
+  // Devices first, without the config lock: their workers get joined and may be in the middle of an interrupt.
+  std::vector<std::shared_ptr<PCIDevice>> devices;
+  {
+    std::lock_guard lock(configMutex);
+    for (const auto &slot : slots) {
+      if (slot) { devices.push_back(slot); }
+    }
+  }
+  for (const auto &device : devices) { device->PlatformReset(); }
+
+  std::lock_guard lock(configMutex);
+  // Own header and interrupt controller back to power-on: routes and mask cleared, nothing held behind the mask.
+  for (u32 i = 0; i != 64; ++i) { header.SetDword(i * 4, kPciBridgeConfigMap[i]); }
+  header.bytes[Xe::PCI::ConfigRevisionId] = revisionId;
+  for (auto &reg : interruptRegisters) { reg.store(0, std::memory_order_release); }
+  heldWhileMasked.store(0, std::memory_order_release);
+  // Every function forgets the BARs and COMMAND the guest gave it.
+  for (const auto &slot : slots) {
+    if (slot) { slot->RestorePowerOnConfig(); }
+  }
+  RebuildDecode();
+  LOG_INFO(PCIBridge, "Platform reset: {} functions reset.", devices.size());
+}
+
+// Memory decode
+
+void PCIBridge::RebuildDecode() {
+  // Writers are serialized by configMutex. Readers retry while the sequence is odd or changed under them.
+  const u32 sequence = decodeSequence.load(std::memory_order_relaxed);
+  decodeSequence.store(sequence + 1, std::memory_order_relaxed);
+  std::atomic_thread_fence(std::memory_order_release);
+
+  const u32 bar0 = header.Dword(Xe::PCI::ConfigBar0);
+  const u32 base = Xe::PCI::BarAssigned(bar0, kWindowSize) ? bar0 & ~Xe::PCI::BarFlagMask : 0;
+  windowBase.store(base, std::memory_order_relaxed);
+  for (auto &granule : windowMap) { granule.store(0, std::memory_order_relaxed); }
+
+  u32 count = 0;
+  for (const auto &slot : slots) {
+    PCIDevice *device = slot.get();
+    if (!device) { continue; }
+    const bool memoryDisabled = !(device->GetCommand() & Xe::PCI::CommandMemorySpace);
+    for (u32 bar = 0; bar != Xe::PCI::ConfigBarCount; ++bar) {
+      const u32 size = device->BarSize(bar);
+      const u32 value = device->GetBar(bar);
+      if (!Xe::PCI::BarAssigned(value, size)) { continue; }
+      if (count == kMaxRanges) {
+        LOG_ERROR(PCIBridge, "Too many BARs to decode; {} BAR{} ignored", device->GetDeviceName(), bar);
+        continue;
+      }
+      const u32 start = value & ~Xe::PCI::BarFlagMask;
+      const u32 decode = Xe::PCI::BarDecodeSize(size);
+      DecodeRange &range = ranges[count];
+      range.base.store(start, std::memory_order_relaxed);
+      range.size.store(decode, std::memory_order_relaxed);
+      range.device.store(device, std::memory_order_relaxed);
+      range.bar.store(static_cast<u8>(bar), std::memory_order_relaxed);
+      range.memoryDisabled.store(memoryDisabled, std::memory_order_relaxed);
+      const u32 offset = start - base;
+      const bool inside =
+        base != 0 && offset >= kRegisterBlockSize && offset < kWindowSize && decode <= kWindowSize - offset;
+      range.outsideWindow.store(!inside, std::memory_order_relaxed);
+      if (inside) {
+        // Overlapping BARs: the first one claims the granule.
+        for (u32 granule = offset >> kGranuleShift; granule != (offset + decode) >> kGranuleShift; ++granule) {
+          if (windowMap[granule].load(std::memory_order_relaxed) == 0) {
+            windowMap[granule].store(static_cast<u8>(count + 1), std::memory_order_relaxed);
+          }
+        }
+      }
+      ++count;
+    }
+  }
+  rangeCount.store(count, std::memory_order_relaxed);
+  decodeSequence.store(sequence + 2, std::memory_order_release);
+}
+
+bool PCIBridge::Decode(u32 address, Target &target) const {
+  for (;;) {
+    const u32 sequence = decodeSequence.load(std::memory_order_acquire);
+    if (sequence & 1) {
+      std::this_thread::yield();
+      continue;
+    }
+    Target result{};
+    bool found = false;
+    const u32 base = windowBase.load(std::memory_order_relaxed);
+    const u32 offset = address - base;
+    if (base != 0 && offset < kWindowSize) {
+      if (offset < kRegisterBlockSize) {
+        result.registers = true;
+        result.offset = offset;
+        found = true;
+      } else if (const u8 index = windowMap[offset >> kGranuleShift].load(std::memory_order_relaxed)) {
+        const DecodeRange &range = ranges[index - 1];
+        result.offset = address - range.base.load(std::memory_order_relaxed);
+        result.device = range.device.load(std::memory_order_relaxed);
+        result.bar = range.bar.load(std::memory_order_relaxed);
+        result.memoryDisabled = range.memoryDisabled.load(std::memory_order_relaxed);
+        found = true;
+      }
+    }
+    if (!found) {
+      // BARs outside the window (the SFCX flash window) or straddling the interrupt controller.
+      const u32 count = rangeCount.load(std::memory_order_relaxed);
+      for (u32 i = 0; i != count; ++i) {
+        const DecodeRange &range = ranges[i];
+        if (!range.outsideWindow.load(std::memory_order_relaxed)) { continue; }
+        if (address - range.base.load(std::memory_order_relaxed) < range.size.load(std::memory_order_relaxed)) {
+          result.offset = address - range.base.load(std::memory_order_relaxed);
+          result.device = range.device.load(std::memory_order_relaxed);
+          result.bar = range.bar.load(std::memory_order_relaxed);
+          result.memoryDisabled = range.memoryDisabled.load(std::memory_order_relaxed);
+          found = true;
+          break;
+        }
+      }
+    }
+    std::atomic_thread_fence(std::memory_order_acquire);
+    if (decodeSequence.load(std::memory_order_relaxed) == sequence) {
+      target = result;
+      return found;
+    }
+  }
+}
+
+void PCIBridge::NoteMemoryDisabled(PCIDevice *device) {
+  if (memoryDisabledWarned.First(device)) {
+    LOG_WARNING(PCIBridge, "{} is accessed with COMMAND.MEM clear, decoding it anyway.", device->GetDeviceName());
   }
 }
 
 bool PCIBridge::Read(u64 readAddress, u8 *data, u64 size) {
-  // Reading to our own space?
-  if (readAddress >= PCI_BRIDGE_BASE_ADDRESS &&
-      readAddress <= PCI_BRIDGE_BASE_END_ADDRESS) {
-    switch (readAddress) {
-    case 0xEA000000:
-      memcpy(data, &pciBridgeState.REG_EA000000, size);
-      break;
-    case 0xEA000004:
-      memcpy(data, &pciBridgeState.REG_EA000004, size);
-      break;
-    case 0xEA00000C:
-      memcpy(data, &pciBridgeState.REG_EA00000C, size);
-      break;
-    case 0xEA000010:
-      memcpy(data, &pciBridgeState.PRIO_REG_CLCK.hexData, size);
-      break;
-    case 0xEA000014:
-      memcpy(data, &pciBridgeState.PRIO_REG_ODD.hexData, size);
-      break;
-    case 0xEA000018:
-      memcpy(data, &pciBridgeState.PRIO_REG_HDD.hexData, size);
-      break;
-    case 0xEA00001C:
-      memcpy(data, &pciBridgeState.PRIO_REG_SMM.hexData, size);
-      break;
-    case 0xEA000020:
-      memcpy(data, &pciBridgeState.PRIO_REG_OHCI0.hexData, size);
-      break;
-    case 0xEA000024:
-      memcpy(data, &pciBridgeState.PRIO_REG_OHCI1.hexData, size);
-      break;
-    case 0xEA000028:
-      memcpy(data, &pciBridgeState.PRIO_REG_EHCI0.hexData, size);
-      break;
-    case 0xEA00002C:
-      memcpy(data, &pciBridgeState.PRIO_REG_EHCI1.hexData, size);
-      break;
-    case 0xEA000038:
-      memcpy(data, &pciBridgeState.PRIO_REG_ENET.hexData, size);
-      break;
-    case 0xEA00003C:
-      memcpy(data, &pciBridgeState.PRIO_REG_XMA.hexData, size);
-      break;
-    case 0xEA000040:
-      memcpy(data, &pciBridgeState.PRIO_REG_AUDIO.hexData, size);
-      break;
-    case 0xEA000044:
-      memcpy(data, &pciBridgeState.PRIO_REG_SFCX.hexData, size);
-      break;
-    default:
-      LOG_ERROR(PCIBridge, "Unknown reg being read: 0x{:X}", readAddress);
-      break;
-    }
+  MICROPROFILE_SCOPEI("[Xe::PCI]", "PCIBridge::Read", MP_AUTO);
+  Target target;
+  if ((readAddress >> 32) != 0 || !Decode(static_cast<u32>(readAddress), target)) { return false; }
+  if (target.registers) {
+    InterruptRegisterRead(target.offset, data, size);
     return true;
   }
-
-  // Try writing to one of the attached devices.
-  for (auto &[name, dev] : connectedPCIDevices) {
-    if (dev->IsAddressMappedInBAR(static_cast<u32>(readAddress))) {
-      // Hit
-      dev->Read(readAddress, data, size);
-      return true;
-    }
-  }
-  memset(data, 0xFF, size);
-  return false;
+  if (target.memoryDisabled) { NoteMemoryDisabled(target.device); }
+  target.device->BarRead(target.bar, target.offset, data, size);
+  return true;
 }
 
 bool PCIBridge::Write(u64 writeAddress, const u8 *data, u64 size) {
-  u64 tmp{};
-  memcpy(&tmp, data, sizeof(tmp) > size ? size : sizeof(tmp));
-  bool enabled = (tmp & 0x00800000) >> 20;
-  bool latched = (tmp & 0x00200000) >> 20;
-  u8 targetCPU = (tmp & 0x00003F00) >> 8;
-  u8 cpuIRQ = (tmp & 0x0000003F) << 2;
-
-  // Writing to our own space?
-  if (writeAddress >= PCI_BRIDGE_BASE_ADDRESS &&
-      writeAddress <= PCI_BRIDGE_BASE_END_ADDRESS) {
-    switch (writeAddress) {
-    case 0xEA000000:
-      memcpy(&pciBridgeState.REG_EA000000, data, sizeof(pciBridgeState.REG_EA000000) > size ? size : sizeof(pciBridgeState.REG_EA000000));
-      break;
-    case 0xEA000004:
-      memcpy(&pciBridgeState.REG_EA000004, data, sizeof(pciBridgeState.REG_EA000004) > size ? size : sizeof(pciBridgeState.REG_EA000004));
-      break;
-    case 0xEA00000C:
-      memcpy(&pciBridgeState.REG_EA00000C, data, sizeof(pciBridgeState.REG_EA00000C) > size ? size : sizeof(pciBridgeState.REG_EA00000C));
-      break;
-    // PRIO_CLOCK
-    case 0xEA000010:
-      memcpy(&pciBridgeState.PRIO_REG_CLCK.hexData, data, sizeof(pciBridgeState.PRIO_REG_CLCK.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_CLCK.hexData));
-      pciBridgeState.PRIO_REG_CLCK.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_CLCK.latched = latched;
-      pciBridgeState.PRIO_REG_CLCK.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_CLCK.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_SATA_ODD
-    case 0xEA000014:
-      memcpy(&pciBridgeState.PRIO_REG_ODD.hexData, data, sizeof(pciBridgeState.PRIO_REG_ODD.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_ODD.hexData));
-      pciBridgeState.PRIO_REG_ODD.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_ODD.latched = latched;
-      pciBridgeState.PRIO_REG_ODD.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_ODD.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_SATA_HDD
-    case 0xEA000018:
-      memcpy(&pciBridgeState.PRIO_REG_HDD.hexData, data, sizeof(pciBridgeState.PRIO_REG_HDD.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_HDD.hexData));
-      pciBridgeState.PRIO_REG_HDD.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_HDD.latched = latched;
-      pciBridgeState.PRIO_REG_HDD.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_HDD.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_SMM
-    case 0xEA00001C:
-      memcpy(&pciBridgeState.PRIO_REG_SMM.hexData, data, sizeof(pciBridgeState.PRIO_REG_SMM.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_SMM.hexData));
-      pciBridgeState.PRIO_REG_SMM.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_SMM.latched = latched;
-      pciBridgeState.PRIO_REG_SMM.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_SMM.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_OHCI0
-    case 0xEA000020:
-      memcpy(&pciBridgeState.PRIO_REG_OHCI0.hexData, data, sizeof(pciBridgeState.PRIO_REG_OHCI0.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_OHCI0.hexData));
-      pciBridgeState.PRIO_REG_OHCI0.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_OHCI0.latched = latched;
-      pciBridgeState.PRIO_REG_OHCI0.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_OHCI0.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_OHCI1
-    case 0xEA000024:
-      memcpy(&pciBridgeState.PRIO_REG_OHCI1.hexData, data, sizeof(pciBridgeState.PRIO_REG_OHCI1.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_OHCI1.hexData));
-      pciBridgeState.PRIO_REG_OHCI1.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_OHCI1.latched = latched;
-      pciBridgeState.PRIO_REG_OHCI1.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_OHCI1.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_EHCI0
-    case 0xEA000028:
-      memcpy(&pciBridgeState.PRIO_REG_EHCI0.hexData, data, sizeof(pciBridgeState.PRIO_REG_EHCI0.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_EHCI0.hexData));
-      pciBridgeState.PRIO_REG_EHCI0.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_EHCI0.latched = latched;
-      pciBridgeState.PRIO_REG_EHCI0.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_EHCI0.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_EHCI1
-    case 0xEA00002C:
-      memcpy(&pciBridgeState.PRIO_REG_EHCI1.hexData, data, sizeof(pciBridgeState.PRIO_REG_EHCI1.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_EHCI1.hexData));
-      pciBridgeState.PRIO_REG_EHCI1.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_EHCI1.latched = latched;
-      pciBridgeState.PRIO_REG_EHCI1.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_EHCI1.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_ENET
-    case 0xEA000038:
-      memcpy(&pciBridgeState.PRIO_REG_ENET.hexData, data, sizeof(pciBridgeState.PRIO_REG_ENET.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_ENET.hexData));
-      pciBridgeState.PRIO_REG_ENET.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_ENET.latched = latched;
-      pciBridgeState.PRIO_REG_ENET.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_ENET.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_XMA
-    case 0xEA00003C:
-      memcpy(&pciBridgeState.PRIO_REG_XMA.hexData, data, sizeof(pciBridgeState.PRIO_REG_XMA.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_XMA.hexData));
-      pciBridgeState.PRIO_REG_XMA.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_XMA.latched = latched;
-      pciBridgeState.PRIO_REG_XMA.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_XMA.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_AUDIO
-    case 0xEA000040:
-      memcpy(&pciBridgeState.PRIO_REG_AUDIO.hexData, data, sizeof(pciBridgeState.PRIO_REG_AUDIO.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_AUDIO.hexData));
-      pciBridgeState.PRIO_REG_AUDIO.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_AUDIO.latched = latched;
-      pciBridgeState.PRIO_REG_AUDIO.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_AUDIO.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_SFCX - Secure Flash Controller for Xbox Int
-    case 0xEA000044:
-      memcpy(&pciBridgeState.PRIO_REG_SFCX.hexData, data, sizeof(pciBridgeState.PRIO_REG_SFCX.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_SFCX.hexData));
-      pciBridgeState.PRIO_REG_SFCX.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_SFCX.latched = latched;
-      pciBridgeState.PRIO_REG_SFCX.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_SFCX.cpuIRQ = cpuIRQ;
-      break;
-    default:
-      LOG_ERROR(PCIBridge, "Unknown reg being written: 0x{:X}, 0x{:X}", writeAddress, tmp);
-      break;
-    }
+  MICROPROFILE_SCOPEI("[Xe::PCI]", "PCIBridge::Write", MP_AUTO);
+  Target target;
+  if ((writeAddress >> 32) != 0 || !Decode(static_cast<u32>(writeAddress), target)) { return false; }
+  if (target.registers) {
+    InterruptRegisterWrite(target.offset, data, size);
     return true;
   }
-
-  // Try writing to one of the attached devices.
-  for (auto &[name, dev] : connectedPCIDevices) {
-    if (dev->IsAddressMappedInBAR(static_cast<u32>(writeAddress))) {
-      // Hit
-      dev->Write(writeAddress, data, size);
-      return true;
-    }
-  }
-  return false;
+  if (target.memoryDisabled) { NoteMemoryDisabled(target.device); }
+  target.device->BarWrite(target.bar, target.offset, data, size);
+  return true;
 }
 
 bool PCIBridge::MemSet(u64 writeAddress, s32 data, u64 size) {
-  u64 tmp{};
-  memset(&tmp, data, sizeof(tmp) > size ? size : sizeof(tmp));
-  bool enabled = (tmp & 0x00800000) >> 20;
-  bool latched = (tmp & 0x00200000) >> 20;
-  u8 targetCPU = (tmp & 0x00003F00) >> 8;
-  u8 cpuIRQ = (tmp & 0x0000003F) << 2;
-
-  // Writing to our own space?
-  if (writeAddress >= PCI_BRIDGE_BASE_ADDRESS &&
-      writeAddress <= PCI_BRIDGE_BASE_END_ADDRESS) {
-    switch (writeAddress) {
-    case 0xEA000000:
-      memset(&pciBridgeState.REG_EA000000, data, sizeof(pciBridgeState.REG_EA000000) > size ? size : sizeof(pciBridgeState.REG_EA000000));
-      break;
-    case 0xEA000004:
-      memset(&pciBridgeState.REG_EA000004, data, sizeof(pciBridgeState.REG_EA000004) > size ? size : sizeof(pciBridgeState.REG_EA000004));
-      break;
-    case 0xEA00000C:
-      memset(&pciBridgeState.REG_EA00000C, data, sizeof(pciBridgeState.REG_EA00000C) > size ? size : sizeof(pciBridgeState.REG_EA00000C));
-      break;
-    // PRIO_CLOCK
-    case 0xEA000010:
-      memset(&pciBridgeState.PRIO_REG_CLCK.hexData, data, sizeof(pciBridgeState.PRIO_REG_CLCK.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_CLCK.hexData));
-      pciBridgeState.PRIO_REG_CLCK.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_CLCK.latched = latched;
-      pciBridgeState.PRIO_REG_CLCK.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_CLCK.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_SATA_ODD
-    case 0xEA000014:
-      memset(&pciBridgeState.PRIO_REG_ODD.hexData, data, sizeof(pciBridgeState.PRIO_REG_ODD.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_ODD.hexData));
-      pciBridgeState.PRIO_REG_ODD.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_ODD.latched = latched;
-      pciBridgeState.PRIO_REG_ODD.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_ODD.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_SATA_HDD
-    case 0xEA000018:
-      memset(&pciBridgeState.PRIO_REG_HDD.hexData, data, sizeof(pciBridgeState.PRIO_REG_HDD.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_HDD.hexData));
-      pciBridgeState.PRIO_REG_HDD.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_HDD.latched = latched;
-      pciBridgeState.PRIO_REG_HDD.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_HDD.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_SMM
-    case 0xEA00001C:
-      memset(&pciBridgeState.PRIO_REG_SMM.hexData, data, sizeof(pciBridgeState.PRIO_REG_SMM.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_SMM.hexData));
-      pciBridgeState.PRIO_REG_SMM.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_SMM.latched = latched;
-      pciBridgeState.PRIO_REG_SMM.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_SMM.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_OHCI0
-    case 0xEA000020:
-      memset(&pciBridgeState.PRIO_REG_OHCI0.hexData, data, sizeof(pciBridgeState.PRIO_REG_OHCI0.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_OHCI0.hexData));
-      pciBridgeState.PRIO_REG_OHCI0.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_OHCI0.latched = latched;
-      pciBridgeState.PRIO_REG_OHCI0.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_OHCI0.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_OHCI1
-    case 0xEA000024:
-      memset(&pciBridgeState.PRIO_REG_OHCI1.hexData, data, sizeof(pciBridgeState.PRIO_REG_OHCI1.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_OHCI1.hexData));
-      pciBridgeState.PRIO_REG_OHCI1.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_OHCI1.latched = latched;
-      pciBridgeState.PRIO_REG_OHCI1.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_OHCI1.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_EHCI0
-    case 0xEA000028:
-      memset(&pciBridgeState.PRIO_REG_EHCI0.hexData, data, sizeof(pciBridgeState.PRIO_REG_EHCI0.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_EHCI0.hexData));
-      pciBridgeState.PRIO_REG_EHCI0.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_EHCI0.latched = latched;
-      pciBridgeState.PRIO_REG_EHCI0.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_EHCI0.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_EHCI1
-    case 0xEA00002C:
-      memset(&pciBridgeState.PRIO_REG_EHCI1.hexData, data, sizeof(pciBridgeState.PRIO_REG_EHCI1.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_EHCI1.hexData));
-      pciBridgeState.PRIO_REG_EHCI1.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_EHCI1.latched = latched;
-      pciBridgeState.PRIO_REG_EHCI1.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_EHCI1.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_ENET
-    case 0xEA000038:
-      memset(&pciBridgeState.PRIO_REG_ENET.hexData, data, sizeof(pciBridgeState.PRIO_REG_ENET.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_ENET.hexData));
-      pciBridgeState.PRIO_REG_ENET.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_ENET.latched = latched;
-      pciBridgeState.PRIO_REG_ENET.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_ENET.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_XMA
-    case 0xEA00003C:
-      memset(&pciBridgeState.PRIO_REG_XMA.hexData, data, sizeof(pciBridgeState.PRIO_REG_XMA.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_XMA.hexData));
-      pciBridgeState.PRIO_REG_XMA.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_XMA.latched = latched;
-      pciBridgeState.PRIO_REG_XMA.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_XMA.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_AUDIO
-    case 0xEA000040:
-      memset(&pciBridgeState.PRIO_REG_AUDIO.hexData, data, sizeof(pciBridgeState.PRIO_REG_AUDIO.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_AUDIO.hexData));
-      pciBridgeState.PRIO_REG_AUDIO.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_AUDIO.latched = latched;
-      pciBridgeState.PRIO_REG_AUDIO.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_AUDIO.cpuIRQ = cpuIRQ;
-      break;
-    // PRIO_SFCX - Secure Flash Controller for Xbox Int.
-    case 0xEA000044:
-      memset(&pciBridgeState.PRIO_REG_SFCX.hexData, data, sizeof(pciBridgeState.PRIO_REG_SFCX.hexData) > size ? size : sizeof(pciBridgeState.PRIO_REG_SFCX.hexData));
-      pciBridgeState.PRIO_REG_SFCX.intEnabled = enabled;
-      pciBridgeState.PRIO_REG_SFCX.latched = latched;
-      pciBridgeState.PRIO_REG_SFCX.targetCPU = targetCPU;
-      pciBridgeState.PRIO_REG_SFCX.cpuIRQ = cpuIRQ;
-      break;
-    default:
-      LOG_ERROR(PCIBridge, "Unknown reg being written: 0x{:X}, 0x{:X}", writeAddress, tmp);
-      break;
-    }
+  Target target;
+  if ((writeAddress >> 32) != 0 || !Decode(static_cast<u32>(writeAddress), target)) { return false; }
+  if (target.registers) {
+    FillInChunks(data, size, [&](u64 done, const u8 *bytes, u64 count) {
+      InterruptRegisterWrite(target.offset + static_cast<u32>(done), bytes, count);
+    });
     return true;
   }
-
-  // Try writing to one of the attached devices
-  for (auto &[name, dev] : connectedPCIDevices) {
-    if (dev->IsAddressMappedInBAR(static_cast<u32>(writeAddress))) {
-      // Hit
-      dev->MemSet(writeAddress, data, size);
-      return true;
-    }
-  }
-  return false;
+  if (target.memoryDisabled) { NoteMemoryDisabled(target.device); }
+  target.device->BarMemSet(target.bar, target.offset, data, size);
+  return true;
 }
 
-bool PCIBridge::ConfigRead(u64 readAddress, u8 *data, u64 size) {
-  PCIE_CONFIG_ADDR configAddr = {};
-  configAddr.hexData = static_cast<u32>(readAddress);
+// Configuration
 
-  if (configAddr.busNum == 0 && configAddr.devNum == 0) {
-    // Reading from our own config space!
-    memcpy(data, &pciBridgeConfig.data[configAddr.regOffset], size);
+bool PCIBridge::ConfigRead(u32 address, u8 *data, u64 size) {
+  MICROPROFILE_SCOPEI("[Xe::PCI]", "PCIBridge::ConfigRead", MP_AUTO);
+  const u32 bus = Xe::PCI::ConfigBus(address);
+  // Registers 0x100 and up alias the first 256 bytes.
+  const u32 reg = Xe::PCI::ConfigRegister(address) & 0xFF;
+  std::lock_guard lock(configMutex);
+  if (bus == 0) {
+    OwnConfigRead(reg, data, size);
     return true;
   }
-
-  // Current device name
-  std::string currentDevName = {};
-
-  switch (configAddr.devNum) {
-  case XMA_DEV_NUM:
-    currentDevName = "XMA";
-    break;
-  case CDROM_DEV_NUM:
-    currentDevName = "CDROM";
-    break;
-  case HDD_DEV_NUM:
-    currentDevName = "HDD";
-    break;
-  case OHCI0_DEV_NUM:
-    if (configAddr.functNum == 0) {
-      currentDevName = "OHCI0";
-    } else if (configAddr.functNum == 1) {
-      currentDevName = "EHCI0";
-    }
-    break;
-  case OHCI1_DEV_NUM:
-    if (configAddr.functNum == 0) {
-      currentDevName = "OHCI1";
-    } else if (configAddr.functNum == 1) {
-      currentDevName = "EHCI1";
-    }
-    break;
-  case FAST_ETH_DEV_NUM:
-    currentDevName = "ETHERNET";
-    break;
-  case SFC_DEV_NUM:
-    currentDevName = "SFCX";
-    break;
-  case AUDIO_CTRLR_DEV_NUM:
-    currentDevName = "AUDIOCTRLR";
-    break;
-  case SMC_DEV_NUM:
-    currentDevName = "SMC";
-    break;
-  case _5841_DEV_NUM:
-    currentDevName = "5841";
-    break;
-  default:
-    LOG_ERROR(PCIBridge, "Config Space Read: Unknown device accessed: Dev 0x{:X}, Reg 0x{:X}",
-        configAddr.devNum, configAddr.regOffset);
-    return true;
+  PCIDevice *device = bus == header.bytes[Xe::PCI::ConfigSecondaryBus]
+                        ? Slot(Xe::PCI::ConfigDevice(address), Xe::PCI::ConfigFunction(address))
+                        : nullptr;
+  if (!device) {
+    // Master abort: no function there, or a bus number behind the bridge with nothing on it.
+    memset(data, 0xFF, size);
+    return false;
   }
-
-  for (auto &[name, dev] : connectedPCIDevices) {
-    if (name == currentDevName) {
-      // Hit!
-      LOG_TRACE(PCIBridge, "Config read, device: {} offset = 0x{:X}", name, configAddr.regOffset);
-      dev->ConfigRead(readAddress, data, size);
-      return true;
-    }
-  }
-
-  LOG_ERROR(PCIBridge, "Read to unimplemented device: {}", currentDevName);
-  memset(data, 0xFF, size);
-  return false;
+  const u32 functionBase = address & ~0xFFFu;
+  ForEachDwordLane(reg, size, [&](u32 at, u64 done, u64 count) {
+    device->ConfigRead(functionBase | (at & 0xFF), data + done, count);
+  });
+  return true;
 }
 
-bool PCIBridge::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
-  PCIE_CONFIG_ADDR configAddr = {};
-  configAddr.hexData = static_cast<u32>(writeAddress);
-
-  if (configAddr.busNum == 0 && configAddr.devNum == 0) {
-    // Writing to our own config space!
-    memcpy(&pciBridgeConfig.data[configAddr.regOffset], data, size);
+bool PCIBridge::ConfigWrite(u32 address, const u8 *data, u64 size) {
+  MICROPROFILE_SCOPEI("[Xe::PCI]", "PCIBridge::ConfigWrite", MP_AUTO);
+  const u32 bus = Xe::PCI::ConfigBus(address);
+  const u32 reg = Xe::PCI::ConfigRegister(address) & 0xFF;
+  std::lock_guard lock(configMutex);
+  if (bus == 0) {
+    OwnConfigWrite(reg, data, size);
     return true;
   }
+  PCIDevice *device = bus == header.bytes[Xe::PCI::ConfigSecondaryBus]
+                        ? Slot(Xe::PCI::ConfigDevice(address), Xe::PCI::ConfigFunction(address))
+                        : nullptr;
+  if (!device) { return false; }
+  const u32 functionBase = address & ~0xFFFu;
+  ForEachDwordLane(reg, size, [&](u32 at, u64 done, u64 count) {
+    DeviceConfigWrite(device, functionBase | (at & 0xFF), data + done, count);
+  });
+  return true;
+}
 
-  // Current device name
-  std::string currentDevName = {};
+void PCIBridge::DeviceConfigWrite(PCIDevice *device, u32 address, const u8 *data, u64 size) {
+  const u32 reg = address & 0xFF;
+  u32 before[Xe::PCI::ConfigBarCount];
+  for (u32 bar = 0; bar != Xe::PCI::ConfigBarCount; ++bar) { before[bar] = device->GetBar(bar); }
+  const u16 commandBefore = device->GetCommand();
 
-  switch (configAddr.devNum) {
-  case XMA_DEV_NUM:
-    currentDevName = "XMA";
-    break;
-  case CDROM_DEV_NUM:
-    currentDevName = "CDROM";
-    break;
-  case HDD_DEV_NUM:
-    currentDevName = "HDD";
-    break;
-  case OHCI0_DEV_NUM:
-    if (configAddr.functNum == 0) {
-      currentDevName = "OHCI0";
-    } else if (configAddr.functNum == 1) {
-      currentDevName = "EHCI0";
-    }
-    break;
-  case OHCI1_DEV_NUM:
-    if (configAddr.functNum == 0) {
-      currentDevName = "OHCI1";
-    } else if (configAddr.functNum == 1) {
-      currentDevName = "EHCI1";
-    }
-    break;
-  case FAST_ETH_DEV_NUM:
-    currentDevName = "ETHERNET";
-    break;
-  case SFC_DEV_NUM:
-    currentDevName = "SFCX";
-    break;
-  case AUDIO_CTRLR_DEV_NUM:
-    currentDevName = "AUDIOCTRLR";
-    break;
-  case SMC_DEV_NUM:
-    currentDevName = "SMC";
-    break;
-  case _5841_DEV_NUM:
-    currentDevName = "5841";
-    break;
-  default:
-    u64 value = 0;
-    memcpy(&value, data, size);
-    LOG_ERROR(PCIBridge, "Config Space Write: Unknown device accessed: Dev 0x{:X} Func 0x{:X}"
-        "Reg 0x{:X} data = 0x{:X}", configAddr.devNum, configAddr.functNum, configAddr.regOffset, value);
-    return true;
-  }
+  device->ConfigWrite(address, data, size);
 
-  for (auto &[name, dev] : connectedPCIDevices) {
-    if (name == currentDevName) {
-      // Hit!
-      LOG_TRACE(PCIBridge, "Config write to '{}+0x{:X}'", name, configAddr.regOffset);
-      dev->ConfigWrite(writeAddress, data, size);
-      return true;
+  // BARs latch whatever base bits their size implements, no matter what the device's ConfigWrite stored. A size
+  // probe then reads ~(size - 1) and unimplemented BARs stay 0.
+  bool changed = false;
+  if (reg < Xe::PCI::ConfigBar0 + 4 * Xe::PCI::ConfigBarCount && reg + size > Xe::PCI::ConfigBar0) {
+    for (u32 bar = 0; bar != Xe::PCI::ConfigBarCount; ++bar) {
+      const u32 barReg = Xe::PCI::ConfigBar0 + 4 * bar;
+      if (reg >= barReg + 4 || reg + size <= barReg) { continue; }
+      const u32 latched = Xe::PCI::BarLatch(before[bar], device->GetBar(bar), device->BarSize(bar));
+      device->SetBar(bar, latched);
+      changed |= latched != before[bar];
     }
   }
+  changed |= ((device->GetCommand() ^ commandBefore) & Xe::PCI::CommandMemorySpace) != 0;
+  if (changed) { RebuildDecode(); }
+}
 
-  LOG_ERROR(PCIBridge, "Config write to unimplemented device '{}'", currentDevName);
-  return false;
+void PCIBridge::OwnConfigRead(u32 reg, u8 *data, u64 size) { header.Read(reg, data, size); }
+
+void PCIBridge::OwnConfigWrite(u32 reg, const u8 *data, u64 size) {
+  // BAR0 is the 64 KiB window. BAR1 isn't implemented.
+  const u32 before = header.Dword(Xe::PCI::ConfigBar0);
+  header.Write(reg, data, size, kWindowSize, 2);
+  if (header.Dword(Xe::PCI::ConfigBar0) != before) { RebuildDecode(); }
+}
+
+// Interrupt controller
+
+u32 PCIBridge::ReadInterruptRegister(u32 offset) {
+  if (!IsModelledRegister(offset, kNumSources)) {
+    if (reportedUnknownRegisters.First(offset)) {
+      LOG_WARNING(PCIBridge,
+                  "Interrupt controller register {:#x} isn't modelled, it reads back what was "
+                  "written.",
+                  offset);
+    }
+  }
+  return interruptRegisters[offset / 4].load(std::memory_order_acquire);
+}
+
+void PCIBridge::WriteInterruptRegister(u32 offset, u32 value) {
+  const bool route = offset >= kRegRoute0 && offset < kRegRoute0 + 4 * kNumSources;
+  if (!IsModelledRegister(offset, kNumSources)) {
+    if (reportedUnknownRegisters.First(offset)) {
+      LOG_WARNING(PCIBridge,
+                  "Interrupt controller register {:#x} isn't modelled (write {:#x}), it reads back "
+                  "what was written.",
+                  offset, value);
+    }
+  }
+  interruptRegisters[offset / 4].store(value, std::memory_order_release);
+  if (offset != kRegSourceMask && !route) { return; }
+  // Mask or route changed: send what was held behind the mask and is now let through.
+  const u32 held = heldWhileMasked.load(std::memory_order_acquire);
+  const u32 mask = interruptRegisters[kRegSourceMask / 4].load(std::memory_order_acquire);
+  for (u32 ready = held & ~mask; ready; ready &= ready - 1) {
+    const u32 source = static_cast<u32>(std::countr_zero(ready));
+    heldWhileMasked.fetch_and(~(1u << source), std::memory_order_acq_rel);
+    DeliverSource(source);
+  }
+}
+
+// Registers are 32-bit little endian, so byte n of the access is byte (offset & 3) + n of the register.
+void PCIBridge::InterruptRegisterRead(u32 offset, u8 *data, u64 size) {
+  ForEachDwordLane(offset, size, [&](u32 at, u64 done, u64 count) {
+    if (at >= kRegisterBlockSize) {
+      memset(data + done, 0xFF, count);
+      return;
+    }
+    const u32 value = ReadInterruptRegister(at & ~3u);
+    memcpy(data + done, reinterpret_cast<const u8 *>(&value) + (at & 3), count);
+  });
+}
+
+void PCIBridge::InterruptRegisterWrite(u32 offset, const u8 *data, u64 size) {
+  ForEachDwordLane(offset, size, [&](u32 at, u64 done, u64 count) {
+    if (at >= kRegisterBlockSize) { return; }
+    u32 value = interruptRegisters[at / 4].load(std::memory_order_acquire);
+    memcpy(reinterpret_cast<u8 *>(&value) + (at & 3), data + done, count);
+    WriteInterruptRegister(at & ~3u, value);
+  });
+}
+
+bool PCIBridge::DeliverSource(u32 source) {
+  const u32 bit = 1u << source;
+  const u32 route = interruptRegisters[kRegRoute0 / 4 + source].load(std::memory_order_acquire);
+  if (!(route & kRouteEnable)) {
+    // Not connected: nobody listens (the kernel and Linux disconnect a source this way).
+    return false;
+  }
+  if (interruptRegisters[kRegSourceMask / 4].load(std::memory_order_acquire) & bit) {
+    heldWhileMasked.fetch_or(bit, std::memory_order_acq_rel);
+    return false;
+  }
+  if (!xenonIIC) { return false; }
+  const u8 vector = static_cast<u8>((route & 0x3F) << 2);
+  const u8 threads = static_cast<u8>((route >> 8) & 0x3F);
+  xenonIIC->GenerateInterrupt(vector, threads);
+  return true;
+}
+
+bool PCIBridge::RouteInterrupt(u8 prio, u8 targetCPU) {
+  MICROPROFILE_SCOPEI("[Xe::PCI]", "PCIBridge::RouteInterrupt", MP_AUTO);
+  const s8 source = Xe::PCI::Southbridge::VectorToSource[(prio >> 2) & 0x1F];
+  if (source >= 0) { return DeliverSource(static_cast<u32>(source)); }
+  if (!xenonIIC) { return false; }
+  // North of the bridge: the IOC routes it.
+  if (northbridge) {
+    std::array<Xe::PCI::NorthbridgeRegisters::Delivery, 6> deliveries;
+    u32 count = 0;
+    if (northbridge->ResolveInterrupt(prio, targetCPU == 0xFF ? 0 : targetCPU, deliveries, count)) {
+      for (u32 i = 0; i != count; ++i) { xenonIIC->GenerateInterrupt(deliveries[i].vector, deliveries[i].threads); }
+      return count != 0;
+    }
+  }
+  if (targetCPU == 0xFF) {
+    LOG_ERROR(PCIBridge, "Interrupt {:#x} has no route and no target", prio);
+    return false;
+  }
+  xenonIIC->GenerateInterrupt(prio, targetCPU);
+  return true;
+}
+
+void PCIBridge::CancelInterrupt(u8 prio) {
+  const s8 source = Xe::PCI::Southbridge::VectorToSource[(prio >> 2) & 0x1F];
+  if (source >= 0) { heldWhileMasked.fetch_and(~(1u << source), std::memory_order_acq_rel); }
 }

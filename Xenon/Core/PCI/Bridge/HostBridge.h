@@ -1,92 +1,84 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #pragma once
 
-#include "Core/PCI/PCIe.h"
-
+#include "Core/PCI/Bridge/BridgeHeader.h"
+#include "Core/PCI/Bridge/NorthbridgeRegisters.h"
 #include "Core/PCI/Bridge/PCIBridge.h"
+#include "Core/PCI/PCIe.h"
+#include "Core/XGPU/XenosGPU.h"
 
-#include "Core/XGPU/XGPU.h"
+#include <array>
+#include <atomic>
+#include <memory>
+#include <mutex>
 
-/*
-        PCI Configuration Space at Address 0xD0000000
-        Bus0
-        - Dev0  PCI-PCI Bridge    0xD0000000
-        - Dev1  HostBridge        0xD0008000
-*/
-
-#define HOST_BRIDGE_SIZE 0x1FFFFFF // Maybe??
-
-// Host Bridge regs, these control interrupts/etc
-struct HOSTBRIDGE_REGS {
-  u32 REG_E0020000;
-  u32 REG_E0020004;
-};
-
-struct BIU_REGS {
-  u32 REG_E1003000;
-  u32 REG_E1003100;
-  u32 REG_E1003200;
-  u32 REG_E1003300;
-  u32 REG_E1010000;
-  u32 REG_E1010010;
-  u32 REG_E1010020;
-  u32 REG_E1013000;
-  u32 REG_E1013100;
-  u32 REG_E1013200;
-  u32 REG_E1013300;
-  u32 REG_E1018000;
-  u32 REG_E1018020;
-  u32 REG_E1020000;
-  u32 REG_E1020004;
-  u32 REG_E1020008;
-  u32 ramSize;
-  u32 REG_E1040074;
-  u32 REG_E1040078;
-};
-
+// The northbridge as the CPU sees it past RAM.
+//
+// The config window is 0xD0000000-0xD0FFFFFF, addressed as bus << 20 | dev << 15 | fn << 12 | reg:
+//   bus 0 dev 0  PCI-PCI bridge to the southbridge (type 1 header, its secondary bus is bus 1)
+//   bus 0 dev 1  host bridge / northbridge, BAR0 0xE0000000, 32 MiB register file
+//   bus 0 dev 2  GPU + memory controllers, BAR0 0xEC800000, 128 KiB (0xE4000000 during HWINIT)
+// They're all single function and anything else on bus 0 master-aborts. Other buses go to the PCI-PCI bridge.
+//
+// Memory is decoded in this order: the northbridge registers (host bridge BAR0), the GPU's BAR0, then whatever the
+// PCI-PCI bridge claims (its interrupt controller and the BARs behind it, the NAND window included). The caller
+// master-aborts the rest.
 class HostBridge {
 public:
-  HostBridge(u64 ramSize);
+  explicit HostBridge(u64 ramSize);
   ~HostBridge();
 
-  // Xbox GPU Register
-  void RegisterXGPU(std::shared_ptr<Xe::Xenos::XGPU> xgpu);
+  // The GPU. While registered it is device 2: BAR0, config space, the BIU's memory size and self-refresh
+  // request. nullptr unregisters it.
+  void RegisterXenosGPU(std::shared_ptr<Xe::Xenos::XenosGPU> gpu);
 
-  // PCI Bridge Register
+  // The PCI-PCI bridge to the southbridge (bus 0 device 0). The northbridge uses it to route the IOC's interrupts.
   void RegisterPCIBridge(std::shared_ptr<PCIBridge> bridge);
 
-  // Read
+  // Platform reset (reboot or power off). The GPU stops and goes back to power-on, every southbridge function is
+  // reset, and the northbridge registers and the host bridge's own header return to their reset
+  // values. Call it with the CPU halted, before guest memory is cleared.
+  void Reset();
+
+  // Memory space (configuration window included). False when nothing decodes the address.
   bool Read(u64 readAddress, u8 *data, u64 size);
-
-  // Write
   bool Write(u64 writeAddress, const u8 *data, u64 size);
-
-  // MemSet
   bool MemSet(u64 writeAddress, s32 data, u64 size);
 
-  // Configuration Read
-  bool ConfigRead(u64 readAddress, u8 *data, u64 size);
-
-  // Configuration Write
-  bool ConfigWrite(u64 writeAddress, const u8 *data, u64 size);
-
 private:
+  enum class eTarget {
+    None,
+    Config,
+    Northbridge,
+    XenosGPU,
+    PCIBridge
+  };
+  // Which target claims address. 'offset' is set for the northbridge.
+  eTarget Decode(u32 address, u32 &offset);
+
+  // Configuration cycles. False = master abort (reads return all ones).
+  bool ConfigRead(u32 address, u8 *data, u64 size);
+  bool ConfigWrite(u32 address, const u8 *data, u64 size);
+  void OwnConfigWrite(u32 reg, const u8 *data, u64 size);
+  // The header as the reset leaves it.
+  void ResetConfig();
+
+  // Guards the host bridge's config space.
   std::mutex mutex{};
 
-  GENRAL_PCI_DEVICE_CONFIG_SPACE hostBridgeConfigSpace{};
+  // Own header (bus 0 device 1). BAR0 is mirrored in northbridgeBase for the decoder.
+  Xe::PCI::BridgeHeader header;
+  std::atomic<u32> northbridgeBase{0};
 
-  // Pointer to the registered XCGPU
-  std::shared_ptr<Xe::Xenos::XGPU> xGPU{};
+  // The GPU, when registered.
+  std::shared_ptr<Xe::Xenos::XenosGPU> xenosGPU{};
 
-  // Pointer to the registered PCI Bridge
+  // The registered PCI-PCI bridge.
   std::shared_ptr<PCIBridge> pciBridge{};
 
-  // Helpers
-  bool isAddressMappedinBAR(u32 address);
-
-  HOSTBRIDGE_REGS hostBridgeRegs{};
-  BIU_REGS biuRegs{};
+  // BAR0: the northbridge register file.
+  Xe::PCI::NorthbridgeRegisters northbridge;
 };

@@ -1,430 +1,216 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #include "HostBridge.h"
 
-#include "Base/Logging/Log.h"
+#include "Base/Config.h"
 #include "Base/Global.h"
+#include "Base/Logging/Log.h"
+#include "Core/PCI/PCIBar.h"
 
-HostBridge::HostBridge(u64 ramSize) {
-  // TODO: Fix these to pull the right data
+#include <algorithm>
+
+using Xe::PCI::FillInChunks;
+using Xe::PCI::ForEachDwordLane;
+
+// BAR0 at reset: where HWINIT puts it (0xD0008010 = 0xE0000000) and where the kernel finds it (0x7FD2xxxx ->
+// 0xE102xxxx).
+constexpr u32 kNorthbridgeBase = 0xE0000000;
+
+// Bus 0 devices.
+constexpr u32 kDevBridge = 0;
+constexpr u32 kDevHost = 1;
+constexpr u32 kDevGPU = 2;
+
+HostBridge::HostBridge(u64 ramSize)
+    : northbridge(static_cast<u32>(ramSize)) {
+  ResetConfig();
+}
+
+void HostBridge::ResetConfig() {
+  header.bytes.fill(0);
+  // Device/Vendor ID. HWINIT takes bits 4-7 of the device ID as the northbridge type and spins forever on one it
+  // doesn't know.
+  u32 id = 0x58301414;
   switch (Config::highlyExperimental.consoleRevison) {
-  case Config::eConsoleRevision::Xenon: {
-    // Device/Vendor ID
-    hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = 0x58301414;
-    // Device Type/Revision
-    hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = 0x06000010;
-  } break;
-  case Config::eConsoleRevision::Zephyr: {
-    // Device/Vendor ID
-    hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = 0x58301414;
-    // Device Type/Revision
-    hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = 0x06000010;
-  } break;
-  case Config::eConsoleRevision::Falcon: {
-    // Device/Vendor ID
-    hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = 0x58301414;
-    // Device Type/Revision
-    hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = 0x06000010;
-  } break;
-  case Config::eConsoleRevision::Jasper: {
-    // Device/Vendor ID
-    hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = 0x58301414;
-    // Device Type/Revision
-    hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = 0x06000010;
-  } break;
-  case Config::eConsoleRevision::Trinity: {
-    // Device/Vendor ID
-    hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = 0x58301414;
-    // Device Type/Revision
-    hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = 0x06000010;
-  } break;
-  case Config::eConsoleRevision::Corona: {
-    // Device/Vendor ID
-    hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = 0x58301414;
-    // Device Type/Revision
-    hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = 0x06000010;
-  } break;
-  case Config::eConsoleRevision::Corona4GB: {
-    // Device/Vendor ID
-    hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = 0x58301414;
-    // Device Type/Revision
-    hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = 0x06000010;
-  } break;
-  case Config::eConsoleRevision::Winchester: {
-    // Device/Vendor ID
-    hostBridgeConfigSpace.configSpaceHeader.reg0.hexData = 0x58301414;
-    // Device Type/Revision
-    hostBridgeConfigSpace.configSpaceHeader.reg1.hexData = 0x06000010;
-  } break;
+    case Config::eConsoleRevision::Falcon: id = 0x58101414; break;
+    case Config::eConsoleRevision::Trinity:
+    case Config::eConsoleRevision::Corona:
+    case Config::eConsoleRevision::Corona4GB: id = 0x58401414; break;
+    case Config::eConsoleRevision::Winchester: id = 0x58501414; break;
+    default: break;
   }
-  //0x20000000
-  hostBridgeConfigSpace.configSpaceHeader.BAR0 = 0xE0010000;
-  hostBridgeConfigSpace.configSpaceHeader.BAR1 = 0xE0030000;
-  hostBridgeConfigSpace.configSpaceHeader.BAR2 = 0xE1010000;
-  hostBridgeConfigSpace.configSpaceHeader.BAR3 = 0xE1030000;
-  hostBridgeConfigSpace.configSpaceHeader.BAR4 = 0xE2010000;
-  hostBridgeConfigSpace.configSpaceHeader.BAR5 = 0xE2030000;
-  biuRegs.ramSize = ramSize;
+  header.SetDword(0x00, id);
+  // Class code 0x060000 (host bridge), revision 0x10.
+  const u32 classRevision = 0x06000010;
+  header.SetDword(0x08, classRevision);
+  // Only BAR0 is implemented.
+  header.SetDword(Xe::PCI::ConfigBar0, kNorthbridgeBase);
+  northbridgeBase.store(kNorthbridgeBase, std::memory_order_relaxed);
+}
+
+void HostBridge::Reset() {
+  // The GPU first: its command processor and DMA stop before the devices behind the PCI bridge do.
+  std::shared_ptr<Xe::Xenos::XenosGPU> gpu;
+  std::shared_ptr<PCIBridge> southbridge;
+  {
+    std::lock_guard lock(mutex);
+    gpu = xenosGPU;
+    southbridge = pciBridge;
+  }
+  if (gpu) { gpu->PlatformReset(); }
+  if (southbridge) { southbridge->Reset(); }
+  std::lock_guard lock(mutex);
+  northbridge.Reset();
+  ResetConfig();
 }
 
 HostBridge::~HostBridge() {
-  xGPU.reset();
+  xenosGPU.reset();
   pciBridge.reset();
 }
 
-void HostBridge::RegisterXGPU(std::shared_ptr<Xe::Xenos::XGPU> xgpu) {
-  std::lock_guard lck(mutex);
-
-  xGPU = std::move(xgpu);
+void HostBridge::RegisterXenosGPU(std::shared_ptr<Xe::Xenos::XenosGPU> gpu) {
+  std::lock_guard lock(mutex);
+  xenosGPU = std::move(gpu);
+  // The memory controllers put DRAM chip select 1 at the upper half of the size HWINIT programs here.
+  northbridge.SetMemorySizeCallback([this](u32 size) {
+    if (xenosGPU) { xenosGPU->SetBiuMemorySize(size); }
+  });
+  // Self-refresh requests from the BIU.
+  northbridge.SetPowerControlCallback([this](u32 value) {
+    if (xenosGPU) {
+      xenosGPU->SetSelfRefreshRequest((value & Xe::PCI::NorthbridgeRegisters::PowerControlSelfRefresh) != 0);
+    }
+  });
+  // The GPU interrupt is level sensitive, so one raised before software enabled the route goes out once it does.
+  northbridge.SetRouteEnabledCallback([this](u32 route) {
+    if (route == Xe::PCI::NorthbridgeRegisters::RouteGraphics && xenosGPU) { xenosGPU->GraphicsRouteEnabled(); }
+  });
 }
 
 void HostBridge::RegisterPCIBridge(std::shared_ptr<PCIBridge> bridge) {
-  std::lock_guard lck(mutex);
+  std::lock_guard lock(mutex);
 
   pciBridge = std::move(bridge);
+  // The IOC routes the GPU's and the northbridge's own interrupts.
+  pciBridge->SetNorthbridge(&northbridge);
+}
+
+HostBridge::eTarget HostBridge::Decode(u32 address, u32 &offset) {
+  if (address - Xe::PCI::ConfigWindowBase < Xe::PCI::ConfigWindowSize) { return eTarget::Config; }
+  const u32 base = northbridgeBase.load(std::memory_order_relaxed);
+  if (base != 0 && address - base < Xe::PCI::NorthbridgeRegisters::WindowSize) {
+    offset = address - base;
+    return eTarget::Northbridge;
+  }
+  if (xenosGPU && xenosGPU->IsAddressMappedInBAR(address)) { return eTarget::XenosGPU; }
+  if (pciBridge) { return eTarget::PCIBridge; }
+  return eTarget::None;
 }
 
 bool HostBridge::Read(u64 readAddress, u8 *data, u64 size) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "HostBridge::Read", MP_AUTO);
-  std::lock_guard lck(mutex);
-
-  // Reading from host bridge registers?
-  if (isAddressMappedinBAR(static_cast<u32>(readAddress))) {
-    switch (readAddress) {
-    // HostBridge
-    case 0xE0020000:
-      memcpy(data, &hostBridgeRegs.REG_E0020000, size);
-      break;
-    case 0xE0020004:
-      memcpy(data, &hostBridgeRegs.REG_E0020004, size);
-      break;
-    // BIU
-    case 0xE1020004:
-      memcpy(data, &biuRegs.REG_E1020004, size);
-      break;
-    case 0xE1010010:
-      memcpy(data, &biuRegs.REG_E1010010, size);
-      break;
-    case 0xE1018000:
-      memcpy(data, &biuRegs.REG_E1018000, size);
-      break;
-    case 0xE1020000:
-      memcpy(data, &biuRegs.REG_E1020000, size);
-      break;
-    case 0xE1040000:
-      memcpy(data, &biuRegs.ramSize, size);
-      break;
-    default:
-      memset(data, 0, size);
-      LOG_ERROR(HostBridge, "Unknown register being read! 0x{:X}", readAddress);
-      break;
-    }
-    return true;
+  if ((readAddress >> 32) != 0) { return false; }
+  u32 offset = 0;
+  switch (Decode(static_cast<u32>(readAddress), offset)) {
+    // A configuration master abort is an ordinary answer (all ones), not a bus error.
+    case eTarget::Config: ConfigRead(static_cast<u32>(readAddress), data, size); return true;
+    case eTarget::Northbridge: northbridge.Read(offset, data, size); return true;
+    case eTarget::XenosGPU: return xenosGPU->Read(readAddress, data, size);
+    case eTarget::PCIBridge: return pciBridge->Read(readAddress, data, size);
+    default: return false;
   }
-
-  // Check if this address is in the PCI Bridge
-  if (xGPU->IsAddressMappedInBAR(static_cast<u32>(readAddress))) {
-    xGPU->Read(readAddress, data, size);
-    return true;
-  }
-
-  // Check if this address is in the PCI Bridge
-  if (pciBridge->IsAddressMappedinBAR(static_cast<u32>(readAddress))) {
-    pciBridge->Read(readAddress, data, size);
-    return true;
-  }
-
-  // Read failed or address is not on this bus
-  return false;
 }
 
 bool HostBridge::Write(u64 writeAddress, const u8 *data, u64 size) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "HostBridge::Write", MP_AUTO);
-  std::lock_guard lck(mutex);
-
-  // If we are not UART, send it to log
-  if (false) {
-    std::stringstream ss{};
-    for (u64 i = 0; i != size; i++) {
-      ss << FMT("0x{:02X}{}", static_cast<u16>(data[i]), i != (size - 1) ? " " : "");
-    }
-    LOG_DEBUG(HostBridge, "Address: 0x{:X} | Data({},0x{:X}): {}", writeAddress, size, size, ss.str());
+  if ((writeAddress >> 32) != 0) { return false; }
+  u32 offset = 0;
+  switch (Decode(static_cast<u32>(writeAddress), offset)) {
+    case eTarget::Config: ConfigWrite(static_cast<u32>(writeAddress), data, size); return true;
+    case eTarget::Northbridge: northbridge.Write(offset, data, size); return true;
+    case eTarget::XenosGPU: return xenosGPU->Write(writeAddress, data, size);
+    case eTarget::PCIBridge: return pciBridge->Write(writeAddress, data, size);
+    default: return false;
   }
-
-  // Writing to host bridge registers?
-  if (isAddressMappedinBAR(static_cast<u32>(writeAddress))) {
-    switch (writeAddress) {
-    // HostBridge
-    case 0xE0020000:
-      memcpy(&hostBridgeRegs.REG_E0020000, data, size);
-      break;
-    case 0xE0020004:
-      memcpy(&hostBridgeRegs.REG_E0020004, data, size);
-      break;
-    // BIU
-    case 0xE1003000:
-      memcpy(&biuRegs.REG_E1003000, data, size);
-      break;
-    case 0xE1003100:
-      memcpy(&biuRegs.REG_E1003100, data, size);
-      break;
-    case 0xE1003200:
-      memcpy(&biuRegs.REG_E1003200, data, size);
-      break;
-    case 0xE1003300:
-      memcpy(&biuRegs.REG_E1003300, data, size);
-      break;
-    case 0xE1010000:
-      memcpy(&biuRegs.REG_E1010000, data, size);
-      // Reading to this addr on a retail returns
-      // the same data on this address
-      memcpy(&biuRegs.REG_E1010010, data, size);
-      break;
-    case 0xE1010010:
-      memcpy(&biuRegs.REG_E1010010, data, size);
-      break;
-    case 0xE1010020:
-      memcpy(&biuRegs.REG_E1010020, data, size);
-      break;
-    case 0xE1013000:
-      memcpy(&biuRegs.REG_E1013000, data, size);
-      break;
-    case 0xE1013100:
-      memcpy(&biuRegs.REG_E1013100, data, size);
-      break;
-    case 0xE1013200:
-      memcpy(&biuRegs.REG_E1013200, data, size);
-      break;
-    case 0xE1013300:
-      memcpy(&biuRegs.REG_E1013300, data, size);
-      break;
-    case 0xE1018020:
-      // Read the comment on E1010000
-      memcpy(&biuRegs.REG_E1018000, data, size);
-      memcpy(&biuRegs.REG_E1018020, data, size);
-      break;
-    case 0xE1020000:
-      memcpy(&biuRegs.REG_E1020000, data, size);
-      break;
-    case 0xE1020004:
-      memcpy(&biuRegs.REG_E1020004, data, size);
-      break;
-    case 0xE1020008:
-      memcpy(&biuRegs.REG_E1020008, data, size);
-      break;
-    case 0xE1040000:
-      memcpy(&biuRegs.ramSize, data, size);
-      break;
-    case 0xE1040074:
-      memcpy(&biuRegs.REG_E1040074, data, size);
-      break;
-    case 0xE1040078:
-      memcpy(&biuRegs.REG_E1040078, data, size);
-      break;
-    default:
-      u64 tmp = 0;
-      memcpy(&tmp, data, size);
-      LOG_ERROR(HostBridge, "Unknown register being written! 0x{:X} = 0x{:X}", writeAddress, tmp);
-      break;
-    }
-    return true;
-  }
-
-  // Check if this address is mapped on the GPU
-  if (xGPU->IsAddressMappedInBAR(static_cast<u32>(writeAddress))) {
-    xGPU->Write(writeAddress, data, size);
-    return true;
-  }
-
-  // Check if this address is in the PCI Bridge
-  if (pciBridge->IsAddressMappedinBAR(static_cast<u32>(writeAddress))) {
-    pciBridge->Write(writeAddress, data, size);
-    return true;
-  }
-
-  // Write failed or address is not on this bus
-  return false;
 }
 
 bool HostBridge::MemSet(u64 writeAddress, s32 data, u64 size) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "HostBridge::MemSet", MP_AUTO);
-  std::lock_guard lck(mutex);
-
-  // Writing to host bridge registers?
-  if (isAddressMappedinBAR(static_cast<u32>(writeAddress))) {
-    switch (writeAddress) {
-    // HostBridge
-    case 0xE0020000:
-      memset(&hostBridgeRegs.REG_E0020000, data, size);
-      break;
-    case 0xE0020004:
-      memset(&hostBridgeRegs.REG_E0020004, data, size);
-      break;
-    // BIU
-    case 0xE1003000:
-      memset(&biuRegs.REG_E1003000, data, size);
-      break;
-    case 0xE1003100:
-      memset(&biuRegs.REG_E1003100, data, size);
-      break;
-    case 0xE1003200:
-      memset(&biuRegs.REG_E1003200, data, size);
-      break;
-    case 0xE1003300:
-      memset(&biuRegs.REG_E1003300, data, size);
-      break;
-    case 0xE1010000:
-      memset(&biuRegs.REG_E1010000, data, size);
-      // Reading to this addr on a retail returns
-      // the same data on this address
-      memset(&biuRegs.REG_E1010010, data, size);
-      break;
-    case 0xE1010010:
-      memset(&biuRegs.REG_E1010010, data, size);
-      break;
-    case 0xE1010020:
-      memset(&biuRegs.REG_E1010020, data, size);
-      break;
-    case 0xE1013000:
-      memset(&biuRegs.REG_E1013000, data, size);
-      break;
-    case 0xE1013100:
-      memset(&biuRegs.REG_E1013100, data, size);
-      break;
-    case 0xE1013200:
-      memset(&biuRegs.REG_E1013200, data, size);
-      break;
-    case 0xE1013300:
-      memset(&biuRegs.REG_E1013300, data, size);
-      break;
-    case 0xE1018020:
-      // Read the comment on E1010000
-      memset(&biuRegs.REG_E1018000, data, size);
-      memset(&biuRegs.REG_E1018020, data, size);
-      break;
-    case 0xE1020000:
-      memset(&biuRegs.REG_E1020000, data, size);
-      break;
-    case 0xE1020004:
-      memset(&biuRegs.REG_E1020004, data, size);
-      break;
-    case 0xE1020008:
-      memset(&biuRegs.REG_E1020008, data, size);
-      break;
-    case 0xE1040000:
-      memset(&biuRegs.ramSize, data, size);
-      break;
-    case 0xE1040074:
-      memset(&biuRegs.REG_E1040074, data, size);
-      break;
-    case 0xE1040078:
-      memset(&biuRegs.REG_E1040078, data, size);
-      break;
-    default:
-      u64 tmp{};
-      memset(&tmp, data, size);
-      LOG_ERROR(HostBridge, "Unknown register being written at address: 0x{:X}, data: 0x{:X}",
-                writeAddress, tmp);
-      break;
-    }
-    return true;
+  if ((writeAddress >> 32) != 0) { return false; }
+  u32 offset = 0;
+  switch (Decode(static_cast<u32>(writeAddress), offset)) {
+    case eTarget::Config:
+      FillInChunks(data, size, [&](u64 done, const u8 *bytes, u64 count) {
+        ConfigWrite(static_cast<u32>(writeAddress + done), bytes, count);
+      });
+      return true;
+    case eTarget::Northbridge: northbridge.Fill(offset, static_cast<u8>(data), size); return true;
+    case eTarget::XenosGPU: return xenosGPU->MemSet(writeAddress, data, size);
+    case eTarget::PCIBridge: return pciBridge->MemSet(writeAddress, data, size);
+    default: return false;
   }
-
-  // Check if this address is mapped on the GPU
-  if (xGPU->IsAddressMappedInBAR(static_cast<u32>(writeAddress))) {
-    xGPU->MemSet(writeAddress, data, size);
-    return true;
-  }
-
-  // Check if this address is in the PCI Bridge
-  if (pciBridge->IsAddressMappedinBAR(static_cast<u32>(writeAddress))) {
-    pciBridge->MemSet(writeAddress, data, size);
-    return true;
-  }
-
-  // Write failed or address is not on this bus
-  return false;
 }
 
-bool HostBridge::ConfigRead(u64 readAddress, u8 *data, u64 size) {
+// Configuration
+
+bool HostBridge::ConfigRead(u32 address, u8 *data, u64 size) {
   MICROPROFILE_SCOPEI("[Xe::PCI]", "HostBridge::ConfigRead", MP_AUTO);
-  std::lock_guard lck(mutex);
-
-  PCIE_CONFIG_ADDR configAddress = {};
-  configAddress.hexData = static_cast<u32>(readAddress);
-
-  if (configAddress.busNum == 0) {
-    switch (configAddress.devNum) {
-    case 0x0: // PCI-PCI Bridge
-      pciBridge->ConfigRead(readAddress, data, size);
-      break;
-    case 0x1: // Host Bridge
-      memcpy(data, &hostBridgeConfigSpace.data[configAddress.regOffset], size);
-      break;
-    case 0x2: // GPU + Memory Controller!
-      xGPU->ConfigRead(readAddress, data, size);
-      break;
-    default:
-      LOG_ERROR(HostBridge, "BUS0: Configuration read to inexistant PCI Device at address: 0x{:X}", readAddress);
-      break;
+  const u32 bus = Xe::PCI::ConfigBus(address);
+  const u32 device = Xe::PCI::ConfigDevice(address);
+  if (bus != 0 || (device == kDevBridge && Xe::PCI::ConfigFunction(address) == 0)) {
+    return pciBridge && pciBridge->ConfigRead(address, data, size);
+  }
+  const u32 reg = Xe::PCI::ConfigRegister(address) & 0xFF;
+  if (Xe::PCI::ConfigFunction(address) == 0) {
+    if (device == kDevHost) {
+      std::lock_guard lock(mutex);
+      header.Read(reg, data, size);
+      return true;
     }
-    return true;
-  }
-
-  // Config Address belongs to a secondary Bus, let's send it to the PCI-PCI
-  // Bridge
-  return pciBridge->ConfigRead(readAddress, data, size);
-}
-
-bool HostBridge::ConfigWrite(u64 writeAddress, const u8 *data, u64 size) {
-  MICROPROFILE_SCOPEI("[Xe::PCI]", "HostBridge::ConfigWrite", MP_AUTO);
-  std::lock_guard lck(mutex);
-
-  PCIE_CONFIG_ADDR configAddress = {};
-  configAddress.hexData = static_cast<u32>(writeAddress);
-
-  if (configAddress.busNum == 0) {
-    switch (configAddress.devNum) {
-    // PCI-PCI Bridge
-    case 0x0:
-      pciBridge->ConfigWrite(writeAddress, data, size);
-      break;
-    // Host Bridge
-    case 0x1:
-      memcpy(&hostBridgeConfigSpace.data[configAddress.regOffset], data, size);
-      break;
-    // GPU/Memory Controller
-    case 0x2:
-      xGPU->ConfigWrite(writeAddress, data, size);
-      break;
-    default:
-      u64 tmp = 0;
-      memcpy(&tmp, data, size);
-      LOG_ERROR(HostBridge, "BUS0: Configuration Write to inexistant PCI Device at address: 0x{:X}, data: 0x{:X}",
-                writeAddress, tmp);
-      break;
+    if (device == kDevGPU && xenosGPU) {
+      ForEachDwordLane(reg, size, [&](u32 at, u64 done, u64 count) {
+        xenosGPU->ConfigRead((address & ~0xFFFu) | (at & 0xFF), data + done, count);
+      });
+      return true;
     }
-    return true;
   }
-
-  // Config Address belongs to a secondary Bus, let's send it to the PCI-PCI
-  // Bridge
-  return pciBridge->ConfigWrite(writeAddress, data, size);
-}
-
-bool HostBridge::isAddressMappedinBAR(u32 address) {
-  #define ADDRESS_BOUNDS_CHECK(a, b) (address >= a && address <= (a + b))
-
-  if (ADDRESS_BOUNDS_CHECK(hostBridgeConfigSpace.configSpaceHeader.BAR0, XGPU_DEVICE_SIZE) ||
-      ADDRESS_BOUNDS_CHECK(hostBridgeConfigSpace.configSpaceHeader.BAR1, XGPU_DEVICE_SIZE) ||
-      ADDRESS_BOUNDS_CHECK(hostBridgeConfigSpace.configSpaceHeader.BAR2, XGPU_DEVICE_SIZE) ||
-      ADDRESS_BOUNDS_CHECK(hostBridgeConfigSpace.configSpaceHeader.BAR3, XGPU_DEVICE_SIZE) ||
-      ADDRESS_BOUNDS_CHECK(hostBridgeConfigSpace.configSpaceHeader.BAR4, XGPU_DEVICE_SIZE) ||
-      ADDRESS_BOUNDS_CHECK(hostBridgeConfigSpace.configSpaceHeader.BAR5, XGPU_DEVICE_SIZE)) {
-    return true;
-  }
-
+  // No device: master abort, all ones.
+  memset(data, 0xFF, size);
   return false;
+}
+
+bool HostBridge::ConfigWrite(u32 address, const u8 *data, u64 size) {
+  MICROPROFILE_SCOPEI("[Xe::PCI]", "HostBridge::ConfigWrite", MP_AUTO);
+  const u32 bus = Xe::PCI::ConfigBus(address);
+  const u32 device = Xe::PCI::ConfigDevice(address);
+  if (bus != 0 || (device == kDevBridge && Xe::PCI::ConfigFunction(address) == 0)) {
+    return pciBridge && pciBridge->ConfigWrite(address, data, size);
+  }
+  const u32 reg = Xe::PCI::ConfigRegister(address) & 0xFF;
+  if (Xe::PCI::ConfigFunction(address) == 0) {
+    if (device == kDevHost) {
+      std::lock_guard lock(mutex);
+      OwnConfigWrite(reg, data, size);
+      return true;
+    }
+    if (device == kDevGPU && xenosGPU) {
+      ForEachDwordLane(reg, size, [&](u32 at, u64 done, u64 count) {
+        xenosGPU->ConfigWrite((address & ~0xFFFu) | (at & 0xFF), data + done, count);
+      });
+      return true;
+    }
+  }
+  return false;
+}
+
+void HostBridge::OwnConfigWrite(u32 reg, const u8 *data, u64 size) {
+  // BAR0 is the 32 MiB register file. BAR1-5 aren't implemented.
+  header.Write(reg, data, size, Xe::PCI::NorthbridgeRegisters::WindowSize, Xe::PCI::ConfigBarCount);
+  const u32 bar0 = header.Dword(Xe::PCI::ConfigBar0);
+  northbridgeBase.store(
+    Xe::PCI::BarAssigned(bar0, Xe::PCI::NorthbridgeRegisters::WindowSize) ? bar0 & ~Xe::PCI::BarFlagMask : 0,
+    std::memory_order_relaxed);
 }
