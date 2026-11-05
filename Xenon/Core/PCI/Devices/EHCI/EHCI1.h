@@ -1,21 +1,18 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
 #pragma once
 
-#include "Core/PCI/PCIDevice.h"
 #include "Core/PCI/Devices/EHCI/EHCI.h"
+#include "Core/PCI/PCIDevice.h"
 
-namespace Xe {
-namespace PCIDev {
+namespace Xe::PCIDev {
 
-class EHCI1 : public EHCI {
-public:
-  EHCI1(const std::string &deviceName, u64 size);
+  class EHCI1 : public EHCI {
+  public:
+    EHCI1(const std::string &deviceName, u64 size, PCIBridge *parentPCIBridge, RAM *ram,
+          std::shared_ptr<USB::PortGroup> ports);
+  };
 
-private:
-};
-
-} // namespace PCIDev
-} // namespace Xe
+} // namespace Xe::PCIDev
