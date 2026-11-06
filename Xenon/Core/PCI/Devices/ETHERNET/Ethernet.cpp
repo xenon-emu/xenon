@@ -1,8 +1,8 @@
 /***************************************************************/
-/* Copyright 2025 Xenon Emulator Project. All rights reserved. */
+/* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
-// Xenon Fast Ethernet Adapter Emulation
+// Xenon Fast Ethernet Adapter emulation
 
 #include "Ethernet.h"
 
@@ -12,75 +12,100 @@
 #include "Base/Thread.h"
 #include "Network/NetworkBridge.h"
 
+#include <algorithm>
+#include <chrono>
+#include <cstddef>
+
+// Every register write, MDIO access, interrupt and frame of the device.
 // #define ETH_DEBUG
 
-#ifndef ETH_DEBUG
-  #define DEBUGP(x, ...)
+#ifdef ETH_DEBUG
+  #define ETH_DEBUGP(x, ...) LOG_DEBUG(ETH, "[ETH] " x, ##__VA_ARGS__)
 #else
-  #define DEBUGP(x, ...) LOG_DEBUG(ETH, x, ##__VA_ARGS__);
+  #define ETH_DEBUGP(x, ...)
 #endif
 
+// PHY register defaults.
+static constexpr u16 kPhyBmcrDefault = 0x1140;   // AN enable, full duplex
+static constexpr u16 kPhyBmsrBase = 0x78E9;      // 10/100 HD/FD capable, AN capable, AN complete, ext caps
+static constexpr u16 kPhyBmsrLinkUp = 0x0004;    // Link status
+static constexpr u16 kPhyAnarDefault = 0x05E1;   // 10/100 HD/FD + PAUSE (kernel asserts PAUSE is advertised)
+static constexpr u16 kPhyAnlparLinkUp = 0x45E1;  // Partner: 10/100 HD/FD + PAUSE, ACK
+static constexpr u16 kPhyMarvellStatus = 0xA800; // 100 Mbps, full duplex, resolved (bit 10 = real time link)
+
+// PHY ID 2 (model/revision) of a common part of each vendor. The kernel only checks ID 1.
+static u16 PhyId2For(u16 id1) {
+  switch (id1) {
+    case Xe::PCIDev::PHY_ICS: return 0xF450;      // ICS1893
+    case Xe::PCIDev::PHY_MICREL: return 0x1513;   // KSZ8041
+    case Xe::PCIDev::PHY_ATHEROS: return 0xD023;  // AR8032
+    case Xe::PCIDev::PHY_MARVELL: return 0x0CC2;  // 88E3016 family
+    case Xe::PCIDev::PHY_BROADCOM: return 0xBC70; // AC131
+    default: return 0;
+  }
+}
+
+static const char *PhyVendorName(u16 id1) {
+  switch (id1) {
+    case Xe::PCIDev::PHY_ICS: return "ICS";
+    case Xe::PCIDev::PHY_MICREL: return "Micrel";
+    case Xe::PCIDev::PHY_ATHEROS: return "Atheros";
+    case Xe::PCIDev::PHY_MARVELL: return "Marvell";
+    case Xe::PCIDev::PHY_BROADCOM: return "Broadcom";
+    default: return "unknown";
+  }
+}
+
+// The PHY of each board. Every board must use one the kernels it ships with accept. Xenon, Zephyr, Falcon and Jasper
+// take ICS or Broadcom (kernels up to 6717 accept nothing else), and with Broadcom the driver also rewrites its PAUSE
+// advertisement itself, which keeps the PHY init's final check consistent. Trinity uses Broadcom, accepted by every
+// kernel. Corona (16 MB and 4 GB) and Winchester use Marvell, the only PHY with a Corona-specific init.
+static u16 PhyForConsole(Config::eConsoleRevision revision) {
+  switch (revision) {
+    case Config::eConsoleRevision::Corona:
+    case Config::eConsoleRevision::Corona4GB:
+    case Config::eConsoleRevision::Winchester: return Xe::PCIDev::PHY_MARVELL;
+    default: return Xe::PCIDev::PHY_BROADCOM;
+  }
+}
+
 // Constructor
-Xe::PCIDev::ETHERNET::ETHERNET(const std::string& deviceName, u64 size, PCIBridge* parentPCIBridge, RAM* ram)
+Xe::PCIDev::ETHERNET::ETHERNET(const std::string &deviceName, u64 size, PCIBridge *parentPCIBridge, RAM *ram)
     : PCIDevice(deviceName, size)
-    , ramPtr(ram)
-    , parentBus(parentPCIBridge) {
+    , interruptLine(parentPCIBridge, PRIO_ENET)
+    , dma(ram) {
 
   // PCI config: Microsoft (0x1414), Xbox 360 Fast Ethernet (0x580A)
-  pciConfigSpace.configSpaceHeader.reg0.hexData = 0x580A1414;
-  pciConfigSpace.configSpaceHeader.reg1.hexData = 0x02100006;
-  pciConfigSpace.configSpaceHeader.reg2.hexData = 0x02000001; // Ethernet controller class
-  pciConfigSpace.configSpaceHeader.regD.hexData = 0x00000040;
-  pciConfigSpace.configSpaceHeader.regF.hexData = 0x00000100;
+  pciConfigSpace.configSpaceHeader.id.hexData = 0x580A1414;
+  pciConfigSpace.configSpaceHeader.commandStatus.hexData = 0x02100006;
+  pciConfigSpace.configSpaceHeader.classRev.hexData = 0x02000001; // Ethernet controller class
+  pciConfigSpace.configSpaceHeader.capabilities.hexData = 0x00000040;
+  pciConfigSpace.configSpaceHeader.interrupt.hexData = 0x00000100;
 
-  pciDevSizes[0] = 0x80; // BAR0
+  pciDevSizes[0] = DevSize; // BAR0
 
-  // Initialize PHY registers based on console revision
-  memset(phyRegs, 0, sizeof(phyRegs));
+  // The PHY depends on the board.
+  phyId1 = PhyForConsole(Config::highlyExperimental.consoleRevison);
+  phyId2 = PhyId2For(phyId1);
+  PhyReset();
+  phyRegs[4] = kPhyAnarDefault;
 
-  // Reg 0: BMCR - Auto-Neg Enable, Full Duplex, 100Mbps
-  phyRegs[0] = 0x1140;
-  // Reg 1: BMSR - Auto-Neg Complete, Link Up, Extended Caps
-  phyRegs[1] = 0x78ED;
+  // Power-on register defaults.
+  SetReg32(REG_MAX_PACKET_SIZE, ETH_MAX_FRAME_SIZE);
+  static constexpr u8 defaultMac[6] = {0x00, 0x1D, 0xD8, 0xB7, 0x1C, 0x00};
+  memcpy(&regFile[REG_MAC_ADDR0], defaultMac, sizeof(defaultMac));
 
-  // Reg 2: PHY ID 1 - vendor-specific based on console revision
-  // From kernel PhyInit: 5 different PHY vendors depending on hardware
-  switch (Config::highlyExperimental.consoleRevison) {
-    case Config::eConsoleRevision::Xenon:
-      phyRegs[2] = PHY_BROADCOM; // 0x0143 - Xenon boards
-      break;
-    default:
-      phyRegs[2] = PHY_MARVELL; // 0x0141 - Jasper and later (most common)
-      break;
-  }
-
-  // Reg 3: PHY ID 2 (model/revision)
-  phyRegs[3] = 0x0CC2;
-  // Reg 4: Auto-Negotiation Advertisement (100Mbps FD + pause)
-  phyRegs[4] = 0x05E1;
-  // Reg 5: Link Partner Ability (partner supports 100Mbps FD)
-  phyRegs[5] = 0x45E1;
-  // Reg 6: Auto-Negotiation Expansion
-  phyRegs[6] = 0x000F;
-  // Reg 9: 1000BASE-T Control
-  phyRegs[9] = 0x0300;
-  // Reg 10: 1000BASE-T Status
-  phyRegs[10] = 0x7C00;
-  // Reg 17: PHY Specific Status (Marvell: link up, 100Mbps, full duplex)
-  phyRegs[17] = 0xAC00;
-
-  // Default register values from kernel init sequence
-  regs.rxMaxFrame = ETH_MAX_FRAME_SIZE;
+  rxBacklog = std::make_unique<BacklogFrame[]>(kRxBacklogFrames);
 
   // Initialize the network bridge (if enabled in config).
   InitializeNetworkBridge();
 
   // Init the worker thread.
   workerRunning = true;
-  workerThread = std::thread(&ETHERNET::WorkerThreadLoop, this);
+  workerThread.Start("Ethernet", [this] { WorkerLoop(); });
 
-  LOG_INFO(ETH, "Ethernet controller initialized. Default MAC: {:02x}:{:02x}:{:02x}:{:02x}:{:02x}:{:02x}",
-           regs.macAddr0[0], regs.macAddr0[1], regs.macAddr0[2], regs.macAddr0[3], regs.macAddr0[4], regs.macAddr0[5]);
+  LOG_INFO(ETH, "Ethernet controller initialized. PHY {} ({:#06x}:{:#06x}), link {}", PhyVendorName(phyId1), phyId1,
+           phyId2, linkUp ? "UP" : "DOWN");
 }
 
 // Destructor
@@ -88,793 +113,607 @@ Xe::PCIDev::ETHERNET::~ETHERNET() {
   // Stop the worker thread and clean up.
   workerRunning = false;
   workerCV.notify_all();
-  if (workerThread.joinable()) { workerThread.join(); }
+  workerThread.Join();
 
-  // Detatch from the network bridge if attached.
+  // Detach from the network bridge if attached.
   Network::GetNetworkBridge().DetachEthernetDevice();
 
-  LOG_INFO(ETH, "Ethernet controller shutdown. Stats: TX: {} packets, RX: {} packets", stats.txPackets.load(),
-           stats.rxPackets.load());
+  LOG_INFO(ETH,
+           "Ethernet controller shutdown. Stats: TX: {} packets ({} errors), RX: {} packets ({} dropped), IRQs: {}",
+           stats.txPackets.load(), stats.txErrors.load(), stats.rxPackets.load(), stats.rxDropped.load(),
+           stats.interrupts.load());
 }
 
-// Intialize the Network Bridge.
+// Initialize the Network Bridge.
 void Xe::PCIDev::ETHERNET::InitializeNetworkBridge() {
   Network::BridgeConfig bridgeConfig;
   bridgeConfig.enabled = Config::network.enabled;
   bridgeConfig.backendType = Network::StringToBackendType(Config::network.backend);
   bridgeConfig.backendConfig = Config::network.backendConfig;
 
-  auto& bridge = Network::GetNetworkBridge();
+  auto &bridge = Network::GetNetworkBridge();
   if (bridge.Initialize(bridgeConfig)) {
+    // Syncs the backend link state.
     bridge.AttachEthernetDevice(this);
-    if (bridge.GetBackend() && bridge.GetBackend()->IsReady()) {
-      linkUp = bridge.GetBackend()->IsLinkUp();
-      if (linkUp) {
-        phyRegs[1] |= 0x0004;  // BMSR link status
-        phyRegs[17] |= 0x0400; // Marvell real-time link
-      } else {
-        phyRegs[1] &= ~0x0004;
-        phyRegs[17] &= ~0x0400;
-      }
-    }
   } else {
     linkUp = true;
+    UpdatePhyLinkBits();
   }
 }
 
+// Register file helpers
+
+u32 Xe::PCIDev::ETHERNET::GetReg32(u8 offset) const {
+  u32 value = 0;
+  memcpy(&value, &regFile[offset], sizeof(value));
+  return value;
+}
+
+void Xe::PCIDev::ETHERNET::SetReg32(u8 offset, u32 value) { memcpy(&regFile[offset], &value, sizeof(value)); }
+
+u16 Xe::PCIDev::ETHERNET::GetReg16(u8 offset) const {
+  u16 value = 0;
+  memcpy(&value, &regFile[offset], sizeof(value));
+  return value;
+}
+
 // Reset
+
+// Soft reset (CONFIG0 bit 15). Stops both DMA engines, clears interrupt state and the ring pointers. Base addresses,
+// MAC addresses and the rest of the configuration are kept, the kernel reprograms them after every reset anyway.
 void Xe::PCIDev::ETHERNET::Reset() {
-  // Reset TX/RX state without clearing register values, kernel expects registers to retain their values across soft
-  // reset).
   txHead[0] = 0;
   txHead[1] = 0;
   rxHead = 0;
 
-  txQ0Active = false;
-  txQ1Active = false;
-  rxActive = false;
-  isrAckedBits = 0;
+  SetReg32(REG_TX_CONFIG, GetReg32(REG_TX_CONFIG) & ~(TX_CFG_ENABLE | TX_CFG_Q0_GO | TX_CFG_Q1_GO));
+  SetReg32(REG_RX_CONFIG, GetReg32(REG_RX_CONFIG) & ~(RX_CFG_ENABLE | RX_CFG_ACTIVE));
 
-  // Clear pending RX queue
-  {
-    std::lock_guard<std::mutex> lock(rxQueueMutex);
-    while (!pendingRxPackets.empty()) pendingRxPackets.pop();
-    hasRxPending.store(false);
-  }
+  intStatus = 0;
+  SetReg32(REG_INT_MASK, 0);
+  UpdateInterruptLine();
 
-  DEBUGP("SOFT-RESET complete.");
+  rxBacklogHead = 0;
+  rxBacklogCount = 0;
+  rxBacklogged.store(false, std::memory_order_relaxed);
+
+  ETH_DEBUGP("SOFT-RESET complete.");
 }
 
 // Full RESET, POR defaults.
 void Xe::PCIDev::ETHERNET::SystemReset() {
   std::lock_guard<std::mutex> lock(stateMutex);
 
-  // Stop DMA, clear ring indices and the pending RX queue.
   Reset();
 
-  // Register file back to power-on defaults. MAC addresses persist (they come from config, the kernel re-programs them
-  // during NicInit anyway).
-  regs.txConfig = 0;
-  regs.txDescBase[0] = 0;
-  regs.txDescBase[1] = 0;
-  regs.txDescStatus = 0;
-  regs.rxConfig = 0;
-  regs.rxDescBase = 0;
-  regs.rxDescStatus = 0;
-  regs.isrStatus.store(0);
-  regs.intEnable = 0;
-  regs.softReset = 0;
-  regs.power = 0;
-  regs.macConfig = 0;
-  regs.miiCmd = 0;
-  regs.miiConfig = 0;
-  regs.macSpeed = 0;
-  regs.flowCtrl = 0;
-  regs.rxFilter = 0;
-  regs.txDescQ0 = 0;
-  regs.txDescQ1 = 0;
-  regs.rxMaxFrame = ETH_MAX_FRAME_SIZE;
-  interruptsEnabled.store(false);
+  // Register file back to power-on defaults. MAC address 0 persists, the kernel programs it again when it sets the
+  // device up anyway.
+  u8 mac0[6];
+  memcpy(mac0, &regFile[REG_MAC_ADDR0], sizeof(mac0));
+  regFile.fill(0);
+  memcpy(&regFile[REG_MAC_ADDR0], mac0, sizeof(mac0));
+  SetReg32(REG_MAX_PACKET_SIZE, ETH_MAX_FRAME_SIZE);
+  txDescBase[0] = 0;
+  txDescBase[1] = 0;
+
+  PhyReset();
+  phyRegs[4] = kPhyAnarDefault;
+  phyDebugRegs.fill(0);
+  workPending.store(false, std::memory_order_release);
 
   LOG_INFO(ETH, "System reset: DMA stopped, registers cleared.");
 }
 
-// MMIO Read
-void Xe::PCIDev::ETHERNET::Read(u64 readAddress, u8* data, u64 size) {
-  u8 offset = readAddress & 0xFF;
+// The worker only touches rings and guest memory under stateMutex, so nothing is in flight once SystemReset returns.
+void Xe::PCIDev::ETHERNET::PlatformReset() { SystemReset(); }
+
+// MMIO
+
+void Xe::PCIDev::ETHERNET::Read(u64 barOffset, u8 *data, u64 size) {
+  const u8 offset = static_cast<u8>(barOffset);
+  const u64 available = std::min<u64>(size, DevSize - offset);
 
   std::lock_guard<std::mutex> lock(stateMutex);
 
-  switch (offset) {
-    case REG_TX_CONFIG: {
-      // Kernel reads TX_CONFIG to check if queues are active/enabled.
-      // Bit 0 (active) reflects whether TX DMA is running.
-      u32 val = regs.txConfig;
-      if (txQ0Active) val |= TX_CFG_ACTIVE | TX_CFG_Q0_EN;
-      if (txQ1Active) val |= TX_CFG_ACTIVE | TX_CFG_Q1_EN;
-      memcpy(data, &val, size);
-      DEBUGP("[Read] TX_CONFIG = {:#010x}", val);
-    } break;
+  const auto covers = [&](u8 reg) { return offset < reg + 4 && offset + available > reg; };
 
-    case REG_TX_DESC_BASE: {
-      // Ring selection via TX_CONFIG bit 16.
-      int ring = (regs.txConfig & TX_CFG_RING_SEL) ? 1 : 0;
-      memcpy(data, &regs.txDescBase[ring], size);
-      DEBUGP("[Read] TX_DESC_BASE[{}] = {:#010x}", ring, regs.txDescBase[ring]);
-    } break;
+  // Refresh the registers whose value is owned by the hardware.
+  if (covers(REG_TX_DESC_BASE)) {
+    const int queue = (GetReg32(REG_TX_CONFIG) & TX_CFG_QUEUE_SEL) ? 1 : 0;
+    SetReg32(REG_TX_DESC_BASE, txDescBase[queue]);
+  }
+  if (covers(REG_RX_DESC_CURRENT)) {
+    SetReg32(REG_RX_DESC_CURRENT, GetReg32(REG_RX_DESC_BASE) + rxHead * sizeof(EmacDescriptor));
+  }
+  const bool readsStatus = covers(REG_INT_STATUS);
+  if (readsStatus) { SetReg32(REG_INT_STATUS, intStatus); }
 
-    case REG_TX_DESC_STATUS: memcpy(data, &regs.txDescStatus, size); break;
+  memcpy(data, &regFile[offset], available);
+  if (available < size) { memset(data + available, 0, size - available); }
 
-    case REG_RX_CONFIG: {
-      // Bit 0 (active) reflects whether RX DMA is running.
-      u32 val = regs.rxConfig;
-      if (rxActive) val |= RX_CFG_ACTIVE;
-      memcpy(data, &val, size);
-      DEBUGP("[Read] RX_CONFIG = {:#010x}", val);
-    } break;
-
-    case REG_RX_DESC_BASE: memcpy(data, &regs.rxDescBase, size); break;
-
-    case REG_RX_DESC_STATUS: memcpy(data, &regs.rxDescStatus, size); break;
-
-    case REG_ISR_STATUS: {
-      // Kernel NicProcessIsr reads ISR_STATUS to get pending interrupt bits.
-      // If the value is 0, the kernel traps (spurious interrupt assertion).
-      // We snapshot the current bits and mark them as "acked" so they get cleared when the DPC re-enables INT_ENABLE.
-      // New bits set by the worker thread between now and re-enable are preserved.
-
-      u32 stale = 0;
-      if (!rxActive.load()) stale |= ISR_RX;
-      if (!txQ0Active.load()) stale |= ISR_TX_Q0;
-      if (!txQ1Active.load()) stale |= ISR_TX_Q1;
-      if (stale) regs.isrStatus.fetch_and(~stale);
-
-      u32 status = regs.isrStatus.load();
-      isrAckedBits = status; // Remember what the ISR saw.
-      memcpy(data, &status, size);
-      DEBUGP("[Read] ISR_STATUS = {:#010x}", status);
-    } break;
-
-    case REG_INT_ENABLE:
-      memcpy(data, &regs.intEnable, size);
-      DEBUGP("[Read] INT_ENABLE = {:#010x}", regs.intEnable);
-      break;
-
-    case REG_SOFT_RESET: memcpy(data, &regs.softReset, size); break;
-
-    case REG_POWER: memcpy(data, &regs.power, size); break;
-
-    case REG_MAC_CONFIG: memcpy(data, &regs.macConfig, size); break;
-
-    case REG_MII_CMD: {
-      // Kernel MII read protocol:
-      // 1. Write command with read bit to MII_CMD
-      // 2. Poll busy bit (bit 4) until clear
-      // 3. Read MII_CMD to get data in upper 16 bits
-      HandleMdioRead();
-      memcpy(data, &regs.miiCmd, size);
-      DEBUGP("[Read] MII_CMD = {:#010x}", regs.miiCmd);
-    } break;
-
-    case REG_MII_CONFIG: memcpy(data, &regs.miiConfig, size); break;
-
-    case REG_MAC_SPEED: memcpy(data, &regs.macSpeed, size); break;
-
-    case REG_FLOW_CTRL: memcpy(data, &regs.flowCtrl, size); break;
-
-    case REG_RX_FILTER: memcpy(data, &regs.rxFilter, size); break;
-
-    // Primary MAC address (byte-addressable)
-    case REG_MAC_ADDR0:
-    case REG_MAC_ADDR0 + 1:
-    case REG_MAC_ADDR0 + 2:
-    case REG_MAC_ADDR0 + 3:
-    case REG_MAC_ADDR0 + 4:
-    case REG_MAC_ADDR0 + 5: memcpy(data, &regs.macAddr0[offset - REG_MAC_ADDR0], size); break;
-
-    case REG_TX_DESC_Q0: memcpy(data, &regs.txDescQ0, size); break;
-
-    case REG_TX_DESC_Q1: memcpy(data, &regs.txDescQ1, size); break;
-
-    case REG_RX_MAX_FRAME: memcpy(data, &regs.rxMaxFrame, size); break;
-
-    // Secondary MAC address (byte-addressable)
-    case REG_MAC_ADDR1:
-    case REG_MAC_ADDR1 + 1:
-    case REG_MAC_ADDR1 + 2:
-    case REG_MAC_ADDR1 + 3:
-    case REG_MAC_ADDR1 + 4:
-    case REG_MAC_ADDR1 + 5: memcpy(data, &regs.macAddr1[offset - REG_MAC_ADDR1], size); break;
-
-    default:
-      LOG_WARNING(ETH, "Unknown register read: offset={:#04x} size={}", static_cast<u16>(offset), size);
-      memset(data, 0, size);
-      break;
+  // INT_STATUS is clear on read. The ISR reads it once after masking, no driver ever writes it.
+  if (readsStatus) {
+    ETH_DEBUGP("[Read] INT_STATUS = {:#010x}", intStatus);
+    intStatus = 0;
+    SetReg32(REG_INT_STATUS, 0);
+    UpdateInterruptLine();
   }
 }
 
-// MMIO Write
-void Xe::PCIDev::ETHERNET::Write(u64 writeAddress, const u8* data, u64 size) {
-  u8 offset = writeAddress & 0xFF;
-  u32 val = 0;
-  memcpy(&val, data, std::min(size, (u64)4));
+void Xe::PCIDev::ETHERNET::Write(u64 barOffset, const u8 *data, u64 size) {
+  const u8 offset = static_cast<u8>(barOffset);
+  const u64 available = std::min<u64>(size, DevSize - offset);
+  if (available == 0) { return; }
 
   std::lock_guard<std::mutex> lock(stateMutex);
 
-  switch (offset) {
+  const u8 reg = offset & ~3;
+  const u32 oldTxConfig = GetReg32(REG_TX_CONFIG);
+  const u32 oldRxConfig = GetReg32(REG_RX_CONFIG);
+
+  // Registers that are not plain storage.
+  if (reg == REG_INT_STATUS) {
+    // The kernel never writes INT_STATUS. Treat writes as write-one-to-clear for other guests.
+    u32 value = 0;
+    memcpy(reinterpret_cast<u8 *>(&value) + (offset - reg), data, std::min<u64>(available, 4 - (offset - reg)));
+    intStatus &= ~value;
+    UpdateInterruptLine();
+    return;
+  }
+  if (reg == REG_TX_DESC_BASE) {
+    const int queue = (oldTxConfig & TX_CFG_QUEUE_SEL) ? 1 : 0;
+    memcpy(reinterpret_cast<u8 *>(&txDescBase[queue]) + (offset - reg), data,
+           std::min<u64>(available, 4 - (offset - reg)));
+    txHead[queue] = 0;
+    ETH_DEBUGP("[Write] TX_DESC_BASE[{}] = {:#010x}", queue, txDescBase[queue]);
+    return;
+  }
+
+  memcpy(&regFile[offset], data, available);
+
+  // Side effects for every register touched by this access.
+  for (u8 r = reg; r < offset + available; r += 4) { OnRegisterWrite(r, oldTxConfig, oldRxConfig); }
+}
+
+void Xe::PCIDev::ETHERNET::OnRegisterWrite(u8 reg, u32 oldTxConfig, u32 oldRxConfig) {
+  switch (reg) {
     case REG_TX_CONFIG: {
-      regs.txConfig = val;
-      DEBUGP("[Write] TX_CONFIG = {:#010x}", val);
-
-      // Kernel NicStartTx writes: (1 << (queueIndex + 4)) | 0x1C01
-      // Check Q0 enable (bit 4)
-      if (val & TX_CFG_Q0_EN) {
-        if (!txQ0Active) {
-          txQ0Active = true;
-          DEBUGP("TX Q0 enabled, desc base: {:#010x}", regs.txDescBase[0]);
-        }
-        workerCV.notify_one();
-      }
-
-      // Check Q1 enable (bit 5)
-      if (val & TX_CFG_Q1_EN) {
-        if (!txQ1Active) {
-          txQ1Active = true;
-          DEBUGP("TX Q1 enabled, desc base: {:#010x}", regs.txDescBase[1]);
-        }
-        workerCV.notify_one();
-      }
-
-      // Kernel NicStopXmitRecv writes 0 to TX_CONFIG to disable
-      if (val == 0) {
-        txQ0Active = false;
-        txQ1Active = false;
-        // Clear active bit immediately (kernel polls bit 0 for stop confirmation)
-        regs.txConfig &= ~TX_CFG_ACTIVE;
+      u32 txConfig = GetReg32(REG_TX_CONFIG);
+      ETH_DEBUGP("[Write] TX_CONFIG = {:#010x}", txConfig);
+      if (!(txConfig & TX_CFG_ENABLE)) {
+        // TX disabled: engine idle, ring pointers back to the ring base, its completion causes withdrawn.
+        txConfig &= ~(TX_CFG_Q0_GO | TX_CFG_Q1_GO);
+        SetReg32(REG_TX_CONFIG, txConfig);
+        txHead[0] = 0;
+        txHead[1] = 0;
+        intStatus &= ~(INT_TX_Q0_INT | INT_TX_Q0_EMPTY | INT_TX_Q1_INT | INT_TX_Q1_EMPTY);
+        UpdateInterruptLine();
+      } else if (txConfig & (TX_CFG_Q0_GO | TX_CFG_Q1_GO)) {
+        // GO bits are sticky until the queue is found drained. Writing a GO bit doesn't stop the other queue. The
+        // queues are walked right here: the descriptors are in memory (written before the GO write) and each frame goes
+        // to the host as it is read, so a GO bit reads back clear again once its queue is empty.
+        txConfig |= oldTxConfig & (TX_CFG_Q0_GO | TX_CFG_Q1_GO);
+        SetReg32(REG_TX_CONFIG, txConfig);
+        ProcessTxQueue(0);
+        ProcessTxQueue(1);
       }
     } break;
-
-    case REG_TX_DESC_BASE: {
-      // Ring selected by TX_CONFIG bit 16
-      int ring = (regs.txConfig & TX_CFG_RING_SEL) ? 1 : 0;
-      regs.txDescBase[ring] = val;
-      DEBUGP("[Write] TX_DESC_BASE[{}] = {:#010x}", ring, val);
-    } break;
-
-    case REG_TX_DESC_STATUS: regs.txDescStatus = val; break;
 
     case REG_RX_CONFIG: {
-      regs.rxConfig = val;
-      DEBUGP("[Write] RX_CONFIG = {:#010x}", val);
-
-      // Kernel NicInit writes 0x111C1000 to enable RX
-      // Any non-zero write with significant bits enables RX
-      if (val != 0 && val != RX_CFG_ACTIVE) {
-        if (!rxActive) {
-          rxActive = true;
-          rxHead = 0;
-          DEBUGP("RX enabled, desc base: {:#010x}", regs.rxDescBase);
-        }
-      }
-
-      // Kernel NicStopXmitRecv writes 0 to RX_CONFIG to disable
-      if (val == 0) {
-        rxActive = false;
-        regs.rxConfig &= ~RX_CFG_ACTIVE;
+      const u32 rxConfig = GetReg32(REG_RX_CONFIG);
+      ETH_DEBUGP("[Write] RX_CONFIG = {:#010x}", rxConfig);
+      if (rxConfig & RX_CFG_ENABLE) {
+        // The DPC rewrites RX_CONFIG after draining the ring, descriptors may be free again for the backlog.
+        DrainRxBacklog();
+      } else {
+        // RX disabled: ring pointer back to the ring base, its completion causes withdrawn.
+        rxHead = 0;
+        intStatus &= ~(INT_RX_INT | INT_RX_EMPTY);
+        UpdateInterruptLine();
+        if (oldRxConfig & RX_CFG_ENABLE) { ETH_DEBUGP("RX stopped"); }
       }
     } break;
 
     case REG_RX_DESC_BASE:
-      regs.rxDescBase = val;
-      DEBUGP("[Write] RX_DESC_BASE = {:#010x}", val);
-      break;
-
-    case REG_RX_DESC_STATUS: regs.rxDescStatus = val; break;
-
-    case REG_ISR_STATUS:
-      // ISR_STATUS is read-only from the kernel's perspective.
-      DEBUGP("[Write] ISR_STATUS = {:#010x} (ignored, read-only)", val);
-      break;
-
-    case REG_INT_ENABLE: {
-      // Kernel interrupt model:
-      //   ISR: writes 0 to INT_ENABLE to disable all interrupts
-      //   ISR: reads ISR_STATUS (we snapshot those bits in isrAckedBits)
-      //   DPC: processes events based on the snapshot
-      //   DPC: writes 0x54000100 to INT_ENABLE to re-enable
-      //
-      // On re-enable, clear only the bits the ISR actually read. Any new bits set by the worker thread between ISR read
-      // and DPC re-enable are preserved.
-      regs.intEnable = val;
-
-      if (val == INT_ENABLE_NONE) {
-        interruptsEnabled.store(false);
-        DEBUGP("[Write] INT_ENABLE = 0 (interrupts disabled)");
-      } else {
-        // DPC re-enabling interrupts: clear only the bits the ISR processed.
-        if (isrAckedBits != 0) {
-          regs.isrStatus.fetch_and(~isrAckedBits);
-          isrAckedBits = 0;
-        }
-        interruptsEnabled.store(true);
-        DEBUGP("[Write] INT_ENABLE = {:#010x} (interrupts enabled)", val);
-
-        // If new bits accumulated while the DPC was running, fire immediately.
-        if (regs.isrStatus.load() != 0) { FireInterrupt(); }
-      }
-    } break;
-
-    case REG_SOFT_RESET: {
-      regs.softReset = val;
-      DEBUGP("[Write] SOFT_RESET = {:#010x}", val);
-
-      // Kernel NicReset sequence:
-      //   1. Write 0x01805504 (assert reset - bit 19 set)
-      //   2. Stall 10us
-      //   3. Write 0x01005504 (release reset - bit 19 clear)
-      if (val == SOFT_RESET_ASSERT || (val & SOFT_RESET_BIT)) {
-        DEBUGP("Soft reset asserted");
-        Reset();
-      }
-    } break;
-
-    case REG_POWER: regs.power = val; break;
-
-    case REG_MAC_CONFIG:
-      regs.macConfig = val;
-      DEBUGP("[Write] MAC_CONFIG = {:#010x}", val);
-      break;
-
-    case REG_MII_CMD: HandleMdioWrite(val); break;
-
-    case REG_MII_CONFIG:
-      regs.miiConfig = val;
-      DEBUGP("[Write] MII_CONFIG = {:#010x}", val);
-      break;
-
-    case REG_MAC_SPEED:
-      regs.macSpeed = val;
-      DEBUGP("[Write] MAC_SPEED = {:#010x}", val);
-      break;
-
-    case REG_FLOW_CTRL:
-      regs.flowCtrl = val;
-      DEBUGP("[Write] FLOW_CTRL = {:#010x}", val);
-      break;
-
-    case REG_RX_FILTER:
-      regs.rxFilter = val;
-      DEBUGP("[Write] RX_FILTER = {:#010x}", val);
-      break;
-
-    // Primary MAC address.
-    case REG_MAC_ADDR0:
-    case REG_MAC_ADDR0 + 1:
-    case REG_MAC_ADDR0 + 2:
-    case REG_MAC_ADDR0 + 3:
-    case REG_MAC_ADDR0 + 4:
-    case REG_MAC_ADDR0 + 5:
-      memcpy(&regs.macAddr0[offset - REG_MAC_ADDR0], data, size);
-      DEBUGP("[Write] MAC0[{}] = {:#04x}", offset - REG_MAC_ADDR0, static_cast<u32>(*data));
-      break;
-
-    case REG_TX_DESC_Q0:
-      regs.txDescQ0 = val;
-      DEBUGP("[Write] TX_DESC_Q0 = {:#010x}", val);
-      break;
-
-    case REG_TX_DESC_Q1:
-      regs.txDescQ1 = val;
-      DEBUGP("[Write] TX_DESC_Q1 = {:#010x}", val);
-      break;
-
-    case REG_RX_MAX_FRAME:
-      regs.rxMaxFrame = val;
-      DEBUGP("[Write] RX_MAX_FRAME = {:#010x}", val);
-      break;
-
-    // Secondary MAC address.
-    case REG_MAC_ADDR1:
-    case REG_MAC_ADDR1 + 1:
-    case REG_MAC_ADDR1 + 2:
-    case REG_MAC_ADDR1 + 3:
-    case REG_MAC_ADDR1 + 4:
-    case REG_MAC_ADDR1 + 5:
-      memcpy(&regs.macAddr1[offset - REG_MAC_ADDR1], data, size);
-      DEBUGP("[Write] MAC1[{}] = {:#04x}", offset - REG_MAC_ADDR1, static_cast<u32>(*data));
-      break;
-
-    default:
-      LOG_WARNING(ETH, "Unknown register write: offset={:#04x} val={:#010x} size={}", static_cast<u16>(offset), val,
-                  size);
-      break;
-  }
-}
-
-void Xe::PCIDev::ETHERNET::MemSet(u64 writeAddress, s32 data, u64 size) {
-  u8 buffer[8];
-  memset(buffer, data, std::min(size, (u64)sizeof(buffer)));
-  Write(writeAddress, buffer, size);
-}
-
-//
-// MDIO / PHY Interface
-//
-
-// Kernel MII read protocol (PhyReadReg):
-//   1. Write command: ((regAddr << 5 | phySelectBit) << 6) | 0x10
-//   2. Poll bit 4 (busy) until clear
-//   3. Read MII_CMD: data in bits [31:16]
-
-// Kernel MII write protocol (PhyWriteReg):
-//   1. Write command: ((data << 5 | regAddr << 5 | phySelectBit) << 6) | 0x30
-//   2. Poll bit 4 (busy) until clear
-
-void Xe::PCIDev::ETHERNET::HandleMdioRead() {
-  // If busy bit (bit 4) is still set, the previous write was a read command.
-  // Extract the register address and return data in upper 16 bits.
-  if (regs.miiCmd & 0x10) {
-    // Extract register number from the command:
-    // Command format: ((regAddr << 5 | phySelect) << 6) | flags
-    // regAddr is at bits [15:11] after the shift encoding
-    u8 regNum = static_cast<u8>((regs.miiCmd >> 11) & 0x1F);
-    u16 readVal = phyRegs[regNum];
-
-    DEBUGP("MDIO READ: reg={} val={:#06x}", regNum, readVal);
-
-    // Place result in upper 16 bits, clear busy bit.
-    regs.miiCmd = (static_cast<u32>(readVal) << 16);
-  }
-}
-
-void Xe::PCIDev::ETHERNET::HandleMdioWrite(u32 val) {
-  regs.miiCmd = val;
-
-  // Check bit 5 for write operation (PhyWriteReg sets bit 5)
-  // Bit 4 = busy, Bit 0 = direction: 0=read, 1=write
-  // Write command has bits 4+5 set (0x30), read command has bit 4 set (0x10)
-  if (val & 0x20) {
-    // This is a write operation.
-    u16 writeVal = static_cast<u16>((val >> 16) & 0xFFFF);
-    u8 regNum = static_cast<u8>((val >> 11) & 0x1F);
-
-    DEBUGP("MDIO WRITE: reg={} val={:#06x}", regNum, writeVal);
-
-    switch (regNum) {
-      case 0: // BMCR
-        if (writeVal & 0x8000) {
-          // Reset bit - self-clearing, restore defaults
-          phyRegs[0] = 0x1140;
-          phyRegs[1] = 0x78ED;
-          DEBUGP("PHY reset");
-        } else {
-          phyRegs[regNum] = writeVal;
-        }
-        break;
-      case 2: // PHY ID 1 - read only
-      case 3: // PHY ID 2 - read only
-        break;
-      default: phyRegs[regNum] = writeVal; break;
-    }
-
-    // Clear busy bit after write completes
-    regs.miiCmd &= ~0x10;
-  }
-  // If bit 5 is not set, this is a read setup command.
-  // The busy bit (bit 4) stays set until the next read of MII_CMD.
-}
-
-//
-// Descriptor Processing
-//
-
-void Xe::PCIDev::ETHERNET::ProcessTxRing(int queueIndex) {
-  bool active = (queueIndex == 0) ? txQ0Active.load() : txQ1Active.load();
-  u32 descBase = regs.txDescBase[queueIndex];
-
-  if (!active || descBase == 0) return;
-
-  u32 maxDescs = (queueIndex == 0) ? NUM_RING0_TX_DESCRIPTORS : NUM_RING1_TX_DESCRIPTORS;
-  u32 processed = 0;
-
-  while (processed < maxDescs) {
-    u32 descAddr = descBase + (txHead[queueIndex] * sizeof(EmacDescriptor));
-    u8* descPtr = ramPtr->GetPointerToAddress(descAddr);
-    if (!descPtr) break;
-
-    EmacDescriptor desc;
-    memcpy(&desc, descPtr, sizeof(EmacDescriptor));
-
-    // Check if HW owns this descriptor (bit 31 of ownership/DW1)
-    if (!(desc.ownership & TX_OWN_HW)) break;
-
-    // Extract frame length from status DW0 [10:0]
-    u32 frameLen = desc.status & 0x7FF;
-
-    if (frameLen == 0 || frameLen > ETH_MAX_FRAME_SIZE) {
-      // Invalid frame - clear ownership and skip
-      desc.ownership &= ~TX_OWN_HW;
-      memcpy(descPtr, &desc, sizeof(EmacDescriptor));
-      stats.txErrors++;
-    } else {
-      // Get packet data from buffer address (DW2)
-      u8* packetPtr = ramPtr->GetPointerToAddress(desc.bufferAddr);
-      if (packetPtr) {
-        HandleTxPacket(packetPtr, frameLen);
-        stats.txPackets++;
-        stats.txBytes += frameLen;
-      } else {
-        stats.txErrors++;
-      }
-
-      // Clear HW ownership - return descriptor to software
-      desc.ownership &= ~TX_OWN_HW;
-      memcpy(descPtr, &desc, sizeof(EmacDescriptor));
-    }
-
-    DEBUGP("TX[Q{}]: desc={} len={} buf={:#010x}", queueIndex, txHead[queueIndex], frameLen, desc.bufferAddr);
-
-    // Advance to next descriptor (wrap if bit 31 of DW3 is set)
-    if (desc.sizeFlags & DESC_WRAP) {
-      txHead[queueIndex] = 0;
-    } else {
-      txHead[queueIndex] = (txHead[queueIndex] + 1) % maxDescs;
-    }
-    processed++;
-  }
-
-  // Raise TX interrupt once for the batch (bit 4 for Q0, bit 5 for Q1)
-  if (processed > 0) { SetInterruptStatus(queueIndex == 0 ? ISR_TX_Q0 : ISR_TX_Q1); }
-}
-
-void Xe::PCIDev::ETHERNET::ProcessRxDescriptors() {
-  if (!rxActive || regs.rxDescBase == 0) return;
-
-  // Fast check without lock
-  if (!hasRxPending.load(std::memory_order_acquire)) return;
-
-  // Extract packets from queue under lock
-  std::vector<EthernetPacket> packets;
-  {
-    std::lock_guard<std::mutex> lock(rxQueueMutex);
-    if (pendingRxPackets.empty()) return;
-
-    packets.reserve(pendingRxPackets.size());
-    while (!pendingRxPackets.empty()) {
-      packets.push_back(std::move(pendingRxPackets.front()));
-      pendingRxPackets.pop();
-    }
-    hasRxPending.store(false, std::memory_order_release);
-  }
-
-  u32 processed = 0;
-
-  for (auto& pkt : packets) {
-    u32 descAddr = regs.rxDescBase + (rxHead * sizeof(EmacDescriptor));
-    u8* descPtr = ramPtr->GetPointerToAddress(descAddr);
-    if (!descPtr) {
-      LOG_ERROR(ETH, "Invalid RX descriptor address: {:#010x}", descAddr);
-      break;
-    }
-
-    EmacDescriptor desc;
-    memcpy(&desc, descPtr, sizeof(EmacDescriptor));
-
-    // Check HW ownership (bit 31 of DW1)
-    if (!(desc.ownership & RX_OWN_HW)) {
-      LOG_WARNING(ETH, "RX ring full at desc {}, dropping packet", rxHead);
-      stats.rxDropped++;
-      // Force an interrupt so kernel processes existing frames
-      SetInterruptStatus(ISR_RX);
-      continue;
-    }
-
-    // Get buffer size from DW3 [10:0]
-    u32 bufSize = desc.sizeFlags & DESC_SIZE_MASK;
-    u32 copyLen = std::min(pkt.length, bufSize);
-
-    // Get buffer pointer
-    u8* bufPtr = ramPtr->GetPointerToAddress(desc.bufferAddr);
-    if (!bufPtr) {
-      LOG_ERROR(ETH, "RX desc {} invalid buffer: {:#010x}", rxHead, desc.bufferAddr);
-      // Mark as error, return to software
-      desc.status = RX_STS_OVERFLOW | (1 << RX_STS_DESC_COUNT_SHIFT);
-      desc.ownership = 0; // SW owns
-      memcpy(descPtr, &desc, sizeof(EmacDescriptor));
-      stats.rxErrors++;
-    } else {
-      // Copy packet data to guest buffer
-      memcpy(bufPtr, pkt.data.data(), copyLen);
-
-      // Fill in RX descriptor status (DW0):
-      // [10:0]  = frame length
-      // Bit 16  = FRAME_OK
-      // [29:24] = descriptor count (1 for single-descriptor frames)
-      desc.status = (copyLen & RX_STS_FRAME_LEN_MASK) | RX_STS_FRAME_OK | (1 << RX_STS_DESC_COUNT_SHIFT);
-
-      // Clear HW ownership - return to software
-      desc.ownership = 0;
-      memcpy(descPtr, &desc, sizeof(EmacDescriptor));
-
-      stats.rxPackets++;
-      stats.rxBytes += copyLen;
-      processed++;
-    }
-
-    DEBUGP("RX: desc={} len={} buf={:#010x}", rxHead, copyLen, desc.bufferAddr);
-
-    // Advance (wrap if bit 31 of DW3)
-    if (desc.sizeFlags & DESC_WRAP) {
       rxHead = 0;
-    } else {
-      rxHead = (rxHead + 1) % NUM_RX_DESCRIPTORS;
+      ETH_DEBUGP("[Write] RX_DESC_BASE = {:#010x}", GetReg32(REG_RX_DESC_BASE));
+      break;
+
+    case REG_INT_MASK:
+      ETH_DEBUGP("[Write] INT_MASK = {:#010x}", GetReg32(REG_INT_MASK));
+      UpdateInterruptLine();
+      break;
+
+    case REG_CONFIG0:
+      if (GetReg32(REG_CONFIG0) & CONFIG0_SOFT_RESET) { Reset(); }
+      break;
+
+    case REG_PHY_CONTROL: HandleMdioCommand(GetReg32(REG_PHY_CONTROL)); break;
+
+    default: break;
+  }
+}
+
+// MDIO / PHY interface
+//
+// PHY_CONTROL: data << 16 | reg << 11 | phyAddr << 6 | WRITE(0x20) | BUSY(0x10). The PHY address is 1 on southbridge
+// revisions below 0x70 and 0 otherwise, the emulated PHY answers on any address. Commands complete immediately: a
+// BUSY bit left set makes the kernel stop with fatal error 75085.
+
+void Xe::PCIDev::ETHERNET::HandleMdioCommand(u32 command) {
+  if (!(command & MDIO_BUSY)) { return; }
+
+  const u8 reg = static_cast<u8>((command >> MDIO_REG_SHIFT) & 0x1F);
+  u32 result = command & ~MDIO_BUSY;
+
+  if (command & MDIO_WRITE) {
+    const u16 value = static_cast<u16>(command >> MDIO_DATA_SHIFT);
+    PhyWrite(reg, value);
+    ETH_DEBUGP("MDIO WRITE: reg={} val={:#06x}", reg, value);
+  } else {
+    const u16 value = PhyRead(reg);
+    result = (result & 0xFFFF) | (static_cast<u32>(value) << MDIO_DATA_SHIFT);
+    ETH_DEBUGP("MDIO READ: reg={} val={:#06x}", reg, value);
+  }
+
+  SetReg32(REG_PHY_CONTROL, result);
+}
+
+u16 Xe::PCIDev::ETHERNET::PhyRead(u8 reg) {
+  reg &= 0x1F;
+  if (phyId1 == PHY_ATHEROS && reg == 0x1E) { return phyDebugRegs[phyRegs[0x1D] & 0x3F]; }
+  return phyRegs[reg];
+}
+
+void Xe::PCIDev::ETHERNET::PhyWrite(u8 reg, u16 value) {
+  switch (reg) {
+    case 0: // BMCR
+      if (value & 0x8000) {
+        // Software reset: self clearing, status registers back to defaults. The written control bits take effect.
+        const u16 anar = phyRegs[4];
+        PhyReset();
+        phyRegs[4] = anar;
+      }
+      // Reset (15) and restart auto-negotiation (9) are self clearing, negotiation completes instantly.
+      phyRegs[0] = value & ~0x8200;
+      break;
+    case 1: // BMSR, read only
+    case 2: // PHY ID 1, read only
+    case 3: // PHY ID 2, read only
+    case 5: // ANLPAR, read only
+    case 6: // ANER, read only
+      break;
+    case 0x1E:
+      // Atheros debug port data (the kernel's PHY setup adjusts debug registers 0x0B, 0x12 and 0x29 through it).
+      if (phyId1 == PHY_ATHEROS) {
+        phyDebugRegs[phyRegs[0x1D] & 0x3F] = value;
+      } else {
+        phyRegs[0x1E] = value;
+      }
+      break;
+    default: phyRegs[reg & 0x1F] = value; break;
+  }
+}
+
+void Xe::PCIDev::ETHERNET::PhyReset() {
+  const u16 anar = phyRegs[4];
+  memset(phyRegs, 0, sizeof(phyRegs));
+  phyRegs[0] = kPhyBmcrDefault;
+  phyRegs[2] = phyId1;
+  phyRegs[3] = phyId2;
+  phyRegs[4] = anar ? anar : kPhyAnarDefault;
+  phyRegs[6] = 0x000F;
+  phyRegs[9] = 0x0300;
+  phyRegs[10] = 0x7C00;
+  UpdatePhyLinkBits();
+}
+
+void Xe::PCIDev::ETHERNET::UpdatePhyLinkBits() {
+  const bool up = linkUp.load();
+  // BMSR bit 5 (AN complete) stays set so the kernel treats the link state as valid in both directions.
+  phyRegs[1] = kPhyBmsrBase | (up ? kPhyBmsrLinkUp : 0);
+  phyRegs[5] = up ? kPhyAnlparLinkUp : 0;
+  // Marvell's PHY specific status (speed/duplex resolved, real-time link). Other vendors keep their own registers.
+  if (phyId1 == PHY_MARVELL) { phyRegs[17] = up ? (kPhyMarvellStatus | 0x0400) : 0; }
+}
+
+// Link state
+
+void Xe::PCIDev::ETHERNET::SetLinkUp(bool up) {
+  std::lock_guard<std::mutex> lock(stateMutex);
+  const bool wasUp = linkUp.exchange(up);
+  UpdatePhyLinkBits();
+  if (wasUp != up) {
+    LOG_INFO(ETH, "Link status: {}", up ? "UP" : "DOWN");
+    SetInterruptStatus(INT_LINK);
+  }
+}
+
+// Interrupts
+
+// Every cause latches into INT_STATUS, whatever INT_MASK says: the mask only gates the line (SiS190 family, which the
+// Xbox 360 Linux Kernel patches bring up with the stock sis190 driver). The kernel relies on it: its ISR masks
+// everything and reads the status, and its DPC walks the RX ring and restores the mask without walking the ring again,
+// so a frame placed in the ring while the mask was 0 has to raise the line once the mask is back (else it waits for the
+// next frame, and a TCP sender waits for its acknowledgement until its retransmission timeout).
+//
+// Stopping an engine (TX/RX_CONFIG enable clear) resets it: its ring pointer goes back to the base and its completion
+// causes are withdrawn. libxenon runs the EMAC polled with the mask at 0, its descriptors requesting interrupts, and
+// stops both engines before it starts a kernel. Linux's xenon_net then requests its shared interrupt before it has
+// rings, and the handler's first (debug) call must find no RX cause. sis190 soft-resets the chip and clears INT_STATUS
+// before it unmasks.
+void Xe::PCIDev::ETHERNET::SetInterruptStatus(u32 bits) {
+  intStatus |= bits;
+  UpdateInterruptLine();
+}
+
+// The EMAC line is level sensitive, it drops when the ISR masks or reads the status.
+void Xe::PCIDev::ETHERNET::UpdateInterruptLine() {
+  const u32 mask = GetReg32(REG_INT_MASK);
+  if (interruptLine.Set((intStatus & mask) != 0)) {
+    ETH_DEBUGP("IRQ assert: status={:#010x} mask={:#010x}", intStatus, mask);
+    stats.interrupts++;
+  }
+}
+
+// DMA helpers
+
+bool Xe::PCIDev::ETHERNET::ReadDescriptor(u32 address, EmacDescriptor &desc) {
+  const u8 *ptr = dma.ReadPointer(address, sizeof(EmacDescriptor));
+  if (!ptr) { return false; }
+  // Ownership is written last by the guest. Read it first, then the rest of the descriptor.
+  memcpy(&desc.control, ptr + offsetof(EmacDescriptor, control), sizeof(u32));
+  std::atomic_thread_fence(std::memory_order_acquire);
+  memcpy(&desc.status, ptr + offsetof(EmacDescriptor, status), sizeof(u32));
+  memcpy(&desc.bufferAddr, ptr + offsetof(EmacDescriptor, bufferAddr), sizeof(u32));
+  memcpy(&desc.bufferSize, ptr + offsetof(EmacDescriptor, bufferSize), sizeof(u32));
+  return true;
+}
+
+// TX
+
+void Xe::PCIDev::ETHERNET::ProcessTxQueue(int queue) {
+  const u32 goBit = queue ? TX_CFG_Q1_GO : TX_CFG_Q0_GO;
+  u32 txConfig = GetReg32(REG_TX_CONFIG);
+  if (!(txConfig & TX_CFG_ENABLE) || !(txConfig & goBit)) { return; }
+
+  const u32 base = txDescBase[queue];
+  bool raiseInterrupt = false;
+  bool drained = false;
+  u8 frame[ETH_MAX_FRAME_SIZE];
+
+  for (u32 frames = 0; frames < MAX_RING_DESCRIPTORS; frames++) {
+    const u32 firstAddr = base + txHead[queue] * sizeof(EmacDescriptor);
+    EmacDescriptor first{};
+    if (base == 0 || !ReadDescriptor(firstAddr, first)) {
+      LOG_ERROR(ETH, "TX[Q{}]: invalid descriptor address {:#010x}", queue, firstAddr);
+      SetInterruptStatus(INT_BUS_ABORT_DETECTED);
+      drained = true;
+      break;
     }
+    if (!(first.control & DESC_OWNERSHIP)) {
+      drained = true;
+      break;
+    }
+
+    // Gather the frame. DW0 of the first descriptor holds the frame length, fragments follow in owned descriptors (the
+    // driver splits buffers crossing a page into two descriptors).
+    const u32 frameLen = first.status & DESC_SIZE_MASK;
+    u32 gathered = 0;
+    bool ok = frameLen != 0 && frameLen <= ETH_MAX_FRAME_SIZE;
+    u32 head = txHead[queue];
+    EmacDescriptor current = first;
+
+    for (u32 fragments = 0; fragments < 8; fragments++) {
+      const u32 fragLen = std::min<u32>(current.bufferSize & DESC_SIZE_MASK, frameLen - gathered);
+      if (ok && fragLen != 0) {
+        const u8 *ptr = dma.ReadPointer(current.bufferAddr, fragLen);
+        if (ptr) {
+          memcpy(frame + gathered, ptr, fragLen);
+          gathered += fragLen;
+        } else {
+          ok = false;
+        }
+      }
+      head = (current.bufferSize & DESC_WRAP) ? 0 : (head + 1) % MAX_RING_DESCRIPTORS;
+
+      if (!ok || gathered >= frameLen) { break; }
+
+      // Continuation descriptor. It must already be owned, the driver hands over the first descriptor last.
+      if (!ReadDescriptor(base + head * sizeof(EmacDescriptor), current) || !(current.control & DESC_OWNERSHIP)) {
+        ok = false;
+        break;
+      }
+    }
+    txHead[queue] = head;
+
+    // Write back status to the first descriptor only: ownership, error bits and retry count cleared on success. The
+    // submitted control word carries 0x00230000 which overlaps the status field, so it must be cleared here or the
+    // driver counts every frame as a collision/underrun.
+    u32 control = first.control & ~(static_cast<u32>(DESC_OWNERSHIP) | TX_STS_ERROR_MASK | TX_STS_TRY_COUNT_MASK);
+    control |= ok ? 1u : TX_STS_TIMEOUT;
+    std::atomic_thread_fence(std::memory_order_release);
+    if (u8 *ptr = dma.BeginWrite(firstAddr, sizeof(EmacDescriptor))) {
+      memcpy(ptr + offsetof(EmacDescriptor, control), &control, sizeof(control));
+      dma.EndWrite(firstAddr, sizeof(EmacDescriptor));
+    }
+
+    if (ok) {
+      // Short frames go out zero padded to the Ethernet minimum.
+      u32 sent = frameLen;
+      if (sent < ETH_MIN_FRAME_SIZE) {
+        memset(frame + sent, 0, ETH_MIN_FRAME_SIZE - sent);
+        sent = ETH_MIN_FRAME_SIZE;
+      }
+      stats.txPackets++;
+      HandleTxPacket(frame, sent);
+      ETH_DEBUGP("TX[Q{}]: len={} next={}", queue, frameLen, txHead[queue]);
+    } else {
+      stats.txErrors++;
+      LOG_WARNING(ETH, "TX[Q{}]: malformed frame at {:#010x} (len {})", queue, firstAddr, frameLen);
+    }
+
+    if (first.control & DESC_INTERRUPT) { raiseInterrupt = true; }
   }
 
-  if (processed > 0) { SetInterruptStatus(ISR_RX); }
+  if (drained) {
+    // Queue idle: clear its GO bit so the next transmit restarts it instead of deferring.
+    SetReg32(REG_TX_CONFIG, GetReg32(REG_TX_CONFIG) & ~goBit);
+  }
+  if (raiseInterrupt) { SetInterruptStatus(queue ? INT_TX_Q1_INT : INT_TX_Q0_INT); }
 }
 
-//
-// Packet Handling
-//
+// The backend's send only queues the frame, so it runs here, under the device lock, from the guest's GO write.
+void Xe::PCIDev::ETHERNET::HandleTxPacket(const u8 *data, u32 len) {
+  if (!data || len == 0) { return; }
 
-void Xe::PCIDev::ETHERNET::HandleTxPacket(const u8* data, u32 len) {
-  if (!data || len == 0) return;
+  auto &bridge = Network::GetNetworkBridge();
+  if (bridge.IsActive() && bridge.GetBackend()) { bridge.GetBackend()->SendPacket(data, len); }
 
-  auto& bridge = Network::GetNetworkBridge();
-  if (bridge.IsActive() && bridge.GetBackend()) {
-    if (!bridge.GetBackend()->SendPacket(data, len)) { stats.txDropped++; }
+  ETH_DEBUGP("TX: dst={:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X} len={}", data[0], data[1], data[2], data[3], data[4],
+             data[5], len);
+}
+
+// RX
+
+// Hardware address filter. Unicast frames must match one of the two station addresses unless promiscuous, broadcast is
+// always accepted, multicast needs the multicast enable bits (the driver does exact matching in software).
+bool Xe::PCIDev::ETHERNET::AcceptFrame(const u8 *frame, u32 length) const {
+  if (length < 6) { return false; }
+  const u16 filter = GetReg16(REG_RX_FILTER);
+  if (filter & RX_FILTER_PROMISCUOUS) { return true; }
+
+  static constexpr u8 broadcast[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+  if (memcmp(frame, broadcast, 6) == 0) { return true; }
+  if (frame[0] & 1) { return (filter & (RX_FILTER_MCAST_HASH | RX_FILTER_ALL_MCAST)) != 0; }
+
+  return memcmp(frame, &regFile[REG_MAC_ADDR0], 6) == 0 || memcmp(frame, &regFile[REG_MAC_ADDR1], 6) == 0;
+}
+
+bool Xe::PCIDev::ETHERNET::DeliverRxFrame(const u8 *frame, u32 length, bool &interrupt) {
+  const u32 base = GetReg32(REG_RX_DESC_BASE);
+  if (base == 0) { return false; }
+
+  const u32 descAddr = base + rxHead * sizeof(EmacDescriptor);
+  EmacDescriptor desc{};
+  if (!ReadDescriptor(descAddr, desc)) {
+    LOG_ERROR(ETH, "RX: invalid descriptor address {:#010x}", descAddr);
+    SetInterruptStatus(INT_BUS_ABORT_DETECTED);
+    return false;
+  }
+  if (!(desc.control & DESC_OWNERSHIP)) {
+    // Ring full, the frame waits until the driver returns descriptors.
+    return false;
   }
 
-  DEBUGP("TX: dst={:02X}:{:02X}:{:02X}:{:02X}:{:02X}:{:02X} len={}", data[0], data[1], data[2], data[3], data[4],
-         data[5], len);
+  // Short frames are zero padded to the Ethernet minimum, the reported length excludes the FCS.
+  const u32 frameLen = std::max<u32>(length, ETH_MIN_FRAME_SIZE);
+  const u32 bufferSize = desc.bufferSize & DESC_SIZE_MASK;
+  u32 status = 1u << RX_STS_DESC_COUNT_SHIFT;
+
+  u8 *buffer = frameLen <= bufferSize ? dma.BeginWrite(desc.bufferAddr, frameLen) : nullptr;
+  if (buffer) {
+    memcpy(buffer, frame, length);
+    if (frameLen > length) { memset(buffer + length, 0, frameLen - length); }
+    dma.EndWrite(desc.bufferAddr, frameLen);
+    status |= frameLen | RX_STS_CRC_OK;
+    stats.rxPackets++;
+  } else {
+    LOG_ERROR(ETH, "RX: descriptor {} has an unusable buffer {:#010x} (size {})", rxHead, desc.bufferAddr, bufferSize);
+    status |= RX_STS_ABORT;
+  }
+
+  // Status first, then hand the descriptor back. DW3 (buffer size) is never modified, the driver asserts on it.
+  u8 *descPtr = dma.BeginWrite(descAddr, sizeof(EmacDescriptor));
+  memcpy(descPtr + offsetof(EmacDescriptor, status), &status, sizeof(status));
+  std::atomic_thread_fence(std::memory_order_release);
+  const u32 control = desc.control & ~DESC_OWNERSHIP;
+  memcpy(descPtr + offsetof(EmacDescriptor, control), &control, sizeof(control));
+  dma.EndWrite(descAddr, sizeof(EmacDescriptor));
+
+  ETH_DEBUGP("RX: desc={} len={} buf={:#010x}", rxHead, frameLen, desc.bufferAddr);
+
+  rxHead = (desc.bufferSize & DESC_WRAP) ? 0 : (rxHead + 1) % MAX_RING_DESCRIPTORS;
+  if (desc.control & DESC_INTERRUPT) { interrupt = true; }
+  return true;
 }
 
-void Xe::PCIDev::ETHERNET::EnqueueRxPacket(const u8* data, u32 length) {
-  if (!data || length == 0) return;
+void Xe::PCIDev::ETHERNET::DrainRxBacklog() {
+  if (!(GetReg32(REG_RX_CONFIG) & RX_CFG_ENABLE)) { return; }
+  bool interrupt = false;
+  while (rxBacklogCount != 0) {
+    const BacklogFrame &waiting = rxBacklog[rxBacklogHead];
+    if (!DeliverRxFrame(waiting.data.data(), waiting.length, interrupt)) { break; }
+    rxBacklogHead = (rxBacklogHead + 1) % kRxBacklogFrames;
+    --rxBacklogCount;
+  }
+  rxBacklogged.store(rxBacklogCount != 0, std::memory_order_relaxed);
+  if (interrupt) { SetInterruptStatus(INT_RX_INT); }
+}
 
-  // RX DMA disabled = no reception on real hardware. Dropping here also keeps pre-boot host traffic from piling up
-  // against a ring the guest has not set up yet.
-  if (!rxActive.load(std::memory_order_acquire)) {
+// Runs on the backend's reader thread, the frame goes into the ring right here unless
+// frames are already waiting for free descriptors, in which case it queues behind them.
+void Xe::PCIDev::ETHERNET::EnqueueRxPacket(const u8 *data, u32 length) {
+  if (!data || length == 0) { return; }
+
+  std::lock_guard<std::mutex> lock(stateMutex);
+  // RX disabled = no reception on real hardware. Dropping here also keeps pre-boot host traffic from piling up against
+  // a ring the guest hasn't set up yet.
+  if (!(GetReg32(REG_RX_CONFIG) & RX_CFG_ENABLE)) {
+    stats.rxDropped++;
+    return;
+  }
+  if (!AcceptFrame(data, length)) { return; }
+  if (length > ETH_MAX_FRAME_SIZE) {
     stats.rxDropped++;
     return;
   }
 
-  EthernetPacket pkt;
-  pkt.data.assign(data, data + length);
-  pkt.length = length;
-
-  {
-    std::lock_guard<std::mutex> lock(rxQueueMutex);
-    if (pendingRxPackets.size() < 256) {
-      pendingRxPackets.push(std::move(pkt));
-      hasRxPending.store(true);
-      workerCV.notify_one();
-    } else {
-      stats.rxDropped++;
-    }
-  }
-}
-
-bool Xe::PCIDev::ETHERNET::DequeueRxPacket(EthernetPacket& packet) {
-  std::lock_guard<std::mutex> lock(rxQueueMutex);
-  if (pendingRxPackets.empty()) return false;
-
-  packet = std::move(pendingRxPackets.front());
-  pendingRxPackets.pop();
-  hasRxPending.store(!pendingRxPackets.empty());
-  return true;
-}
-
-//
-// Link State
-//
-
-void Xe::PCIDev::ETHERNET::SetLinkUp(bool up) {
-  bool wasUp = linkUp.exchange(up);
-  if (wasUp != up) {
-    LOG_INFO(ETH, "Link status: {}", up ? "UP" : "DOWN");
-
-    if (up) {
-      phyRegs[1] |= 0x0004;
-      phyRegs[17] |= 0x0400;
-    } else {
-      phyRegs[1] &= ~0x0004;
-      phyRegs[17] &= ~0x0400;
-    }
-
-    // MII interrupt (bit 16) for link state change
-    SetInterruptStatus(ISR_MII);
-  }
-}
-
-//
-// Interrupt Processing
-//
-
-// Kernel interrupt model:
-//   1. HW sets bits in ISR_STATUS
-//   2. HW fires interrupt if INT_ENABLE is non-zero
-//   3. Kernel ISR writes 0 to INT_ENABLE (disables interrupts)
-//   4. Kernel ISR reads ISR_STATUS to get pending bits
-//   5. Kernel DPC processes the bits
-//   6. Kernel DPC writes 0x54000100 to INT_ENABLE (re-enables)
-//   7. On re-enable, we clear ISR_STATUS (handled in Write for INT_ENABLE)
-
-void Xe::PCIDev::ETHERNET::SetInterruptStatus(u32 bits) {
-  // Set status bits atomically
-  regs.isrStatus.fetch_or(bits);
-
-  // Fire interrupt if enabled
-  FireInterrupt();
-}
-
-void Xe::PCIDev::ETHERNET::FireInterrupt() {
-  if (!interruptsEnabled.load()) return;
-
-  u32 status = regs.isrStatus.load();
-  if (status == 0) return;
-
-  // Only fire if there are enabled bits.
-  // INT_ENABLE acts as a global gate, not a per-bit mask.
-  if (regs.intEnable != 0) {
-    DEBUGP("Firing interrupt: status={:#010x} enable={:#010x}", status, regs.intEnable);
-    parentBus->RouteInterrupt(PRIO_ENET);
-  }
-}
-
-//
-// PCI Config Space
-//
-
-void Xe::PCIDev::ETHERNET::ConfigRead(u64 readAddress, u8* data, u64 size) {
-  memcpy(data, &pciConfigSpace.data[static_cast<u8>(readAddress)], size);
-}
-
-void Xe::PCIDev::ETHERNET::ConfigWrite(u64 writeAddress, const u8* data, u64 size) {
-  u64 tmp = 0;
-  memcpy(&tmp, data, size);
-
-  if (static_cast<u8>(writeAddress) >= 0x10 && static_cast<u8>(writeAddress) < 0x34) {
-    const u32 regOffset = (static_cast<u8>(writeAddress) - 0x10) >> 2;
-    if (pciDevSizes[regOffset] != 0) {
-      if (tmp == 0xFFFFFFFF) { // BAR size discovery
-        u64 x = 2;
-        for (int idx = 2; idx < 31; idx++) {
-          tmp &= ~x;
-          x <<= 1;
-          if (x >= pciDevSizes[regOffset]) break;
-        }
-        tmp &= ~0x3;
-      }
-    }
-    if (static_cast<u8>(writeAddress) == 0x30) {
-      tmp = 0; // Expansion ROM not implemented
-    }
+  if (rxBacklogCount == 0) {
+    bool interrupt = false;
+    const bool delivered = DeliverRxFrame(data, length, interrupt);
+    if (interrupt) { SetInterruptStatus(INT_RX_INT); }
+    if (delivered) { return; }
   }
 
-  memcpy(&pciConfigSpace.data[static_cast<u8>(writeAddress)], &tmp, size);
+  if (rxBacklogCount == kRxBacklogFrames) {
+    stats.rxDropped++;
+    return;
+  }
+  BacklogFrame &slot = rxBacklog[(rxBacklogHead + rxBacklogCount) % kRxBacklogFrames];
+  memcpy(slot.data.data(), data, length);
+  slot.length = length;
+  ++rxBacklogCount;
+  DrainRxBacklog();
+  // Still waiting: the worker retries it (a polled driver returns descriptors without a register write).
+  if (rxBacklogCount != 0) { KickWorker(); }
 }
 
-// Worker Thread
-void Xe::PCIDev::ETHERNET::WorkerThreadLoop() {
-  Base::SetCurrentThreadName("[Xe] Ethernet");
+// Worker thread
+
+void Xe::PCIDev::ETHERNET::KickWorker() {
+  workPending.store(true, std::memory_order_release);
+  workerCV.notify_one();
+}
+
+void Xe::PCIDev::ETHERNET::WorkerLoop() {
 
   while (workerRunning && XeRunning) {
     {
+      // Frames waiting for descriptors are retried every millisecond, a polled driver (libxenon) returns descriptors
+      // without a register write.
+      const auto wait =
+        rxBacklogged.load(std::memory_order_relaxed) ? std::chrono::milliseconds(1) : std::chrono::milliseconds(100);
       std::unique_lock<std::mutex> lock(workerMutex);
-      workerCV.wait_for(lock, std::chrono::microseconds(500), [this] {
-        return !workerRunning || !XeRunning || txQ0Active || txQ1Active || (hasRxPending.load() && rxActive);
-      });
+      workerCV.wait_for(lock, wait,
+                        [this] { return !workerRunning || !XeRunning || workPending.load(std::memory_order_acquire); });
     }
+    if (!workerRunning || !XeRunning) { break; }
+    workPending.store(false, std::memory_order_release);
 
-    if (!workerRunning || !XeRunning) break;
-
-    // Process TX rings
-    if (txQ0Active) ProcessTxRing(0);
-    if (txQ1Active) ProcessTxRing(1);
-
-    // Process RX
-    if (rxActive) ProcessRxDescriptors();
+    if (rxBacklogged.load(std::memory_order_relaxed)) {
+      std::lock_guard<std::mutex> lock(stateMutex);
+      DrainRxBacklog();
+    }
   }
 }

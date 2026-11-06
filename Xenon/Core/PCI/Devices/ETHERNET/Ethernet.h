@@ -2,286 +2,277 @@
 /* Copyright 2026 Xenon Emulator Project. All rights reserved. */
 /***************************************************************/
 
-// Xenon Fast Ethernet Adapter Emulation.
+// Xenon Fast Ethernet Adapter (southbridge EMAC) emulation.
+//
+// Behaviour follows the kernel's network driver (interrupt driven) and the kernel debugger's (polled). All device
+// registers and DMA descriptors are little-endian. MMIO data arrives here in guest memory byte order, so reading it
+// as a host little-endian integer gives the device value directly (the guest byte-swaps on its side).
 
 #pragma once
 
 #include "Core/PCI/Bridge/PCIBridge.h"
+#include "Core/PCI/DmaEngine.h"
+#include "Core/PCI/InterruptLine.h"
 #include "Core/PCI/PCIDevice.h"
+#include "Core/PCI/Worker.h"
 #include "Core/RAM/RAM.h"
 
 #include <array>
 #include <atomic>
 #include <condition_variable>
+#include <memory>
 #include <mutex>
-#include <queue>
 #include <thread>
 #include <vector>
 
-#define ETHERNET_DEV_SIZE 0x80
+// Frame size constants. The kernel programs MAX_PACKET_SIZE = 1522.
+constexpr u32 ETH_MAX_FRAME_SIZE = 1522; // Including VLAN tag, excluding FCS
+constexpr u32 ETH_MIN_FRAME_SIZE = 60;   // Minimum frame without FCS, short frames are zero padded
 
-// Frame size constants
-#define ETH_MAX_FRAME_SIZE 1522 // Including VLAN tag
-#define ETH_MTU            1500
-#define ETH_MIN_FRAME_SIZE 64
-#define ETH_RX_BUFFER_SIZE 1528 // 1522 data + 6 padding (kernel uses this)
+// Most descriptors of a ring walk (the wrap bit is authoritative, this only bounds runaway rings)
+constexpr u32 MAX_RING_DESCRIPTORS = 256;
 
-// Descriptor ring sizes (kernel allocates 64 RX descriptors)
-#define NUM_RING0_TX_DESCRIPTORS 32
-#define NUM_RING1_TX_DESCRIPTORS 8
-#define NUM_RX_DESCRIPTORS       64
+namespace Xe::PCIDev {
 
-namespace Xe {
-  namespace PCIDev {
+  // EMAC Register Map (offsets from BAR0, phys 0xEA001400, kernel VA 0x7FEA1400)
+  enum EMAC_REG : u8 {
+    REG_TX_CONFIG = 0x00,       // Bit 0 TX enable, bit 4/5 queue 0/1 GO (HW clears when idle), bit 16 queue select
+    REG_TX_DESC_BASE = 0x04,    // TX ring base of the queue selected by TX_CONFIG bit 16
+    REG_RX_CONFIG = 0x10,       // Bit 0 RX enable, bit 4 RX DMA active
+    REG_RX_DESC_BASE = 0x14,    // RX ring base
+    REG_RX_DESC_CURRENT = 0x1C, // Current RX descriptor (phys). Kernel asserts it equals the base after RX stop
+    REG_INT_STATUS = 0x20,      // Interrupt status, clear on read
+    REG_INT_MASK = 0x24,        // Interrupt mask
+    REG_CONFIG0 = 0x28,         // Bit 15: soft reset
+    REG_PHY_CONTROL = 0x44,     // MDIO command/data
+    REG_RX_FILTER = 0x60,       // u16 receive filter
+    REG_MAC_ADDR0 = 0x62,       // Unicast address 0 (6 bytes)
+    REG_MAX_PACKET_SIZE = 0x78, // u16, 1522
+    REG_MAC_ADDR1 = 0x7A,       // Unicast address 1 (6 bytes)
+  };
 
-    // EMAC Register Map (offsets from BAR0, base 0x7FEA1400)
-    enum EMAC_REG : u8 {
-      REG_TX_CONFIG = 0x00,      // TX DMA config. Bit 0: active (HW status). Bit 4: Q0 enable. Bit 5: Q1 enable.
-      REG_TX_DESC_BASE = 0x04,   // TX descriptor ring base (selected by TX_CONFIG ring select bit)
-      REG_TX_DESC_STATUS = 0x0C, // TX descriptor status / next free
-      REG_RX_CONFIG = 0x10,      // RX DMA config. Bit 0: active (HW status). Kernel writes 0x111C1000 to enable.
-      REG_RX_DESC_BASE = 0x14,   // RX descriptor ring base address
-      REG_RX_DESC_STATUS = 0x1C, // RX descriptor status / next free
-      REG_ISR_STATUS = 0x20,     // Interrupt Status (read-only from kernel, written by HW)
-      REG_INT_ENABLE = 0x24,     // Interrupt Enable/Mask. Write 0 = disable all. Write 0x54000100 = enable.
-      REG_SOFT_RESET = 0x28,     // Soft reset. Write 0x01805504 = assert, 0x01005504 = release.
-      REG_POWER = 0x30,          // Power management
-      REG_MAC_CONFIG = 0x40,     // MAC configuration (speed, duplex, flow control)
-      REG_MII_CMD = 0x44,        // MII/MDIO command register (PHY access)
-      REG_MII_CONFIG = 0x48,     // MII configuration (FORCE_LINK toggle for Jasper)
-      REG_MAC_SPEED = 0x50,      // MAC speed/duplex setting
-      REG_FLOW_CTRL = 0x54,      // Flow control (0x10000000 when link down, 0 when up)
-      REG_RX_FILTER = 0x60,      // Receive filter control
-      REG_MAC_ADDR0 = 0x62,      // Primary MAC address (6 bytes, byte-written with eieio)
-      REG_TX_DESC_Q0 = 0x68,     // TX descriptor ring Q0 offset
-      REG_TX_DESC_Q1 = 0x6C,     // TX descriptor ring Q1 offset
-      REG_MCAST_HASH0 = 0x68,    // Multicast hash filter 0 (alias, context-dependent)
-      REG_MCAST_HASH1 = 0x6C,    // Multicast hash filter 1 (alias, context-dependent)
-      REG_RX_MAX_FRAME = 0x78,   // Max frame size / RX config
-      REG_MAC_ADDR1 = 0x7A,      // Secondary MAC address (6 bytes)
-    };
+  // INT_STATUS / INT_MASK bits
+  enum EMAC_INT_BITS : u32 {
+    INT_TX_Q0_INT = 0x00000004,
+    INT_TX_Q0_EMPTY = 0x00000008,
+    INT_TX_Q1_INT = 0x00000010,
+    INT_TX_Q1_EMPTY = 0x00000020,
+    INT_RX_INT = 0x00000040,
+    INT_RX_EMPTY = 0x00000080,
+    INT_LINK = 0x00010000,
+    INT_BUS_ABORT_DETECTED = 0x00200000,
+  };
 
-    // ISR_STATUS bits (0x7FEA1420)
-    enum EMAC_ISR_BITS : u32 {
-      ISR_TX_Q0 = 0x00000010, // Bit 4: TX queue 0 complete
-      ISR_TX_Q1 = 0x00000020, // Bit 5: TX queue 1 complete
-      ISR_RX = 0x00000040,    // Bit 6: RX frame received
-      ISR_MII = 0x00010000,   // Bit 16: PHY/MII status change
-    };
+  // TX_CONFIG bits
+  enum EMAC_TX_CFG : u32 {
+    TX_CFG_ENABLE = 0x00000001,    // Bit 0: TX enable (reads back as written)
+    TX_CFG_Q0_GO = 0x00000010,     // Bit 4: queue 0 start, cleared by HW once the queue is drained
+    TX_CFG_Q1_GO = 0x00000020,     // Bit 5: queue 1 start, cleared by HW once the queue is drained
+    TX_CFG_QUEUE_SEL = 0x00010000, // Bit 16: TX_DESC_BASE addresses queue 1
+  };
 
-// INT_ENABLE values (0x7FEA1424) - from kernel ISR/DPC flow
-#define INT_ENABLE_ALL  0x54000100u // Enable TX/RX/MII interrupts
-#define INT_ENABLE_NONE 0x00000000u // Disable all interrupts
+  // RX_CONFIG bits
+  enum EMAC_RX_CFG : u32 {
+    RX_CFG_ENABLE = 0x00000001, // Bit 0: RX enable
+    RX_CFG_ACTIVE = 0x00000010, // Bit 4: RX DMA active. Must stay set while running (kernel watchdog)
+  };
 
-    // TX_CONFIG bits (0x7FEA1400)
-    enum EMAC_TX_CFG : u32 {
-      TX_CFG_ACTIVE = 0x00000001,    // Bit 0: TX DMA active (HW status, poll to check stop)
-      TX_CFG_Q0_EN = 0x00000010,     // Bit 4: TX queue 0 enable
-      TX_CFG_Q1_EN = 0x00000020,     // Bit 5: TX queue 1 enable
-      TX_CFG_BASE_BITS = 0x00001C00, // Bits [12:10]: base configuration
-      TX_CFG_RING_SEL = 0x00010000,  // Bit 16: select ring 1 for descriptor base read/write
-      TX_CFG_START = 0x00001C01,     // Base value for NicStartTx (active + base bits)
-    };
+  // CONFIG0 bits
+  enum EMAC_CONFIG0_BITS : u32 {
+    CONFIG0_SOFT_RESET = 0x00008000,
+  };
 
-    // RX_CONFIG bits (0x7FEA1410)
-    enum EMAC_RX_CFG : u32 {
-      RX_CFG_ACTIVE = 0x00000001, // Bit 0: RX DMA active (HW status, poll to check stop)
-      RX_CFG_ENABLE = 0x111C1000, // Full enable value written by kernel
-    };
+  // RX_FILTER bits
+  enum EMAC_RX_FILTER_BITS : u16 {
+    RX_FILTER_PROMISCUOUS = 0x0100,
+    RX_FILTER_MCAST_HASH = 0x0200,
+    RX_FILTER_ALL_MCAST = 0x0400,
+  };
 
-// DMA Descriptor (16 bytes)
+// DMA Descriptor (16 bytes, little-endian, 16 byte aligned)
 #pragma pack(push, 1)
-    struct EmacDescriptor {
-      u32 status;     // +0x00: Status/control flags
-      u32 ownership;  // +0x04: Bit 31 = HW owns (1=HW, 0=SW)
-      u32 bufferAddr; // +0x08: Physical address of data buffer
-      u32 sizeFlags;  // +0x0C: [10:0] buffer size, bit 31 = wrap (last in ring)
-    };
+  struct EmacDescriptor {
+    u32 status;     // +0x00 RX: status written by HW. TX: frame length on the first descriptor, 0 on continuations
+    u32 control;    // +0x04 Bit 31 ownership (1 = HW), bit 30 interrupt request, TX control/status bits
+    u32 bufferAddr; // +0x08 Physical address of the data buffer
+    u32 bufferSize; // +0x0C [10:0] buffer size, bit 31 = wrap (last in ring). Never modified by HW
+  };
 #pragma pack(pop)
+  static_assert(sizeof(EmacDescriptor) == 16, "EMAC descriptors are 16 bytes");
 
-    // RX Descriptor Status (DW0) bits
-    enum RX_STATUS_BITS : u32 {
-      RX_STS_FRAME_LEN_MASK = 0x000007FF, // [10:0] received frame length
-      RX_STS_FRAME_OK = 0x00010000,       // Bit 16: frame received OK
-      RX_STS_CRC_ERROR = 0x00020000,      // Bit 17: CRC error
-      RX_STS_ALIGN_ERROR = 0x00080000,    // Bit 19: alignment error
-      RX_STS_OVERFLOW = 0x00200000,       // Bit 21: RX overflow
-      RX_STS_TOO_LONG = 0x00400000,       // Bit 22: frame too long
-      RX_STS_DESC_COUNT_SHIFT = 24,
+  // Descriptor control (DW1) bits, shared by RX and TX
+  enum DESC_CONTROL_BITS : u32 {
+    DESC_OWNERSHIP = 0x80000000, // Owned by HW
+    DESC_INTERRUPT = 0x40000000, // Raise the queue interrupt on completion
+  };
+
+  // TX descriptor status bits in DW1, written back by HW on the first descriptor of a frame. Bits 16-19 are, from
+  // the lowest, collision, underrun, timeout and tryout.
+  enum TX_STATUS_BITS : u32 {
+    TX_STS_TRY_COUNT_MASK = 0x000000FF,
+    TX_STS_TIMEOUT = 0x00040000,
+    TX_STS_ERROR_MASK = 0x000F0000,
+  };
+
+  // RX descriptor status (DW0) bits
+  enum RX_STATUS_BITS : u32 {
+    RX_STS_CRC_OK = 0x00010000,
+    RX_STS_ABORT = 0x00800000,
+    RX_STS_DESC_COUNT_SHIFT = 24,
+  };
+
+  // Descriptor buffer size (DW3)
+  enum DESC_SIZE_BITS : u32 {
+    DESC_SIZE_MASK = 0x000007FF,
+    DESC_WRAP = 0x80000000,
+  };
+
+  // PHY vendor IDs (MII register 2, the OUI's upper bits): the only ones the kernel's driver accepts when it sets the
+  // PHY up, anything else is fatal error E75. Kernels 1888 through 6717 know ICS and Broadcom, 9199 adds Micrel and
+  // Atheros, 17489 Marvell (with a Corona-only sequence for southbridge revision 0x90).
+  enum PHY_VENDOR : u16 {
+    PHY_ICS = 0x0015,      // OUI 00:A0:BE
+    PHY_MICREL = 0x0022,   // OUI 00:10:A1
+    PHY_ATHEROS = 0x004D,  // OUI 00:13:74
+    PHY_MARVELL = 0x0141,  // OUI 00:50:43
+    PHY_BROADCOM = 0x0143, // OUI 00:50:EF
+  };
+
+  // PHY_CONTROL (MDIO) bits
+  enum MDIO_BITS : u32 {
+    MDIO_BUSY = 0x00000010,
+    MDIO_WRITE = 0x00000020,
+    MDIO_REG_SHIFT = 11,
+    MDIO_DATA_SHIFT = 16,
+  };
+
+  // Statistics, reported when the device shuts down
+  struct EthernetStats {
+    std::atomic<u64> txPackets{0};
+    std::atomic<u64> rxPackets{0};
+    std::atomic<u64> txErrors{0};
+    std::atomic<u64> rxDropped{0};
+    std::atomic<u64> interrupts{0};
+  };
+
+  // Ethernet
+  class ETHERNET : public PCIDevice {
+  public:
+    // Size of the register file, which BAR0 decodes.
+    static constexpr u32 DevSize = 0x80;
+
+    ETHERNET(const std::string &deviceName, u64 size, PCIBridge *parentPCIBridge, RAM *ram);
+    ~ETHERNET();
+
+    // MMIO interface.
+    void Read(u64 offset, u8 *data, u64 size) override;
+    void Write(u64 offset, const u8 *data, u64 size) override;
+    void PlatformReset() override;
+
+    // A frame from the host network: placed in the RX ring right away, or in the
+    // backlog behind frames already waiting there for free descriptors.
+    void EnqueueRxPacket(const u8 *data, u32 length);
+
+    // Sets current link state.
+    void SetLinkUp(bool up);
+
+    // Full Power On Reset, called on system reboot. Stops DMA and returns the register file to power-on defaults.
+    void SystemReset();
+
+  private:
+    void InitializeNetworkBridge();
+
+    // Register file helpers (little-endian storage).
+    u32 GetReg32(u8 offset) const;
+    void SetReg32(u8 offset, u32 value);
+    u16 GetReg16(u8 offset) const;
+
+    // Side effects of a register write, called with the new register file contents in place.
+    void OnRegisterWrite(u8 offset, u32 oldTxConfig, u32 oldRxConfig);
+
+    // MDIO (PHY) operations.
+    void HandleMdioCommand(u32 command);
+    u16 PhyRead(u8 reg);
+    void PhyWrite(u8 reg, u16 value);
+    void PhyReset();
+    void UpdatePhyLinkBits();
+
+    // Descriptor ring processing.
+    void ProcessTxQueue(int queue);
+    // Places one frame in the RX ring: false when the ring has no free descriptor (or isn't set up yet) and the frame
+    // has to wait. interrupt: its descriptor asked for the RX interrupt.
+    bool DeliverRxFrame(const u8 *frame, u32 length, bool &interrupt);
+    // Moves backlog frames into the ring while it has free descriptors.
+    void DrainRxBacklog();
+    bool AcceptFrame(const u8 *frame, u32 length) const;
+
+    // Hands a transmitted frame to the host network.
+    void HandleTxPacket(const u8 *data, u32 len);
+
+    // Interrupt management.
+    void SetInterruptStatus(u32 bits);
+    void UpdateInterruptLine();
+
+    // Worker thread.
+    void WorkerLoop();
+    void KickWorker();
+
+    // Soft reset (CONFIG0 bit 15).
+    void Reset();
+
+    // RAM helpers.
+    bool ReadDescriptor(u32 address, EmacDescriptor &desc);
+
+    // The level sensitive interrupt line to the bridge.
+    Xe::PCI::InterruptLine interruptLine;
+    // Bus-master access to guest RAM for descriptor and buffer access.
+    Xe::PCI::DmaEngine dma;
+
+    // MMIO register file, little-endian byte image of the device registers.
+    std::array<u8, DevSize> regFile{};
+    // TX ring bases per queue (0x04 is banked by TX_CONFIG bit 16).
+    u32 txDescBase[2] = {};
+
+    // MII/MDIO PHY registers (32 registers)
+    u16 phyRegs[32] = {};
+    u16 phyId1 = PHY_BROADCOM;
+    u16 phyId2 = 0;
+    // Atheros debug port: register 0x1D selects, 0x1E reads/writes the selected debug register.
+    std::array<u16, 0x40> phyDebugRegs{};
+
+    // Protects registers, ring state and the interrupt line.
+    std::mutex stateMutex;
+
+    // Interrupt state.
+    u32 intStatus = 0; // INT_STATUS, clear on read
+
+    // Ring state (internal DMA pointers, reset to the ring base when the engine is disabled).
+    u32 txHead[2] = {};
+    u32 rxHead = 0;
+
+    std::atomic<bool> linkUp{true};
+
+    // RX backlog: frames that found no free descriptor, oldest first, in preallocated slots.
+    // rxBacklogged mirrors a non-empty backlog for the worker, which retries it.
+    static constexpr u32 kRxBacklogFrames = 256;
+    struct BacklogFrame {
+      std::array<u8, ETH_MAX_FRAME_SIZE> data;
+      u32 length;
     };
+    std::unique_ptr<BacklogFrame[]> rxBacklog;
+    u32 rxBacklogHead = 0;
+    u32 rxBacklogCount = 0;
+    std::atomic<bool> rxBacklogged{false};
 
-    // TX Descriptor Ownership (DW1) flags
-    enum TX_OWN_BITS : u32 {
-      TX_OWN_HW = 0x80000000,          // Bit 31: HW owns descriptor
-      TX_OWN_CTRL_NORMAL = 0x40200000, // SOP + EOP + CRC insert (normal frame)
-      TX_OWN_CTRL_VLAN = 0x40300000,   // SOP + EOP + CRC + VLAN tagged
-    };
+    // Current Statistics counters.
+    EthernetStats stats;
 
-    // RX Descriptor Ownership (DW1)
-    enum RX_OWN_BITS : u32 {
-      RX_OWN_HW = 0x80000000,   // Bit 31: HW owns (ready for receive)
-      RX_OWN_INIT = 0x000000C0, // Initial ownership value
-    };
+    // Worker thread: retries the RX backlog (descriptors a polled guest returns without a register write).
+    Xe::PCI::Worker workerThread;
+    std::atomic<bool> workerRunning{false};
+    std::atomic<bool> workPending{false};
+    std::condition_variable workerCV;
+    std::mutex workerMutex;
+  };
 
-    // Descriptor Size/Flags (DW3)
-    enum DESC_SIZE_BITS : u32 {
-      DESC_SIZE_MASK = 0x000007FF, // [10:0] buffer size
-      DESC_WRAP = 0x80000000,      // Bit 31: wrap to first descriptor
-    };
-
-// SOFT_RESET register values (0x7FEA1428)
-#define SOFT_RESET_ASSERT  0x01805504u // Assert reset
-#define SOFT_RESET_RELEASE 0x01005504u // Release reset
-#define SOFT_RESET_BIT     0x00800000u // The bit that differs between assert/release
-
-    // PHY vendor IDs (MII register 2)
-    enum PHY_VENDOR : u16 {
-      PHY_ICS = 0x0015,      // ICS (Xenon/Zephyr boards)
-      PHY_MICREL = 0x0022,   // Micrel
-      PHY_ATHEROS = 0x004D,  // Atheros AR8035 (Slim/E models)
-      PHY_MARVELL = 0x0141,  // Marvell 88E1116 (Jasper)
-      PHY_BROADCOM = 0x0143, // Broadcom (Xenon)
-    };
-
-    // Packet buffer for pending TX/RX
-    struct EthernetPacket {
-      std::vector<u8> data;
-      u32 length = 0;
-    };
-
-    // Statistics
-    struct EthernetStats {
-      std::atomic<u64> txPackets{0};
-      std::atomic<u64> rxPackets{0};
-      std::atomic<u64> txBytes{0};
-      std::atomic<u64> rxBytes{0};
-      std::atomic<u64> txErrors{0};
-      std::atomic<u64> rxErrors{0};
-      std::atomic<u64> txDropped{0};
-      std::atomic<u64> rxDropped{0};
-    };
-
-    // Ethernet
-    class ETHERNET : public PCIDevice {
-    public:
-      ETHERNET(const std::string& deviceName, u64 size, PCIBridge* parentPCIBridge, RAM* ram);
-      ~ETHERNET();
-
-      // MMIO interface.
-      void Read(u64 readAddress, u8* data, u64 size) override;
-      void Write(u64 writeAddress, const u8* data, u64 size) override;
-      void MemSet(u64 writeAddress, s32 data, u64 size) override;
-      void ConfigRead(u64 readAddress, u8* data, u64 size) override;
-      void ConfigWrite(u64 writeAddress, const u8* data, u64 size) override;
-
-      // External interface for network bridge.
-      void EnqueueRxPacket(const u8* data, u32 length);
-      bool DequeueRxPacket(EthernetPacket& packet);
-
-      // Returns a reference to the current statistics.
-      const EthernetStats& GetStats() const { return stats; }
-
-      // Returns true if the link is up.
-      bool IsLinkUp() const { return linkUp; }
-      // Sets current link state.
-      void SetLinkUp(bool up);
-
-      // Full Power On Reset, called on system reboot. Unlike the guest-initiated soft reset (REG_SOFT_RESET), this also
-      // returns the register file to power-on defaults. NOTE: A reboot must stop DMA, or the stale RX ring base from
-      // the previous  kernel keeps scribbling status writes over the new kernel's freshly reset RAM.
-      void SystemReset();
-
-    private:
-      // Initializes the network bridge.
-      void InitializeNetworkBridge();
-
-      // MDIO (PHY) operations.
-      void HandleMdioRead();
-      void HandleMdioWrite(u32 val);
-
-      // Descriptor ring processing.
-      void ProcessTxRing(int queueIndex);
-      void ProcessRxDescriptors();
-
-      // Packet handling.
-      void HandleTxPacket(const u8* data, u32 len);
-
-      // Interrupt management.
-      void SetInterruptStatus(u32 bits);
-      void FireInterrupt();
-
-      // Worker thread.
-      void WorkerThreadLoop();
-
-      // Hardware reset.
-      void Reset();
-
-      // PCI bridge for interrupt routing.
-      PCIBridge* parentBus = nullptr;
-      // RAM Pointer for descriptor and buffer access.
-      RAM* ramPtr = nullptr;
-
-      // MMIO register file.
-      struct {
-        u32 txConfig = 0;              // 0x00
-        u32 txDescBase[2] = {};        // 0x04 (per-ring, selected by ring_sel)
-        u32 txDescStatus = 0;          // 0x0C
-        u32 rxConfig = 0;              // 0x10
-        u32 rxDescBase = 0;            // 0x14
-        u32 rxDescStatus = 0;          // 0x1C
-        std::atomic<u32> isrStatus{0}; // 0x20
-        u32 intEnable = 0;             // 0x24
-        u32 softReset = 0;             // 0x28
-        u32 power = 0;                 // 0x30
-        u32 macConfig = 0;             // 0x40
-        u32 miiCmd = 0;                // 0x44
-        u32 miiConfig = 0;             // 0x48
-        u32 macSpeed = 0;              // 0x50
-        u32 flowCtrl = 0;              // 0x54
-        u32 rxFilter = 0;              // 0x60
-        u8 macAddr0[6] = {0x00, 0x1D, 0xD8, 0xB7, 0x1C, 0x00};
-        u32 txDescQ0 = 0;    // 0x68
-        u32 txDescQ1 = 0;    // 0x6C
-        u32 rxMaxFrame = 0;  // 0x78
-        u8 macAddr1[6] = {}; // 0x7A
-      } regs;
-
-      // MII/MDIO PHY registers (32 registers)
-      u16 phyRegs[32] = {};
-
-      // Mutex for protecting shared state.
-      std::mutex stateMutex;
-
-      // DMA state
-      std::atomic<bool> rxActive{false};
-      std::atomic<bool> txQ0Active{false};
-      std::atomic<bool> txQ1Active{false};
-      std::atomic<bool> linkUp{true};
-
-      // Interrupt state.
-      std::atomic<bool> interruptsEnabled{false};
-      u32 isrAckedBits = 0; // Bits the ISR has read (cleared on INT_ENABLE re-enable)
-
-      // Descriptor ring indices.
-      u32 txHead[2] = {};
-      u32 rxHead = 0;
-
-      // Pending RX packets.
-      std::queue<EthernetPacket> pendingRxPackets;
-      std::mutex rxQueueMutex;
-      std::atomic<bool> hasRxPending{false};
-
-      // Current Statistics counters.
-      EthernetStats stats;
-
-      // Worker thread for processing TX/RX descriptors.
-      std::thread workerThread;
-      // Flag to indicate if the worker thread is running.
-      std::atomic<bool> workerRunning{false};
-      // Condition variable and mutex for worker thread synchronization.
-      std::condition_variable workerCV;
-      std::mutex workerMutex;
-    };
-
-  } // namespace PCIDev
-} // namespace Xe
+} // namespace Xe::PCIDev
